@@ -162,7 +162,7 @@ jobs:
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Android CI aggregate gate
-        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_verify_compose_backport_control.py
+        run: python3 -m unittest scripts/test_android_ci_gate.py
 
       - name: Check committed screenshot golden owners
         run: |
@@ -280,7 +280,6 @@ jobs:
       - name: Compile (Kotlin)
         if: matrix.phase == 'tooling'
         run: |
-          ./gradlew -p buildSrc test --build-cache --profile --no-daemon --stacktrace
           ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
       - name: ktlint and detekt
@@ -330,24 +329,6 @@ jobs:
           compression-level: 0
           if-no-files-found: error
           retention-days: 7
-
-      - name: Verify unpatched Compose regression control
-        if: matrix.phase == 'baseline' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')
-        env:
-          BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
-        run: python3 scripts/verify_compose_backport_control.py --base "$BASE_SHA" --head "$HEAD_SHA"
-
-      - name: Upload Compose backport verification
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: compose-backport-verification-${{ matrix.phase }}
-          path: |
-            build/reports/compose-backport-control/
-            buildSrc/build/test-results/
-          if-no-files-found: ignore
-          retention-days: 14
 
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
@@ -643,9 +624,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: compose-backport-regressions-${{ matrix.flavor }}
+          name: compose-rectlist-regressions-${{ matrix.flavor }}
           path: |
-            app/build/test-results/testDev${{ matrix.flavor }}DebugUnitTest/TEST-dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportTest.xml
+            app/build/test-results/testDev${{ matrix.flavor }}DebugUnitTest/TEST-dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListRegressionTest.xml
             app/build/test-results/testDev${{ matrix.flavor }}DebugUnitTest/TEST-dev.ipf.whitenoise.android.ui.conversation.messages.BubbleFooterRectListReuseTest.xml
           if-no-files-found: ignore
           retention-days: 14

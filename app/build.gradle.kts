@@ -282,7 +282,9 @@ val buildShortSha =
 android {
     namespace = "dev.ipf.whitenoise.android"
     compileSdk {
-        version = release(37)
+        version = release(37) {
+            minorApiLevel = 1
+        }
     }
 
     defaultConfig {
@@ -1067,6 +1069,14 @@ dependencies {
     val bouncyCastleVersion = providers.gradleProperty("bouncycastle.version").get()
 
     constraints {
+        // The beta BOM also advances Material3. Preserve the accepted component tokens
+        // while adopting the Compose runtime/UI fix, including redirected Android modules.
+        listOf("material3", "material3-android", "material3-ripple", "material3-ripple-android").forEach { module ->
+            implementation("androidx.compose.material3:$module") {
+                version { strictly(libs.versions.material3.get()) }
+                because("preserve the accepted Material3 component and screenshot baseline pin")
+            }
+        }
         testImplementation("org.bouncycastle:bcprov-jdk18on:$bouncyCastleVersion") {
             because("Bouncy Castle 1.86 includes the 1.85 and 1.86 security fixes")
         }
