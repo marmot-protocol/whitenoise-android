@@ -337,6 +337,22 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "surface": "Viewer group-picture crop, permission and native commit ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "admitViewerGroupImageMutation(",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.toast_group_updated",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_updated",
+        "test_ids": [
+          "GRP-003"
+        ]
       }
     ]
   },

@@ -1,0 +1,177 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+  "legacy_sha256": "514325f65b61056cf3154964e45e964b5ab6296ef9a4ac0ee63b9ff7a2e15ec8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Media viewer save action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_save",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "ConversationMediaViewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "fun ConversationMediaViewer(",
+        "test_ids": [
+          "MED-007",
+          "MED-015",
+          "MED-016",
+          "MED-017"
+        ]
+      },
+      {
+        "surface": "FullScreenMediaViewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "fun FullScreenMediaViewer(",
+        "test_ids": [
+          "MED-001",
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "MediaViewerFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "fun MediaViewerFrame(",
+        "test_ids": [
+          "MED-001",
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "StableMediaViewerPager",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "fun StableMediaViewerPager(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "ViewerPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "fun ViewerPage(",
+        "test_ids": [
+          "MED-001",
+          "MED-015"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.media_viewer_forward_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_viewer_forward_message",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.media_viewer_metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_viewer_metadata",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.more_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.more_options",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.share",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.shared_content_go_to_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.shared_content_go_to_message",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "Viewer group-picture crop, permission and native commit ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "onSetGroupPicture =",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.group_photo_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.group_photo_error",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.group_preparing_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.group_preparing_photo",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.media_set_group_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.media_set_group_picture",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+        "anchor": "R.string.toast_couldnt_update_group",
+        "test_ids": [
+          "GRP-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

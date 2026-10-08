@@ -2287,4 +2287,5 @@
     <string name="pinned_shortcut_finish">Bu sohbeti eklemek için başlatıcınızda onaylayın.</string>
     <string name="pinned_shortcut_unavailable">Bu sohbet artık kullanılamıyor.</string>
     <string name="pinned_shortcut_failed">Ana ekran kısayolu istenemedi. Tekrar deneyin.</string>
+    <string name="media_set_group_picture">Grup fotoğrafı olarak ayarla</string>
 </resources>

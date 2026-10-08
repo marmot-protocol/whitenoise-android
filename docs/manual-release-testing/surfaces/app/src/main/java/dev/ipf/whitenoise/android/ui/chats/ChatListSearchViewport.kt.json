@@ -1,0 +1,19 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSearchViewport.kt",
+  "legacy_sha256": "8a77be08ca7e25e4401dd5a9d657635c0b50f1956ed03bc7c2a894918dbdbd0b",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListSearchTopResetEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSearchViewport.kt",
+        "anchor": "fun ChatListSearchTopResetEffect(",
+        "test_ids": [
+          "FIND-001",
+          "FIND-012",
+          "FIND-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

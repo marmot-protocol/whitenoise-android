@@ -121,6 +121,7 @@ internal fun ChatListRow(
     bodyMatch: MessageBodyMatch? = null,
     menuHighlighted: Boolean = false,
     onActionsHeldChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     ChatRow(
         item = item,
@@ -151,6 +152,7 @@ internal fun ChatListRow(
         bodyMatch = bodyMatch,
         isMuted = isMuted,
         interactionsEnabled = interactionsEnabled,
+        modifier = modifier,
     )
 }
 
@@ -197,6 +199,7 @@ internal fun ChatRow(
     bodyMatch: MessageBodyMatch? = null,
     menuHighlighted: Boolean = false,
     onActionsHeldChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val selectedPreview =
         appState.chatRowSelectedPreviewFor(
@@ -284,7 +287,12 @@ internal fun ChatRow(
     val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || deliveryIndicator != null
     val actionColors = accountActionColors(appState)
     ChatRowLayout(
-        modifier = rowModifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("chat.row.${item.id}"),
+        modifier =
+            modifier
+                .then(rowModifier)
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .testTag("chat.row.${item.id}"),
         onClick = onClick,
         interactionsEnabled = interactionsEnabled,
         consumeSelectionLongPress = selectionMode && !rangeDragActive,

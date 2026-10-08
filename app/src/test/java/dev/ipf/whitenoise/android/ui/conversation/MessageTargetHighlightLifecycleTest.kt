@@ -17,6 +17,26 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class MessageTargetHighlightLifecycleTest {
     @Test
+    fun dragDuringGlobalTargetLoadPreventsLateScrollAndHighlight() =
+        runTest {
+            val navigation = MessageTargetNavigationOwner()
+            val loaded = CompletableDeferred<Unit>()
+            val request = navigation.begin()
+            val completions = mutableListOf<String>()
+            val job =
+                launch {
+                    loaded.await()
+                    if (!request.isCurrent()) return@launch
+                    completions += "global-target"
+                }
+            runCurrent()
+            navigation.cancel()
+            loaded.complete(Unit)
+            job.join()
+            assertTrue(completions.isEmpty())
+        }
+
+    @Test
     fun replyLoadSupersededBySearchCannotCenterTheStaleReply() =
         runTest {
             val navigation = MessageTargetNavigationOwner()

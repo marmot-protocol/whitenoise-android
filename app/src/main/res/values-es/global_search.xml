@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_filter_unavailable">Fuera del ámbito actual</string>
+    <string name="search_filter_members_pending">Algunas opciones aún no están disponibles. Los filtros seleccionados siguen activos hasta que los elimines.</string>
+</resources>

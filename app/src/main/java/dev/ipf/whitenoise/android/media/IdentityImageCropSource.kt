@@ -47,6 +47,10 @@ private suspend fun readSourceOrNull(
         null
     }
 
+/**
+ * Keeps the original encoded pixels and prepares an orientation-aware bounded preview for cropping.
+ * Unreadable or undecodable input returns null; cancellation propagates so a departed picker cannot upload.
+ */
 internal suspend fun loadIdentityImageCropSource(
     contentResolver: ContentResolver,
     uri: Uri,
@@ -60,5 +64,22 @@ internal suspend fun loadIdentityImageCropSource(
         IdentityImageCropSource(bytes = bytes, preview = preview, orientedSize = oriented)
     } else {
         null
+    }
+}
+
+/** Prepares a verified private attachment with the same group SVG and bounded crop policies as the picker. */
+internal suspend fun loadGroupAttachmentCropSource(
+    bytes: ByteArray,
+    mediaType: String,
+): IdentityImageCropSource {
+    if (bytes.size > IDENTITY_IMAGE_SOURCE_MAX_BYTES) throw ImageUploadPreparationException.PreparedImageTooLarge
+    val source = prepareGroupIdentityImageSource(bytes, mediaType)
+    val renderer = PhotoEditorRenderer()
+    val oriented = (renderer.inspect(source) as? PhotoEditorInspectResult.Success)?.source?.orientedSize
+    val preview = oriented?.let { renderer.decodePreview(source) }
+    return if (oriented != null && preview != null) {
+        IdentityImageCropSource(source, preview, oriented)
+    } else {
+        throw ImageUploadPreparationException.UnsupportedImage
     }
 }
