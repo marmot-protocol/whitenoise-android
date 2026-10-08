@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -63,6 +64,7 @@ class ScrollEdgeFadeImeAndroidTest {
     @Test
     fun sheetFormUsesItsOwnKeyboardWindowWithoutMovingTheFooterIntoIme() = exerciseMask(modal = true)
 
+    @OptIn(ExperimentalMaterial3Api::class)
     private fun exerciseMask(modal: Boolean) {
         lateinit var scroll: ScrollState
         var submissions = 0
