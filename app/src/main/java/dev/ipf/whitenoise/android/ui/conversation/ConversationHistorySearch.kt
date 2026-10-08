@@ -133,7 +133,12 @@ private suspend fun scanHistoryForNeedle(
             page.messages
                 .filter {
                     !isRetentionExpiredForSearch(it, nowMillis) &&
-                        ChatListMessageSearch.isEligibleMatch(searchableTimelineRecord(it), ciNeedle, constraints)
+                        ChatListMessageSearch.isEligibleMatch(
+                            searchableTimelineRecord(it),
+                            ciNeedle,
+                            constraints,
+                            bodyScanLimit = Int.MAX_VALUE,
+                        )
                 }.map { it.timelineAt to it.messageIdHex }
         val oldest =
             page.messages

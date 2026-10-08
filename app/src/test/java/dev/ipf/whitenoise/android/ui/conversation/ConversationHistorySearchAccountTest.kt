@@ -117,6 +117,20 @@ class ConversationHistorySearchAccountTest {
             assertEquals(emptyList<ConversationSearchMatch>(), result)
         }
 
+    @Test
+    fun fullHistoryNeedleMatchesBeyondTheHomePreviewTextLimit() =
+        runBlocking {
+            val row = timelineRecord("long", 30uL, "a".repeat(5_000) + " needle")
+            val result =
+                searchConversationHistoryMatches(
+                    appState = testAppState(),
+                    accountRef = PINNED_ACCOUNT,
+                    groupIdHex = group.groupIdHex,
+                    query = "needle",
+                ) { _, _ -> TimelinePageFfi(listOf(row), false, false) }
+            assertEquals(listOf(ConversationSearchMatch("long", 30uL)), result)
+        }
+
     /** Builds an app state whose active account differs from the pinned conversation account. */
     private fun testAppState() =
         conversationTimelineTestAppState(

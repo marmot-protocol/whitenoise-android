@@ -65,6 +65,13 @@ class ChatListMessageSearchTest {
     }
 
     @Test
+    fun conversationMatchingCanKeepTheCompleteBodyWithSharedNormalization() {
+        val body = "a".repeat(5_000) + " marmot\n   friends"
+        assertTrue(ChatListMessageSearch.bodyMatches(body, "marmot friends", scanLimit = Int.MAX_VALUE))
+        assertFalse(ChatListMessageSearch.bodyMatches(body, "marmot friends"))
+    }
+
+    @Test
     fun blankNeedleNeverMatches() {
         assertFalse(ChatListMessageSearch.bodyMatches("anything", ""))
         assertFalse(ChatListMessageSearch.bodyMatches("anything", " \n\t "))

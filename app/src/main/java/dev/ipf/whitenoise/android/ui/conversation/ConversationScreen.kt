@@ -1768,9 +1768,10 @@ internal fun ConversationScreen(
         }
 
     fun updateConversationSearch(transform: (GlobalSearchState) -> GlobalSearchState) {
-        val updated = transform(presentationState.searchState.value.copy(isOpen = navigationState.searchOpen))
-        if (updated == conversationSearchState) return
-        if (updated.copy(openFilterCategory = null) != conversationSearchState.copy(openFilterCategory = null)) {
+        val current = presentationState.searchState.value.copy(isOpen = navigationState.searchOpen)
+        val updated = transform(current)
+        if (updated == current) return
+        if (updated.copy(openFilterCategory = null) != current.copy(openFilterCategory = null)) {
             navigationState.cancelJobs()
             navigationState.searchPinnedMatchId = null
         }
@@ -2620,6 +2621,7 @@ internal fun ConversationScreen(
                                 record,
                                 MessageSearch.normalize(navigationState.searchQuery),
                                 searchConstraints,
+                                bodyScanLimit = Int.MAX_VALUE,
                             )
                         ) {
                             ConversationSearchMatch(
