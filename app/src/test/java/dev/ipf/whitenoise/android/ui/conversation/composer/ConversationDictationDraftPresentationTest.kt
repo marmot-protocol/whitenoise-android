@@ -168,12 +168,15 @@ class ConversationDictationDraftPresentationTest {
             val f = Fixture()
             composeRule.setContent { f.RenderComposer() }
             composeRule.runOnIdle { f.retainTail() }
-            composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text))
-                .assertIsDisplayed().performClick()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.dictate_text))
+                .assertIsDisplayed()
+                .performClick()
             composeRule.onNodeWithTag("dictation-recovery-panel").assertIsDisplayed()
             composeRule.onNodeWithText(context.getString(R.string.dictation_keep_later)).performClick()
             composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).assertIsDisplayed()
-            composeRule.onNodeWithTag("dictation-composer")
+            composeRule
+                .onNodeWithTag("dictation-composer")
                 .captureRoboImage("src/test/snapshots/dictation_retained_compact_composer.png")
             composeRule.onNode(hasSetTextAction()).performTextReplacement("Edited message")
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
@@ -197,8 +200,11 @@ class ConversationDictationDraftPresentationTest {
         composeRule.setContent { f.RenderComposer() }
         composeRule.onNode(hasSetTextAction()).performClick()
         val expand =
-            composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
-                .fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single()
         assertEquals(context.getString(R.string.composer_expand_full_screen), expand.label)
         composeRule.runOnIdle { assertTrue(expand.action()) }
         composeRule.runOnIdle {
@@ -212,15 +218,21 @@ class ConversationDictationDraftPresentationTest {
             f.controller.onAppForegrounded()
         }
         val expandedActions =
-            composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
-                .fetchSemanticsNode().config[SemanticsActions.CustomActions]
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
         assertEquals(context.getString(R.string.composer_collapse), expandedActions.single().label)
-        composeRule.onNodeWithTag("dictation-composer")
+        composeRule
+            .onNodeWithTag("dictation-composer")
             .captureRoboImage("src/test/snapshots/dictation_retained_expanded_composer.png")
-        composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text))
-            .assertIsDisplayed().performClick()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.dictate_text))
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithText(context.getString(R.string.dictation_retry_remaining)).performClick()
-        composeRule.onNodeWithTag("dictation-recovery-status")
+        composeRule
+            .onNodeWithTag("dictation-recovery-status")
             .assertTextEquals(context.getString(R.string.dictation_processing))
         composeRule.onNodeWithText(context.getString(R.string.dictation_keep_later)).performClick()
         composeRule.onNode(hasSetTextAction()).performTextReplacement("New edit")

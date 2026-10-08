@@ -60,7 +60,8 @@ class ConversationDictationRecoveryScreenshotTest {
     @Test
     fun optionalRetryProgressCanBeInspectedWithoutStartingAnotherCapture() {
         render(ConversationDictationComposerPhase.Transcribing, theme = "dark")
-        composeRule.onNode(hasText("Transcribing…") and hasAnyAncestor(hasTestTag("dictation-recovery-panel")))
+        composeRule
+            .onNode(hasText("Transcribing…") and hasAnyAncestor(hasTestTag("dictation-recovery-panel")))
             .assertIsDisplayed()
         composeRule.onNodeWithText("Retry remaining audio").assertDoesNotExist()
         capture("dictation_remaining_audio_progress_dark")

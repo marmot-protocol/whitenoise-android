@@ -56,7 +56,13 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
             context.getString(R.string.dictation_recovery_expired_text),
             notice.extras.getString(Notification.EXTRA_TEXT),
         )
-        assertFalse(notice.extras.getString(Notification.EXTRA_TEXT).orEmpty().contains("cleared"))
+        assertFalse(
+            notice
+                .extras
+                .getString(Notification.EXTRA_TEXT)
+                .orEmpty()
+                .contains("cleared"),
+        )
         assertTrue(notice.contentIntent != null)
     }
 
