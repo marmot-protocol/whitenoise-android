@@ -47,7 +47,8 @@ name: profile-edit-warm-resume-discard
 - assertVisible:
     id: profile.name_field
     text: ^Maestro unsaved name$
-- back
+# Use the actual editor action; foreground restoration may reopen its focused IME.
+- tapOn: Back
 - assertVisible:
     id: profile.edit
 - scrollUntilVisible:

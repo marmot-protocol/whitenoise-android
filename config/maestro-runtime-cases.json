@@ -2205,7 +2205,7 @@
         "PRO-001",
         "NAV-010"
       ],
-      "assertions": "Exact unsaved profile name survives warm-resume inside the original host; Back discards it and read-mode plus complete native profile comparison prove all three accounts unchanged. No Activity recreation/process-death claim.",
+      "assertions": "The exact unsaved Name survives Home and foreground return without stopping the fixture. The real toolbar Back discards it, restores the original Alice value and Edit action, and native proof requires complete owning/public profile metadata plus all other accounts unchanged. A system Back consumed by a restored IME does not qualify editor discard; no process-death or every-IME claim.",
       "postcondition": "public-profile-unchanged"
     },
     "smart-folders-draft-rotation-discard": {
