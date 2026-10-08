@@ -109,20 +109,30 @@ class TimelineRowTtsHighlightPaintTest {
                 blankLinesBefore = byteArrayOf(),
             )
         val record = untokenizedRecord().copy(plaintext = "Hello nostr:$key", contentTokens = doc)
+
         fun entry(name: String) =
             runBlocking {
                 projectTtsSpeakableEntry(record, null, SENDER_NAME, { doc }, { name })!!
             }
+
         renderProductionRow(record)
         check(appState.ttsController.speak(listOf(entry("Frozen Alice")), Locale.US))
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Hello @Frozen Alice").fetchSemanticsNode()
-        val first = requireNotNull(appState.ttsController.state.value.conversationFollowTargetOrNull())
+        val first =
+            requireNotNull(
+                appState.ttsController.state.value
+                    .conversationFollowTargetOrNull(),
+            )
         assertTrue(sentenceLayouts.completeSentenceBounds(first) != null)
         check(appState.ttsController.speak(listOf(entry("Changed Alice")), Locale.US))
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Hello @Changed Alice").fetchSemanticsNode()
-        val target = requireNotNull(appState.ttsController.state.value.conversationFollowTargetOrNull())
+        val target =
+            requireNotNull(
+                appState.ttsController.state.value
+                    .conversationFollowTargetOrNull(),
+            )
         assertTrue(sentenceLayouts.completeSentenceBounds(target) != null)
     }
 
@@ -132,18 +142,26 @@ class TimelineRowTtsHighlightPaintTest {
         val record = untokenizedRecord().copy(plaintext = body)
         val entry =
             runBlocking {
-                projectTtsSpeakableEntry(record, null, SENDER_NAME, { emptyDocument() })!!
+                projectTtsSpeakableEntry(record, null, SENDER_NAME, { emptyPaintDocument() })!!
             }
         renderProductionRow(record)
         check(appState.ttsController.speak(listOf(entry), Locale.US))
         composeRule.waitUntil(5_000) {
-            val target = appState.ttsController.state.value.conversationFollowTargetOrNull()
+            val target =
+                appState.ttsController.state.value
+                    .conversationFollowTargetOrNull()
             target != null && sentenceLayouts.completeSentenceBounds(target) != null
         }
-        val first = requireNotNull(appState.ttsController.state.value.conversationFollowTargetOrNull())
+        val first =
+            requireNotNull(
+                appState.ttsController.state.value
+                    .conversationFollowTargetOrNull(),
+            )
         composeRule.runOnIdle { appState.ttsController.seekToSentence(entry.messageIdHex, 1, entry.projectionId) }
         composeRule.waitUntil(5_000) {
-            val target = appState.ttsController.state.value.conversationFollowTargetOrNull()
+            val target =
+                appState.ttsController.state.value
+                    .conversationFollowTargetOrNull()
             target?.sentenceIndex == 1 && sentenceLayouts.completeSentenceBounds(target) != null
         }
         assertEquals(null, sentenceLayouts.completeSentenceBounds(first))
@@ -158,7 +176,7 @@ class TimelineRowTtsHighlightPaintTest {
                     message = record,
                     editedText = null,
                     senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { plainTextDocument(BODY) },
+                    parseMarkdown = { plainPaintDocument(BODY) },
                 )!!
             }
 
@@ -246,7 +264,7 @@ class TimelineRowTtsHighlightPaintTest {
                     message = record,
                     editedText = null,
                     senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { plainTextDocument(body) },
+                    parseMarkdown = { plainPaintDocument(body) },
                 )!!
             }
 
@@ -335,7 +353,7 @@ class TimelineRowTtsHighlightPaintTest {
                     message = record,
                     editedText = null,
                     senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { plainTextDocument(BODY) },
+                    parseMarkdown = { plainPaintDocument(BODY) },
                 )!!
             }
         renderProductionRow(record)
@@ -547,7 +565,7 @@ class TimelineRowTtsHighlightPaintTest {
             groupIdHex = GROUP_ID,
             sender = SENDER_ID,
             plaintext = BODY,
-            contentTokens = emptyDocument(),
+            contentTokens = emptyPaintDocument(),
             kind = 9uL,
             tags = emptyList(),
             sourceEpoch = null,
@@ -555,13 +573,6 @@ class TimelineRowTtsHighlightPaintTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
-        )
-
-    private fun emptyDocument() =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blankLinesBefore = byteArrayOf(),
-            blocks = emptyList(),
         )
 
     /**
@@ -610,33 +621,7 @@ class TimelineRowTtsHighlightPaintTest {
     private fun speakableRecord(
         messageIdHex: String,
         plaintext: String,
-    ) = AppMessageRecordFfi(
-        messageIdHex = messageIdHex,
-        direction = "received",
-        groupIdHex = GROUP_ID,
-        sender = SENDER_ID,
-        plaintext = plaintext,
-        contentTokens = plainTextDocument(plaintext),
-        kind = 9uL,
-        tags = emptyList(),
-        sourceEpoch = null,
-        retentionSeconds = null,
-        retentionExpiresAt = null,
-        recordedAt = 1uL,
-        receivedAt = 1uL,
-    )
-
-    private fun plainTextDocument(text: String) =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blankLinesBefore = byteArrayOf(),
-            blocks =
-                listOf(
-                    MarkdownBlockFfi.Paragraph(
-                        inlines = listOf(MarkdownInlineFfi.Text(text)),
-                    ),
-                ),
-        )
+    ) = speakablePaintRecord(messageIdHex, plaintext, GROUP_ID, SENDER_ID)
 
     private fun appState() =
         WhiteNoiseAppState(

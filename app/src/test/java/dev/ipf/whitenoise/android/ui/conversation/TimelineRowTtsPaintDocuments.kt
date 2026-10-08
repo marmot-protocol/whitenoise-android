@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -68,3 +69,43 @@ internal fun richPaintDocument() =
             ),
     )
 
+/** Keeps tokenized and untokenized production-row fixtures on the same document shapes. */
+internal fun emptyPaintDocument() =
+    MarkdownDocumentFfi(
+        truncated = false,
+        blankLinesBefore = byteArrayOf(),
+        blocks = emptyList(),
+    )
+
+internal fun plainPaintDocument(text: String) =
+    MarkdownDocumentFfi(
+        truncated = false,
+        blankLinesBefore = byteArrayOf(),
+        blocks =
+            listOf(
+                MarkdownBlockFfi.Paragraph(
+                    inlines = listOf(MarkdownInlineFfi.Text(text)),
+                ),
+            ),
+    )
+
+internal fun speakablePaintRecord(
+    messageIdHex: String,
+    plaintext: String,
+    groupIdHex: String,
+    sender: String,
+) = AppMessageRecordFfi(
+    messageIdHex = messageIdHex,
+    direction = "received",
+    groupIdHex = groupIdHex,
+    sender = sender,
+    plaintext = plaintext,
+    contentTokens = plainPaintDocument(plaintext),
+    kind = 9uL,
+    tags = emptyList(),
+    sourceEpoch = null,
+    retentionSeconds = null,
+    retentionExpiresAt = null,
+    recordedAt = 1uL,
+    receivedAt = 1uL,
+)

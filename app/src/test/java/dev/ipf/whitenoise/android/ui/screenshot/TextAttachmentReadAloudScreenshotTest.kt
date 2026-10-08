@@ -190,12 +190,14 @@ class TextAttachmentReadAloudScreenshotTest {
         val entry = textAttachmentTtsEntry(preview, "alice", "Alice", "message", 0)
         val session = harness.controller.state.value.sessionId
         val scrolling = hasScrollAction() and hasAnyDescendant(hasTestTag(TEXT_ATTACHMENT_READER_BODY_TAG))
+
         fun scrollOffset() =
             composeRule
                 .onNode(scrolling)
                 .fetchSemanticsNode()
                 .config[SemanticsProperties.VerticalScrollAxisRange]
                 .value()
+
         for (sentence in listOf(30, 45)) {
             val previous = scrollOffset()
             composeRule.runOnIdle {
@@ -205,7 +207,11 @@ class TextAttachmentReadAloudScreenshotTest {
             composeRule.waitForIdle()
             composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertDoesNotExist()
             assertEquals(session, harness.controller.state.value.sessionId)
-            assertEquals(sentence, harness.controller.state.value.passage?.sentenceIndex)
+            assertEquals(
+                sentence,
+                harness.controller.state.value.passage
+                    ?.sentenceIndex,
+            )
         }
     }
 

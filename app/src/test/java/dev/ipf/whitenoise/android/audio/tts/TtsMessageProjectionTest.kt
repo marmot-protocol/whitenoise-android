@@ -30,7 +30,9 @@ class TtsMessageProjectionTest {
             val record = message("Hello nostr:$key", contentTokens = doc)
             var name = "Alice"
             var member = true
+
             suspend fun entry() = namedEntry(record, name, member)
+
             val original = entry()
             val controller = TtsController(audioFocus = FakeSessionFocus(), maxChunkLength = 4_000)
             controller.attachEngine(FakeSessionEngine())
