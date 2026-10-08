@@ -356,6 +356,7 @@ fixture_delivery_state() {
 }
 
 # Other users retain their data but must not bootstrap with fixture configuration.
+# Keep adb shell from consuming the profile list on its inherited standard input.
 protect_other_users() {
   local user action
   original_protected_users="$(fixture_delivery_state --protected-users)" || return 1
@@ -365,7 +366,7 @@ protect_other_users() {
     [[ "$user" =~ ^[0-9]+$ && "$user" != "$benchmark_user" ]] || return 1
     case "$action" in
       default-state | enable)
-        adb_cmd shell pm disable-user --user "$user" "$target_package" >/dev/null || return 1
+        adb_cmd shell pm disable-user --user "$user" "$target_package" </dev/null >/dev/null || return 1
         ;;
       disable | disable-user | disable-until-used) ;;
       *) return 1 ;;
@@ -391,7 +392,7 @@ restore_other_users() {
   while IFS=$'\t' read -r user action; do
     [[ "$user" =~ ^[0-9]+$ && "$user" != "$benchmark_user" ]] || return 1
     case "$action" in default-state | enable | disable | disable-user | disable-until-used) ;; *) return 1 ;; esac
-    adb_cmd shell pm "$action" --user "$user" "$target_package" >/dev/null || return 1
+    adb_cmd shell pm "$action" --user "$user" "$target_package" </dev/null >/dev/null || return 1
   done < <(jq -r '.[] | [.user, .action] | @tsv' <<<"$original_protected_users")
   observed="$(fixture_delivery_state --protected-users)" || return 1
   [[ "$observed" == "$original_protected_users" ]] || {

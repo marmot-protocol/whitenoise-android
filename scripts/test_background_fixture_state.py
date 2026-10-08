@@ -1,5 +1,6 @@
 """Pin restoration against personal-user state, absent permissions and ambiguous overrides."""
 
+import json
 import os
 import re
 import subprocess
@@ -149,6 +150,57 @@ exit 37
                 result = subprocess.run(["bash", "-c", run], cwd=root, env=environment, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 37, result.stderr)
                 self.assertEqual(state.read_text(), original + "\n")
+
+
+class ProtectedUserLoopTest(unittest.TestCase):
+    """Exercise all profiles when an adb-like child consumes its standard input."""
+
+    def test_protection_and_restoration_reach_every_installed_profile(self):
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts/run-performance-benchmarks.sh").read_text()
+        functions = "\n".join(
+            re.search(rf"^{name}\(\) \{{\n.*?^\}}", script, re.M | re.S).group(0)
+            for name in ("protect_other_users", "restore_other_users")
+        )
+        original = [
+            {"user": user, "action": action}
+            for user, action in ((0, "default-state"), (10, "enable"), (12, "disable"),
+                                 (13, "disable-user"), (14, "disable-until-used"))
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "state.json"
+            calls = Path(directory) / "calls"
+            state.write_text(json.dumps(original))
+            environment = dict(os.environ, FIXTURE_APP_STATE=str(state), FIXTURE_CALLS=str(calls),
+                               FIXTURE_OUTPUT=directory)
+            mock = r'''
+set -euo pipefail
+benchmark_user=11
+target_package=dev.ipf.whitenoise.android.dev
+local_output="$FIXTURE_OUTPUT"
+dev_app_apk=preserved-original.apk
+installed_code_hash() { printf '%s\n' original-hash; }
+sha256_file() { printf '%s\n' original-hash; }
+fixture_delivery_state() { jq -c . "$FIXTURE_APP_STATE"; }
+adb_cmd() {
+  [[ "$1 $2 $4 $6" == "shell pm --user $target_package" ]] || return 99
+  printf '%s %s\n' "$5" "$3" >>"$FIXTURE_CALLS"
+  jq -c --argjson user "$5" --arg action "$3" \
+    'map(if .user == $user then .action = $action else . end)' \
+    "$FIXTURE_APP_STATE" >"$FIXTURE_APP_STATE-next"
+  mv "$FIXTURE_APP_STATE-next" "$FIXTURE_APP_STATE"
+  # adb shell can drain the enclosing read loop, even for a noninteractive command.
+  cat >/dev/null
+}
+'''
+            run = mock + "\n" + functions + "\nprotect_other_users\nrestore_other_users\n"
+            result = subprocess.run(["bash", "-c", run], cwd=root, env=environment, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(state.read_text()), original)
+            self.assertEqual(calls.read_text().splitlines(), [
+                "0 disable-user", "10 disable-user", "0 default-state", "10 enable", "12 disable",
+                "13 disable-user", "14 disable-until-used",
+            ])
 
 
 if __name__ == "__main__":
