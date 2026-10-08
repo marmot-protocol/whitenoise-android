@@ -77,7 +77,7 @@ internal fun MessageBubbleFrame(
         )
 
     Surface(
-        modifier = modifier.then(highlightModifier).then(mentionModifier),
+        modifier = modifier.then(highlightModifier).then(mentionModifier).then(messageTargetAccessibility(highlighted)),
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = shape,
@@ -140,7 +140,7 @@ internal fun MediaCaptionFrame(
             integratedWithBorder = amoled,
         )
     Surface(
-        modifier = modifier.then(highlightModifier).then(mentionModifier),
+        modifier = modifier.then(highlightModifier).then(mentionModifier).then(messageTargetAccessibility(highlighted)),
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = shape,

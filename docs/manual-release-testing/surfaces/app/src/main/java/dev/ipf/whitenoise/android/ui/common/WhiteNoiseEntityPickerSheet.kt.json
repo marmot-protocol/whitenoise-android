@@ -1,0 +1,93 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+  "legacy_sha256": "ccedc118b33083978d4a44f45b2ec97ba29a8f66bc2505c1e41be7e4a5264931",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: WhiteNoiseEntityPickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "PickerRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "fun PickerRow(",
+        "test_ids": [
+          "FIND-008",
+          "SET-009",
+          "FLD-001",
+          "FLD-002"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseCompactSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "fun WhiteNoiseCompactSearchField(",
+        "test_ids": [
+          "FIND-001",
+          "FIND-004",
+          "FLD-001",
+          "FLD-002",
+          "SET-009"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseEntityPickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "fun WhiteNoiseEntityPickerSheet(",
+        "test_ids": [
+          "FIND-008",
+          "SET-009",
+          "FLD-001",
+          "FLD-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:clear_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "R.string.clear_search",
+        "test_ids": [
+          "SET-009",
+          "FLD-001",
+          "FLD-002"
+        ]
+      },
+      {
+        "surface": "string:done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "SET-009",
+          "FLD-001",
+          "FLD-002"
+        ]
+      },
+      {
+        "surface": "string:folder_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "R.string.folder_search",
+        "test_ids": [
+          "SET-009",
+          "FLD-001",
+          "FLD-002"
+        ]
+      },
+      {
+        "surface": "string:no_results",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "R.string.no_results",
+        "test_ids": [
+          "SET-009",
+          "FLD-001",
+          "FLD-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

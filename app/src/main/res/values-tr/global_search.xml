@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_filter_unavailable">Geçerli kapsam dışında</string>
+    <string name="search_filter_members_pending">Bazı seçenekler henüz kullanılamıyor. Seçilen filtreler siz kaldırana kadar etkin kalır.</string>
+</resources>

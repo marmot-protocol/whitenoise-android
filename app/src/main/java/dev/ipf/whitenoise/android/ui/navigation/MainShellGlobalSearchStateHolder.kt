@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -11,10 +12,13 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchAccountScope
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchStateSaver
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchViewport
+import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchViewport
 
 internal data class MainShellGlobalSearchStateHolder(
     val scopedState: GlobalSearchState,
     val update: ((GlobalSearchState) -> GlobalSearchState) -> Unit,
+    val viewport: GlobalSearchViewport,
 )
 
 /**
@@ -36,6 +40,7 @@ internal fun rememberMainShellGlobalSearchState(
         }
     val scopedGlobalSearchState =
         GlobalSearchTransitions.reconcileAccountScope(globalSearchState, globalSearchAccountScope)
+    val viewport = key(globalSearchAccountScope) { rememberGlobalSearchViewport() }
     LaunchedEffect(globalSearchAccountScope) {
         if (globalSearchState != scopedGlobalSearchState) {
             globalSearchState = scopedGlobalSearchState
@@ -43,6 +48,7 @@ internal fun rememberMainShellGlobalSearchState(
     }
     return MainShellGlobalSearchStateHolder(
         scopedState = scopedGlobalSearchState,
+        viewport = viewport,
         update = { transform ->
             val currentState =
                 GlobalSearchTransitions.reconcileAccountScope(

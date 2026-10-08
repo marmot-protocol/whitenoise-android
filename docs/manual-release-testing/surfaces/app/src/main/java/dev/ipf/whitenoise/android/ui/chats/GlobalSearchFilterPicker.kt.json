@@ -1,0 +1,183 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+  "legacy_sha256": "06b369833b71ebf1c6b5ca43991783b850ea76d66de139705a2425c7bab64e3f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalSearchChatTypePicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "fun GlobalSearchChatTypePicker(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalSearchCheckDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "fun GlobalSearchCheckDialog(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalSearchCheckRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "fun GlobalSearchCheckRow(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalSearchDatePicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "fun GlobalSearchDatePicker(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalSearchEntityPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "fun GlobalSearchEntityPicker(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalSearchFilterPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "fun GlobalSearchFilterPicker(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalSearchFolderPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "fun GlobalSearchFolderPicker(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:chat_list_search_filter_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_chat",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_chat_type",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_chat_type",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_content",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_folders",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_folders",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_sender",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_filter_sender",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_no_folders",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.chat_list_search_no_folders",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:search_filter_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.search_filter_unavailable",
+        "test_ids": [
+          "FIND-008",
+          "FIND-012"
+        ]
+      },
+      {
+        "surface": "string:search_filter_members_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": "R.string.search_filter_members_pending",
+        "test_ids": [
+          "FIND-008",
+          "FIND-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
