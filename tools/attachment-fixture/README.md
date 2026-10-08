@@ -312,8 +312,12 @@ representative performance. All original small-file budgets stay unchanged.
 Android's resumed RUNNING state does not start MDK's native retry clock. After
 observing that state, the fixture allows up to 60 seconds for the independently
 recorded resumed body, within the existing 120-second probe deadline. This is a
-functional recovery allowance, not a latency guarantee. Terminal native transfer
-decisions fail immediately. Reports retain only the last 12 native phase, attempt
-and remaining retry-delay observations, with no account/attachment references,
+functional recovery allowance, not a latency guarantee. The resumed body is accepted
+only after a native observation newer than the position captured before stopping
+the job. Observation indices keep increasing when the diagnostic buffer rolls over;
+an unchanged phase/attempt/retry delay on a fresh emission still counts as new evidence.
+Terminal native transfer decisions fail immediately. Reports include the pre-stop
+position and only the last 12 indexed native phase, attempt and remaining retry-delay
+observations, with no account/attachment references,
 URLs or error text. The two-GET, Range/If-Range, exact-byte and no-manual-retry
 requirements are unchanged.

@@ -32,7 +32,6 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -47,6 +46,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicLong
 
 /** Stops one real ordinary WorkManager job, preserving native automatic demand and its received checkpoint. */
 internal object PlatformInterruptedAttachmentProbe {
@@ -55,6 +55,7 @@ internal object PlatformInterruptedAttachmentProbe {
 
     /** Closed native scheduling facts; references, account identities and error text never enter reports. */
     private data class NativeResumeSnapshot(
+        val observationIndex: Long,
         val phase: AttachmentTransferStateFfi,
         val attempt: ULong,
         val retryAt: ULong?,
@@ -84,6 +85,7 @@ internal object PlatformInterruptedAttachmentProbe {
         val observations = ResumeObservations()
         val states = observations.workStates
         val nativeStates = observations.nativeStates
+        val nativeObservationIndex = AtomicLong()
         var nativeObserver: Job? = null
         val observer =
             launch {
@@ -110,13 +112,19 @@ internal object PlatformInterruptedAttachmentProbe {
                         state
                             .nativeProgress(request)
                             .filterNotNull()
-                            .map { NativeResumeSnapshot(it.phase, it.attempt, it.retryAt) }
-                            .distinctUntilChanged()
-                            .collect {
+                            .map {
+                                NativeResumeSnapshot(
+                                    observationIndex = nativeObservationIndex.incrementAndGet(),
+                                    phase = it.phase,
+                                    attempt = it.attempt,
+                                    retryAt = it.retryAt,
+                                )
+                            }.collect {
                                 if (nativeStates.size == FAILURE_STATE_LIMIT) nativeStates.removeAt(0)
                                 nativeStates.add(it)
                             }
                     }
+                awaitFirstNativeSnapshot(nativeStates)
                 assertEquals((bytes.size + 16).toULong(), progress.total)
                 HeldAttachmentCancellationProbe.awaitLedger(port) { events ->
                     events.any { it.getString("kind") == "held" }
@@ -134,6 +142,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 val beforeLogs = workerStopLogs()
                 HeldAttachmentCancellationProbe.control(port, "/__platform-stop-marker")
                 val namespace = if (job.first == null) "" else "-n ${job.first} "
+                val nativeObservationBeforeStop = nativeObservationIndex.get()
                 val stopped = shell("cmd jobscheduler timeout -u 0 ${namespace}${context.packageName} ${job.second}")
                 check(stopped.contains("Timing out:") || stopped.contains("Stopping job:")) {
                     "Android did not stop the selected job: $stopped"
@@ -158,7 +167,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 awaitResumedRun(states, firstRun)
                 val runningAt = SystemClock.elapsedRealtime()
                 step = "resume-request"
-                awaitResumedAcquisition(port, nativeStates)
+                awaitResumedAcquisition(port, nativeStates, nativeObservationBeforeStop)
                 val requestedAt = SystemClock.elapsedRealtime()
                 step = "resumed-completion"
                 assertNull("resumed partial ciphertext cannot be published", state.openNativeAttachment(request))
@@ -194,6 +203,7 @@ internal object PlatformInterruptedAttachmentProbe {
                         .put("worker_run_attempt", stopDiagnostic.second)
                         .put("resume_running_ms", runningAt - stoppedAt)
                         .put("resume_request_ms", requestedAt - runningAt)
+                        .put("native_observation_before_stop", nativeObservationBeforeStop)
                         .put("native_resume_states", nativeResumeDiagnostics(nativeStates))
                         .put("android_process_restart_qualified", false),
                 )
@@ -215,23 +225,32 @@ internal object PlatformInterruptedAttachmentProbe {
         }
     }
 
+    /** Establishes a first-run observation before capturing the boundary used to reject stale resume evidence. */
+    private suspend fun awaitFirstNativeSnapshot(nativeStates: List<NativeResumeSnapshot>) {
+        withTimeout(5_000L) { while (nativeStates.isEmpty()) delay(25L) }
+    }
+
     /**
      * Android RUNNING does not start MDK's retry clock. Observe the independent resumed body under a bounded
      * functional deadline, allowing native backoff/maintenance while rejecting terminal decisions immediately.
+     * A monotonically indexed native emission after the stop boundary is also required, even if its scheduling
+     * fields match the first run. The bounded diagnostic buffer's size is not an observation position.
      * The enclosing probe's 120-second deadline remains in force; this is not a latency qualification.
      */
     private suspend fun awaitResumedAcquisition(
         port: Int,
         nativeStates: List<NativeResumeSnapshot>,
+        nativeObservationBeforeStop: Long,
     ) = withTimeout(NATIVE_RESUME_TIMEOUT_MILLIS) {
         while (true) {
-            val latest = nativeStates.lastOrNull()
+            val latest = nativeStates.toList().lastOrNull()
             check(latest?.phase !in NATIVE_TRANSFER_TERMINAL_FAILURES) {
                 "automatic native recovery ended as ${latest?.phase}"
             }
             val events = HeldAttachmentCancellationProbe.ledger(port)
-            if (events.any { it.getString("kind") == "held" && it.getLong("value") == 3L * 1024 * 1024 }) {
-                check(latest != null) { "resumed body has no native progress observation" }
+            val resumedBodyHeld =
+                events.any { it.getString("kind") == "held" && it.getLong("value") == 3L * 1024 * 1024 }
+            if (latest != null && latest.observationIndex > nativeObservationBeforeStop && resumedBodyHeld) {
                 return@withTimeout
             }
             delay(25L)
@@ -242,8 +261,9 @@ internal object PlatformInterruptedAttachmentProbe {
     private fun nativeResumeDiagnostics(states: List<NativeResumeSnapshot>): JSONArray {
         val nowSeconds = System.currentTimeMillis() / 1_000L
         return JSONArray(
-            states.takeLast(FAILURE_STATE_LIMIT).map { snapshot ->
+            states.toList().takeLast(FAILURE_STATE_LIMIT).map { snapshot ->
                 JSONObject()
+                    .put("observation_index", snapshot.observationIndex)
                     .put("state", snapshot.phase.name)
                     .put("attempt", snapshot.attempt.toLong())
                     .put(
