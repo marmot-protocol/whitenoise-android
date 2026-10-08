@@ -29,7 +29,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.util.Locale
 
-internal const val LARGE_GROUP_INVITE_WARNING_THRESHOLD = 50
+internal const val LARGE_GROUP_INVITE_WARNING_THRESHOLD = 150
 internal const val LARGE_GROUP_INVITE_WARNING_TAG = "large-group-invite-warning"
 internal const val LARGE_GROUP_INVITE_CONFIRMATION_TAG = "large-group-invite-confirmation"
 
