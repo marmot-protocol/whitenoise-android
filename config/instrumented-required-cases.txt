@@ -23,3 +23,7 @@ dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndro
 dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndroidTest#lookaheadBaselineQueryDuringReuseKeepsRectListConsistent
 dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndroidTest#rowAlignmentDuringFarSnapKeepsRectListConsistent
 dev.ipf.whitenoise.android.ui.conversation.messages.ReportMessageImeTest#sendsFromPinnedFooterAboveRealIme
+
+# Draft navigation retains real keyboard/viewport geometry and cancels reading momentum (#3131).
+dev.ipf.whitenoise.android.ui.ComposerDraftNavigationAndroidTest#typingAndRealImeReflowPreserveNavigation
+dev.ipf.whitenoise.android.ui.ComposerDraftNavigationAndroidTest#topActionCancelsFlingWithoutEditingOrKeyboardChanges

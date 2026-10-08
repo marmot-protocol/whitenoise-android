@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
@@ -46,6 +47,7 @@ class ComposerDraftNavigationAndroidTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
     private var value by mutableStateOf(TextFieldValue(longDraft, TextRange(longDraft.length)))
     private var sends = 0
+    private var imeAnimationRunning = false
 
     /** Character edits remain stable with the actual keyboard, and hide/show reflow preserves draft navigation. */
     @Test
@@ -119,12 +121,8 @@ class ComposerDraftNavigationAndroidTest {
     }
 
     /** Owns no account, draft store or send transport; only real platform geometry and the production composer. */
-    @Suppress("DEPRECATION")
     private fun renderWithKeyboard() {
-        composeRule.runOnUiThread {
-            composeRule.activity.enableEdgeToEdge()
-            composeRule.activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        }
+        configureResizingWindow()
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -145,10 +143,43 @@ class ComposerDraftNavigationAndroidTest {
         }
         val field = composeRule.onNode(hasSetTextAction())
         field.performClick().performTextInputSelection(TextRange(value.text.length))
-        composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeVisible() }
+        composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometrySettled(show = true) }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
     }
+
+    /** Observes the real IME animation end without replacing the child's production inset handling. */
+    @Suppress("DEPRECATION")
+    private fun configureResizingWindow() {
+        composeRule.runOnUiThread {
+            composeRule.activity.enableEdgeToEdge()
+            val window = composeRule.activity.window
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            ViewCompat.setWindowInsetsAnimationCallback(
+                window.decorView,
+                object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+                    /** Prevents exact-bounds checks from starting during a platform-owned keyboard animation. */
+                    override fun onPrepare(animation: WindowInsetsAnimationCompat) {
+                        if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) imeAnimationRunning = true
+                    }
+
+                    /** Allows checking final docked/hidden geometry only after the platform animation completes. */
+                    override fun onEnd(animation: WindowInsetsAnimationCompat) {
+                        if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) imeAnimationRunning = false
+                    }
+                },
+            )
+        }
+    }
+
+    /** Requires a real positive docked inset or zero hidden inset, with no pending IME animation. */
+    private fun imeGeometrySettled(show: Boolean): Boolean =
+        composeRule.runOnUiThread {
+            val insets = ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
+            val bottom = insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: return@runOnUiThread false
+            insets.isVisible(WindowInsetsCompat.Type.ime()) == show &&
+                (if (show) bottom > 0 else bottom == 0) && !imeAnimationRunning
+        }
 
     /** Reads the actual platform inset rather than substituting a test-only available-height change. */
     private fun imeVisible(): Boolean =
@@ -164,7 +195,7 @@ class ComposerDraftNavigationAndroidTest {
             checkNotNull(controller)
             if (show) controller.show(WindowInsetsCompat.Type.ime()) else controller.hide(WindowInsetsCompat.Type.ime())
         }
-        composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeVisible() == show }
+        composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometrySettled(show) }
         composeRule.waitForIdle()
     }
 

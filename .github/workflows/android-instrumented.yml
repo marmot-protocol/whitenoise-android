@@ -57,6 +57,8 @@ on:
       - 'app/build.gradle.kts'
       - 'app/src/androidTest/AndroidManifest.xml'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/ComposerDraftNavigationAndroidTest.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageImeTest.kt'
       - 'app/src/main/marmotkit/**'
