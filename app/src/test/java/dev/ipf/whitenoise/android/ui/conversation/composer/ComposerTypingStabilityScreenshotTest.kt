@@ -135,7 +135,11 @@ class ComposerTypingStabilityScreenshotTest {
     fun lineBreakGrowthStillWaitsForRenderedGeometry() {
         value = TextFieldValue("a", TextRange(1))
         render("light", narrow = true, rtl = false, mode = ComposerExpansionMode.Automatic, expectTop = false)
-        val before = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot.height
+        val before =
+            composeRule
+                .onNode(hasSetTextAction())
+                .fetchSemanticsNode()
+                .boundsInRoot.height
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.onNode(hasSetTextAction()).performTextInput("\na")
@@ -151,7 +155,12 @@ class ComposerTypingStabilityScreenshotTest {
             composeRule.mainClock.autoAdvance = true
         }
         composeRule.waitForIdle()
-        assertTrue(composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot.height > before)
+        assertTrue(
+            composeRule
+                .onNode(hasSetTextAction())
+                .fetchSemanticsNode()
+                .boundsInRoot.height > before,
+        )
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
     }
 
