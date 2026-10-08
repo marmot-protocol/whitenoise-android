@@ -57,6 +57,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -435,6 +436,9 @@ internal fun ComposerPill(
     // Reports that the send collapse has taken its snap so the owner can let
     // later geometry, a dismiss or a refocus of the empty field, tween again.
     onSendCollapseApplied: () -> Unit = {},
+    // The owner places the trailing Send/voice action outside this pill, so it needs the same animated
+    // editing progress to stay centered with the text while resting. Read it during layout, never composition.
+    onEditingProgress: (State<Float>) -> Unit = {},
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -893,9 +897,21 @@ internal fun ComposerPill(
                 ),
             label = "composer editing row",
         )
-    // Keep every bottom control below the grip and aligned with the external Send/voice action.
-    val leadingActionsAlignment = if (multilineControlsSuppressed) Alignment.CenterStart else Alignment.BottomStart
-    val trailingActionsAlignment = if (multilineControlsSuppressed) Alignment.CenterEnd else Alignment.BottomEnd
+    SideEffect { onEditingProgress(editingProgress) }
+    // The resting one-line row centers its inline actions with the text, whatever the font scale; as the
+    // editing row unfolds they settle on the bottom row, aligned with the external Send/voice action.
+    val leadingActionsAlignment =
+        if (multilineControlsSuppressed) {
+            Alignment.CenterStart
+        } else {
+            remember(editingProgress) { ComposerActionRowAlignment(Alignment.Start) { editingProgress.value } }
+        }
+    val trailingActionsAlignment =
+        if (multilineControlsSuppressed) {
+            Alignment.CenterEnd
+        } else {
+            remember(editingProgress) { ComposerActionRowAlignment(Alignment.End) { editingProgress.value } }
+        }
     // The editor and action edges animate without reserving space above the surface.
     val expansionProgress =
         animateFloatAsState(
@@ -1177,13 +1193,10 @@ internal fun ComposerPill(
                                             editingProgress.value,
                                         )
                                     },
-                                    top = {
-                                        if (multilineControlsSuppressed || accessoryContent != null) {
-                                            12.dp
-                                        } else {
-                                            interpolateDp(24.dp, CompactEditorTopInset, editingProgress.value)
-                                        }
-                                    },
+                                    // The resting row keeps the editing inset: an extra 12 dp above one line
+                                    // read as dead space and pushed the text and placeholder below the
+                                    // vertical center of the controls beside them.
+                                    top = { CompactEditorTopInset },
                                     end = {
                                         interpolateDp(
                                             compactTrailingReserve,

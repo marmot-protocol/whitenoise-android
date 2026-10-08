@@ -39,6 +39,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -99,7 +100,9 @@ import kotlin.math.roundToInt
 // One measured editor line, dedicated grip, bottom tools, and outer padding.
 private val ComposerManualChromeHeight = 72.dp
 private val ComposerManualCompactChromeHeight = 36.dp
-private val ComposerAutomaticEmptyChromeHeight = 48.dp
+
+// The resting single-line row: 12 dp above and below the line, plus the 12 dp outer padding.
+private val ComposerAutomaticEmptyChromeHeight = 36.dp
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
@@ -511,6 +514,10 @@ internal fun ComposerBar(
         remember(draftKey, draftAccountRef, draftGroupIdHex) {
             mutableFloatStateOf(0f)
         }
+    // The pill's animated editing progress, shared so the trailing action centers with the resting row.
+    var editingProgressSource by remember { mutableStateOf<State<Float>?>(null) }
+    val trailingActionAlignment =
+        remember { ComposerActionRowAlignment(Alignment.End) { editingProgressSource?.value ?: 0f } }
     var composerUsesMultilineControls by
         remember(
             draftKey,
@@ -1487,6 +1494,7 @@ internal fun ComposerBar(
                                 null
                             },
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
+                        onEditingProgress = { editingProgressSource = it },
                         onExtraControlsHeightChanged = { extraComposerControlsHeight = it },
                         onAccessoryHeightChanged = { measuredComposerAccessoryHeight = it },
                         onAutomaticTextMeasured = { heightPx, automaticEditing ->
@@ -1532,7 +1540,7 @@ internal fun ComposerBar(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier =
                             Modifier
-                                .align(Alignment.BottomEnd)
+                                .align(trailingActionAlignment)
                                 .expandedComposerActionRow(),
                     ) {
                         // This call site stays shared by idle and recording states;
