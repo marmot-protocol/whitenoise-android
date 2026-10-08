@@ -51,6 +51,15 @@ adb_cmd() {
   "$adb_bin" "${adb_args[@]}" "$@"
 }
 
+benchmark_user="$(adb_cmd shell am get-current-user | tr -d '\r')"
+[[ "$benchmark_user" =~ ^[0-9]+$ ]] || { echo "Cannot resolve the current Android user." >&2; exit 1; }
+if [[ -n "${QUALIFICATION_USER_ID:-}" ]]; then
+  [[ "$QUALIFICATION_USER_ID" =~ ^[1-9][0-9]*$ && "$benchmark_user" == "$QUALIFICATION_USER_ID" ]] || {
+    echo "Switch to the explicitly authorized disposable profile before qualification." >&2
+    exit 1
+  }
+fi
+
 wait_for_package_update_ui_to_settle() {
   local resumed_activity stable_samples=0
   for _ in {1..50}; do
@@ -81,7 +90,7 @@ quote_device_shell_arg() {
   printf "'%s'" "$escaped"
 }
 
-if ! adb_cmd shell pm path "$target_package" >/dev/null 2>&1; then
+if ! adb_cmd shell pm path --user "$benchmark_user" "$target_package" >/dev/null 2>&1; then
   echo "The authenticated dev app is not installed: $target_package" >&2
   echo "Install :app:installDevZapstoreDebug and prepare the fixture first." >&2
   exit 1
@@ -96,12 +105,14 @@ case "$device_abi" in
     ;;
 esac
 
-./gradlew \
-  :app:assembleDevZapstoreDebug \
-  :app:assembleDevZapstoreBenchmarkRelease \
-  :benchmark:assembleDevZapstoreBenchmarkRelease \
-  -Pandroid.injected.build.abi="$device_abi" \
-  --no-daemon
+if [[ -z "${BENCHMARK_APK_DIR:-}" ]]; then
+  ./gradlew \
+    :app:assembleDevZapstoreDebug \
+    :app:assembleDevZapstoreBenchmarkRelease \
+    :benchmark:assembleDevZapstoreBenchmarkRelease \
+    -Pandroid.injected.build.abi="$device_abi" \
+    --no-daemon
+fi
 
 resolve_apk() {
   local module_dir="$1"
@@ -150,9 +161,36 @@ resolve_apk() {
   return 1
 }
 
-dev_app_apk="$(resolve_apk app "$target_package" devZapstoreDebug)"
-app_apk="$(resolve_apk app "$target_package" devZapstoreBenchmarkRelease)"
-test_apk="$(resolve_apk benchmark "$test_package" devZapstoreBenchmarkRelease)"
+if [[ -n "${BENCHMARK_APK_DIR:-}" ]]; then
+  [[ -n "${QUALIFICATION_USER_ID:-}" && -f "${ORIGINAL_DEV_APK:-}" ]] || {
+    echo "Prebuilt qualification requires a disposable profile and the preserved original Dev APK." >&2
+    exit 1
+  }
+  [[ -x "${APKSIGNER:-}" && -x "${AAPT:-}" ]] || {
+    echo "Prebuilt qualification requires APKSIGNER and AAPT for binary verification." >&2
+    exit 1
+  }
+  installed_apk="$(mktemp)"
+  installed_path="$(adb_cmd shell pm path --user "$benchmark_user" "$target_package" | tr -d '\r')"
+  [[ "$installed_path" == package:* && "$installed_path" != *$'\n'* ]] || {
+    rm -f "$installed_apk"; echo "Require one installed Dev base APK." >&2; exit 1;
+  }
+  if ! adb_cmd pull "${installed_path#package:}" "$installed_apk" >/dev/null ||
+    ! python3 scripts/background_fixture_artifacts.py verify-install \
+      "$BENCHMARK_APK_DIR" "$(git rev-parse HEAD)" \
+      --original-dev-apk "$ORIGINAL_DEV_APK" --installed-dev-apk "$installed_apk" \
+      --apksigner "$APKSIGNER" --aapt "$AAPT"; then
+    rm -f "$installed_apk"; exit 1
+  fi
+  rm -f "$installed_apk"
+  dev_app_apk="$ORIGINAL_DEV_APK"
+  app_apk="$BENCHMARK_APK_DIR/app-devZapstoreBenchmarkRelease.apk"
+  test_apk="$BENCHMARK_APK_DIR/benchmark-devZapstoreBenchmarkRelease.apk"
+else
+  dev_app_apk="$(resolve_apk app "$target_package" devZapstoreDebug)"
+  app_apk="$(resolve_apk app "$target_package" devZapstoreBenchmarkRelease)"
+  test_apk="$(resolve_apk benchmark "$test_package" devZapstoreBenchmarkRelease)"
+fi
 
 for apk in "$dev_app_apk" "$app_apk" "$test_apk"; do
   if [[ ! -f "$apk" ]]; then
@@ -163,7 +201,7 @@ done
 
 result_file="$(mktemp)"
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
-device_output="/sdcard/Android/media/$test_package/$run_id"
+device_output="/storage/emulated/$benchmark_user/Android/media/$test_package/$run_id"
 local_output="benchmark/build/outputs/manual/$run_id"
 mkdir -p "$local_output"
 device_output_pulled=false
@@ -264,7 +302,7 @@ cleanup() {
     adb_cmd shell rm -rf "$device_output" || true
   fi
   if [[ "$target_replaced" == true ]]; then
-    if ! adb_cmd install -r -d -t "$dev_app_apk"; then
+    if ! adb_cmd install --user "$benchmark_user" -r -d -t "$dev_app_apk"; then
       echo "Failed to restore the normal dev app: $dev_app_apk" >&2
       if ((status == 0)); then status=1; fi
     fi
@@ -305,14 +343,14 @@ adb_cmd shell cmd statusbar collapse
 # normal dev debug APK even when either journey fails.
 capture_device_state "$local_output/package-replacement-device.txt"
 package_replacement_install_log="$local_output/package-replacement-install.log"
-if adb_cmd install -r -d -t "$app_apk" >"$package_replacement_install_log" 2>&1; then
+if adb_cmd install --user "$benchmark_user" -r -d -t "$app_apk" >"$package_replacement_install_log" 2>&1; then
   target_replaced=true
   cat "$package_replacement_install_log"
 else
   cat "$package_replacement_install_log" >&2
   exit 1
 fi
-adb_cmd install -r -d -t "$test_apk"
+adb_cmd install --user "$benchmark_user" -r -d -t "$test_apk"
 
 # Isolate this run from stale device output. Supplying the directory explicitly
 # also makes every pulled report and trace attributable to this invocation.
@@ -326,12 +364,12 @@ adb_cmd shell mkdir -p "$device_output"
 # an Activity, so force-stop immediately before the explicit launch to make the
 # journey cold without clearing authenticated data.
 main_activity="$target_package/dev.ipf.whitenoise.android.MainActivity"
-adb_cmd shell am force-stop "$target_package"
+adb_cmd shell am force-stop --user "$benchmark_user" "$target_package"
 wait_for_package_update_ui_to_settle
 # The transient package-update Activity may have forwarded the launch intent as
 # it closed. Force-stop once more after it is gone so the measured process is
 # unambiguously created by the following command.
-adb_cmd shell am force-stop "$target_package"
+adb_cmd shell am force-stop --user "$benchmark_user" "$target_package"
 launch_started_uptime_ms="$(
   adb_cmd shell cat /proc/uptime | awk '{printf "%.0f\n", $1 * 1000}' | tr -d '\r'
 )"
@@ -339,7 +377,7 @@ if [[ ! "$launch_started_uptime_ms" =~ ^[0-9]+$ ]]; then
   echo "Could not capture device uptime before the package-replacement launch." >&2
   exit 1
 fi
-preflight_output="$(adb_cmd shell am start -W -n "$main_activity")"
+preflight_output="$(adb_cmd shell am start --user "$benchmark_user" -W -n "$main_activity")"
 {
   printf 'DeviceUptimeBeforeLaunchMs: %s\n' "$launch_started_uptime_ms"
   printf '%s\n' "$preflight_output"
@@ -352,7 +390,9 @@ fi
 
 preflight_pid=""
 for _ in {1..20}; do
-  preflight_pid="$(adb_cmd shell pidof "$target_package" | tr -d '\r')"
+  preflight_pid="$(adb_cmd shell ps -A -o UID,PID,NAME | tr -d '\r' |
+    awk -v profile="$benchmark_user" -v package="$target_package" \
+      '$3 == package && int($1 / 100000) == profile {print $2}')"
   if [[ "$preflight_pid" =~ ^[0-9]+$ ]]; then break; fi
   sleep 0.1
 done
@@ -410,7 +450,7 @@ if [[ "$preflight_ready" != true ]]; then
   echo "Benchmark target did not reach the authenticated chat list during preflight." >&2
   exit 1
 fi
-adb_cmd shell am force-stop "$target_package"
+adb_cmd shell am force-stop --user "$benchmark_user" "$target_package"
 
 default_benchmark_classes="dev.ipf.whitenoise.android.benchmark.StartupBenchmark#coldStartupNoCompilation,\
 dev.ipf.whitenoise.android.benchmark.StartupBenchmark#coldStartupBaselineProfile,\
@@ -424,7 +464,7 @@ if [[ -z "$group_name" && -z "${BENCHMARK_CLASS_FILTER:-}" ]]; then
   exit 1
 fi
 
-instrument_command="am instrument -w -r \
+instrument_command="am instrument --user $benchmark_user -w -r \
 -e class $(quote_device_shell_arg "$benchmark_classes") \
 -e androidx.benchmark.output.enable true \
 -e additionalTestOutputDir $(quote_device_shell_arg "$device_output")"
@@ -439,6 +479,13 @@ fi
 if [[ -n "${IDLE_WINDOW_MS:-}" ]]; then
   instrument_command="$instrument_command \
 -e idleWindowMs $(quote_device_shell_arg "$IDLE_WINDOW_MS")"
+fi
+if [[ -n "${QUALIFICATION_USER_ID:-}" ]]; then
+  instrument_command="$instrument_command \
+-e qualificationUserId $(quote_device_shell_arg "$QUALIFICATION_USER_ID")"
+fi
+if [[ "${ALLOW_RECEIPT_LISTENER:-false}" == true ]]; then
+  instrument_command="$instrument_command -e allowReceiptListener true"
 fi
 if [[ -n "${CREATED_GROUP_PREFIX:-}" ]]; then
   instrument_command="$instrument_command \

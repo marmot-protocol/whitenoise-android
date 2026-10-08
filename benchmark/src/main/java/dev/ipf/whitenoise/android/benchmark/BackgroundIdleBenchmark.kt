@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.benchmark
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Process
 import android.os.SystemClock
 import android.util.Log
 import androidx.benchmark.macro.BaselineProfileMode
@@ -40,6 +43,7 @@ class BackgroundIdleBenchmark {
     @Test
     fun idleWithDeliveryDisabledPower() {
         val journeys = WhiteNoiseJourneys()
+        val permissionWasGranted = notificationPermissionGranted()
         try {
             benchmarkRule.measureRepeated(
                 packageName = BenchmarkConfig.TARGET_PACKAGE,
@@ -62,7 +66,7 @@ class BackgroundIdleBenchmark {
                 },
             )
         } finally {
-            grantNotificationPermission()
+            restoreNotificationPermission(permissionWasGranted)
         }
     }
 
@@ -120,23 +124,33 @@ class BackgroundIdleBenchmark {
      */
     @Test
     fun pushBurstPower() {
+        val expectedTexts = BenchmarkConfig.notificationTexts
+        require(expectedTexts.size >= 5 && expectedTexts.distinct().size == expectedTexts.size) {
+            "Pass at least five distinct disposable fixture texts in notificationTexts."
+        }
         val journeys = WhiteNoiseJourneys()
-        benchmarkRule.measureRepeated(
-            packageName = BenchmarkConfig.TARGET_PACKAGE,
-            metrics = idleMetrics(),
-            compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
-            iterations = BURST_ITERATIONS,
-            setupBlock = {
-                journeys.run { resumeToChatList() }
-                journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
-                pressHome()
-            },
-            measureBlock = {
-                device.sleep()
-                Log.i(BURST_LOG_TAG, "Send the push burst now; observing for ${burstWindowMs()}ms.")
-                SystemClock.sleep(burstWindowMs())
-            },
-        )
+        val receipts = BackgroundDeliveryReceiptProbe(device, expectedTexts)
+        receipts.withListener {
+            benchmarkRule.measureRepeated(
+                packageName = BenchmarkConfig.TARGET_PACKAGE,
+                metrics = idleMetrics(),
+                compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
+                iterations = BURST_ITERATIONS,
+                setupBlock = {
+                    journeys.run { resumeToChatList() }
+                    journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
+                    receipts.requireFreshFixture()
+                    pressHome()
+                },
+                measureBlock = {
+                    device.sleep()
+                    receipts.beginWindow(burstWindowMs())
+                    Log.i(BURST_LOG_TAG, "Send the push burst now; observing for ${burstWindowMs()}ms.")
+                    SystemClock.sleep(burstWindowMs())
+                    receipts.finishWindow()
+                },
+            )
+        }
     }
 
     /** The idle methods' sleep duration, overridable via `idleWindowMs` for a short smoke run. */
@@ -148,16 +162,30 @@ class BackgroundIdleBenchmark {
     /** Revokes POST_NOTIFICATIONS so the OS cannot surface anything during the disabled baseline. */
     private fun revokeNotificationPermission() {
         device.executeShellCommand(
-            "pm revoke ${BenchmarkConfig.TARGET_PACKAGE} android.permission.POST_NOTIFICATIONS",
+            "pm revoke --user ${fixtureUserId()} ${BenchmarkConfig.TARGET_PACKAGE} android.permission.POST_NOTIFICATIONS",
         )
     }
 
-    /** Restores the notification permission grant after the disabled-baseline iterations finish. */
-    private fun grantNotificationPermission() {
+    /** Reads the original fixture grant rather than assuming setup always started granted. */
+    private fun notificationPermissionGranted(): Boolean =
+        InstrumentationRegistry.getInstrumentation().context.packageManager.checkPermission(
+            Manifest.permission.POST_NOTIFICATIONS,
+            BenchmarkConfig.TARGET_PACKAGE,
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /** Restores the exact original grant after success, failure or a permission-killed process. */
+    private fun restoreNotificationPermission(wasGranted: Boolean) {
+        val action = if (wasGranted) "grant" else "revoke"
         device.executeShellCommand(
-            "pm grant ${BenchmarkConfig.TARGET_PACKAGE} android.permission.POST_NOTIFICATIONS",
+            "pm $action --user ${fixtureUserId()} ${BenchmarkConfig.TARGET_PACKAGE} android.permission.POST_NOTIFICATIONS",
         )
+        check(notificationPermissionGranted() == wasGranted) {
+            "The fixture notification permission was not restored."
+        }
     }
+
+    /** Applies shell permission changes to this instrumentation's profile, never the Owner implicitly. */
+    private fun fixtureUserId(): Int = Process.myUid() / 100_000
 
     private companion object {
         // A genuinely slept screen re-engages a secure keyguard that `wm dismiss-keyguard`
