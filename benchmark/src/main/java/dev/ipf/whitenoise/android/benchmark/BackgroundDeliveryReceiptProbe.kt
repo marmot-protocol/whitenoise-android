@@ -149,8 +149,11 @@ internal object BackgroundDeliveryReceipts {
         wallNowMs: Long,
     ) {
         val complete =
-            deadlineMs != null && seen.size == expected.size && connected &&
-                !clockChanged && clockStable(nowMs, wallNowMs)
+            deadlineMs != null &&
+                seen.size == expected.size &&
+                connected &&
+                !clockChanged &&
+                clockStable(nowMs, wallNowMs)
         deadlineMs = null
         check(complete) { "The complete disposable burst was not observed while backgrounded." }
     }
@@ -159,8 +162,7 @@ internal object BackgroundDeliveryReceipts {
     private fun clockStable(
         nowMs: Long,
         wallNowMs: Long,
-    ): Boolean =
-        abs((wallNowMs - startWallMs) - (nowMs - startElapsedMs)) <= 1_000L
+    ): Boolean = abs((wallNowMs - startWallMs) - (nowMs - startElapsedMs)) <= 1_000L
 
     /** Releases all expected payloads and generation state after success, failure or cancellation. */
     @Synchronized
@@ -218,7 +220,8 @@ internal class BackgroundDeliveryReceiptProbe(
 
     /** Compares parsed components so short and full Android setting spellings preserve one grant. */
     private fun hasListenerGrant(): Boolean =
-        Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+        Settings.Secure
+            .getString(context.contentResolver, "enabled_notification_listeners")
             .orEmpty()
             .split(':')
             .mapNotNull(ComponentName::unflattenFromString)
@@ -235,8 +238,7 @@ internal class BackgroundDeliveryReceiptProbe(
     }
 
     /** Requires every unique fixture payload before any foreground catch-up can occur. */
-    fun finishWindow() =
-        BackgroundDeliveryReceipts.finishWindow(SystemClock.elapsedRealtime(), System.currentTimeMillis())
+    fun finishWindow() = BackgroundDeliveryReceipts.finishWindow(SystemClock.elapsedRealtime(), System.currentTimeMillis())
 
     private companion object {
         const val ANDROID_PER_USER_UID_RANGE = 100_000

@@ -376,6 +376,10 @@ adb_cmd shell cmd statusbar collapse
 # normal dev debug APK even when either journey fails.
 capture_device_state "$local_output/package-replacement-device.txt"
 package_replacement_install_log="$local_output/package-replacement-install.log"
+if [[ -n "${BENCHMARK_APK_DIR:-}" && "$(installed_code_hash)" != "$(sha256_file "$dev_app_apk")" ]]; then
+  echo "Shared Dev APK changed before replacement; preserving the competing install." >&2
+  exit 1
+fi
 if adb_cmd install --user "$benchmark_user" -r -d -t "$app_apk" >"$package_replacement_install_log" 2>&1; then
   target_replaced=true
   cat "$package_replacement_install_log"
