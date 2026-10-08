@@ -1514,7 +1514,7 @@
       "manual_ids": [
         "NTF-033"
       ],
-      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
       "postcondition": "none"
     },
     "alerts-chat-sounds-back": {
@@ -1592,9 +1592,10 @@
     "smart-folders-condition-rotation": {
       "suite": "smart-folders",
       "manual_ids": [
-        "FLD-004"
+        "FLD-004",
+        "NAV-009"
       ],
-      "assertions": "The Unread condition editor survives handled orientation changes before cancellation. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "assertions": "The proven open Unread condition either remains valid and is cancelled, or dismisses safely on handled rotation. Both paths require the unchanged empty outer form, no applied advanced rules and no persisted custom folder.",
       "postcondition": "folder-absent"
     },
     "smart-folders-title-empty": {
@@ -1627,7 +1628,7 @@
       "manual_ids": [
         "MSG-005"
       ],
-      "assertions": "Filtering to the owner’s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
       "postcondition": "reactions-retained",
       "fixture": "reactions"
     },
@@ -1679,7 +1680,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
+      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
@@ -1703,7 +1704,7 @@
       "manual_ids": [
         "SET-008"
       ],
-      "assertions": "繁體中文 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
       "postcondition": "language-system"
     },
     "advanced-relay-empty": {
@@ -1859,7 +1860,7 @@
       "manual_ids": [
         "ACC-007"
       ],
-      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice’s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -1887,7 +1888,7 @@
         "ACC-007",
         "NAV-004"
       ],
-      "assertions": "Save Alice’s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice’s retained private records, every other viewer empty and unchanged public profiles.",
+      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -2146,7 +2147,7 @@
       "manual_ids": [
         "TTS-002"
       ],
-      "assertions": "Apply custom rate then replace with 0\\.5×; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
+      "assertions": "Apply custom rate then replace with 0\\.5\u00d7; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
       "postcondition": "speech-rate-preset"
     },
     "speech-invalid-keeps-saved-rate": {
@@ -2156,6 +2157,65 @@
       ],
       "assertions": "Apply custom 2.75, attempt out-of-range 10.01, require exact editor/error and Cancel; re-entry plus fresh preference reader prove the saved normalized2.8 override was not replaced.",
       "postcondition": "speech-rate-custom"
+    },
+    "profile-text-save-reopen": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Save and reopen actual Name/About. Native verification compares the complete target profile and unchanged metadata for both other generated accounts; no separate peer-delivery proof is claimed.",
+      "postcondition": "public-profile-text-saved"
+    },
+    "profile-about-clear-reopen": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Clear and save existing About, reopen to an empty editor; complete native profile comparison proves only Alice About changed, with both other accounts unchanged.",
+      "postcondition": "public-profile-about-cleared"
+    },
+    "profile-restore-manual-name": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Restore the saved name after replacing it manually; exact name and disabled Restore action return, while native profiles for all three accounts remain unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-restore-generated-name": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Generate a profile name through the actual dice, restore the saved name and leave without publishing; complete native profile comparison proves all accounts unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-edit-rotation-discard": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001",
+        "NAV-009"
+      ],
+      "assertions": "Exact unsaved profile name survives rotation inside the original host; Back discards it and read-mode plus complete native profile comparison prove all three accounts unchanged. No Activity recreation/process-death claim.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-edit-warm-resume-discard": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001",
+        "NAV-010"
+      ],
+      "assertions": "Exact unsaved profile name survives warm-resume inside the original host; Back discards it and read-mode plus complete native profile comparison prove all three accounts unchanged. No Activity recreation/process-death claim.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "smart-folders-draft-rotation-discard": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004",
+        "NAV-009"
+      ],
+      "assertions": "A named outer folder draft survives handled rotation while a transient condition restores safely or dismisses without applying a rule. Keep Editing retains the exact name; explicit Discard creates no custom folder. No Activity recreation or process-death proof.",
+      "postcondition": "folder-absent"
     }
   }
 }

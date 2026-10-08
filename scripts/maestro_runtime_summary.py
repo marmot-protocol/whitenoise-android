@@ -105,6 +105,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'].startswith('speech-rate-')
                         and read_json(leaf / 'verified.json').get('speechRateVerified') is not True):
                     raise ValueError('Persisted speech rate was not verified')
+                if (CASES[name]['postcondition'].startswith('public-profile-')
+                        and read_json(leaf / 'verified.json').get('publicProfileVerified') is not True):
+                    raise ValueError('Authoritative public profiles were not verified')
                 ready = read_json(leaf / 'ready.json')
                 if (ready.get('accounts') != 3 or ready.get('fixture') != CASES[name].get('fixture', 'basic')
                         or ready.get('uiObserver') != 'maestro'):

@@ -69,6 +69,9 @@ private val MAESTRO_POSTCONDITIONS =
         "speech-rate-maximum",
         "speech-rate-preset",
         "speech-rate-system",
+        "public-profile-text-saved",
+        "public-profile-about-cleared",
+        "public-profile-unchanged",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -106,6 +109,8 @@ class MaestroRuntimeHostTest {
             var messageBaseline: MaestroMessageBaseline? = null
             var expectedAccountIds: Set<String> = emptySet()
             var externalContact: MaestroExternalContact? = null
+            var publicProfileOwner: String? = null
+            var publicProfileBaseline: Map<String, UserProfileMetadataFfi> = emptyMap()
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -176,6 +181,13 @@ class MaestroRuntimeHostTest {
                             "Generated group missing from native presentation"
                         }
                     val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
+                    if (postcondition.startsWith("public-profile-")) {
+                        publicProfileOwner = owner.accountIdHex
+                        publicProfileBaseline =
+                            accounts.associate {
+                                it.accountIdHex to checkNotNull(native.userProfile(it.accountIdHex))
+                            }
+                    }
                     if (postcondition.startsWith("message-") || postcondition == "accounts-retained") {
                         expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
                         val original = checkNotNull(nativeRow.row.lastMessage)
@@ -240,6 +252,16 @@ class MaestroRuntimeHostTest {
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
                         .put("speechRateVerified", verifyMaestroSpeechRate(context, checkNotNull(state), postcondition))
+                        .put(
+                            "publicProfileVerified",
+                            verifyMaestroPublicProfile(
+                                native,
+                                checkNotNull(state),
+                                publicProfileBaseline,
+                                publicProfileOwner,
+                                postcondition,
+                            ),
+                        )
                         .toString(),
                 )
             } finally {

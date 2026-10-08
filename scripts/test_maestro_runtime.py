@@ -224,6 +224,24 @@ class CampaignSummaryTest(unittest.TestCase):
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
 
+    def test_generic_native_success_cannot_certify_saved_public_profile(self):
+        """A successful UI leaf cannot replace whole-profile and other-account persistence proof."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            replacement = {**runtime.CASES[name], 'postcondition': 'public-profile-text-saved'}
+            with patch.dict(runtime.CASES, {name: replacement}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('public profile', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['publicProfileVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
     def test_future_shard_attempt_cannot_certify_current_run(self):
         """A future artifact is invalid even when older matching evidence passes."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -700,7 +718,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
 
     def test_folder_cancel_return_restores_viewport_before_untouched_name_assertion(self):
         """The returned LazyColumn stays at filters; an off-screen name is not a failed dismissal."""
-        cases = {name: case for name, case in runtime.CASES.items() if case['suite'] == 'smart-folders'}
+        cases = {name: case for name, case in runtime.CASES.items()
+                 if case['suite'] == 'smart-folders' and name != 'smart-folders-draft-rotation-discard'}
         self.assertEqual(len(cases), 8)
         returned = {'runFlow': '../fixtures/return-from-smart-folder-filter.yaml'}
         for name, case in cases.items():
@@ -736,8 +755,17 @@ class RuntimeEvidenceTest(unittest.TestCase):
             {'takeScreenshot': 'smart-folder-condition-before-rotation'},
         ])
         self.assertEqual(commands[rotation + 1], {'takeScreenshot': 'smart-folder-condition-after-rotation'})
-        self.assertEqual(commands[rotation + 2], {'assertVisible': {'id': 'folder.conditionDone'}})
-        self.assertEqual(commands[rotation + 3], {'setOrientation': 'PORTRAIT'})
+        retained = commands[rotation + 2]['runFlow']
+        self.assertEqual(retained['when'], {'visible': {'id': 'folder.conditionDone'}})
+        self.assertIn({'assertVisible': {'id': 'folder.conditionDone', 'enabled': True}}, retained['commands'])
+        self.assertIn({'assertVisible': {'id': 'folder.mode'}}, retained['commands'])
+        self.assertEqual(retained['commands'][-1], {'tapOn': 'Cancel'})
+        self.assertEqual(commands[rotation + 3:rotation + 6], [
+            {'assertNotVisible': {'id': 'folder.mode'}},
+            {'assertNotVisible': {'id': 'folder.conditionDone'}},
+            {'assertVisible': {'id': 'chat-folder-edit-content'}},
+        ])
+        self.assertIn({'assertNotVisible': {'id': 'folder.group.'}}, commands[rotation:])
         self.assertEqual(runtime.CASES['smart-folders-condition-rotation']['postcondition'], 'folder-absent')
 
     def test_private_contact_editing_proves_recipient_focus_and_dismisses_each_ime(self):

@@ -1,5 +1,5 @@
 appId: dev.ipf.whitenoise.android.maestrolab
-name: smart-folders-condition-rotation
+name: smart-folders-draft-rotation-discard
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: Maestro group
@@ -15,6 +15,16 @@ name: smart-folders-condition-rotation
 - tapOn: New Folder
 - assertVisible:
     id: folder.name
+- tapOn:
+    id: folder.name
+- assertVisible:
+    id: folder.name
+    focused: true
+- inputText: Maestro rotation draft
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rotation draft$
+- hideKeyboard
 - scrollUntilVisible:
     element:
       id: folder.add.
@@ -59,7 +69,29 @@ name: smart-folders-condition-rotation
     direction: DOWN
 - assertNotVisible:
     id: folder.group.
-- runFlow: ../fixtures/return-from-smart-folder-filter.yaml
+- assertVisible:
+    id: chat-folder-edit-content
+- assertNotVisible:
+    id: folder.addField.PARTICIPANTS
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rotation draft$
+- assertVisible:
+    id: folder.save
+    enabled: true
 - back
+- assertVisible: Discard changes?
+- tapOn: Keep Editing
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rotation draft$
+- back
+- assertVisible: Discard changes?
+- tapOn: Discard Changes
 - assertVisible:
     id: chat-folders-content
+- assertNotVisible: Maestro rotation draft
