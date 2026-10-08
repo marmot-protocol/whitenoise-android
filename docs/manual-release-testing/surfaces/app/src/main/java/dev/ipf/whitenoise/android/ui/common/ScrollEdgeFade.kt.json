@@ -37,6 +37,15 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt",
+        "surface": "Shared scroll masks during software-keyboard visibility",
+        "anchor": "WindowInsets.isImeVisible",
+        "test_ids": [
+          "SCR-002",
+          "SCR-003"
+        ]
       }
     ]
   },

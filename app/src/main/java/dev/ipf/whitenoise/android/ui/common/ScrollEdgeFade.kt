@@ -4,6 +4,9 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
@@ -77,12 +80,16 @@ private class ScrollEdgeSource(
 )
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun Modifier.scrollEdgeFade(
     source: ScrollEdgeSource,
     reverseScrolling: Boolean,
     fadeEnabled: Boolean,
     fadeHeight: Dp,
 ): Modifier {
+    // Keyboard forms keep ordinary painting and their caller-owned scroll state.
+    // Remove the added layer immediately; hiding the IME restores the same viewport's cues.
+    if (!fadeEnabled || WindowInsets.isImeVisible) return this
     val top = remember(source.owner, reverseScrolling, fadeEnabled) { Animatable(0.dp, Dp.VectorConverter) }
     val bottom = remember(source.owner, reverseScrolling, fadeEnabled) { Animatable(0.dp, Dp.VectorConverter) }
     LaunchedEffect(source.owner, reverseScrolling, fadeEnabled, fadeHeight) {

@@ -47,7 +47,7 @@
     },
     {
       "surface": "ReportMessageSheet IME form",
-      "reason": "Keep its previously tested ordinary scrolling while the added offscreen mask fails the unchanged real-keyboard regression. Other form fades remain covered; this surface is explicitly deferred."
+      "reason": "Keep its tested ordinary scrolling while the added mask is deferred after real-keyboard emulator disconnects. Their cause is unproven; shared keyboard forms also bypass added masks while the IME is visible."
     },
     {
       "surface": "AddRelaySheet IME form",
@@ -1592,5 +1592,6 @@
         "SCR-004"
       ]
     }
-  ]
+  ],
+  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport’s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
 }

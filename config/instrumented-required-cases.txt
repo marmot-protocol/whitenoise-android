@@ -23,3 +23,7 @@ dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndro
 dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndroidTest#lookaheadBaselineQueryDuringReuseKeepsRectListConsistent
 dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndroidTest#rowAlignmentDuringFarSnapKeepsRectListConsistent
 dev.ipf.whitenoise.android.ui.conversation.messages.ReportMessageImeTest#sendsFromPinnedFooterAboveRealIme
+
+# Added masks must leave real keyboard forms unlayered and preserve their viewport/actions.
+dev.ipf.whitenoise.android.ui.common.ScrollEdgeFadeImeAndroidTest#activityFormRemovesMaskForRealKeyboardAndRestoresItAfterHide
+dev.ipf.whitenoise.android.ui.common.ScrollEdgeFadeImeAndroidTest#sheetFormUsesItsOwnKeyboardWindowWithoutMovingTheFooterIntoIme

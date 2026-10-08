@@ -59,6 +59,7 @@ on:
       # Scroll masks must preserve real IME geometry and Android accessibility export.
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/VerticalEdgeFade.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFadeImeAndroidTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScrollContainers.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/ComposerResizeAccessibilityAndroidTest.kt'
