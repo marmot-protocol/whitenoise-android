@@ -3494,11 +3494,85 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Starting)
         assertTrue(fixture.platform.pendingCallerAudio)
         assertTrue(fixture.controller.hasDurableSession)
+        assertFalse(fixture.controller.foregroundMicrophoneRequired)
+        assertEquals(sessions, fixture.platform.sessions.size)
+        fixture.controller.onAppBackgrounded()
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
         assertEquals(0, fixture.platform.discardedCallerAudio)
         fixture.scheduler.runDelay(500L)
         assertEquals(sessions + 1, fixture.platform.sessions.size)
         assertEquals(1, expired)
         assertEquals(0, fixture.writes)
+    }
+
+    /** Either readiness order needs both promotion acknowledgment and the original backoff deadline. */
+    @Test
+    fun expiredAudioRetryWaitsForPromotionAndBackoffInEitherOrder() {
+        for (acknowledgeBeforeDeadline in listOf(true, false)) {
+            var holdPromotion = false
+            var acknowledgePromotion: () -> Unit = {}
+            var starts = 0
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    startDurableSession = { _, ready ->
+                        starts++
+                        if (holdPromotion) acknowledgePromotion = ready else ready()
+                        true
+                    },
+                )
+            f.platform.pendingCallerAudio = true
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.platform.tracksCallerAudioDisposal = true
+            f.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+            f.scheduler.sleepWithoutDispatch(35 * 60 * 1_000L)
+            holdPromotion = true
+            val sessions = f.platform.sessions.size
+            f.controller.retry()
+            assertTrue(f.controller.hasDurableSession)
+            assertFalse(f.controller.foregroundMicrophoneRequired)
+            f.controller.onAppBackgrounded()
+            f.controller.onAppForegrounded()
+            assertEquals(2, starts)
+            if (acknowledgeBeforeDeadline) acknowledgePromotion()
+            assertEquals(sessions, f.platform.sessions.size)
+            f.scheduler.runDelay(500L)
+            assertEquals(sessions + if (acknowledgeBeforeDeadline) 1 else 0, f.platform.sessions.size)
+            if (!acknowledgeBeforeDeadline) acknowledgePromotion()
+            assertEquals(sessions + 1, f.platform.sessions.size)
+            assertEquals(0, f.platform.discardedCallerAudio)
+            assertTrue(f.platform.pendingCallerAudio)
+            acknowledgePromotion()
+            assertEquals(sessions + 1, f.platform.sessions.size)
+        }
+    }
+
+    /** Rejected foreground enqueue cancels its delayed provider retry without consuming PCM. */
+    @Test
+    fun expiredAudioRetryRejectedPromotionPreservesPcmAndCancelsBackoff() {
+        var acceptsPromotion = true
+        val f =
+            fixture(
+                draft = TextFieldValue(""),
+                startDurableSession = { _, ready ->
+                    ready()
+                    acceptsPromotion
+                },
+            )
+        f.platform.pendingCallerAudio = true
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.platform.tracksCallerAudioDisposal = true
+        f.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        f.scheduler.sleepWithoutDispatch(35 * 60 * 1_000L)
+        acceptsPromotion = false
+        val sessions = f.platform.sessions.size
+        f.controller.retry()
+        assertTrue(f.controller.state is ConversationDictationState.Failed)
+        assertFalse(f.controller.hasDurableSession)
+        assertTrue(f.platform.pendingCallerAudio)
+        assertEquals(0, f.platform.discardedCallerAudio)
+        f.scheduler.runDelay(500L)
+        assertEquals(sessions, f.platform.sessions.size)
     }
 
     /** Neither transcript recovery action may dispatch or paste after an undispatched sleep deadline. */

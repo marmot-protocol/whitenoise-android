@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,9 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -239,18 +238,24 @@ class ConversationDictationDraftPresentationTest {
     fun staleDiscardDialogCannotConsumeAudioAfterConversationNavigation() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val f = Fixture()
-        composeRule.setContent { f.RenderComposer() }
+        var currentDictate: () -> Unit = {}
+        composeRule.setContent {
+            val action = rememberComposerDictationAction(f.controller, ACCOUNT, f.visibleGroup, f.draft, null)
+            SideEffect { currentDictate = action }
+            f.RenderComposer()
+        }
         composeRule.runOnIdle { f.retainTail() }
         composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.discard)).performClick()
-        val oldDiscard =
-            composeRule.onNode(hasText(context.getString(R.string.discard)) and hasClickAction())
-                .fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldDictate = currentDictate
         composeRule.runOnIdle { f.visibleGroup = "other" }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("dictation-discard-confirmation").assertDoesNotExist()
         composeRule.runOnIdle {
-            oldDiscard()
+            // Invoke the production app callback, not a detached Compose clickable node.
+            val availabilityReads = f.targetAvailabilityReads
+            oldDictate()
+            assertEquals(availabilityReads, f.targetAvailabilityReads)
             assertTrue(f.pendingAudio)
             assertTrue(f.controller.state is ConversationDictationState.Failed)
         }
@@ -263,6 +268,7 @@ class ConversationDictationDraftPresentationTest {
     ) {
         var draft by mutableStateOf(TextFieldValue("Draft", TextRange(5)))
         var visibleGroup by mutableStateOf(GROUP)
+        var targetAvailabilityReads = 0
 
         // Native draft generations and editor presentation revisions are separate domains.
         var revision = 41L
@@ -325,6 +331,10 @@ class ConversationDictationDraftPresentationTest {
                             }
                         }
                     },
+                targetAvailable = { _, _ ->
+                    targetAvailabilityReads++
+                    true
+                },
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
                 writeDraft = { _, _, expected, value ->
                     if (expected != revision) {

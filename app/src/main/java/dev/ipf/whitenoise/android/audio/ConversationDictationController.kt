@@ -1602,6 +1602,9 @@ internal class ConversationDictationController internal constructor(
             startRecognition(failed.sessionId, failed.target)
         } else {
             scheduleRetainedCallerAudioRetry(failed.sessionId, failed.target, delayMillis)
+            // Pending foreground ownership protects a background return during provider backoff.
+            // Promotion acknowledgment cannot start recognition before this timer completes.
+            ensureDurableSession(failed.sessionId, failed.target)
         }
     }
 
@@ -1875,7 +1878,7 @@ internal class ConversationDictationController internal constructor(
         promotionTimeoutHandle?.cancel()
         promotionTimeoutHandle = null
         durableSessionReady = true
-        startRecognition(sessionId, target)
+        if (!finishRequested || restartTimeoutHandle == null) startRecognition(sessionId, target)
     }
 
     private fun ownsDurableSession(
