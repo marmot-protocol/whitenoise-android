@@ -1495,22 +1495,20 @@ internal class ConversationDictationController internal constructor(
             conversationDictationDiagnostic("event=retry accepted=false reason=delivery_unknown")
             return
         }
+        val pendingAudio = runCatching(platform::callerAudioHasPending).getOrNull() ?: return
         if (recoveryHandedToComposer) {
+            if (!pendingAudio) return
             completionIntent.reset()
             completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
-            if (!runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
-                retainSupersededSendDraft(failed)
-                return
-            }
         }
-        if (retainSupersededSendDraft(failed)) return
+        if (retainSupersededSendDraft(failed, pendingAudio)) return
         recoveryTimeoutHandle?.cancel()
         recoveryTimeoutHandle = null
         recoveryDeadlineElapsedMillis = null
         recoveryProtectionExpired = false
         pendingForegroundRecoverySessionId = null
         notificationActionGeneration += 1L
-        if (finishRequested && runCatching(platform::callerAudioHasPending).getOrDefault(false)) {
+        if (finishRequested && pendingAudio) {
             retryRetainedCallerAudio(failed)
             return
         }
@@ -1534,6 +1532,7 @@ internal class ConversationDictationController internal constructor(
         failed: ConversationDictationState.Failed,
         transcript: String,
     ) {
+        if (recoveryHandedToComposer) return
         conversationDictationDiagnostic("event=retry path=retained_transcript")
         val retrySend =
             failed.reason == ConversationDictationFailure.SendBlocked ||
@@ -1554,7 +1553,10 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Keeps an intentionally edited saved draft and its original deadline without restarting recovery. */
-    private fun retainSupersededSendDraft(failed: ConversationDictationState.Failed): Boolean {
+    private fun retainSupersededSendDraft(
+        failed: ConversationDictationState.Failed,
+        pendingAudio: Boolean,
+    ): Boolean {
         val hasBlockedText =
             failed.reason == ConversationDictationFailure.SendBlocked && !failed.retainedTranscript.isNullOrBlank()
         if (!hasBlockedText) return false
@@ -1566,7 +1568,7 @@ internal class ConversationDictationController internal constructor(
                 requireVerifiedRecovery = false,
             )
         if (!savedBefore || canRetryRecoveredSend) return false
-        if (runCatching(platform::callerAudioHasPending).getOrDefault(true)) return false
+        if (pendingAudio) return false
         val recovery = recoverRecognizedDraftResult(failed.sessionId, failed.target, failed.retainedTranscript)
         if (state !== failed) return true
         state =

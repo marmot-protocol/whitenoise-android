@@ -194,6 +194,59 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
         harness.conversationDictation.cancel()
     }
 
+    /** A previously displayed drawer Retry cannot resend a saved prefix when audio reads become unavailable. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun displayedAudioRetryFailsClosedAfterPendingAudioReadStartsThrowing() =
+        runTest {
+            val harness = Harness(this)
+            harness.acceptSend = false
+            harness.platform.pendingCallerAudio = true
+            ConversationDictationForegroundService.hostResolver = { harness }
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            try {
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                harness.platform.listener.onResult("first")
+                shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+                harness.conversationDictation.send()
+                repeat(2) {
+                    harness.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+                    shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+                }
+                harness.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+                runCurrent()
+                val failed = harness.conversationDictation.state as ConversationDictationState.Failed
+                assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+                assertTrue(harness.conversationDictation.recoveryHandedToComposer)
+                assertFalse(harness.conversationDictation.foregroundMicrophoneRequired)
+                service.foreground.dictation.refreshNotification()
+                val notice =
+                    service
+                        .getSystemService(NotificationManager::class.java)
+                        .activeNotifications
+                        .single { it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID }
+                        .notification
+                val retry = notice.actions.single { it.title == service.getString(R.string.retry) }.actionIntent
+                val command = shadowOf(retry).savedIntent
+                val sessions = harness.platform.sessionsCreated
+                val captures = harness.platform.captureSessionsStarted
+                harness.acceptSend = true
+                harness.platform.callerAudioStateFailure = IllegalStateException("audio state unavailable")
+                service.onStartCommand(command, 0, 2)
+                shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+                runCurrent()
+                assertTrue(harness.conversationDictation.state === failed)
+                assertEquals(sessions, harness.platform.sessionsCreated)
+                assertEquals(captures, harness.platform.captureSessionsStarted)
+                assertTrue(harness.platform.pendingCallerAudio)
+                assertTrue(harness.sent.isEmpty())
+                assertEquals("first", harness.draft.text)
+            } finally {
+                lifecycle.destroy()
+            }
+        }
+
     /** Connection readiness is invalidated even when microphone ownership keeps the host alive. */
     @Test
     @Config(application = Application::class)
@@ -803,9 +856,18 @@ internal abstract class ConversationDictationNotificationTestFixture {
 
     protected class FakePlatform : ConversationDictationPlatform {
         var sessionsCreated = 0
+        var captureSessionsStarted = 0
         var pendingCallerAudio = false
+        var callerAudioStateFailure: RuntimeException? = null
 
-        override fun callerAudioHasPending(): Boolean = pendingCallerAudio
+        override fun beginCaptureSession() {
+            captureSessionsStarted++
+        }
+
+        override fun callerAudioHasPending(): Boolean {
+            callerAudioStateFailure?.let { throw it }
+            return pendingCallerAudio
+        }
 
         lateinit var listener: ConversationDictationRecognitionListener
 

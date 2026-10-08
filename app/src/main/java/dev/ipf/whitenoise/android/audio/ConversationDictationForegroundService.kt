@@ -102,7 +102,7 @@ internal class ConversationDictationForegroundService(
                 ACTION_CANCEL -> controller.cancel()
                 ACTION_PASTE -> controller.paste()
                 ACTION_SEND -> controller.send()
-                ACTION_RETRY_AUDIO -> if (!controller.foregroundMicrophoneRequired) controller.retry()
+                ACTION_RETRY_AUDIO -> controller.retryRetainedAudioIfAvailable()
                 ACTION_DISCARD_RECOVERY -> controller.cancel()
             }
             // A completion received before the queued start must not promote stale controls
@@ -409,6 +409,11 @@ internal class ConversationDictationForegroundService(
             )
         }
     }
+}
+
+/** Rechecks a drawer action's audio and closure prerequisites at the moment it is handled. */
+private fun ConversationDictationController.retryRetainedAudioIfAvailable() {
+    if (canRetryRetainedAudio && !foregroundMicrophoneRequired) retry()
 }
 
 /** Recognizes API 31+'s explicit foreground-start rejection without resolving that class on older Android. */

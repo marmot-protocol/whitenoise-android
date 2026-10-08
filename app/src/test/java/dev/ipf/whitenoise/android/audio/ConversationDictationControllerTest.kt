@@ -4299,6 +4299,101 @@ class ConversationDictationControllerTest {
             }
         }
 
+    /** Saved prefix ownership cannot turn an unreadable or absent audio queue into another Send. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun handedOffBlockedSendRetryFailsClosedWithoutPendingAudioEvidence() =
+        runTest {
+            for (unreadable in listOf(false, true)) {
+                var acceptSend = false
+                var attempts = 0
+                val sent = mutableListOf<String>()
+                val f =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = {
+                            attempts++
+                            (acceptSend && it.beginDispatch()).also { claimed -> if (claimed) sent += it.payload }
+                        },
+                    )
+                failRecognizedTail(f, send = true)
+                advanceUntilIdle()
+                val failed = f.controller.state as ConversationDictationState.Failed
+                assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+                assertTrue(f.controller.recoveryHandedToComposer)
+                assertEquals("first", f.drafts.getValue(key()).text)
+                val sessions = f.platform.sessions.size
+                val captures = f.platform.captureSessionsStarted
+                val generation = f.controller.notificationActionGeneration
+                f.platform.tracksCallerAudioDisposal = true
+                acceptSend = true
+                f.platform.onCallerAudioStateRead = {
+                    if (unreadable) error("audio state unavailable") else false
+                }
+                repeat(2) { f.controller.retry() }
+                f.scheduler.advanceBy(500L)
+                runCurrent()
+                assertTrue(f.controller.state === failed)
+                assertEquals(generation, f.controller.notificationActionGeneration)
+                assertEquals(sessions, f.platform.sessions.size)
+                assertEquals(captures, f.platform.captureSessionsStarted)
+                assertEquals(1, attempts)
+                assertTrue(sent.isEmpty())
+                assertTrue(f.platform.pendingCallerAudio)
+                assertEquals(0, f.platform.discardedCallerAudio)
+                assertEquals("first", f.drafts.getValue(key()).text)
+            }
+        }
+
+    /** One positive Retry admission cannot be replaced by a contradictory probe and old SendBlocked intent. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun handedOffAudioRetryUsesOneAdmissionReadAndNeverResendsRejectedPrefix() =
+        runTest {
+            for (unreadable in listOf(false, true)) {
+                var acceptSend = false
+                val sent = mutableListOf<String>()
+                val f =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = {
+                            (acceptSend && it.beginDispatch()).also { claimed -> if (claimed) sent += it.payload }
+                        },
+                    )
+                failRecognizedTail(f, send = true)
+                advanceUntilIdle()
+                assertEquals(
+                    ConversationDictationFailure.SendBlocked,
+                    (f.controller.state as ConversationDictationState.Failed).reason,
+                )
+                assertTrue(f.controller.recoveryHandedToComposer)
+                val captures = f.platform.captureSessionsStarted
+                var reads = 0
+                acceptSend = true
+                f.platform.onCallerAudioStateRead = {
+                    reads++
+                    if (reads == 1) true else if (unreadable) error("audio state changed") else false
+                }
+                f.controller.retry()
+                assertEquals(1, reads)
+                assertTrue(f.controller.state is ConversationDictationState.Starting)
+                assertFalse(f.controller.completionControlsRequired)
+                assertTrue(f.platform.pendingCallerAudio)
+                assertEquals("first", f.drafts.getValue(key()).text)
+                f.platform.onCallerAudioStateRead = null
+                f.scheduler.runDelay(500L)
+                f.platform.pendingCallerAudio = false
+                f.platform.listener.onResult("tail")
+                advanceUntilIdle()
+                assertEquals(captures, f.platform.captureSessionsStarted)
+                assertTrue(sent.isEmpty())
+                assertEquals("first tail", f.drafts.getValue(key()).text)
+                assertTrue(f.controller.state is ConversationDictationState.Idle)
+            }
+        }
+
     /** Android's distinct outcomes preserve timeout retries without labelling a no-match as silence. */
     @Test
     fun noMatchAndSpeechTimeoutHaveDistinctRecoveryOutcomes() {
@@ -7657,6 +7752,7 @@ class ConversationDictationControllerTest {
         var forceCaptureFailure: RuntimeException? = null
         var discardCaptureFailure: RuntimeException? = null
         var callerAudioStateFailure: RuntimeException? = null
+        var onCallerAudioStateRead: (() -> Boolean)? = null
         var captureSessionsStarted = 0
         var onRetainedCallerAudioRetry: () -> Unit = {}
 
@@ -7708,7 +7804,7 @@ class ConversationDictationControllerTest {
         /** Lets lifecycle tests retain caller PCM independently of recognizer readiness. */
         override fun callerAudioHasPending(): Boolean {
             callerAudioStateFailure?.let { throw it }
-            return audioBuffer?.hasPending ?: pendingCallerAudio
+            return onCallerAudioStateRead?.invoke() ?: audioBuffer?.hasPending ?: pendingCallerAudio
         }
 
         override fun acknowledgeRetainedCallerAudioFailure() = onRetainedCallerAudioRetry()
