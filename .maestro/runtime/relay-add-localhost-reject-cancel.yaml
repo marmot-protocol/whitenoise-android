@@ -31,15 +31,14 @@ name: relay-add-localhost-reject-cancel
 - assertVisible:
     id: relay.add.url
     text: ^wss://localhost$
-- !!set
-  hideKeyboard: null
+- hideKeyboard
 - assertVisible:
     id: relay.add.submit
     enabled: false
-- back: null
+- back
 - assertNotVisible:
     id: relay.add.url
 - assertVisible:
     id: relays.group
-- back: null
+- back
 - assertVisible: Settings

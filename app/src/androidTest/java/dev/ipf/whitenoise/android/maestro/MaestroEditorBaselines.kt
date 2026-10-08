@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.maestro
 
-import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -11,7 +10,7 @@ internal data class MaestroEditorBaselines(
     val profileOwner: String?,
     val publicProfiles: Map<String, UserProfileMetadataFfi>,
     val folderRules: MaestroFolderRulesBaseline?,
-    val relayLists: Map<String, AccountRelayListsFfi>,
+    val relayLists: MaestroRelayListsBaseline?,
 )
 
 /** Snapshot only the selected editor's real owner state before launching the Activity. */
@@ -33,11 +32,15 @@ internal suspend fun captureMaestroEditorBaselines(
     val folders = if (postcondition.startsWith("smart-rule-")) captureMaestroFolderRules(state) else null
     val relays =
         if (postcondition == "relay-lists-unchanged") {
+            val relayOwner = withContext(Dispatchers.Main.immediate) { checkNotNull(state.activeAccountRef) }
             withContext(Dispatchers.IO) {
-                accounts.associate { it.label to native.accountRelayLists(it.label) }
+                MaestroRelayListsBaseline(
+                    relayOwner,
+                    accounts.associate { it.label to native.accountRelayLists(it.label) },
+                )
             }
         } else {
-            emptyMap()
+            null
         }
     return MaestroEditorBaselines(owner, profiles, folders, relays)
 }

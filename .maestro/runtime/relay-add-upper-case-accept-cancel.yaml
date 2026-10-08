@@ -31,15 +31,14 @@ name: relay-add-upper-case-accept-cancel
 - assertVisible:
     id: relay.add.url
     text: ^WSS://RELAY\.EXAMPLE\.INVALID/path$
-- !!set
-  hideKeyboard: null
+- hideKeyboard
 - assertVisible:
     id: relay.add.submit
     enabled: true
-- back: null
+- back
 - assertNotVisible:
     id: relay.add.url
 - assertVisible:
     id: relays.group
-- back: null
+- back
 - assertVisible: Settings

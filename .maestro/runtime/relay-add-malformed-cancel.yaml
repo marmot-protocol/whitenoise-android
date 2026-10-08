@@ -31,15 +31,14 @@ name: relay-add-malformed-cancel
 - assertVisible:
     id: relay.add.url
     text: ^not\-a\-relay$
-- !!set
-  hideKeyboard: null
+- hideKeyboard
 - assertVisible:
     id: relay.add.submit
     enabled: false
-- back: null
+- back
 - assertNotVisible:
     id: relay.add.url
 - assertVisible:
     id: relays.group
-- back: null
+- back
 - assertVisible: Settings

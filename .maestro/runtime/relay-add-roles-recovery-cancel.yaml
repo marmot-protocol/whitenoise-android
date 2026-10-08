@@ -31,8 +31,7 @@ name: relay-add-roles-recovery-cancel
 - assertVisible:
     id: relay.add.url
     text: ^wss://relay\.example\.invalid$
-- !!set
-  hideKeyboard: null
+- hideKeyboard
 - assertVisible:
     id: relay.add.submit
     enabled: true
@@ -47,10 +46,10 @@ name: relay-add-roles-recovery-cancel
 - assertVisible:
     id: relay.add.submit
     enabled: true
-- back: null
+- back
 - assertNotVisible:
     id: relay.add.url
 - assertVisible:
     id: relays.group
-- back: null
+- back
 - assertVisible: Settings

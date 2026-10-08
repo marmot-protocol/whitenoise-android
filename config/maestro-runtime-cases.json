@@ -2469,6 +2469,86 @@
       ],
       "assertions": "The actual relay editor accepts the upper-case URL format and closes without Add; all three complete native account relay projections remain unchanged.",
       "postcondition": "relay-lists-unchanged"
+    },
+    "inbound-share-owned-error-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-invalid-owned",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-http-error-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-invalid-http",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-continue-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; explicit partial acknowledgment/target staging preserves the exact Unicode/whitespace owner draft; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-text-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-text-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-text-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; explicit partial acknowledgment/target staging preserves the exact Unicode/whitespace owner draft; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-staged"
     }
   }
 }

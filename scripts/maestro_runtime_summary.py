@@ -114,6 +114,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and read_json(leaf / 'verified.json').get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')
+                if (CASES[name]['postcondition'].startswith('share-request-')
+                        and read_json(leaf / 'verified.json').get('shareImportVerified') is not True):
+                    raise ValueError('Actual inbound share recovery and no-send proof was not verified')
                 ready = read_json(leaf / 'ready.json')
                 if (ready.get('accounts') != 3 or ready.get('fixture') != CASES[name].get('fixture', 'basic')
                         or ready.get('uiObserver') != 'maestro'):

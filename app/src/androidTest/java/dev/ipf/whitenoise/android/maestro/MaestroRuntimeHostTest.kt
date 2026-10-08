@@ -83,6 +83,8 @@ private val MAESTRO_POSTCONDITIONS =
         "smart-rule-title",
         "smart-rule-absent",
         "relay-lists-unchanged",
+        "share-request-cancelled",
+        "share-request-staged",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -121,6 +123,7 @@ class MaestroRuntimeHostTest {
             var expectedAccountIds: Set<String> = emptySet()
             var externalContact: MaestroExternalContact? = null
             var editorBaselines: MaestroEditorBaselines? = null
+            var inboundShareBaseline: MaestroInboundShareBaseline? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -207,8 +210,10 @@ class MaestroRuntimeHostTest {
                             .put("title", nativeRow.presentation.title.toString())
                             .toString(),
                     )
-                    activity = ActivityScenario.launch(MainActivity::class.java)
+                    activity = ActivityScenario.launch(maestroRuntimeLaunchIntent(context, fixture))
                     checkNotNull(activity).onActivity { originalActivity = it }
+                    inboundShareBaseline =
+                        captureMaestroInboundShare(native, app, checkNotNull(activity), group, fixture)
                     // Maestro alone owns Android accessibility; this receipt certifies native handoff only.
                     File(directory, "ready.json").writeText(
                         JSONObject()
@@ -262,6 +267,16 @@ class MaestroRuntimeHostTest {
                                 context,
                                 checkNotNull(state),
                                 checkNotNull(editorBaselines).folderRules,
+                                postcondition,
+                            ),
+                        )
+                        .put(
+                            "shareImportVerified",
+                            verifyMaestroInboundShare(
+                                native,
+                                checkNotNull(state),
+                                checkNotNull(activity),
+                                inboundShareBaseline,
                                 postcondition,
                             ),
                         )

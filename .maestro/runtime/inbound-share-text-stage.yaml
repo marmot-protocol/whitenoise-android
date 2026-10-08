@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-text-stage
+---
+- runFlow: ../fixtures/runtime-share-text-ready.yaml
+- assertNotVisible: Some files could not be imported
+- assertVisible:
+    id: performance.share_picker
+- assertVisible: Maestro group
+- assertVisible:
+    text: ^Share$
+    enabled: false
+- tapOn: Maestro group
+- assertVisible:
+    text: ^Share to 1 chat$
+    enabled: true
+- tapOn:
+    text: ^Share to 1 chat$
+- assertNotVisible:
+    id: performance.share_picker
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible:
+    text: '^\ \ Maestro\ café\ 👋\
+
+      second\ line\ \ $'

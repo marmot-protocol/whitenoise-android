@@ -31,15 +31,14 @@ name: relay-add-secure-443-accept-cancel
 - assertVisible:
     id: relay.add.url
     text: ^wss://relay\.example\.invalid:443/path\?fixture=1$
-- !!set
-  hideKeyboard: null
+- hideKeyboard
 - assertVisible:
     id: relay.add.submit
     enabled: true
-- back: null
+- back
 - assertNotVisible:
     id: relay.add.url
 - assertVisible:
     id: relays.group
-- back: null
+- back
 - assertVisible: Settings

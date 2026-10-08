@@ -288,6 +288,26 @@ class CampaignSummaryTest(unittest.TestCase):
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
 
+    def test_generic_native_success_cannot_certify_inbound_share_recovery(self):
+        """UI navigation needs real imported-error/request-cleanup/no-send native evidence."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'share-request-staged'}}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('inbound share', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['shareImportVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
+                record['shareImportVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
     def test_future_shard_attempt_cannot_certify_current_run(self):
         """A future artifact is invalid even when older matching evidence passes."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -416,6 +436,28 @@ class RuntimeEvidenceTest(unittest.TestCase):
         text = markdown_inventory(result)
         for dimension in EDGE_DIMENSIONS:
             self.assertEqual(text.count(f'- [ ] **{dimension}**'), len(result['screen_catalog']))
+
+    def test_runtime_flow_commands_reject_yaml_sets_and_unsupported_shapes(self):
+        """A valid YAML set is still an invalid Maestro command; inspect nested flows too."""
+        def validate(commands):
+            self.assertIsInstance(commands, list)
+            for command in commands:
+                if isinstance(command, str):
+                    self.assertIn(command, ('hideKeyboard', 'back', 'eraseText'))
+                    continue
+                self.assertIsInstance(command, dict)
+                self.assertEqual(len(command), 1)
+                name, args = next(iter(command.items()))
+                self.assertNotIn(name, ('hideKeyboard', 'back'))
+                if name in ('retry', 'repeat') or (
+                        name == 'runFlow' and isinstance(args, dict) and 'commands' in args):
+                    validate(args['commands'])
+        for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
+            with self.subTest(flow=path.name):
+                validate(list(yaml.safe_load_all(path.read_text()))[1])
+        for invalid in ([{'hideKeyboard'}], [{'back': None}], [{'tapOn': 'X', 'hideKeyboard': None}]):
+            with self.subTest(invalid=invalid), self.assertRaises(AssertionError):
+                validate(invalid)
 
     def test_long_press_uses_a_command_not_an_unsupported_tap_property(self):
         """Regress the actual CLI parse failure that prevented all contextual-menu journeys."""

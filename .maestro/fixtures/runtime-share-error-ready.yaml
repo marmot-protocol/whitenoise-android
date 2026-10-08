@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: emulator-interruption.yaml
+- retry:
+    maxRetries: 3
+    commands:
+    - runFlow:
+        when:
+          visible: Help Improve White Noise
+        commands:
+        - tapOn: Close
+    - runFlow:
+        when:
+          visible: Allow Maestro Test Lab to send you notifications\?
+        commands:
+        - tapOn:
+            id: com.android.permissioncontroller:id/permission_deny_button
+    - assertVisible: Some files could not be imported

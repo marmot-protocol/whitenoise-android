@@ -15,11 +15,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-internal data class MaestroFolderRulesBaseline(
-    val owner: String,
-    val accounts: Map<String, ChatFolderAccountState>,
-)
-
 /** Capture real existing folders, memberships, exclusions and rules before the editor can mutate them. */
 internal suspend fun captureMaestroFolderRules(state: WhiteNoiseAppState): MaestroFolderRulesBaseline =
     withContext(Dispatchers.Main.immediate) {
