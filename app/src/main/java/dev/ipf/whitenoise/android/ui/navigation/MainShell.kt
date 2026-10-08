@@ -2433,7 +2433,7 @@ internal fun MainShell(
                                         origin.searchOpen.value = false
                                         origin.searchState.value =
                                             dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
-                                                .close(request)
+                                                .closeSearch(request)
                                     }
                                     selectedChatListFolderId = null
                                     appState.clearActiveConversation()
