@@ -222,7 +222,9 @@ class ComposerTypingStabilityScreenshotTest {
         firstFrame: () -> Unit = {},
     ) {
         var captured = false
-        repeat(COMPOSER_EXPANSION_ANIMATION_MILLIS / (FRAME_STEP_MS * 4)) {
+        val frameBatchMillis = FRAME_STEP_MS * 4
+        val animationBatches = (COMPOSER_EXPANSION_ANIMATION_MILLIS + frameBatchMillis - 1) / frameBatchMillis
+        repeat(animationBatches + 1) {
             assertStableDraftTopFrames(composeRule, { value }, { sends }, bounds) {
                 assertEquals(48.dp, extraHeight)
                 if (!captured) {
