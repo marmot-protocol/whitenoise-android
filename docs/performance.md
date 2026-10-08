@@ -481,8 +481,8 @@ the captured override file identifies the recovery state. A concurrent Dev
 installation invalidates the campaign. Ownership checks run before instrumentation,
 after measurement and before restoration; the runner refuses to overwrite unexpected
 code. Resolve the competing install and take a new private backup before retrying.
-The host also captures and verifies the fixture notification permission and FCM
-receiver override, restoring them even if the instrumented process terminates.
+The host also captures and verifies fixture notification permission, FCM receiver
+override and receipt-listener access, restoring them even if instrumentation dies.
 
 ### Resource campaign acceptance
 

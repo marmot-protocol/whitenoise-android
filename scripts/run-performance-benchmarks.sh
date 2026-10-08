@@ -251,6 +251,9 @@ delivery_state_captured=false
 original_delivery_state=""
 protected_users_changed=false
 original_protected_users=""
+listener_state_captured=false
+original_listener_granted=""
+fixture_listener="$test_package/dev.ipf.whitenoise.android.benchmark.BackgroundDeliveryReceiptListener"
 
 capture_device_state() {
   local destination="$1"
@@ -418,6 +421,22 @@ restore_fixture_delivery_state() {
   }
 }
 
+fixture_listener_granted() {
+  adb_cmd shell settings --user "$benchmark_user" get secure enabled_notification_listeners |
+    python3 scripts/background_fixture_state.py --listener-grant
+}
+
+restore_fixture_listener() {
+  local action restored
+  if [[ "$original_listener_granted" == true ]]; then action=allow_listener; else action=disallow_listener; fi
+  adb_cmd shell cmd notification "$action" "$fixture_listener" "$benchmark_user" >/dev/null 2>&1 || true
+  restored="$(fixture_listener_granted)" || return 1
+  [[ "$restored" == "$original_listener_granted" ]] || {
+    echo "The fixture receipt listener's original access was not restored." >&2
+    return 1
+  }
+}
+
 restore_wifi_state() {
   local action restored attempt
   if [[ "$original_wifi_enabled" == true ]]; then action=enabled; else action=disabled; fi
@@ -441,6 +460,9 @@ cleanup() {
     if ((status == 0)); then status=1; fi
   fi
   if [[ "$delivery_state_captured" == true ]] && ! restore_fixture_delivery_state; then
+    if ((status == 0)); then status=1; fi
+  fi
+  if [[ "$listener_state_captured" == true ]] && ! restore_fixture_listener; then
     if ((status == 0)); then status=1; fi
   fi
   if [[ "$heads_up_setting_captured" == true ]] && ! restore_heads_up_notifications; then
@@ -475,6 +497,11 @@ if [[ -n "${QUALIFICATION_USER_ID:-}" ]]; then
     exit 1
   }
   delivery_state_captured=true
+  original_listener_granted="$(fixture_listener_granted)" || {
+    echo "Cannot capture the fixture receipt listener's prior access." >&2
+    exit 1
+  }
+  listener_state_captured=true
 fi
 
 if [[ "$allow_network_toggle" == true ]]; then

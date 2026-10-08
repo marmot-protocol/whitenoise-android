@@ -1,8 +1,13 @@
 """Pin restoration against personal-user state, absent permissions and ambiguous overrides."""
 
+import os
+import re
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
-from scripts.background_fixture_state import RECEIVER, delivery_state, protected_users
+from scripts.background_fixture_state import LISTENER_CLASS, LISTENER_PACKAGE, RECEIVER, delivery_state, listener_granted, protected_users
 
 
 class DeliveryStateTest(unittest.TestCase):
@@ -79,6 +84,71 @@ class DeliveryStateTest(unittest.TestCase):
         self.assertTrue(delivery_state(text, 11)["permission_granted"])
         text = "    User 0: installed=true enabled=0\n    User 11: installed=true enabled=0\n    User 0:\n    User 11:\n"
         self.assertEqual(protected_users(text, 11), [{"user": 0, "action": "default-state"}])
+
+    def test_listener_short_and_full_spelling_preserve_prior_access(self):
+        self.assertTrue(listener_granted(f"{LISTENER_PACKAGE}/{LISTENER_CLASS}"))
+        self.assertTrue(listener_granted(f"foreign.listener/.Service:{LISTENER_PACKAGE}/.BackgroundDeliveryReceiptListener"))
+
+    def test_unrelated_listener_or_class_substring_is_not_fixture_access(self):
+        self.assertFalse(listener_granted(f"foreign.listener/{LISTENER_CLASS}"))
+        self.assertFalse(listener_granted(f"{LISTENER_PACKAGE}/{LISTENER_CLASS}Other"))
+        self.assertFalse(listener_granted("null"))
+
+
+class ListenerCrashCleanupTest(unittest.TestCase):
+    """Run the actual host exit trap after a failed child, without Android or Kotlin cleanup."""
+
+    def test_host_exit_restores_granted_and_ungranted_listener(self):
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts/run-performance-benchmarks.sh").read_text()
+        functions = "\n".join(
+            re.search(rf"^{name}\(\) \{{\n.*?^\}}", script, re.M | re.S).group(0)
+            for name in ("fixture_listener_granted", "restore_fixture_listener", "cleanup")
+        )
+        foreign = "unrelated.listener/.Service"
+        fixture = f"{LISTENER_PACKAGE}/{LISTENER_CLASS}"
+        for granted in (False, True):
+            with self.subTest(granted=granted), tempfile.TemporaryDirectory() as directory:
+                state = Path(directory) / "listeners"
+                original = foreign + (":" + fixture if granted else "")
+                state.write_text(original + "\n")
+                environment = dict(os.environ, FIXTURE_LISTENER_STATE=str(state))
+                mock = r'''
+set -euo pipefail
+adb_cmd() {
+  if [[ "$*" == "shell settings --user 11 get secure enabled_notification_listeners" ]]; then
+    cat "$FIXTURE_LISTENER_STATE"
+  elif [[ "$*" == "shell cmd notification allow_listener $fixture_listener 11" ]]; then
+    printf '%s\n' "unrelated.listener/.Service:$fixture_listener" >"$FIXTURE_LISTENER_STATE"
+  elif [[ "$*" == "shell cmd notification disallow_listener $fixture_listener 11" ]]; then
+    printf '%s\n' "unrelated.listener/.Service" >"$FIXTURE_LISTENER_STATE"
+  else
+    return 99
+  fi
+}
+benchmark_user=11
+fixture_listener=dev.ipf.whitenoise.android.benchmark/dev.ipf.whitenoise.android.benchmark.BackgroundDeliveryReceiptListener
+airplane_mode_captured=false
+wifi_state_captured=false
+delivery_state_captured=false
+listener_state_captured=true
+heads_up_setting_captured=false
+device_output_pulled=false
+target_replaced=false
+protected_users_changed=false
+result_file="$FIXTURE_LISTENER_STATE-unused"
+'''
+                run = mock + "\n" + functions + "\n" + r'''
+original_listener_granted="$(fixture_listener_granted)"
+trap cleanup EXIT
+# Simulate a changed grant followed by instrumentation death: no Kotlin finally.
+if [[ "$original_listener_granted" == true ]]; then action=disallow_listener; else action=allow_listener; fi
+adb_cmd shell cmd notification "$action" "$fixture_listener" 11
+exit 37
+'''
+                result = subprocess.run(["bash", "-c", run], cwd=root, env=environment, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 37, result.stderr)
+                self.assertEqual(state.read_text(), original + "\n")
 
 
 if __name__ == "__main__":

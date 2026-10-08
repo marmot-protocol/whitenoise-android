@@ -7,8 +7,7 @@ internal class BackgroundFixtureGuard(
     private val device: UiDevice,
 ) {
     /** Requires the explicitly authorized instrumentation profile to remain foreground. */
-    fun requireForeground(): Int =
-        BenchmarkConfig.requireQualificationUser(device.executeShellCommand("am get-current-user"))
+    fun requireForeground(): Int = BenchmarkConfig.requireQualificationUser(device.executeShellCommand("am get-current-user"))
 
     /** Captures one live target process after sleep; radio or permission changes may have killed it. */
     fun requireScreenOffProcess(): Int {

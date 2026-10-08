@@ -33,9 +33,10 @@ class NetworkRecoveryBenchmark {
     fun backgroundValidatedNetworkRecoveryPower() {
         requireFixtureForeground()
         val originalAirplaneMode = BenchmarkConfig.requireNetworkToggle()
-        val originalWifiEnabled = requireNotNull(BenchmarkConfig.originalWifiEnabled) {
-            "The host must capture the original Wi-Fi state before qualification."
-        }
+        val originalWifiEnabled =
+            requireNotNull(BenchmarkConfig.originalWifiEnabled) {
+                "The host must capture the original Wi-Fi state before qualification."
+            }
         require(originalAirplaneMode == BenchmarkAirplaneMode.Disabled) {
             "Prepare an online fixture before the background recovery measurement."
         }
