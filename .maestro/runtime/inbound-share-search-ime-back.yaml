@@ -1,0 +1,32 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-search-ime-back
+---
+- runFlow: ../fixtures/runtime-share-text-ready.yaml
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    text: ^Share$
+- tapOn: Search chats
+- assertVisible:
+    focused: true
+- inputText: Maestro
+- assertVisible:
+    focused: true
+    text: ^Maestro$
+- back
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    text: ^Share$
+- tapOn: Close
+- assertNotVisible: Some files could not be imported
+- assertNotVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$

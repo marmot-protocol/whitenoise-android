@@ -459,6 +459,31 @@ class RuntimeEvidenceTest(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(AssertionError):
                 validate(invalid)
 
+    def test_saved_folder_rule_checks_return_from_the_reopened_title_viewport(self):
+        """Reopen parks at the title, so the Match any proof must move toward the lower rules."""
+        path = runtime.ROOT / '.maestro/runtime/folder-rules-match-any-reopen.yaml'
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        reopen = commands.index({'runFlow': '../fixtures/save-and-reopen-smart-folder.yaml'})
+        self.assertEqual(commands[reopen + 1], {
+            'scrollUntilVisible': {'element': {'id': 'folder.match.'}, 'direction': 'DOWN'}})
+        keyword = runtime.ROOT / '.maestro/runtime/folder-rules-title-save-reopen.yaml'
+        commands = list(yaml.safe_load_all(keyword.read_text()))[1]
+        typing = commands.index({'inputText': 'Maestro'})
+        self.assertEqual(commands[typing - 1], {'assertVisible': {'focused': True}})
+        self.assertEqual(commands[typing + 1], {
+            'assertVisible': {'focused': True, 'text': '^Maestro$'}})
+
+    def test_share_account_sheet_dismissal_distinguishes_the_persistent_open_button(self):
+        """The opener's accessible label survives dismissal and cannot certify an absent sheet."""
+        for path in (runtime.ROOT / '.maestro/runtime').glob('inbound-share-account-*.yaml'):
+            commands = list(yaml.safe_load_all(path.read_text()))[1]
+            self.assertNotIn({'assertNotVisible': '^Choose sending account$'}, commands)
+            self.assertIn({'assertNotVisible':
+                           '^Choose which signed-in account will own these shared drafts\\.$'}, commands)
+            case = runtime.CASES[path.stem]
+            self.assertEqual(case['fixture'], 'share-text')
+            self.assertEqual(case['postcondition'], 'share-request-cancelled')
+
     def test_long_press_uses_a_command_not_an_unsupported_tap_property(self):
         """Regress the actual CLI parse failure that prevented all contextual-menu journeys."""
         # https://docs.maestro.dev/reference/commands-available/longpresson

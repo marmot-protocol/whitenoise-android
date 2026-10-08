@@ -1514,7 +1514,7 @@
       "manual_ids": [
         "NTF-033"
       ],
-      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
       "postcondition": "none"
     },
     "alerts-chat-sounds-back": {
@@ -1628,7 +1628,7 @@
       "manual_ids": [
         "MSG-005"
       ],
-      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "assertions": "Filtering to the owner’s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
       "postcondition": "reactions-retained",
       "fixture": "reactions"
     },
@@ -1680,7 +1680,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
+      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
@@ -1704,7 +1704,7 @@
       "manual_ids": [
         "SET-008"
       ],
-      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "assertions": "繁體中文 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
       "postcondition": "language-system"
     },
     "advanced-relay-empty": {
@@ -1860,7 +1860,7 @@
       "manual_ids": [
         "ACC-007"
       ],
-      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice’s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -1888,7 +1888,7 @@
         "ACC-007",
         "NAV-004"
       ],
-      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
+      "assertions": "Save Alice’s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice’s retained private records, every other viewer empty and unchanged public profiles.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -2147,7 +2147,7 @@
       "manual_ids": [
         "TTS-002"
       ],
-      "assertions": "Apply custom rate then replace with 0\\.5\u00d7; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
+      "assertions": "Apply custom rate then replace with 0\\.5×; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
       "postcondition": "speech-rate-preset"
     },
     "speech-invalid-keeps-saved-rate": {
@@ -2549,6 +2549,186 @@
       "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; explicit partial acknowledgment/target staging preserves the exact Unicode/whitespace owner draft; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
       "fixture": "share-text",
       "postcondition": "share-request-staged"
+    },
+    "inbound-share-owned-error-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share owned error rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-invalid-owned",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-http-error-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share http error rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-invalid-http",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-error-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share partial error rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-picker-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share picker rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-selected-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share selected rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and exact Unicode owner draft with other drafts untouched.",
+      "fixture": "share-text",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-owned-error-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share owned error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-invalid-owned",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-http-error-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share http error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-invalid-http",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-error-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share partial error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-picker-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share picker warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-selected-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share selected warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and exact Unicode owner draft with other drafts untouched.",
+      "fixture": "share-text",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-deselect-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share deselect cancel; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-reselect-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share reselect stage; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and exact Unicode owner draft with other drafts untouched.",
+      "fixture": "share-text",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-account-sheet-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share account sheet back; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-account-switch-clears": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share account switch clears; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-account-return-clears": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share account return clears; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-search-no-match-clear": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share search no match clear; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-search-mixed-case": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share search mixed case; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-search-ime-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share search ime back; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
     }
   }
 }

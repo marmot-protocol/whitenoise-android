@@ -1,0 +1,41 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-search-no-match-clear
+---
+- runFlow: ../fixtures/runtime-share-text-ready.yaml
+- &id001
+  assertVisible:
+    id: performance.share_picker
+- &id002
+  assertVisible:
+    text: ^Maestro group$
+- &id003
+  assertVisible:
+    enabled: false
+    text: ^Share$
+- tapOn: Search chats
+- assertVisible:
+    focused: true
+- inputText: ZZZMaestroNoDestination
+- assertVisible:
+    focused: true
+    text: ^ZZZMaestroNoDestination$
+- hideKeyboard
+- assertVisible:
+    text: ^No chats match your search.$
+- assertVisible:
+    enabled: false
+    text: ^Share$
+- tapOn: ZZZMaestroNoDestination
+- assertVisible:
+    focused: true
+- eraseText: 100
+- hideKeyboard
+- *id001
+- *id002
+- *id003
+- tapOn: Close
+- assertNotVisible: Some files could not be imported
+- assertNotVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$

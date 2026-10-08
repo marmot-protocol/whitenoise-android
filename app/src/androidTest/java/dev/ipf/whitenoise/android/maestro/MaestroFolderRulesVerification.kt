@@ -22,7 +22,8 @@ internal suspend fun captureMaestroFolderRules(state: WhiteNoiseAppState): Maest
         state.accounts.forEach { state.chatFolderPreferences.foldersFor(it.label) }
         MaestroFolderRulesBaseline(
             checkNotNull(state.activeAccountRef),
-            state.chatFolderPreferences.state.value.toMap(),
+            state.chatFolderPreferences.state.value
+                .toMap(),
         )
     }
 

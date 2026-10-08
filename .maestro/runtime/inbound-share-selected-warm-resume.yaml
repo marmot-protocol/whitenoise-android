@@ -1,0 +1,35 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-selected-warm-resume
+---
+- runFlow: ../fixtures/runtime-share-text-ready.yaml
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    text: ^Share$
+- tapOn: Maestro group
+- &id001
+  assertVisible:
+    id: performance.share_picker
+- &id002
+  assertVisible:
+    text: ^Maestro group$
+- &id003
+  assertVisible:
+    enabled: true
+    text: ^Share to 1 chat$
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- *id001
+- *id002
+- *id003
+- tapOn:
+    text: ^Share to 1 chat$
+- assertNotVisible:
+    id: performance.share_picker
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible:
+    text: '^\ \ Maestro\ café\ 👋\
+
+      second\ line\ \ $'

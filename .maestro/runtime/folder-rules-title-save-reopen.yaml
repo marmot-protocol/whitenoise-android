@@ -17,8 +17,12 @@ name: folder-rules-title-save-reopen
 - tapOn:
     id: folder.addField.TITLE
 - tapOn: Keyword
+- assertVisible:
+    focused: true
 - inputText: Maestro
-- assertVisible: ^Maestro$
+- assertVisible:
+    focused: true
+    text: ^Maestro$
 - hideKeyboard
 - assertVisible:
     id: folder.conditionDone

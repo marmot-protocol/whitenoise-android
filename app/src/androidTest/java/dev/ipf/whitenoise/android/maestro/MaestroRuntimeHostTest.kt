@@ -269,8 +269,7 @@ class MaestroRuntimeHostTest {
                                 checkNotNull(editorBaselines).folderRules,
                                 postcondition,
                             ),
-                        )
-                        .put(
+                        ).put(
                             "shareImportVerified",
                             verifyMaestroInboundShare(
                                 native,
@@ -279,8 +278,7 @@ class MaestroRuntimeHostTest {
                                 inboundShareBaseline,
                                 postcondition,
                             ),
-                        )
-                        .put(
+                        ).put(
                             "relayListsVerified",
                             verifyMaestroRelayLists(
                                 native,

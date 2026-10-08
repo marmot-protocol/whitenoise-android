@@ -112,13 +112,17 @@ internal suspend fun verifyMaestroInboundShare(
     val context = InstrumentationRegistry.getInstrumentation().targetContext
     val store = createPendingShareRequestStore(context)
     return withTimeoutOrNull(15_000L) {
-        var cleared = false
-        while (!cleared) {
+        var matches = false
+        while (!matches) {
+            var cleared = false
             activity.onActivity { cleared = it.pendingInboundShareRequestForTest == null }
             cleared = cleared && withContext(Dispatchers.IO) { store.load(before.requestId) == null }
-            if (!cleared) delay(100L)
+            matches =
+                cleared && maestroShareLocalStateMatches(state, before, expectedDraft) &&
+                maestroShareHistoriesMatch(native, before)
+            if (!matches) delay(100L)
         }
-        maestroShareLocalStateMatches(state, before, expectedDraft) && maestroShareHistoriesMatch(native, before)
+        true
     } ?: false
 }
 

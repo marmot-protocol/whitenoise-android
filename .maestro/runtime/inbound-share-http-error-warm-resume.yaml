@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-http-error-warm-resume
+---
+- runFlow: ../fixtures/runtime-share-error-ready.yaml
+- &id001
+  assertVisible:
+    text: Some files could not be imported
+- &id002
+  assertVisible:
+    text: Only content-provider files are supported.
+- &id003
+  assertVisible:
+    text: '^Files not imported: 1$'
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- *id001
+- *id002
+- *id003
+- tapOn: Close
+- assertNotVisible: Some files could not be imported
+- assertNotVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$

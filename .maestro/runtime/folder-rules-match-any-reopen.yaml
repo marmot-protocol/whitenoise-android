@@ -15,8 +15,7 @@ name: folder-rules-match-any-reopen
 - assertVisible:
     id: folder.condition.2
 - assertVisible: '^Read status: No unread messages$'
-- &id001
-  scrollUntilVisible:
+- scrollUntilVisible:
     element:
       id: folder.match.
     direction: UP
@@ -27,7 +26,10 @@ name: folder-rules-match-any-reopen
     id: folder.match.
     text: ^Match any$
 - runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
-- *id001
+- scrollUntilVisible:
+    element:
+      id: folder.match.
+    direction: DOWN
 - assertVisible:
     id: folder.match.
     text: ^Match any$
