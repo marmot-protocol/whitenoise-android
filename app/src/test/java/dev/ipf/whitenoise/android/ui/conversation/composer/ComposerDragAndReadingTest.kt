@@ -164,6 +164,7 @@ class ComposerDragAndReadingTest {
         assertTrue("returning to Automatic must restore content growth", height() > automaticHeight + 100f)
     }
 
+    /** Compact resizing preserves one measured editor line and focus without reserving an expanded toolbar. */
     @Test
     fun compactHeightCanReachOneEditorLineWithoutReservingAnExpandedToolbar() {
         render(longDraft, surfaceHeight = 150)
@@ -223,6 +224,7 @@ class ComposerDragAndReadingTest {
         assertEquals(original, observed)
     }
 
+    /** Adding a long draft after empty expansion retains the one-line minimum without changing its content. */
     @Test
     fun aLongDraftEnteredAfterExpandingAnEmptyComposerCanStillStayAtOneLine() {
         render("")
@@ -395,6 +397,7 @@ class ComposerDragAndReadingTest {
         assertEquals(0f, scroll(), 1f)
     }
 
+    /** Large RTL text retains one measured line and top navigation at the narrow manual minimum. */
     @Test
     fun narrowLargeRtlDraftRetainsUsableMinimumAndTopAction() {
         render(longDraft, width = 280, rtl = true, fontScale = 2f)
@@ -480,6 +483,7 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
     }
 
+    /** Narrow RTL editing preserves both top navigation and Cancel when the editor reaches its minimum. */
     @Test
     fun narrowEditedDraftKeepsNavigationAndCancelUsable() {
         render(longDraft, width = 280, rtl = true, fontScale = 2f, editing = true)
@@ -599,6 +603,7 @@ class ComposerDragAndReadingTest {
         assertEquals(1, dismissed)
     }
 
+    /** Swipes the actual resize strip and waits for layout before assertions inspect its resulting geometry. */
     private fun drag(delta: Float) {
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
             swipe(center, center + Offset(0f, delta), durationMillis = 320)
@@ -606,18 +611,21 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
     }
 
+    /** Measures the full composer, including any separate navigation row, for resize and reservation assertions. */
     private fun height() =
         composeRule
             .onNodeWithTag(TAG)
             .fetchSemanticsNode()
             .boundsInRoot.height
 
+    /** Measures the editor pill separately from surrounding composer controls during compact resizing. */
     private fun pillHeight() =
         composeRule
             .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
             .fetchSemanticsNode()
             .boundsInRoot.height
 
+    /** Reads the editor's semantic scroll offset without moving its caret or selection. */
     private fun scroll() =
         composeRule
             .onNode(hasSetTextAction())
@@ -625,6 +633,7 @@ class ComposerDragAndReadingTest {
             .config[SemanticsProperties.VerticalScrollAxisRange]
             .value()
 
+    /** Hosts the real composer with an unsent synthetic draft and observes edits, Send and Cancel callbacks. */
     private fun render(
         draft: String,
         dark: Boolean = false,
