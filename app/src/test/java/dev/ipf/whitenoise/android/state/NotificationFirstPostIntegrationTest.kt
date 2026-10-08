@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -452,11 +453,14 @@ class NotificationFirstPostIntegrationTest {
             }
         }
 
-    /** Converts a local resolver failure into one fallback and one silent correction. */
+    /**
+     * Resolves the initial failure inline, then gates the late correction without blocking its dispatcher.
+     * Runner scheduling delay must not turn this failure-path assertion into a deadline test.
+     */
     @Test
     fun failedFirstContentPostsFallbackThenOneSilentCorrection() =
         runBlocking {
-            val releaseLateRead = CountDownLatch(1)
+            val releaseLateRead = CompletableDeferred<Unit>()
             val identityReads = AtomicInteger(0)
             val events = CopyOnWriteArrayList<NotificationFirstPostTimingEvent>()
             val raw = "**hello nostr:$MENTION_NPUB**"
@@ -467,15 +471,13 @@ class NotificationFirstPostIntegrationTest {
                     previewText = raw,
                     markdownDocumentFactory = ::mentionMarkdown,
                     notificationFirstPostTimingObserver = events::add,
-                    // The resolver fails immediately, so a generous budget keeps a loaded runner from
-                    // reporting timeout_fallback instead of failed_fallback.
-                    receiverTimeoutMillis = 5_000L,
+                    notificationDispatcher = Dispatchers.Unconfined,
                     accountIdHexResolver = { bech32 ->
                         check(bech32 == MENTION_NPUB)
                         if (identityReads.incrementAndGet() == 1) {
                             error("synthetic local mention failure")
                         }
-                        releaseLateRead.await(5, TimeUnit.SECONDS)
+                        releaseLateRead.await()
                         MENTION_ACCOUNT_ID_HEX
                     },
                 )
@@ -488,7 +490,7 @@ class NotificationFirstPostIntegrationTest {
                         events.single { it.stage == NotificationFirstPostTimingStage.ContentComplete }.outcome,
                     )
                     assertEquals(raw, fixture.activeNotification().contentText())
-                    releaseLateRead.countDown()
+                    releaseLateRead.complete(Unit)
                     fixture.awaitNotificationBody("hello @Alice")
                     delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
 
@@ -496,7 +498,7 @@ class NotificationFirstPostIntegrationTest {
                     assertEquals(2, writes.get())
                 }
             } finally {
-                releaseLateRead.countDown()
+                releaseLateRead.complete(Unit)
                 fixture.close()
             }
         }

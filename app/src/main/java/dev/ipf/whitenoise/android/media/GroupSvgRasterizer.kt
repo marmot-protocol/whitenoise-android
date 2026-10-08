@@ -85,7 +85,7 @@ internal suspend fun readGroupIdentityImageSource(
 ): ByteArray {
     val source = readIdentityImageSource(resolver, uri)
     val mime = withContext(ioDispatcher) { resolver.getType(uri) }
-    return if (looksLikeGroupSvg(mime, source)) GroupSvgRasterizer.rasterize(source) else source
+    return prepareGroupIdentityImageSource(source, mime)
 }
 
 /** Sniff only a small prefix so raster fallback never needs to read a large photo into memory. */
@@ -117,6 +117,7 @@ private fun isSvgMime(mime: String?): Boolean =
         ?.trim()
         ?.equals("image/svg+xml", ignoreCase = true) == true
 
+/** Detects candidate XML/SVG bytes; the rasterizer still validates content before any crop is offered. */
 private fun looksLikeGroupSvg(
     mime: String?,
     source: ByteArray,
@@ -129,3 +130,9 @@ private fun looksLikeGroupSvg(
             .removePrefix("\uFEFF")
             .trimStart()
             .startsWith("<")
+
+/** Picker and decrypted viewer inputs share SVG detection, validation and rasterization. */
+internal suspend fun prepareGroupIdentityImageSource(
+    source: ByteArray,
+    mime: String?,
+): ByteArray = if (looksLikeGroupSvg(mime, source)) GroupSvgRasterizer.rasterize(source) else source

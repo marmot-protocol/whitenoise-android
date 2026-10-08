@@ -2448,4 +2448,5 @@
     <string name="pinned_shortcut_finish">Confirm with your launcher to add this conversation.</string>
     <string name="pinned_shortcut_unavailable">This conversation is no longer available.</string>
     <string name="pinned_shortcut_failed">Could not request a Home screen shortcut. Try again.</string>
+    <string name="media_set_group_picture">Set as group picture</string>
 </resources>

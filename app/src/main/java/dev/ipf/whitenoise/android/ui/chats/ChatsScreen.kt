@@ -187,6 +187,7 @@ internal fun ChatsScreen(
     // Shell-owned global search state survives conversation navigation (#1941).
     globalSearchState: GlobalSearchState = GlobalSearchState(),
     onGlobalSearchStateChange: ((GlobalSearchState) -> GlobalSearchState) -> Unit = {},
+    searchViewport: GlobalSearchViewport? = null,
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
@@ -438,11 +439,11 @@ internal fun ChatsScreen(
             )
         }
     val scopedSourceList =
-        remember(sourceList, globalSearchState.chatTypeFilters, globalSearchState.chatFilters) {
-            applyGlobalSearchChatScope(
+        remember(sourceList, globalSearchState.chatTypeFilters, globalSearchState.chatFilters, effectiveFolderChatIds) {
+            globalSearchScopedChats(
                 sourceList,
-                globalSearchState.chatTypeFilters,
-                globalSearchState.chatFilters.mapTo(mutableSetOf()) { it.stableId },
+                globalSearchState,
+                effectiveFolderChatIds,
             )
         }
     val messageSearchConstraints =
@@ -456,28 +457,37 @@ internal fun ChatsScreen(
     val globalSearchFolderOptions = accountFolders.map { GlobalSearchFolderOption(it.id, chatFolderDisplayName(it)) }
     val globalSearchFolderNames =
         remember(globalSearchFolderOptions) { globalSearchFolderOptions.associate { it.id to it.name } }
+    val selfLabel = stringResource(R.string.you)
     val globalSearchFilterOptions =
-        remember(globalSearchFolderOptions, folderTypeScopedList, groupTitleCopy, appState.profileRevisionForCompose) {
-            globalSearchFilterOptions(appState, globalSearchFolderOptions, folderTypeScopedList, groupTitleCopy)
-        }
-    // Deleted folders and chats outside the folder / type scope leave the filters (prototype `reconcile`).
-    LaunchedEffect(globalSearchState.isOpen, accountFolders, folderTypeScopedList) {
+        rememberGlobalSearchFilterOptions(
+            appState = appState,
+            scope =
+                GlobalSearchFilterScope(
+                    folders = globalSearchFolderOptions,
+                    chatChoices = folderTypeScopedList,
+                    senderChats = scopedSourceList,
+                    titleCopy = groupTitleCopy,
+                    selfId = controller.boundAccountIdHex(),
+                    selfLabel = selfLabel,
+                    accountRef = controller.boundAccountRef,
+                    accountScope = globalSearchState.accountScopeToken,
+                ),
+            enabled = globalSearchState.isOpen,
+        )
+    // Existing bounded native roster loading owns membership; opening search adds no cache.
+    LaunchedEffect(controller, globalSearchState.isOpen, scopedSourceList) {
         if (!globalSearchState.isOpen) return@LaunchedEffect
-        val folderIds =
-            if (appState.activeAccountRef == null) {
-                null
-            } else {
-                accountFolders.mapTo(mutableSetOf()) {
-                    it.id
-                }
-            }
-        val chatIds =
-            if (sourceList.isEmpty()) {
-                null
-            } else {
-                folderTypeScopedList.mapTo(mutableSetOf()) { canonicalChatListGroupId(it.group.groupIdHex) }
-            }
-        onGlobalSearchStateChange { GlobalSearchTransitions.reconcileAvailable(it, folderIds, chatIds) }
+        controller.requestMemberSnapshots(scopedSourceList.map { it.group.groupIdHex })
+    }
+    LaunchedEffect(globalSearchState.isOpen, globalSearchFilterOptions) {
+        if (!globalSearchState.isOpen) return@LaunchedEffect
+        onGlobalSearchStateChange {
+            GlobalSearchTransitions.reconcileLabels(
+                it,
+                globalSearchFilterOptions.chats.associate { choice -> choice.id to choice.title },
+                globalSearchFilterOptions.senders.associate { choice -> choice.id to choice.title },
+            )
+        }
     }
     // Subscribing read of the profile-cache revision so the filter
     // re-runs when a DM peer's display name resolves — the title
@@ -524,6 +534,10 @@ internal fun ChatsScreen(
             ?.takeIf { it.request === bodySearchRequest }
             ?.matches
             .orEmpty()
+    val bodySearchLoading =
+        searchActive &&
+            (trimmedQuery.isNotEmpty() || messageSearchConstraints != null) &&
+            bodySearchResult?.request !== bodySearchRequest
     LaunchedEffect(bodySearchRequest) {
         // Folder / type / chat scopes alone need no body search; a needle or a
         // message-level filter does.
@@ -622,7 +636,7 @@ internal fun ChatsScreen(
             runtimeGeneration = appState.runtimeGeneration,
             showArchived = showArchived,
         )
-    val chatListState = key(viewportOwner) { rememberLazyListState() }
+    val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
     LaunchedEffect(chatListState, actionSheetChatId, actionMenuOwner.token, actionMenuOwner.pointerHeld) {
         val anchorId = actionSheetChatId ?: return@LaunchedEffect
@@ -778,7 +792,10 @@ internal fun ChatsScreen(
         val canonical = canonicalChatListGroupId(groupIdHex)
         val item =
             sourceList.firstOrNull { canonicalChatListGroupId(it.group.groupIdHex) == canonical }
-                ?: return
+                ?: run {
+                    appState.present(R.string.toast_original_message_unavailable)
+                    return
+                }
         openGroupFromVisibleList(item, messageIdHex, false)
     }
 
@@ -940,13 +957,19 @@ internal fun ChatsScreen(
             query = normalizedSearchQuery,
             accountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
+            searchFilters = globalSearchState.viewportFilters(),
         )
     ChatListSearchTopResetEffect(
         listState = chatListState,
         datasetKey = chatListDatasetKey,
         searchActive = searchActive,
-        onScrollRequested = { programmaticViewportGeneration += 1L },
+        viewportState = searchViewport?.resetState(showArchived),
+        onScrollRequested = {
+            searchViewport?.selection?.selected = GlobalSearchSelectedResult()
+            programmaticViewportGeneration += 1L
+        },
     )
+    GlobalSearchGridResetEffect(searchViewport, chatListDatasetKey, browsingAttachments)
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
     val density = LocalDensity.current
     val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
@@ -1339,9 +1362,41 @@ internal fun ChatsScreen(
         diagnosticsPrompt()
     }
 
+    val returnedSearchSelection = rememberReturnedSearchSelection(searchViewport?.selection)
+    globalSearchReturnFocusExpiryEffect(
+        owner = searchViewport?.selection,
+        ready = searchActive && !browsingAttachments && !bodySearchLoading,
+    ) {
+        val selected = returnedSearchSelection
+        val rowId = selected?.groupId?.let(::canonicalChatListGroupId)
+        !selectionMode &&
+            rowId != null &&
+            selected != null &&
+            selected == searchViewport?.selection?.selected &&
+            bodyMatches[rowId]?.messageIdHex == selected.messageId &&
+            !chatListState.isScrollInProgress &&
+            chatListState.layoutInfo.visibleItemsInfo.any { it.key == rowId }
+    }
     val chatRowContent: @Composable LazyItemScope.(ChatListItem, Int, MessageBodyMatch?) -> Unit =
         { item, targetIndex, bodyMatch ->
             val rowId = visibleRowId(item)
+            val returnedRow =
+                searchActive &&
+                    !selectionMode &&
+                    bodyMatch != null &&
+                    returnedSearchSelection == searchViewport?.selection?.selected &&
+                    returnedSearchSelection?.matches(item.group.groupIdHex, bodyMatch.messageIdHex) == true
+            val returnFocus =
+                globalSearchReturnFocusModifier(
+                    restoredSelection = returnedRow,
+                    returnGeneration = searchViewport?.selection?.returnGeneration ?: 0L,
+                    consumeReturn = {
+                        searchViewport?.selection?.let { it.consumeReturnFocus(it.returnGeneration) } == true
+                    },
+                ) {
+                    !chatListState.isScrollInProgress &&
+                        chatListState.layoutInfo.visibleItemsInfo.any { it.key == rowId }
+                }
             Box(
                 modifier =
                     if (searchActive) {
@@ -1420,13 +1475,14 @@ internal fun ChatsScreen(
                     },
                 ) {
                     ChatListRow(
+                        modifier = returnFocus,
                         item = item,
                         appState = appState,
                         accountRef = controller.boundAccountRef,
                         isMuted = item.engineMuted(),
                         interactionsEnabled = chatListInteractionsEnabled,
                         selectionMode = selectionMode,
-                        selected = rowId in selectedChatIds,
+                        selected = rowId in selectedChatIds || returnedRow,
                         menuHighlighted = actionSheetChatId == rowId,
                         onActionsHeldChange = { held ->
                             if (held && menuActionsCurrent()) {
@@ -1439,7 +1495,12 @@ internal fun ChatsScreen(
                             }
                         },
                         bodyMatch = bodyMatch,
-                        onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
+                        onOpen = {
+                            searchViewport?.selection?.selected =
+                                bodyMatch?.let { GlobalSearchSelectedResult(item.group.groupIdHex, it.messageIdHex) }
+                                    ?: GlobalSearchSelectedResult()
+                            openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false)
+                        },
                         onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
                         onOpenActions = {
                             if (menuActionsCurrent()) {
@@ -1819,6 +1880,10 @@ internal fun ChatsScreen(
                                 openSearchMessage(groupIdHex, messageIdHex)
                             },
                             thumbnail = { item -> libraryThumbnail(appState, controller.boundAccountRef, item) },
+                            selectionOwner = searchViewport?.selection,
+                            gridState =
+                                searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
+                                    .rememberLazyGridState(),
                         )
                     controller.isLoading && sourceList.isEmpty() -> {
                         val slowCopy = stringResource(R.string.chat_list_startup_slow)
@@ -1830,6 +1895,10 @@ internal fun ChatsScreen(
                             requireNotNull(controller.error),
                             onRetry = controller::retryLoad,
                         )
+                    bodySearchLoading ->
+                        // Even nonempty title-only rows would clamp a deep message-results position
+                        // before the current body lookup publishes. Wait without measuring a replacement list.
+                        LoadingScreen(message = stringResource(R.string.conversation_search_loading))
                     sourceList.isEmpty() && showArchived -> EmptyArchivedChats()
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = openNewMessageFlow)
