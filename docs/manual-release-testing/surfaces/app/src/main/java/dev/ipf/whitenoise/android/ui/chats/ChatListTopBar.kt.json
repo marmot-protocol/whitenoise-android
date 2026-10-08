@@ -1,0 +1,199 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+  "legacy_sha256": "419eca0e9f7cc8d4c3a017065d06f14bacf21b8e394555989f115e0d7cfb0d4f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListFilterChips",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "fun ChatListFilterChips(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      },
+      {
+        "surface": "ChatListSearchFilterAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "fun ChatListSearchFilterAction(",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "ChatListTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "fun ChatListTopBar(",
+        "test_ids": [
+          "CHL-001",
+          "SYS-008",
+          "SYS-009",
+          "SYS-010"
+        ]
+      },
+      {
+        "surface": "ConversationSearchNavBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "fun ConversationSearchNavBar(",
+        "test_ids": [
+          "FIND-001",
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "ConversationSearchTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "fun ConversationSearchTopBar(",
+        "test_ids": [
+          "FIND-001",
+          "FIND-016"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.switch_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.switch_profile",
+        "test_ids": [
+          "NAV-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.app_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "CHL-001",
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.chat_list_search_clear",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.chat_list_search_open",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.chat_list_search_hint",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_voice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.chat_list_search_voice",
+        "test_ids": [
+          "FIND-010"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_clear",
+        "test_ids": [
+          "FIND-003",
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_loading",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_incomplete",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_match_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_match_count",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_match_count_loaded_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_match_count_loaded_only",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_no_matches",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_retry",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_hint",
+        "test_ids": [
+          "FIND-003",
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_messages",
+        "test_ids": [
+          "FIND-003",
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "R.string.open_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.open_settings",
+        "test_ids": [
+          "NAV-001",
+          "NAV-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
