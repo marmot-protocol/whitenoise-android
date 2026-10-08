@@ -249,10 +249,8 @@ internal fun ChatsScreen(
     // filters exactly as before.
     var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
-    val accountFolders =
-        remember(folderStoreState, appState.activeAccountRef) {
-            appState.activeAccountRef?.let { appState.chatFolderPreferences.foldersFor(it) }.orEmpty()
-        }
+    val searchFolderContext = rememberSearchFolderContext(appState, controller, groupTitleCopy)
+    val accountFolders = searchFolderContext.folders
     val selectedFolder = accountFolders.firstOrNull { it.id == selectedFolderId }
     val selectedFolderRule =
         remember(folderStoreState, appState.activeAccountRef, selectedFolder) {
@@ -263,43 +261,7 @@ internal fun ChatsScreen(
     // Effective folder membership: manual members plus rule matches,
     // re-derived from the live list so rule-driven chats join and leave
     // folders as rosters, unread state, and mute state change.
-    val resolveFolderChatIds: (String) -> Set<String> =
-        remember(
-            folderStoreState,
-            appState.activeAccountRef,
-            controller.items,
-            controller.archivedItems,
-            groupTitleCopy,
-            // Keyword rules match the rendered row title, which resolves as
-            // peer profiles land — re-derive when the presentation cache bumps.
-            appState.profileRevisionForCompose,
-        ) {
-            { folderId ->
-                appState.activeAccountRef
-                    ?.let { accountRef ->
-                        // Advanced rules share the loaded active/archive union with counts and previews.
-                        val rule = appState.chatFolderPreferences.folderRule(accountRef, folderId)
-                        val sourceItems = chatFolderSource(rule, controller.items, controller.archivedItems)
-                        val engineMutedChatIds =
-                            sourceItems
-                                .asSequence()
-                                .filter { it.engineMuted() }
-                                .map { it.group.groupIdHex }
-                                .toSet()
-                        chatFolderChatIds(
-                            items = sourceItems,
-                            manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
-                            excludedChatIds = appState.chatFolderPreferences.excludedChats(accountRef, folderId),
-                            rule = rule,
-                            activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                            isMuted = { groupIdHex ->
-                                groupIdHex in engineMutedChatIds
-                            },
-                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                        )
-                    }.orEmpty()
-            }
-        }
+    val resolveFolderChatIds = searchFolderContext.resolveChatIds
     val selectedFolderChatIds =
         remember(selectedFolder, resolveFolderChatIds) {
             selectedFolder?.let { resolveFolderChatIds(it.id) }

@@ -206,10 +206,10 @@ object ChatListMessageSearch {
      * A row counts when it is a searchable body kind, satisfies the needle (or carries content without one) and
      * the filters.
      */
-    private fun isEligibleMatch(
+    fun isEligibleMatch(
         record: SearchableRecord,
         ciNeedle: String,
-        constraints: MessageSearchConstraints?,
+        constraints: MessageSearchConstraints? = null,
     ): Boolean {
         val hasBody = record.plaintext.isNotBlank()
         val needleSatisfied =
