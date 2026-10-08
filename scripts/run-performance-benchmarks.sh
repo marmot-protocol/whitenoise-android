@@ -60,6 +60,32 @@ if [[ -n "${QUALIFICATION_USER_ID:-}" ]]; then
   }
 fi
 
+# Package code is shared across Android users. Refuse a changed binary instead
+# of overwriting another task's in-place update or attributing mixed code to a run.
+installed_code_hash() {
+  local path copy hash
+  path="$(adb_cmd shell pm path --user "$benchmark_user" "$target_package" | tr -d '\r')" || return 1
+  [[ "$path" == package:* && "$path" != *$'\n'* ]] || return 1
+  copy="$(mktemp)" || return 1
+  if ! adb_cmd pull "${path#package:}" "$copy" >/dev/null 2>&1; then
+    rm -f "$copy"; return 1
+  fi
+  hash="$(sha256_file "$copy")" || { rm -f "$copy"; return 1; }
+  rm -f "$copy"
+  printf '%s\n' "$hash"
+}
+
+require_owned_candidate() {
+  local installed
+  installed="$(installed_code_hash)" || {
+    echo "Cannot verify shared Dev APK ownership." >&2; return 1;
+  }
+  [[ "$installed" == "$candidate_sha256" ]] || {
+    echo "Shared Dev APK changed during qualification; refusing mixed-code evidence or restoration overwrite." >&2
+    return 1
+  }
+}
+
 wait_for_package_update_ui_to_settle() {
   local resumed_activity stable_samples=0
   for _ in {1..50}; do
@@ -199,6 +225,7 @@ for apk in "$dev_app_apk" "$app_apk" "$test_apk"; do
   fi
 done
 
+candidate_sha256="$(sha256_file "$app_apk")"
 result_file="$(mktemp)"
 run_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 device_output="/storage/emulated/$benchmark_user/Android/media/$test_package/$run_id"
@@ -302,8 +329,14 @@ cleanup() {
     adb_cmd shell rm -rf "$device_output" || true
   fi
   if [[ "$target_replaced" == true ]]; then
-    if ! adb_cmd install --user "$benchmark_user" -r -d -t "$dev_app_apk"; then
+    if ! require_owned_candidate; then
+      echo "Original Dev APK remains preserved; restoration requires resolving the concurrent install." >&2
+      if ((status == 0)); then status=1; fi
+    elif ! adb_cmd install --user "$benchmark_user" -r -d -t "$dev_app_apk"; then
       echo "Failed to restore the normal dev app: $dev_app_apk" >&2
+      if ((status == 0)); then status=1; fi
+    elif [[ "$(installed_code_hash)" != "$(sha256_file "$dev_app_apk")" ]]; then
+      echo "The restored Dev APK does not match the preserved original." >&2
       if ((status == 0)); then status=1; fi
     fi
   fi
@@ -515,11 +548,13 @@ fi
 instrument_command="$instrument_command \
 $(quote_device_shell_arg "$runner")"
 
+require_owned_candidate
 capture_device_state "$local_output/device-before.txt"
 instrumentation_status=0
 adb_cmd shell "$instrument_command" | tee "$result_file" || instrumentation_status=$?
 cp "$result_file" "$local_output/instrumentation.log"
 capture_device_state "$local_output/device-after.txt"
+require_owned_candidate
 
 if adb_cmd shell test -d "$device_output"; then
   if adb_cmd pull "$device_output/." "$local_output"; then

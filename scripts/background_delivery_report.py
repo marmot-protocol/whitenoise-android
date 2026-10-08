@@ -134,6 +134,8 @@ def validate(value):
             fail("permission_mismatch")
         if run["duplicates"]:
             fail("duplicate_delivery")
+        if scenario.endswith("_idle") and (run["received"] != 0 or run["receipt_before_window_end"]):
+            fail("loaded_idle")
         if scenario == "push_burst" and (
             run["received"] != expected_burst or not run["receipt_before_window_end"]
         ):

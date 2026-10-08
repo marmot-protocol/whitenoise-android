@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.benchmark
 
 import android.app.Notification
 import android.content.ComponentName
+import android.os.Bundle
 import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
@@ -9,17 +10,20 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import kotlin.math.abs
 
 /** Observes only explicitly named disposable payloads, retaining indices rather than message content. */
 class BackgroundDeliveryReceiptListener : NotificationListenerService() {
     /** Confirms that Android has acknowledged the listener before measurement starts. */
     override fun onListenerConnected() {
-        activeNotifications?.forEach(::onNotificationPosted)
+        activeListener = this
+        scanExistingCards()
         BackgroundDeliveryReceipts.connected = true
     }
 
     /** Invalidates availability immediately when Android disconnects the listener. */
     override fun onListenerDisconnected() {
+        if (activeListener === this) activeListener = null
         BackgroundDeliveryReceipts.connected = false
     }
 
@@ -27,12 +31,36 @@ class BackgroundDeliveryReceiptListener : NotificationListenerService() {
     override fun onNotificationPosted(notification: StatusBarNotification) {
         if (!BackgroundDeliveryReceipts.accepts(notification.packageName)) return
         val extras = notification.notification.extras
-        val messages = Notification.MessagingStyle.Message.getMessagesFromBundleArray(
-            extras.getParcelableArray(Notification.EXTRA_MESSAGES),
+        val messages =
+            Notification.MessagingStyle.Message.getMessagesFromBundleArray(
+                extras.getParcelableArray(Notification.EXTRA_MESSAGES, Bundle::class.java),
+            )
+        val texts =
+            messages.mapNotNull { it.text?.toString() } +
+                listOfNotNull(extras.getCharSequence(Notification.EXTRA_TEXT)?.toString())
+        BackgroundDeliveryReceipts.record(
+            notification.packageName,
+            texts,
+            SystemClock.elapsedRealtime(),
+            notification.postTime,
+            System.currentTimeMillis(),
         )
-        val texts = messages.mapNotNull { it.text?.toString() } +
-            listOfNotNull(extras.getCharSequence(Notification.EXTRA_TEXT)?.toString())
-        BackgroundDeliveryReceipts.record(notification.packageName, texts, SystemClock.elapsedRealtime())
+    }
+
+    /** Rescans every measurement generation, including access retained from an earlier run. */
+    private fun scanExistingCards() {
+        activeNotifications?.forEach(::onNotificationPosted)
+    }
+
+    companion object {
+        @Volatile
+        private var activeListener: BackgroundDeliveryReceiptListener? = null
+
+        /** Refuses unavailable ownership and checks old cards immediately before opening a window. */
+        internal fun scanFixtureCards() {
+            val listener = checkNotNull(activeListener) { "The fixture listener is unavailable." }
+            listener.scanExistingCards()
+        }
     }
 }
 
@@ -45,15 +73,24 @@ internal object BackgroundDeliveryReceipts {
     private var expected = emptyList<String>()
     private val seen = mutableSetOf<Int>()
     private var deadlineMs: Long? = null
+    private var startElapsedMs = 0L
+    private var startWallMs = 0L
+    private var clockChanged = false
     private var staleFixture = false
 
     /** Replaces all probe ownership before a new listener or measurement can emit callbacks. */
     @Synchronized
-    fun arm(packageName: String, texts: List<String>) {
+    fun arm(
+        packageName: String,
+        texts: List<String>,
+    ) {
         target = packageName
         expected = texts.toList()
         seen.clear()
         deadlineMs = null
+        startElapsedMs = 0L
+        startWallMs = 0L
+        clockChanged = false
         staleFixture = false
     }
 
@@ -69,32 +106,61 @@ internal object BackgroundDeliveryReceipts {
 
     /** Begins a bounded observation without allowing setup callbacks into its receive count. */
     @Synchronized
-    fun beginWindow(endMs: Long) {
+    fun beginWindow(
+        startMs: Long,
+        endMs: Long,
+        wallMs: Long,
+    ) {
+        require(endMs > startMs)
         requireFreshFixture()
         seen.clear()
+        startElapsedMs = startMs
+        startWallMs = wallMs
+        clockChanged = false
         deadlineMs = endMs
     }
 
     /** Records each expected body once, only while the matching background window is still open. */
     @Synchronized
-    fun record(packageName: String, texts: List<String>, nowMs: Long) {
+    fun record(
+        packageName: String,
+        texts: List<String>,
+        nowMs: Long,
+        postedWallMs: Long,
+        wallNowMs: Long,
+    ) {
         if (target != packageName) return
         val matches = expected.indices.filter { expected[it] in texts }
         val deadline = deadlineMs
         if (deadline == null) {
             staleFixture = staleFixture || matches.isNotEmpty()
-        } else if (nowMs <= deadline) {
-            seen.addAll(matches)
+        } else {
+            clockChanged = clockChanged || !clockStable(nowMs, wallNowMs)
+            if (nowMs in startElapsedMs..deadline && postedWallMs >= startWallMs && !clockChanged) {
+                seen.addAll(matches)
+            }
         }
     }
 
     /** Closes the generation before asserting complete in-window evidence. */
     @Synchronized
-    fun finishWindow() {
-        val complete = deadlineMs != null && seen.size == expected.size && connected
+    fun finishWindow(
+        nowMs: Long,
+        wallNowMs: Long,
+    ) {
+        val complete =
+            deadlineMs != null && seen.size == expected.size && connected &&
+                !clockChanged && clockStable(nowMs, wallNowMs)
         deadlineMs = null
         check(complete) { "The complete disposable burst was not observed while backgrounded." }
     }
+
+    /** Rejects wall-clock steps that make Android posting timestamps ambiguous. */
+    private fun clockStable(
+        nowMs: Long,
+        wallNowMs: Long,
+    ): Boolean =
+        abs((wallNowMs - startWallMs) - (nowMs - startElapsedMs)) <= 1_000L
 
     /** Releases all expected payloads and generation state after success, failure or cancellation. */
     @Synchronized
@@ -103,6 +169,9 @@ internal object BackgroundDeliveryReceipts {
         expected = emptyList()
         seen.clear()
         deadlineMs = null
+        startElapsedMs = 0L
+        startWallMs = 0L
+        clockChanged = false
         staleFixture = false
     }
 }
@@ -113,7 +182,8 @@ internal class BackgroundDeliveryReceiptProbe(
     private val expectedTexts: List<String>,
 ) {
     private val context = InstrumentationRegistry.getInstrumentation().context
-    private val component = ComponentName(context, BackgroundDeliveryReceiptListener::class.java).flattenToString()
+    private val componentName = ComponentName(context, BackgroundDeliveryReceiptListener::class.java)
+    private val component = componentName.flattenToString()
 
     /** Restores the prior listener grant and clears all synthetic payloads on every exit path. */
     fun withListener(block: () -> Unit) {
@@ -125,8 +195,7 @@ internal class BackgroundDeliveryReceiptProbe(
         require(Process.myUid() / ANDROID_PER_USER_UID_RANGE == userId) {
             "Instrumentation is not running in the authorized disposable profile."
         }
-        val original = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-            .orEmpty().split(':').contains(component)
+        val original = hasListenerGrant()
         BackgroundDeliveryReceipts.arm(BenchmarkConfig.TARGET_PACKAGE, expectedTexts)
         try {
             if (!original) {
@@ -142,20 +211,32 @@ internal class BackgroundDeliveryReceiptProbe(
         } finally {
             BackgroundDeliveryReceipts.disarm()
             if (!original) device.executeShellCommand("cmd notification disallow_listener $component $userId")
-            val restored = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-                .orEmpty().split(':').contains(component)
+            val restored = hasListenerGrant()
             check(restored == original) { "The fixture receipt-listener grant was not restored." }
         }
     }
+
+    /** Compares parsed components so short and full Android setting spellings preserve one grant. */
+    private fun hasListenerGrant(): Boolean =
+        Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+            .orEmpty()
+            .split(':')
+            .mapNotNull(ComponentName::unflattenFromString)
+            .contains(componentName)
 
     /** Refuses a fixture whose payloads were already seen during setup. */
     fun requireFreshFixture() = BackgroundDeliveryReceipts.requireFreshFixture()
 
     /** Uses a monotonic deadline so callbacks after a delayed wake cannot qualify the burst. */
-    fun beginWindow(durationMs: Long) = BackgroundDeliveryReceipts.beginWindow(SystemClock.elapsedRealtime() + durationMs)
+    fun beginWindow(durationMs: Long) {
+        BackgroundDeliveryReceiptListener.scanFixtureCards()
+        val startMs = SystemClock.elapsedRealtime()
+        BackgroundDeliveryReceipts.beginWindow(startMs, startMs + durationMs, System.currentTimeMillis())
+    }
 
     /** Requires every unique fixture payload before any foreground catch-up can occur. */
-    fun finishWindow() = BackgroundDeliveryReceipts.finishWindow()
+    fun finishWindow() =
+        BackgroundDeliveryReceipts.finishWindow(SystemClock.elapsedRealtime(), System.currentTimeMillis())
 
     private companion object {
         const val ANDROID_PER_USER_UID_RANGE = 100_000

@@ -415,8 +415,10 @@ burst now" line, then send at least five messages with distinct fresh fixture
 bodies from a disposable second account before the window closes. Set
 `NOTIFICATION_TEXTS` to those bodies using the existing `;;` delimiter. The
 benchmark requires temporary listener access on an explicitly named disposable
-Android profile, counts each matching body once, rejects existing matching
-cards, and fails if the full burst is absent at the deadline. The listener
+Android profile, counts each matching body once, rescans existing matching
+cards for every generation, and fails if the full burst is absent at the deadline.
+Actual Android posting time must follow the window start; delayed setup callbacks
+and ambiguous wall-clock changes cannot qualify. The listener
 ignores other packages before reading extras, emits no payloads, clears the
 fixture bodies, and restores its prior access on exit:
 
@@ -459,7 +461,9 @@ Run the benchmark script with `BENCHMARK_APK_DIR`, `ORIGINAL_DEV_APK`,
 It skips Gradle completely in this route. Switch to the authorized profile first.
 Process selection, installs, instrumentation and output storage are profile-scoped;
 the exit trap restores the preserved original Dev APK in place. A concurrent Dev
-installation invalidates the preflight and requires a new private backup.
+installation invalidates the campaign. Ownership checks run before instrumentation,
+after measurement and before restoration; the runner refuses to overwrite unexpected
+code. Resolve the competing install and take a new private backup before retrying.
 
 ### Resource campaign acceptance
 

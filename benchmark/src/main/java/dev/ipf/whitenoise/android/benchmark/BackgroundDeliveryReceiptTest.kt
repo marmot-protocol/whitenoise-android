@@ -29,66 +29,82 @@ class BackgroundDeliveryReceiptTest {
     /** A sleep-only smoke run cannot satisfy the receive-side burst contract. */
     @Test
     fun emptyBurstFails() {
-        BackgroundDeliveryReceipts.beginWindow(100)
-        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow() }.isFailure)
+        BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
+        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 1_100) }.isFailure)
     }
 
     /** Reposting one enriched card cannot stand in for receiving five different payloads. */
     @Test
     fun repeatedEnrichmentDoesNotCompleteMissingMessages() {
-        BackgroundDeliveryReceipts.beginWindow(100)
-        repeat(5) { BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, listOf(texts.first()), 50) }
-        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow() }.isFailure)
+        BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
+        repeat(5) { BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, listOf(texts.first()), 50, 1_050, 1_050) }
+        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 1_100) }.isFailure)
     }
 
     /** A foreign package cannot contribute a matching body to the fixture's measured receipt set. */
     @Test
     fun anotherPackageCannotCompleteBurst() {
-        BackgroundDeliveryReceipts.beginWindow(100)
-        BackgroundDeliveryReceipts.record("unrelated.fixture", texts, 50)
-        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow() }.isFailure)
+        BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
+        BackgroundDeliveryReceipts.record("unrelated.fixture", texts, 50, 1_050, 1_050)
+        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 1_100) }.isFailure)
     }
 
     /** Catch-up after the closed background window cannot qualify in-window delivery. */
     @Test
     fun lateCallbacksCannotCompleteBurst() {
-        BackgroundDeliveryReceipts.beginWindow(100)
-        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 101)
-        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow() }.isFailure)
+        BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
+        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 101, 1_101, 1_101)
+        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 1_100) }.isFailure)
     }
 
     /** An existing matching card must be replaced with a new disposable fixture before measurement. */
     @Test
     fun setupReceiptsRejectReusedFixture() {
-        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 0)
-        assertTrue(runCatching { BackgroundDeliveryReceipts.beginWindow(100) }.isFailure)
+        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 0, 1_000, 1_000)
+        assertTrue(runCatching { BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000) }.isFailure)
     }
 
     /** Complete payloads qualify only while the same acknowledged listener is available. */
     @Test
     fun disconnectedListenerCannotQualify() {
-        BackgroundDeliveryReceipts.beginWindow(100)
-        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 50)
+        BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
+        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 50, 1_050, 1_050)
         BackgroundDeliveryReceipts.connected = false
-        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow() }.isFailure)
+        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 1_100) }.isFailure)
     }
 
     /** Re-arming changes ownership and discards all receipt indices from the old generation. */
     @Test
     fun replacedGenerationCannotReuseOldReceipts() {
-        BackgroundDeliveryReceipts.beginWindow(100)
-        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 50)
+        BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
+        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 50, 1_050, 1_050)
         BackgroundDeliveryReceipts.arm("replacement.fixture", texts)
-        BackgroundDeliveryReceipts.beginWindow(200)
-        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow() }.isFailure)
+        BackgroundDeliveryReceipts.beginWindow(100, 200, 1_100)
+        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 1_100) }.isFailure)
     }
 
     /** All five distinct in-window payloads can complete without retaining their notification identities. */
     @Test
     fun completeMeasuredBurstPasses() {
-        BackgroundDeliveryReceipts.beginWindow(100)
-        texts.forEach { BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, listOf(it), 50) }
-        BackgroundDeliveryReceipts.finishWindow()
+        BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
+        texts.forEach { BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, listOf(it), 50, 1_050, 1_050) }
+        BackgroundDeliveryReceipts.finishWindow(100, 1_100)
+    }
+
+    /** A setup card queued until after the window opens retains its actual old posting time. */
+    @Test
+    fun delayedPreWindowCallbackCannotQualify() {
+        BackgroundDeliveryReceipts.beginWindow(10, 100, 1_010)
+        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 50, 1_009, 1_050)
+        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 1_100) }.isFailure)
+    }
+
+    /** A clock adjustment cannot relabel a pre-window card as in-window delivery. */
+    @Test
+    fun wallClockStepInvalidatesReceipts() {
+        BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
+        BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 50, 3_000, 3_000)
+        assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 3_050) }.isFailure)
     }
 
     private companion object {

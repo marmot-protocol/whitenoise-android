@@ -170,6 +170,17 @@ class BackgroundDeliveryReportTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("budget_exceeded", result.stdout)
 
+    def test_message_traffic_cannot_be_accepted_as_idle(self):
+        """Loaded windows must not define an idle resource budget, even with quiet rails."""
+        for scenario in ("disabled_idle", "push_idle", "local_idle"):
+            for received, flag in ((5, True), (1, False), (0, True)):
+                with self.subTest(scenario=scenario, received=received, flag=flag):
+                    value = campaign()
+                    row = next(r for r in value["runs"] if r["scenario"] == scenario)
+                    row["received"] = received
+                    row["receipt_before_window_end"] = flag
+                    self.assertIn("loaded_idle", self.report(value).stdout)
+
     def test_original_input_is_not_mutated(self):
         """Leave original measured evidence available for independent review."""
         value = campaign()
