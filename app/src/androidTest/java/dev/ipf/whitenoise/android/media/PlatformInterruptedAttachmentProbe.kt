@@ -249,7 +249,9 @@ internal object PlatformInterruptedAttachmentProbe {
                     .put("attempt", snapshot.attempt.toLong())
                     .put(
                         "retry_delay_ms",
-                        snapshot.retryAt?.let { (it.toLong() - nowSeconds).coerceAtLeast(0L) * 1_000L } ?: JSONObject.NULL,
+                        snapshot.retryAt?.let {
+                            (it.toLong() - nowSeconds).coerceAtLeast(0L) * 1_000L
+                        } ?: JSONObject.NULL,
                     )
             },
         )
@@ -313,7 +315,7 @@ internal object PlatformInterruptedAttachmentProbe {
     /**
      * Records which step failed and what the platform and server had shown by then, as closed facts only: step name,
      * exception class, work states, native phases/attempts/retry delays, ledger counts and time since the stop.
-     * Nothing identifies the generated attachment, so a failed hosted run says where it stopped instead of only that it did.
+     * Nothing identifies the generated attachment; a failed run says where it stopped instead of only that it did.
      */
     private suspend fun reportFailure(
         step: String,
@@ -335,7 +337,10 @@ internal object PlatformInterruptedAttachmentProbe {
                 .put("phase", "automatic-platform-resume-failure")
                 .put("step", step)
                 .put("exception", failure.javaClass.simpleName)
-                .put("work_states", JSONArray(observations.workStates.takeLast(FAILURE_STATE_LIMIT).map { it.state.name }))
+                .put(
+                    "work_states",
+                    JSONArray(observations.workStates.takeLast(FAILURE_STATE_LIMIT).map { it.state.name }),
+                )
                 .put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
