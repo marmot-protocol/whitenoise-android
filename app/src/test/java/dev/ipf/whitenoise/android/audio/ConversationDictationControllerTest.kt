@@ -3146,12 +3146,13 @@ class ConversationDictationControllerTest {
             for (edited in listOf("Edited text", "")) {
                 var readUnavailable = false
                 var expired = 0
-                val f = fixture(
-                    draft = TextFieldValue("Draft", TextRange(5)),
-                    targetValidationScope = this,
-                    onDraftRead = { check(!readUnavailable) },
-                    onRecoveryExpired = { expired++ },
-                )
+                val f =
+                    fixture(
+                        draft = TextFieldValue("Draft", TextRange(5)),
+                        targetValidationScope = this,
+                        onDraftRead = { check(!readUnavailable) },
+                        onRecoveryExpired = { expired++ },
+                    )
                 f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
                 f.controller.send()
                 f.platform.listener.onResult("retained")
@@ -3180,20 +3181,21 @@ class ConversationDictationControllerTest {
             var readUnavailable = false
             var starts = 0
             var sends = 0
-            val f = fixture(
-                draft = TextFieldValue("Draft", TextRange(5)),
-                targetValidationScope = this,
-                onDraftRead = { check(!readUnavailable) },
-                startDurableSession = { _, ready ->
-                    starts++
-                    ready()
-                    true
-                },
-                sendTranscriptIfOriginUnchanged = {
-                    sends++
-                    false
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    onDraftRead = { check(!readUnavailable) },
+                    startDurableSession = { _, ready ->
+                        starts++
+                        ready()
+                        true
+                    },
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        false
+                    },
+                )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.controller.send()
             f.platform.listener.onResult("retained")
@@ -3938,16 +3940,17 @@ class ConversationDictationControllerTest {
         runTest {
             val transport = CompletableDeferred<Boolean>()
             val sent = mutableListOf<String>()
-            val f = fixture(
-                draft = TextFieldValue(""),
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    assertTrue(it.beginDispatch())
-                    sent += it.payload
-                    it.onPendingShown()
-                    transport.await()
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        assertTrue(it.beginDispatch())
+                        sent += it.payload
+                        it.onPendingShown()
+                        transport.await()
+                    },
+                )
             failRecognizedTail(f, send = true)
             runCurrent()
             assertEquals(listOf("first"), sent)
@@ -3998,21 +4001,22 @@ class ConversationDictationControllerTest {
         runTest {
             for (mode in listOf("draft", "validation")) {
                 val sent = mutableListOf<String>()
-                val f = fixture(
-                    draft = TextFieldValue(""),
-                    targetValidationScope = this,
-                    targetValidator = { _, _ ->
-                        if (mode == "validation") {
-                            ConversationDictationTargetValidation.Indeterminate
-                        } else {
-                            ConversationDictationTargetValidation.Available
-                        }
-                    },
-                    sendTranscriptIfOriginUnchanged = {
-                        sent += it.payload
-                        true
-                    },
-                )
+                val f =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        targetValidationScope = this,
+                        targetValidator = { _, _ ->
+                            if (mode == "validation") {
+                                ConversationDictationTargetValidation.Indeterminate
+                            } else {
+                                ConversationDictationTargetValidation.Available
+                            }
+                        },
+                        sendTranscriptIfOriginUnchanged = {
+                            sent += it.payload
+                            true
+                        },
+                    )
                 failRecognizedTail(f, send = true)
                 if (mode == "draft") f.edit(key(), TextFieldValue("Another writer"))
                 advanceUntilIdle()
@@ -4109,14 +4113,15 @@ class ConversationDictationControllerTest {
         runTest {
             var sends = 0
             val platform = FakePlatform(deferCaptureCompletion = true)
-            val f = fixture(
-                draft = TextFieldValue(""),
-                platform = platform,
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    it.beginDispatch().also { claimed -> if (claimed) sends++ }
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    platform = platform,
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        it.beginDispatch().also { claimed -> if (claimed) sends++ }
+                    },
+                )
             f.platform.pendingCallerAudio = true
             f.platform.deferCallerAudioFinish = true
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
@@ -4142,14 +4147,15 @@ class ConversationDictationControllerTest {
         runTest {
             val sent = mutableListOf<String>()
             val platform = FakePlatform(deferCaptureCompletion = true)
-            val f = fixture(
-                draft = TextFieldValue(""),
-                platform = platform,
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    it.beginDispatch().also { claimed -> if (claimed) sent += it.payload }
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    platform = platform,
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        it.beginDispatch().also { claimed -> if (claimed) sent += it.payload }
+                    },
+                )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             platform.listener.onResult("first")
             f.scheduler.runDelay(500L)
@@ -4175,16 +4181,17 @@ class ConversationDictationControllerTest {
             var readUnavailable = false
             var sends = 0
             val platform = FakePlatform(deferCaptureCompletion = true)
-            val f = fixture(
-                draft = TextFieldValue(""),
-                platform = platform,
-                targetValidationScope = this,
-                onDraftRead = { if (readUnavailable) error("draft read unavailable") },
-                sendTranscriptIfOriginUnchanged = {
-                    sends++
-                    true
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    platform = platform,
+                    targetValidationScope = this,
+                    onDraftRead = { if (readUnavailable) error("draft read unavailable") },
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        true
+                    },
+                )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             platform.listener.onResult("first")
             f.scheduler.runDelay(500L)
@@ -4209,15 +4216,16 @@ class ConversationDictationControllerTest {
         runTest {
             var sends = 0
             val platform = FakePlatform(deferCaptureCompletion = true)
-            val f = fixture(
-                draft = TextFieldValue(""),
-                platform = platform,
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    sends++
-                    true
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    platform = platform,
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        true
+                    },
+                )
             f.platform.pendingCallerAudio = true
             f.platform.deferCallerAudioFinish = true
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
@@ -4245,18 +4253,19 @@ class ConversationDictationControllerTest {
         runTest {
             var readUnavailable = false
             val sent = mutableListOf<String>()
-            val f = fixture(
-                draft = TextFieldValue(""),
-                onDraftRead = { if (readUnavailable) error("draft read unavailable") },
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    assertTrue(it.beginDispatch())
-                    sent += it.payload
-                    readUnavailable = true
-                    it.onPendingShown()
-                    true
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    onDraftRead = { if (readUnavailable) error("draft read unavailable") },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        assertTrue(it.beginDispatch())
+                        sent += it.payload
+                        readUnavailable = true
+                        it.onPendingShown()
+                        true
+                    },
+                )
             failRecognizedTail(f, send = true)
             advanceUntilIdle()
             assertEquals(listOf("first"), sent)
@@ -4279,14 +4288,15 @@ class ConversationDictationControllerTest {
     fun explicitSendWithOnlyFailedAudioRetainsRecoveryWithoutDispatch() =
         runTest {
             var sends = 0
-            val f = fixture(
-                draft = TextFieldValue("Existing"),
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    sends++
-                    true
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue("Existing"),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        true
+                    },
+                )
             f.platform.pendingCallerAudio = true
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.controller.send()
@@ -4306,14 +4316,15 @@ class ConversationDictationControllerTest {
         runTest {
             var allowWrite = true
             val sent = mutableListOf<String>()
-            val f = fixture(
-                draft = TextFieldValue(""),
-                allowDraftWrite = { allowWrite },
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    it.beginDispatch().also { claimed -> if (claimed) sent += it.payload }
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    allowDraftWrite = { allowWrite },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        it.beginDispatch().also { claimed -> if (claimed) sent += it.payload }
+                    },
+                )
             failRecognizedTail(f, send = true)
             advanceUntilIdle()
             assertTrue(f.controller.recoveryHandedToComposer)
@@ -4342,15 +4353,16 @@ class ConversationDictationControllerTest {
     fun explicitPrefixDispatchUnknownKeepsBothAudioAndTransportProtection() =
         runTest {
             var sends = 0
-            val f = fixture(
-                draft = TextFieldValue(""),
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    assertTrue(it.beginDispatch())
-                    sends++
-                    false
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        assertTrue(it.beginDispatch())
+                        sends++
+                        false
+                    },
+                )
             f.platform.pendingCallerAudio = true
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.tracksCallerAudioDisposal = true
@@ -4382,13 +4394,14 @@ class ConversationDictationControllerTest {
     fun explicitSendAfterCallerAudioFailurePreservesUnacknowledgedInput() =
         runTest {
             val sent = mutableListOf<String>()
-            val f = fixture(
-                draft = TextFieldValue(""),
-                targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = {
-                    it.beginDispatch().also { claimed -> if (claimed) sent += it.payload }
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        it.beginDispatch().also { claimed -> if (claimed) sent += it.payload }
+                    },
+                )
             f.platform.pendingCallerAudio = true
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.platform.tracksCallerAudioDisposal = true

@@ -570,9 +570,11 @@ internal class ConversationDictationNotificationSuppressionTest : ConversationDi
                 assertFalse(harness.conversationDictation.hasDurableSession)
                 assertFalse(harness.conversationDictation.foregroundMicrophoneRequired)
                 service.foreground.dictation.refreshNotification()
-                assertFalse(manager.activeNotifications.any {
-                    it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
-                })
+                assertFalse(
+                    manager.activeNotifications.any {
+                        it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                    },
+                )
                 harness.conversationDictation.onAppForegrounded()
                 runCurrent()
                 assertFalse(harness.conversationDictation.hasDurableSession)

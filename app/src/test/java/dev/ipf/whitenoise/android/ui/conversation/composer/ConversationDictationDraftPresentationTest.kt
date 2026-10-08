@@ -151,7 +151,9 @@ class ConversationDictationDraftPresentationTest {
         }
     }
 
-    private class Fixture(private val dispatchRecognized: Boolean = false) {
+    private class Fixture(
+        private val dispatchRecognized: Boolean = false,
+    ) {
         var draft by mutableStateOf(TextFieldValue("Draft", TextRange(5)))
 
         // Native draft generations and editor presentation revisions are separate domains.
