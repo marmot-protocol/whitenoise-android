@@ -1,0 +1,203 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+  "legacy_sha256": "d1e6b70c9c50af6702db6dc3593c192e0ef041446d6e4f2fa52a4ddfa69857dc",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Pending send preview preparation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.sending",
+        "test_ids": [
+          "CHL-004",
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "ChatListRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "fun ChatListRow(",
+        "test_ids": [
+          "CHL-001",
+          "CHL-002",
+          "CHL-011",
+          "CHL-016",
+          "CHL-019",
+          "FIND-003",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "ChatRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "fun ChatRow(",
+        "test_ids": [
+          "MSG-022",
+          "CHL-001",
+          "CHL-002",
+          "CHL-011",
+          "CHL-016",
+          "CHL-019",
+          "FIND-003",
+          "MSG-007",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "ChatRowPreviewLine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "fun ChatRowPreviewLine(",
+        "test_ids": [
+          "CHL-001",
+          "CHL-002",
+          "CHL-011",
+          "CHL-016",
+          "FIND-003"
+        ]
+      },
+      {
+        "surface": "ChatRowTitleStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "fun ChatRowTitleStatus(",
+        "test_ids": [
+          "CHL-002",
+          "CHL-011",
+          "CHL-016",
+          "FIND-003"
+        ]
+      },
+      {
+        "surface": "EvictedLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "fun EvictedLabel(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      },
+      {
+        "surface": "MentionBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "fun MentionBadge(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      },
+      {
+        "surface": "PinnedBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "fun PinnedBadge(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      },
+      {
+        "surface": "Chat row resolves the membership preview subject's name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "GroupSystemPreviewNames(activeAccountIdHex, appState::chatMemberTitle)",
+        "test_ids": [
+          "CHL-020"
+        ]
+      }
+    ],
+    "documentation_contracts": [
+      {
+        "surface": "R.string.checking_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.checking_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.actions",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_mention_badge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.chat_list_mention_badge",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.chat_muted_badge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.chat_muted_badge",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.chat_pinned_badge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.chat_pinned_badge",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_draft_prefix",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.chat_row_draft_prefix",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_removed_badge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.chat_row_removed_badge",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_removed_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.chat_row_removed_description",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.disappearing_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.disappearing_messages",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "string:invited_to_chat_by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.invited_to_chat_by",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.no_messages_yet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.no_messages_yet",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "string:someone",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.someone",
+        "test_ids": [
+          "CHL-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

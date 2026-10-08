@@ -1746,7 +1746,7 @@ class ConversationScrollCoordinatorTest {
         val searchNavigation =
             screen
                 .substringAfter("fun scrollToSearchMatch(match: ConversationSearchMatch)")
-                .substringBefore("// Step the cursor")
+                .substringBefore("fun navigateToSearchMatch(forward: Boolean)")
         val searchCallbacks =
             screen
                 .substringAfter("onSearchQueryChange = {")
@@ -1777,7 +1777,7 @@ class ConversationScrollCoordinatorTest {
     fun conversationScreenHighlightsOnlyCompletedCenteringCommands() {
         val screen = sourceFile("ConversationScreen.kt").readText()
 
-        assertEquals(1, Regex("if \\(!centered\\)").findAll(screen).count())
+        assertEquals(1, Regex("if \\(!centered \\|\\| !navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
         assertEquals(1, Regex("if \\(centered && navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
         val mention =
             screen
@@ -1789,6 +1789,27 @@ class ConversationScrollCoordinatorTest {
         val highlight = mention.indexOf("showTransientMessageHighlight(targetMessageId)")
         assertTrue(positioned >= 0 && guard > positioned && read > guard && highlight > read)
         assertTrue(mention.contains("resolveTargetIndex = { currentTimelineListIndex(targetMessageId) }"))
+    }
+
+    @Test
+    fun failedFocusTargetSharesExistingLocalizedRetryActions() {
+        val screen = sourceFile("ConversationScreen.kt").readText()
+        val focus =
+            screen
+                .substringAfter("// Scroll-to-message for a chat-list")
+                .substringBefore("// A settled visible anchor")
+        assertTrue("explicit Retry must restart the focus effect", "focusTargetRetry.generation" in focus)
+        assertTrue("a newer target must clear the earlier failed request", "focusTargetRetry.clear()" in focus)
+        assertEquals(2, Regex("focusTargetRetry.failed\\(navigationRequest\\)").findAll(focus).count())
+        val retryAction = Regex("focusTargetRetry.retry\\(\\s*loadFailurePresent = controller.error != null,?\\s*\\)")
+        assertEquals(3, retryAction.findAll(screen).count())
+        assertTrue(
+            "searchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)" in screen,
+        )
+        assertTrue(
+            "unavailable targets keep the existing localized notice",
+            "toast_original_message_unavailable" in focus,
+        )
     }
 
     @Test

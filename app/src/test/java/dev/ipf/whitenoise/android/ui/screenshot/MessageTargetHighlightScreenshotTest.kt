@@ -9,6 +9,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
@@ -30,6 +34,21 @@ import org.robolectric.annotation.GraphicsMode
 class MessageTargetHighlightScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun destinationHighlightHasTemporaryAccessibleSelection() {
+        val highlighted = mutableStateOf(true)
+        render(darkTheme = false, amoled = false, customBorder = null, highlightedState = highlighted)
+        composeRule
+            .onNodeWithTag(BUBBLE_TAG)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        composeRule.runOnIdle { highlighted.value = false }
+        composeRule
+            .onNodeWithTag(BUBBLE_TAG)
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
+    }
 
     @Test
     fun fullReplyTargetHighlightLight() {

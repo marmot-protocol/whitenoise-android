@@ -25,7 +25,9 @@
         "anchor": "fun ConversationLoadErrorContent(",
         "test_ids": [
           "CON-001",
-          "NTF-009"
+          "NTF-009",
+          "FIND-013",
+          "FIND-014"
         ]
       },
       {
@@ -38,7 +40,9 @@
           "GRP-021",
           "DIC-002",
           "CON-023",
-          "CON-029"
+          "CON-029",
+          "FIND-013",
+          "FIND-014"
         ]
       }
     ],

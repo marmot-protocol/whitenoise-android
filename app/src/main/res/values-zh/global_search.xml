@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_filter_unavailable">不在当前范围内</string>
+    <string name="search_filter_members_pending">部分选项暂不可用。已选筛选条件会保持有效，直到你移除它们。</string>
+</resources>
