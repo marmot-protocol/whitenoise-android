@@ -1,0 +1,20 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchReturnFocus.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "globalSearchReturnFocusExpiryEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchReturnFocus.kt",
+        "anchor": "fun globalSearchReturnFocusExpiryEffect(",
+        "test_ids": ["FIND-013"]
+      },
+      {
+        "surface": "Visible search-result return focus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchReturnFocus.kt",
+        "anchor": "fun globalSearchReturnFocusModifier(",
+        "test_ids": ["FIND-013"]
+      }
+    ]
+  }
+}

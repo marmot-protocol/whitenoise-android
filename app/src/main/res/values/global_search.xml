@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_filter_unavailable">Not in current scope</string>
+    <string name="search_filter_members_pending">Some choices are not available yet. Selected filters stay active until you remove them.</string>
+</resources>

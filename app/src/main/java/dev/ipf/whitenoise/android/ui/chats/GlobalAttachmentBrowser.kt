@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -40,6 +41,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -94,12 +96,23 @@ internal fun GlobalAttachmentBrowser(
     thumbnail: (GlobalAttachmentItem) -> ImageBitmap? = { null },
     modifier: Modifier = Modifier,
     zoneId: ZoneId = ZoneId.systemDefault(),
+    gridState: LazyGridState = rememberLazyGridState(),
+    selectionOwner: GlobalSearchSelectionOwner? = null,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val formatter =
         remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
     val days = remember(items, zoneId) { groupGlobalAttachmentsByDay(items, zoneId) }
     val visual = globalAttachmentGridIsVisual(kinds)
+    val returnedSelection = rememberReturnedSearchSelection(selectionOwner)
+    globalSearchReturnFocusExpiryEffect(selectionOwner, ready = !loading) {
+        val selected = returnedSelection?.takeIf { it == selectionOwner?.selected }
+        val item =
+            items.firstOrNull { selected?.matches(it.groupIdHex, it.messageIdHex, it.attachmentIndex) == true }
+        item != null &&
+            !gridState.isScrollInProgress &&
+            gridState.layoutInfo.visibleItemsInfo.any { it.key == globalLibraryItemTag(item) }
+    }
     Column(modifier.fillMaxSize().testTag(GLOBAL_LIBRARY_TAG)) {
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth().testTag(GLOBAL_LIBRARY_LOADING_TAG))
@@ -123,9 +136,15 @@ internal fun GlobalAttachmentBrowser(
         }
         GlobalAttachmentGrid(
             days = days,
-            visual = visual,
-            formatter = formatter,
-            bottomPadding = bottomPadding,
+            layout =
+                GlobalAttachmentGridLayout(
+                    visual,
+                    formatter,
+                    bottomPadding,
+                    gridState,
+                    selectionOwner,
+                    returnedSelection,
+                ),
             onOpenMessage = onOpenMessage,
             thumbnail = thumbnail,
         )
@@ -133,24 +152,31 @@ internal fun GlobalAttachmentBrowser(
 }
 
 /** The grid itself: a day heading spanning the row, then the cards of that day. */
+private data class GlobalAttachmentGridLayout(
+    val visual: Boolean,
+    val formatter: DateTimeFormatter,
+    val bottomPadding: Dp,
+    val state: LazyGridState,
+    val selectionOwner: GlobalSearchSelectionOwner?,
+    val returnedSelection: GlobalSearchSelectedResult?,
+)
+
 @Composable
 private fun GlobalAttachmentGrid(
     days: List<GlobalAttachmentDay>,
-    visual: Boolean,
-    formatter: DateTimeFormatter,
-    bottomPadding: Dp,
+    layout: GlobalAttachmentGridLayout,
     onOpenMessage: (groupIdHex: String, messageIdHex: String) -> Unit,
     thumbnail: (GlobalAttachmentItem) -> ImageBitmap?,
 ) {
     LazyVerticalGrid(
-        columns = if (visual) GridCells.Adaptive(LibraryGridCellSize) else GridCells.Fixed(1),
-        state = rememberLazyGridState(),
+        columns = if (layout.visual) GridCells.Adaptive(LibraryGridCellSize) else GridCells.Fixed(1),
+        state = layout.state,
         modifier = Modifier.fillMaxWidth().testTag(GLOBAL_LIBRARY_RESULTS_TAG),
         contentPadding =
             PaddingValues(
                 start = WhiteNoiseSpacing.CompactScreenMargin,
                 end = WhiteNoiseSpacing.CompactScreenMargin,
-                bottom = bottomPadding + WhiteNoiseSpacing.Section,
+                bottom = layout.bottomPadding + WhiteNoiseSpacing.Section,
             ),
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -158,7 +184,7 @@ private fun GlobalAttachmentGrid(
         days.forEach { day ->
             item(key = "day-${day.day}", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    text = day.day.format(formatter),
+                    text = day.day.format(layout.formatter),
                     modifier =
                         Modifier
                             .padding(vertical = WhiteNoiseSpacing.Related)
@@ -174,14 +200,44 @@ private fun GlobalAttachmentGrid(
                     GridItemSpan(if (tile) 1 else maxLineSpan)
                 },
             ) { item ->
-                GlobalAttachmentCard(
-                    item = item,
-                    thumbnail = thumbnail(item),
-                    onClick = { onOpenMessage(item.groupIdHex, item.messageIdHex) },
-                )
+                GlobalAttachmentGridCard(item, layout, onOpenMessage, thumbnail)
             }
         }
     }
+}
+
+/** The grid's real clickable card owns selection and its single-use return focus. */
+@Composable
+private fun GlobalAttachmentGridCard(
+    item: GlobalAttachmentItem,
+    layout: GlobalAttachmentGridLayout,
+    onOpenMessage: (groupIdHex: String, messageIdHex: String) -> Unit,
+    thumbnail: (GlobalAttachmentItem) -> ImageBitmap?,
+) {
+    val returnedRow =
+        layout.returnedSelection == layout.selectionOwner?.selected &&
+            layout.returnedSelection?.matches(item.groupIdHex, item.messageIdHex, item.attachmentIndex) == true
+    val returnFocus =
+        globalSearchReturnFocusModifier(
+            restoredSelection = returnedRow,
+            returnGeneration = layout.selectionOwner?.returnGeneration ?: 0L,
+            consumeReturn = { layout.selectionOwner?.let { it.consumeReturnFocus(it.returnGeneration) } == true },
+        ) {
+            !layout.state.isScrollInProgress &&
+                layout.state.layoutInfo.visibleItemsInfo
+                    .any { it.key == globalLibraryItemTag(item) }
+        }
+    GlobalAttachmentCard(
+        item = item,
+        thumbnail = thumbnail(item),
+        onClick = {
+            layout.selectionOwner?.selected =
+                GlobalSearchSelectedResult(item.groupIdHex, item.messageIdHex, item.attachmentIndex)
+            onOpenMessage(item.groupIdHex, item.messageIdHex)
+        },
+        selected = returnedRow,
+        modifier = returnFocus,
+    )
 }
 
 /** One library card: a square thumbnail for visual media, then the chat and time it came from. */
@@ -190,11 +246,13 @@ private fun GlobalAttachmentCard(
     item: GlobalAttachmentItem,
     thumbnail: ImageBitmap?,
     onClick: () -> Unit,
+    selected: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val visual = globalAttachmentPresentation(item.mediaType) == GlobalAttachmentPresentation.VISUAL
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().testTag(globalLibraryItemTag(item)),
+        modifier = modifier.fillMaxWidth().testTag(globalLibraryItemTag(item)).semantics { this.selected = selected },
         shape = MaterialTheme.shapes.large,
         colors =
             CardDefaults.cardColors(

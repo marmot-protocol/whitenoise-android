@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_filter_unavailable">Вне текущей области</string>
+    <string name="search_filter_members_pending">Некоторые варианты пока недоступны. Выбранные фильтры остаются активными, пока вы их не удалите.</string>
+</resources>
