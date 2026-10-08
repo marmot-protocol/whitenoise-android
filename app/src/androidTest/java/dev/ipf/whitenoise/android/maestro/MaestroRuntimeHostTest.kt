@@ -39,6 +39,7 @@ private val MAESTRO_POSTCONDITIONS =
         "reactions-draft-retained",
         "composer-expanded",
         "composer-automatic",
+        "composer-recreated",
         "dark",
         "light",
         "amoled",
@@ -91,6 +92,7 @@ class MaestroRuntimeHostTest {
                 )
             var state: WhiteNoiseAppState? = null
             var activity: ActivityScenario<MainActivity>? = null
+            var originalActivity: MainActivity? = null
             var peerLabel: String? = null
             var groupId: String? = null
             var messageBaseline: MaestroMessageBaseline? = null
@@ -176,6 +178,7 @@ class MaestroRuntimeHostTest {
                             .toString(),
                     )
                     activity = ActivityScenario.launch(MainActivity::class.java)
+                    checkNotNull(activity).onActivity { originalActivity = it }
                     // Maestro alone owns Android accessibility; this receipt certifies native handoff only.
                     File(directory, "ready.json").writeText(
                         JSONObject()
@@ -200,8 +203,20 @@ class MaestroRuntimeHostTest {
                     checkNotNull(activity),
                     postcondition,
                 )
+                val activityRecreated =
+                    verifyMaestroComposerRecreated(
+                        checkNotNull(state),
+                        checkNotNull(groupId),
+                        checkNotNull(activity),
+                        originalActivity,
+                        postcondition,
+                    )
                 File(directory, "verified.json").writeText(
-                    JSONObject().put("generation", generation).put("verified", true).toString(),
+                    JSONObject()
+                        .put("generation", generation)
+                        .put("verified", true)
+                        .put("activityRecreated", activityRecreated)
+                        .toString(),
                 )
             } finally {
                 val activityClosed = runCatching { activity?.close() }

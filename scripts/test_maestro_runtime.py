@@ -170,6 +170,24 @@ class CampaignSummaryTest(unittest.TestCase):
                 self.assertFalse(result['evidence_complete'])
                 self.assertTrue(result['errors'])
 
+    def test_generic_native_success_cannot_certify_activity_recreation(self):
+        """A recreation case needs its explicit native instance proof as well as normal UI/cleanup success."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            replacement = {**runtime.CASES[name], 'postcondition': 'composer-recreated'}
+            with patch.dict(runtime.CASES, {name: replacement}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('recreation', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['activityRecreated'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
     def test_future_shard_attempt_cannot_certify_current_run(self):
         """A future artifact is invalid even when older matching evidence passes."""
         with tempfile.TemporaryDirectory() as temporary:

@@ -718,6 +718,17 @@
       "assertions": "Expanded draft and full-screen geometry survive leaving and reopening the conversation. Require the actual composer, hidden original bubble, absent chat-list route and native retained FullScreen preference plus unchanged draft.",
       "postcondition": "composer-expanded"
     },
+    "composer-expanded-locale-recreation": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017",
+        "CON-008",
+        "NAV-009",
+        "SET-008"
+      ],
+      "assertions": "Expand an actual native draft, apply German through the real locale screen to recreate MainActivity, restore System and reopen the owning conversation. Native verification requires a different actual Activity instance, retained FullScreen geometry, unchanged draft and empty application locale; handled rotation is not recreation or process death.",
+      "postcondition": "composer-recreated"
+    },
     "developer-unlock": {
       "suite": "developer",
       "manual_ids": [

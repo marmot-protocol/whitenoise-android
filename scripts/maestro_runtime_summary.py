@@ -96,6 +96,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 generations.add(generation)
                 for flag in ('ready', 'verified', 'closed'):
                     receipt(json.dumps(read_json(leaf / f'{flag}.json')), generation, flag)
+                if (CASES[name]['postcondition'] == 'composer-recreated'
+                        and read_json(leaf / 'verified.json').get('activityRecreated') is not True):
+                    raise ValueError('Actual Activity recreation was not verified')
                 ready = read_json(leaf / 'ready.json')
                 if (ready.get('accounts') != 3 or ready.get('fixture') != CASES[name].get('fixture', 'basic')
                         or ready.get('uiObserver') != 'maestro'):

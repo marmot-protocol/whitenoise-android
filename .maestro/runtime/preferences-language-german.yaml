@@ -28,6 +28,10 @@ name: preferences-language-german
       id: "appearance.language.group"
     direction: DOWN
 - tapOn: "Sprache"
+- scrollUntilVisible:
+    element:
+      text: "Deutsch"
+    direction: DOWN
 - assertVisible: "Deutsch"
 - scrollUntilVisible:
     element:

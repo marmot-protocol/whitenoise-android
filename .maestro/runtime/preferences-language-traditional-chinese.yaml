@@ -28,6 +28,10 @@ name: preferences-language-traditional-chinese
       id: "appearance.language.group"
     direction: DOWN
 - tapOn: "語言"
+- scrollUntilVisible:
+    element:
+      text: "繁體中文"
+    direction: DOWN
 - assertVisible: "繁體中文"
 - scrollUntilVisible:
     element:
