@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
@@ -45,6 +46,7 @@ import org.junit.runner.RunWith
 
 /** Real IME, viewport pixels and pinned actions, without an account or network operation. */
 @PullRequestDeviceSmoke
+@SdkSuppress(minSdkVersion = 30)
 @RunWith(AndroidJUnit4::class)
 class ScrollEdgeFadeImeAndroidTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -116,7 +118,11 @@ class ScrollEdgeFadeImeAndroidTest {
     ) {
         Column(modifier.fillMaxWidth().imePadding().background(Color.Black)) {
             Column(
-                Modifier.weight(1f).fillMaxWidth().testTag(VIEWPORT).fadingVerticalScroll(scroll),
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .testTag(VIEWPORT)
+                    .fadingVerticalScroll(scroll),
             ) {
                 WhiteNoiseTextField(state = rememberTextFieldState(), modifier = Modifier.fillMaxWidth().testTag(FIELD))
                 repeat(40) { Box(Modifier.fillMaxWidth().height(40.dp).background(Color.Green)) }
@@ -139,14 +145,21 @@ class ScrollEdgeFadeImeAndroidTest {
                     ?: return@runOnUiThread null
             val insets = ViewCompat.getRootWindowInsets(window) ?: return@runOnUiThread null
             val height = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-            if (insets.isVisible(WindowInsetsCompat.Type.ime()) && height > 0) window.height to height else null
+            if (!insets.isVisible(WindowInsetsCompat.Type.ime()) || height <= 0) return@runOnUiThread null
+            // adjustResize can shrink an Activity's root; subtracting its IME again double-counts it.
+            val manager = requireNotNull(window.context.getSystemService(WindowManager::class.java))
+            val frame = manager.currentWindowMetrics.bounds
+            frame.height() to height
         }
 
     private fun assertFooterAboveIme() {
         composeRule.onNodeWithTag(FOOTER).assertIsDisplayed()
         val (windowHeight, imeHeight) = requireNotNull(imeGeometry())
         val bounds = composeRule.onNodeWithTag(FOOTER).fetchSemanticsNode().boundsInWindow
-        assertTrue("footer overlaps real IME: $bounds", bounds.bottom <= windowHeight - imeHeight + 2)
+        assertTrue(
+            "footer overlaps real IME: footer=$bounds frame=$windowHeight ime=$imeHeight",
+            bounds.bottom <= windowHeight - imeHeight + 2,
+        )
     }
 
     private companion object {
