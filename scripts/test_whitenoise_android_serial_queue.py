@@ -375,6 +375,71 @@ class QueueTest(unittest.TestCase):
         self.assertEqual(self.tick(candidate=None), 'not-sent-exhausted-held')
         self.assertFalse(self.writes)
 
+    def test_exhausted_admission_does_not_block_known_revocation_or_drain(self):
+        self.exhaust_never_sent_budget()
+        other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base, 'd' * 40, 'ENTRY')
+        for kind in ('revoke-integration', 'dequeue'):
+            effect = q.Effect(kind, other, 'c' * 64)
+            self.assertEqual(q.execute(self.journal, effect, self.write,
+                                      self.readback, self.save), kind + '-confirmed')
+        self.assertEqual(len(self.writes), 2)
+        self.assertEqual(self.tick(), 'not-sent-exhausted-held')
+
+    def test_receipt_bound_withdrawal_releases_hold_without_erasing_exhaustion(self):
+        self.exhaust_never_sent_budget()
+        record = next(iter(self.journal['effects'].values()))
+        record['exhaustion_withdrawal'] = {'proof_sha256': 'e' * 64, 'owner': {'run_id': 1}}
+        other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
+        self.assertEqual(record['state'], 'not-sent-exhausted')
+        self.assertEqual(record['not_sent_attempts'], 3)
+
+    def test_corrupt_withdrawal_proof_cannot_release_exhaustion(self):
+        self.exhaust_never_sent_budget()
+        record = next(iter(self.journal['effects'].values()))
+        for proof in ({'proof_sha256': 'bad', 'owner': {'run_id': 1}},
+                      {'proof_sha256': 'e' * 64, 'owner': {}}, True):
+            record['exhaustion_withdrawal'] = proof
+            with self.assertRaises(q.Held):
+                self.tick()
+        self.assertFalse(self.writes)
+
+    def test_drain_maintenance_retains_its_own_finite_retry_budget(self):
+        from unittest.mock import patch
+        self.exhaust_never_sent_budget()
+        identity = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base, 'd' * 40, 'ENTRY')
+        for kind in ('revoke-integration', 'dequeue'):
+            effect = q.Effect(kind, identity, 'c' * 64)
+            attempts = []
+
+            def never_sent(effect, key):
+                attempts.append(key)
+                raise q.NotSent('e' * 64)
+
+            for index in range(q.MAX_NOT_SENT_ATTEMPTS):
+                with patch.object(q.time, 'time', return_value=1000 + index * 1000):
+                    result = q.execute(self.journal, effect, never_sent, self.readback, self.save)
+                self.assertEqual(result, 'not-sent-exhausted-held' if index == 2 else 'not-sent-backoff')
+                self.journal = copy.deepcopy(self.saved[-1])
+            with patch.object(q.time, 'time', return_value=1000000):
+                self.assertEqual(q.execute(self.journal, effect, never_sent, self.readback,
+                                          self.save), 'not-sent-exhausted-held')
+            self.assertEqual(len(attempts), 3)
+        self.assertFalse(self.writes)
+
+    def test_uncertain_maintenance_cannot_be_replayed_or_bypassed(self):
+        self.exhaust_never_sent_budget()
+        identity = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base, 'd' * 40, 'ENTRY')
+        revoke = q.Effect('revoke-integration', identity, 'c' * 64)
+        self.assertEqual(q.execute(self.journal, revoke, self.write,
+                                  lambda *_: False, self.save), 'unknown-held')
+        self.journal = copy.deepcopy(self.saved[-1])
+        for effect in (revoke, q.Effect('dequeue', identity, 'c' * 64, 1)):
+            self.assertEqual(q.execute(self.journal, effect, self.write,
+                                      self.readback, self.save), 'unknown-held')
+        self.assertEqual(len(self.writes), 1)
+
     def test_corrupt_no_send_proof_cannot_be_retried(self):
         from unittest.mock import patch
         with patch.object(q.time,'time',return_value=1000):
