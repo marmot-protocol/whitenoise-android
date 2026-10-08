@@ -643,14 +643,13 @@ internal fun ComposerBar(
             if (editingMessageId != null) {
                 null
             } else {
-                {
-                    controllerForDictation.requestStart(
-                        accountRef = accountForDictation,
-                        groupIdHex = groupForDictation,
-                        draft = textFieldValue,
-                        replyToMessageIdHex = replyingTo?.messageIdHex,
-                    )
-                }
+                rememberComposerDictationAction(
+                    controller = controllerForDictation,
+                    accountRef = accountForDictation,
+                    groupIdHex = groupForDictation,
+                    draft = textFieldValue,
+                    replyToMessageIdHex = replyingTo?.messageIdHex,
+                )
             }
         } else {
             null
@@ -1279,6 +1278,14 @@ internal fun ComposerBar(
                         },
                     )
                 }
+                if (dictationOwnedByComposer && dictationController?.recoveryHandedToComposer == true) {
+                    ConversationDictationRecoveryStatus(
+                        dictationController.composerAccess(
+                            checkNotNull(dictationAccountRef),
+                            checkNotNull(dictationGroupIdHex),
+                        ),
+                    )
+                }
                 val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
                 val isRecordingVoice = activeRecordingController != null
                 val dictationActiveInComposer =
@@ -1403,8 +1410,7 @@ internal fun ComposerBar(
                             },
                         onDictation =
                             startAppOwnedDictation?.takeIf {
-                                dictationState is ConversationDictationState.Idle &&
-                                    !dictationPendingElsewhere &&
+                                !dictationActiveInComposer &&
                                     !isRecordingVoice &&
                                     voiceReviewClip == null
                             },

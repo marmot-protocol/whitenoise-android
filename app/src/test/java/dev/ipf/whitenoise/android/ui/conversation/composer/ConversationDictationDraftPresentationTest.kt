@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.app.NotificationManager
 import android.content.Context
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
@@ -8,10 +9,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
@@ -20,6 +27,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
@@ -40,6 +48,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener as RecognitionListener
@@ -151,10 +160,109 @@ class ConversationDictationDraftPresentationTest {
         }
     }
 
+    @Test
+    fun retainedAudioKeepsDictateVisibleAndOrdinarySendUsableWithoutNotifications() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val manager = context.getSystemService(NotificationManager::class.java)
+        shadowOf(manager).setNotificationsEnabled(false)
+        try {
+            val f = Fixture()
+            composeRule.setContent { f.RenderComposer() }
+            composeRule.runOnIdle { f.retainTail() }
+            composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text))
+                .assertIsDisplayed().performClick()
+            composeRule.onNodeWithTag("dictation-recovery-panel").assertIsDisplayed()
+            composeRule.onNodeWithText(context.getString(R.string.dictation_keep_later)).performClick()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).assertIsDisplayed()
+            composeRule.onNodeWithTag("dictation-composer")
+                .captureRoboImage("src/test/snapshots/dictation_retained_compact_composer.png")
+            composeRule.onNode(hasSetTextAction()).performTextReplacement("Edited message")
+            composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
+            composeRule.runOnIdle { f.lateSendAcceptance.invoke() }
+            composeRule.onNode(hasSetTextAction()).performTextReplacement("Next message")
+            composeRule.onNode(hasSetTextAction()).performImeAction()
+            composeRule.runOnIdle {
+                assertEquals(listOf("Edited message", "Next message"), f.sent)
+                assertTrue(f.pendingAudio)
+                assertFalse(f.controller.completionControlsRequired)
+            }
+        } finally {
+            shadowOf(manager).setNotificationsEnabled(true)
+        }
+    }
+
+    @Test
+    fun expandedComposerSettingsReturnOffersDraftOnlyRemainingAudioRetry() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val f = Fixture(dispatchRecognized = true)
+        composeRule.setContent { f.RenderComposer() }
+        composeRule.onNode(hasSetTextAction()).performClick()
+        val expand =
+            composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
+        assertEquals(context.getString(R.string.composer_expand_full_screen), expand.label)
+        composeRule.runOnIdle { assertTrue(expand.action()) }
+        composeRule.runOnIdle {
+            f.pendingAudio = true
+            f.controller.requestStart(ACCOUNT, GROUP, f.draft)
+            f.controller.send()
+            f.result("recognized")
+            f.runRestart()
+            f.failTail()
+            f.controller.onAppForegrounded()
+            f.controller.onAppForegrounded()
+        }
+        val expandedActions =
+            composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertEquals(context.getString(R.string.composer_collapse), expandedActions.single().label)
+        composeRule.onNodeWithTag("dictation-composer")
+            .captureRoboImage("src/test/snapshots/dictation_retained_expanded_composer.png")
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text))
+            .assertIsDisplayed().performClick()
+        composeRule.onNodeWithText(context.getString(R.string.dictation_retry_remaining)).performClick()
+        composeRule.onNodeWithTag("dictation-recovery-status")
+            .assertTextEquals(context.getString(R.string.dictation_processing))
+        composeRule.onNodeWithText(context.getString(R.string.dictation_keep_later)).performClick()
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("New edit")
+        composeRule.runOnIdle {
+            f.runRestart()
+            f.pendingAudio = false
+            f.result("tail")
+        }
+        composeRule.onNodeWithText("New edit tail").assertExists()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(listOf("Draft recognized"), f.dictationSends) }
+    }
+
+    @Test
+    fun staleDiscardDialogCannotConsumeAudioAfterConversationNavigation() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val f = Fixture()
+        composeRule.setContent { f.RenderComposer() }
+        composeRule.runOnIdle { f.retainTail() }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.discard)).performClick()
+        val oldDiscard =
+            composeRule.onNode(hasText(context.getString(R.string.discard)) and hasClickAction())
+                .fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        composeRule.runOnIdle { f.visibleGroup = "other" }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("dictation-discard-confirmation").assertDoesNotExist()
+        composeRule.runOnIdle {
+            oldDiscard()
+            assertTrue(f.pendingAudio)
+            assertTrue(f.controller.state is ConversationDictationState.Failed)
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.dictation_original_conversation)).assertIsDisplayed()
+    }
+
     private class Fixture(
         private val dispatchRecognized: Boolean = false,
     ) {
         var draft by mutableStateOf(TextFieldValue("Draft", TextRange(5)))
+        var visibleGroup by mutableStateOf(GROUP)
 
         // Native draft generations and editor presentation revisions are separate domains.
         var revision = 41L
@@ -165,6 +273,7 @@ class ConversationDictationDraftPresentationTest {
         val writers = mutableMapOf<Int, (TextFieldValue) -> Unit>()
         val sent = mutableListOf<String>()
         private lateinit var listener: RecognitionListener
+        private var recognitionCreated = false
         var pendingAudio = false
         val dictationSends = mutableListOf<String>()
         private val restarts = mutableListOf<() -> Unit>()
@@ -178,6 +287,15 @@ class ConversationDictationDraftPresentationTest {
 
                         override fun callerAudioHasPending(): Boolean = pendingAudio
 
+                        override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
+                            val retained = pendingAudio && recognitionCreated
+                            if (retained) {
+                                pendingAudio = false
+                                onClosed()
+                            }
+                            return retained
+                        }
+
                         override fun finishCallerAudioCapture(onClosed: () -> Unit): Boolean {
                             onClosed()
                             return true
@@ -185,6 +303,7 @@ class ConversationDictationDraftPresentationTest {
 
                         override fun createSession(listener: RecognitionListener): RecognitionSession {
                             this@Fixture.listener = listener
+                            recognitionCreated = true
                             return object : RecognitionSession {
                                 override fun start() = listener.onReady()
 
@@ -247,7 +366,7 @@ class ConversationDictationDraftPresentationTest {
             val writer = conversationDictationDraftWriter(controller, ACCOUNT, GROUP, presentationRevision, ::edit)
             writers[presentationRevision] = writer
             WhiteNoiseTheme {
-                Surface(Modifier.width(360.dp)) {
+                Surface(Modifier.width(360.dp).testTag("dictation-composer")) {
                     ComposerBar(
                         replyingTo = null,
                         messageTextCopy = MessageTextCopy.Default,
@@ -264,7 +383,7 @@ class ConversationDictationDraftPresentationTest {
                         textState = editor,
                         dictationController = controller,
                         dictationAccountRef = ACCOUNT,
-                        dictationGroupIdHex = GROUP,
+                        dictationGroupIdHex = visibleGroup,
                     )
                 }
             }
@@ -274,6 +393,15 @@ class ConversationDictationDraftPresentationTest {
             assertTrue(controller.requestStart(ACCOUNT, GROUP, draft))
             controller.send()
             listener.onResult("recognized")
+        }
+
+        fun retainTail() {
+            pendingAudio = true
+            controller.requestStart(ACCOUNT, GROUP, draft)
+            controller.paste()
+            result("recognized")
+            runRestart()
+            failTail()
         }
 
         fun result(text: String) = listener.onResult(text)

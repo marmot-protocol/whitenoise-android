@@ -51,6 +51,13 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
         assertFalse(channel.canShowBadge())
         assertEquals(context.getString(R.string.notification_channel_dictation_description), channel.description)
         assertEquals(NotificationManager.IMPORTANCE_LOW, channel.importance)
+        val notice = shadowOf(manager).allNotifications.single()
+        assertEquals(
+            context.getString(R.string.dictation_recovery_expired_text),
+            notice.extras.getString(Notification.EXTRA_TEXT),
+        )
+        assertFalse(notice.extras.getString(Notification.EXTRA_TEXT).orEmpty().contains("cleared"))
+        assertTrue(notice.contentIntent != null)
     }
 
     /** Stopping connection while Android still queues the host cannot cancel microphone ownership. */

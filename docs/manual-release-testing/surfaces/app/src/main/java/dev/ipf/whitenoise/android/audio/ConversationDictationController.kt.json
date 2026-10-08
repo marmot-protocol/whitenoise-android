@@ -213,6 +213,38 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Composer dictation admission and inspectable recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal fun composerAccess(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Remaining PCM draft-only explicit retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal fun retryComposerAudio(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Recovery service expiry preserves unresolved data",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private var recoveryProtectionExpired = false",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Confirmed recovery discard and stale receipt fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal fun discardComposerAudio(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

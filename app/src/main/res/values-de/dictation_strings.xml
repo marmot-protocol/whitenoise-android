@@ -3,11 +3,20 @@
     <string name="dictation_send_blocked">Nicht gesendet</string>
     <string name="dictation_retry_send">Erneut senden</string>
     <string name="dictation_recovery_title">Diktat benötigt Aufmerksamkeit</string>
-    <string name="dictation_recovery_text">Öffne White Noise, um das Diktat wiederherzustellen. Unfertige Diktate können bis zu 30 Minuten lang wiederhergestellt werden.</string>
+    <string name="dictation_recovery_text">Öffne White Noise, um das Diktat wiederherzustellen. Gespeichertes Audio ist vorübergehend und kann verloren gehen, wenn Android die App beendet.</string>
     <string name="dictation_recovery_open">App öffnen</string>
-    <string name="dictation_recovery_expired_title">Diktatwiederherstellung abgelaufen</string>
-    <string name="dictation_recovery_expired_text">Das unfertige Diktat wurde von diesem Gerät gelöscht.</string>
+    <string name="dictation_recovery_expired_title">Diktat in der App wiederherstellbar</string>
+    <string name="dictation_recovery_expired_text">Der Hintergrundschutz ist beendet. Öffne White Noise, um das gespeicherte Diktat wiederherzustellen.</string>
     <string name="dictation_incomplete_title">Unvollständiges Diktat</string>
     <string name="dictation_incomplete_text">Die Transkription wurde vorzeitig beendet. Prüfe den erkannten Text im Entwurf, bevor du ihn sendest.</string>
     <string name="dictation_send_recognized_text">Erkannten Text senden</string>
+    <string name="dictation_remaining_audio">Verbleibendes Diktataudio</string>
+    <string name="dictation_stopped_remaining">Aufnahme beendet. Einige Audiodaten sind noch nicht transkribiert.</string>
+    <string name="dictation_remaining_explanation">Erneut versuchen transkribiert das gespeicherte Audio, ohne aufzunehmen oder zu senden. Audio ist vorübergehend und kann verloren gehen, wenn Android die App beendet.</string>
+    <string name="dictation_retry_remaining">Verbleibendes Audio erneut versuchen</string>
+    <string name="dictation_keep_later">Für später behalten</string>
+    <string name="dictation_discard_remaining">Nicht transkribiertes Audio verwerfen? Text im Eingabefeld bleibt erhalten.</string>
+    <string name="dictation_finishing_microphone">Mikrofon wird geschlossen…</string>
+    <string name="dictation_audio_state_unavailable">Das gespeicherte Audio konnte nicht geprüft werden. Behalte es und versuche es erneut.</string>
+    <string name="dictation_original_conversation">Beende das Diktat im ursprünglichen Gespräch.</string>
 </resources>

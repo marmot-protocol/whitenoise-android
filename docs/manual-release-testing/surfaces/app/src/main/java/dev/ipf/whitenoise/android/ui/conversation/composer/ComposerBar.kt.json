@@ -93,6 +93,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Persistent compact and expanded Dictate recovery access",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "rememberComposerDictationAction(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

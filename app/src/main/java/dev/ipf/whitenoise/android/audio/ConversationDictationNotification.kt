@@ -76,7 +76,7 @@ private fun Notification.Builder.addRecoveryActions(
     )
 }
 
-/** Expiry clears recovery data and leaves one ordinary, dismissible notice with no recording actions. */
+/** Protection expiry leaves a dismissible Open-app notice without consuming retained recovery data. */
 internal fun notifyConversationDictationRecoveryExpired(context: Context) {
     val manager = context.getSystemService(NotificationManager::class.java)
     ConversationDictationForegroundService.ensureChannel(context)

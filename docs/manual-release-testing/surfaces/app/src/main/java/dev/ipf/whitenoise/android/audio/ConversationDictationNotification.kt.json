@@ -112,6 +112,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Protection-ended notification retains app-local recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "internal fun notifyConversationDictationRecoveryExpired(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

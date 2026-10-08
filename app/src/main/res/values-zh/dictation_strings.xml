@@ -22,11 +22,20 @@
     <string name="dictation_send_blocked">未发送</string>
     <string name="dictation_retry_send">重试发送</string>
     <string name="dictation_recovery_title">语音输入需要处理</string>
-    <string name="dictation_recovery_text">打开 White Noise 以恢复语音输入。未完成的语音输入可在 30 分钟内恢复。</string>
+    <string name="dictation_recovery_text">打开 White Noise 恢复听写。保留的音频是临时的，Android 停止应用后可能丢失。</string>
     <string name="dictation_recovery_open">打开应用</string>
-    <string name="dictation_recovery_expired_title">语音输入恢复已过期</string>
-    <string name="dictation_recovery_expired_text">未完成的语音输入已从此设备清除。</string>
+    <string name="dictation_recovery_expired_title">可在应用中恢复听写</string>
+    <string name="dictation_recovery_expired_text">后台保护已结束。打开 White Noise 恢复保留的听写。</string>
     <string name="dictation_incomplete_title">听写未完成</string>
     <string name="dictation_incomplete_text">转录在完成前停止了。发送前请检查草稿中的已识别文本。</string>
     <string name="dictation_send_recognized_text">发送已识别的文字</string>
+    <string name="dictation_remaining_audio">剩余听写音频</string>
+    <string name="dictation_stopped_remaining">录音已停止。部分音频尚未转写。</string>
+    <string name="dictation_remaining_explanation">重试会转写保留的音频，不会录音或发送。音频为临时保留，Android 停止应用后可能丢失。</string>
+    <string name="dictation_retry_remaining">重试剩余音频</string>
+    <string name="dictation_keep_later">保留到以后</string>
+    <string name="dictation_discard_remaining">丢弃尚未转写的音频？输入框中已有的文字将保留。</string>
+    <string name="dictation_finishing_microphone">正在关闭麦克风…</string>
+    <string name="dictation_audio_state_unavailable">无法检查保留的音频。请保留并重试。</string>
+    <string name="dictation_original_conversation">请在原会话中完成听写。</string>
 </resources>

@@ -421,7 +421,7 @@ private fun dictationStatusLabel(
  */
 @Composable
 @Suppress("CyclomaticComplexMethod") // Exhaustive enum-to-resource mapping is intentionally flat.
-private fun dictationFailureLabel(reason: ConversationDictationFailure): String =
+internal fun dictationFailureLabel(reason: ConversationDictationFailure): String =
     stringResource(
         when (reason) {
             ConversationDictationFailure.ProviderUnavailable -> R.string.dictation_provider_unavailable
