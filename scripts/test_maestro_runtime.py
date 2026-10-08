@@ -496,6 +496,34 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 self.assertFalse(by_name[name]['execution_verified'])
                 self.assertEqual({edge['dimension'] for edge in by_name[name]['edge_plan']}, set(EDGE_DIMENSIONS))
 
+    def test_nested_menus_panels_and_modal_content_keep_distinct_edge_plans(self):
+        """A terminal Screen/Sheet match must not hide menus or named dialog and picker content."""
+        catalog = {screen['symbol']: screen for screen in inventory()['screen_catalog']}
+        for name in ('ChatContextMenu', 'GlobalSearchFilterMenu', 'ComposerAttachmentMenu',
+                     'MessageActionMenu', 'KeyboardSafePopup', 'MessageDeleteDialogContent',
+                     'AddAccountSheetContent', 'ForwardMessagePickerContent', 'QrScannerSheetContent',
+                     'ShareChatPickerFullScreenContent', 'SmartFolderRulePanel', 'KeyPackagesScreenForAccount'):
+            with self.subTest(surface=name):
+                self.assertIn(name, catalog)
+                self.assertTrue(catalog[name]['manual_ids'])
+                self.assertFalse(catalog[name]['execution_verified'])
+                self.assertEqual(len(catalog[name]['edge_plan']), len(EDGE_DIMENSIONS))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = 'app/src/main/java/dev/ipf/whitenoise/android/ui/Nested.kt'
+            path = root / source
+            path.parent.mkdir(parents=True)
+            path.write_text('@Composable fun PrivateSheetModal() {}\n'
+                            '@Composable fun ToolbarPopup() {}\n'
+                            '@Composable fun MenuItem() {}\n'
+                            '@Composable fun PopupBackHandler() {}\n'
+                            '@Composable fun PickerScrollSync() {}\n')
+            with self.assertRaisesRegex(ValueError, 'no maintained source'):
+                screen_catalog(root, {}, {})
+            screens = screen_catalog(root, {'ui': [{'source': source, 'test_ids': ['INT-001']}]}, {})
+            self.assertEqual([screen['symbol'] for screen in screens], ['PrivateSheetModal', 'ToolbarPopup'])
+            self.assertTrue(all(len(screen['edge_plan']) == len(EDGE_DIMENSIONS) for screen in screens))
+
     def test_new_requirement_family_requires_an_explicit_campaign_plan(self):
         """New families cannot silently inherit a generic or obsolete layer assignment."""
         for fault in ('missing', 'extra', 'unknown-layer', 'no-prerequisite', 'non-string-layer'):

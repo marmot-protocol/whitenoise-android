@@ -21,13 +21,13 @@ name: profiles-private-account-isolation
 - assertVisible: Name from profile.*Maestro Dave
 - scrollUntilVisible:
     element:
-      text: Name
+      id: person_profile.nickname
     direction: DOWN
 - assertVisible: Name
 - assertNotVisible: Maestro private Dave
 - scrollUntilVisible:
     element:
-      text: Notes
+      id: person_profile.notes
     direction: DOWN
 - assertVisible: Notes
 - assertNotVisible: Maestro private note

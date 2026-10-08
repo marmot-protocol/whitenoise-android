@@ -4,15 +4,17 @@ name: profiles-private-rotation
 - runFlow: ../fixtures/open-external-private-details.yaml
 - scrollUntilVisible:
     element:
-      text: "Name"
+      id: person_profile.nickname
     direction: DOWN
-- tapOn: "Name"
+- tapOn:
+    id: person_profile.nickname
 - inputText: "Maestro unsaved nickname"
 - scrollUntilVisible:
     element:
-      text: "Notes"
+      id: person_profile.notes
     direction: DOWN
-- tapOn: "Notes"
+- tapOn:
+    id: person_profile.notes
 - inputText: "Maestro unsaved note"
 - hideKeyboard
 - setOrientation: LANDSCAPE_LEFT

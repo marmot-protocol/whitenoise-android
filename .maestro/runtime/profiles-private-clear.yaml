@@ -4,15 +4,17 @@ name: profiles-private-clear
 - runFlow: ../fixtures/open-external-private-details.yaml
 - scrollUntilVisible:
     element:
-      text: Name
+      id: person_profile.nickname
     direction: DOWN
-- tapOn: Name
+- tapOn:
+    id: person_profile.nickname
 - inputText: Maestro private Dave
 - scrollUntilVisible:
     element:
-      text: Notes
+      id: person_profile.notes
     direction: DOWN
-- tapOn: Notes
+- tapOn:
+    id: person_profile.notes
 - inputText: Maestro private note
 - hideKeyboard
 - tapOn: Save
@@ -34,15 +36,17 @@ name: profiles-private-clear
 - assertVisible: Maestro private note
 - scrollUntilVisible:
     element:
-      text: Name
+      id: person_profile.nickname
     direction: UP
-- tapOn: Name
+- tapOn:
+    id: person_profile.nickname
 - eraseText
 - scrollUntilVisible:
     element:
-      text: Notes
+      id: person_profile.notes
     direction: DOWN
-- tapOn: Notes
+- tapOn:
+    id: person_profile.notes
 - eraseText
 - hideKeyboard
 - tapOn: Save
@@ -60,7 +64,7 @@ name: profiles-private-clear
 - assertNotVisible: Maestro private Dave
 - scrollUntilVisible:
     element:
-      text: Notes
+      id: person_profile.notes
     direction: DOWN
 - assertNotVisible: Maestro private note
 - tapOn: Cancel

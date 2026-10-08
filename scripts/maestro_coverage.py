@@ -94,7 +94,9 @@ def screen_catalog(root, surfaces, cases, include_companions=False):
         text = path.read_text()
         composables = composable_names(text)
         names = {name for name in composables if name.endswith(
-            ('Screen', 'Sheet', 'Dialog', 'FullScreen', 'FullScreenView', 'Picker', 'Viewer', 'Drawer', 'Overlay', 'Pane'))}
+            ('Screen', 'Sheet', 'Dialog', 'FullScreen', 'FullScreenView', 'Picker', 'Viewer', 'Drawer', 'Overlay', 'Pane',
+             'Menu', 'Panel', 'Popup', 'DialogContent', 'SheetContent', 'PickerContent', 'FullScreenContent',
+             'Modal', 'ScreenForAccount'))}
         source_symbols = set(re.findall(r'\bfun\s+([A-Z]\w*)\s*\(', text))
         source_symbols.update(name.rsplit('.', 1)[-1] for name in composables)
         companion_paths = sorted({path for symbol in source_symbols for path in companions.get(symbol, [])})

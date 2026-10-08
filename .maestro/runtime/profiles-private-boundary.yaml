@@ -4,9 +4,10 @@ name: profiles-private-boundary
 - runFlow: ../fixtures/open-external-private-details.yaml
 - scrollUntilVisible:
     element:
-      text: Name
+      id: person_profile.nickname
     direction: DOWN
-- tapOn: Name
+- tapOn:
+    id: person_profile.nickname
 - inputText: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
 - assertVisible: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
 - hideKeyboard

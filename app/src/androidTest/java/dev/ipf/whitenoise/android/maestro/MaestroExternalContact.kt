@@ -35,6 +35,9 @@ internal class MaestroExternalContact(
         remote.start()
         val identity = remote.createIdentity(relays, relays)
         account = identity
+        // Identity setup publishes kind:0 too; give this rename a strictly newer Nostr second.
+        val initialProfileSecond = System.currentTimeMillis() / 1000L
+        while (System.currentTimeMillis() / 1000L <= initialProfileSecond) delay(25L)
         remote.publishUserProfile(identity.label, publishedProfile, relays, relays)
     }
 
@@ -48,14 +51,15 @@ internal class MaestroExternalContact(
         native: Marmot,
         relays: List<String>,
     ) {
-        native.refreshProfile(accountIdHex, relays)
         val ids = native.listAccounts().map { it.accountIdHex } + accountIdHex
         check(ids.size == 4 && ids.toSet().size == 4)
         withTimeout(15_000L) {
-            while (native.userProfile(accountIdHex) != publishedProfile) delay(100L)
+            native.refreshProfile(accountIdHex, relays)
+            check(native.userProfile(accountIdHex) == publishedProfile) {
+                "External profile publication was not fetched"
+            }
             for (id in ids) {
-                while (native.userProfile(id) == null) delay(100L)
-                publicProfiles[id] = checkNotNull(native.userProfile(id))
+                publicProfiles[id] = checkNotNull(native.userProfile(id)) { "Generated public profile missing" }
             }
         }
     }
