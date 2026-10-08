@@ -484,8 +484,13 @@ internal suspend fun ConversationController.reportVisibleMessage(
         if (!ownsHandle() || !retainsTimelineRecord(messageIdHex)) return@withLock false
         val page = withContext(Dispatchers.IO) { handle.setVisibleAnchor(messageIdHex) } ?: return@withLock false
         if (!ownsHandle()) return@withLock false
-        applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
-        true
+        withContext(Dispatchers.Main.immediate) {
+            // The native call is IO; installing its page is a main-thread commit.
+            // Dispatch may suspend, so a retired owner must be rejected here too.
+            if (!ownsHandle()) return@withContext false
+            applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
+            true
+        }
     }
 
 /** Replaces a bounded history window with its newest page, reporting whether the newest edge is ready. */
