@@ -6,7 +6,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Check the complete authoritative profile and unchanged other identities after editing the real form. */
 internal suspend fun verifyMaestroPublicProfile(
@@ -29,21 +29,28 @@ internal suspend fun verifyMaestroPublicProfile(
                     about = "Maestro saved biography",
                 )
             "public-profile-about-cleared" -> original.copy(about = null)
+            "public-profile-text-trimmed" ->
+                original.copy(
+                    name = "Maestro trimmed Alice",
+                    displayName = "Maestro trimmed Alice",
+                    about = "Maestro trimmed biography",
+                )
+            "public-profile-name-cleared" -> original.copy(name = null, displayName = null)
             "public-profile-unchanged" -> original
             else -> error("Unknown public-profile postcondition")
         }
     check(withContext(Dispatchers.Main.immediate) { state.activeAccount?.accountIdHex == accountId })
-    withTimeout(15_000L) {
-        while (true) {
-            val matches =
+    return withTimeoutOrNull(15_000L) {
+        var matches = false
+        while (!matches) {
+            matches =
                 withContext(Dispatchers.IO) {
                     baseline.all { (id, profile) ->
                         native.userProfile(id) == if (id == accountId) expected else profile
                     }
                 }
-            if (matches) return@withTimeout
-            delay(100L)
+            if (!matches) delay(100L)
         }
-    }
-    return true
+        true
+    } ?: false
 }

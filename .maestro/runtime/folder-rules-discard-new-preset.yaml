@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-discard-new-preset
+---
+- runFlow: ../fixtures/open-named-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.presetRead
+    direction: DOWN
+- tapOn:
+    id: folder.presetRead
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: '^Read status: No unread messages$'
+- back
+- assertVisible: Discard changes?
+- tapOn: Discard Changes
+- assertVisible:
+    id: chat-folders-content
+- assertNotVisible: Maestro rules folder

@@ -1,0 +1,44 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-edit-read-status
+---
+- runFlow: ../fixtures/open-named-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.presetRead
+    direction: DOWN
+- tapOn:
+    id: folder.presetRead
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: '^Read status: No unread messages$'
+- tapOn:
+    id: folder.condition.2
+- assertVisible:
+    id: folder.conditionDone
+    enabled: true
+- tapOn:
+    id: folder.mode
+- tapOn: Has unread messages
+- assertVisible:
+    id: folder.mode
+    text: ^Has unread messages$
+- tapOn:
+    id: folder.conditionDone
+- assertNotVisible:
+    id: folder.conditionDone
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: '^Read status: Has unread messages$'
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

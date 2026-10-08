@@ -1,0 +1,53 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-empty-group-blocks-save
+---
+- runFlow: ../fixtures/open-named-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.presetRead
+    direction: DOWN
+- tapOn:
+    id: folder.presetRead
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: '^Read status: No unread messages$'
+- scrollUntilVisible:
+    element:
+      id: folder.options.
+    direction: DOWN
+- tapOn:
+    id: folder.options.
+- tapOn: Add group
+- scrollUntilVisible:
+    element:
+      id: folder.group.3
+    direction: DOWN
+- assertVisible:
+    id: folder.group.3
+- assertVisible:
+    id: folder.save
+    enabled: false
+- tapOn: Match all · 0 items
+- assertVisible: Add a condition or remove this empty group before saving.
+- tapOn: Remove group
+- assertNotVisible:
+    id: folder.group.3
+- assertVisible:
+    id: folder.save
+    enabled: true
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: '^Read status: No unread messages$'
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

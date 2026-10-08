@@ -1,0 +1,38 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+  "legacy_sha256": "d4a2ae58515acdba4ddc616843562bb75406b27d45645caaa24463a03f3f34f4",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WhiteNoiseSecureTextField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun WhiteNoiseSecureTextField(",
+        "test_ids": [
+          "ACC-009",
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseTextField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun WhiteNoiseTextField(",
+        "test_ids": [
+          "PRO-001",
+          "FLD-004",
+          "SYS-002"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseTextFieldContainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun WhiteNoiseTextFieldContainer(",
+        "test_ids": [
+          "PRO-001",
+          "FLD-004",
+          "SYS-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

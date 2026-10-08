@@ -1,0 +1,82 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profile-lightning-invalid-clear
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- tapOn: Profile
+- assertVisible:
+    id: profile.edit
+- tapOn:
+    id: profile.edit
+- scrollUntilVisible:
+    element:
+      id: profile.lightning_field
+    direction: DOWN
+- assertVisible:
+    id: profile.lightning_field
+- tapOn:
+    id: profile.lightning_field
+- longPressOn:
+    id: profile.lightning_field
+- runFlow:
+    when:
+      visible: (?i)select all
+    commands:
+    - tapOn: (?i)select all
+- assertVisible:
+    id: profile.lightning_field
+    focused: true
+- eraseText: 100
+- assertNotVisible:
+    id: profile.lightning_field
+    text: .+
+- inputText: maestro@example.invalid/path
+- assertVisible:
+    id: profile.lightning_field
+    text: ^maestro@example\.invalid/path$
+- hideKeyboard
+- assertVisible: Enter a Lightning address like name@example.com.
+- assertVisible:
+    id: profile.save
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: profile.lightning_field
+    direction: DOWN
+- assertVisible:
+    id: profile.lightning_field
+- tapOn:
+    id: profile.lightning_field
+- longPressOn:
+    id: profile.lightning_field
+- runFlow:
+    when:
+      visible: (?i)select all
+    commands:
+    - tapOn: (?i)select all
+- assertVisible:
+    id: profile.lightning_field
+    focused: true
+- eraseText: 100
+- assertNotVisible:
+    id: profile.lightning_field
+    text: .+
+- hideKeyboard
+- assertNotVisible: Enter a Lightning address like name@example.com.
+- assertVisible:
+    id: profile.save
+    enabled: false
+- back
+- assertVisible:
+    id: profile.edit
+- scrollUntilVisible:
+    element:
+      id: profile.lightning_field
+    direction: DOWN
+- assertVisible:
+    id: profile.lightning_field
+- assertNotVisible:
+    id: profile.lightning_field
+    text: .+

@@ -6,7 +6,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Verify the actual Android preference owner and a fresh reader after the visible rate mutation. */
 internal suspend fun verifyMaestroSpeechRate(
@@ -24,16 +24,16 @@ internal suspend fun verifyMaestroSpeechRate(
             "speech-rate-system" -> null
             else -> error("Unknown speech-rate postcondition")
         }
-    withTimeout(15_000L) {
-        while (true) {
-            val matches =
+    return withTimeoutOrNull(15_000L) {
+        var matches = false
+        while (!matches) {
+            matches =
                 withContext(Dispatchers.Main.immediate) {
                     state.ttsRatePreferences.rateOverride.value == expected &&
                         TtsRatePreferences(context).rateOverride.value == expected
                 }
-            if (matches) return@withTimeout
-            delay(100L)
+            if (!matches) delay(100L)
         }
-    }
-    return true
+        true
+    } ?: false
 }

@@ -220,6 +220,9 @@ class CampaignSummaryTest(unittest.TestCase):
                 self.assertIn('speech rate', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
                 record = json.loads(path.read_text())
+                record['speechRateVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
                 record['speechRateVerified'] = True
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
@@ -238,7 +241,50 @@ class CampaignSummaryTest(unittest.TestCase):
                 self.assertIn('public profile', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
                 record = json.loads(path.read_text())
+                record['publicProfileVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
                 record['publicProfileVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
+    def test_generic_native_success_cannot_certify_complete_folder_rules(self):
+        """Require persisted rule/metadata/account isolation proof alongside visible editor success."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'smart-rule-read'}}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('smart-folder', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['smartFolderRuleVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
+                record['smartFolderRuleVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
+    def test_generic_native_success_cannot_certify_unchanged_relay_lists(self):
+        """Relay cancellation must compare all native account projections before it qualifies."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'relay-lists-unchanged'}}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('native relay lists', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['relayListsVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
+                record['relayListsVerified'] = True
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
 

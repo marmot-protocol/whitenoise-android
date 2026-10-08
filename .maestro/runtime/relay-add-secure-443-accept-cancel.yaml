@@ -1,0 +1,45 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: relay-add-secure-443-accept-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Relays
+    direction: DOWN
+- tapOn: Relays
+- assertVisible:
+    id: relays.group
+- tapOn: Add relay
+- assertVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relay.add.submit
+    enabled: false
+- tapOn:
+    id: relay.add.url
+- assertVisible:
+    id: relay.add.url
+    focused: true
+- eraseText: 100
+- assertNotVisible:
+    id: relay.add.url
+    text: .+
+- inputText: wss://relay.example.invalid:443/path?fixture=1
+- assertVisible:
+    id: relay.add.url
+    text: ^wss://relay\.example\.invalid:443/path\?fixture=1$
+- !!set
+  hideKeyboard: null
+- assertVisible:
+    id: relay.add.submit
+    enabled: true
+- back: null
+- assertNotVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relays.group
+- back: null
+- assertVisible: Settings

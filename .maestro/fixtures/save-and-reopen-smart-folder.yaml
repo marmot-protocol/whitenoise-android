@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- assertVisible:
+    id: folder.save
+    enabled: true
+- tapOn:
+    id: folder.save
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder
+- tapOn: Maestro rules folder
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rules folder$
+- assertVisible:
+    id: folder.description
+    text: ^Maestro rules description$

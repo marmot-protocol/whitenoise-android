@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'settings-lifecycle', 'speech-persistence', 'profile-text')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 660
 UI_TIMEOUTS = {'polls-question-boundary': 240}
@@ -131,6 +131,12 @@ def run_case(name, reports):
                 if (CASES[name]['postcondition'].startswith('public-profile-')
                         and verified.get('publicProfileVerified') is not True):
                     raise ValueError('Authoritative public profiles were not verified')
+                if (CASES[name]['postcondition'].startswith('smart-rule-')
+                        and verified.get('smartFolderRuleVerified') is not True):
+                    raise ValueError('Persisted smart-folder rules were not verified')
+                if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
+                        and verified.get('relayListsVerified') is not True):
+                    raise ValueError('Unchanged native relay lists were not verified')
                 if process.returncode != 0 or 'OK (1 test)' not in (directory / 'instrumentation.txt').read_text():
                     raise ValueError('Fixture instrumentation or cleanup failed')
                 if failure is None:

@@ -1,0 +1,50 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+  "legacy_sha256": "15d76906563dc6a9fe9fa435736f1f345f535a2b17436a4eb7c8e518ad9c2aa0",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SettingsAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsAction(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsChoice(",
+        "test_ids": [
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "SettingsGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsGroup(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsLink",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsLink(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "anchor": "fun SettingsSwitch(",
+        "test_ids": [
+          "SET-001",
+          "SYS-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

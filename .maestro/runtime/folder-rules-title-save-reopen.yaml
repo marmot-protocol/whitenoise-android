@@ -1,0 +1,41 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-title-save-reopen
+---
+- runFlow: ../fixtures/open-named-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.add.
+    direction: DOWN
+- tapOn:
+    id: folder.add.
+- assertVisible:
+    id: folder.addField.PARTICIPANTS
+- scrollUntilVisible:
+    element:
+      id: folder.addField.TITLE
+    direction: DOWN
+- tapOn:
+    id: folder.addField.TITLE
+- tapOn: Keyword
+- inputText: Maestro
+- assertVisible: ^Maestro$
+- hideKeyboard
+- assertVisible:
+    id: folder.conditionDone
+    enabled: true
+- tapOn:
+    id: folder.conditionDone
+- assertNotVisible:
+    id: folder.conditionDone
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: '^Title contains: Maestro$'
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

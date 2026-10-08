@@ -2216,6 +2216,259 @@
       ],
       "assertions": "A named outer folder draft survives handled rotation while a transient condition restores safely or dismisses without applying a rule. Keep Editing retains the exact name; explicit Discard creates no custom folder. No Activity recreation or process-death proof.",
       "postcondition": "folder-absent"
+    },
+    "folder-rules-all-read-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Save and reopen the All read preset with exact name, description and Read status. Native verification requires its complete rule tree and unchanged other accounts. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-read"
+    },
+    "folder-rules-mentions-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Save and reopen the Unread mentions preset and require its exact complete stored tree, metadata and unchanged other accounts. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-mentions"
+    },
+    "folder-rules-match-any-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Switch the preset root to Match any, save/reopen the actual selected mode and verify the entire stored group with all=false. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-any"
+    },
+    "folder-rules-exclusion-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Exclude the root group, save and reopen its actual exclusion control and exact stored tree without changing other folders or identities. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-excluded"
+    },
+    "folder-rules-edit-read-status": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Edit an existing Read status condition from No unread to Has unread, save/reopen its actual summary and independently verify the PRESENT rule. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-unread"
+    },
+    "folder-rules-remove-condition": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Remove the existing Read status condition while retaining Archived and Accepted defaults; save/reopen and verify exactly those two stored conditions. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-defaults"
+    },
+    "folder-rules-empty-group-blocks-save": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "An empty nested group disables the real Save action. Expand and remove it, then save/reopen the unchanged valid preset; no empty nested group may persist. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-read"
+    },
+    "folder-rules-replace-saved-cancel": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Cancel replacement of saved All read rules with mentions. The original complete persisted rule, name and description must remain intact. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-read"
+    },
+    "folder-rules-replace-saved-confirm": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Confirm replacement of saved All read rules with mentions, save/reopen the result and verify the exact new tree with retained metadata and unchanged other accounts. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-mentions"
+    },
+    "folder-rules-discard-new-preset": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Discard a named unsaved preset through the actual confirmation. Native whole-store and fresh-reader checks require every account to match its original state. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-absent"
+    },
+    "folder-rules-title-save-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Add a real title keyword condition, save/reopen its summary and verify the exact CONTAINS value together with all metadata and other accounts. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-title"
+    },
+    "profile-address-malformed-correction-cancel": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Malformed address input shows the actual format error and disables Save. A corrected synthetic identifier enables Save, but Back clears it without publication or external resolution; complete native profiles remain unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-lightning-malformed-correction-cancel": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Malformed lightning input shows the actual format error and disables Save. A corrected synthetic identifier enables Save, but Back clears it without publication or external resolution; complete native profiles remain unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-address-invalid-clear": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Reject malformed address input, then clear it to the original blank value. The error disappears and unchanged Save stays disabled; native metadata for every identity remains unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-lightning-invalid-clear": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Reject malformed lightning input, then clear it to the original blank value. The error disappears and unchanged Save stays disabled; native metadata for every identity remains unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-trimmed-text-reopen": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Save Name/About with surrounding whitespace and reopen their exact trimmed values. Native whole-profile verification requires trimmed metadata and unchanged other identities.",
+      "postcondition": "public-profile-text-trimmed"
+    },
+    "profile-blank-name-reopen": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Save a whitespace-only optional Name and reopen its empty normalized editor. Native verification requires both name and displayName absent while all remaining profile fields and other identities stay unchanged.",
+      "postcondition": "public-profile-name-cleared"
+    },
+    "relay-add-empty-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Empty URL disables Add; dismiss the actual sheet and leave all native relay lists unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-malformed-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Malformed URL disables Add and cancellation preserves all three account projections.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-insecure-correction-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Insecure URL disables Add; a structurally secure correction enables it, then cancel without submission or DNS/publication.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-roles-recovery-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "A secure URL with no roles disables Add and shows the actual explanation; restoring one role enables Add, then cancel without publishing.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-whitespace-correction-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Whitespace alone disables Add; surrounding whitespace on a secure identifier is accepted, then cancel and verify every original list remains unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-loopback-ip-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the loopback-ip URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-private-ip-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the private-ip URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-localhost-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the localhost URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-credentials-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the credentials URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-nonstandard-port-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the nonstandard-port URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-ws-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the ws URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-blank-host-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the blank-host URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-secure-443-accept-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor accepts the secure-443 URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-upper-case-accept-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor accepts the upper-case URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
     }
   }
 }

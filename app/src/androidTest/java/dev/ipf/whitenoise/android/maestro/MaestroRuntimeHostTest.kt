@@ -72,6 +72,17 @@ private val MAESTRO_POSTCONDITIONS =
         "public-profile-text-saved",
         "public-profile-about-cleared",
         "public-profile-unchanged",
+        "public-profile-text-trimmed",
+        "public-profile-name-cleared",
+        "smart-rule-read",
+        "smart-rule-mentions",
+        "smart-rule-any",
+        "smart-rule-excluded",
+        "smart-rule-unread",
+        "smart-rule-defaults",
+        "smart-rule-title",
+        "smart-rule-absent",
+        "relay-lists-unchanged",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -109,8 +120,7 @@ class MaestroRuntimeHostTest {
             var messageBaseline: MaestroMessageBaseline? = null
             var expectedAccountIds: Set<String> = emptySet()
             var externalContact: MaestroExternalContact? = null
-            var publicProfileOwner: String? = null
-            var publicProfileBaseline: Map<String, UserProfileMetadataFfi> = emptyMap()
+            var editorBaselines: MaestroEditorBaselines? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -181,13 +191,7 @@ class MaestroRuntimeHostTest {
                             "Generated group missing from native presentation"
                         }
                     val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
-                    if (postcondition.startsWith("public-profile-")) {
-                        publicProfileOwner = owner.accountIdHex
-                        publicProfileBaseline =
-                            accounts.associate {
-                                it.accountIdHex to checkNotNull(native.userProfile(it.accountIdHex))
-                            }
-                    }
+                    editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
                     if (postcondition.startsWith("message-") || postcondition == "accounts-retained") {
                         expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
                         val original = checkNotNull(nativeRow.row.lastMessage)
@@ -253,12 +257,30 @@ class MaestroRuntimeHostTest {
                         .put("privateContactVerified", privateContactVerified)
                         .put("speechRateVerified", verifyMaestroSpeechRate(context, checkNotNull(state), postcondition))
                         .put(
+                            "smartFolderRuleVerified",
+                            verifyMaestroFolderRules(
+                                context,
+                                checkNotNull(state),
+                                checkNotNull(editorBaselines).folderRules,
+                                postcondition,
+                            ),
+                        )
+                        .put(
+                            "relayListsVerified",
+                            verifyMaestroRelayLists(
+                                native,
+                                checkNotNull(state),
+                                checkNotNull(editorBaselines).relayLists,
+                                postcondition,
+                            ),
+                        )
+                        .put(
                             "publicProfileVerified",
                             verifyMaestroPublicProfile(
                                 native,
                                 checkNotNull(state),
-                                publicProfileBaseline,
-                                publicProfileOwner,
+                                checkNotNull(editorBaselines).publicProfiles,
+                                checkNotNull(editorBaselines).profileOwner,
                                 postcondition,
                             ),
                         )
