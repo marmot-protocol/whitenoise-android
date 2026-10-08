@@ -620,7 +620,12 @@ internal class ConversationDictationController internal constructor(
     private var pendingTargetValidation: Any? = null
     private var accumulatedTranscript = ""
     private var pendingCompletedTranscript = ""
-    private data class PendingPrefixSend(val sessionId: Long, val captureGeneration: Long, val transcript: String)
+
+    private data class PendingPrefixSend(
+        val sessionId: Long,
+        val captureGeneration: Long,
+        val transcript: String,
+    )
 
     private var pendingPrefixSend: PendingPrefixSend? = null
     private var retainedAudioFailure: ConversationDictationFailure? = null
@@ -1426,7 +1431,10 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Revalidates retained text without upgrading an automatic completion to an explicit Send. */
-    private fun retryRetainedTranscript(failed: ConversationDictationState.Failed, transcript: String) {
+    private fun retryRetainedTranscript(
+        failed: ConversationDictationState.Failed,
+        transcript: String,
+    ) {
         conversationDictationDiagnostic("event=retry path=retained_transcript")
         val retrySend =
             failed.reason == ConversationDictationFailure.SendBlocked ||
@@ -3038,7 +3046,9 @@ internal class ConversationDictationController internal constructor(
         } else if (explicitSendRequested && failureCause != null) {
             pendingPrefixSend = PendingPrefixSend(sessionId, captureClosureGeneration, transcript)
             fail(
-                sessionId, target, failureCause,
+                sessionId,
+                target,
+                failureCause,
                 captureEnd = DictationFailureCapture.CancelIncomplete,
                 retainedTranscript = transcript,
             )
@@ -3265,7 +3275,8 @@ internal class ConversationDictationController internal constructor(
 
     /** Only a verified save or respected editor change can release completion controls. */
     private fun handRecoveryToComposer(failed: ConversationDictationState.Failed) {
-        if (state !== failed || pendingPrefixSend != null ||
+        if (state !== failed ||
+            pendingPrefixSend != null ||
             failed.reason == ConversationDictationFailure.DeliveryUnknown
         ) {
             return
@@ -3592,7 +3603,8 @@ internal class ConversationDictationController internal constructor(
                 if (state.sessionId != sessionId) return@launch
                 try {
                     val accepted = dispatchTranscript(guardedRequest)
-                    if (pendingDispatchClaim !== claim || state.sessionId != sessionId ||
+                    if (pendingDispatchClaim !== claim ||
+                        state.sessionId != sessionId ||
                         state !is ConversationDictationState.Processing
                     ) {
                         return@launch
@@ -3609,7 +3621,8 @@ internal class ConversationDictationController internal constructor(
                         retainFailedDispatchDraft(sessionId, target, admissionTarget, transcript, claim)
                     }
                 } finally {
-                    if (pendingDispatchClaim === claim && state.sessionId == sessionId &&
+                    if (pendingDispatchClaim === claim &&
+                        state.sessionId == sessionId &&
                         state is ConversationDictationState.Processing
                     ) {
                         conversationDictationDiagnostic("event=send_outcome outcome=retained reason=interrupted")
@@ -3886,7 +3899,9 @@ internal class ConversationDictationController internal constructor(
             completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
             val failed =
                 ConversationDictationState.Failed(
-                    sessionId, target, failure,
+                    sessionId,
+                    target,
+                    failure,
                     retainedTranscript = transcript,
                     recognitionIncomplete = true,
                     draftRecovered = true,

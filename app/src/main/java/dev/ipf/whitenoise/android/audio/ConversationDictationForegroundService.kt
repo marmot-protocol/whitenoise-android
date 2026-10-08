@@ -314,7 +314,10 @@ internal class ConversationDictationForegroundService(
         internal const val EXTRA_ACTION_GENERATION = "dictation_action_generation"
 
         /** Completion actions belong to the controls and action generation that created them. */
-        private fun isStaleCompletionCommand(intent: Intent, controller: ConversationDictationController): Boolean {
+        private fun isStaleCompletionCommand(
+            intent: Intent,
+            controller: ConversationDictationController,
+        ): Boolean {
             val staleGeneration =
                 intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration
             return when (intent.action) {
