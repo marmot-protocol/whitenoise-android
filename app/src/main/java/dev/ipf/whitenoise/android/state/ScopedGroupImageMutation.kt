@@ -4,4 +4,16 @@ package dev.ipf.whitenoise.android.state
 internal class ScopedGroupImageMutation<out T>(
     val value: T,
     val isActive: () -> Boolean,
-)
+) {
+    var viewerPermissionCheck: Boolean = false
+        private set
+    var reconcilePrimary: Boolean = false
+        private set
+
+    /** Opts this single viewer attempt into authoritative admission and committed-image reconciliation. */
+    fun forViewer(reconcile: Boolean): ScopedGroupImageMutation<T> {
+        viewerPermissionCheck = true
+        reconcilePrimary = reconcile
+        return this
+    }
+}
