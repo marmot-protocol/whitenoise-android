@@ -161,7 +161,7 @@ internal fun ProfileEditContent(
         Column(
             Modifier
                 .fillMaxSize()
-                .whiteNoiseVerticalScroll(rememberScrollState())
+                .whiteNoiseVerticalScroll(rememberScrollState(), fadeEnabled = false)
                 .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Section)
                 .testTag("profile.form"),
             horizontalAlignment = Alignment.CenterHorizontally,

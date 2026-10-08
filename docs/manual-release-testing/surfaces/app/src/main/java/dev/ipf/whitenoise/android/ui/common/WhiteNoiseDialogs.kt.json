@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
-  "legacy_sha256": "d62f9583b833971ce029f9f5a2b599a56b06718939825088065747233fece469",
+  "legacy_sha256": "a345b89725b579d322586b2a0b47f66fe912a5672cd88cfbf2238b3198073c11",
   "categories": {
     "composable_surfaces": [
       {
@@ -78,6 +78,19 @@
           "SET-006",
           "SET-007",
           "SET-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: WhiteNoiseDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

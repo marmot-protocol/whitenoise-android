@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
@@ -32,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -72,7 +72,7 @@ internal fun PersonGroupsInCommonContent(
             )
         },
     ) {
-        LazyColumn(
+        WhiteNoiseLazyColumn(
             Modifier.fillMaxSize().testTag("groups_in_common.list"),
             contentPadding = PaddingValues(vertical = WhiteNoiseSpacing.Section),
         ) {

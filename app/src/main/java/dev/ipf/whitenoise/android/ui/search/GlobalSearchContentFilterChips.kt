@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val GLOBAL_SEARCH_CONTENT_FILTER_TAG = "global-search-content-filter"
@@ -50,7 +50,7 @@ internal fun GlobalSearchContentFilterChips(
         modifier
             .fillMaxWidth()
             .heightIn(max = 320.dp)
-            .verticalScroll(rememberScrollState())
+            .fadingVerticalScroll(rememberScrollState())
             .testTag(GLOBAL_SEARCH_CONTENT_FILTER_TAG),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {

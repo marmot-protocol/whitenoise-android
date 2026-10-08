@@ -19,6 +19,7 @@ internal const val SCROLL_CHAT_LIST_TRACE = "benchmark:scroll-chat-list"
 internal const val PAGING_DEEP_OLDER_TRACE = "benchmark:paging-deep-older"
 internal const val PAGING_RETURN_NEWER_TRACE = "benchmark:paging-return-newer"
 internal const val PAGING_JUMP_TO_NEWEST_TRACE = "benchmark:paging-jump-to-newest"
+internal const val PAGING_JUMP_TO_MENTION_TRACE = "benchmark:paging-jump-to-mention"
 internal const val PAGING_MOMENTUM_TRACE = "benchmark:paging-momentum"
 internal const val PAGING_BUSY_ENGINE_TRACE = "benchmark:paging-busy-engine"
 
@@ -202,6 +203,21 @@ internal fun pagingMetrics(sectionName: String): List<Metric> =
             pagingSection(PAGE_EDGE_STOP_TRACE, TraceSectionMetric.Mode.Count, "edgeStopCount"),
             pagingSection(PAGE_RUNWAY_KEPT_TRACE, TraceSectionMetric.Mode.Count, "runwayKeptCount"),
             pagingSection(PAGE_EDGE_REACHED_TRACE, TraceSectionMetric.Mode.Count, "edgeReachedCount"),
+        )
+
+/** Reuses paging/frame reporting and separates availability, animation, layout waits and correction. */
+@OptIn(ExperimentalMetricApi::class)
+internal fun mentionJumpMetrics(): List<Metric> =
+    pagingMetrics(PAGING_JUMP_TO_MENTION_TRACE) +
+        listOf(
+            pagingSection("WhiteNoise.conversation.mention.total", TraceSectionMetric.Mode.Sum, "mentionTotalMs"),
+            pagingSection("WhiteNoise.conversation.mention.availability", TraceSectionMetric.Mode.Sum, "mentionAvailabilityMs"),
+            pagingSection("WhiteNoise.conversation.mention.approach", TraceSectionMetric.Mode.Sum, "mentionApproachMs"),
+            pagingSection("WhiteNoise.conversation.mention.position", TraceSectionMetric.Mode.Sum, "mentionPositionMs"),
+            pagingSection("WhiteNoise.conversation.mention.animation", TraceSectionMetric.Mode.Sum, "mentionAnimationMs"),
+            pagingSection("WhiteNoise.conversation.mention.layout", TraceSectionMetric.Mode.Sum, "mentionLayoutMs"),
+            pagingSection("WhiteNoise.conversation.mention.correction", TraceSectionMetric.Mode.Sum, "mentionCorrectionMs"),
+            pagingSection("WhiteNoise.conversation.mention.correction", TraceSectionMetric.Mode.Count, "mentionCorrectionCount"),
         )
 
 /** One paging slice aggregated over the measured block, restricted to the app's own process. */

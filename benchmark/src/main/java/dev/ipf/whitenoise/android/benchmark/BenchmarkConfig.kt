@@ -13,6 +13,22 @@ internal object BenchmarkConfig {
     val groupName: String?
         get() = arguments.getString("groupName")?.trim()?.takeIf(String::isNotEmpty)
 
+    /** Synthetic, single-use unread-mention fixture; never prepared by changing native read state. */
+    val mentionFixtureId: String?
+        get() = arguments.getString("mentionFixtureId")?.takeIf(String::isNotBlank)
+
+    val mentionStartText: String?
+        get() = arguments.getString("mentionStartText")?.takeIf(String::isNotBlank)
+
+    val mentionTargetText: String?
+        get() = arguments.getString("mentionTargetText")?.takeIf(String::isNotBlank)
+
+    val mentionUnreadCount: Int
+        get() = arguments.getString("mentionUnreadCount")?.toIntOrNull() ?: 0
+
+    val mentionFinalOnly: Boolean
+        get() = arguments.getString("mentionFinalOnly") == "true"
+
     val inviteName: String?
         get() = arguments.getString("inviteName")?.trim()?.takeIf(String::isNotEmpty)
 

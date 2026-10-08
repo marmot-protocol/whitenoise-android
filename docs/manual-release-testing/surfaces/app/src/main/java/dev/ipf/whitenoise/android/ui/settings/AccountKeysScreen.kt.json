@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
-  "legacy_sha256": "fad867b866be80b4be51c67c5d437491b1ceb054fc61fb704fc4f06bf209c333",
+  "legacy_sha256": "6f78cf991cbf0af360da68877cc07d54344bbccc041dad8c1a7d98b889b2eb0f",
   "categories": {
     "composable_surfaces": [
       {
@@ -861,6 +861,17 @@
         "anchor": "testTag(\"profile_keys.signout_invitation_keys\")",
         "test_ids": [
           "ACC-013"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: AccountKeysScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

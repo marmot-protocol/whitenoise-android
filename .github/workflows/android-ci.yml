@@ -69,7 +69,7 @@ jobs:
           ref: ${{ github.sha }}
 
       - name: Test manual release guide and viewport coverage validators
-        run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py scripts/test_check_viewport_restoration_coverage.py
+        run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py scripts/test_check_scroll_edge_fades.py scripts/test_check_viewport_restoration_coverage.py scripts/test_paging_trace_report.py
 
       # This must run outside the path-filtered fuzz workflow: missing a parser
       # trigger would otherwise also skip the check intended to catch it.

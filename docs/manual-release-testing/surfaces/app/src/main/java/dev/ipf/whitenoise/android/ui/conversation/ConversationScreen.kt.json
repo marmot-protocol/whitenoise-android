@@ -62,7 +62,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.conversation_jump_to_mention",
         "test_ids": [
-          "CON-028"
+          "CON-028",
+          "CON-031"
         ]
       },
       {

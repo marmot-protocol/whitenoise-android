@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -59,6 +60,7 @@ import dev.ipf.whitenoise.android.core.GroupSystemSubjectLink
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -166,7 +168,10 @@ internal fun GroupSystemRow(
                                 },
                             ),
                 )
+                val menuScrollState = rememberScrollState()
                 DropdownMenu(
+                    scrollState = menuScrollState,
+                    modifier = Modifier.scrollEdgeFade(menuScrollState),
                     expanded = actionMenuOpen,
                     onDismissRequest = { actionMenuOpen = false },
                     shape = MenuDefaults.shape,

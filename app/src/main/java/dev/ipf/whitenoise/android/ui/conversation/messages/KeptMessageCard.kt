@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +46,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.KeptAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlin.math.roundToInt
@@ -320,7 +320,7 @@ private fun KeptMessageBody(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .then(if (expanded) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .then(if (expanded) Modifier.fadingVerticalScroll(rememberScrollState()) else Modifier)
                 .testTag(KEPT_MESSAGE_PREVIEW_TAG),
     ) {
         if (expanded) {

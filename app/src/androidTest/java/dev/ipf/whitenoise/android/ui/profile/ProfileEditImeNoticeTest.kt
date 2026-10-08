@@ -22,6 +22,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -49,6 +50,7 @@ import org.junit.runner.RunWith
  * confirmation is presented while the field still holds the keyboard, which is the state the issue
  * is about, rather than after the editor has already dismissed it.
  */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ProfileEditImeNoticeTest {
     @get:Rule

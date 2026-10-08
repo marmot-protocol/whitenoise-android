@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.core.ReplyNavigation
+import dev.ipf.whitenoise.android.state.tracedPagingSection
 
 private const val MAX_MENTION_LAYOUT_CORRECTIONS = 3
 
@@ -31,9 +32,18 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
         programmaticJump(targetMessageId, ConversationScrollReason.Mention) {
             val initialIndex = resolveTargetIndex() ?: return@programmaticJump
             val initialOffset = readLayout(initialIndex).readingStartOffset
-            if (!animateScrollToItem(initialIndex, initialOffset, resolveTargetIndex)) return@programmaticJump
+            val approached =
+                tracedPagingSection(ConversationMentionJumpTrace.APPROACH) {
+                    animateScrollToItem(
+                        initialIndex,
+                        initialOffset,
+                        traceMentionJump = true,
+                        resolveIndex = resolveTargetIndex,
+                    )
+                }
+            if (!approached) return@programmaticJump
 
-            awaitLayout()
+            tracedPagingSection(ConversationMentionJumpTrace.LAYOUT) { awaitLayout() }
             var placedIndex = initialIndex
             var placedOffset = initialOffset
             var measuredIndex = resolveTargetIndex() ?: return@programmaticJump
@@ -41,10 +51,12 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
             // An expanded-row estimate can overshoot a now-collapsed row entirely.
             // Reach its newest edge once without the estimate, then measure afresh.
             if (!measuredLayout.isMeasured && measuredLayout.viewportEndOffsetPx > 0 && initialOffset != 0) {
-                scrollToItem(measuredIndex, 0)
+                tracedPagingSection(ConversationMentionJumpTrace.CORRECTION) {
+                    scrollToItem(measuredIndex, 0)
+                }
                 placedIndex = measuredIndex
                 placedOffset = 0
-                awaitLayout()
+                tracedPagingSection(ConversationMentionJumpTrace.LAYOUT) { awaitLayout() }
                 measuredIndex = resolveTargetIndex() ?: return@programmaticJump
                 measuredLayout = readLayout(measuredIndex)
             }
@@ -81,10 +93,12 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
         if (index == placedIndex && layout.readingStartOffset == placedOffset) {
             reached = true
         } else if (attempt < MAX_MENTION_LAYOUT_CORRECTIONS) {
-            scrollToItem(index, layout.readingStartOffset)
+            tracedPagingSection(ConversationMentionJumpTrace.CORRECTION) {
+                scrollToItem(index, layout.readingStartOffset)
+            }
             placedIndex = index
             placedOffset = layout.readingStartOffset
-            awaitLayout()
+            tracedPagingSection(ConversationMentionJumpTrace.LAYOUT) { awaitLayout() }
         }
         attempt++
     }

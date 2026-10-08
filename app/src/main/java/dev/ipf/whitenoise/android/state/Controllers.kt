@@ -7217,6 +7217,7 @@ class ConversationController(
                 }
             initializeReadState(account)
             publishRecoveryTimelineProjection(recoveryGeneration)
+            publishReadyTimelineSubscription(timelineStream)
             streamIds
         }
     }
@@ -7650,6 +7651,7 @@ class ConversationController(
                 synchronized(liveSubscriptionLock) {
                     if (timelineSubscription === timelineStream) {
                         timelineSubscription = null
+                        window.readySubscription = null
                     }
                 }
                 withContext(Dispatchers.IO) {
@@ -7849,6 +7851,7 @@ class ConversationController(
                             reconcileNewExtendedRecords = true,
                         )
                     }
+                publishReadyTimelineSubscription(timelineStream)
                 // Older recovery is revision-gated inside the commit: a queued command echo must
                 // not release its own failed attempt. Preserve forward prefetch's arrival budget.
                 automaticPaging.newer.reset()

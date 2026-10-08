@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ButtonDefaults
@@ -81,7 +80,7 @@ private fun LocalDeleteDetails(
         title = { Text(stringResource(R.string.details)) },
         text = {
             SelectionContainer {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
+                Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                     Text(requireNotNull(visuals.details))
                 }
             }
