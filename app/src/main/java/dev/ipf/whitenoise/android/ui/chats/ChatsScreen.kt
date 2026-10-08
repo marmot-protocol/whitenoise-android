@@ -81,13 +81,11 @@ import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
-import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.canonicalChatListBodyMatches
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
-import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
@@ -241,18 +239,15 @@ internal fun ChatsScreen(
     // Async message-body results retain their exact query/account/list key.
     // A superseding key therefore hides stale matches synchronously, before
     // the replacement effect gets its first post-composition frame (#2202).
-    var bodySearchResult by remember { mutableStateOf<ChatListBodySearchResult?>(null) }
-    var libraryResult by remember { mutableStateOf<ChatListAttachmentLibraryResult?>(null) }
     // Resolution state for a pasted Nostr identifier in the search field (#344).
     // An npub resolves synchronously; a NIP-05 address resolves over the network
     // (loading → resolved/failed). Plain-text queries stay [None] and the list
     // filters exactly as before.
     var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
-    val accountFolders =
-        remember(folderStoreState, appState.activeAccountRef) {
-            appState.activeAccountRef?.let { appState.chatFolderPreferences.foldersFor(it) }.orEmpty()
-        }
+    val searchFolderContext =
+        rememberSearchFolderContext(appState, controller, groupTitleCopy, accountRef = appState.activeAccountRef)
+    val accountFolders = searchFolderContext.folders
     val selectedFolder = accountFolders.firstOrNull { it.id == selectedFolderId }
     val selectedFolderRule =
         remember(folderStoreState, appState.activeAccountRef, selectedFolder) {
@@ -263,43 +258,7 @@ internal fun ChatsScreen(
     // Effective folder membership: manual members plus rule matches,
     // re-derived from the live list so rule-driven chats join and leave
     // folders as rosters, unread state, and mute state change.
-    val resolveFolderChatIds: (String) -> Set<String> =
-        remember(
-            folderStoreState,
-            appState.activeAccountRef,
-            controller.items,
-            controller.archivedItems,
-            groupTitleCopy,
-            // Keyword rules match the rendered row title, which resolves as
-            // peer profiles land — re-derive when the presentation cache bumps.
-            appState.profileRevisionForCompose,
-        ) {
-            { folderId ->
-                appState.activeAccountRef
-                    ?.let { accountRef ->
-                        // Advanced rules share the loaded active/archive union with counts and previews.
-                        val rule = appState.chatFolderPreferences.folderRule(accountRef, folderId)
-                        val sourceItems = chatFolderSource(rule, controller.items, controller.archivedItems)
-                        val engineMutedChatIds =
-                            sourceItems
-                                .asSequence()
-                                .filter { it.engineMuted() }
-                                .map { it.group.groupIdHex }
-                                .toSet()
-                        chatFolderChatIds(
-                            items = sourceItems,
-                            manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
-                            excludedChatIds = appState.chatFolderPreferences.excludedChats(accountRef, folderId),
-                            rule = rule,
-                            activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                            isMuted = { groupIdHex ->
-                                groupIdHex in engineMutedChatIds
-                            },
-                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                        )
-                    }.orEmpty()
-            }
-        }
+    val resolveFolderChatIds = searchFolderContext.resolveChatIds
     val selectedFolderChatIds =
         remember(selectedFolder, resolveFolderChatIds) {
             selectedFolder?.let { resolveFolderChatIds(it.id) }
@@ -528,32 +487,23 @@ internal fun ChatsScreen(
     // Use a request identity as well as the structural cache key. If a user
     // types A → B → A, the second A owns a fresh token, so the first A's
     // result cannot flash for one frame before this query's effect starts.
-    val bodySearchRequest = remember(bodySearchKey) { ChatListBodySearchRequest() }
+    var bodySearchRetry by remember(bodySearchKey, controller, appState.runtimeGeneration) { mutableStateOf(0) }
+    val bodySearchRequest =
+        remember(bodySearchKey, controller, appState.runtimeGeneration, bodySearchRetry) { ChatListBodySearchRequest() }
+    val bodySearchEnabled = searchActive && (trimmedQuery.isNotEmpty() || messageSearchConstraints != null)
+    val bodySearchResult =
+        rememberGlobalSearchLookup(bodySearchRequest, bodySearchEnabled, "GLOBAL_BODY_SEARCH") {
+            canonicalChatListBodyMatches(
+                controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints),
+            )
+        }
     val bodyMatches =
         bodySearchResult
             ?.takeIf { it.request === bodySearchRequest }
-            ?.matches
+            ?.value
             .orEmpty()
-    val bodySearchLoading =
-        searchActive &&
-            (trimmedQuery.isNotEmpty() || messageSearchConstraints != null) &&
-            bodySearchResult?.request !== bodySearchRequest
-    LaunchedEffect(bodySearchRequest) {
-        // Folder / type / chat scopes alone need no body search; a needle or a
-        // message-level filter does.
-        if (!searchActive || (trimmedQuery.isEmpty() && messageSearchConstraints == null)) {
-            return@LaunchedEffect
-        }
-        delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
-        bodySearchResult =
-            ChatListBodySearchResult(
-                request = bodySearchRequest,
-                matches =
-                    canonicalChatListBodyMatches(
-                        controller.searchMessageBodies(scopedSourceList, trimmedQuery, messageSearchConstraints),
-                    ),
-            )
-    }
+    val bodySearchLoading = bodySearchEnabled && bodySearchResult == null
+    val bodySearchFailure = bodySearchResult?.error
     // Files-and-media browsing replaces the result list while a mode chip narrows the
     // search to attachments. It pages the plain timeline, so it runs on its own request
     // token rather than sharing the body search's.
@@ -563,29 +513,41 @@ internal fun ChatsScreen(
         remember(scopedSourceList, groupTitleCopy, profileRev) {
             globalAttachmentSources(appState, scopedSourceList, groupTitleCopy)
         }
+    var libraryRetry by
+        remember(browsingAttachments, bodySearchKey, libraryKinds, controller, appState.runtimeGeneration) {
+            mutableStateOf(0)
+        }
     val libraryRequest =
-        remember(browsingAttachments, bodySearchKey, libraryKinds) { ChatListBodySearchRequest() }
+        remember(
+            browsingAttachments,
+            bodySearchKey,
+            libraryKinds,
+            controller,
+            appState.runtimeGeneration,
+            libraryRetry,
+        ) {
+            ChatListBodySearchRequest()
+        }
+    val libraryResult =
+        rememberGlobalSearchLookup(libraryRequest, browsingAttachments, "GLOBAL_ATTACHMENT_SEARCH") {
+            val account = controller.boundAccountRef
+            if (account == null) {
+                error("Search account unavailable")
+            } else {
+                collectGlobalAttachments(
+                    appState = appState,
+                    accountRef = account,
+                    sources = librarySources,
+                    rawQuery = trimmedQuery,
+                    constraints = messageSearchConstraints,
+                    kinds = libraryKinds,
+                )
+            }
+        }
     val libraryItems =
-        libraryResult?.takeIf { it.request === libraryRequest }?.items.orEmpty()
+        libraryResult?.takeIf { it.request === libraryRequest }?.value.orEmpty()
     val libraryLoading = browsingAttachments && libraryResult?.request !== libraryRequest
-    LaunchedEffect(libraryRequest) {
-        if (!browsingAttachments) return@LaunchedEffect
-        delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
-        val account = controller.boundAccountRef ?: return@LaunchedEffect
-        libraryResult =
-            ChatListAttachmentLibraryResult(
-                request = libraryRequest,
-                items =
-                    collectGlobalAttachments(
-                        appState = appState,
-                        accountRef = account,
-                        sources = librarySources,
-                        rawQuery = trimmedQuery,
-                        constraints = messageSearchConstraints,
-                        kinds = libraryKinds,
-                    ),
-            )
-    }
+    val libraryFailure = libraryResult?.error
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
     // address shows a loading state, then a `/.well-known/nostr.json` lookup
@@ -1365,7 +1327,7 @@ internal fun ChatsScreen(
     val returnedSearchSelection = rememberReturnedSearchSelection(searchViewport?.selection)
     globalSearchReturnFocusExpiryEffect(
         owner = searchViewport?.selection,
-        ready = searchActive && !browsingAttachments && !bodySearchLoading,
+        ready = searchActive && !browsingAttachments && !bodySearchLoading && bodySearchFailure == null,
     ) {
         val selected = returnedSearchSelection
         val rowId = selected?.groupId?.let(::canonicalChatListGroupId)
@@ -1870,6 +1832,12 @@ internal fun ChatsScreen(
                 },
             ) {
                 when {
+                    browsingAttachments && libraryFailure != null ->
+                        ErrorContent(
+                            stringResource(R.string.couldnt_load_chats),
+                            libraryFailure,
+                            onRetry = { libraryRetry++ },
+                        )
                     browsingAttachments ->
                         GlobalAttachmentBrowser(
                             items = libraryItems,
@@ -1899,6 +1867,12 @@ internal fun ChatsScreen(
                         // Even nonempty title-only rows would clamp a deep message-results position
                         // before the current body lookup publishes. Wait without measuring a replacement list.
                         LoadingScreen(message = stringResource(R.string.conversation_search_loading))
+                    bodySearchFailure != null ->
+                        ErrorContent(
+                            stringResource(R.string.couldnt_load_chats),
+                            bodySearchFailure,
+                            onRetry = { bodySearchRetry++ },
+                        )
                     sourceList.isEmpty() && showArchived -> EmptyArchivedChats()
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = openNewMessageFlow)
@@ -2333,17 +2307,6 @@ private data class ChatListBodySearchKey(
 )
 
 private class ChatListBodySearchRequest
-
-private data class ChatListBodySearchResult(
-    val request: ChatListBodySearchRequest,
-    val matches: Map<String, MessageBodyMatch>,
-)
-
-/** One library scan's results, held against the token that asked for them. */
-private data class ChatListAttachmentLibraryResult(
-    val request: ChatListBodySearchRequest,
-    val items: List<GlobalAttachmentItem>,
-)
 
 // Debounce before the chat-list message-body search fires its per-chat FFI
 // queries (issue #290). Sits inside the existing 250–300 ms chat-list input

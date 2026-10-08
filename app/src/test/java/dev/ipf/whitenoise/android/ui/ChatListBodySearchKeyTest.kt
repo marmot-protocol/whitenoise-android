@@ -16,7 +16,7 @@ class ChatListBodySearchKeyTest {
         )
         assertTrue(
             "body-search effect must key by the stable account-aware search key, not sourceList identity",
-            "LaunchedEffect(bodySearchRequest)" in source &&
+            "rememberGlobalSearchLookup(bodySearchRequest, bodySearchEnabled" in source &&
                 "LaunchedEffect(trimmedQuery, sourceList)" !in source,
         )
         assertTrue(
@@ -26,7 +26,7 @@ class ChatListBodySearchKeyTest {
         )
         assertTrue(
             "a repeated A-B-A query must hide the first A result before the replacement effect runs",
-            "remember(bodySearchKey) { ChatListBodySearchRequest() }" in source &&
+            "remember(bodySearchKey, controller, appState.runtimeGeneration, bodySearchRetry)" in source &&
                 "?.takeIf { it.request === bodySearchRequest }" in source,
         )
         assertTrue(

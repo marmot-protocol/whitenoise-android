@@ -97,6 +97,8 @@ internal fun ConversationTopBar(
     openDetailsDescription: String,
     onOpenDetails: () -> Unit,
     onBack: () -> Unit,
+    searchFilterAction: @Composable () -> Unit = {},
+    searchFilterControls: @Composable () -> Unit = {},
     // Compact-height windows (landscape with the IME open) trade top-bar
     // height back to the transcript and composer while keeping Back, the
     // conversation identity and the details action reachable.
@@ -202,7 +204,9 @@ internal fun ConversationTopBar(
                 onClose = onCloseSearch,
                 onSearchAction = onSearchAction,
                 focusRequester = searchFocusRequester,
+                filterAction = searchFilterAction,
             )
+            searchFilterControls()
         } else {
             PreparedGroupAvatarContent(
                 appState,

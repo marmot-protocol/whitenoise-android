@@ -6,19 +6,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
+import dev.ipf.whitenoise.android.ui.chats.decodeGlobalSearchState
+import dev.ipf.whitenoise.android.ui.chats.encodeGlobalSearchState
+
+private const val SAVED_SEARCH_STATE_INDEX = 6
 
 /**
  * Controller-scoped presentation shared by the shell and its conversation.
  *
- * Only the details-route flag enters Android saved state so configuration or Activity recreation can rebuild the
- * nested details destination. Search, selection, and backfill state remain transient, and none of this enters protocol
- * storage.
+ * Details and search controls enter Android saved state for configuration recreation.
+ * Selection, navigation jobs and backfill remain transient; none enters protocol storage.
  */
 internal class ConversationSurfaceState(
     showDetailsInitially: Boolean = false,
+    searchInitially: GlobalSearchState = GlobalSearchState(),
 ) {
     val showDetails = mutableStateOf(showDetailsInitially)
-    val searchOpen = mutableStateOf(false)
+    val searchOpen = mutableStateOf(searchInitially.isOpen)
+    val searchState = mutableStateOf(searchInitially)
     val initialTimelineBackfillNoProgress = mutableStateOf(false)
     val selectedMessages = mutableStateMapOf<String, BatchMessageSelection>()
 }
@@ -41,6 +47,7 @@ internal fun conversationSurfaceStateSaver(
                 chatId.orEmpty(),
                 runtimeGeneration,
                 state.showDetails.value,
+                encodeGlobalSearchState(state.searchState.value.copy(isOpen = state.searchOpen.value)),
             )
         },
         restore = { saved ->
@@ -50,7 +57,15 @@ internal fun conversationSurfaceStateSaver(
                 savedAccountRef == accountRef &&
                     savedChatId == chatId &&
                     saved[4] == runtimeGeneration
-            ConversationSurfaceState(showDetailsInitially = identityMatches && saved[5] as Boolean)
+            ConversationSurfaceState(
+                showDetailsInitially = identityMatches && saved[5] as Boolean,
+                searchInitially =
+                    if (identityMatches && saved.size > SAVED_SEARCH_STATE_INDEX) {
+                        decodeGlobalSearchState(saved[SAVED_SEARCH_STATE_INDEX] as String)
+                    } else {
+                        GlobalSearchState()
+                    },
+            )
         },
     )
 

@@ -352,6 +352,8 @@ private class ComposerLayoutCaretCorrectionGate {
  * Renders the editable composer pill and coordinates its compact, multiline,
  * and manually expanded geometry. BasicTextField keeps the pill independent
  * of Material's 56dp filled-field minimum.
+ * Draft navigation admission follows measured geometry and owner changes, while same-size typing
+ * retains the admitted button and its reserved space.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -679,31 +681,6 @@ internal fun ComposerPill(
             hasUserShare ||
             hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
-    val draftTopGeometryState =
-        remember(
-            scrollOwnerKey,
-            textFieldValue.text,
-            geometryTransitionActive,
-            geometryAvailableHeight,
-            transformedText,
-            compactMeasurementWidth,
-            compactOuterEndInset,
-            expandedTrailingActionInset,
-            expansionMode,
-            composerFocused,
-            forceEditingLayout,
-            dismissInProgress,
-            multilineControlsSuppressed,
-            dictationControls != null,
-            onDictation != null,
-            hasAttachmentAction,
-            trailingAction != null,
-            sendAccessoryContent != null,
-            accessoryContent != null,
-            compactMeasurementReservesTrailingAction,
-            density,
-        ) { mutableStateOf(false) }
-    var draftTopGeometrySettled by draftTopGeometryState
     val draftStartOffscreen by remember(composerScrollState) {
         derivedStateOf { composerScrollState.value > 0 }
     }
@@ -724,23 +701,11 @@ internal fun ComposerPill(
     val navigationRoom =
         navigationSurfaceWidth - leadingControlsWidth - primaryTrailingWidth -
             minimumDictationWidth - (if (sendAccessoryContent != null) 66.dp else 0.dp)
-    // A compact-height row cannot afford another toolbar above it; preserve its editor and core tools.
-    val showDraftTop =
-        textFieldValue.text.isNotEmpty() &&
-            !geometryTransitionActive &&
-            draftTopGeometrySettled &&
-            draftStartOffscreen &&
-            (!multilineControlsSuppressed || navigationRoom >= 40.dp)
-    val textMeasurer = rememberTextMeasurer()
-    val topOnSeparateRow = showDraftTop && inputContentVisible && navigationRoom < 40.dp
-    val draftTopWidth = if (showDraftTop && inputContentVisible) 40.dp else 0.dp
-    val extraControlsHeight = if (topOnSeparateRow) 48.dp else 0.dp
-    SideEffect { onExtraControlsHeightChanged(extraControlsHeight) }
-    SideEffect { if (accessoryContent == null) onAccessoryHeightChanged(0.dp) }
-    val reservedTrailingWidth = primaryTrailingWidth + if (topOnSeparateRow) 0.dp else draftTopWidth
+    // Navigation uses only leftover room after the dictation minimum; reserving it cannot reduce
+    // the capped dictation width. Keep this measurement independent of navigation admission.
     val availableDictationWidth =
         compactMeasurementWidth?.let {
-            (navigationSurfaceWidth - leadingControlsWidth - reservedTrailingWidth).coerceAtLeast(0.dp)
+            (navigationSurfaceWidth - leadingControlsWidth - primaryTrailingWidth).coerceAtLeast(0.dp)
         } ?: DICTATION_ACTIVE_ACTIONS_WIDTH
     val targetDictationControlWidth =
         when {
@@ -755,9 +720,6 @@ internal fun ComposerPill(
             label = "composer dictation control morph",
         )
     val dictationControlWidth by dictationControlWidthState
-    val compactTrailingReserve =
-        4.dp + (if (topOnSeparateRow) 0.dp else draftTopWidth) + dictationControlWidth + expandedTrailingActionInset +
-            (if (trailingAction != null) 40.dp else 0.dp)
     // What the compact trailing reserve leaves over once the control row has taken its share: the 4dp
     // gap before the controls when nothing sits between them, and nothing at all when it does.
     val compactFreeTrailingGutter = if (expandedTrailingActionInset > 0.dp) 0.dp else 4.dp
@@ -780,6 +742,7 @@ internal fun ComposerPill(
             mode = expansionMode,
             dismissInProgress = dismissInProgress,
         )
+    val textMeasurer = rememberTextMeasurer()
     val compactDraftMeasurement =
         compactMeasurementWidth?.let { measurementWidth ->
             val editingWidthPx =
@@ -853,12 +816,16 @@ internal fun ComposerPill(
                 ),
             label = "composer text height",
         )
-    val automaticTextHeight =
-        if (compactTextLayout != null &&
+    // Record the exact clipping bounds used by the rendered editor, not its unbounded draft height.
+    val textHeightBounds = remember(scrollOwnerKey) { mutableStateOf(0..Int.MAX_VALUE) }
+    val usesAnimatedTextHeight =
+        compactTextLayout != null &&
             expansionMode == ComposerExpansionMode.Automatic &&
             !multilineControlsSuppressed
-        ) {
+    val automaticTextHeight =
+        if (usesAnimatedTextHeight) {
             Modifier.layout { measurable, constraints ->
+                textHeightBounds.value = constraints.minHeight..constraints.maxHeight
                 val height = animatedTextHeight.value.coerceIn(constraints.minHeight, constraints.maxHeight)
                 val child = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
                 layout(child.width, child.height) { child.placeRelative(0, 0) }
@@ -931,6 +898,58 @@ internal fun ComposerPill(
     val textHeightTarget by rememberUpdatedState(compactTextLayout?.size?.height ?: 0)
     val editingTarget by rememberUpdatedState(if (editingLayout) 1f else 0f)
     val expansionTarget by rememberUpdatedState(if (expandedLayout) 1f else 0f)
+    val textHeightGeometrySettled by remember(scrollOwnerKey, usesAnimatedTextHeight, animatedTextHeight) {
+        derivedStateOf {
+            val bounds = textHeightBounds.value
+            !usesAnimatedTextHeight ||
+                animatedTextHeight.value.coerceIn(bounds) == textHeightTarget.coerceIn(bounds)
+        }
+    }
+    // Text content and natural height are not admission owners. A manual viewport does not use the
+    // text animation, and automatic overflow clips it: only a change to rendered height revokes admission.
+    val draftTopGeometryState =
+        remember(
+            scrollOwnerKey,
+            editingTarget,
+            expansionTarget,
+            targetDictationControlWidth,
+            geometryTransitionActive,
+            geometryAvailableHeight,
+            compactMeasurementWidth,
+            compactOuterEndInset,
+            expandedTrailingActionInset,
+            expansionMode,
+            composerFocused,
+            forceEditingLayout,
+            dismissInProgress,
+            multilineControlsSuppressed,
+            dictationControls != null,
+            onDictation != null,
+            hasAttachmentAction,
+            trailingAction != null,
+            sendAccessoryContent != null,
+            accessoryContent != null,
+            compactMeasurementReservesTrailingAction,
+            density,
+        ) { mutableStateOf(false) }
+    var draftTopGeometrySettled by draftTopGeometryState
+    // A compact-height row cannot afford another toolbar above it; preserve its editor and core tools.
+    val showDraftTop =
+        textFieldValue.text.isNotEmpty() &&
+            !geometryTransitionActive &&
+            textHeightGeometrySettled &&
+            draftTopGeometrySettled &&
+            draftStartOffscreen &&
+            (!multilineControlsSuppressed || navigationRoom >= 40.dp)
+    val topOnSeparateRow = showDraftTop && inputContentVisible && navigationRoom < 40.dp
+    val draftTopWidth = if (showDraftTop && inputContentVisible) 40.dp else 0.dp
+    val extraControlsHeight = if (topOnSeparateRow) 48.dp else 0.dp
+    val reservedTrailingWidth = primaryTrailingWidth + if (topOnSeparateRow) 0.dp else draftTopWidth
+    SideEffect { onExtraControlsHeightChanged(extraControlsHeight) }
+    SideEffect { if (accessoryContent == null) onAccessoryHeightChanged(0.dp) }
+    val compactTrailingReserve =
+        4.dp + (if (topOnSeparateRow) 0.dp else draftTopWidth) + dictationControlWidth + expandedTrailingActionInset +
+            (if (trailingAction != null) 40.dp else 0.dp)
     LaunchedEffect(collapsedBySend) {
         if (!collapsedBySend) return@LaunchedEffect
         snapshotFlow {
@@ -949,6 +968,7 @@ internal fun ComposerPill(
         scrollOwnerKey,
         compactMeasurementWidth,
         textHeightTarget,
+        textHeightGeometrySettled,
         editingTarget,
         expansionTarget,
         targetDictationControlWidth,
@@ -964,7 +984,7 @@ internal fun ComposerPill(
         /** Admits navigation only after the owner geometry and the current draft layout reach their endpoints. */
         fun layoutSettled(): Boolean =
             !geometryTransitionActive &&
-                animatedTextHeight.value == textHeightTarget &&
+                textHeightGeometrySettled &&
                 editingProgress.value == editingTarget &&
                 expansionProgress.value == expansionTarget &&
                 dictationControlWidthState.value == targetDictationControlWidth &&
@@ -973,6 +993,7 @@ internal fun ComposerPill(
                     it.sourceText == textFieldValue.text && it.transformedText == transformedText
                 } == true
 
+        if (!textHeightGeometrySettled) draftTopGeometrySettled = false
         // Admission belongs to the external geometry keys above. Mounting an optional row can briefly
         // reduce the viewport before its parent accepts that row's height; it must not revoke its own admission.
         if (!draftTopGeometrySettled) {
