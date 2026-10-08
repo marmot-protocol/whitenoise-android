@@ -3249,6 +3249,90 @@
       ],
       "assertions": "Open the actual empty library for Alice, Carol and restored Alice through real profile switching; Carol remains chatless and returning Alice retains the generated group. This empty fixture does not qualify cross-account populated caches or pending searches. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
+    },
+    "keys-private-copy-hidden": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Copy the actual locally signed raw key while its UI remains hidden. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-hide-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Deliberately reveal and explicitly hide the disposable private key, then copy while hidden. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-warm-resume-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "NAV-010"
+      ],
+      "assertions": "Deliberately reveal the disposable key, background/foreground the same process and require it hidden before copying. No process recreation or pending-export completion is inferred. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-departure-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Deliberately reveal the disposable key, depart through Settings/Chats and reopen Profile Keys; require hidden state before copying. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-rotation-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "NAV-009"
+      ],
+      "assertions": "Deliberately reveal the disposable key through handled landscape and portrait, then explicitly hide it before copying. This does not qualify Activity recreation or frame-by-frame cover security. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-expiry-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Require the actual 30-second reveal timer to hide the disposable key within a 35-second observation window, then copy while hidden. This is an upper-bound expiry observation, not precise lower-bound or clock-boundary qualification. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-raw-export-cancel": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Open the actual raw Export confirmation and dismiss it through cancel. Require both destination controls and return to the hidden key screen and original chat without beginning export. No document/share transport, recipient delivery or file-write claim. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "accounts-retained"
+    },
+    "keys-raw-export-back": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Open the actual raw Export confirmation and dismiss it through back. Require both destination controls and return to the hidden key screen and original chat without beginning export. No document/share transport, recipient delivery or file-write claim. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "accounts-retained"
+    },
+    "keys-private-copy-peer": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "ACC-017"
+      ],
+      "assertions": "Switch from Alice to Bob through the actual profile selector and copy Bob’s raw key while hidden. Native proof requires active Bob from the original peer baseline, exact SDK Bob nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. All three original identities and both original messages must remain. This deliberate active-account change does not require restored active Alice. Disposable loopback accounts only; no pending-result races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-peer"
+    },
+    "keys-private-account-switch-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "ACC-017"
+      ],
+      "assertions": "Visit Bob’s actual Profile Keys and deliberately reveal/hide his disposable key, then restore Alice and copy Alice while hidden. Native proof requires restored active Alice and her exact original SDK nsec in one plain-text Android clipboard item with private-key label/sensitive flag and no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; no key contents enter evidence. Three original identities and both original messages must remain. This completed account-return route does not qualify pending-key callbacks/owner races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "private-key-copy-owner"
     }
   }
 }

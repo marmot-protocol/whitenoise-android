@@ -173,6 +173,9 @@ def run_fixture(name, directory, generation):
                 if (CASES[name]['postcondition'] == 'global-library-empty'
                         and verified.get('globalLibraryVerified') is not True):
                     raise ValueError('Actual empty native attachment timelines were not verified')
+                if (CASES[name]['postcondition'].startswith('private-key-copy-')
+                        and verified.get('privateKeyCopyVerified') is not True):
+                    raise ValueError('Actual private-key clipboard sensitivity and cleanup were not verified')
                 if (CASES[name]['postcondition'].startswith('public-key-copy-')
                         and verified.get('publicKeyCopyVerified') is not True):
                     raise ValueError('Actual public-key clipboard and cleanup were not verified')

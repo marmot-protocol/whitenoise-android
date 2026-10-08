@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-private-reveal-rotation-copy
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-fixture-profile-keys.yaml
+- runFlow: ../fixtures/reveal-fixture-private-key.yaml
+- setOrientation: LANDSCAPE_LEFT
+- scrollUntilVisible:
+    element:
+      text: Private key revealed.*
+    direction: DOWN
+- assertVisible: Private key revealed.*
+- setOrientation: PORTRAIT
+- scrollUntilVisible:
+    element:
+      text: Hide private key
+    direction: DOWN
+- tapOn: Hide private key
+- assertVisible: Private key hidden
+- runFlow: ../fixtures/copy-hidden-fixture-private-key.yaml

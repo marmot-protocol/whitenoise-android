@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-raw-export-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-fixture-profile-keys.yaml
+- scrollUntilVisible:
+    element:
+      text: Export Private Key
+    direction: DOWN
+- tapOn: Export Private Key
+- assertVisible: Keep Your Private Key Safe
+- assertVisible: Export Private Key
+- assertVisible: Share
+- assertVisible: Cancel
+- back
+- assertNotVisible: Keep Your Private Key Safe
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: UP
+- assertVisible: Private key hidden
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

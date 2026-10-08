@@ -70,6 +70,8 @@ private val MAESTRO_POSTCONDITIONS =
         "public-key-copy-owner",
         "public-key-copy-peer",
         "global-library-empty",
+        "private-key-copy-owner",
+        "private-key-copy-peer",
         "account-action-signed-out",
         "account-action-wiped",
         "contact-private-saved",
@@ -222,7 +224,7 @@ class MaestroRuntimeHostTest {
                     }
                     editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
                     accountActionBaseline = captureMaestroAccountAction(native, app, group, postcondition)
-                    if (postcondition.startsWith("message-") || requiresMaestroAccountRetentionProof(postcondition)) {
+                    if (requiresMaestroMessageBaseline(postcondition)) {
                         expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
                         val original = checkNotNull(nativeRow.row.lastMessage)
                         check(original.plaintext == "Generated fixture message")
@@ -311,6 +313,16 @@ class MaestroRuntimeHostTest {
                         .put("privateContactVerified", privateContactVerified)
                         .put("publicKeyCopyVerified", publicKeyCopyVerified)
                         .put("globalLibraryVerified", verifyMaestroEmptyLibrary(native, messageBaseline, postcondition))
+                        .put(
+                            "privateKeyCopyVerified",
+                            verifyMaestroPrivateKeyCopy(
+                                checkNotNull(originalActivity),
+                                native,
+                                checkNotNull(state),
+                                messageBaseline,
+                                postcondition,
+                            ),
+                        )
                         .put("credentialEvidence", appLockVerification.credentialJsonValue)
                         .put("appLockVerified", appLockVerification.verified)
                         .put(

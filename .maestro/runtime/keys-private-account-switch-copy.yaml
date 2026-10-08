@@ -1,0 +1,29 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-private-account-switch-copy
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-fixture-profile-keys.yaml
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group
+- tapOn: Switch Profile, Maestro Alice
+- assertVisible: Switch Profile
+- tapOn: Maestro Bob
+- assertVisible: Switch Profile, Maestro Bob
+- runFlow: ../fixtures/open-fixture-profile-keys.yaml
+- runFlow: ../fixtures/reveal-fixture-private-key.yaml
+- tapOn: Hide private key
+- assertVisible: Private key hidden
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group
+- tapOn: Switch Profile, Maestro Bob
+- assertVisible: Switch Profile
+- tapOn: Maestro Alice
+- assertVisible: Switch Profile, Maestro Alice
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-fixture-profile-keys.yaml
+- runFlow: ../fixtures/copy-hidden-fixture-private-key.yaml

@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-private-reveal-hide-copy
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-fixture-profile-keys.yaml
+- runFlow: ../fixtures/reveal-fixture-private-key.yaml
+- tapOn: Hide private key
+- assertVisible: Private key hidden
+- runFlow: ../fixtures/copy-hidden-fixture-private-key.yaml

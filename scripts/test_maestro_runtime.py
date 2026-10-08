@@ -327,6 +327,26 @@ class CampaignSummaryTest(unittest.TestCase):
                     if proof is not True:
                         self.assertIn('public-key clipboard', result['results'][0]['failure'])
 
+    def test_private_copy_needs_its_own_typed_sensitive_clipboard_and_cleanup_proof(self):
+        """Public clipboard success cannot stand in for actual private identity and sensitivity checks."""
+        for post in ('private-key-copy-owner', 'private-key-copy-peer'):
+            for proof in (None, False, 1, 'true', True):
+                with self.subTest(post=post, proof=proof), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    leaves, _ = self.prepare(root)
+                    name = runtime.case_selection('navigation', 1)[0]
+                    path = leaves[0] / 'verified.json'
+                    row = json.loads(path.read_text())
+                    row['publicKeyCopyVerified'] = True
+                    if proof is not None:
+                        row['privateKeyCopyVerified'] = proof
+                    path.write_text(json.dumps(row))
+                    with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': post}}):
+                        result = self.result(root)
+                    self.assertEqual(result['evidence_complete'], proof is True)
+                    if proof is not True:
+                        self.assertIn('private-key clipboard sensitivity', result['results'][0]['failure'])
+
     def test_empty_library_needs_typed_native_timeline_proof(self):
         """Empty visible UI must fail qualification if the actual SDK attachment proof is absent."""
         for proof in (None, False, 1, 'true', True):
@@ -1179,6 +1199,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
             ('public-key-copy-owner', 'publicKeyCopyVerified', 'verified', 'public-key clipboard'),
             ('public-key-copy-peer', 'publicKeyCopyVerified', 'verified', 'public-key clipboard'),
             ('global-library-empty', 'globalLibraryVerified', 'verified', 'empty native attachment timelines'),
+            ('private-key-copy-owner', 'privateKeyCopyVerified', 'verified', 'private-key clipboard sensitivity'),
+            ('private-key-copy-peer', 'privateKeyCopyVerified', 'verified', 'private-key clipboard sensitivity'),
             ('app-lock-unavailable', 'appLockFixtureNoCredential', 'ready', 'app-lock prerequisite'),
             ('app-lock-unavailable', 'appLockVerified', 'verified', 'app-lock state'),
         )
@@ -1425,6 +1447,68 @@ class RuntimeEvidenceTest(unittest.TestCase):
         query = (root / 'runtime/search-library-empty-query-clear.yaml').read_text()
         self.assertIn('- inputText: Maestro absent attachment 934867', query)
         self.assertIn('- eraseText', query)
+
+    def test_disposable_private_key_routes_use_state_descriptions_and_actual_hide_controls(self):
+        """Lifecycle hiding and private-copy routes must never extract raw UI values into evidence."""
+        root = runtime.ROOT / '.maestro'
+        names = [name for name, case in runtime.CASES.items() if case['postcondition'].startswith('private-key-copy-')]
+        self.assertEqual(len(names), 8)
+        for name in names:
+            text = (root / 'runtime' / f'{name}.yaml').read_text()
+            self.assertIn('copy-hidden-fixture-private-key.yaml', text)
+            self.assertIn('ACC-010', runtime.CASES[name]['manual_ids'])
+            self.assertNotIn('copyTextFrom', text)
+            self.assertNotIn('inputText', text)
+            self.assertNotIn('nsec1', text)
+        reveal = (root / 'fixtures/reveal-fixture-private-key.yaml').read_text()
+        self.assertIn('- tapOn: Show private key', reveal)
+        self.assertIn('- assertVisible: Private key revealed.*', reveal)
+        self.assertIn('- assertVisible: Hide private key', reveal)
+        copy = (root / 'fixtures/copy-hidden-fixture-private-key.yaml').read_text()
+        self.assertIn('- tapOn: Copy Private Key', copy)
+        self.assertIn('- assertVisible: Private key hidden', copy)
+        for route in ('warm-resume', 'departure', 'rotation', 'expiry'):
+            text = (root / 'runtime' / f'keys-private-reveal-{route}-copy.yaml').read_text()
+            self.assertIn('reveal-fixture-private-key.yaml', text)
+            if route == 'warm-resume':
+                self.assertIn('runtime-warm-resume.yaml', text)
+            elif route == 'rotation':
+                self.assertIn('LANDSCAPE_LEFT', text)
+                self.assertIn('PORTRAIT', text)
+                self.assertIn('- tapOn: Hide private key', text)
+            elif route == 'departure':
+                self.assertIn('- assertVisible: Maestro group', text)
+                self.assertEqual(text.count('open-fixture-profile-keys.yaml'), 2)
+            else:
+                commands = list(yaml.safe_load_all(text))[1]
+                waits = [row['extendedWaitUntil'] for row in commands if isinstance(row, dict)
+                         and 'extendedWaitUntil' in row]
+                self.assertEqual(waits, [{'visible': 'Private key hidden', 'timeout': 35000}])
+        peer = (root / 'runtime/keys-private-copy-peer.yaml').read_text()
+        self.assertIn('- tapOn: Maestro Bob', peer)
+        self.assertNotIn('- tapOn: Maestro Alice', peer)
+        self.assertEqual(runtime.CASES['keys-private-copy-peer']['postcondition'], 'private-key-copy-peer')
+        returned = (root / 'runtime/keys-private-account-switch-copy.yaml').read_text()
+        self.assertLess(returned.index('- tapOn: Maestro Bob'), returned.index('- tapOn: Maestro Alice'))
+        self.assertEqual(runtime.CASES['keys-private-account-switch-copy']['postcondition'], 'private-key-copy-owner')
+        for action in ('cancel', 'back'):
+            text = (root / 'runtime' / f'keys-raw-export-{action}.yaml').read_text()
+            self.assertIn('- tapOn: Export Private Key', text)
+            self.assertIn('- assertVisible: Keep Your Private Key Safe', text)
+            self.assertIn('- assertVisible: Share', text)
+            self.assertNotIn('- tapOn: Share', text)
+            self.assertIn('- assertNotVisible: Keep Your Private Key Safe', text)
+            self.assertEqual(runtime.CASES['keys-raw-export-' + action]['postcondition'], 'accounts-retained')
+
+    def test_private_key_verifier_keeps_secret_values_out_of_native_evidence(self):
+        """A raw-key assertion must not introduce a logging/output route or value-printing comparison."""
+        source = (runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro/'
+                  'MaestroPrivateKeyCopyVerification.kt').read_text()
+        self.assertNotRegex(source, r'\b(?:assertEquals|JSONObject|JSONArray|writeText|println|print)\s*\(')
+        self.assertNotRegex(source, r'\b(?:Log|System\.out|System\.err)\.')
+        self.assertNotIn('.put(', source)
+        self.assertIn('runCatchingCancellable { native.revealNsec(target) }.getOrNull()', source)
+        self.assertNotRegex(source, r'\$\{?(?:expected|secret|clip|item)\b')
 
     def test_settings_entry_uses_real_multi_identity_selector(self):
         """Regress the hosted tree where the avatar says Switch Profile rather than Open settings."""
