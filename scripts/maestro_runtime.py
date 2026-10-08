@@ -11,6 +11,11 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
+try:
+    from scripts.maestro_credential import DisposableCredential, PIN, accepted_unlock, credential_state
+except ModuleNotFoundError:
+    from maestro_credential import DisposableCredential, PIN, accepted_unlock, credential_state
+
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
@@ -55,6 +60,28 @@ def run_case(name, reports):
     generation = uuid.uuid4().hex
     directory = reports / name
     directory.mkdir()
+    if not CASES[name]['postcondition'].startswith('app-lock-credential-'):
+        return run_fixture(name, directory, generation)
+    credential = DisposableCredential(generation, directory)
+    result = {'case': name, 'generation': generation, **CASES[name], 'passed': False, 'cleanup_safe': False}
+    try:
+        credential.install()
+        result = run_fixture(name, directory, generation)
+    except Exception as error:
+        result['failure'] = f'{type(error).__name__}: {error}'
+    finally:
+        try:
+            credential.restore()
+        except Exception as error:
+            result['credential_failure'] = f'{type(error).__name__}: {error}'
+            result['passed'] = False
+            result['cleanup_safe'] = False
+        (directory / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
+    return result
+
+
+def run_fixture(name, directory, generation):
+    """Native fixture lifetime; outer credential ownership covers early setup and launch failures."""
     relative = f'files/maestro-{generation}'
     adb = ['adb', '-s', 'emulator-5554']
     def read(flag):
@@ -91,6 +118,9 @@ def run_case(name, reports):
                     if (CASES[name]['postcondition'] == 'app-lock-unavailable'
                             and ready.get('appLockFixtureNoCredential') is not True):
                         raise ValueError('Actual no-credential app-lock prerequisite was not verified')
+                    if (CASES[name]['postcondition'].startswith('app-lock-credential-')
+                            and ready.get('appLockFixtureCredential') is not True):
+                        raise ValueError('Actual synthetic app-lock prerequisite was not verified')
                     break
                 except (subprocess.CalledProcessError, json.JSONDecodeError):
                     if time.monotonic() >= deadline:
@@ -146,6 +176,15 @@ def run_case(name, reports):
                 if (CASES[name]['postcondition'] == 'app-lock-unavailable'
                         and verified.get('appLockVerified') is not True):
                     raise ValueError('Actual no-credential app-lock state was not verified')
+                if CASES[name]['postcondition'].startswith('app-lock-credential-'):
+                    observed = credential_state(ready, verified, CASES[name]['postcondition'])
+                    trace = command(adb + ['logcat', '-d', '-v', 'threadtime', 'WNAppUnlock:I', '*:S'])
+                    (directory / 'app-unlock-trace.txt').write_text(trace[-256000:])
+                    proof = accepted_unlock(trace, ready.get('nativePid'))
+                    if any(proof.get(key) != observed.get(key) for key in ('cancelledSession', 'acceptedSession')):
+                        raise ValueError('Native observation and real app callback disagree')
+                    (directory / 'credential-accepted.json').write_text(
+                        json.dumps({'generation': generation, **proof}, indent=2) + '\n')
                 if (CASES[name]['postcondition'].startswith('share-request-')
                         and verified.get('shareImportVerified') is not True):
                     raise ValueError('Actual inbound share recovery and no-send proof was not verified')
@@ -181,9 +220,11 @@ def run_ui(name, directory):
     navigation = os.environ.get('MAESTRO_NAVIGATION_MODE', 'button')
     if navigation not in ('button', 'gesture'):
         raise ValueError('Qualified navigation mode required')
+    credential_arguments = (['-e', f'APP_LOCK_FIXTURE_PIN={PIN}']
+                            if CASES[name]['postcondition'].startswith('app-lock-credential-') else [])
     with (directory / 'maestro-output.txt').open('w') as log:
         return subprocess.run(['maestro', '--device', 'emulator-5554', 'test', '--format', 'JUNIT',
-                               '-e', f'MAESTRO_NAVIGATION_MODE={navigation}',
+                               '-e', f'MAESTRO_NAVIGATION_MODE={navigation}', *credential_arguments,
                                '--output', str(directory / 'junit.xml'), '--debug-output', str(directory / 'debug'),
                                '--test-output-dir', str(directory / 'screenshots'),
                                str(ROOT / '.maestro/runtime' / f'{name}.yaml')],

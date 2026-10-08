@@ -3108,6 +3108,25 @@
       ],
       "assertions": "On a real emulator without an OS credential, require the disabled unchecked device-authentication switch, setup guidance, available Android security action and absent Auto-lock/lock cover. Open the real Android Settings activity and return without configuring a credential; require the unchanged unavailable state. Independent native proof checks real Keyguard/biometric unavailability before UI and at completion, unchanged lock preferences, three original identities, Alice session and both original messages. No PIN setup, lock/unlock success or full SEC-001 completion claim.",
       "postcondition": "app-lock-unavailable"
+    },
+    "app-lock-credential-cancel-retry": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-002",
+        "SEC-004"
+      ],
+      "assertions": "A generation-owned synthetic PIN on a disposable hosted API34 AVD enables the real device-authentication switch. Cancel actual Android authentication, require the opaque app cover, cancellation error and Retry with protected UI absent, then enter the synthetic PIN through real Android UI. Native samples require secure cancelled cover, a later accepted unlocked session, persisted enabled preference, three identities and both original messages; same-process production callback markers prove accepted crypto/session retry. Independent OS probes require no enrolled biometric alternative and restored no-credential baseline after cleanup. No full SEC-002/SEC-004, frame-by-frame flash, Recents, prompt recreation or other-API claim.",
+      "postcondition": "app-lock-credential-retry"
+    },
+    "app-lock-credential-cover-rotation-retry": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-002",
+        "SEC-004",
+        "NAV-009"
+      ],
+      "assertions": "Cancel actual Android PIN authentication on a generation-owned disposable API34 AVD, rotate the cancelled opaque app cover to landscape and back, require the error, Retry and hidden protected UI in both orientations, then perform a real PIN retry. Ordered native samples require the secure cancelled cover in both orientations and a later unlocked session; actual accepted crypto/session markers, enabled preference, three identities, both original messages and independently restored OS credential baseline are mandatory. Rotation of the cancelled app cover does not claim rotation/recreation of the pending Android prompt, frame-by-frame flash, Recents or full manual acceptance.",
+      "postcondition": "app-lock-credential-rotation"
     }
   }
 }

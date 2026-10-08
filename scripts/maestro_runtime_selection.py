@@ -28,8 +28,17 @@ def matrix_selection(value):
     return result
 
 
+def validate_credential_platform(value, api):
+    """Reject unsupported PIN campaigns before requesting the APK producer or any emulator."""
+    chosen = selection(value)
+    if api != '34' and any(case['suite'] in chosen and case['postcondition'].startswith('app-lock-credential-')
+                          for case in CASES.values()):
+        raise ValueError('Synthetic device-credential cases initially require API34')
+
+
 if __name__ == '__main__':
     try:
+        validate_credential_platform(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else '34')
         print('slices=' + json.dumps(matrix_selection(sys.argv[1])))
     except (IndexError, ValueError) as error:
         sys.exit(str(error))

@@ -402,7 +402,7 @@ jobs:
         run: |
           [[ "$REPEATS" == 1 && "$NEGATIVE" == false && "$DEMO" == false && "$DOCUMENTS" == false ]] || exit 2
           python3 scripts/maestro_environment.py validate --api "$ANDROID_API" --navigation "$NAVIGATION"
-          python3 -m scripts.maestro_runtime_selection "$SELECTED" >> "$GITHUB_OUTPUT"
+          python3 -m scripts.maestro_runtime_selection "$SELECTED" "$ANDROID_API" >> "$GITHUB_OUTPUT"
           python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_suite.py scripts/test_maestro_apk.py scripts/test_maestro_environment.py
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:

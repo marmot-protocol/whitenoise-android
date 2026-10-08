@@ -1411,6 +1411,257 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for path in (runtime.ROOT / 'app/src/main').rglob('*MaestroFixture*'):
             self.fail(f'Fixture must remain outside app APK: {path}')
 
+class CredentialControlTest(unittest.TestCase):
+    """Never certify mocked unlocks, stale OS probes or a credential left behind by failed setup."""
+    generation = 'a' * 32
+    environment = {'GITHUB_ACTIONS': 'true', 'MAESTRO_ANDROID_API': '34',
+                   'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '123'}
+
+    def row(self, stage, secure=False):
+        return {'schema': 1, 'generation': self.generation, 'stage': stage, 'package': runtime.PACKAGE,
+                'user': 0, 'sdk': 34, 'qemu': True, 'noBiometricAlternative': True,
+                'secure': secure, 'credentialAvailable': secure}
+
+    def output(self, row):
+        return 'INSTRUMENTATION_STATUS: maestroCredential=' + json.dumps(row) + '\nOK (1 test)\n'
+
+    def trace(self):
+        return '\n'.join('10-08 12:00:00.001  456  789 I WNAppUnlock: activity=10 session=' + s
+                         for s in ['1 event=prompt-launched', '1 event=prompt-terminated',
+                                   '2 event=prompt-launched', '2 event=prompt-succeeded'])
+
+    def evidence(self, rotated=False):
+        cancelled = {'cover': True, 'secure': True, 'cancelled': True, 'evaluating': False,
+                     'activeSession': None, 'latestSession': 1, 'required': True,
+                     'available': True, 'orientation': 1}
+        final = {**cancelled, 'cover': False, 'cancelled': False, 'latestSession': 2}
+        rows = [cancelled]
+        if rotated:
+            rows.extend([{**cancelled, 'orientation': 2}, dict(cancelled)])
+        rows.append(final)
+        return {'cancelledSecure': True, 'rotatedCover': rotated, 'cancelledSession': 1,
+                'acceptedSession': 2, 'acceptedState': True, 'observations': rows}
+
+    def test_native_probe_requires_completed_exact_typed_os_observation(self):
+        from scripts import maestro_credential as credential
+        row = self.row('baseline')
+        self.assertEqual(credential.probe_record(self.output(row), self.generation, 'baseline'), row)
+        for key, value in [('schema', True), ('generation', 'b' * 32), ('stage', 'installed'),
+                           ('user', 1), ('user', False), ('sdk', 36), ('qemu', 1),
+                           ('noBiometricAlternative', False), ('secure', 0), ('credentialAvailable', 'false')]:
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                credential.probe_record(self.output({**row, key: value}), self.generation, 'baseline')
+        for output in ['', self.output(row).replace('OK (1 test)', 'FAILURES!!!'), self.output(row) * 2]:
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                credential.probe_record(output, self.generation, 'baseline')
+
+    def test_preexisting_credential_never_reaches_set_or_clear(self):
+        from scripts import maestro_credential as credential
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment), \
+                patch.object(credential, 'command') as command:
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            with patch.object(owner, 'observe', return_value=self.row('baseline', True)):
+                with self.assertRaisesRegex(ValueError, 'Pre-existing'):
+                    owner.install()
+                with self.assertRaisesRegex(ValueError, 'No admitted baseline'):
+                    owner.restore()
+            command.assert_not_called()
+
+    def test_wrong_host_or_api_cannot_reach_native_probe(self):
+        from scripts import maestro_credential as credential
+        for key, value in [('GITHUB_ACTIONS', 'false'), ('MAESTRO_ANDROID_API', '36'),
+                           ('GITHUB_SHA', ''), ('GITHUB_RUN_ID', '')]:
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as temporary, \
+                    patch.dict(os.environ, {**self.environment, key: value}):
+                owner = credential.DisposableCredential(self.generation, Path(temporary))
+                with patch.object(owner, 'observe') as probe, self.assertRaises(ValueError):
+                    owner.install()
+                probe.assert_not_called()
+
+    def test_uncertain_installation_is_read_back_and_restored_without_replay(self):
+        from scripts import maestro_credential as credential
+        calls = []
+        def command(arguments, **options):
+            calls.append(arguments)
+            if 'set-pin' in arguments:
+                raise subprocess.TimeoutExpired(arguments, 15)
+            if 'verify' in arguments:
+                return 'Lock credential verified successfully'
+            return 'Lock credential cleared'
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment), \
+                patch.object(credential, 'command', side_effect=command):
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            with patch.object(owner, 'observe', side_effect=[self.row('baseline'), self.row('installed', True),
+                                                            self.row('before-clear', True), self.row('restored')]):
+                with self.assertRaisesRegex(ValueError, 'Uncertain'):
+                    owner.install()
+                self.assertTrue(owner.owned)
+                owner.restore()
+                self.assertTrue(json.loads((Path(temporary) / 'credential-restored.json').read_text())['credentialRestored'])
+                with self.assertRaisesRegex(ValueError, 'cannot be replayed'):
+                    owner.install()
+                with self.assertRaisesRegex(ValueError, 'cannot be replayed'):
+                    owner.restore()
+        self.assertEqual(sum('set-pin' in call for call in calls), 1)
+        self.assertEqual(sum('clear' in call for call in calls), 1)
+        installation = next(call for call in calls if 'set-pin' in call)
+        self.assertNotIn('--old', installation)
+        self.assertTrue(all(call[:3] == ['adb', '-s', 'emulator-5554'] for call in calls))
+
+    def test_unknown_or_foreign_credential_cannot_be_cleared(self):
+        from scripts import maestro_credential as credential
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment), \
+                patch.object(credential, 'command', return_value='Credential did not match') as command:
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            with patch.object(owner, 'observe', side_effect=[self.row('baseline'), self.row('installed', True),
+                                                            self.row('before-clear', True), self.row('installed', True)]):
+                with self.assertRaisesRegex(ValueError, 'does not belong'):
+                    owner.install()
+                with self.assertRaisesRegex(ValueError, 'does not belong'):
+                    owner.restore()
+            self.assertFalse(any('clear' in call.args[0] for call in command.call_args_list))
+            self.assertFalse((Path(temporary) / 'credential-restored.json').exists())
+
+    def test_verified_pin_can_be_restored_even_when_app_authentication_is_unavailable(self):
+        from scripts import maestro_credential as credential
+        unavailable = {**self.row('installed', True), 'credentialAvailable': False}
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment), \
+                patch.object(credential, 'command', return_value='Lock credential verified successfully') as command:
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            with patch.object(owner, 'observe', side_effect=[self.row('baseline'), unavailable,
+                                                            self.row('before-clear', True), self.row('restored')]):
+                with self.assertRaisesRegex(ValueError, 'unavailable to real app'):
+                    owner.install()
+                self.assertTrue(owner.owned)
+                owner.restore()
+            self.assertEqual(sum('clear' in call.args[0] for call in command.call_args_list), 1)
+
+    def test_uncertain_clear_requires_actual_native_restoration_and_cannot_retry(self):
+        from scripts import maestro_credential as credential
+        for still_secure in (False, True):
+            with self.subTest(still_secure=still_secure), tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(credential, 'command', side_effect=subprocess.TimeoutExpired('clear', 15)) as command:
+                owner = credential.DisposableCredential(self.generation, Path(temporary))
+                owner.admitted = owner.attempted = owner.owned = True
+                with patch.object(owner, 'observe', side_effect=[self.row('before-clear', True),
+                                                                self.row('restored', still_secure)]):
+                    if still_secure:
+                        with self.assertRaisesRegex(ValueError, 'not independently certified'):
+                            owner.restore()
+                    else:
+                        owner.restore()
+                    with self.assertRaisesRegex(ValueError, 'cannot be replayed'):
+                        owner.restore()
+                self.assertEqual(command.call_count, 1)
+                self.assertEqual((Path(temporary) / 'credential-restored.json').exists(), not still_secure)
+
+    def test_credential_cleanup_covers_early_fixture_failure_and_invalidates_unsafe_success(self):
+        from scripts import maestro_credential as credential
+        for early_failure, restoration_failure in [(True, False), (False, True), (False, False)]:
+            with self.subTest(early_failure=early_failure, restoration_failure=restoration_failure), \
+                    tempfile.TemporaryDirectory() as temporary:
+                owner = Mock()
+                if restoration_failure:
+                    owner.restore.side_effect = ValueError('OS restoration unavailable')
+                returned = {'case': 'navigation-settings-back', 'generation': self.generation,
+                            'passed': True, 'cleanup_safe': True}
+                with patch.dict(runtime.CASES, {'navigation-settings-back': {
+                        **runtime.CASES['navigation-settings-back'], 'postcondition': 'app-lock-credential-retry'}}), \
+                        patch.object(runtime.uuid, 'uuid4', return_value=Mock(hex=self.generation)), \
+                        patch.object(runtime, 'DisposableCredential', return_value=owner), \
+                        patch.object(runtime, 'run_fixture', side_effect=ValueError('Early setup failure')
+                                     if early_failure else None, return_value=returned):
+                    result = runtime.run_case('navigation-settings-back', Path(temporary))
+                owner.install.assert_called_once()
+                owner.restore.assert_called_once()
+                self.assertEqual(result['passed'], not early_failure and not restoration_failure)
+                self.assertEqual(result['cleanup_safe'], not early_failure and not restoration_failure)
+                self.assertEqual(json.loads((Path(temporary) / 'navigation-settings-back/result.json').read_text()), result)
+
+    def test_accepted_callback_requires_same_process_ordered_cancel_and_later_crypto_success(self):
+        from scripts import maestro_credential as credential
+        self.assertEqual(credential.accepted_unlock(self.trace(), 456)['acceptedSession'], 2)
+        for output, pid in [(self.trace(), 457), (self.trace(), True), (self.trace(), '456'),
+                            (self.trace().replace('2 event=prompt-succeeded', '1 event=prompt-succeeded'), 456),
+                            (self.trace().replace('prompt-succeeded', 'stale-success-ignored'), 456),
+                            (self.trace() + '\n' + self.trace(), 456),
+                            ('\n'.join(reversed(self.trace().splitlines())), 456),
+                            (self.trace().replace('activity=10 session=2', 'activity=20 session=2'), 456)]:
+            with self.subTest(output=output, pid=pid), self.assertRaises(ValueError):
+                credential.accepted_unlock(output, pid)
+
+    def test_native_credential_evidence_rejects_generic_success_untyped_or_unsecured_cover(self):
+        from scripts import maestro_credential as credential
+        ready = {'appLockFixtureCredential': True, 'nativePid': 456}
+        for rotated in (False, True):
+            postcondition = 'app-lock-credential-rotation' if rotated else 'app-lock-credential-retry'
+            verified = {'appLockVerified': True, 'credentialEvidence': self.evidence(rotated)}
+            credential.credential_state(ready, verified, postcondition)
+            for field, value in [('cancelledSecure', False), ('cancelledSecure', 1), ('acceptedState', 'true'),
+                                  ('acceptedSession', True), ('acceptedSession', 1), ('rotatedCover', not rotated)]:
+                with self.subTest(field=field, rotated=rotated), self.assertRaises(ValueError):
+                    credential.credential_state(ready, {**verified, 'credentialEvidence': {
+                        **verified['credentialEvidence'], field: value}}, postcondition)
+            for field, value in [('secure', False), ('secure', 1), ('activeSession', 1), ('cancelled', False)]:
+                changed = self.evidence(rotated)
+                changed['observations'] = [{**row, field: value} for row in changed['observations']]
+                with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                    credential.credential_state(ready, {**verified, 'credentialEvidence': changed}, postcondition)
+            with self.assertRaises(ValueError):
+                credential.credential_state({**ready, 'nativePid': '456'}, verified, postcondition)
+
+    def test_complete_credential_chain_rejects_forged_restoration_foreign_callback_and_symlink(self):
+        from scripts import maestro_credential as credential
+        with tempfile.TemporaryDirectory() as temporary:
+            leaf = Path(temporary)
+            for stage, secure in [('baseline', False), ('installed', True), ('restored', False)]:
+                row = self.row(stage, secure)
+                (leaf / f'credential-probe-{stage}.txt').write_text(self.output(row))
+                (leaf / f'credential-{stage}.json').write_text(json.dumps(row))
+            restored = {**self.row('restored'), 'credentialRestored': True}
+            (leaf / 'credential-restored.json').write_text(json.dumps(restored))
+            (leaf / 'credential-ownership.txt').write_text('Lock credential verified successfully')
+            (leaf / 'app-unlock-trace.txt').write_text(self.trace())
+            (leaf / 'credential-accepted.json').write_text(json.dumps({
+                'generation': self.generation, **credential.accepted_unlock(self.trace(), 456)}))
+            ready = {'appLockFixtureCredential': True, 'nativePid': 456}
+            verified = {'appLockVerified': True, 'credentialEvidence': self.evidence()}
+            credential.qualify_credential(leaf, self.generation, ready, verified, 'app-lock-credential-retry')
+            for field, value in [('generation', 'b' * 32), ('credentialRestored', 1),
+                                  ('secure', True), ('user', True)]:
+                (leaf / 'credential-restored.json').write_text(json.dumps({**restored, field: value}))
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    credential.qualify_credential(leaf, self.generation, ready, verified, 'app-lock-credential-retry')
+            (leaf / 'credential-restored.json').write_text(json.dumps(restored))
+            trace = leaf / 'app-unlock-trace.txt'
+            saved = leaf / 'saved-trace.txt'
+            trace.rename(saved)
+            trace.symlink_to(saved)
+            with self.assertRaisesRegex(ValueError, 'regular'):
+                credential.qualify_credential(leaf, self.generation, ready, verified, 'app-lock-credential-retry')
+
+    def test_unsupported_pin_platform_is_rejected_before_the_fixture_build(self):
+        from scripts.maestro_runtime_selection import validate_credential_platform
+        for suite in ('runtime-all', 'runtime-app-lock'):
+            validate_credential_platform(suite, '34')
+            for api in ('33', '36', '37.0'):
+                with self.subTest(suite=suite, api=api), self.assertRaisesRegex(ValueError, 'require API34'):
+                    validate_credential_platform(suite, api)
+        for api in ('33', '34', '36', '37.0'):
+            validate_credential_platform('runtime-navigation', api)
+        workflow = (runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text()
+        self.assertIn('maestro_runtime_selection "$SELECTED" "$ANDROID_API"', workflow)
+
+    def test_restoration_commands_share_a_bounded_deadline(self):
+        from scripts import maestro_credential as credential
+        with tempfile.TemporaryDirectory() as temporary, patch.object(credential.time, 'monotonic', return_value=61), \
+                patch.object(credential, 'command') as command:
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            owner.restore_deadline = 60
+            with self.assertRaisesRegex(TimeoutError, 'deadline'):
+                owner.execute(['adb'])
+            command.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

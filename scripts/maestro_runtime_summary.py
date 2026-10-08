@@ -11,10 +11,12 @@ try:
     from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result
     from scripts.maestro_runtime_selection import matrix_selection
     from scripts.maestro_environment import qualify
+    from scripts.maestro_credential import qualify_credential
 except ModuleNotFoundError:
     from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result
     from maestro_runtime_selection import matrix_selection
     from maestro_environment import qualify
+    from maestro_credential import qualify_credential
 
 
 def read_json(path):
@@ -130,6 +132,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (ready.get('accounts') != 3 or ready.get('fixture') != CASES[name].get('fixture', 'basic')
                         or ready.get('uiObserver') != 'maestro'):
                     raise ValueError('Native fixture handoff mismatch')
+                if CASES[name]['postcondition'].startswith('app-lock-credential-'):
+                    qualify_credential(leaf, generation, ready, read_json(leaf / 'verified.json'),
+                                       CASES[name]['postcondition'])
                 if 'OK (1 test)' not in (leaf / 'instrumentation.txt').read_text():
                     raise ValueError('Instrumentation completion missing')
                 result['seconds'] = ui_result(leaf / 'junit.xml', name)

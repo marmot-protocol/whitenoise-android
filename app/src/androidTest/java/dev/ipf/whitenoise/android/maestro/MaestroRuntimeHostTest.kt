@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.maestro
 
 import android.content.Context
+import android.os.Process
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -61,6 +62,8 @@ private val MAESTRO_POSTCONDITIONS =
         "notification-granted",
         "camera-denied",
         "app-lock-unavailable",
+        "app-lock-credential-retry",
+        "app-lock-credential-rotation",
         "accounts-retained",
         "account-action-signed-out",
         "account-action-wiped",
@@ -129,6 +132,7 @@ class MaestroRuntimeHostTest {
             var editorBaselines: MaestroEditorBaselines? = null
             var inboundShareBaseline: MaestroInboundShareBaseline? = null
             var accountActionBaseline: MaestroAccountActionBaseline? = null
+            var credentialJournal: MaestroCredentialJournal? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -206,6 +210,8 @@ class MaestroRuntimeHostTest {
                             context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
                             postcondition,
                         )
+                    val appLockFixtureCredential = requireMaestroSyntheticCredential(context, app, postcondition)
+                    if (appLockFixtureCredential) credentialJournal = MaestroCredentialJournal()
                     editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
                     accountActionBaseline = captureMaestroAccountAction(native, app, group, postcondition)
                     if (postcondition.startsWith("message-") || requiresMaestroAccountRetentionProof(postcondition)) {
@@ -235,13 +241,18 @@ class MaestroRuntimeHostTest {
                             .put("fixture", fixture)
                             .put("uiObserver", "maestro")
                             .put("appLockFixtureNoCredential", appLockFixtureNoCredential)
+                            .put("appLockFixtureCredential", appLockFixtureCredential)
+                            .put("nativePid", Process.myPid())
                             .put("ready", true)
                             .toString(),
                     )
                 }
                 // The controller writes only this generation's finish file; no arbitrary commands.
                 withTimeout(300_000L) {
-                    while (!File(directory, "finish").exists()) delay(100L)
+                    while (!File(directory, "finish").exists()) {
+                        credentialJournal?.observe(checkNotNull(state), checkNotNull(originalActivity))
+                        delay(100L)
+                    }
                 }
                 verifyNativeState(native, state, checkNotNull(peerLabel), checkNotNull(groupId), messageBaseline)
                 val postcondition = InstrumentationRegistry.getArguments().getString("postcondition")
@@ -268,21 +279,33 @@ class MaestroRuntimeHostTest {
                         context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
                         postcondition,
                     )
+                credentialJournal?.observe(checkNotNull(state), checkNotNull(originalActivity))
+                val credentialEvidence =
+                    credentialJournal?.verify(
+                        context,
+                        checkNotNull(state),
+                        context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                        checkNotNull(postcondition),
+                    )
+                val appLockVerified =
+                    if (credentialEvidence != null) {
+                        true
+                    } else {
+                        verifyMaestroNoAppLockCredential(
+                            context,
+                            checkNotNull(state),
+                            context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                            postcondition,
+                        )
+                    }
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
-                        .put(
-                            "appLockVerified",
-                            verifyMaestroNoAppLockCredential(
-                                context,
-                                checkNotNull(state),
-                                context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
-                                postcondition,
-                            ),
-                        )
+                        .put("credentialEvidence", credentialEvidence ?: JSONObject.NULL)
+                        .put("appLockVerified", appLockVerified)
                         .put(
                             "accountActionVerified",
                             verifyMaestroAccountAction(

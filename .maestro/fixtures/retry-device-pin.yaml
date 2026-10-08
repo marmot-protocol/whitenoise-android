@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- tapOn:
+    id: app.unlock
+- assertVisible:
+    id: '^(com.android.systemui|com.android.settings):id/(pinEntry|password_entry|lockPassword)$'
+- tapOn:
+    id: '^(com.android.systemui|com.android.settings):id/(pinEntry|password_entry|lockPassword)$'
+- inputText: '${APP_LOCK_FIXTURE_PIN}'
+- pressKey: Enter
+- assertNotVisible:
+    id: app.lock
+- assertVisible:
+    id: privacy.device_protection.group
+- scrollUntilVisible:
+    element:
+      text: '(?s).*Require device authentication.*'
+    direction: UP
+- assertVisible:
+    text: '(?s).*Require device authentication.*'
+    enabled: true
+    checked: true
+- assertVisible: Auto-lock
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group
