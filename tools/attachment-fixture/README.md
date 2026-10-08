@@ -308,3 +308,12 @@ or acquisition record is seeded. The HTTP checker requires two GETs with no pref
 retransfer. This combines actual scheduler stop with independent transport failure;
 it does not kill the app process, simulate every policy transition, or qualify
 representative performance. All original small-file budgets stay unchanged.
+
+Android's resumed RUNNING state does not start MDK's native retry clock. After
+observing that state, the fixture allows up to 60 seconds for the independently
+recorded resumed body, within the existing 120-second probe deadline. This is a
+functional recovery allowance, not a latency guarantee. Terminal native transfer
+decisions fail immediately. Reports retain only the last 12 native phase, attempt
+and remaining retry-delay observations, with no account/attachment references,
+URLs or error text. The two-GET, Range/If-Range, exact-byte and no-manual-retry
+requirements are unchanged.

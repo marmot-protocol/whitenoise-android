@@ -43,11 +43,23 @@ dependency verification mechanism.
   required emulator smoke manifest.
 - `BubbleFooterRectListReuseTest`: five production footer/Markdown reuse,
   reactivation and far-snap cases.
-- Existing scrolling, jump-to-bottom, unread-marker and screenshot tests remain
-  unchanged. CI retains results as `compose-rectlist-regressions-Play` and
+- Existing scrolling, jump-to-bottom, unread-marker and screenshot coverage is
+  retained. CI retains results as `compose-rectlist-regressions-Play` and
   `compose-rectlist-regressions-Zapstore`.
 - [CON-029](manual-release-testing/cases/CON-029.md) remains the manual acceptance
   scenario for minified candidates on both distributions, including Android 17.
+
+Three fixtures account for the official runtime's test behavior without changing
+production code or accepting new screenshot baselines:
+
+- Keyboard chip traversal explicitly requests keyboard input mode before focus;
+  the new test rule starts in touch mode, where these controls reject focus.
+- Rapid pin/unpin verifies the same visible chat key and pixel offset after its
+  index changes in the authoritative order. It no longer expects the obsolete
+  index of that chat before unpinning.
+- The large-font RTL reports dialog starts with an RTL Android configuration as
+  well as an RTL composition. This keeps initial dialog text measurement in the
+  intended direction and verifies the original PNG unchanged.
 
 The old backport identity assertion, its original-1.12.1 negative control and
 workflow calls to the APK marker checker are removed because the runtime now

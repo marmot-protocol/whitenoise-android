@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import android.view.View
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Surface
@@ -175,9 +176,15 @@ class ContentReportScreenshotTest {
         assertEquals(oversized.take(REPORT_EXPLANATION_LIMIT).trim(), submitted.last().second)
     }
 
-    /** An admin sees each report's reason, explanation, reporter and time, with Dismiss only on open ones. */
+    /**
+     * An admin sees complete reports in a consistently RTL Android window and composition. Matching the platform
+     * direction avoids first measuring dialog text in LTR before applying the fixture's RTL composition local.
+     */
     @Test
+    @Config(qualifiers = "en-ldrtl-w360dp-h780dp-mdpi")
     fun detailsReportsDarkLargeRtl() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        assertEquals(View.LAYOUT_DIRECTION_RTL, context.resources.configuration.layoutDirection)
         val dismissed = mutableListOf<String>()
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
