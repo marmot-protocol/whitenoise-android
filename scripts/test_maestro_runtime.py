@@ -705,6 +705,23 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(commands[scroll + 2], {'assertNotVisible': {'id': 'folder.name', 'text': '.+'}})
         self.assertEqual(commands[scroll + 3], {'assertVisible': {'id': 'folder.save', 'enabled': False}})
 
+    def test_folder_rotation_proves_open_dialog_before_changing_orientation(self):
+        """Separate the captured missing dialog from the unrelated returned-name viewport."""
+        _, commands = list(yaml.safe_load_all(
+            (runtime.ROOT / '.maestro/runtime/smart-folders-condition-rotation.yaml').read_text()))
+        selected = commands.index({'tapOn': {'id': 'folder.addField.UNREAD'}})
+        rotation = commands.index({'setOrientation': 'LANDSCAPE_LEFT'})
+        self.assertEqual(commands[selected + 1:rotation], [
+            {'assertVisible': {'id': 'folder.conditionDone', 'enabled': True}},
+            {'assertVisible': {'id': 'folder.mode'}},
+            {'assertNotVisible': {'id': 'folder.addField.PARTICIPANTS'}},
+            {'takeScreenshot': 'smart-folder-condition-before-rotation'},
+        ])
+        self.assertEqual(commands[rotation + 1], {'takeScreenshot': 'smart-folder-condition-after-rotation'})
+        self.assertEqual(commands[rotation + 2], {'assertVisible': {'id': 'folder.conditionDone'}})
+        self.assertEqual(commands[rotation + 3], {'setOrientation': 'PORTRAIT'})
+        self.assertEqual(runtime.CASES['smart-folders-condition-rotation']['postcondition'], 'folder-absent')
+
     def test_private_contact_editing_proves_recipient_focus_and_dismisses_each_ime(self):
         """Reject the captured notes-in-nickname failure and keyboard suggestion Save match."""
         paths = [runtime.ROOT / '.maestro/fixtures/save-external-private-details.yaml']

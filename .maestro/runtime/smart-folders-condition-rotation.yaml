@@ -25,7 +25,16 @@ name: smart-folders-condition-rotation
     id: folder.addField.PARTICIPANTS
 - tapOn:
     id: folder.addField.UNREAD
+- assertVisible:
+    id: folder.conditionDone
+    enabled: true
+- assertVisible:
+    id: folder.mode
+- assertNotVisible:
+    id: folder.addField.PARTICIPANTS
+- takeScreenshot: smart-folder-condition-before-rotation
 - setOrientation: LANDSCAPE_LEFT
+- takeScreenshot: smart-folder-condition-after-rotation
 - assertVisible:
     id: folder.conditionDone
 - setOrientation: PORTRAIT
