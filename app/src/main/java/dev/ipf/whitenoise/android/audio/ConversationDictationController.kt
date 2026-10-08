@@ -850,7 +850,7 @@ internal class ConversationDictationController internal constructor(
 
     /** Sealed recovery is always draft-only, even after an earlier explicit Send. */
     internal fun retryComposerAudio(access: ConversationDictationComposerAccess) {
-        currentComposerRecovery(access)?.let {
+        composerRecovery(access)?.let {
             if (canRetryRetainedAudio) {
                 completionIntent.reset()
                 completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
@@ -861,10 +861,10 @@ internal class ConversationDictationController internal constructor(
 
     /** Only a confirmed, current receipt can discard PCM; saved composer edits are never rewritten. */
     internal fun discardComposerAudio(access: ConversationDictationComposerAccess) {
-        currentComposerRecovery(access)?.let { cancelSession() }
+        composerRecovery(access)?.let { cancelSession() }
     }
 
-    private fun currentComposerRecovery(access: ConversationDictationComposerAccess): ConversationDictationState.Failed? {
+    private fun composerRecovery(access: ConversationDictationComposerAccess): ConversationDictationState.Failed? {
         val owned =
             access.sessionId == state.sessionId &&
                 access.actionGeneration == notificationActionGeneration &&
