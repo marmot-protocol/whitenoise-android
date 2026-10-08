@@ -1279,7 +1279,7 @@
     <string name="chat_folder_people">Personnes</string>
     <string name="folder_none">Aucun dossier</string>
     <string name="folder_none_detail">Créez un dossier pour organiser vos discussions.</string>
-    <string name="folder_restore_hint">Rétablit les dossiers Non lus, Archivés et Groupes manquants. Les dossiers existants conservent vos modifications.</string>
+    <string name="folder_restore_hint">Rétablit les dossiers Discussions, Non lus, Archivés et Groupes manquants. Les dossiers existants conservent vos modifications.</string>
     <string name="folder_edit">Modifier le dossier</string>
     <string name="folder_delete_action">Supprimer le dossier</string>
     <string name="folder_delete_title">Supprimer « %1$s » ?</string>

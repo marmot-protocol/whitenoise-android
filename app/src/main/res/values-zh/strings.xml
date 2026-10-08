@@ -1257,7 +1257,7 @@
     <string name="chat_folder_people">人员</string>
     <string name="folder_none">没有文件夹</string>
     <string name="folder_none_detail">创建文件夹来整理你的聊天。</string>
-    <string name="folder_restore_hint">恢复缺失的“未读”“已归档”和“群组”文件夹。现有文件夹保留你的更改。</string>
+    <string name="folder_restore_hint">恢复缺失的“聊天”“未读”“已归档”和“群组”文件夹。现有文件夹保留你的更改。</string>
     <string name="folder_edit">编辑文件夹</string>
     <string name="folder_delete_action">删除文件夹</string>
     <string name="folder_delete_title">删除“%1$s”？</string>

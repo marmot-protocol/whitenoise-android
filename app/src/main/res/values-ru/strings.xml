@@ -1327,7 +1327,7 @@
     <string name="chat_folder_people">Люди</string>
     <string name="folder_none">Нет папок</string>
     <string name="folder_none_detail">Создайте папку для организации своих чатов.</string>
-    <string name="folder_restore_hint">Восстановите отсутствующие папки «Непрочитанные», «Архивированные» и «Группы». Существующие папки сохраняют ваши изменения.</string>
+    <string name="folder_restore_hint">Восстановите отсутствующие папки «Чаты», «Непрочитанные», «Архивированные» и «Группы». Существующие папки сохраняют ваши изменения.</string>
     <string name="folder_edit">Редактировать папку</string>
     <string name="folder_delete_action">Удалить папку</string>
     <string name="folder_delete_title">Удалить «%1$s»?</string>

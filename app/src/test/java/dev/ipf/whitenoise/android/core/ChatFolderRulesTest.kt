@@ -14,6 +14,24 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ChatFolderRulesTest {
+    /** Exact overrides win even over manual membership and malformed advanced rules. */
+    @Test fun exclusionsWinForEveryRulePathAndIncludeAllUsesNativeRows() {
+        val items = listOf(item("g1", unread = true), item("g2"))
+        val rules =
+            listOf(
+                null,
+                ChatFolderRule(),
+                ChatFolderRule(includeAll = true),
+                ChatFolderRule(unreadOnly = true),
+                ChatFolderRule(smartFilter = "invalid"),
+            )
+        rules.forEach { rule ->
+            assertEquals(setOf("g2"), folderIds(items, manual = setOf("g1", "g2"), rule = rule, excluded = setOf("g1")))
+        }
+        assertEquals(setOf("g1", "g2"), folderIds(items, rule = ChatFolderRule(includeAll = true)))
+        assertEquals(setOf("g1"), folderIds(items, rule = ChatFolderRule(includeAll = true, unreadOnly = true)))
+    }
+
     @Test
     fun memberRuleFollowsRosterJoinAndLeave() {
         val rule = ChatFolderRule(includeMemberPubkeys = setOf("AA"))
@@ -278,6 +296,7 @@ class ChatFolderRulesTest {
         isMuted: (String) -> Boolean = { false },
         displayTitle: (ChatListItem) -> String = { "" },
         activeAccount: String? = null,
+        excluded: Set<String> = emptySet(),
     ): Set<String> =
         chatFolderChatIds(
             items = items,
@@ -286,6 +305,7 @@ class ChatFolderRulesTest {
             activeAccountIdHex = activeAccount,
             isMuted = isMuted,
             displayTitle = displayTitle,
+            excludedChatIds = excluded,
         )
 
     private fun item(

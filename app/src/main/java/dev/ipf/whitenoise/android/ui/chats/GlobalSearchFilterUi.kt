@@ -71,6 +71,7 @@ internal fun GlobalSearchChatType.labelRes(): Int =
 internal fun chatFolderDisplayName(folder: ChatFolder): String =
     folder.name.ifEmpty {
         when (folder.systemKind) {
+            SystemFolderKind.CHATS -> stringResource(R.string.chats)
             SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
             SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
             SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)

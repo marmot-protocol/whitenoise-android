@@ -1279,7 +1279,7 @@
     <string name="chat_folder_people">Personas</string>
     <string name="folder_none">Sin carpetas</string>
     <string name="folder_none_detail">Crea una carpeta para organizar tus chats.</string>
-    <string name="folder_restore_hint">Restaura las carpetas No leídos, Archivados y Grupos que falten. Las carpetas existentes conservan tus cambios.</string>
+    <string name="folder_restore_hint">Restaura las carpetas Chats, No leídos, Archivados y Grupos que falten. Las carpetas existentes conservan tus cambios.</string>
     <string name="folder_edit">Editar carpeta</string>
     <string name="folder_delete_action">Eliminar carpeta</string>
     <string name="folder_delete_title">¿Eliminar “%1$s”?</string>

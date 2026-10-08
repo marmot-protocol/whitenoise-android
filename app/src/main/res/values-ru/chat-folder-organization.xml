@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="folder_all_chats">Все чаты</string>
+    <string name="folder_exclude_chat">Исключить из этой папки</string>
+    <string name="folder_sort_title">Сортировка чатов</string>
+    <string name="folder_sort_recent">Последняя активность</string>
+    <string name="folder_sort_name">По имени А–Я</string>
+    <string name="folder_sort_unread">Сначала непрочитанные</string>
+    <string name="folder_sort_hint">Приглашения и закреплённые чаты остаются сверху. Закреплённые чаты сохраняют ручной порядок.</string>
+    <string name="folder_all_active">Включать все активные чаты</string>
+</resources>

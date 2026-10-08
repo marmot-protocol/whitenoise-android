@@ -30,6 +30,83 @@ func main() {
 	}
 }
 
+// offlineSignerRelay retains this disposable client's replies so publishing before
+// subscription cannot lose the connect response and consume the entire deadline.
+type offlineSignerRelay struct {
+	ctx       context.Context
+	signer    *nip46.StaticKeySigner
+	clientPub string
+	mu        sync.Mutex
+	peers     map[*websocket.Conn]string
+	responses []nostr.Event
+	requests  int
+	forbidden int
+}
+
+// newOfflineSignerRelay creates one isolated, deadline-bound rehearsal relay.
+func newOfflineSignerRelay(ctx context.Context, signer *nip46.StaticKeySigner, clientPub string) *offlineSignerRelay {
+	return &offlineSignerRelay{
+		ctx: ctx, signer: signer, clientPub: clientPub,
+		peers: map[*websocket.Conn]string{},
+	}
+}
+
+// ServeHTTP serializes request handling and reply replay across connection orderings.
+func (relay *offlineSignerRelay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	conn, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.CloseNow()
+	defer func() { relay.mu.Lock(); delete(relay.peers, conn); relay.mu.Unlock() }()
+	for {
+		_, raw, err := conn.Read(relay.ctx)
+		if err != nil {
+			return
+		}
+		var parts []json.RawMessage
+		if json.Unmarshal(raw, &parts) != nil || len(parts) < 2 {
+			return
+		}
+		var kind string
+		json.Unmarshal(parts[0], &kind)
+		relay.mu.Lock()
+		send := func(c *websocket.Conn, values ...any) {
+			payload, _ := json.Marshal(values)
+			c.Write(relay.ctx, websocket.MessageText, payload)
+		}
+		switch kind {
+		case "REQ":
+			var sub string
+			json.Unmarshal(parts[1], &sub)
+			relay.peers[conn] = sub
+			for _, response := range relay.responses {
+				send(conn, "EVENT", sub, response)
+			}
+			send(conn, "EOSE", sub)
+		case "EVENT":
+			var event nostr.Event
+			json.Unmarshal(parts[1], &event)
+			valid, _ := event.CheckSignature()
+			if event.Kind != 24133 || event.PubKey != relay.clientPub || !valid {
+				relay.forbidden++
+				send(conn, "OK", event.ID, false, "fixture only accepts its preseeded NIP-46 client")
+			} else {
+				_, _, response, err := relay.signer.HandleRequest(relay.ctx, &event)
+				if err == nil {
+					relay.requests++
+					relay.responses = append(relay.responses, response)
+					send(conn, "OK", event.ID, true, "")
+					for peer, sub := range relay.peers {
+						send(peer, "EVENT", sub, response)
+					}
+				}
+			}
+		}
+		relay.mu.Unlock()
+	}
+}
+
 func rehearse() error {
 	if len(os.Args) != 3 {
 		return fmt.Errorf("usage: rehearse-zsp.go PINNED_ZSP DISPOSABLE_APK")
@@ -70,60 +147,8 @@ func rehearse() error {
 		return err
 	}
 	defer listener.Close()
-	var mu sync.Mutex
-	peers := map[*websocket.Conn]string{}
-	requests, forbidden := 0, 0
-	server := &http.Server{ReadHeaderTimeout: 5 * time.Second}
-	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer conn.CloseNow()
-		defer func() { mu.Lock(); delete(peers, conn); mu.Unlock() }()
-		for {
-			_, raw, err := conn.Read(ctx)
-			if err != nil {
-				return
-			}
-			var parts []json.RawMessage
-			if json.Unmarshal(raw, &parts) != nil || len(parts) < 2 {
-				return
-			}
-			var kind string
-			json.Unmarshal(parts[0], &kind)
-			mu.Lock()
-			send := func(c *websocket.Conn, values ...any) {
-				payload, _ := json.Marshal(values)
-				c.Write(ctx, websocket.MessageText, payload)
-			}
-			switch kind {
-			case "REQ":
-				var sub string
-				json.Unmarshal(parts[1], &sub)
-				peers[conn] = sub
-				send(conn, "EOSE", sub)
-			case "EVENT":
-				var event nostr.Event
-				json.Unmarshal(parts[1], &event)
-				valid, _ := event.CheckSignature()
-				if event.Kind != 24133 || event.PubKey != clientPub || !valid {
-					forbidden++
-					send(conn, "OK", event.ID, false, "fixture only accepts its preseeded NIP-46 client")
-				} else {
-					_, _, response, err := signer.HandleRequest(ctx, &event)
-					if err == nil {
-						requests++
-						send(conn, "OK", event.ID, true, "")
-						for peer, sub := range peers {
-							send(peer, "EVENT", sub, response)
-						}
-					}
-				}
-			}
-			mu.Unlock()
-		}
-	})
+	relay := newOfflineSignerRelay(ctx, &signer, clientPub)
+	server := &http.Server{ReadHeaderTimeout: 5 * time.Second, Handler: relay}
 	go server.Serve(listener)
 	defer server.Close()
 	temporary, err := os.MkdirTemp("", "zsp-offline-listing-")
@@ -166,15 +191,15 @@ func rehearse() error {
 	if err != nil || strings.TrimSpace(string(restored)) != clientKey {
 		return fmt.Errorf("preseeded key changed")
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if kinds[32267] != 1 || kinds[30063] != 1 || kinds[3063] != 1 || len(kinds) != 3 || requests < 3 || forbidden != 0 {
-		return fmt.Errorf("unexpected offline contract: kinds=%v requests=%d forbidden=%d", kinds, requests, forbidden)
+	relay.mu.Lock()
+	defer relay.mu.Unlock()
+	if kinds[32267] != 1 || kinds[30063] != 1 || kinds[3063] != 1 || len(kinds) != 3 || relay.requests < 3 || relay.forbidden != 0 {
+		return fmt.Errorf("unexpected offline contract: kinds=%v requests=%d forbidden=%d", kinds, relay.requests, relay.forbidden)
 	}
 	return json.NewEncoder(os.Stdout).Encode(map[string]any{
 		"version": "v0.4.17", "eventKinds": kinds,
 		"signerAuthor": signerPub, "preseededClientRestored": true,
-		"nip46Requests": requests, "publicEventsSent": forbidden,
+		"nip46Requests": relay.requests, "publicEventsSent": relay.forbidden,
 		"signerRelay": "loopback only", "keyDirectory": "os.UserConfigDir()/zsp/bunker-keys",
 	})
 }

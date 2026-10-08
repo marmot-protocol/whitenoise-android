@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+  "legacy_sha256": "d00dc83b18470d934b2aed79b6a7fe7715d5019a03fbe7d4dedfde77c9d1a2d3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListBodyFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListBodyFrame(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      },
+      {
+        "surface": "ChatListIdentifierResult",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListIdentifierResult(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      },
+      {
+        "surface": "ChatListSearchSectionHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListSearchSectionHeader(",
+        "test_ids": [
+          "FIND-002",
+          "FIND-003"
+        ]
+      },
+      {
+        "surface": "ChatsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatsScreen(",
+        "test_ids": [
+          "CHL-001",
+          "SEC-012",
+          "CHL-018",
+          "CHL-021",
+          "FLD-007",
+          "FLD-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:chat_list_startup_slow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_startup_slow",
+        "test_ids": [
+          "CHL-015"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Stored group-avatar surface: R.string.chat_list_filter_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_filter_groups",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.notification_channel_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.notification_channel_messages",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_voice_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_voice_unavailable",
+        "test_ids": [
+          "FIND-010"
+        ]
+      },
+      {
+        "surface": "Chats upward endpoint navigation icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.drawable.ic_jump_to_edge",
+        "test_ids": [
+          "CHL-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

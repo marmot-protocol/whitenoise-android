@@ -1277,7 +1277,7 @@
     <string name="chat_folder_people">Personen</string>
     <string name="folder_none">Keine Ordner</string>
     <string name="folder_none_detail">Erstelle einen Ordner, um deine Chats zu ordnen.</string>
-    <string name="folder_restore_hint">Stellt fehlende Ordner „Ungelesen“, „Archiviert“ und „Gruppen“ wieder her. Vorhandene Ordner behalten deine Änderungen.</string>
+    <string name="folder_restore_hint">Stellt fehlende Ordner „Chats“, „Ungelesen“, „Archiviert“ und „Gruppen“ wieder her. Vorhandene Ordner behalten deine Änderungen.</string>
     <string name="folder_edit">Ordner bearbeiten</string>
     <string name="folder_delete_action">Ordner löschen</string>
     <string name="folder_delete_title">„%1$s“ löschen?</string>

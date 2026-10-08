@@ -37,7 +37,10 @@ class ChatFolderChipModelTest {
 
         // Archived hides (empty); Unread carries its count; Groups shows for
         // the 3-member chat — all purely from the seeded rules.
-        assertEquals(listOf(SystemFolderKind.UNREAD, SystemFolderKind.GROUPS), chips.map { it.systemKind })
+        assertEquals(
+            listOf(SystemFolderKind.CHATS, SystemFolderKind.UNREAD, SystemFolderKind.GROUPS),
+            chips.map { it.systemKind },
+        )
         assertEquals(1, chips.first { it.systemKind == SystemFolderKind.UNREAD }.trailingCount)
         assertEquals(1, chips.first { it.systemKind == SystemFolderKind.GROUPS }.trailingCount)
     }
