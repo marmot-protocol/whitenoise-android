@@ -4,8 +4,10 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
+import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isRetentionExpiredForSearch
+import dev.ipf.whitenoise.android.state.searchableTimelineRecord
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -40,9 +42,10 @@ internal fun conversationSearchScanStatus(
     query: String,
     scanMatches: List<ConversationSearchMatch>?,
     scanFailed: Boolean,
+    filtersActive: Boolean = false,
 ): ConversationSearchScanStatus =
     when {
-        query.isBlank() -> ConversationSearchScanStatus.IDLE
+        query.isBlank() && !filtersActive -> ConversationSearchScanStatus.IDLE
         scanMatches != null -> ConversationSearchScanStatus.COMPLETE
         scanFailed -> ConversationSearchScanStatus.FAILED
         else -> ConversationSearchScanStatus.LOADING
@@ -68,6 +71,7 @@ internal suspend fun searchConversationHistoryMatches(
     accountRef: String?,
     groupIdHex: String,
     query: String,
+    constraints: MessageSearchConstraints? = null,
     readPage: HistoryPageReader = { account, pageQuery ->
         appState.marmotIo { timelineMessages(account, pageQuery) }
     },
@@ -75,8 +79,8 @@ internal suspend fun searchConversationHistoryMatches(
     val needle = query.trim()
     return when {
         accountRef == null -> null
-        needle.isEmpty() -> emptyList()
-        else -> scanHistoryForNeedle(accountRef, groupIdHex, needle, readPage)
+        needle.isEmpty() && constraints?.isActive != true -> emptyList()
+        else -> scanHistoryForNeedle(accountRef, groupIdHex, needle, readPage, constraints)
     }
 }
 
@@ -100,6 +104,7 @@ private suspend fun scanHistoryForNeedle(
     groupIdHex: String,
     needle: String,
     readPage: HistoryPageReader,
+    constraints: MessageSearchConstraints?,
 ): List<ConversationSearchMatch>? {
     val ciNeedle = needle.lowercase(Locale.ROOT)
     return paginateHistoryMatches { cursorBefore, cursorMessageId ->
@@ -109,7 +114,7 @@ private suspend fun scanHistoryForNeedle(
                     account,
                     TimelineMessageQueryFfi(
                         groupIdHex = groupIdHex,
-                        search = needle,
+                        search = needle.takeIf { it.isNotEmpty() },
                         before = cursorBefore,
                         beforeMessageId = cursorMessageId,
                         after = null,
@@ -128,8 +133,12 @@ private suspend fun scanHistoryForNeedle(
             page.messages
                 .filter {
                     !isRetentionExpiredForSearch(it, nowMillis) &&
-                        ChatListMessageSearch.isSearchableBody(it.kind, it.deleted, it.plaintext) &&
-                        ChatListMessageSearch.bodyMatches(it.plaintext, ciNeedle)
+                        ChatListMessageSearch.isEligibleMatch(
+                            searchableTimelineRecord(it),
+                            ciNeedle,
+                            constraints,
+                            bodyScanLimit = Int.MAX_VALUE,
+                        )
                 }.map { it.timelineAt to it.messageIdHex }
         val oldest =
             page.messages

@@ -50,6 +50,24 @@
     ],
     "settings_controls": [
       {
+        "surface": "string:couldnt_load_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.couldnt_load_chats",
+        "test_ids": ["CHL-001", "FIND-015"]
+      },
+      {
+        "surface": "Global body lookup Retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "onRetry = { bodySearchRetry++ }",
+        "test_ids": ["FIND-015"]
+      },
+      {
+        "surface": "Global attachment lookup Retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "onRetry = { libraryRetry++ }",
+        "test_ids": ["FIND-015"]
+      },
+      {
         "surface": "string:chat_list_startup_slow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.chat_list_startup_slow",

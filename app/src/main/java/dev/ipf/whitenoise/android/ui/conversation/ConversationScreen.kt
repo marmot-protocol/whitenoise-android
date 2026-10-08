@@ -92,6 +92,7 @@ import androidx.core.content.ContextCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
+import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
@@ -112,6 +113,7 @@ import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingEvent
 import dev.ipf.whitenoise.android.state.ChatCreateOpenConversationTimingState
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
@@ -157,8 +159,16 @@ import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
+import dev.ipf.whitenoise.android.ui.chats.ChatListSearchFilterAction
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterControlsRow
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterPicker
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
+import dev.ipf.whitenoise.android.ui.chats.isBrowsingAttachments
+import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
+import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
@@ -239,7 +249,6 @@ import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -272,12 +281,15 @@ private class ConversationNavigationState(
     val focusTargetRetry = SearchTargetRetryState()
     var navigateReplyJob by mutableStateOf<Job?>(null)
     var searchOpen by surfaceState.searchOpen
-    var searchQuery by mutableStateOf("")
+    val searchState = surfaceState.searchState
+    var searchQuery: String
+        get() = searchState.value.query
+        set(value) {
+            searchState.value = searchState.value.copy(query = value)
+        }
     var searchPinnedMatchId by mutableStateOf<String?>(null)
     var searchJob by mutableStateOf<Job?>(null)
     var preSearchScrollAnchor by mutableStateOf<ConversationSearchScrollAnchor?>(null)
-    var historySearchMatches by mutableStateOf<List<ConversationSearchMatch>?>(null)
-    var historySearchFailed by mutableStateOf(false)
     var historySearchRetryGeneration by mutableStateOf(0)
     val timelineItemHeightsPx = mutableStateMapOf<String, Int>()
     val searchFocusRequester = FocusRequester()
@@ -619,6 +631,8 @@ internal fun ConversationScreen(
     dictationControlsVisible: Boolean = true,
     playbackTransport: @Composable () -> Unit = {},
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
+    searchChatsController: ChatsController? = null,
+    onBroadenSearch: (GlobalSearchState) -> Unit = {},
 ) {
     androidx.compose.runtime.LaunchedEffect(
         controller,
@@ -1704,6 +1718,70 @@ internal fun ConversationScreen(
         )
     val clipboard = LocalClipboardManager.current
     val groupTitleCopy = rememberGroupTitleCopy()
+    val conversationSearchState = presentationState.searchState.value.copy(isOpen = navigationState.searchOpen)
+    val searchControls =
+        rememberConversationSearchControls(
+            appState,
+            searchChatsController,
+            chat,
+            conversationAccountRef,
+            conversationSelfAccountIdHex,
+            groupTitleCopy,
+            conversationSearchState,
+        )
+    val searchConstraints =
+        remember(
+            conversationSearchState.senderFilters,
+            conversationSearchState.dateFilterSelection,
+            conversationSearchState.contentFilterSelection,
+        ) {
+            messageSearchConstraintsFor(conversationSearchState)
+        }
+    val hasSearchRequest = navigationState.searchQuery.isNotBlank() || conversationSearchState.messageFiltersActive
+    val historySearchRequest =
+        remember(
+            controller,
+            conversationAccountRef,
+            conversationSearchState.copy(openFilterCategory = null),
+            searchControls.includesConversation,
+            appState.runtimeGeneration,
+            navigationState.historySearchRetryGeneration,
+        ) { Any() }
+    val historySearchResult =
+        rememberGlobalSearchLookup(
+            historySearchRequest,
+            navigationState.searchOpen && hasSearchRequest,
+            "CONVERSATION_FILTER_SEARCH",
+            debounceMillis = HISTORY_SEARCH_DEBOUNCE_MILLIS,
+        ) {
+            if (!searchControls.includesConversation) {
+                emptyList()
+            } else {
+                searchConversationHistoryMatches(
+                    appState = appState,
+                    accountRef = conversationAccountRef,
+                    groupIdHex = controller.group.groupIdHex,
+                    query = conversationSearchState.query,
+                    constraints = searchConstraints,
+                )
+            }
+        }
+
+    fun updateConversationSearch(transform: (GlobalSearchState) -> GlobalSearchState) {
+        val current = presentationState.searchState.value.copy(isOpen = navigationState.searchOpen)
+        val updated = transform(current)
+        if (updated == current) return
+        if (updated.copy(openFilterCategory = null) != current.copy(openFilterCategory = null)) {
+            navigationState.cancelJobs()
+            navigationState.searchPinnedMatchId = null
+        }
+        presentationState.searchState.value = updated
+        if (updated.openFilterCategory == null &&
+            (!keepsConversationSearchNavigator(updated, chat.id) || updated.isBrowsingAttachments())
+        ) {
+            onBroadenSearch(updated)
+        }
+    }
     val messageTextCopy = rememberMessageTextCopy()
     // Seeded empty and populated off the Main thread: the first access to a
     // SharedPreferences file blocks on disk, and doing that inside composition
@@ -2520,8 +2598,15 @@ internal fun ConversationScreen(
     // `controller.displayedText(...)` without altering the rendered timeline's
     // first/last id or size — re-runs the derivation and keeps matches fresh.
     val searchWindowMatches =
-        remember(navigationState.searchQuery, controller.timeline, renderedTimeline) {
-            if (navigationState.searchQuery.isBlank()) {
+        remember(
+            navigationState.searchQuery,
+            searchConstraints,
+            searchControls.includesConversation,
+            controller.timeline,
+            controller.deletedMessageIds,
+            renderedTimeline,
+        ) {
+            if (!hasSearchRequest || !searchControls.includesConversation) {
                 emptyList()
             } else {
                 // Restrict to rows that carry a user-typed body, then run the
@@ -2531,20 +2616,23 @@ internal fun ConversationScreen(
                 // text used for matching is the same text used to map hits.
                 val searchable =
                     renderedTimeline.mapNotNull { item ->
-                        val body = controller.displayedText(item.record)
-                        if (MessageSearch.isSearchable(item.record, body)) {
+                        val record = conversationSearchRecord(controller, item, System.currentTimeMillis())
+                        if (ChatListMessageSearch.isEligibleMatch(
+                                record,
+                                MessageSearch.normalize(navigationState.searchQuery),
+                                searchConstraints,
+                                bodyScanLimit = Int.MAX_VALUE,
+                            )
+                        ) {
                             ConversationSearchMatch(
                                 messageIdHex = item.record.messageIdHex,
                                 timelineAt = item.projected?.timelineAt ?: item.record.recordedAt,
-                            ) to body
+                            )
                         } else {
                             null
                         }
                     }
-                val bodies = searchable.map { it.second }
-                MessageSearch
-                    .matchIndices(bodies, navigationState.searchQuery)
-                    .map { searchable[it].first }
+                searchable
             }
         }
     // Full local-store matches: the loaded-window derivation above is instant
@@ -2552,37 +2640,17 @@ internal fun ConversationScreen(
     // it lands, so a result cannot depend on incidental scroll history. The
     // effect restarting on each keystroke cancels a superseded scan, and the
     // debounce keeps typing from firing one scan per character.
-    LaunchedEffect(navigationState.searchQuery, chat.id, controller, navigationState.historySearchRetryGeneration) {
-        navigationState.historySearchMatches = null
-        navigationState.historySearchFailed = false
-        if (navigationState.searchQuery.isBlank()) return@LaunchedEffect
-        delay(HISTORY_SEARCH_DEBOUNCE_MILLIS)
-        val launchedForQuery = navigationState.searchQuery
-        val scan =
-            searchConversationHistoryMatches(
-                appState = appState,
-                accountRef = controller.boundAccountRef,
-                groupIdHex = controller.group.groupIdHex,
-                query = launchedForQuery,
-            )
-        // Only publish if this is still the current query. Cancellation already
-        // propagates from the scan, so this only guards a scan that completed
-        // in the gap before the effect restarted for a newer keystroke. A null
-        // scan is a failure, kept distinct so loaded-window matches never read as final.
-        if (navigationState.searchQuery == launchedForQuery) {
-            navigationState.historySearchMatches = scan
-            navigationState.historySearchFailed = scan == null
-        }
-    }
+    val historyMatches = historySearchResult?.value
     val searchScanStatus =
         conversationSearchScanStatus(
             query = navigationState.searchQuery,
-            scanMatches = navigationState.historySearchMatches,
-            scanFailed = navigationState.historySearchFailed,
+            scanMatches = historyMatches,
+            scanFailed = historySearchResult != null && historyMatches == null,
+            filtersActive = conversationSearchState.messageFiltersActive,
         )
     val effectiveSearchMatches =
-        remember(searchWindowMatches, navigationState.historySearchMatches, renderedTimeline) {
-            val scan = navigationState.historySearchMatches
+        remember(searchWindowMatches, historyMatches, renderedTimeline) {
+            val scan = historyMatches
             if (scan == null) {
                 searchWindowMatches
             } else {
@@ -2707,7 +2775,7 @@ internal fun ConversationScreen(
     /** Closes in-conversation search and clears its query and pinned match. */
     fun closeSearch() {
         navigationState.searchOpen = false
-        navigationState.searchQuery = ""
+        presentationState.searchState.value = GlobalSearchTransitions.closeSearch(presentationState.searchState.value)
         navigationState.searchPinnedMatchId = null
         val previousSearchJob = navigationState.searchJob
         previousSearchJob?.cancel()
@@ -2744,7 +2812,12 @@ internal fun ConversationScreen(
 
     // Back exits partial text selection, then batch selection, then search,
     // then dismisses the composer before leaving the conversation.
-    BackHandler {
+    GlobalSearchFilterPicker(
+        state = conversationSearchState,
+        options = searchControls.options,
+        onStateChange = ::updateConversationSearch,
+    )
+    BackHandler(enabled = !conversationSearchState.filterSheetOpen) {
         when (
             conversationBackAction(
                 textSelectionActive = textSelectionMessageId != null,
@@ -3261,6 +3334,13 @@ internal fun ConversationScreen(
             onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
             onOpenSearch = {
                 showDetails = false
+                presentationState.searchState.value =
+                    conversationSearchPreset(
+                        conversationAccountRef,
+                        appState.runtimeGeneration,
+                        chat.id,
+                        controller.title(groupTitleCopy),
+                    )
                 navigationState.searchOpen = true
             },
             onStartGroupWithPeer = onStartGroupWithPeer,
@@ -3498,7 +3578,7 @@ internal fun ConversationScreen(
                             navigationState.navigateReplyJob?.cancel()
                             navigationState.targetNavigation.cancel()
                             navigationState.targetHighlight.clear()
-                            navigationState.searchQuery = it
+                            updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, it) }
                             navigationState.searchPinnedMatchId = null
                         },
                         onClearSearch = {
@@ -3507,12 +3587,39 @@ internal fun ConversationScreen(
                             navigationState.navigateReplyJob?.cancel()
                             navigationState.targetNavigation.cancel()
                             navigationState.targetHighlight.clear()
-                            navigationState.searchQuery = ""
+                            updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, "") }
                             navigationState.searchPinnedMatchId = null
                         },
                         onCloseSearch = ::closeSearch,
                         onSearchAction = { navigateToSearchMatch(forward = true) },
                         searchFocusRequester = navigationState.searchFocusRequester,
+                        searchFilterAction = {
+                            ChatListSearchFilterAction(
+                                state = conversationSearchState,
+                                onCategory = { category ->
+                                    updateConversationSearch {
+                                        GlobalSearchTransitions.openFilterCategory(it, category)
+                                    }
+                                },
+                                onClearAll = { updateConversationSearch(GlobalSearchTransitions::clearAllFilters) },
+                            )
+                        },
+                        searchFilterControls = {
+                            dev.ipf.whitenoise.android.ui.chats.GlobalSearchAttachmentModes(
+                                state = conversationSearchState,
+                                onSelectionChange = { selection ->
+                                    updateConversationSearch { it.copy(contentFilterSelection = selection) }
+                                },
+                            )
+                            GlobalSearchFilterControlsRow(
+                                state = conversationSearchState,
+                                onRemoveFilter = { chip ->
+                                    updateConversationSearch { GlobalSearchTransitions.removeFilter(it, chip) }
+                                },
+                                onClearAll = { updateConversationSearch(GlobalSearchTransitions::clearAllFilters) },
+                                folderNames = searchControls.folderNames,
+                            )
+                        },
                         appState = appState,
                         controller = controller,
                         groupTitleCopy = groupTitleCopy,
@@ -4317,6 +4424,8 @@ internal fun ConversationScreen(
                                         ConversationJumpToNewestButton(
                                             unreadIncomingCount = unreadIncomingCount,
                                             onClick = {
+                                                navigationState.cancelJobs()
+                                                navigationState.focusTargetRetry.clear()
                                                 scope.launch {
                                                     val pendingMessageId = unreadJumpState.pendingMessageId
                                                     val outcome =

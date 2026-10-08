@@ -294,7 +294,7 @@ internal fun ChatListTopBar(
 /** The prototype's filter entry beside the search field: the menu opens with the keyboard dismissed. */
 @Suppress("FunctionNaming")
 @Composable
-private fun ChatListSearchFilterAction(
+internal fun ChatListSearchFilterAction(
     state: GlobalSearchState,
     onCategory: (GlobalSearchFilterCategory) -> Unit,
     onClearAll: () -> Unit,
@@ -337,6 +337,7 @@ internal fun ConversationSearchTopBar(
     onClose: () -> Unit,
     onSearchAction: () -> Unit,
     focusRequester: FocusRequester,
+    filterAction: @Composable () -> Unit = {},
 ) {
     val searchDescription = stringResource(R.string.conversation_search_hint)
     TopAppBar(
@@ -370,10 +371,7 @@ internal fun ConversationSearchTopBar(
             }
         },
         actions = {
-            // Date-jump has no native owner yet (M128); expose the prototype affordance truthfully as disabled.
-            IconButton(onClick = {}, enabled = false, modifier = Modifier.testTag("conversation.search.calendar")) {
-                Icon(painterResource(R.drawable.ic_calendar_month), stringResource(R.string.conversation_jump_to_date))
-            }
+            filterAction()
         },
         scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
