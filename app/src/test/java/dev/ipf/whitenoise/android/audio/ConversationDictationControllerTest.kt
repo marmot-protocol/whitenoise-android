@@ -4374,7 +4374,13 @@ class ConversationDictationControllerTest {
                 acceptSend = true
                 f.platform.onCallerAudioStateRead = {
                     reads++
-                    if (reads == 1) true else if (unreadable) error("audio state changed") else false
+                    if (reads == 1) {
+                        true
+                    } else if (unreadable) {
+                        error("audio state changed")
+                    } else {
+                        false
+                    }
                 }
                 f.controller.retry()
                 assertEquals(1, reads)
