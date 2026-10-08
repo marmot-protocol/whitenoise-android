@@ -302,6 +302,15 @@ internal class ChatListWindowSet private constructor(
             }
         }
 
+        /** One complete native stream replaces all bounded handles for an explicitly sorted folder. */
+        suspend fun openComplete(
+            account: String,
+            open: suspend (String) -> ChatListWindowHandle,
+        ): ChatListWindowSet {
+            val handles = linkedMapOf(ChatListViewFfi.CHATS to open(account))
+            return openOrClose(handles) { ChatListWindowSet(handles, initialReplacements(handles)) }
+        }
+
         /** Runs [build] and closes every handle in [handles] if it fails, so a half-open set cannot leak. */
         @Suppress("TooGenericExceptionCaught") // Any failure must release the handles opened so far.
         private inline fun openOrClose(

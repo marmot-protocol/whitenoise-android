@@ -1279,7 +1279,7 @@
     <string name="chat_folder_people">Pessoas</string>
     <string name="folder_none">Nenhuma pasta</string>
     <string name="folder_none_detail">Crie uma pasta para organizar seus chats.</string>
-    <string name="folder_restore_hint">Restaura as pastas Não lidas, Arquivadas e Grupos ausentes. As pastas existentes mantêm suas alterações.</string>
+    <string name="folder_restore_hint">Restaura as pastas Conversas, Não lidas, Arquivadas e Grupos ausentes. As pastas existentes mantêm suas alterações.</string>
     <string name="folder_edit">Editar pasta</string>
     <string name="folder_delete_action">Excluir pasta</string>
     <string name="folder_delete_title">Excluir “%1$s”?</string>

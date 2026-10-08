@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="folder_all_chats">Todos los chats</string>
+    <string name="folder_exclude_chat">Excluir de esta carpeta</string>
+    <string name="folder_sort_title">Ordenar chats por</string>
+    <string name="folder_sort_recent">Actividad más reciente</string>
+    <string name="folder_sort_name">Nombre A–Z</string>
+    <string name="folder_sort_unread">No leídos primero</string>
+    <string name="folder_sort_hint">Las invitaciones y los chats fijados permanecen arriba. Los chats fijados conservan su orden manual.</string>
+    <string name="folder_all_active">Incluir todos los chats activos</string>
+</resources>

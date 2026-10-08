@@ -44,6 +44,7 @@ internal fun ChatContextMenu(
     canRunAction: () -> Boolean = { true },
     actions: ChatListRowActionsFfi? = null,
     onLeaveAndDelete: (() -> Unit)? = null,
+    onExcludeFromFolder: (() -> Unit)? = null,
 ) {
     val items =
         buildList {
@@ -111,6 +112,13 @@ internal fun ChatContextMenu(
                     onAddToFolder()
                 },
             )
+            if (onExcludeFromFolder != null) {
+                add(
+                    chatMenuItem(R.string.folder_exclude_chat, R.drawable.ic_folder, "ExcludeFolder") {
+                        onExcludeFromFolder()
+                    },
+                )
+            }
             add(chatMenuItem(R.string.select, R.drawable.ic_check, "Select") { onSelect() })
             if (showMovePinnedUp) {
                 add(

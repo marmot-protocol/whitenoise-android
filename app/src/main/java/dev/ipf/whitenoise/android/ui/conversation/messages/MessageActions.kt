@@ -328,6 +328,7 @@ internal fun destinationFolderMembershipRows(
                 chatFolderChatIds(
                     items = targets,
                     manualChatIds = store.membershipFor(accountRef, folder.id),
+                    excludedChatIds = store.excludedChats(accountRef, folder.id),
                     rule = store.folderRule(accountRef, folder.id),
                     activeAccountIdHex = ownerAccountIdHex,
                     isMuted = { groupIdHex ->
