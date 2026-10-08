@@ -10,13 +10,14 @@ name: lifecycle-settings-help-rotation
       text: Help
     direction: DOWN
 - tapOn: Help
-- &id001
-  assertVisible:
+- assertVisible:
     id: help.destinations
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: help.destinations
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: help.destinations
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

@@ -10,13 +10,14 @@ name: lifecycle-settings-data-rotation
       text: Data Usage
     direction: DOWN
 - tapOn: Data Usage
-- &id001
-  assertVisible:
+- assertVisible:
     id: data_usage.downloads.group
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: data_usage.downloads.group
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: data_usage.downloads.group
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

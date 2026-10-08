@@ -117,10 +117,16 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'].startswith('account-action-')
                         and read_json(leaf / 'verified.json').get('accountActionVerified') is not True):
                     raise ValueError('Authoritative account action and retained private state were not verified')
+                if (CASES[name]['postcondition'] == 'app-lock-unavailable'
+                        and read_json(leaf / 'verified.json').get('appLockVerified') is not True):
+                    raise ValueError('Actual no-credential app-lock state was not verified')
                 if (CASES[name]['postcondition'].startswith('share-request-')
                         and read_json(leaf / 'verified.json').get('shareImportVerified') is not True):
                     raise ValueError('Actual inbound share recovery and no-send proof was not verified')
                 ready = read_json(leaf / 'ready.json')
+                if (CASES[name]['postcondition'] == 'app-lock-unavailable'
+                        and ready.get('appLockFixtureNoCredential') is not True):
+                    raise ValueError('Actual no-credential app-lock prerequisite was not verified')
                 if (ready.get('accounts') != 3 or ready.get('fixture') != CASES[name].get('fixture', 'basic')
                         or ready.get('uiObserver') != 'maestro'):
                     raise ValueError('Native fixture handoff mismatch')

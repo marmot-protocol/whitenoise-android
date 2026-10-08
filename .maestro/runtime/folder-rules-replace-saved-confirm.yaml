@@ -15,8 +15,7 @@ name: folder-rules-replace-saved-confirm
 - assertVisible:
     id: folder.condition.2
 - assertVisible: '^Read status: No unread messages$'
-- &id001
-  runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
 - scrollUntilVisible:
     element:
       id: folder.presets
@@ -31,20 +30,21 @@ name: folder-rules-replace-saved-confirm
     id: folder.confirmPreset
 - assertNotVisible:
     id: folder.confirmPreset
-- &id002
-  scrollUntilVisible:
+- scrollUntilVisible:
     element:
       id: folder.condition.2
     direction: DOWN
-- &id003
-  assertVisible:
+- assertVisible:
     id: folder.condition.2
-- &id004
-  assertVisible: ^Has unread mentions$
-- *id001
-- *id002
-- *id003
-- *id004
+- assertVisible: ^Has unread mentions$
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: ^Has unread mentions$
 - back
 - assertVisible:
     id: chat-folders-content

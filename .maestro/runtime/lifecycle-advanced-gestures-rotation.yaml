@@ -10,12 +10,13 @@ name: lifecycle-advanced-gestures-rotation
       text: Swipe actions
     direction: DOWN
 - tapOn: Swipe actions
-- &id001
-  assertVisible:
+- assertVisible:
     id: gestures.MessageLeft
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: gestures.MessageLeft
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: gestures.MessageLeft
 - back
 - assertVisible: Settings

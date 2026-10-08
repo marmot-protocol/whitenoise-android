@@ -23,15 +23,14 @@ name: inbound-share-document-expired-grant-rotation
 - assertNotVisible:
     id: conversation.composer.attachment.1
 - setOrientation: LANDSCAPE_LEFT
-- &id001
-  runFlow: ../fixtures/assert-fixture-conversation.yaml
-- &id002
-  assertVisible:
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible:
     id: conversation.composer.attachment.0
-- &id003
-  assertNotVisible:
+- assertNotVisible:
     id: conversation.composer.attachment.1
 - setOrientation: PORTRAIT
-- *id001
-- *id002
-- *id003
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible:
+    id: conversation.composer.attachment.0
+- assertNotVisible:
+    id: conversation.composer.attachment.1

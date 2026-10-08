@@ -12,14 +12,10 @@ name: speech-apply-maximum-reopen
 - tapOn: Read Aloud
 - assertVisible:
     id: speech.engine.group
-- &id001
-  tapOn: Speech rate
-- &id002
-  runFlow: ../fixtures/scroll-speech-custom.yaml
-- &id003
-  tapOn: Custom
-- &id004
-  assertVisible:
+- tapOn: Speech rate
+- runFlow: ../fixtures/scroll-speech-custom.yaml
+- tapOn: Custom
+- assertVisible:
     id: speech.custom_rate
 - tapOn:
     id: speech.custom_rate
@@ -52,10 +48,11 @@ name: speech-apply-maximum-reopen
 - assertVisible:
     id: speech.engine.group
 - assertVisible: 10×
-- *id001
-- *id002
-- *id003
-- *id004
+- tapOn: Speech rate
+- runFlow: ../fixtures/scroll-speech-custom.yaml
+- tapOn: Custom
+- assertVisible:
+    id: speech.custom_rate
 - assertVisible:
     id: speech.custom_rate
     text: ^10\.0$

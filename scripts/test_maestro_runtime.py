@@ -308,6 +308,31 @@ class CampaignSummaryTest(unittest.TestCase):
                     path.write_text(json.dumps(record))
                     self.assertTrue(self.result(root)['evidence_complete'])
 
+    def test_app_lock_needs_typed_real_credential_state_before_and_after_ui(self):
+        """Final OS state cannot certify a fake prerequisite or replace its native postcondition."""
+        for phase, field in (('ready', 'appLockFixtureNoCredential'), ('verified', 'appLockVerified')):
+            for proof in (None, False, 'true', 1, True):
+                with self.subTest(phase=phase, proof=proof), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    leaves, _ = self.prepare(root)
+                    name = runtime.case_selection('navigation', 1)[0]
+                    for receipt_phase, receipt_field in (
+                        ('ready', 'appLockFixtureNoCredential'), ('verified', 'appLockVerified'),
+                    ):
+                        path = leaves[0] / f'{receipt_phase}.json'
+                        record = json.loads(path.read_text())
+                        if receipt_phase != phase:
+                            record[receipt_field] = True
+                        elif proof is not None:
+                            record[receipt_field] = proof
+                        path.write_text(json.dumps(record))
+                    with patch.dict(runtime.CASES, {name: {**runtime.CASES[name],
+                                                          'postcondition': 'app-lock-unavailable'}}):
+                        result = self.result(root)
+                    self.assertEqual(result['evidence_complete'], proof is True)
+                    if proof is not True:
+                        self.assertIn('app-lock', result['results'][0]['failure'])
+
     def test_generic_native_success_cannot_certify_inbound_share_recovery(self):
         """UI navigation needs real imported-error/request-cleanup/no-send native evidence."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -488,12 +513,17 @@ class RuntimeEvidenceTest(unittest.TestCase):
             self.assertEqual(text.count(f'- [ ] **{dimension}**'), len(result['screen_catalog']))
 
     def test_runtime_flow_commands_reject_yaml_sets_and_unsupported_shapes(self):
-        """A valid YAML set is still an invalid Maestro command; inspect nested flows too."""
+        """Valid YAML sets and aliases are invalid Maestro commands; inspect original tokens too."""
+        def no_aliases(text):
+            # PyYAML expands aliases before shape validation; Maestro rejects their command token.
+            self.assertFalse(any(isinstance(token, (yaml.tokens.AnchorToken, yaml.tokens.AliasToken))
+                                 for token in yaml.scan(text)))
+
         def validate(commands):
             self.assertIsInstance(commands, list)
             for command in commands:
                 if isinstance(command, str):
-                    self.assertIn(command, ('hideKeyboard', 'back', 'eraseText'))
+                    self.assertIn(command, ('hideKeyboard', 'back', 'eraseText', 'stopApp'))
                     continue
                 self.assertIsInstance(command, dict)
                 self.assertEqual(len(command), 1)
@@ -502,12 +532,21 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 if name in ('retry', 'repeat') or (
                         name == 'runFlow' and isinstance(args, dict) and 'commands' in args):
                     validate(args['commands'])
-        for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
-            with self.subTest(flow=path.name):
-                validate(list(yaml.safe_load_all(path.read_text()))[1])
+        for path in (runtime.ROOT / '.maestro').rglob('*.yaml'):
+            with self.subTest(flow=str(path.relative_to(runtime.ROOT))):
+                no_aliases(path.read_text())
+                documents = list(yaml.safe_load_all(path.read_text()))
+                if path.name != 'config.yaml':
+                    self.assertEqual(len(documents), 2)
+                    validate(documents[1])
         for invalid in ([{'hideKeyboard'}], [{'back': None}], [{'tapOn': 'X', 'hideKeyboard': None}]):
             with self.subTest(invalid=invalid), self.assertRaises(AssertionError):
                 validate(invalid)
+        for text in ('- &repeat\n  assertVisible: Settings\n- *repeat\n',
+                     '- assertVisible: &name Settings\n- assertVisible: *name\n'):
+            with self.subTest(unsupported_yaml=text), self.assertRaises(AssertionError):
+                no_aliases(text)
+        no_aliases('- inputText: "literal &repeat and *repeat"\n')
 
     def test_saved_folder_rule_checks_return_from_the_reopened_title_viewport(self):
         """Reopen parks at the title, so the Match any proof must move toward the lower rules."""
@@ -906,30 +945,36 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(commands[scroll + 3], {'assertVisible': {'id': 'folder.save', 'enabled': False}})
 
     def test_folder_rotation_proves_open_dialog_before_changing_orientation(self):
-        """Separate the captured missing dialog from the unrelated returned-name viewport."""
-        _, commands = list(yaml.safe_load_all(
-            (runtime.ROOT / '.maestro/runtime/smart-folders-condition-rotation.yaml').read_text()))
-        selected = commands.index({'tapOn': {'id': 'folder.addField.UNREAD'}})
-        rotation = commands.index({'setOrientation': 'LANDSCAPE_LEFT'})
-        self.assertEqual(commands[selected + 1:rotation], [
-            {'assertVisible': {'id': 'folder.conditionDone', 'enabled': True}},
-            {'assertVisible': {'id': 'folder.mode'}},
-            {'assertNotVisible': {'id': 'folder.addField.PARTICIPANTS'}},
-            {'takeScreenshot': 'smart-folder-condition-before-rotation'},
-        ])
-        self.assertEqual(commands[rotation + 1], {'takeScreenshot': 'smart-folder-condition-after-rotation'})
-        retained = commands[rotation + 2]['runFlow']
+        """Prove the initial dialog, then handle its observed reappearance on return to portrait."""
+        helper = '../fixtures/dismiss-restored-folder-condition.yaml'
+        _, dismissal = list(yaml.safe_load_all((runtime.ROOT / '.maestro/fixtures' / Path(helper).name).read_text()))
+        retained = dismissal[0]['runFlow']
         self.assertEqual(retained['when'], {'visible': {'id': 'folder.conditionDone'}})
         self.assertIn({'assertVisible': {'id': 'folder.conditionDone', 'enabled': True}}, retained['commands'])
         self.assertIn({'assertVisible': {'id': 'folder.mode'}}, retained['commands'])
         self.assertEqual(retained['commands'][-1], {'tapOn': 'Cancel'})
-        self.assertEqual(commands[rotation + 3:rotation + 6], [
+        self.assertEqual(dismissal[1:], [
             {'assertNotVisible': {'id': 'folder.mode'}},
             {'assertNotVisible': {'id': 'folder.conditionDone'}},
-            {'assertVisible': {'id': 'chat-folder-edit-content'}},
         ])
-        self.assertIn({'assertNotVisible': {'id': 'folder.group.'}}, commands[rotation:])
-        self.assertEqual(runtime.CASES['smart-folders-condition-rotation']['postcondition'], 'folder-absent')
+        for name in ('smart-folders-condition-rotation', 'smart-folders-draft-rotation-discard'):
+            with self.subTest(case=name):
+                _, commands = list(yaml.safe_load_all((runtime.ROOT / '.maestro/runtime' / f'{name}.yaml').read_text()))
+                selected = commands.index({'tapOn': {'id': 'folder.addField.UNREAD'}})
+                rotation = commands.index({'setOrientation': 'LANDSCAPE_LEFT'})
+                self.assertEqual(commands[selected + 1:rotation], [
+                    {'assertVisible': {'id': 'folder.conditionDone', 'enabled': True}},
+                    {'assertVisible': {'id': 'folder.mode'}},
+                    {'assertNotVisible': {'id': 'folder.addField.PARTICIPANTS'}},
+                    {'takeScreenshot': 'smart-folder-condition-before-rotation'},
+                ])
+                self.assertEqual(commands[rotation + 1], {'takeScreenshot': 'smart-folder-condition-after-rotation'})
+                self.assertEqual(commands[rotation + 2], {'runFlow': helper})
+                portrait = commands.index({'setOrientation': 'PORTRAIT'})
+                self.assertEqual(commands[portrait + 1], {'runFlow': helper})
+                self.assertEqual(commands[portrait + 2], {'assertVisible': {'id': 'chat-folder-edit-content'}})
+                self.assertIn({'assertNotVisible': {'id': 'folder.group.'}}, commands[portrait:])
+                self.assertEqual(runtime.CASES[name]['postcondition'], 'folder-absent')
 
     def test_private_contact_editing_proves_recipient_focus_and_dismisses_each_ime(self):
         """Reject the captured notes-in-nickname failure and keyboard suggestion Save match."""
@@ -1061,11 +1106,17 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 with self.subTest(value=value), self.assertRaises(ValueError):
                     runtime.receipt(json.dumps(value), generation, flag)
 
-    def test_executor_rejects_missing_false_or_untyped_account_action_proof(self):
-        """Even successful UI and safe teardown cannot turn a missing account-action proof into PASS."""
+    def test_executor_rejects_missing_false_or_untyped_native_state_proof(self):
+        """Successful UI and teardown cannot certify absent account or real OS-credential proof."""
         generation = 'a' * 32
         name = 'navigation-settings-back'
-        for postcondition in ('account-action-signed-out', 'account-action-wiped'):
+        requirements = (
+            ('account-action-signed-out', 'accountActionVerified', 'verified', 'account action'),
+            ('account-action-wiped', 'accountActionVerified', 'verified', 'account action'),
+            ('app-lock-unavailable', 'appLockFixtureNoCredential', 'ready', 'app-lock prerequisite'),
+            ('app-lock-unavailable', 'appLockVerified', 'verified', 'app-lock state'),
+        )
+        for postcondition, field, phase, message in requirements:
             for proof in (None, False, 'true', 1, True):
                 with self.subTest(postcondition=postcondition, proof=proof), tempfile.TemporaryDirectory() as temporary:
                     process = Mock(returncode=0)
@@ -1081,14 +1132,22 @@ class RuntimeEvidenceTest(unittest.TestCase):
                             return 'Success'
                         path = arguments[-1]
                         if path.endswith('/ready.json'):
-                            return json.dumps({'generation': generation, 'ready': True, 'accounts': 3,
-                                               'fixture': 'basic', 'uiObserver': 'maestro'})
+                            record = {'generation': generation, 'ready': True, 'accounts': 3,
+                                      'fixture': 'basic', 'uiObserver': 'maestro',
+                                      'appLockFixtureNoCredential': True}
+                            if phase == 'ready':
+                                record.pop(field)
+                                if proof is not None:
+                                    record[field] = proof
+                            return json.dumps(record)
                         if path.endswith('/closed.json'):
                             return json.dumps({'generation': generation, 'closed': True})
                         if path.endswith('/verified.json'):
-                            record = {'generation': generation, 'verified': True}
-                            if proof is not None:
-                                record['accountActionVerified'] = proof
+                            record = {'generation': generation, 'verified': True, 'appLockVerified': True}
+                            if phase == 'verified':
+                                record.pop(field, None)
+                                if proof is not None:
+                                    record[field] = proof
                             return json.dumps(record)
                         return ''
 
@@ -1106,7 +1165,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertTrue(result['cleanup_safe'])
                     self.assertEqual(result['passed'], proof is True)
                     if proof is not True:
-                        self.assertIn('account action', result['cleanup_failure'])
+                        self.assertIn(message, result['failure' if phase == 'ready' else 'cleanup_failure'])
 
     def test_missing_duplicate_skipped_wrong_and_failed_ui_results_are_rejected(self):
         """Require exactly the selected named assertion without skipped or failure children."""

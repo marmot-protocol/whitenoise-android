@@ -10,24 +10,29 @@ name: inbound-share-selected-rotation
     enabled: false
     text: ^Share$
 - tapOn: Maestro group
-- &id001
-  assertVisible:
+- assertVisible:
     id: performance.share_picker
-- &id002
-  assertVisible:
+- assertVisible:
     text: ^Maestro group$
-- &id003
-  assertVisible:
+- assertVisible:
     enabled: true
     text: ^Share to 1 chat$
 - setOrientation: LANDSCAPE_LEFT
-- *id001
-- *id002
-- *id003
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: true
+    text: ^Share to 1 chat$
 - setOrientation: PORTRAIT
-- *id001
-- *id002
-- *id003
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: true
+    text: ^Share to 1 chat$
 - tapOn:
     text: ^Share to 1 chat$
 - assertNotVisible:

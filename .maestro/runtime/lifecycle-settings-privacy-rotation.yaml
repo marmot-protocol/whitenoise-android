@@ -10,13 +10,14 @@ name: lifecycle-settings-privacy-rotation
       text: Privacy & Security
     direction: DOWN
 - tapOn: Privacy & Security
-- &id001
-  assertVisible:
+- assertVisible:
     id: privacy.device_protection.group
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: privacy.device_protection.group
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: privacy.device_protection.group
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

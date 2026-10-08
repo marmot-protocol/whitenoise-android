@@ -10,13 +10,14 @@ name: lifecycle-settings-read-aloud-rotation
       text: Read Aloud
     direction: DOWN
 - tapOn: Read Aloud
-- &id001
-  assertVisible:
+- assertVisible:
     id: speech.engine.group
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: speech.engine.group
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: speech.engine.group
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

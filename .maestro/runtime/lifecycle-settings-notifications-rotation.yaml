@@ -10,13 +10,14 @@ name: lifecycle-settings-notifications-rotation
       text: Notifications
     direction: DOWN
 - tapOn: Notifications
-- &id001
-  assertVisible:
+- assertVisible:
     id: notifications.permission.group
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: notifications.permission.group
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: notifications.permission.group
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

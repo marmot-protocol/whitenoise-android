@@ -6,15 +6,13 @@ name: lifecycle-settings-profile-keys-rotation
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible: Settings
 - tapOn: Profile Keys
-- &id001
-  assertVisible: Show private key
-- &id002
-  assertVisible: Private key hidden
+- assertVisible: Show private key
+- assertVisible: Private key hidden
 - setOrientation: LANDSCAPE_LEFT
-- *id001
-- *id002
+- assertVisible: Show private key
+- assertVisible: Private key hidden
 - setOrientation: PORTRAIT
-- *id001
-- *id002
+- assertVisible: Show private key
+- assertVisible: Private key hidden
 - back
 - assertVisible: Settings

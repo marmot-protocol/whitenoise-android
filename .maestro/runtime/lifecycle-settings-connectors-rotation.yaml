@@ -10,13 +10,14 @@ name: lifecycle-settings-connectors-rotation
       text: AI Agents
     direction: DOWN
 - tapOn: AI Agents
-- &id001
-  assertVisible:
+- assertVisible:
     id: ai_agents.connectors
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: ai_agents.connectors
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: ai_agents.connectors
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

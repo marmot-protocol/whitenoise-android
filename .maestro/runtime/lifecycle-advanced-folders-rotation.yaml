@@ -10,12 +10,13 @@ name: lifecycle-advanced-folders-rotation
       text: Folders
     direction: DOWN
 - tapOn: Folders
-- &id001
-  assertVisible:
+- assertVisible:
     id: chat-folders-content
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: chat-folders-content
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: chat-folders-content
 - back
 - assertVisible: Settings

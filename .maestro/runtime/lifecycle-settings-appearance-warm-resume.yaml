@@ -10,11 +10,11 @@ name: lifecycle-settings-appearance-warm-resume
       text: Appearance
     direction: DOWN
 - tapOn: Appearance
-- &id001
-  assertVisible:
+- assertVisible:
     id: appearance.theme.group
 - runFlow: ../fixtures/runtime-warm-resume.yaml
-- *id001
+- assertVisible:
+    id: appearance.theme.group
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

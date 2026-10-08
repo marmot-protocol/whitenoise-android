@@ -10,14 +10,11 @@ name: inbound-share-account-sheet-back
     enabled: false
     text: ^Share$
 - tapOn: Maestro group
-- &id001
-  assertVisible:
+- assertVisible:
     id: performance.share_picker
-- &id002
-  assertVisible:
+- assertVisible:
     text: ^Maestro group$
-- &id003
-  assertVisible:
+- assertVisible:
     enabled: true
     text: ^Share to 1 chat$
 - tapOn: Choose sending account
@@ -29,9 +26,13 @@ name: inbound-share-account-sheet-back
     text: ^Maestro Carol$
 - back
 - assertNotVisible: ^Choose which signed-in account will own these shared drafts\.$
-- *id001
-- *id002
-- *id003
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: true
+    text: ^Share to 1 chat$
 - tapOn: Close
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:

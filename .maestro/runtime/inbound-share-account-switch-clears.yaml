@@ -2,14 +2,11 @@ appId: dev.ipf.whitenoise.android.maestrolab
 name: inbound-share-account-switch-clears
 ---
 - runFlow: ../fixtures/runtime-share-text-ready.yaml
-- &id001
-  assertVisible:
+- assertVisible:
     id: performance.share_picker
-- &id002
-  assertVisible:
+- assertVisible:
     text: ^Maestro group$
-- &id003
-  assertVisible:
+- assertVisible:
     enabled: false
     text: ^Share$
 - tapOn: Maestro group
@@ -31,9 +28,13 @@ name: inbound-share-account-switch-clears
 - assertNotVisible: ^Choose which signed-in account will own these shared drafts\.$
 - assertVisible:
     text: ^Maestro Bob$
-- *id001
-- *id002
-- *id003
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    text: ^Share$
 - tapOn: Close
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:

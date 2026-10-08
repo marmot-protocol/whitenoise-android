@@ -10,10 +10,10 @@ name: lifecycle-advanced-folders-warm-resume
       text: Folders
     direction: DOWN
 - tapOn: Folders
-- &id001
-  assertVisible:
+- assertVisible:
     id: chat-folders-content
 - runFlow: ../fixtures/runtime-warm-resume.yaml
-- *id001
+- assertVisible:
+    id: chat-folders-content
 - back
 - assertVisible: Settings

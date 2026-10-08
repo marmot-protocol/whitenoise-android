@@ -10,13 +10,14 @@ name: lifecycle-settings-appearance-rotation
       text: Appearance
     direction: DOWN
 - tapOn: Appearance
-- &id001
-  assertVisible:
+- assertVisible:
     id: appearance.theme.group
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: appearance.theme.group
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: appearance.theme.group
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

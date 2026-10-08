@@ -60,6 +60,7 @@ private val MAESTRO_POSTCONDITIONS =
         "notification-denied",
         "notification-granted",
         "camera-denied",
+        "app-lock-unavailable",
         "accounts-retained",
         "account-action-signed-out",
         "account-action-wiped",
@@ -198,6 +199,13 @@ class MaestroRuntimeHostTest {
                             "Generated group missing from native presentation"
                         }
                     val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
+                    val appLockFixtureNoCredential =
+                        verifyMaestroNoAppLockCredential(
+                            context,
+                            app,
+                            context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                            postcondition,
+                        )
                     editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
                     accountActionBaseline = captureMaestroAccountAction(native, app, group, postcondition)
                     if (postcondition.startsWith("message-") || requiresMaestroAccountRetentionProof(postcondition)) {
@@ -226,6 +234,7 @@ class MaestroRuntimeHostTest {
                             .put("accounts", accounts.size)
                             .put("fixture", fixture)
                             .put("uiObserver", "maestro")
+                            .put("appLockFixtureNoCredential", appLockFixtureNoCredential)
                             .put("ready", true)
                             .toString(),
                     )
@@ -265,6 +274,15 @@ class MaestroRuntimeHostTest {
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
+                        .put(
+                            "appLockVerified",
+                            verifyMaestroNoAppLockCredential(
+                                context,
+                                checkNotNull(state),
+                                context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                                postcondition,
+                            ),
+                        )
                         .put(
                             "accountActionVerified",
                             verifyMaestroAccountAction(

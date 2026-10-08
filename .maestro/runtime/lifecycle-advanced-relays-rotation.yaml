@@ -10,12 +10,13 @@ name: lifecycle-advanced-relays-rotation
       text: Relays
     direction: DOWN
 - tapOn: Relays
-- &id001
-  assertVisible:
+- assertVisible:
     id: relays.group
 - setOrientation: LANDSCAPE_LEFT
-- *id001
+- assertVisible:
+    id: relays.group
 - setOrientation: PORTRAIT
-- *id001
+- assertVisible:
+    id: relays.group
 - back
 - assertVisible: Settings
