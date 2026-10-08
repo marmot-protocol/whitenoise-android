@@ -612,26 +612,13 @@ class ComposerDragAndReadingTest {
     }
 
     /** Measures the full composer, including any separate navigation row, for resize and reservation assertions. */
-    private fun height() =
-        composeRule
-            .onNodeWithTag(TAG)
-            .fetchSemanticsNode()
-            .boundsInRoot.height
+    private fun height() = composerNodeHeight(composeRule.onNodeWithTag(TAG))
 
     /** Measures the editor pill separately from surrounding composer controls during compact resizing. */
-    private fun pillHeight() =
-        composeRule
-            .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
-            .fetchSemanticsNode()
-            .boundsInRoot.height
+    private fun pillHeight() = composerNodeHeight(composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG))
 
     /** Reads the editor's semantic scroll offset without moving its caret or selection. */
-    private fun scroll() =
-        composeRule
-            .onNode(hasSetTextAction())
-            .fetchSemanticsNode()
-            .config[SemanticsProperties.VerticalScrollAxisRange]
-            .value()
+    private fun scroll() = composerEditorScroll(composeRule.onNode(hasSetTextAction()))
 
     /** Hosts the real composer with an unsent synthetic draft and observes edits, Send and Cancel callbacks. */
     private fun render(

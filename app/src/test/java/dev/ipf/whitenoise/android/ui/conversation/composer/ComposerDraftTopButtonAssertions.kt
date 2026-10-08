@@ -30,3 +30,16 @@ internal fun assertOneComposerEditorLine(editor: SemanticsNodeInteraction) {
         1f,
     )
 }
+
+/** Measures actual node height without changing focus or advancing the fixture's animation clock. */
+internal fun composerNodeHeight(node: SemanticsNodeInteraction): Float =
+    node
+        .fetchSemanticsNode()
+        .boundsInRoot.height
+
+/** Reads the editor's live scroll position while leaving its draft, caret and selection unchanged. */
+internal fun composerEditorScroll(editor: SemanticsNodeInteraction): Float =
+    editor
+        .fetchSemanticsNode()
+        .config[SemanticsProperties.VerticalScrollAxisRange]
+        .value()
