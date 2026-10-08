@@ -7,4 +7,4 @@ import org.junit.runner.RunWith
 /** Executes the same alignment/reuse regressions on a real Android layout pipeline in PR smoke. */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
-class ComposeRectListBackportAndroidTest : ComposeRectListReuseFixture()
+class ComposeRectListRegressionAndroidTest : ComposeRectListReuseFixture()

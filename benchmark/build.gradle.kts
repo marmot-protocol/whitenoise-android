@@ -7,7 +7,10 @@ plugins {
 android {
     namespace = "dev.ipf.whitenoise.android.benchmark"
     compileSdk {
-        version = release(37)
+        version =
+            release(37) {
+                minorApiLevel = 1
+            }
     }
 
     defaultConfig {

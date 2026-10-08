@@ -1,21 +1,39 @@
 #!/usr/bin/env python3
-"""Require the reviewed backport provenance resource in each packaged release APK."""
+"""Check official UI metadata for the trusted master preview workflow during adoption.
+
+The legacy filename remains because master dispatches check out the candidate's
+scripts before calling it. Remove this compatibility entry point after master has
+adopted the workflow that no longer calls it. It never patches Compose or accepts
+the former backport. Version metadata is a packaging check, not a bytecode hash.
+"""
 import sys
 import zipfile
 
-MARKER = 'META-INF/whitenoise-compose-rectlist-backport.properties'
-EXPECTED = b'upstream=fd550bed793b66378c83091532e29c18fdef44cc\nbase=1.12.1\n'
+VERSION_RESOURCE = 'META-INF/androidx.compose.ui_ui.version'
+EXPECTED_VERSION = b'1.13.0-beta01\n'
+BACKPORT_MARKER = 'META-INF/whitenoise-compose-rectlist-backport.properties'
+
+
+def verify_apk(path):
+    """Reject missing, duplicate or mismatched UI metadata and custom backport APKs."""
+    with zipfile.ZipFile(path) as apk:
+        names = apk.namelist()
+        if BACKPORT_MARKER in names:
+            raise ValueError(f'{path}: temporary Compose backport is still packaged')
+        if names.count(VERSION_RESOURCE) != 1 or apk.read(VERSION_RESOURCE) != EXPECTED_VERSION:
+            raise ValueError(f'{path}: expected official Compose UI 1.13.0-beta01 version metadata')
 
 
 def main():
-    """Reject missing, duplicate or unexpected markers before a release artifact is handed off."""
+    """Validate every candidate passed by the trusted pre-adoption preview workflow."""
     if len(sys.argv) < 2:
         raise SystemExit('Usage: verify_compose_backport_apk.py APK [APK ...]')
     for path in sys.argv[1:]:
-        with zipfile.ZipFile(path) as apk:
-            if apk.namelist().count(MARKER) != 1 or apk.read(MARKER) != EXPECTED:
-                raise SystemExit(f'{path}: missing or mismatched Compose source-backport marker')
-        print(f'{path}: reviewed Compose UI 1.12.1 backport marker present')
+        try:
+            verify_apk(path)
+        except (OSError, ValueError, zipfile.BadZipFile) as error:
+            raise SystemExit(str(error)) from error
+        print(f'{path}: official Compose UI 1.13.0-beta01 metadata present; no custom backport marker')
 
 
 if __name__ == '__main__':

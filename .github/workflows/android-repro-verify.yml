@@ -149,9 +149,6 @@ jobs:
             "$RUNNER_TEMP/repro-$BUILD_TREE" "$RUNNER_TEMP/repro-gradle-home" \
             "$RUNNER_TEMP/repro-evidence"
 
-      - name: Verify packaged Compose backport identity
-        run: python3 scripts/verify_compose_backport_apk.py "$RUNNER_TEMP"/repro-evidence/*.apk
-
       # The two runners have independent filesystems but consume identical inputs.
       - name: Save shared build inputs once
         if: >-

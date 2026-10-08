@@ -54,7 +54,7 @@ import kotlin.math.ceil
 
 /**
  * Exercises production footer/Markdown components when lazy slots are reused or reactivated.
- * The unpatched 1.12.1 artifact crashes in the first three cases; the source backport must not.
+ * The unpatched 1.12.1 artifact crashes in the first three cases; the official runtime must not.
  * The centering driver models the snap/animate sequence and is not a full screen navigation test.
  */
 @RunWith(RobolectricTestRunner::class)
