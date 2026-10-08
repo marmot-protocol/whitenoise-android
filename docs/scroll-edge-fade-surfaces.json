@@ -306,7 +306,8 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
       "calls": {
-        "fadingVerticalScroll": 1
+        "fadingVerticalScroll": 1,
+        "verticalScroll": 1
       },
       "family": "common",
       "policy": "ordinary",
@@ -954,7 +955,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
       "calls": {
-        "verticalScroll": 1
+        "whiteNoiseVerticalScroll": 1
       },
       "family": "profile",
       "policy": "ordinary scrolling retained until the real-keyboard relay-add regression passes with masking",

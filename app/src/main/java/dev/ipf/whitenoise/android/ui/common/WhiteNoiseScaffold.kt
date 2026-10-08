@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.MaterialTheme
@@ -62,14 +63,18 @@ fun WhiteNoiseScaffold(
 /**
  * Vertical scroll that also drives the pinned top bar's scrolled colour, so a plain column behaves like the lazy
  * lists under the same header. The header offset resets when the content leaves composition.
+ * Forms can disable masking while retaining that header contract.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Modifier.whiteNoiseVerticalScroll(state: ScrollState = rememberScrollState()): Modifier {
+fun Modifier.whiteNoiseVerticalScroll(
+    state: ScrollState = rememberScrollState(),
+    fadeEnabled: Boolean = true,
+): Modifier {
     val behavior = LocalWhiteNoiseHeaderScroll.current
     DisposableEffect(behavior) { onDispose { behavior?.state?.contentOffset = 0f } }
     LaunchedEffect(state, behavior) {
         snapshotFlow { state.value }.collect { behavior?.state?.contentOffset = -it.toFloat() }
     }
-    return fadingVerticalScroll(state)
+    return if (fadeEnabled) fadingVerticalScroll(state) else verticalScroll(state)
 }

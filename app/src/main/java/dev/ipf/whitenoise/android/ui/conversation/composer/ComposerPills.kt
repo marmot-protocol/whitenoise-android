@@ -1148,7 +1148,9 @@ internal fun ComposerPill(
                                     .pointerInput(inputContentVisible, scrollOwnerKey) {
                                         if (!inputContentVisible) return@pointerInput
                                         composerEditorReadingScrollGestures(
-                                            acceptsTouchDown = { position -> position.y >= latestReadingTopInset.toPx() },
+                                            acceptsTouchDown = { position ->
+                                                position.y >= latestReadingTopInset.toPx()
+                                            },
                                             onScrollInterrupted = { editorScrollJob?.cancel() },
                                             onFling = { velocity ->
                                                 editorScrollJob =
@@ -1304,7 +1306,9 @@ internal fun ComposerPill(
                                                                     value.selection.end != originalOffset
                                                                 ) {
                                                                     latestOnValueChange(
-                                                                        value.copy(selection = TextRange(originalOffset)),
+                                                                        value.copy(
+                                                                            selection = TextRange(originalOffset),
+                                                                        ),
                                                                     )
                                                                 }
                                                             }
@@ -1455,7 +1459,11 @@ internal fun ComposerPill(
                                             Icon(
                                                 painter =
                                                     painterResource(
-                                                        if (attachmentSheetOpen) R.drawable.ic_close else R.drawable.ic_add,
+                                                        if (attachmentSheetOpen) {
+                                                            R.drawable.ic_close
+                                                        } else {
+                                                            R.drawable.ic_add
+                                                        },
                                                     ),
                                                 contentDescription =
                                                     stringResource(
@@ -1488,7 +1496,11 @@ internal fun ComposerPill(
                             modifier =
                                 Modifier
                                     .align(
-                                        if (voiceReviewContent == null) trailingActionsAlignment else Alignment.BottomEnd,
+                                        if (voiceReviewContent == null) {
+                                            trailingActionsAlignment
+                                        } else {
+                                            Alignment.BottomEnd
+                                        },
                                     ).height(48.dp),
                         ) {
                             if (draftTopWidth > 0.dp && !topOnSeparateRow) draftTopAction()
@@ -1502,7 +1514,8 @@ internal fun ComposerPill(
                                                 availableDictationWidth.roundToPx(),
                                                 constraints.maxWidth,
                                             )
-                                        val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maximum))
+                                        val child =
+                                            measurable.measure(constraints.copy(minWidth = 0, maxWidth = maximum))
                                         layout(child.width, child.height) { child.placeRelative(0, 0) }
                                     },
                                 ) { dictationControls() }
@@ -1515,7 +1528,9 @@ internal fun ComposerPill(
                                             .width(40.dp)
                                             .height(48.dp)
                                             .alpha(if (inputContentVisible) 1f else 0f)
-                                            .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                                            .then(
+                                                if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {},
+                                            ),
                                 ) {
                                     // The prototype's microphone is dictation; voice notes use the waveform glyph.
                                     Icon(
