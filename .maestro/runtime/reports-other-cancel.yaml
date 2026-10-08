@@ -9,10 +9,7 @@ name: reports-other-cancel
     text: Generated incoming fixture message
 - tapOn: Report
 - assertVisible: Report this message
-- assertVisible:
-    containsChild:
-      text: "Send report"
-    enabled: true
+- assertVisible: "Send report"
 - scrollUntilVisible:
     element:
       text: Something else

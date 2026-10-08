@@ -99,6 +99,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'] == 'composer-recreated'
                         and read_json(leaf / 'verified.json').get('activityRecreated') is not True):
                     raise ValueError('Actual Activity recreation was not verified')
+                if (CASES[name]['postcondition'].startswith('contact-private-')
+                        and read_json(leaf / 'verified.json').get('privateContactVerified') is not True):
+                    raise ValueError('External contact privacy was not verified')
                 ready = read_json(leaf / 'ready.json')
                 if (ready.get('accounts') != 3 or ready.get('fixture') != CASES[name].get('fixture', 'basic')
                         or ready.get('uiObserver') != 'maestro'):

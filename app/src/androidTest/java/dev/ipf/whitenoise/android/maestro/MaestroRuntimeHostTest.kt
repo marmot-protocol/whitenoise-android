@@ -61,6 +61,9 @@ private val MAESTRO_POSTCONDITIONS =
         "notification-granted",
         "camera-denied",
         "accounts-retained",
+        "contact-private-saved",
+        "contact-private-cleared",
+        "contact-private-boundary",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -97,6 +100,7 @@ class MaestroRuntimeHostTest {
             var groupId: String? = null
             var messageBaseline: MaestroMessageBaseline? = null
             var expectedAccountIds: Set<String> = emptySet()
+            var externalContact: MaestroExternalContact? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -120,9 +124,12 @@ class MaestroRuntimeHostTest {
                             }
                         }
                     val owner = accounts.first()
-                    val group = native.createGroup(owner.label, "Maestro group", listOf(accounts[1].accountIdHex), null)
-                    while (runCatching { native.acceptGroupInvite(accounts[1].label, group) }.isFailure) delay(100L)
                     val fixture = InstrumentationRegistry.getArguments().getString("fixtureScenario", "basic")
+                    externalContact = prepareMaestroExternalContact(root, relays, owner.label, fixture)
+                    val members = listOf(accounts[1].accountIdHex) + listOfNotNull(externalContact?.accountIdHex)
+                    val group = native.createGroup(owner.label, "Maestro group", members, null)
+                    while (runCatching { native.acceptGroupInvite(accounts[1].label, group) }.isFailure) delay(100L)
+                    externalContact?.acceptGroup(group)
                     seedMaestroFixtureMessages(native, owner.label, accounts[1].label, group, fixture)
                     if (fixture == "departed") prepareMaestroDepartedGroup(native, owner, accounts[1], group)
                     // Let app bootstrap own start/subscription ordering on a freshly opened runtime.
@@ -156,6 +163,7 @@ class MaestroRuntimeHostTest {
                         }
                     (context.applicationContext as MaestroFixtureApplication).fixtureState = app
                     app.bootstrap()
+                    externalContact?.captureProfiles(native, relays)
                     check(app.phase == AppPhase.Ready) { "Generated app bootstrap did not reach Ready: ${app.phase}" }
                     val nativeRow =
                         checkNotNull(native.presentedChatListRow(owner.label, group)) {
@@ -211,11 +219,20 @@ class MaestroRuntimeHostTest {
                         originalActivity,
                         postcondition,
                     )
+                val privateContactVerified =
+                    verifyMaestroContactPrivateDetails(
+                        native,
+                        state,
+                        externalContact,
+                        context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                        postcondition,
+                    )
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
+                        .put("privateContactVerified", privateContactVerified)
                         .toString(),
                 )
             } finally {
@@ -223,7 +240,16 @@ class MaestroRuntimeHostTest {
                 val listenerStopped =
                     runCatching { withTimeout(10_000L) { state?.stopNotificationListenerForAccountTeardown() } }
                 state?.mutationsScope?.cancel()
-                val nativeClosed = runCatching { withTimeout(15_000L) { native.shutdownAndClose() } }
+                val nativeClosed =
+                    runCatching {
+                        withTimeout(15_000L) {
+                            try {
+                                externalContact?.close()
+                            } finally {
+                                native.shutdownAndClose()
+                            }
+                        }
+                    }
                 val relayClosed = runCatching { relay.close() }
                 val preferencesRemoved = runCatching { context.deleteSharedPreferences(directory.name) }
                 val rootRemoved = nativeClosed.isSuccess && root.deleteRecursively()

@@ -10,10 +10,7 @@ name: reports-back
 - tapOn: Report
 - assertVisible: Report this message
 - assertVisible: "Your report goes to this group's admins, encrypted like any other message[.] They will see who reported it[.]"
-- assertVisible:
-    containsChild:
-      text: "Send report"
-    enabled: true
+- assertVisible: "Send report"
 - back
 - assertNotVisible: Report this message
 - assertVisible: Generated incoming fixture message

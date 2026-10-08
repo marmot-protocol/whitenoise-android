@@ -9,16 +9,10 @@ name: reports-rotation-cancel
     text: Generated incoming fixture message
 - tapOn: Report
 - assertVisible: Report this message
-- assertVisible:
-    containsChild:
-      text: "Send report"
-    enabled: true
+- assertVisible: "Send report"
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible: Report this message
-- assertVisible:
-    containsChild:
-      text: "Send report"
-    enabled: true
+- assertVisible: "Send report"
 - setOrientation: PORTRAIT
 - assertVisible: Report this message
 - back

@@ -1,24 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: profiles-private-cancel
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: "Maestro group"
-- tapOn: "Maestro group"
-- runFlow: ../fixtures/assert-fixture-conversation.yaml
-- tapOn: "Maestro group"
-- assertVisible:
-    id: "chat_info.list"
-- scrollUntilVisible:
-    element:
-      text: "Maestro Bob"
-    direction: DOWN
-- tapOn: "Maestro Bob"
-- assertVisible: "User Profile"
-- scrollUntilVisible:
-    element:
-      text: "Nickname & notes"
-    direction: DOWN
-- tapOn: "Nickname & notes"
+- runFlow: ../fixtures/open-external-private-details.yaml
 - scrollUntilVisible:
     element:
       text: "Name"

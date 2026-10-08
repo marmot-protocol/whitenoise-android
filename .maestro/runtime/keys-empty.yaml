@@ -20,12 +20,10 @@ name: keys-empty
     id: "profile_keys.export_confirmation"
     text: ".+"
 - assertVisible:
-    containsChild:
-      text: "View backup"
+    id: "profile_keys.view_backup"
     enabled: false
 - assertVisible:
-    containsChild:
-      text: "Export"
+    id: "profile_keys.export_file"
     enabled: false
 - tapOn: "Cancel"
 - assertVisible: "Private key hidden"

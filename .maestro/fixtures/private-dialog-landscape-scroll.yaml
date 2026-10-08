@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# The API-34 landscape capture has a small dialog scroll region at 27%-62% of screen height.
+# Keep both swipe endpoints inside that region and bound every search.
+- repeat:
+    times: 8
+    commands:
+      - runFlow:
+          when:
+            notVisible: Name from profile.*
+          commands:
+            - swipe:
+                start: 50%, 40%
+                end: 50%, 60%
+                duration: 300
+- assertVisible: Name from profile.*
+- repeat:
+    times: 12
+    commands:
+      - runFlow:
+          when:
+            notVisible: ${PRIVATE_FIELD}
+          commands:
+            - swipe:
+                start: 50%, 55%
+                end: 50%, 45%
+                duration: 300
+- assertVisible: ${PRIVATE_FIELD}

@@ -15,18 +15,15 @@ name: keys-rotation-cancel
 - inputText: "Maestro-test1!"
 - hideKeyboard
 - assertVisible:
-    containsChild:
-      text: "View backup"
+    id: "profile_keys.view_backup"
     enabled: true
 - assertVisible:
-    containsChild:
-      text: "Export"
+    id: "profile_keys.export_file"
     enabled: true
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible: "Encrypted Private Key"
 - assertVisible:
-    containsChild:
-      text: "View backup"
+    id: "profile_keys.view_backup"
     enabled: true
 - setOrientation: PORTRAIT
 - assertVisible: "Encrypted Private Key"
@@ -46,12 +43,10 @@ name: keys-rotation-cancel
     id: "profile_keys.export_confirmation"
     text: ".+"
 - assertVisible:
-    containsChild:
-      text: "View backup"
+    id: "profile_keys.view_backup"
     enabled: false
 - assertVisible:
-    containsChild:
-      text: "Export"
+    id: "profile_keys.export_file"
     enabled: false
 - tapOn: "Cancel"
 - assertVisible: "Private key hidden"

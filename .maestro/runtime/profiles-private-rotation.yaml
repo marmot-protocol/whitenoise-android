@@ -1,24 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: profiles-private-rotation
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: "Maestro group"
-- tapOn: "Maestro group"
-- runFlow: ../fixtures/assert-fixture-conversation.yaml
-- tapOn: "Maestro group"
-- assertVisible:
-    id: "chat_info.list"
-- scrollUntilVisible:
-    element:
-      text: "Maestro Bob"
-    direction: DOWN
-- tapOn: "Maestro Bob"
-- assertVisible: "User Profile"
-- scrollUntilVisible:
-    element:
-      text: "Nickname & notes"
-    direction: DOWN
-- tapOn: "Nickname & notes"
+- runFlow: ../fixtures/open-external-private-details.yaml
 - scrollUntilVisible:
     element:
       text: "Name"
@@ -33,11 +16,10 @@ name: profiles-private-rotation
 - inputText: "Maestro unsaved note"
 - hideKeyboard
 - setOrientation: LANDSCAPE_LEFT
-- scrollUntilVisible:
-    element:
-      text: "Maestro unsaved nickname"
-    direction: DOWN
-- assertVisible: "Maestro unsaved nickname"
+- runFlow:
+    file: ../fixtures/private-dialog-landscape-scroll.yaml
+    env:
+      PRIVATE_FIELD: Maestro unsaved nickname
 - setOrientation: PORTRAIT
 - scrollUntilVisible:
     element:
@@ -48,6 +30,6 @@ name: profiles-private-rotation
 - assertVisible: "User Profile"
 - scrollUntilVisible:
     element:
-      text: "Maestro Bob"
+      text: "Maestro Dave"
     direction: UP
-- assertVisible: "Maestro Bob"
+- assertVisible: "Maestro Dave"

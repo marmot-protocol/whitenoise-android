@@ -811,10 +811,12 @@ private fun ExportPasswordDialog(
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onViewBackup,
+                    modifier = Modifier.testTag("profile_keys.view_backup"),
                 ) { Text(stringResource(R.string.key_export_view_backup)) }
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onConfirm,
+                    modifier = Modifier.testTag("profile_keys.export_file"),
                 ) { Text(stringResource(R.string.export)) }
             }
         },

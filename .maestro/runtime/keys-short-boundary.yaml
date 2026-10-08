@@ -15,12 +15,10 @@ name: keys-short-boundary
 - inputText: "12345678901"
 - hideKeyboard
 - assertVisible:
-    containsChild:
-      text: "View backup"
+    id: "profile_keys.view_backup"
     enabled: false
 - assertVisible:
-    containsChild:
-      text: "Export"
+    id: "profile_keys.export_file"
     enabled: false
 - assertVisible: "Too short"
 - tapOn: "Cancel"

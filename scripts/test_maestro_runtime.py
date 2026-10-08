@@ -188,6 +188,24 @@ class CampaignSummaryTest(unittest.TestCase):
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
 
+    def test_generic_native_success_cannot_certify_external_contact_privacy(self):
+        """Private-edit results need actual external-contact/scoped-store proof, not a generic success receipt."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            replacement = {**runtime.CASES[name], 'postcondition': 'contact-private-saved'}
+            with patch.dict(runtime.CASES, {name: replacement}):
+                result = self.result(root)
+                self.assertEqual(result['passed_count'], 5)
+                self.assertFalse(result['evidence_complete'])
+                self.assertIn('contact privacy', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['privateContactVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
     def test_future_shard_attempt_cannot_certify_current_run(self):
         """A future artifact is invalid even when older matching evidence passes."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -588,8 +606,9 @@ class RuntimeEvidenceTest(unittest.TestCase):
             with self.subTest(case=name):
                 self.assertNotIn('- assertVisible: "Encrypted Private Key"\n- hideKeyboard', flow)
                 self.assertNotRegex(flow, r'(?m)^    text: "(?:View backup|Export)"\n    enabled:')
-                for label in ('View backup', 'Export'):
-                    self.assertIn('containsChild:\n      text: "' + label + '"\n    enabled:', flow)
+                self.assertNotIn('containsChild:', flow)
+                for tag in ('view_backup', 'export_file'):
+                    self.assertIn('id: "profile_keys.' + tag + '"\n    enabled:', flow)
                 self.assertNotIn('- tapOn: "View backup"', flow)
                 self.assertNotIn('- tapOn: "Export"', flow)
                 if name in ('keys-empty', 'keys-cancel-clears', 'keys-back-clears', 'keys-rotation-cancel'):

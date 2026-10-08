@@ -879,8 +879,9 @@
       "manual_ids": [
         "ACC-007"
       ],
-      "assertions": "Cancelling private nickname and notes leaves Bob unchanged and discards the unsaved values on reopen.",
-      "postcondition": "none"
+      "assertions": "Cancelling private nickname and notes leaves the external Dave contact unchanged and discards the unsaved values on reopen. Native verification requires empty owner/other-viewer private preferences and unchanged public profiles.",
+      "postcondition": "contact-private-cleared",
+      "fixture": "contacts"
     },
     "profiles-private-rotation": {
       "suite": "profiles",
@@ -888,8 +889,9 @@
         "ACC-007",
         "NAV-009"
       ],
-      "assertions": "Private nickname and notes survive Activity rotation while editing, then explicit Cancel discards them.",
-      "postcondition": "none"
+      "assertions": "Private nickname and notes survive Activity rotation while editing, then explicit Cancel discards them. Native verification requires empty owner/other-viewer private preferences and unchanged public profiles.",
+      "postcondition": "contact-private-cleared",
+      "fixture": "contacts"
     },
     "profiles-add-group-back": {
       "suite": "profiles",
@@ -1677,7 +1679,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
+      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
@@ -1851,6 +1853,33 @@
       "assertions": "Dismiss the genuine reactor sheet with a typed composer and reopen it on All; native postconditions require both original reactions, the exact retained draft, automatic composer mode and actual activity IME visibility. Gesture cancellation and physical keyboard behavior remain separate.",
       "postcondition": "reactions-draft-retained",
       "fixture": "reactions"
+    },
+    "profiles-private-save": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007"
+      ],
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "postcondition": "contact-private-saved",
+      "fixture": "contacts"
+    },
+    "profiles-private-clear": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007"
+      ],
+      "assertions": "Save then clear both private fields, reopen to the actual public profile name and require removed private records for every local viewer with unchanged public native profiles.",
+      "postcondition": "contact-private-cleared",
+      "fixture": "contacts"
+    },
+    "profiles-private-boundary": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007"
+      ],
+      "assertions": "Enter 81 ASCII nickname characters, Save and reopen the normalized 80-character value; native and direct private-store verification require that exact account-scoped boundary with no notes/public-profile changes.",
+      "postcondition": "contact-private-boundary",
+      "fixture": "contacts"
     }
   }
 }

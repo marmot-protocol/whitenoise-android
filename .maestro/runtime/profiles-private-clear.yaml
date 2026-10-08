@@ -1,0 +1,66 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-private-clear
+---
+- runFlow: ../fixtures/open-external-private-details.yaml
+- scrollUntilVisible:
+    element:
+      text: Name
+    direction: DOWN
+- tapOn: Name
+- inputText: Maestro private Dave
+- scrollUntilVisible:
+    element:
+      text: Notes
+    direction: DOWN
+- tapOn: Notes
+- inputText: Maestro private note
+- hideKeyboard
+- tapOn: Save
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Nickname & notes
+    direction: DOWN
+- tapOn: Nickname & notes
+- scrollUntilVisible:
+    element:
+      text: Maestro private Dave
+    direction: DOWN
+- assertVisible: Maestro private Dave
+- scrollUntilVisible:
+    element:
+      text: Maestro private note
+    direction: DOWN
+- assertVisible: Maestro private note
+- scrollUntilVisible:
+    element:
+      text: Name
+    direction: UP
+- tapOn: Name
+- eraseText
+- scrollUntilVisible:
+    element:
+      text: Notes
+    direction: DOWN
+- tapOn: Notes
+- eraseText
+- hideKeyboard
+- tapOn: Save
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Nickname & notes
+    direction: DOWN
+- tapOn: Nickname & notes
+- scrollUntilVisible:
+    element:
+      text: Name from profile.*Maestro Dave
+    direction: UP
+- assertVisible: Name from profile.*Maestro Dave
+- assertNotVisible: Maestro private Dave
+- scrollUntilVisible:
+    element:
+      text: Notes
+    direction: DOWN
+- assertNotVisible: Maestro private note
+- tapOn: Cancel
