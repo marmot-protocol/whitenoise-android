@@ -484,6 +484,37 @@ code. Resolve the competing install and take a new private backup before retryin
 The host also captures and verifies fixture notification permission, FCM receiver
 override and receipt-listener access, restoring them even if instrumentation dies.
 
+### Direct platform collector for disposable-profile diagnostics
+
+When secondary-profile Macrobenchmark file access fails, an explicitly guarded
+on-device worker can source `scripts/background_perfetto.sh` and call
+`background_perfetto_start <config> <fresh-trace-path> <private-launch-log>`.
+Push the helper/config to the worker's owned directory first. The function returns
+one positive collector PID after data-source startup; the worker remains
+responsible for deadlines, process ownership, finalization, state restoration and
+trace validation. It neither changes app/profile/network settings nor qualifies
+a battery campaign by itself.
+
+Perfetto runs in a separate SELinux domain. A configuration redirected from a
+shell-data file can become unreadable even after the shell opened it. The helper
+pipes config through `cat` and both diagnostic descriptors through `tee`, so
+shell-domain processes perform file access. Pipeline failure, missing/ambiguous
+PID and a pre-existing trace path reject the start; rejected diagnostics remain
+private instead of disappearing into inaccessible file descriptors. See
+[Perfetto's Android tracing guide](https://perfetto.dev/docs/learning-more/android).
+
+On the stock Pixel, the original file-stdin launch rejected the config as empty
+with a SELinux read denial. Identical piped config and the checked-in helper each
+produce parseable five-second smoke traces; invalid config is rejected with
+nonempty retained diagnostics. These charging system-only probes establish the
+collector repair, not reconnect behavior, fixed-window energy or delivery.
+
+Keep an active, unsaturated bounded phase session for each diagnostic window.
+The local phase sink expires after 30 minutes and caps output at 256 events; a
+missing callback phase without a verified active session is not proof that FCM
+never reached the app. Renew sessions only in unmeasured fixture setup, retaining
+the previous export and recording the setup change.
+
 ### Resource campaign acceptance
 
 `scripts/background_delivery_report.py <campaign.json>` validates measured,
