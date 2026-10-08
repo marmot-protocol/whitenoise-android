@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -13,9 +12,6 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import org.junit.Assert.assertEquals
-
-/** The editor and navigation rectangles whose reservation must survive text-only edits. */
-internal data class DraftTopBounds(val editor: Rect, val action: Rect)
 
 /** Checks actual text edits on every frame, including editor and button space rather than final visibility alone. */
 internal fun assertDraftTopStableDuringTextEdits(

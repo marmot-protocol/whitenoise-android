@@ -34,7 +34,6 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
@@ -171,7 +170,7 @@ class ComposerDragAndReadingTest {
         val before = height()
         drag(600f)
         assertTrue("compact chrome must leave unused space to the transcript", height() < before - 40f)
-        assertOneEditorLine()
+        assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         composeRule.onNode(hasSetTextAction()).assertIsFocused()
     }
@@ -232,7 +231,7 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
         val original = observed
         drag(600f)
-        assertOneEditorLine()
+        assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         val minimum = height()
         composeRule.mainClock.advanceTimeBy(500)
         composeRule.waitForIdle()
@@ -403,7 +402,7 @@ class ComposerDragAndReadingTest {
         drag(600f)
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_large_rtl.png")
-        assertOneEditorLine()
+        assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
         composeRule.waitForIdle()
         assertEquals(0f, scroll(), 1f)
@@ -488,7 +487,7 @@ class ComposerDragAndReadingTest {
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_edit_large_rtl.png")
         composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).assertIsDisplayed()
-        assertOneEditorLine()
+        assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).performClick()
         composeRule.waitForIdle()
         assertEquals("navigation must not crowd out Cancel", 1, cancels)
@@ -625,19 +624,6 @@ class ComposerDragAndReadingTest {
             .fetchSemanticsNode()
             .config[SemanticsProperties.VerticalScrollAxisRange]
             .value()
-
-    private fun assertOneEditorLine() {
-        val editor = composeRule.onNode(hasSetTextAction())
-        val layouts = mutableListOf<TextLayoutResult>()
-        editor.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        val layout = layouts.single()
-        assertEquals(
-            "collapsed editor must expose exactly one measured text line",
-            layout.getLineTop(1) - layout.getLineTop(0),
-            editor.fetchSemanticsNode().boundsInRoot.height,
-            1f,
-        )
-    }
 
     private fun render(
         draft: String,
