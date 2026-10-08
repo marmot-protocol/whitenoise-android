@@ -48,6 +48,10 @@
     {
       "surface": "ReportMessageSheet IME form",
       "reason": "Keep its previously tested ordinary scrolling while the added offscreen mask fails the unchanged real-keyboard regression. Other form fades remain covered; this surface is explicitly deferred."
+    },
+    {
+      "surface": "AddRelaySheet IME form",
+      "reason": "Retain ordinary scrolling until this sheet has real-keyboard geometry coverage. The relay confirmation test uses the profile editor and cannot validate this sheet with an offscreen mask."
     }
   ],
   "surfaces": [
@@ -958,7 +962,7 @@
         "whiteNoiseVerticalScroll": 1
       },
       "family": "profile",
-      "policy": "ordinary scrolling retained until the real-keyboard relay-add regression passes with masking",
+      "policy": "Profile edit retains header tracking with its mask disabled until its real-keyboard confirmation regression passes with masking.",
       "test_ids": [
         "SCR-001",
         "SCR-002",
@@ -1395,10 +1399,10 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
       "calls": {
         "SettingsList": 2,
-        "fadingVerticalScroll": 1
+        "verticalScroll": 1
       },
       "family": "settings",
-      "policy": "ordinary",
+      "policy": "Relay lists retain fades; the Add Relay keyboard form retains ordinary scrolling pending its own real-IME geometry validation.",
       "test_ids": [
         "SCR-001",
         "SCR-002",

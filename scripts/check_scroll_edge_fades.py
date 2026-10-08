@@ -22,6 +22,8 @@ RAW_ALLOWED = {
     ('conversation/composer/ComposerPills.kt', 'verticalScroll'),
     # Retain the tested IME form until its offscreen fade survives the real-keyboard regression.
     ('conversation/messages/ReportMessageSheet.kt', 'verticalScroll'),
+    # The profile-host relay confirmation test does not exercise this sheet's real IME geometry.
+    ('settings/RelaysScreen.kt', 'verticalScroll'),
     ('common/WhiteNoiseScaffold.kt', 'verticalScroll'),
 }
 RAW = {'verticalScroll', 'LazyColumn', 'LazyVerticalGrid'}
