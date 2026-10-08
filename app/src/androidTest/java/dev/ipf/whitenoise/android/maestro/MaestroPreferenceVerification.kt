@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.maestro
 
+import androidx.appcompat.app.AppCompatDelegate
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -22,6 +23,9 @@ internal suspend fun verifyMaestroPreferences(
                         "dark" -> state.themeMode == AppThemeMode.Dark
                         "amoled" -> state.themeMode == AppThemeMode.Amoled
                         "font-large" -> state.fontScale == AppFontScale.Large
+                        "language-system" ->
+                            state.languageTag.isEmpty() &&
+                                AppCompatDelegate.getApplicationLocales().toLanguageTags().isEmpty()
                         else -> error("Unknown presentation postcondition")
                     }
                 }

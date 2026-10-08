@@ -24,6 +24,7 @@ internal suspend fun seedMaestroFixtureMessages(
                 "incoming",
                 "reactions",
                 "creation",
+                "departed",
             ),
     )
     native.sendText(account, group, "Generated fixture message")

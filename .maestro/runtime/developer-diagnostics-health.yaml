@@ -37,8 +37,7 @@ name: developer-diagnostics-health
     id: "diagnostics-content"
 - tapOn:
     id: "diagnostics.actions"
-- tapOn:
-    id: "diagnostics.action.health"
+- tapOn: "Health & Performance"
 - assertVisible:
     id: "diagnostics.health"
 - back

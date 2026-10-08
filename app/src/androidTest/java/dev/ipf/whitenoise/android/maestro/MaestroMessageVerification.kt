@@ -43,12 +43,13 @@ internal suspend fun verifyMaestroMessageMutation(
 }
 
 /** Use the same typed MDK projection as the application, without synthesizing message records. */
-private suspend fun readMaestroMessages(
+private fun readMaestroMessages(
     native: Marmot,
     account: String,
     group: String,
-): List<TimelineMessageRecordFfi> =
-    native.timelineMessages(account, TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)).messages
+): List<TimelineMessageRecordFfi> {
+    return native.timelineMessages(account, TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)).messages
+}
 
 /** Reply publication preserves the original and references that exact original on both accounts. */
 private fun originalMessagesRetained(
@@ -56,8 +57,10 @@ private fun originalMessagesRetained(
     peer: TimelineMessageRecordFfi?,
 ): Boolean {
     if (own == null || peer == null) return false
-    return own.plaintext == "Generated fixture message" && !own.deleted &&
-        peer.plaintext == "Generated fixture message" && !peer.deleted
+    return own.plaintext == "Generated fixture message" &&
+        !own.deleted &&
+        peer.plaintext == "Generated fixture message" &&
+        !peer.deleted
 }
 
 /** Duplicate reply publication or a plain text send without its native reply target is a failure. */
@@ -73,7 +76,8 @@ private fun replyMatches(
     val remoteReply = remote.singleOrNull()
     if (localReply == null || remoteReply == null) return false
     return localReply.messageIdHex == remoteReply.messageIdHex &&
-        localReply.replyToMessageIdHex == baseline.messageId && remoteReply.replyToMessageIdHex == baseline.messageId
+        localReply.replyToMessageIdHex == baseline.messageId &&
+        remoteReply.replyToMessageIdHex == baseline.messageId
 }
 
 /** An accepted edit must change the original identity on the owner and peer, with native edit metadata. */
@@ -82,8 +86,10 @@ private fun editMatches(
     peer: TimelineMessageRecordFfi?,
 ): Boolean {
     if (own == null || peer == null) return false
-    return own.plaintext == "Maestro verified edit" && own.edit != null &&
-        peer.plaintext == "Maestro verified edit" && peer.edit != null
+    return own.plaintext == "Maestro verified edit" &&
+        own.edit != null &&
+        peer.plaintext == "Maestro verified edit" &&
+        peer.edit != null
 }
 
 /** Device-local deletion must leave the exact original visible and undeleted to its peer. */
@@ -101,6 +107,8 @@ private fun deletionMatches(
     peer: TimelineMessageRecordFfi?,
 ): Boolean {
     if (own == null || peer == null) return false
-    return own.deleted && peer.deleted &&
-        own.deletedByMessageIdHex != null && own.deletedByMessageIdHex == peer.deletedByMessageIdHex
+    return own.deleted &&
+        peer.deleted &&
+        own.deletedByMessageIdHex != null &&
+        own.deletedByMessageIdHex == peer.deletedByMessageIdHex
 }

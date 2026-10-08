@@ -488,18 +488,19 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 with self.subTest(key=key), self.assertRaises(ValueError):
                     pair(directory, 'verify', {**retry, key: value})
 
-    def test_every_settings_route_has_named_cases(self):
-        """Reject silent coverage drift when a new Settings destination has no named journey."""
+    def test_every_main_and_settings_route_has_named_cases(self):
+        """Reject silent coverage drift in top-level and nested navigation destinations."""
         path = runtime.ROOT / 'config/maestro-screen-coverage.json'
         mapping = json.loads(path.read_text())
         source = (runtime.ROOT / mapping['source']).read_text()
-        body = re.search(r'internal enum class SettingsDetail\s*\{([^}]+)\}', source).group(1)
-        routes = set(re.findall(r'^\s*(\w+),?\s*$', body, re.MULTILINE))
-        self.assertEqual(routes, set(mapping['settings_routes']))
-        for route, cases in mapping['settings_routes'].items():
-            with self.subTest(route=route):
-                self.assertTrue(cases)
-                self.assertTrue(set(cases) <= set(runtime.CASES))
+        for enum, key in [('MainSection', 'main_routes'), ('SettingsDetail', 'settings_routes')]:
+            body = re.search(r'internal enum class ' + enum + r'\s*\{([^}]+)\}', source).group(1)
+            routes = set(re.findall(r'^\s*(\w+),?\s*$', body, re.MULTILINE))
+            self.assertEqual(routes, set(mapping[key]))
+            for route, cases in mapping[key].items():
+                with self.subTest(enum=enum, route=route):
+                    self.assertTrue(cases)
+                    self.assertTrue(set(cases) <= set(runtime.CASES))
 
     def test_foreign_or_partial_fixture_receipts_are_rejected(self):
         """Reject stale generations, false flags and incomplete fixture receipts."""

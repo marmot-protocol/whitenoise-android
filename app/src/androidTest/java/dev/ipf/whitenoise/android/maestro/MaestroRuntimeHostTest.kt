@@ -42,6 +42,7 @@ private val MAESTRO_POSTCONDITIONS =
         "light",
         "amoled",
         "font-large",
+        "language-system",
         "folder-saved",
         "folder-absent",
         "poll-no-vote",
@@ -118,6 +119,7 @@ class MaestroRuntimeHostTest {
                     while (runCatching { native.acceptGroupInvite(accounts[1].label, group) }.isFailure) delay(100L)
                     val fixture = InstrumentationRegistry.getArguments().getString("fixtureScenario", "basic")
                     seedMaestroFixtureMessages(native, owner.label, accounts[1].label, group, fixture)
+                    if (fixture == "departed") prepareMaestroDepartedGroup(native, owner, accounts[1], group)
                     // Let app bootstrap own start/subscription ordering on a freshly opened runtime.
                     native.shutdownAndClose()
                     native =
@@ -236,7 +238,7 @@ class MaestroRuntimeHostTest {
             verifyMaestroMessageMutation(native, checkNotNull(state), postcondition, checkNotNull(messageBaseline))
         }
         when (postcondition) {
-            "light", "dark", "amoled", "font-large" ->
+            "light", "dark", "amoled", "font-large", "language-system" ->
                 verifyMaestroPreferences(checkNotNull(state), postcondition)
             "send" -> verifyMaestroSend(native, checkNotNull(state), peerLabel, group)
             "reactions-retained" ->

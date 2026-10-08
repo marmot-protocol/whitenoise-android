@@ -37,8 +37,9 @@ name: developer-diagnostics-actions
     id: "diagnostics-content"
 - tapOn:
     id: "diagnostics.actions"
-- assertVisible:
-    id: "diagnostics.actions.menu"
+- assertVisible: "Health & Performance"
+- assertVisible: "Send to self"
+- assertVisible: "Clear"
 - back
 - assertVisible:
     id: "diagnostics.events_title"

@@ -28,5 +28,6 @@ name: developer-unlock
 - assertVisible:
     id: "developer.warning"
 - back
-- assertVisible:
-    id: "about.app"
+- assertVisible: "Settings"
+- assertNotVisible:
+    id: "developer.warning"

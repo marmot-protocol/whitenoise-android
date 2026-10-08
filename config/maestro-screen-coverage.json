@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "scope": "Every SettingsDetail route; mappings are assertions written, not complete or executed release proof.",
+  "scope": "Every MainSection and SettingsDetail route; mappings are assertions written, not complete or executed release proof.",
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/AppDestinations.kt",
   "settings_routes": {
     "ShareConnect": [
@@ -19,7 +19,9 @@
       "nested-bubble-colors"
     ],
     "Language": [
-      "preferences-language-cancel"
+      "preferences-language-cancel",
+      "preferences-language-german",
+      "preferences-language-traditional-chinese"
     ],
     "CustomEmoji": [
       "advanced-custom-emoji"
@@ -42,7 +44,13 @@
       "keys-rotation-cancel"
     ],
     "Relays": [
-      "advanced-relays"
+      "advanced-relays",
+      "advanced-relay-empty",
+      "advanced-relay-whitespace",
+      "advanced-relay-malformed",
+      "advanced-relay-http",
+      "advanced-relay-ws",
+      "advanced-relay-secure-cancel"
     ],
     "Support": [
       "support-entry-back",
@@ -132,6 +140,21 @@
     "Developer": [
       "developer-unlock",
       "developer-mode-off"
+    ]
+  },
+  "main_routes": {
+    "Chats": [
+      "navigation-search-clear",
+      "navigation-account-empty",
+      "conversation-draft-return"
+    ],
+    "Settings": [
+      "navigation-settings-back"
+    ],
+    "Diagnostics": [
+      "developer-diagnostics",
+      "developer-diagnostics-actions",
+      "developer-diagnostics-health"
     ]
   }
 }

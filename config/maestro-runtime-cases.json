@@ -724,7 +724,7 @@
         "SET-019",
         "SET-020"
       ],
-      "assertions": "Seven version taps reveal Developer Tools with its development warning; Back returns to About.",
+      "assertions": "Seven version taps reveal Developer Tools with its development warning; Back returns to Settings.",
       "postcondition": "none"
     },
     "developer-mode-off": {
@@ -896,12 +896,12 @@
       "assertions": "Groups in Common shows the actual generated shared group and Back restores Bob profile.",
       "postcondition": "none"
     },
-    "profiles-admin-picker-back": {
+    "profiles-admin-confirm-back": {
       "suite": "profiles",
       "manual_ids": [
         "GRP-007"
       ],
-      "assertions": "The group admin picker is reachable for Alice and Back cancels without promoting Bob.",
+      "assertions": "The actual group-scoped Make Admin confirmation names Bob; Back dismisses it and the unchanged Make Admin action remains available. Global multi-group picking and published promotion remain separate.",
       "postcondition": "none"
     },
     "profiles-start-group-back": {
@@ -926,7 +926,8 @@
         "CHL-010"
       ],
       "assertions": "Cancel dismisses device-local deletion confirmation and preserves accessible history.",
-      "postcondition": "none"
+      "postcondition": "none",
+      "fixture": "departed"
     },
     "chats-folder-cancel": {
       "suite": "chats",
@@ -976,7 +977,8 @@
         "CHL-010"
       ],
       "assertions": "Confirmed local deletion removes only Alice row while Bob retains his actual group.",
-      "postcondition": "chat-deleted"
+      "postcondition": "chat-deleted",
+      "fixture": "departed"
     },
     "consent-default-close": {
       "suite": "consent",
@@ -1674,6 +1676,78 @@
       ],
       "assertions": "Delete for everyone marks the original deleted with the same native deletion identity on the owner and peer.",
       "postcondition": "message-delete-everyone"
+    },
+    "preferences-language-german": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-008"
+      ],
+      "assertions": "Deutsch changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "postcondition": "language-system"
+    },
+    "preferences-language-traditional-chinese": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-008"
+      ],
+      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "postcondition": "language-system"
+    },
+    "advanced-relay-empty": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft empty makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-whitespace": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft whitespace makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-malformed": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft malformed makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-http": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft http makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-ws": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft ws makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-secure-cancel": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft secure-cancel makes the real Add action enabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "chats-delete-unavailable-active": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-010"
+      ],
+      "assertions": "The genuine active-member group context menu keeps normal controls and omits Delete from this device; Back retains the conversation. Terminal-history deletion is a separate departed fixture.",
+      "postcondition": "none"
     }
   }
 }

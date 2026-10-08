@@ -8,11 +8,11 @@ name: ballots-votes-sheet-back
 - tapOn: "Maestro Tea"
 - tapOn:
     id: "poll-view-votes"
-- assertVisible:
-    id: "poll-votes-sheet"
+- assertVisible: "Votes"
+- assertVisible: "Polls are not anonymous[.] Every group member can see who chose each option[.]"
 - assertVisible: "Maestro Alice"
 - assertVisible: "Maestro Tea"
 - back
-- assertNotVisible:
-    id: "poll-votes-sheet"
+- assertNotVisible: "Votes"
+- assertNotVisible: "Polls are not anonymous[.] Every group member can see who chose each option[.]"
 - assertVisible: "Maestro fixture poll"

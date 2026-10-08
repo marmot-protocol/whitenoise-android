@@ -1,5 +1,5 @@
 appId: dev.ipf.whitenoise.android.maestrolab
-name: profiles-admin-picker-back
+name: profiles-admin-confirm-back
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
@@ -16,9 +16,11 @@ name: profiles-admin-picker-back
 - assertVisible: "User Profile"
 - scrollUntilVisible:
     element:
-      text: "Make admin in groups"
+      text: "Make Admin"
     direction: DOWN
-- tapOn: "Make admin in groups"
-- assertVisible: "Make admin in groups"
+- tapOn: "Make Admin"
+- assertVisible: "Make Maestro Bob an admin[?]"
 - back
+- assertNotVisible: "Make Maestro Bob an admin[?]"
 - assertVisible: "User Profile"
+- assertVisible: "Make Admin"
