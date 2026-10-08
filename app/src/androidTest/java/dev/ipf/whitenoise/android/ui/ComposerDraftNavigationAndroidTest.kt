@@ -163,6 +163,12 @@ class ComposerDraftNavigationAndroidTest {
                         if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) imeAnimationRunning = true
                     }
 
+                    /** Forwards unchanged animation insets so descendants retain production IME geometry. */
+                    override fun onProgress(
+                        insets: WindowInsetsCompat,
+                        runningAnimations: List<WindowInsetsAnimationCompat>,
+                    ): WindowInsetsCompat = insets
+
                     /** Allows checking final docked/hidden geometry only after the platform animation completes. */
                     override fun onEnd(animation: WindowInsetsAnimationCompat) {
                         if (animation.typeMask and WindowInsetsCompat.Type.ime() != 0) imeAnimationRunning = false
