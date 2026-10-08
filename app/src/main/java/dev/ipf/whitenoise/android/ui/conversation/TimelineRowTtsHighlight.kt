@@ -206,7 +206,8 @@ private fun rememberRowScopedTtsHighlightState(
                 passage = timelineRowTtsHighlightPassage(messageIdHex, state),
                 progress = timelineRowTtsReadAloudProgress(messageIdHex, state),
                 followTarget = timelineRowTtsFollowTarget(messageIdHex, state),
-                sessionId = state.sessionId.takeIf { it != 0L },
+                // Zero is the first valid playback session, not an idle sentinel.
+                sessionId = state.sessionId.takeUnless { state is TtsState.Idle },
             )
         }.distinctUntilChanged()
         .collect { value = it }

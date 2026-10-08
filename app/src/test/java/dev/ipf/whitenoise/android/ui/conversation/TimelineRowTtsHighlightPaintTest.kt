@@ -260,7 +260,12 @@ class TimelineRowTtsHighlightPaintTest {
         val entry = runBlocking { projectTtsSpeakableEntry(record, null, SENDER_NAME, { document })!! }
         val next =
             runBlocking {
-                projectTtsSpeakableEntry(speakableRecord(MESSAGE_D, BODY), null, SENDER_NAME, { plainPaintDocument(BODY) })!!
+                projectTtsSpeakableEntry(
+                    speakableRecord(MESSAGE_D, BODY),
+                    null,
+                    SENDER_NAME,
+                    { plainPaintDocument(BODY) },
+                )!!
             }
         renderProductionRow(record, collapseLongMessages = true)
         val readMore = composeRule.onNodeWithText(context.getString(R.string.message_read_more))
@@ -273,10 +278,15 @@ class TimelineRowTtsHighlightPaintTest {
                 appState.ttsController.state.value
                     .conversationFollowTargetOrNull(),
             )
-        assertTrue("Expanded body must report its actual sentence", sentenceLayouts.completeSentenceBounds(first) != null)
+        assertTrue(
+            "Expanded body must report its actual sentence",
+            sentenceLayouts.completeSentenceBounds(first) != null,
+        )
         val expandedHeight =
             collapsedRowHeight()
-        composeRule.runOnIdle { appState.ttsController.seekToSentence(entry.messageIdHex, LONG_BODY_LINES - 1, entry.projectionId) }
+        composeRule.runOnIdle {
+            appState.ttsController.seekToSentence(entry.messageIdHex, LONG_BODY_LINES - 1, entry.projectionId)
+        }
         composeRule.waitForIdle()
         assertLateSentenceHighlighted(body)
         appState.ttsController.pause()

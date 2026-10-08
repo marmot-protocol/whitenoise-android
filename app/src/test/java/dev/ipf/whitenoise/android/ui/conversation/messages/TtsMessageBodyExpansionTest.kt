@@ -24,7 +24,7 @@ class TtsMessageBodyExpansionTest {
         val mounted = mutableStateOf(true)
         val active = mutableStateOf(false)
         val source = mutableStateOf("First sentence. Later sentence.")
-        val session = mutableStateOf<Long?>(1L)
+        val session = mutableStateOf<Long?>(0L)
         var expanded = false
         restoration.setContent {
             val holder = rememberSaveableStateHolder()
@@ -45,7 +45,7 @@ class TtsMessageBodyExpansionTest {
         composeRule.runOnIdle { assertTrue(expanded) }
         composeRule.runOnIdle { session.value = null }
         composeRule.runOnIdle { assertTrue(expanded) }
-        composeRule.runOnIdle { session.value = 2L }
+        composeRule.runOnIdle { session.value = 1L }
         composeRule.runOnIdle { assertFalse(expanded) }
         composeRule.runOnIdle { active.value = true }
         composeRule.runOnIdle { assertTrue(expanded) }

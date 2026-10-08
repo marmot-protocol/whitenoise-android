@@ -204,7 +204,9 @@ class TimelineRowTtsHighlightPaintAndroidTest {
         check(appState.ttsController.speak(listOf(entry), Locale.US))
         composeRule.waitForIdle()
         readMore.assertDoesNotExist()
-        composeRule.runOnIdle { appState.ttsController.seekToSentence(entry.messageIdHex, LONG_BODY_LINES - 1, entry.projectionId) }
+        composeRule.runOnIdle {
+            appState.ttsController.seekToSentence(entry.messageIdHex, LONG_BODY_LINES - 1, entry.projectionId)
+        }
         composeRule.waitForIdle()
         val range =
             composeRule
