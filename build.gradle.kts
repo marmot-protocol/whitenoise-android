@@ -32,8 +32,6 @@ plugins {
     alias(libs.plugins.kover) apply false
 }
 
-apply(from = "gradle/compose-ui-backport.gradle.kts")
-
 subprojects {
     tasks.withType<Test>().configureEach {
         // CI uses three isolated workers; local and other workflow runs stay serial.

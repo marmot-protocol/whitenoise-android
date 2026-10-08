@@ -202,6 +202,7 @@ class TileTransferDeviceTest {
         HeldAttachmentCancellationProbe.control(blobPort, "/__restore-acquisition")
         if (failedSeen) driver.node(retry).performClick()
         row.put("completed", driver.waitFor(COMPLETE_TIMEOUT_MILLIS) { driver.shown(tile) })
+        row.put("descriptions_after_retry", driver.snapshot())
         report(row)
     }
 
