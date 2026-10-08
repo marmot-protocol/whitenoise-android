@@ -512,6 +512,26 @@ internal fun MainShell(
             runtimeGeneration = appState.runtimeGeneration,
         )
     val scopedGlobalSearchState = globalSearch.scopedState
+    LaunchedEffect(globalSearch.conversationReturn, scopedGlobalSearchState.isOpen, selectedChat, sectionName) {
+        val origin = globalSearch.conversationReturn ?: return@LaunchedEffect
+        if (sectionName != MainSection.Chats.name) {
+            globalSearch.finishConversationSearch()
+        } else if (!scopedGlobalSearchState.isOpen && selectedChat == null) {
+            globalSearch.finishConversationSearch()
+            selectedChatListFolderId = origin.previousFolderId
+            val item = chatsController.chatItemForGroup(origin.groupId) ?: return@LaunchedEffect
+            nextPendingConversationOpenRequestId += 1L
+            pendingConversationOpen =
+                PendingConversationOpen(
+                    requestId = nextPendingConversationOpenRequestId,
+                    accountRef = appState.activeAccountRef,
+                    item = item,
+                    focusMessageId = null,
+                    justCreated = false,
+                    visibleActiveListHeadId = null,
+                )
+        }
+    }
     // True while a tapped notification for a non-active account is mid-resolution
     // (switching account / awaiting its chat list). Holds a single stable loading
     // state over the multi-step route so the chat list never paints as an
@@ -2399,6 +2419,40 @@ internal fun MainShell(
                             chat = chat,
                             controller = content.controller,
                             surfaceState = content.surfaceState,
+                            searchChatsController = chatsController,
+                            onBroadenSearch = { request ->
+                                if (content.accountRef == appState.activeAccountRef &&
+                                    selectedChat?.id == chat.id &&
+                                    globalSearch.beginConversationSearch(chat.id, request, selectedChatListFolderId)
+                                ) {
+                                    notificationReadThroughCommitter.commit(commitNotificationReadThrough)
+                                    // The global surface now owns this request. Returning to the origin
+                                    // must not revive a broad request in the single-chat navigator.
+                                    content.surfaceState?.let { origin ->
+                                        origin.searchOpen.value = false
+                                        origin.searchState.value =
+                                            dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
+                                                .close(request)
+                                    }
+                                    selectedChatListFolderId = null
+                                    appState.clearActiveConversation()
+                                    chatsController.setChatListVisible(true)
+                                    shellNavState =
+                                        reduceShellNavigation(
+                                            shellNavState,
+                                            ShellNavigationEvent.ConversationBackedOut,
+                                        ).state
+                                    content.openContext.notificationRouteTraceRequestId?.let {
+                                        releaseNotificationFirstFrameGate(it)
+                                        NotificationRouteTrace.finishRequest(it)
+                                    }
+                                    exitingConversationContent = content
+                                    selectedChat = null
+                                    selectedChatOpenContext = ConversationOpenContext()
+                                    selectedChatJustCreated = false
+                                    selectedChatOpenedAsDmHint = false
+                                }
+                            },
                             playbackTransport = {
                                 // Match released read-aloud: retain this screen's chrome until its Back
                                 // animation disposes it. Route deselection must not collapse the outgoing header.

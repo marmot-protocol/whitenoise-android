@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
@@ -35,8 +36,10 @@ internal fun conversationSearchPreset(
     )
 
 /** A single explicitly selected chat keeps its exhaustive navigator; broader scopes use the existing list. */
-internal fun keepsConversationSearchNavigator(state: GlobalSearchState, chatId: String): Boolean =
-    state.chatFilters.map { canonicalChatListGroupId(it.stableId) }.toSet() == setOf(canonicalChatListGroupId(chatId))
+internal fun keepsConversationSearchNavigator(
+    state: GlobalSearchState,
+    chatId: String,
+): Boolean = state.chatFilters.map { canonicalChatListGroupId(it.stableId) }.toSet() == setOf(canonicalChatListGroupId(chatId))
 
 internal data class ConversationSearchControls(
     val options: GlobalSearchFilterOptions,
@@ -57,12 +60,19 @@ internal fun rememberConversationSearchControls(
 ): ConversationSearchControls {
     val ownedController = chatsController?.takeIf { it.boundAccountRef == accountRef && accountRef != null }
     val folders =
-        if (ownedController != null) rememberSearchFolderContext(appState, ownedController, titleCopy)
-        else SearchFolderContext(emptyList()) { emptySet() }
-    val source = ownedController?.let { it.items + it.archivedItems } ?: listOf(chat)
+        if (ownedController != null) {
+            rememberSearchFolderContext(appState, ownedController, titleCopy)
+        } else {
+            SearchFolderContext(emptyList()) { emptySet() }
+        }
+    // A notification can open a valid conversation before the list projects it.
+    val source = (ownedController?.let { it.items + it.archivedItems }.orEmpty() + chat).distinctBy { it.id }
     val folderIds = state.folderFilters.takeIf { it.isNotEmpty() }?.flatMapTo(mutableSetOf()) { folders.resolveChatIds(it) }
     val choices = restrictToChatIds(applyGlobalSearchChatScope(source, state.chatTypeFilters, emptySet()), folderIds)
     val scoped = globalSearchScopedChats(source, state, folderIds)
+    LaunchedEffect(ownedController, state.isOpen, scoped) {
+        if (state.isOpen) ownedController?.requestMemberSnapshots(scoped.map { it.group.groupIdHex })
+    }
     val folderOptions = folders.folders.map { GlobalSearchFolderOption(it.id, chatFolderDisplayName(it)) }
     val options =
         rememberGlobalSearchFilterOptions(

@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchAccountScope
@@ -13,12 +14,38 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchStateSaver
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchViewport
+import dev.ipf.whitenoise.android.ui.chats.decodeGlobalSearchState
+import dev.ipf.whitenoise.android.ui.chats.encodeGlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchViewport
+
+internal data class ConversationSearchReturn(
+    val groupId: String,
+    val previousSearch: GlobalSearchState,
+    val previousFolderId: String?,
+)
+
+private val ConversationSearchReturnSaver =
+    listSaver<ConversationSearchReturn?, String>(
+        save = { origin ->
+            origin?.let { listOf(it.groupId, encodeGlobalSearchState(it.previousSearch), it.previousFolderId.orEmpty()) }
+                ?: emptyList()
+        },
+        restore = { saved ->
+            if (saved.isEmpty()) {
+                null
+            } else {
+                ConversationSearchReturn(saved[0], decodeGlobalSearchState(saved[1]), saved[2].takeIf(String::isNotEmpty))
+            }
+        },
+    )
 
 internal data class MainShellGlobalSearchStateHolder(
     val scopedState: GlobalSearchState,
     val update: ((GlobalSearchState) -> GlobalSearchState) -> Unit,
     val viewport: GlobalSearchViewport,
+    val conversationReturn: ConversationSearchReturn?,
+    val beginConversationSearch: (String, GlobalSearchState, String?) -> Boolean,
+    val finishConversationSearch: () -> ConversationSearchReturn?,
 )
 
 /**
@@ -41,6 +68,14 @@ internal fun rememberMainShellGlobalSearchState(
     val scopedGlobalSearchState =
         GlobalSearchTransitions.reconcileAccountScope(globalSearchState, globalSearchAccountScope)
     val viewport = key(globalSearchAccountScope) { rememberGlobalSearchViewport() }
+    var conversationReturn by key(globalSearchAccountScope) {
+        rememberSaveable(stateSaver = ConversationSearchReturnSaver) { mutableStateOf<ConversationSearchReturn?>(null) }
+    }
+    // The saved state can outlive an Activity. It must never restore an origin into a new account/runtime.
+    val ownedReturn =
+        conversationReturn?.takeIf {
+            it.previousSearch.accountScopeToken == globalSearchAccountScope.encodeToken()
+        }
     LaunchedEffect(globalSearchAccountScope) {
         if (globalSearchState != scopedGlobalSearchState) {
             globalSearchState = scopedGlobalSearchState
@@ -49,6 +84,21 @@ internal fun rememberMainShellGlobalSearchState(
     return MainShellGlobalSearchStateHolder(
         scopedState = scopedGlobalSearchState,
         viewport = viewport,
+        conversationReturn = ownedReturn,
+        beginConversationSearch = { groupId, request, folderId ->
+            if (request.accountScopeToken == globalSearchAccountScope.encodeToken()) {
+                conversationReturn = ConversationSearchReturn(groupId, scopedGlobalSearchState, folderId)
+                globalSearchState = request.copy(isOpen = true, openFilterCategory = null)
+                true
+            } else {
+                false
+            }
+        },
+        finishConversationSearch = {
+            conversationReturn = null
+            if (ownedReturn != null) globalSearchState = ownedReturn.previousSearch
+            ownedReturn
+        },
         update = { transform ->
             val currentState =
                 GlobalSearchTransitions.reconcileAccountScope(

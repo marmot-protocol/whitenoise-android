@@ -26,12 +26,13 @@ internal fun <T> rememberGlobalSearchLookup(
     request: Any,
     enabled: Boolean,
     operationCode: String,
+    debounceMillis: Long = CHAT_LIST_SEARCH_DEBOUNCE_MS,
     lookup: suspend () -> T,
 ): GlobalSearchLookupResult<T>? {
     var result by remember(request, enabled) { mutableStateOf<GlobalSearchLookupResult<T>?>(null) }
     LaunchedEffect(request, enabled) {
         if (!enabled) return@LaunchedEffect
-        delay(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+        delay(debounceMillis)
         val completed =
             runCatchingCancellable { lookup() }.fold(
                 onSuccess = { GlobalSearchLookupResult<T>(request, value = it) },

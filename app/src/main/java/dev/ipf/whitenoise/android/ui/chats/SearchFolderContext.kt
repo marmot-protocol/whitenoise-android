@@ -30,20 +30,21 @@ internal fun rememberSearchFolderContext(
     val resolve: (String) -> Set<String> =
         remember(storeState, account, controller.items, controller.archivedItems, titleCopy, appState.profileRevisionForCompose) {
             { folderId ->
-                account?.let { owner ->
-                    val rule = appState.chatFolderPreferences.folderRule(owner, folderId)
-                    val items = chatFolderSource(rule, controller.items, controller.archivedItems)
-                    val mutedIds = items.filter { it.engineMuted() }.mapTo(mutableSetOf()) { it.group.groupIdHex }
-                    chatFolderChatIds(
-                        items = items,
-                        manualChatIds = appState.chatFolderPreferences.membershipFor(owner, folderId),
-                        excludedChatIds = appState.chatFolderPreferences.excludedChats(owner, folderId),
-                        rule = rule,
-                        activeAccountIdHex = controller.boundAccountIdHex(),
-                        isMuted = { it in mutedIds },
-                        displayTitle = { chatListItemDisplayTitle(it, appState, titleCopy) },
-                    )
-                }.orEmpty()
+                account
+                    ?.let { owner ->
+                        val rule = appState.chatFolderPreferences.folderRule(owner, folderId)
+                        val items = chatFolderSource(rule, controller.items, controller.archivedItems)
+                        val mutedIds = items.filter { it.engineMuted() }.mapTo(mutableSetOf()) { it.group.groupIdHex }
+                        chatFolderChatIds(
+                            items = items,
+                            manualChatIds = appState.chatFolderPreferences.membershipFor(owner, folderId),
+                            excludedChatIds = appState.chatFolderPreferences.excludedChats(owner, folderId),
+                            rule = rule,
+                            activeAccountIdHex = controller.boundAccountIdHex(),
+                            isMuted = { it in mutedIds },
+                            displayTitle = { chatListItemDisplayTitle(it, appState, titleCopy) },
+                        )
+                    }.orEmpty()
             }
         }
     return SearchFolderContext(folders, resolve)

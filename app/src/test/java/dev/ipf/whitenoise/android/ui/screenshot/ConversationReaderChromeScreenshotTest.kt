@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -13,7 +14,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -27,8 +28,14 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EditVersion
+import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_SEARCH_FILTERS_ACTION_TAG
+import dev.ipf.whitenoise.android.ui.chats.ChatListSearchFilterAction
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchAttachmentModes
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterControlsRow
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.conversation.MessageSelectionBar
+import dev.ipf.whitenoise.android.ui.conversation.conversationSearchPreset
 import dev.ipf.whitenoise.android.ui.conversation.messages.EditHistoryDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -71,11 +78,15 @@ class ConversationReaderChromeScreenshotTest {
     /** Large RTL fallback history keeps full revision text, the Original row and a reachable native Back. */
     @Test fun historyDarkLargeRtl() = captureHistory("conversation_edit_history_dark_large_rtl", dark = true)
 
-    /** The compact field and disabled date affordance use the prototype light header. */
+    /** The conversation entry reuses the shared filter action and removable chat preset. */
     @Test fun searchLight() = captureSearch("conversation_search_header_light", largeRtl = false)
 
     /** Large RTL search retains the real query and exposes all native navigation targets. */
     @Test fun searchLargeRtl() = captureSearch("conversation_search_header_large_rtl", largeRtl = true)
+
+    @Test fun searchDark() = captureSearch("conversation_search_header_dark", largeRtl = false, dark = true)
+
+    @Test fun searchAmoled() = captureSearch("conversation_search_header_amoled", largeRtl = false, dark = true, amoled = true)
 
     /** Selection uses the prototype title while native count remains an accessible state. */
     @Test fun selectionDark() {
@@ -153,31 +164,49 @@ class ConversationReaderChromeScreenshotTest {
     private fun captureSearch(
         name: String,
         largeRtl: Boolean,
+        dark: Boolean = false,
+        amoled: Boolean = false,
     ) {
         val callbacks = mutableListOf<String>()
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(fontScale = if (largeRtl) 2f else 1f) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                     var query by remember { mutableStateOf("Native message") }
+                    var filters by remember { mutableStateOf(conversationSearchPreset("account", 1, "group", "Community")) }
                     Surface(Modifier.fillMaxWidth().testTag("reader.chrome")) {
-                        ConversationSearchTopBar(
-                            query = query,
-                            onQueryChange = { query = it },
-                            onClear = {
-                                query = ""
-                                callbacks += "clear"
-                            },
-                            onClose = { callbacks += "close" },
-                            onSearchAction = { callbacks += "search" },
-                            focusRequester = remember { FocusRequester() },
-                        )
+                        Column {
+                            ConversationSearchTopBar(
+                                query = query,
+                                onQueryChange = { query = it },
+                                onClear = {
+                                    query = ""
+                                    callbacks += "clear"
+                                },
+                                onClose = { callbacks += "close" },
+                                onSearchAction = { callbacks += "search" },
+                                focusRequester = remember { FocusRequester() },
+                                filterAction = {
+                                    ChatListSearchFilterAction(
+                                        state = filters,
+                                        onCategory = { category -> filters = GlobalSearchTransitions.openFilterCategory(filters, category) },
+                                        onClearAll = { filters = GlobalSearchTransitions.clearAllFilters(filters) },
+                                    )
+                                },
+                            )
+                            GlobalSearchAttachmentModes(filters, { filters = filters.copy(contentFilterSelection = it) })
+                            GlobalSearchFilterControlsRow(
+                                filters,
+                                { filters = GlobalSearchTransitions.removeFilter(filters, it) },
+                                { filters = GlobalSearchTransitions.clearAllFilters(filters) },
+                            )
+                        }
                     }
                 }
             }
         }
-        composeRule.onNodeWithTag("conversation.search.calendar").assertIsNotEnabled()
+        composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG).assertIsEnabled()
         composeRule.onNodeWithTag("reader.chrome").captureRoboImage("src/test/snapshots/$name.png")
         composeRule.onNodeWithTag("conversation.searchField").performTextReplacement("Updated query")
         composeRule.onNodeWithTag("conversation.searchField").performImeAction()

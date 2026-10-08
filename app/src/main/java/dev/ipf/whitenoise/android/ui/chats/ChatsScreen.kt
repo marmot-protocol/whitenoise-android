@@ -525,7 +525,7 @@ internal fun ChatsScreen(
         rememberGlobalSearchLookup(libraryRequest, browsingAttachments, "GLOBAL_ATTACHMENT_SEARCH") {
             val account = controller.boundAccountRef
             if (account == null) {
-                emptyList()
+                error("Search account unavailable")
             } else {
                 collectGlobalAttachments(
                     appState = appState,

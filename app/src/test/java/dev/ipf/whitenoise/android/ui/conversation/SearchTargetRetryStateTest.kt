@@ -5,6 +5,18 @@ import org.junit.Test
 
 class SearchTargetRetryStateTest {
     @Test
+    fun explicitNewestJumpCancelsDeferredSearchRetry() {
+        val navigation = MessageTargetNavigationOwner()
+        val retry = SearchTargetRetryState()
+        retry.failed(navigation.begin())
+        retry.retry(loadFailurePresent = true)
+        navigation.cancel()
+        retry.clear()
+        retry.onLoadFailureChanged(false)
+        assertEquals(0L, retry.generation)
+    }
+
+    @Test
     fun explicitRetryResumesCurrentFailedTargetOnce() {
         val navigation = MessageTargetNavigationOwner()
         val retry = SearchTargetRetryState()
