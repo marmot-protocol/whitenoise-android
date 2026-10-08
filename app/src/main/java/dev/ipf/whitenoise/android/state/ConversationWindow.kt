@@ -23,7 +23,10 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Unchanged
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** Rows requested per conversation page and at opening; MDK accepts 1–200 and retains at most 200. */
 internal const val CONVERSATION_WINDOW_MAX_ROWS: UInt = 200u
@@ -58,6 +61,9 @@ internal data class InstalledConversationWindow(
 
 /** Observable owner of the newest installed frame for one conversation controller. */
 internal class ConversationWindowState {
+    /** Identity of the subscription whose initial snapshot is installed, independent of frame revisions. */
+    var readySubscription by mutableStateOf<ConversationTimelineSubscriptionHandle?>(null)
+
     /** Newest installed frame, or null before the window delivered one or when the seam has no window. */
     var frame by mutableStateOf<ConversationWindowFrame?>(null)
         private set
@@ -99,6 +105,7 @@ internal class ConversationWindowState {
     /** Forgets the frame when the window is retired. */
     fun clear() {
         frame = null
+        readySubscription = null
     }
 }
 
@@ -456,11 +463,27 @@ internal fun ConversationController.installWindowFrame(frame: ConversationWindow
  * Reports the message the reader settled on so replacements keep it in view; a no-op without a window.
  * Optimistic rows carry local ids MDK never issued, so only a retained authoritative row is reported.
  */
-suspend fun ConversationController.reportVisibleMessage(messageIdHex: String) {
-    if (!retainsTimelineRecord(messageIdHex)) return
-    val page = timelineSubscription?.setVisibleAnchor(messageIdHex) ?: return
-    applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
-}
+suspend fun ConversationController.reportVisibleMessage(
+    messageIdHex: String,
+    expectedSubscription: ConversationTimelineSubscriptionHandle? = window.readySubscription,
+): Boolean =
+    timelineSubscriptionActiveCallMutex.withLock {
+        val handle = expectedSubscription ?: return@withLock false
+
+        fun ownsHandle(): Boolean =
+            synchronized(liveSubscriptionLock) {
+                !accountTeardownRequested && timelineSubscription === handle && window.readySubscription === handle
+            }
+        if (!ownsHandle() || !retainsTimelineRecord(messageIdHex)) return@withLock false
+        val page = withContext(Dispatchers.IO) { handle.setVisibleAnchor(messageIdHex) }
+        if (!ownsHandle()) return@withLock false
+        if (page != null) {
+            applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
+        }
+        // A null page can be an unchanged window. Record submission to this
+        // owner, rather than claiming that a new native frame was installed.
+        true
+    }
 
 /** Replaces a bounded history window with its newest page, reporting whether the newest edge is ready. */
 suspend fun ConversationController.returnToLatestWindow(): Boolean {

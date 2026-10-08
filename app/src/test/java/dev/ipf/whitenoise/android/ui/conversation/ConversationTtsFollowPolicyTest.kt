@@ -105,9 +105,14 @@ class ConversationTtsFollowPolicyTest {
         policy.observe(speaking, ownsSession = true)
 
         assertEquals(target, policy.claimPendingTarget())
+        assertTrue(policy.claimCorrectiveScroll(target))
+        assertFalse(policy.claimCorrectiveScroll(target))
         assertTrue(policy.retryFailedFollowAttempt(target))
         assertEquals(target, policy.claimPendingTarget())
+        assertTrue(policy.claimCorrectiveScroll(target))
+        assertFalse(policy.claimCorrectiveScroll(target))
         assertFalse(policy.retryFailedFollowAttempt(target))
+        assertFalse(policy.claimCorrectiveScroll(target))
 
         policy.observe(speaking, ownsSession = true)
         assertNull(policy.claimPendingTarget())

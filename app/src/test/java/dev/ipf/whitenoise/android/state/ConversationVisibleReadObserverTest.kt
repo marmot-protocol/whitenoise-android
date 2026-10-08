@@ -14,8 +14,11 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.whitenoise.android.ui.conversation.observeConversationVisibleReads
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -29,6 +32,96 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 class ConversationVisibleReadObserverTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun retiredAnchorReplyCannotInstallItsOldTimelinePage() {
+        val row = reminderRow()
+        val fixture = fixture(row)
+        runBlocking { fixture.bootstrap() }
+        val state = fixture.appState
+        val first =
+            ScriptedConversationTimelineSubscription(
+                timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL)),
+                anchorPage = emptyTimelinePage(),
+            )
+        state.liveSubscriptionOverrides.conversation =
+            ScriptedConversationLiveSubscriptions(listOf(first), conversationTimelineTestGroup()).subscriptions
+        val controller = controller(state, row)
+        awaitTimeline(controller, first)
+        try {
+            runBlocking {
+                val started = CompletableDeferred<Unit>()
+                val release = CompletableDeferred<Unit>()
+                first.beforeAnchorReply = {
+                    started.complete(Unit)
+                    release.await()
+                }
+                val reply = async { controller.reportVisibleMessage(ConversationTimelineTestIds.MESSAGE_B, first) }
+                started.await()
+                // The ready owner can change while IO is returning; its old page
+                // must not clear records belonging to the current presentation.
+                controller.window.readySubscription = null
+                release.complete(Unit)
+                assertFalse(reply.await())
+                assertTrue(controller.retainsTimelineRecord(ConversationTimelineTestIds.MESSAGE_B))
+            }
+        } finally {
+            controller.onCleared()
+            fixture.close()
+        }
+    }
+
+    /** A retained reader must seed each replacement native window with its settled row. */
+    @Test
+    fun retainedObserverReportsSameAnchorToReplacementTimelineWindow() {
+        val row = reminderRow()
+        val fixture = fixture(row)
+        runBlocking { fixture.bootstrap() }
+        val state = fixture.appState
+        val first =
+            ScriptedConversationTimelineSubscription(
+                timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL)),
+            )
+        val second =
+            ScriptedConversationTimelineSubscription(
+                timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL)),
+            )
+        val scripted =
+            ScriptedConversationLiveSubscriptions(listOf(first, second), conversationTimelineTestGroup())
+        state.liveSubscriptionOverrides.conversation = scripted.subscriptions
+        val controller = controller(state, row)
+        awaitTimeline(controller, first)
+        var observing by mutableStateOf(true)
+        try {
+            composeRule.runOnIdle {
+                state.setAppInForeground(true, dismissRetainedVisibleConversation = false)
+                state.clearActiveConversation()
+            }
+            val lifecycleOwner = ReadLifecycleOwner()
+            installObserver(state, controller, lifecycleOwner) { observing }
+            activate(state, row.groupIdHex)
+            awaitReads(fixture, controller, 1)
+            awaitAnchor(first)
+            first.endWindows()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                shadowOf(Looper.getMainLooper()).idle()
+                first.closeCallCount == 1
+            }
+            // Use the same public retry signal as the existing reconnect fixtures,
+            // rather than relying on an unadvanced paused-looper backoff timer.
+            runBlocking { controller.retryLoadFailure() }
+            awaitTimeline(controller, second)
+            // Replacing the native window alone must wake the retained observer,
+            // even with an unchanged row and no reminder or viewport mutation.
+            awaitAnchor(second)
+            assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_B), second.anchorReports)
+        } finally {
+            composeRule.runOnIdle { observing = false }
+            composeRule.waitForIdle()
+            controller.onCleared()
+            fixture.close()
+        }
+    }
 
     /**
      * Exercises the production observer: ownership reentry retries three reads while reporting one unchanged
@@ -131,6 +224,7 @@ class ConversationVisibleReadObserverTest {
     ) = runBlocking {
         awaitConversationCondition {
             controller.timelineSubscription === subscription &&
+                controller.window.readySubscription === subscription &&
                 controller.retainsTimelineRecord(ConversationTimelineTestIds.MESSAGE_B)
         }
     }

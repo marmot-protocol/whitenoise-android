@@ -404,6 +404,9 @@ internal class ConversationTtsFollowPolicy private constructor(
         } else {
             retriedTarget = target
             evaluatedTarget = null
+            // Expansion can move a sentence after the first measured correction.
+            // The single retry must be able to correct its newly placed geometry.
+            correctedTarget = null
             pendingTarget = target
             pendingDirection = activeDirection
             requestRevision++
@@ -588,6 +591,15 @@ private suspend fun awaitCompleteTtsSentenceLayout(
                 CompleteTtsSentenceLayout(sentenceBounds, viewportBounds)
             }
         }.filterNotNull().first()
+        // A newly enabled leaf reporter may replay its cached text coordinates
+        // before the expanded row is placed. Frame callbacks precede layout;
+        // crossing the next callback completes that placement before we reread.
+        withFrameNanos { }
+        withFrameNanos { }
+        if (!isCurrentTarget()) return@withTimeoutOrNull null
+        val sentenceBounds = registry.completeSentenceBounds(target) ?: return@withTimeoutOrNull null
+        val viewportBounds = registry.viewportBoundsInWindow ?: return@withTimeoutOrNull null
+        CompleteTtsSentenceLayout(sentenceBounds, viewportBounds)
     }
 
 /** Scrolls the viewport so the Read Aloud target is visible, honouring the follow direction. */

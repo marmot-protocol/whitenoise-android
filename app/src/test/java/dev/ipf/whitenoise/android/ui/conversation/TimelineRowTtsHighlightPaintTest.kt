@@ -1,12 +1,14 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.toArgb
@@ -18,7 +20,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -28,7 +29,6 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -36,8 +36,6 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudSentenceHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
@@ -75,7 +73,6 @@ class TimelineRowTtsHighlightPaintTest {
     private lateinit var appState: WhiteNoiseAppState
     private lateinit var controller: ConversationController
     private val sentenceLayouts = ConversationTtsSentenceLayoutRegistry()
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
 
     @Before
     fun setUp() {
@@ -532,50 +529,14 @@ class TimelineRowTtsHighlightPaintTest {
             "renderedHighlightRange=$highlightRange"
     }
 
-    /** Builds a row fixture. */
     @Composable
-    @Suppress("FunctionNaming", "LongMethod")
+    @Suppress("FunctionNaming")
     private fun row(
         item: TimelineMessage,
         collapseLongMessages: Boolean = false,
     ) {
-        TimelineRowMessageBubble(
-            messageIdHex = item.record.messageIdHex,
-            item = item,
-            controller = controller,
-            appState = appState,
-            composerTextState = composerTextState,
-            highlighted = false,
-            selectionMode = false,
-            textSelectionMode = false,
-            onTextSelectionModeChange = {},
-            onTextSelectionBoundsChange = {},
-            batchSelectable = false,
-            selected = false,
-            onToggleSelection = {},
-            rangeDragActive = false,
-            onDragSelectionStart = {},
-            onDragSelection = { false },
-            onDragSelectionEnd = {},
-            onDragSelectionCancel = {},
-            quickReactionEmojis = emptyList(),
-            recentEmojis = emptyList(),
-            onEmojiUsed = {},
-            isActionMenuOpen = false,
-            onActionMenuOpenChange = {},
-            onQuickReactionsSave = {},
-            onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            onBack = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
-            showSenderName = false,
-            showSenderAvatar = false,
-            collapseLongMessages = collapseLongMessages,
-            readOnly = false,
-            ttsSentenceLayoutSink = sentenceLayouts,
-            parseMarkdown = { item.record.contentTokens },
-        )
+        val fixture = remember(controller, appState) { PaintTimelineRow(controller, appState, sentenceLayouts) }
+        fixture.Render(item, collapseLongMessages)
     }
 
     private fun richRecord() =
@@ -665,47 +626,6 @@ class TimelineRowTtsHighlightPaintTest {
         messageIdHex: String,
         plaintext: String,
     ) = speakablePaintRecord(messageIdHex, plaintext, GROUP_ID, SENDER_ID)
-
-    private class FakePaintTtsSpeechEngine : TtsSpeechEngine {
-        private val spoken = mutableListOf<String>()
-        private var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
-
-        override fun setLanguage(locale: Locale): Int = TextToSpeech.LANG_AVAILABLE
-
-        override fun setSpeechRate(rate: Float) = Unit
-
-        override fun setCallbacks(
-            onStart: (String?) -> Unit,
-            onDone: (String?) -> Unit,
-            onError: (String?, Int) -> Unit,
-            onRangeStart: (String?, Int, Int, Int) -> Unit,
-            onStop: (String?, Boolean) -> Unit,
-        ) {
-            rangeCallback = onRangeStart
-        }
-
-        override fun clearCallbacks() {
-            rangeCallback = null
-        }
-
-        override fun speak(
-            text: String,
-            utteranceId: String,
-        ): Int {
-            spoken += utteranceId
-            return TextToSpeech.SUCCESS
-        }
-
-        override fun stop() = Unit
-
-        fun range(
-            index: Int,
-            start: Int,
-            end: Int,
-        ) {
-            rangeCallback?.invoke(spoken[index], start, end, 0)
-        }
-    }
 
     /** Captures the three production layout boundaries that read-aloud state must leave unchanged. */
     private data class ReadAloudBounds(

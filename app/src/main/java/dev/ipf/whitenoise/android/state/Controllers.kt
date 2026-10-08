@@ -7213,6 +7213,7 @@ class ConversationController(
                 }
             initializeReadState(account)
             publishRecoveryTimelineProjection(recoveryGeneration)
+            window.readySubscription = timelineStream
             streamIds
         }
     }
@@ -7646,6 +7647,7 @@ class ConversationController(
                 synchronized(liveSubscriptionLock) {
                     if (timelineSubscription === timelineStream) {
                         timelineSubscription = null
+                        window.readySubscription = null
                     }
                 }
                 withContext(Dispatchers.IO) {
