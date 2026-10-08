@@ -463,7 +463,7 @@ internal fun ConversationController.installWindowFrame(frame: ConversationWindow
  * Reports the message the reader settled on so replacements keep it in view; a no-op without a window.
  * Optimistic rows carry local ids MDK never issued, so only a retained authoritative row is reported.
  */
-suspend fun ConversationController.reportVisibleMessage(
+internal suspend fun ConversationController.reportVisibleMessage(
     messageIdHex: String,
     expectedSubscription: ConversationTimelineSubscriptionHandle? = window.readySubscription,
 ): Boolean =
