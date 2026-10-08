@@ -3597,7 +3597,9 @@ internal fun ConversationScreen(
                             ChatListSearchFilterAction(
                                 state = conversationSearchState,
                                 onCategory = { category ->
-                                    updateConversationSearch { GlobalSearchTransitions.openFilterCategory(it, category) }
+                                    updateConversationSearch {
+                                        GlobalSearchTransitions.openFilterCategory(it, category)
+                                    }
                                 },
                                 onClearAll = { updateConversationSearch(GlobalSearchTransitions::clearAllFilters) },
                             )

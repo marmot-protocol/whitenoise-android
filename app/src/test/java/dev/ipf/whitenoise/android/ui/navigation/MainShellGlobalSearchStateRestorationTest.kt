@@ -42,6 +42,7 @@ class MainShellGlobalSearchStateRestorationTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
+    /** Broader chat search restores its origin and independent home filters only within the same account. */
     @Test
     fun conversationSearchHandoffPreservesOriginAndIndependentHomeFilters() {
         val account = mutableStateOf("personal")

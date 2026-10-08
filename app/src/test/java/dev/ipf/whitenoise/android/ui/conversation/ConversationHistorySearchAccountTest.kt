@@ -68,6 +68,7 @@ class ConversationHistorySearchAccountTest {
             assertEquals(emptyList<String>(), readAccounts)
         }
 
+    /** Filter-only history scans advance paired cursors and intersect all constraints, excluding expiry. */
     @Test
     fun filterOnlyScanUsesPairedPagesAndIntersectsSenderDateAndContent() =
         runBlocking {
@@ -102,6 +103,7 @@ class ConversationHistorySearchAccountTest {
             assertEquals(listOf<Pair<ULong?, String?>>(null to null, 30uL to "eligible"), seen)
         }
 
+    /** A contradictory sender restriction yields no match instead of silently broadening the request. */
     @Test
     fun impossibleFilterDoesNotFallBackToUnfilteredHistory() =
         runBlocking {
@@ -117,6 +119,7 @@ class ConversationHistorySearchAccountTest {
             assertEquals(emptyList<ConversationSearchMatch>(), result)
         }
 
+    /** Conversation history keeps matches beyond the separate home preview-text scan limit. */
     @Test
     fun fullHistoryNeedleMatchesBeyondTheHomePreviewTextLimit() =
         runBlocking {

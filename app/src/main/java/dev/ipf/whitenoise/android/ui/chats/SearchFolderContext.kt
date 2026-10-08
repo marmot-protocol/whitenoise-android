@@ -17,18 +17,26 @@ internal data class SearchFolderContext(
     val resolveChatIds: (String) -> Set<String>,
 )
 
-/** All message-search entries use the existing folder membership and smart-rule projection. */
+/** Reuses existing folder rules for the entry's explicit account, including home before its controller binds. */
 @Composable
 internal fun rememberSearchFolderContext(
     appState: WhiteNoiseAppState,
     controller: ChatsController,
     titleCopy: GroupTitleCopy,
+    accountRef: String?,
 ): SearchFolderContext {
     val storeState by appState.chatFolderPreferences.state.collectAsState()
-    val account = controller.boundAccountRef
+    val account = accountRef
     val folders = remember(storeState, account) { account?.let(appState.chatFolderPreferences::foldersFor).orEmpty() }
     val resolve: (String) -> Set<String> =
-        remember(storeState, account, controller.items, controller.archivedItems, titleCopy, appState.profileRevisionForCompose) {
+        remember(
+            storeState,
+            account,
+            controller.items,
+            controller.archivedItems,
+            titleCopy,
+            appState.profileRevisionForCompose,
+        ) {
             { folderId ->
                 account
                     ?.let { owner ->
@@ -40,7 +48,7 @@ internal fun rememberSearchFolderContext(
                             manualChatIds = appState.chatFolderPreferences.membershipFor(owner, folderId),
                             excludedChatIds = appState.chatFolderPreferences.excludedChats(owner, folderId),
                             rule = rule,
-                            activeAccountIdHex = controller.boundAccountIdHex(),
+                            activeAccountIdHex = appState.accounts.firstOrNull { it.label == owner }?.accountIdHex,
                             isMuted = { it in mutedIds },
                             displayTitle = { chatListItemDisplayTitle(it, appState, titleCopy) },
                         )

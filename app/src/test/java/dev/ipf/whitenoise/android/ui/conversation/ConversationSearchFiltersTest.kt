@@ -14,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationSearchFiltersTest {
+    /** Removing or broadening the entry preset keeps the user's query, sender and date selections. */
     @Test
     fun chatPresetIsRemovableWithoutLosingTheRequest() {
         val initial = conversationSearchPreset("account", 1, "chat", "Community")
@@ -41,6 +42,7 @@ class ConversationSearchFiltersTest {
         )
     }
 
+    /** Rotation preserves all filter state, but another account, chat or runtime rejects that state. */
     @Test
     fun rotationKeepsRemovedPresetsAndAllFilterCategoriesWithinTheirOwner() {
         val state =
@@ -71,6 +73,7 @@ class ConversationSearchFiltersTest {
         }
     }
 
+    /** A blank query with active filters still exposes real scan loading, completion and failure. */
     @Test
     fun filterOnlyScansHaveRealLoadingCompletionAndFailureStates() {
         assertEquals(ConversationSearchScanStatus.LOADING, conversationSearchScanStatus("", null, false, true))

@@ -14,6 +14,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue("the viewport expires off-window return focus", "globalSearchReturnFocusExpiryEffect(" in source)
     }
 
+    /** Error presentation retries only its lookup and cannot settle or expire the results viewport. */
     @Test
     fun lookupFailureKeepsTheViewportUnmountedAndOffersRequestOnlyRetry() {
         val source = chatsScreenSource().readText()
@@ -24,9 +25,18 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue("body retry renews the lookup only", "onRetry = { bodySearchRetry++ }" in source)
         assertTrue("attachment retry renews the lookup only", "onRetry = { libraryRetry++ }" in source)
-        assertTrue("body lookup uses the cancellation-safe presenter", "rememberGlobalSearchLookup(bodySearchRequest" in source)
-        assertTrue("library lookup uses the cancellation-safe presenter", "rememberGlobalSearchLookup(libraryRequest" in source)
-        assertTrue("failed lookups cannot expire return focus as settled data", "&& bodySearchFailure == null" in source)
+        assertTrue(
+            "body lookup uses the cancellation-safe presenter",
+            "rememberGlobalSearchLookup(bodySearchRequest" in source,
+        )
+        assertTrue(
+            "library lookup uses the cancellation-safe presenter",
+            "rememberGlobalSearchLookup(libraryRequest" in source,
+        )
+        assertTrue(
+            "failed lookups cannot expire return focus as settled data",
+            "&& bodySearchFailure == null" in source,
+        )
     }
 
     /** Single selection overflow wires mark read. */

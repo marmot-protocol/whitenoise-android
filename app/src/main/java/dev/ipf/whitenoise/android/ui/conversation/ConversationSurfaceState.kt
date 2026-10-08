@@ -10,6 +10,8 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.decodeGlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.encodeGlobalSearchState
 
+private const val SAVED_SEARCH_STATE_INDEX = 6
+
 /**
  * Controller-scoped presentation shared by the shell and its conversation.
  *
@@ -58,7 +60,11 @@ internal fun conversationSurfaceStateSaver(
             ConversationSurfaceState(
                 showDetailsInitially = identityMatches && saved[5] as Boolean,
                 searchInitially =
-                    if (identityMatches && saved.size > 6) decodeGlobalSearchState(saved[6] as String) else GlobalSearchState(),
+                    if (identityMatches && saved.size > SAVED_SEARCH_STATE_INDEX) {
+                        decodeGlobalSearchState(saved[SAVED_SEARCH_STATE_INDEX] as String)
+                    } else {
+                        GlobalSearchState()
+                    },
             )
         },
     )

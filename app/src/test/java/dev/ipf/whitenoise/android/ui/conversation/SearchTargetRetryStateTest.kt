@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SearchTargetRetryStateTest {
+    /** An explicit newest jump invalidates both navigation ownership and its deferred recovery retry. */
     @Test
     fun explicitNewestJumpCancelsDeferredSearchRetry() {
         val navigation = MessageTargetNavigationOwner()

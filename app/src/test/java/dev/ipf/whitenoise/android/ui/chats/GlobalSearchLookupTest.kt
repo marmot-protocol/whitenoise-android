@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class GlobalSearchLookupTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** A failed request completes with a redacted error; a fresh Retry request can publish success. */
     @Test
     fun failedLookupOffersRetryAndFreshRequestCanSucceed() {
         val request = mutableStateOf(Any())
@@ -39,6 +40,7 @@ class GlobalSearchLookupTest {
                 }
             SideEffect { visible = result }
         }
+        advanceLookup()
         composeRule.waitUntil(TIMEOUT_MILLIS) { visible?.error != null }
         composeRule.runOnIdle {
             assertSame(request.value, visible?.request)
@@ -47,6 +49,7 @@ class GlobalSearchLookupTest {
             assertFalse(requireNotNull(visible?.error).report.contains("private query text"))
             request.value = Any()
         }
+        advanceLookup()
         composeRule.waitUntil(TIMEOUT_MILLIS) { visible?.value == "recovered" }
         composeRule.runOnIdle {
             assertEquals(2, calls.get())
@@ -55,6 +58,7 @@ class GlobalSearchLookupTest {
         }
     }
 
+    /** Even cancellation-insensitive work cannot publish over the replacement request's result. */
     @Test
     fun obsoleteNonCooperativeLookupCannotOverwriteReplacementResult() {
         val request = mutableStateOf(Any())
@@ -76,8 +80,10 @@ class GlobalSearchLookupTest {
                 }
             SideEffect { visible = result }
         }
+        advanceLookup()
         composeRule.waitUntil(TIMEOUT_MILLIS) { started.get() == 1 }
         composeRule.runOnIdle { request.value = Any() }
+        advanceLookup()
         composeRule.waitUntil(TIMEOUT_MILLIS) { visible?.value == "new-account-result" }
         finishOld.complete(Unit)
         composeRule.waitForIdle()
@@ -87,6 +93,7 @@ class GlobalSearchLookupTest {
         }
     }
 
+    /** Closing a surface drops completed results and prevents its cancelled lookup from publishing. */
     @Test
     fun disablingLookupDropsCompletedResultsAndDoesNotPublishCancelledFailure() {
         val enabled = mutableStateOf(true)
@@ -103,18 +110,21 @@ class GlobalSearchLookupTest {
                 }
             SideEffect { visible = result }
         }
+        advanceLookup()
         composeRule.waitUntil(TIMEOUT_MILLIS) { started.get() == 1 }
         composeRule.runOnIdle { enabled.value = false }
         finish.complete(Unit)
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertNull(visible) }
         composeRule.runOnIdle { enabled.value = true }
+        advanceLookup()
         composeRule.waitUntil(TIMEOUT_MILLIS) { visible?.value == "attachment" }
         composeRule.runOnIdle { enabled.value = false }
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertNull(visible) }
     }
 
+    /** An attachment read failure remains distinguishable from a successfully empty library. */
     @Test
     fun attachmentLookupFailureCompletesWithoutFabricatingAnEmptyLibrary() {
         val request = Any()
@@ -126,12 +136,20 @@ class GlobalSearchLookupTest {
                 }
             SideEffect { visible = result }
         }
+        advanceLookup()
         composeRule.waitUntil(TIMEOUT_MILLIS) { visible?.error != null }
         composeRule.runOnIdle {
             assertSame(request, visible?.request)
             assertNull(visible?.value)
             assertTrue(requireNotNull(visible?.error).retryable)
         }
+    }
+
+    /** Starts the replacement effect and advances its real debounce on Compose's virtual clock. */
+    private fun advanceLookup() {
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeBy(CHAT_LIST_SEARCH_DEBOUNCE_MS)
+        composeRule.waitForIdle()
     }
 
     private companion object {

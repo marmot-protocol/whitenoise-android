@@ -37,7 +37,10 @@ internal fun <T> rememberGlobalSearchLookup(
             runCatchingCancellable { lookup() }.fold(
                 onSuccess = { GlobalSearchLookupResult<T>(request, value = it) },
                 onFailure = {
-                    GlobalSearchLookupResult<T>(request = request, error = privacySafeErrorPresentation(operationCode, it))
+                    GlobalSearchLookupResult<T>(
+                        request = request,
+                        error = privacySafeErrorPresentation(operationCode, it),
+                    )
                 },
             )
         currentCoroutineContext().ensureActive()

@@ -86,7 +86,6 @@ import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.Nip05Resolver
 import dev.ipf.whitenoise.android.core.canonicalChatListBodyMatches
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
-import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
@@ -246,7 +245,8 @@ internal fun ChatsScreen(
     // filters exactly as before.
     var identifierResolution by remember { mutableStateOf<IdentifierResolution>(IdentifierResolution.None) }
     val folderStoreState by appState.chatFolderPreferences.state.collectAsState()
-    val searchFolderContext = rememberSearchFolderContext(appState, controller, groupTitleCopy)
+    val searchFolderContext =
+        rememberSearchFolderContext(appState, controller, groupTitleCopy, accountRef = appState.activeAccountRef)
     val accountFolders = searchFolderContext.folders
     val selectedFolder = accountFolders.firstOrNull { it.id == selectedFolderId }
     val selectedFolderRule =
@@ -518,7 +518,14 @@ internal fun ChatsScreen(
             mutableStateOf(0)
         }
     val libraryRequest =
-        remember(browsingAttachments, bodySearchKey, libraryKinds, controller, appState.runtimeGeneration, libraryRetry) {
+        remember(
+            browsingAttachments,
+            bodySearchKey,
+            libraryKinds,
+            controller,
+            appState.runtimeGeneration,
+            libraryRetry,
+        ) {
             ChatListBodySearchRequest()
         }
     val libraryResult =

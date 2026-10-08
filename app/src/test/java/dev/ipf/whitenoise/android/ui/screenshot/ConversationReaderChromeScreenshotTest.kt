@@ -84,9 +84,17 @@ class ConversationReaderChromeScreenshotTest {
     /** Large RTL search retains the real query and exposes all native navigation targets. */
     @Test fun searchLargeRtl() = captureSearch("conversation_search_header_large_rtl", largeRtl = true)
 
+    /** Shared filter controls and the removable preset remain legible with the dark palette. */
     @Test fun searchDark() = captureSearch("conversation_search_header_dark", largeRtl = false, dark = true)
 
-    @Test fun searchAmoled() = captureSearch("conversation_search_header_amoled", largeRtl = false, dark = true, amoled = true)
+    /** The same search controls preserve contrast on the AMOLED background. */
+    @Test fun searchAmoled() =
+        captureSearch(
+            "conversation_search_header_amoled",
+            largeRtl = false,
+            dark = true,
+            amoled = true,
+        )
 
     /** Selection uses the prototype title while native count remains an accessible state. */
     @Test fun selectionDark() {
@@ -174,7 +182,9 @@ class ConversationReaderChromeScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                     var query by remember { mutableStateOf("Native message") }
-                    var filters by remember { mutableStateOf(conversationSearchPreset("account", 1, "group", "Community")) }
+                    var filters by remember {
+                        mutableStateOf(conversationSearchPreset("account", 1, "group", "Community"))
+                    }
                     Surface(Modifier.fillMaxWidth().testTag("reader.chrome")) {
                         Column {
                             ConversationSearchTopBar(
@@ -190,12 +200,17 @@ class ConversationReaderChromeScreenshotTest {
                                 filterAction = {
                                     ChatListSearchFilterAction(
                                         state = filters,
-                                        onCategory = { category -> filters = GlobalSearchTransitions.openFilterCategory(filters, category) },
+                                        onCategory = { category ->
+                                            filters = GlobalSearchTransitions.openFilterCategory(filters, category)
+                                        },
                                         onClearAll = { filters = GlobalSearchTransitions.clearAllFilters(filters) },
                                     )
                                 },
                             )
-                            GlobalSearchAttachmentModes(filters, { filters = filters.copy(contentFilterSelection = it) })
+                            GlobalSearchAttachmentModes(
+                                filters,
+                                { filters = filters.copy(contentFilterSelection = it) },
+                            )
                             GlobalSearchFilterControlsRow(
                                 filters,
                                 { filters = GlobalSearchTransitions.removeFilter(filters, it) },

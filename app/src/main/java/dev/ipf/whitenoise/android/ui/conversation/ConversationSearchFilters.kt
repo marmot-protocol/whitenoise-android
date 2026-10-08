@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchFilterOptions
 import dev.ipf.whitenoise.android.ui.chats.rememberSearchFolderContext
 import dev.ipf.whitenoise.android.ui.chats.restrictToChatIds
 
+/** Seeds one removable chat filter within the conversation's actual account/runtime ownership. */
 internal fun conversationSearchPreset(
     accountRef: String?,
     runtimeGeneration: Int,
@@ -39,7 +40,10 @@ internal fun conversationSearchPreset(
 internal fun keepsConversationSearchNavigator(
     state: GlobalSearchState,
     chatId: String,
-): Boolean = state.chatFilters.map { canonicalChatListGroupId(it.stableId) }.toSet() == setOf(canonicalChatListGroupId(chatId))
+): Boolean {
+    val selectedChats = state.chatFilters.map { canonicalChatListGroupId(it.stableId) }.toSet()
+    return selectedChats == setOf(canonicalChatListGroupId(chatId))
+}
 
 internal data class ConversationSearchControls(
     val options: GlobalSearchFilterOptions,
@@ -61,13 +65,14 @@ internal fun rememberConversationSearchControls(
     val ownedController = chatsController?.takeIf { it.boundAccountRef == accountRef && accountRef != null }
     val folders =
         if (ownedController != null) {
-            rememberSearchFolderContext(appState, ownedController, titleCopy)
+            rememberSearchFolderContext(appState, ownedController, titleCopy, accountRef = accountRef)
         } else {
             SearchFolderContext(emptyList()) { emptySet() }
         }
     // A notification can open a valid conversation before the list projects it.
     val source = (ownedController?.let { it.items + it.archivedItems }.orEmpty() + chat).distinctBy { it.id }
-    val folderIds = state.folderFilters.takeIf { it.isNotEmpty() }?.flatMapTo(mutableSetOf()) { folders.resolveChatIds(it) }
+    val folderIds =
+        state.folderFilters.takeIf { it.isNotEmpty() }?.flatMapTo(mutableSetOf()) { folders.resolveChatIds(it) }
     val choices = restrictToChatIds(applyGlobalSearchChatScope(source, state.chatTypeFilters, emptySet()), folderIds)
     val scoped = globalSearchScopedChats(source, state, folderIds)
     LaunchedEffect(ownedController, state.isOpen, scoped) {

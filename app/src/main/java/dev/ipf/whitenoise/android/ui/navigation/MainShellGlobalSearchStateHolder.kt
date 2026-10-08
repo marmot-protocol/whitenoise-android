@@ -27,14 +27,23 @@ internal data class ConversationSearchReturn(
 private val ConversationSearchReturnSaver =
     listSaver<ConversationSearchReturn?, String>(
         save = { origin ->
-            origin?.let { listOf(it.groupId, encodeGlobalSearchState(it.previousSearch), it.previousFolderId.orEmpty()) }
-                ?: emptyList()
+            origin?.let {
+                listOf(
+                    it.groupId,
+                    encodeGlobalSearchState(it.previousSearch),
+                    it.previousFolderId.orEmpty(),
+                )
+            } ?: emptyList()
         },
         restore = { saved ->
             if (saved.isEmpty()) {
                 null
             } else {
-                ConversationSearchReturn(saved[0], decodeGlobalSearchState(saved[1]), saved[2].takeIf(String::isNotEmpty))
+                ConversationSearchReturn(
+                    groupId = saved[0],
+                    previousSearch = decodeGlobalSearchState(saved[1]),
+                    previousFolderId = saved[2].takeIf(String::isNotEmpty),
+                )
             }
         },
     )
