@@ -128,23 +128,48 @@ internal object AttachmentUserInitiatedDownloads {
     }
 }
 
-/** Notification contains no conversation, attachment, account, or file metadata. */
-internal fun attachmentDownloadNotification(context: Context): Notification {
+/** Creates the low-importance transfer channel, silent and badge-free, if it does not exist yet. */
+private fun ensureAttachmentDownloadChannel(context: Context) {
     val manager = context.getSystemService(NotificationManager::class.java)
     manager.createNotificationChannel(
         NotificationChannel(
             CHANNEL_ID,
             context.getString(R.string.media_downloading),
             NotificationManager.IMPORTANCE_LOW,
-        ),
+        ).apply {
+            setShowBadge(false)
+            setSound(null, null)
+            enableVibration(false)
+            enableLights(false)
+        },
     )
+}
+
+/**
+ * The notification for one transfer, which contains no conversation, attachment, account, or file metadata.
+ *
+ * It is quiet by construction. A progress update never alerts again, an indeterminate bar shows an active
+ * transfer is alive without claiming a byte count neither scheduler reports, and Android may hold back a
+ * transfer that finishes within its foreground-service grace period, so a cached or tiny file never flashes
+ * a card that vanishes at once.
+ */
+internal fun attachmentDownloadNotification(context: Context): Notification {
+    ensureAttachmentDownloadChannel(context)
     return Notification
         .Builder(context, CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_stat_whitenoise)
         .setContentTitle(context.getString(R.string.media_downloading))
         .setContentText(context.getString(R.string.media_attachment))
+        .setCategory(Notification.CATEGORY_PROGRESS)
+        .setProgress(0, 0, true)
         .setOngoing(true)
-        .build()
+        .setOnlyAlertOnce(true)
+        .setLocalOnly(true)
+        .apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
+            }
+        }.build()
 }
 
 /** Runs an explicit attachment fetch through Android's user-initiated transfer job. */
@@ -153,12 +178,14 @@ class AttachmentUserInitiatedDownloadService : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val runs = AttachmentDownloadJobRuns(scope)
 
+    /** Posts the quiet transfer card for the job, then runs its explicit download until the job finishes or stops. */
     override fun onStartJob(params: JobParameters): Boolean {
         val request = decodeAttachmentJobExtras(params.extras)
         if (request == null) {
             Log.w(TAG, "attachment_user_job_invalid_identity")
             return false
         }
+        Log.i(TAG, "attachment_user_job_started")
         setNotification(
             params,
             params.jobId,
