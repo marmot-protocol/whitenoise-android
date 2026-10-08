@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: advanced-relay-secure-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Relays"
+    direction: DOWN
+- tapOn: "Relays"
+- assertVisible:
+    id: "relays.group"
+- scrollUntilVisible:
+    element:
+      text: "Add relay"
+    direction: DOWN
+- tapOn: "Add relay"
+- assertVisible: "Relay URL"
+- tapOn: "Relay URL"
+- inputText: "wss://relay.example.com"
+- hideKeyboard
+- assertVisible:
+    id: "relay.add.submit"
+    enabled: true
+- back
+- assertNotVisible: "Relay URL"
+- assertVisible:
+    id: "relays.group"

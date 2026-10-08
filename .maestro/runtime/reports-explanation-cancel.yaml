@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reports-explanation-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible: Generated incoming fixture message
+- longPressOn:
+    text: Generated incoming fixture message
+- tapOn: Report
+- assertVisible: Report this message
+- assertVisible: "Send report"
+- scrollUntilVisible:
+    element:
+      text: "Anything the admins should know [(]optional[)]"
+    direction: DOWN
+- tapOn:
+    text: "Anything the admins should know [(]optional[)]"
+- inputText: Maestro disposable explanation
+- assertVisible: Maestro disposable explanation
+- hideKeyboard
+- back
+- assertNotVisible: Report this message
+- assertVisible: Generated incoming fixture message

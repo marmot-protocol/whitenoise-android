@@ -26,8 +26,14 @@ on:
         description: Full source commit SHA displayed by the producer Android CI run
         required: false
         type: string
+      maestro_suite:
+        description: Offline retained-APK coverage or opt-in generated-account runtime slice
+        required: false
+        type: choice
+        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-polls, runtime-folders, runtime-nested, runtime-reader, runtime-composer, runtime-developer, runtime-support, runtime-ballots, runtime-profiles, runtime-chats, runtime-chatstate, runtime-consent, runtime-keys, runtime-search, runtime-permissions, runtime-reports, runtime-acquisition, runtime-speech, runtime-speech-validation, runtime-dictation, runtime-reactions, runtime-alert-dialogs, runtime-smart-folders, runtime-account-guards, runtime-all]
+        default: onboarding
       maestro_repetitions:
-        description: Journeys in one emulator boot (1 through 20)
+        description: Suite repetitions (onboarding 1–20, offline 1–3, focused suites 1)
         required: false
         type: string
         default: '1'
@@ -36,6 +42,18 @@ on:
         required: false
         type: boolean
         default: false
+      maestro_android_api:
+        description: Android version for the manual generated-account campaign
+        required: false
+        type: choice
+        options: ['33', '34', '36', '37.0']
+        default: '34'
+      maestro_navigation_mode:
+        description: Observed system navigation and reactor Back action in the manual runtime campaign
+        required: false
+        type: choice
+        options: [button, gesture]
+        default: button
       review_demo_e2e:
         description: Run the opt-in isolated-preview real-relay demo test
         required: true
@@ -252,13 +270,16 @@ jobs:
 
   maestro-pilot:
     name: Optional Maestro onboarding pilot
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !startsWith(inputs.maestro_suite, 'runtime-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
       actions: read
     env:
+      MAESTRO_SUITE: ${{ inputs.maestro_suite }}
+      MAESTRO_ANDROID_API: ${{ inputs.maestro_android_api || '34' }}
+      MAESTRO_NAVIGATION_MODE: ${{ inputs.maestro_navigation_mode || 'button' }}
       MAESTRO_REPETITIONS: ${{ inputs.maestro_repetitions }}
       MAESTRO_NEGATIVE_CONTROL: ${{ inputs.maestro_negative_control }}
       MAESTRO_CLI_NO_ANALYTICS: 'true'
@@ -283,6 +304,10 @@ jobs:
           mkdir -p build/maestro-pilot
           printf 'setup_started_at=%s\n' "$(date +%s)" > build/maestro-pilot/timings.env
           [[ "$REVIEW_DEMO" != true && "$DOCUMENT_MATRIX" != true ]] || { echo 'Select only the Maestro pilot'; exit 2; }
+          [[ "$MAESTRO_ANDROID_API" == 34 && "$MAESTRO_NAVIGATION_MODE" == button ]] || { echo 'OS/navigation qualification requires a runtime suite'; exit 2; }
+          python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py
+          python3 scripts/maestro_suite.py validate --suite "$MAESTRO_SUITE" \
+            --repetitions "$MAESTRO_REPETITIONS" --negative "$MAESTRO_NEGATIVE_CONTROL"
           python3 scripts/maestro_apk.py fetch --artifact-id "$ARTIFACT_ID" --source "$SOURCE_SHA" \
             --repetitions "$MAESTRO_REPETITIONS" --destination build/maestro-pilot/apk
 
@@ -352,4 +377,226 @@ jobs:
             build/maestro-pilot/debug/
             build/maestro-pilot/screenshots/
           if-no-files-found: warn
+          retention-days: 7
+
+  maestro-runtime-build:
+    name: Build isolated Maestro fixture pair
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && startsWith(inputs.maestro_suite, 'runtime-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      slices: ${{ steps.selection.outputs.slices }}
+      pair_artifact: ${{ steps.fixture.outputs.pair_artifact }}
+      pair_attempt: ${{ steps.fixture.outputs.pair_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Validate explicit fixture selection
+        id: selection
+        env:
+          SELECTED: ${{ inputs.maestro_suite }}
+          REPEATS: ${{ inputs.maestro_repetitions }}
+          NEGATIVE: ${{ inputs.maestro_negative_control }}
+          DEMO: ${{ inputs.review_demo_e2e }}
+          DOCUMENTS: ${{ inputs.document_provider_matrix }}
+          ANDROID_API: ${{ inputs.maestro_android_api || '34' }}
+          NAVIGATION: ${{ inputs.maestro_navigation_mode || 'button' }}
+        run: |
+          [[ "$REPEATS" == 1 && "$NEGATIVE" == false && "$DEMO" == false && "$DOCUMENTS" == false ]] || exit 2
+          python3 scripts/maestro_environment.py validate --api "$ANDROID_API" --navigation "$NAVIGATION"
+          python3 -m scripts.maestro_runtime_selection "$SELECTED" >> "$GITHUB_OUTPUT"
+          python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_suite.py scripts/test_maestro_apk.py scripts/test_maestro_environment.py
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          # An unrelated release cache must not consume this optional pair's build budget.
+          gradle-home-cache-strict-match: true
+          cache-read-only: false
+      - name: Build app and test APK once for this source revision
+        id: fixture
+        run: |
+          ./gradlew --init-script scripts/maestro-runtime.init.gradle :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon
+          mkdir -p build/maestro-runtime-pair
+          app_apks=(app/build/outputs/apk/devZapstore/debug/*-universal-debug.apk)
+          test_apks=(app/build/outputs/apk/androidTest/devZapstore/debug/*.apk)
+          [[ ${#app_apks[@]} == 1 && ${#test_apks[@]} == 1 ]]
+          cp "${app_apks[0]}" build/maestro-runtime-pair/app.apk
+          cp "${test_apks[0]}" build/maestro-runtime-pair/test.apk
+          python3 scripts/maestro_runtime_pair.py stage build/maestro-runtime-pair
+          printf 'pair_artifact=maestro-runtime-pair-%s-%s-%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          printf 'pair_attempt=%s\n' "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.fixture.outputs.pair_artifact }}
+          path: build/maestro-runtime-pair/
+          if-no-files-found: error
+          retention-days: 7
+
+  maestro-runtime:
+    name: Maestro generated accounts (${{ matrix.slice }} ${{ matrix.partition }}/${{ matrix.partitions }})
+    needs: maestro-runtime-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include: ${{ fromJSON(needs.maestro-runtime-build.outputs.slices) }}
+    env:
+      MAESTRO_CLI_NO_ANALYTICS: 'true'
+      MAESTRO_DISABLE_UPDATE_CHECK: 'true'
+      MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
+      MAESTRO_PAIR_PRODUCER_ATTEMPT: ${{ needs.maestro-runtime-build.outputs.pair_attempt }}
+      MAESTRO_ANDROID_API: ${{ inputs.maestro_android_api || '34' }}
+      MAESTRO_NAVIGATION_MODE: ${{ inputs.maestro_navigation_mode || 'button' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ needs.maestro-runtime-build.outputs.pair_artifact }}
+          path: build/maestro-runtime-pair
+      - name: Verify the matching app and instrumentation pair
+        run: python3 scripts/maestro_runtime_pair.py verify build/maestro-runtime-pair
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Reuse the checksummed Maestro distribution
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/maestro.zip
+          key: maestro-cli-${{ runner.os }}-2.11.0-5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
+
+      - name: Install the pinned Maestro CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RUNNER_TEMP/maestro.zip" ]]; then
+            curl --fail --location --retry 2 --max-time 120 \
+              https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.11.0/maestro.zip \
+              --output "$RUNNER_TEMP/maestro.zip"
+          fi
+          echo '5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a  '"$RUNNER_TEMP/maestro.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro-cli"
+          printf '%s\n' "$RUNNER_TEMP/maestro-cli/maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Update SDK cmdline-tools for API 37
+        if: inputs.maestro_android_api == '37.0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?}}"
+          set +o pipefail
+          yes | "$sdk_root/cmdline-tools/latest/bin/sdkmanager" \
+            --install 'cmdline-tools;latest' > /dev/null
+          set -o pipefail
+          mapfile -t cmdline_tools_bins < <(
+            find "$sdk_root/cmdline-tools" \
+              -mindepth 2 -maxdepth 2 -type d -name bin \
+              -path '*/latest*/bin' -print \
+              | sort -V
+          )
+          if [[ ${#cmdline_tools_bins[@]} -eq 0 ]]; then
+            printf 'Updated Android SDK cmdline-tools were not found\n' >&2
+            exit 1
+          fi
+          cmdline_tools_bin="${cmdline_tools_bins[${#cmdline_tools_bins[@]} - 1]}"
+          "$cmdline_tools_bin/avdmanager" list device > /dev/null
+          printf '%s\n' "$cmdline_tools_bin" >> "$GITHUB_PATH"
+
+      - name: Retry Android 17 input-service readiness
+        if: inputs.maestro_android_api == '37.0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          real_adb="$sdk_root/platform-tools/adb"
+          test -x "$real_adb"
+          wrapper_dir="$RUNNER_TEMP/android17-adb-wrapper"
+          mkdir -p "$wrapper_dir"
+          ln -s "$GITHUB_WORKSPACE/scripts/android17-adb-wrapper.sh" "$wrapper_dir/adb"
+          printf 'ANDROID17_REAL_ADB=%s\n' "$real_adb" >> "$GITHUB_ENV"
+          printf '%s\n' "$wrapper_dir" >> "$GITHUB_PATH"
+
+      - name: Test Android 17 stabilization handshake
+        if: inputs.maestro_android_api == '37.0'
+        run: ./scripts/test-android17-emulator-stabilization.sh
+
+      - name: Run generated native-account UI cases
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          emulator-boot-timeout: 300
+          api-level: ${{ inputs.maestro_android_api || '34' }}
+          target: ${{ inputs.maestro_android_api == '37.0' && 'google_apis_ps16k' || 'google_apis' }}
+          arch: x86_64
+          profile: ${{ inputs.maestro_android_api == '37.0' && 'pixel_6' || '' }}
+          ram-size: ${{ inputs.maestro_android_api == '37.0' && '4096M' || '2048M' }}
+          disk-size: 8G
+          pre-emulator-launch-script: ${{ inputs.maestro_android_api == '37.0' && './scripts/stabilize-android17-emulator.sh' || 'true' }}
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none ${{ inputs.maestro_android_api == '37.0' && '-feature GLDirectMem' || '' }}
+          script: |
+            python3 scripts/maestro_environment.py configure --api "$MAESTRO_ANDROID_API" --navigation "$MAESTRO_NAVIGATION_MODE" --output build/maestro-runtime-environment.json
+            python3 scripts/maestro_apk.py locale
+            python3 scripts/maestro_apk.py offline
+            adb -s emulator-5554 install -r -t build/maestro-runtime-pair/app.apk
+            adb -s emulator-5554 install -r -t build/maestro-runtime-pair/test.apk
+            python3 scripts/maestro_runtime.py --suite "${{ matrix.slice }}" --partition "${{ matrix.partition }}" --reports "build/maestro-runtime-${{ matrix.slice }}-${{ matrix.partition }}"
+      - name: Retain runtime results, including failed or incomplete cases
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maestro-runtime-results-${{ matrix.slice }}-${{ matrix.partition }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/maestro-runtime-${{ matrix.slice }}-${{ matrix.partition }}/
+            build/maestro-runtime-pair/pair.json
+            build/maestro-runtime-environment.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  maestro-runtime-summary:
+    name: Reconcile every selected Maestro runtime case
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && startsWith(inputs.maestro_suite, 'runtime-')
+    needs: [maestro-runtime-build, maestro-runtime]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MAESTRO_ANDROID_API: ${{ inputs.maestro_android_api || '34' }}
+      MAESTRO_NAVIGATION_MODE: ${{ inputs.maestro_navigation_mode || 'button' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Collect selected runtime shard evidence
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: maestro-runtime-results-*-${{ github.run_id }}-*
+          path: build/maestro-campaign-shards
+      - name: Reconcile UI and native evidence for every selected case
+        run: >-
+          python3 scripts/maestro_runtime_summary.py
+          --artifacts build/maestro-campaign-shards
+          --suite "${{ inputs.maestro_suite }}"
+          --output build/maestro-campaign-summary.json
+      - name: Retain the complete campaign verdict
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maestro-campaign-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/maestro-campaign-summary.json
+          if-no-files-found: error
           retention-days: 7

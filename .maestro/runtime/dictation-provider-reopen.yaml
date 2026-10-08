@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: dictation-provider-reopen
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Dictation
+    direction: DOWN
+- tapOn: Dictation
+- assertVisible:
+    id: dictation.preferences.group
+- tapOn: Speech provider
+- assertVisible:
+    text: "Choose a provider for future dictation[.].*"
+- assertVisible: Automatic
+- back
+- tapOn: Speech provider
+- assertVisible:
+    text: "Choose a provider for future dictation[.].*"
+- assertVisible: Automatic
+- back
+- assertVisible:
+    id: dictation.preferences.group

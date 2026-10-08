@@ -1,0 +1,29 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: advanced-custom-emoji
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: DOWN
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Custom emoji"
+    direction: DOWN
+- tapOn: "Custom emoji"
+- assertVisible:
+    id: "custom-emoji-content"
+- assertVisible:
+    id: "custom_emoji.add"
+- back
+- assertVisible: "Appearance"
+- scrollUntilVisible:
+    element:
+      id: "appearance.custom_emoji.group"
+    direction: DOWN
+- assertVisible:
+    id: "appearance.custom_emoji.group"

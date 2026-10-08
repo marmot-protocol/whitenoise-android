@@ -1,0 +1,33 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: alerts-person-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Maestro group
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      text: Maestro Bob
+    direction: DOWN
+- tapOn: Maestro Bob
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Notifications
+    direction: DOWN
+- tapOn:
+    text: Notifications
+- assertVisible:
+    text: Use defaults
+- assertVisible:
+    text: Mute notifications from this person
+- back
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Maestro Bob
+    direction: UP
+- assertVisible: Maestro Bob

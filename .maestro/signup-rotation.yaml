@@ -1,0 +1,65 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signup-rotation
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+# Back closes this known optional sheet and records declined sharing choices.
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign Up"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.name"
+    direction: DOWN
+- tapOn:
+    id: "onboarding.sign_up.name"
+- eraseText
+- inputText: "Maestro Offline Draft"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
+    direction: DOWN
+- tapOn:
+    id: "onboarding.sign_up.about"
+- inputText: "Synthetic offline test only"
+- hideKeyboard
+- setOrientation: LANDSCAPE_LEFT
+- scrollUntilVisible:
+    element:
+      text: "Maestro Offline Draft"
+    direction: UP
+- assertVisible: "Maestro Offline Draft"
+- scrollUntilVisible:
+    element:
+      text: "Synthetic offline test only"
+    direction: DOWN
+- assertVisible: "Synthetic offline test only"
+- assertVisible:
+    id: "onboarding.sign_up.action"
+    enabled: true
+- setOrientation: PORTRAIT
+- scrollUntilVisible:
+    element:
+      text: "Maestro Offline Draft"
+    direction: UP
+- assertVisible: "Maestro Offline Draft"
+- scrollUntilVisible:
+    element:
+      text: "Synthetic offline test only"
+    direction: DOWN
+- assertVisible: "Synthetic offline test only"
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- takeScreenshot: signup-rotation

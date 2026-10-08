@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Only the disposable image's external launcher; never dismiss a test-app crash or ANR.
+- runFlow:
+    when:
+      visible: "Pixel Launcher isn't responding"
+    commands:
+    - tapOn: "Close app"

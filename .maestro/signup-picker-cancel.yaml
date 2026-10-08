@@ -1,0 +1,32 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signup-picker-cancel
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign Up"
+- tapOn:
+    id: "onboarding.sign_up.photo"
+- assertVisible: "Choose photos"
+- tapOn: "Choose photos"
+- back
+- assertVisible:
+    id: "onboarding.sign_up.photo"
+- assertVisible: "Add Photo"
+- assertVisible:
+    id: "onboarding.sign_up.action"
+    enabled: true
+- tapOn: "Back"
+- assertVisible: "Sign In"
+- takeScreenshot: signup-picker-cancel

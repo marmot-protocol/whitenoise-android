@@ -1,0 +1,51 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-private-account-isolation
+---
+- runFlow: ../fixtures/save-external-private-details.yaml
+- back
+- assertVisible:
+    id: chat_info.list
+- back
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- back
+- assertVisible: Chats
+- tapOn: "Switch Profile, Maestro Alice"
+- assertVisible: Switch Profile
+- tapOn: Maestro Bob
+- assertVisible: "Switch Profile, Maestro Bob"
+- runFlow: ../fixtures/open-external-private-details.yaml
+- scrollUntilVisible:
+    element:
+      text: Name \(from profile\).*Maestro Dave
+    direction: UP
+- assertVisible: Name \(from profile\).*Maestro Dave
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: DOWN
+- assertVisible: Name
+- assertNotVisible: Maestro private Dave
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- assertVisible: Notes
+- assertNotVisible: Maestro private note
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel
+- back
+- assertVisible:
+    id: chat_info.list
+- back
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- back
+- assertVisible: Chats
+- tapOn: "Switch Profile, Maestro Bob"
+- assertVisible: Switch Profile
+- tapOn: Maestro Alice
+- assertVisible: "Switch Profile, Maestro Alice"
+- assertVisible: Maestro group

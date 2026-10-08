@@ -1,0 +1,33 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: developer-unlock
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Help"
+    direction: DOWN
+- tapOn: "Help"
+- tapOn:
+    id: "help.about"
+- assertVisible:
+    id: "about.app"
+- repeat:
+    times: 7
+    commands:
+      - tapOn:
+          id: "about.version"
+- scrollUntilVisible:
+    element:
+      id: "about.developer"
+    direction: DOWN
+- tapOn:
+    id: "about.developer"
+- assertVisible:
+    id: "developer.warning"
+- back
+- assertVisible: "Settings"
+- assertNotVisible:
+    id: "developer.warning"

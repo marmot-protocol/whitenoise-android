@@ -1,0 +1,32 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: speech-custom-maximum-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Read Aloud
+    direction: DOWN
+- tapOn: Read Aloud
+- assertVisible:
+    id: speech.engine.group
+- tapOn: Speech rate
+- runFlow: ../fixtures/scroll-speech-custom.yaml
+- tapOn: Custom
+- assertVisible:
+    id: speech.custom_rate
+- tapOn:
+    id: speech.custom_rate
+- eraseText: 100
+- inputText: '10.0'
+- hideKeyboard
+- assertVisible:
+    id: speech.custom_rate
+    text: 10\.0
+- tapOn: Cancel
+- assertNotVisible:
+    id: speech.custom_rate
+- assertVisible:
+    id: speech.engine.group

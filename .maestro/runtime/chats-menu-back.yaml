@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: chats-menu-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- longPressOn:
+    text: "Maestro group"
+- assertVisible: "Pin"
+- back
+- assertVisible: "Chats"
+- assertVisible: "Maestro group"

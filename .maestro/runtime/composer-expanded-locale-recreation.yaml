@@ -1,0 +1,60 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: composer-expanded-locale-recreation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Message
+- inputText: Maestro expanded draft
+- swipe:
+    from:
+      id: composer-resize-gesture
+    direction: UP
+    duration: 1000
+- assertNotVisible: Generated fixture message
+- assertVisible:
+    id: composer-pill-surface
+- assertVisible: Maestro expanded draft
+- hideKeyboard
+- back
+- assertVisible: "Draft: Maestro expanded draft"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Appearance
+    direction: DOWN
+- tapOn: Appearance
+- scrollUntilVisible:
+    element:
+      text: Language
+    direction: DOWN
+- tapOn: Language
+- scrollUntilVisible:
+    element:
+      text: Deutsch
+    direction: DOWN
+- tapOn: Deutsch
+- assertVisible: Sprache
+- scrollUntilVisible:
+    element:
+      text: English
+    direction: UP
+- tapOn: English
+- assertVisible: Language
+- tapOn: System default
+- assertVisible: Language
+- back
+- assertVisible: Appearance
+- back
+- assertVisible: Settings
+- back
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible:
+    id: composer-pill-surface
+- assertNotVisible:
+    id: chats.scope.chats
+- assertNotVisible: Generated fixture message
+- assertVisible: Maestro expanded draft

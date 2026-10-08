@@ -1,0 +1,34 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: polls-custom-zero
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Add attachment"
+- scrollUntilVisible:
+    element:
+      text: "Create poll"
+    direction: DOWN
+- tapOn: "Create poll"
+- assertVisible: "Question"
+- scrollUntilVisible:
+    element:
+      text: "Custom time"
+    direction: DOWN
+- tapOn: "Custom time"
+- scrollUntilVisible:
+    element:
+      text: "Duration"
+    direction: DOWN
+- tapOn: "Duration"
+- inputText: "0"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Enter a whole number from 1 second to 30 days."
+    direction: DOWN
+- assertVisible: "Enter a whole number from 1 second to 30 days."
+- tapOn: "Cancel"
+- assertNotVisible: "Post poll"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

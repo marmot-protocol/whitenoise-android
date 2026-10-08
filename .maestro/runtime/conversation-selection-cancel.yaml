@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: conversation-selection-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- longPressOn:
+    text: "Generated fixture message"
+- back
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

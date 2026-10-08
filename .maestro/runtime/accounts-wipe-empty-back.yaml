@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: accounts-wipe-empty-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-wipe-confirm.yaml
+- assertVisible:
+    id: "profile_keys.wipe_confirm"
+    enabled: false
+- back
+- assertNotVisible: "Wipe this account[?]"
+- assertNotVisible: "What gets destroyed"
+- assertVisible: "Private key hidden"
+- back
+- assertVisible: "Settings"
+- back
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
