@@ -5,8 +5,8 @@ name: conversation-selection-cancel
 # The instrumentation host owns launch, reset and disposal.
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - longPressOn:
     text: "Generated fixture message"
 - back
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

@@ -5,10 +5,10 @@ name: conversation-landscape
 # The instrumentation host owns launch, reset and disposal.
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - setOrientation: LANDSCAPE_LEFT
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - setOrientation: PORTRAIT
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - back
 - assertVisible: "Maestro group"

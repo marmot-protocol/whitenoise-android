@@ -4,7 +4,7 @@ name: composer-expanded-rotation
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn: "Message"
 - inputText: "Maestro expanded draft"
 - swipe:
@@ -25,4 +25,4 @@ name: composer-expanded-rotation
       id: "composer-resize-gesture"
     direction: DOWN
     duration: 1000
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

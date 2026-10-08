@@ -1820,6 +1820,26 @@
       ],
       "assertions": "The typed confirmation remains enabled through handled orientation changes; Cancel leaves all original native accounts and histories intact.",
       "postcondition": "accounts-retained"
+    },
+    "reactions-details-keyboard-back": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005",
+        "CON-005"
+      ],
+      "assertions": "Dismiss the genuine reactor sheet with a typed composer and stay in the conversation; native postconditions require both original reactions, the exact retained draft, automatic composer mode and actual activity IME visibility. Gesture cancellation and physical keyboard behavior remain separate.",
+      "postcondition": "reactions-draft-retained",
+      "fixture": "reactions"
+    },
+    "reactions-details-keyboard-reopen": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005",
+        "CON-005"
+      ],
+      "assertions": "Dismiss the genuine reactor sheet with a typed composer and reopen it on All; native postconditions require both original reactions, the exact retained draft, automatic composer mode and actual activity IME visibility. Gesture cancellation and physical keyboard behavior remain separate.",
+      "postcondition": "reactions-draft-retained",
+      "fixture": "reactions"
     }
   }
 }

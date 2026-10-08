@@ -1,20 +1,17 @@
 appId: dev.ipf.whitenoise.android.maestrolab
-name: reactions-details-rotation
+name: reactions-details-keyboard-reopen
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: Maestro group
 - tapOn: Maestro group
 - runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Message
+- inputText: Maestro expanded draft
 - tapOn:
     id: conversation.reaction.pill:0
 - assertVisible: All · 2
 - assertVisible: You
 - assertVisible: Maestro Bob
-- setOrientation: LANDSCAPE_LEFT
-- assertVisible: All · 2
-- setOrientation: PORTRAIT
-- assertVisible: Maestro Bob
-- assertVisible: You
 - back
 - assertNotVisible: All · 2
 - assertVisible:
@@ -23,4 +20,16 @@ name: reactions-details-rotation
     id: conversation.reaction.pill:0
 - assertNotVisible:
     id: chats.scope.chats
-- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible: Maestro expanded draft
+- tapOn:
+    id: conversation.reaction.pill:0
+- assertVisible: All · 2
+- assertVisible: You
+- assertVisible: Maestro Bob
+- back
+- assertNotVisible: All · 2
+- assertVisible:
+    id: composer-pill-surface
+- assertNotVisible:
+    id: chats.scope.chats
+- assertVisible: Maestro expanded draft

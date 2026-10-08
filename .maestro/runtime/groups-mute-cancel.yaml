@@ -4,7 +4,7 @@ name: groups-mute-cancel
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn: "Maestro group"
 - assertVisible:
     id: "chat_info.list"

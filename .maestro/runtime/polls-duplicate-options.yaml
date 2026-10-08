@@ -4,7 +4,7 @@ name: polls-duplicate-options
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn: "Add attachment"
 - scrollUntilVisible:
     element:
@@ -25,4 +25,4 @@ name: polls-duplicate-options
 - assertVisible: "Each option must be different."
 - tapOn: "Cancel"
 - assertNotVisible: "Post poll"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

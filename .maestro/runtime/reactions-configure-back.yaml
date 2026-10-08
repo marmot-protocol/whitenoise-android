@@ -4,7 +4,7 @@ name: reactions-configure-back
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: Maestro group
 - tapOn: Maestro group
-- assertVisible: Generated fixture message
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - longPressOn:
     text: Generated fixture message
 - tapOn: Open emoji picker
@@ -14,4 +14,4 @@ name: reactions-configure-back
 - assertVisible: Tap an emoji to replace it\.
 - back
 - assertNotVisible: Tap an emoji to replace it\.
-- assertVisible: Generated fixture message
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

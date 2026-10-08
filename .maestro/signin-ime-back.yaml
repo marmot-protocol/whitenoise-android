@@ -20,7 +20,7 @@ name: signin-ime-back
 - inputText: "not-a-key"
 - back
 - assertVisible: "Private key"
-- hideKeyboard
+- assertVisible: "not-a-key"
 - tapOn:
     id: "onboarding.sign_in.action"
 - assertVisible: "That doesn't look like a valid nsec or npub key."

@@ -4,7 +4,7 @@ name: composer-expand-collapse
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn: "Message"
 - inputText: "Maestro expanded draft"
 - swipe:
@@ -21,7 +21,7 @@ name: composer-expand-collapse
       id: "composer-resize-gesture"
     direction: DOWN
     duration: 1000
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - assertVisible:
     id: "composer-resize-gesture"
 - assertVisible: "Maestro expanded draft"

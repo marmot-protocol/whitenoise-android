@@ -4,13 +4,13 @@ name: acquisition-gallery-cancel
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: Maestro group
 - tapOn: Maestro group
-- assertVisible: Generated fixture message
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn: Add attachment
 - assertVisible:
     text: "Camera"
 - tapOn: Photos and videos
 - assertVisible: Albums
 - back
-- assertVisible: Generated fixture message
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - assertNotVisible:
     text: "Camera"

@@ -5,7 +5,7 @@ name: conversation-draft-return
 # The instrumentation host owns launch, reset and disposal.
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn: "Message"
 - inputText: "Maestro unsent draft"
 - hideKeyboard

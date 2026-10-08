@@ -9,25 +9,29 @@ import kotlinx.coroutines.withTimeout
 /** Cancelled account actions must preserve the original native identities, session and both histories. */
 internal suspend fun verifyMaestroAccountsRetained(
     native: Marmot,
-    state: WhiteNoiseAppState,
-    baseline: MaestroMessageBaseline,
+    state: WhiteNoiseAppState?,
+    baseline: MaestroMessageBaseline?,
     expectedAccountIds: Set<String>,
+    postcondition: String?,
 ) {
+    if (postcondition != "accounts-retained") return
+    val app = checkNotNull(state)
+    val originalMessage = checkNotNull(baseline)
     withTimeout(15_000L) {
         check(expectedAccountIds.size == 3)
         withContext(Dispatchers.Main.immediate) {
-            check(state.activeAccountRef == baseline.account)
-            check(!state.signOutInProgress)
-            check(!state.wipeInProgress)
-            check(state.accounts.map { it.accountIdHex }.toSet() == expectedAccountIds)
+            check(app.activeAccountRef == originalMessage.account)
+            check(!app.signOutInProgress)
+            check(!app.wipeInProgress)
+            check(app.accounts.map { it.accountIdHex }.toSet() == expectedAccountIds)
         }
         check(native.listAccounts().map { it.accountIdHex }.toSet() == expectedAccountIds)
-        for (account in listOf(baseline.account, baseline.peer)) {
-            checkNotNull(native.presentedChatListRow(account, baseline.group)) {
+        for (account in listOf(originalMessage.account, originalMessage.peer)) {
+            checkNotNull(native.presentedChatListRow(account, originalMessage.group)) {
                 "Cancelled account action removed its original conversation"
             }
-            val original = readMaestroMessages(native, account, baseline.group).singleOrNull {
-                it.messageIdHex == baseline.messageId
+            val original = readMaestroMessages(native, account, originalMessage.group).singleOrNull {
+                it.messageIdHex == originalMessage.messageId
             }
             checkNotNull(original) { "Cancelled account action removed the original message" }
             check(!original.deleted)

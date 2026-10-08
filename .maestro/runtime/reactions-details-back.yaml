@@ -4,7 +4,7 @@ name: reactions-details-back
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: Maestro group
 - tapOn: Maestro group
-- assertVisible: Generated fixture message
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn:
     id: conversation.reaction.pill:0
 - assertVisible: All · 2
@@ -18,4 +18,4 @@ name: reactions-details-back
     id: conversation.reaction.pill:0
 - assertNotVisible:
     id: chats.scope.chats
-- assertVisible: Generated fixture message
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

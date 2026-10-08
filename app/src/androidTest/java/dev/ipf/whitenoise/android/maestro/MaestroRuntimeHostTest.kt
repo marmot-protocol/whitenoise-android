@@ -36,6 +36,7 @@ private val MAESTRO_POSTCONDITIONS =
         "message-delete-local",
         "message-delete-everyone",
         "reactions-retained",
+        "reactions-draft-retained",
         "composer-expanded",
         "composer-automatic",
         "dark",
@@ -191,14 +192,14 @@ class MaestroRuntimeHostTest {
                     while (!File(directory, "finish").exists()) delay(100L)
                 }
                 verifyNativeState(native, state, checkNotNull(peerLabel), checkNotNull(groupId), messageBaseline)
-                if (InstrumentationRegistry.getArguments().getString("postcondition") == "accounts-retained") {
-                    verifyMaestroAccountsRetained(
-                        native,
-                        checkNotNull(state),
-                        checkNotNull(messageBaseline),
-                        expectedAccountIds,
-                    )
-                }
+                val postcondition = InstrumentationRegistry.getArguments().getString("postcondition")
+                verifyMaestroAccountsRetained(native, state, messageBaseline, expectedAccountIds, postcondition)
+                verifyMaestroReactionKeyboard(
+                    checkNotNull(state),
+                    checkNotNull(groupId),
+                    checkNotNull(activity),
+                    postcondition,
+                )
                 File(directory, "verified.json").writeText(
                     JSONObject().put("generation", generation).put("verified", true).toString(),
                 )
@@ -252,7 +253,7 @@ class MaestroRuntimeHostTest {
             "light", "dark", "amoled", "font-large", "language-system" ->
                 verifyMaestroPreferences(checkNotNull(state), postcondition)
             "send" -> verifyMaestroSend(native, checkNotNull(state), peerLabel, group)
-            "reactions-retained" ->
+            "reactions-retained", "reactions-draft-retained" ->
                 verifyMaestroReactions(native, checkNotNull(state?.activeAccountRef), peerLabel, group)
             "composer-expanded", "composer-automatic" ->
                 verifyMaestroComposer(checkNotNull(state), group, postcondition)

@@ -4,7 +4,7 @@ name: groups-details-return
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn: "Maestro group"
 - assertVisible:
     id: "chat_info.list"
@@ -17,4 +17,4 @@ name: groups-details-return
     direction: DOWN
 - assertVisible: "Maestro group"
 - back
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

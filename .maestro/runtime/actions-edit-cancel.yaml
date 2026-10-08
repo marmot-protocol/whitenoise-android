@@ -4,7 +4,7 @@ name: actions-edit-cancel
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - longPressOn:
     text: "Generated fixture message"
 - tapOn: "Edit"
@@ -14,4 +14,4 @@ name: actions-edit-cancel
     id: "conversation.composer.edit.cancel"
 - assertNotVisible:
     id: "conversation.composer.edit.cancel"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

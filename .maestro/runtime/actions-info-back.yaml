@@ -4,7 +4,7 @@ name: actions-info-back
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - longPressOn:
     text: "Generated fixture message"
 - tapOn: "Info"
@@ -12,4 +12,4 @@ name: actions-info-back
 - assertVisible: "Message ID"
 - back
 - assertNotVisible: "Message Details"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

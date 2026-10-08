@@ -4,7 +4,7 @@ name: reactions-configure-slot-cancel
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: Maestro group
 - tapOn: Maestro group
-- assertVisible: Generated fixture message
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - longPressOn:
     text: Generated fixture message
 - tapOn: Open emoji picker
@@ -18,4 +18,4 @@ name: reactions-configure-slot-cancel
 - back
 - assertNotVisible: "Search emoji"
 - assertNotVisible: Tap an emoji to replace it\.
-- assertVisible: Generated fixture message
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

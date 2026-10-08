@@ -4,11 +4,11 @@ name: conversation-emoji-cancel
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
 - tapOn: "Open emoji picker"
 - assertVisible:
     id: "emoji.picker.grid"
 - back
 - assertNotVisible:
     id: "emoji.picker.grid"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
