@@ -27,16 +27,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
-/** Disposed composer callbacks cannot act on a recovery panel from another account or conversation. */
-internal class ConversationDictationPanelBinding {
-    var active = true
-        private set
-
-    fun dispose() {
-        active = false
-    }
-}
-
 /** Dictate remains useful while the single capture owner holds unresolved audio or native closure. */
 @Composable
 internal fun rememberComposerDictationAction(

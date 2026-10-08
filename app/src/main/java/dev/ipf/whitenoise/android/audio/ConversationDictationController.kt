@@ -1696,8 +1696,7 @@ internal class ConversationDictationController internal constructor(
             releaseDurableSessionLease()
         }
         if (recoveryHandedToComposer) (state as? ConversationDictationState.Failed)?.let(::handRecoveryToComposer)
-        expireRetainedRecoveryIfDue()
-        if (recoveryProtectionExpired && !foregroundMicrophoneRequired) releaseDurableSessionLease()
+        releaseExpiredRecoveryProtection()
         reattachForegroundRecoveryAfterClosure()
     }
 
@@ -3433,6 +3432,12 @@ internal class ConversationDictationController internal constructor(
         notificationActionGeneration += 1L
         if (!foregroundMicrophoneRequired) releaseDurableSessionLease()
         onRecoveryExpired()
+    }
+
+    /** Native closure releases an expired lease even when its timeout already ran during teardown. */
+    private fun releaseExpiredRecoveryProtection() {
+        expireRetainedRecoveryIfDue()
+        if (recoveryProtectionExpired && !foregroundMicrophoneRequired) releaseDurableSessionLease()
     }
 
     /** Delivery, explicit dismissal and expiry end the logical foreground lease. */

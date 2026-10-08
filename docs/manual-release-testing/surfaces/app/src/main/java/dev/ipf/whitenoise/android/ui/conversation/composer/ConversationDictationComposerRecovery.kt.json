@@ -155,16 +155,6 @@
           "DIC-002"
         ]
       }
-    ],
-    "source_coverage": [
-      {
-        "surface": "Disposed composer recovery callback fence",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "class ConversationDictationPanelBinding",
-        "test_ids": [
-          "DIC-002"
-        ]
-      }
     ]
   }
 }
