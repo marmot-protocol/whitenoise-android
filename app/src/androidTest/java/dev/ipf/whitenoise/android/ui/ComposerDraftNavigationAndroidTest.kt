@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
@@ -93,16 +94,7 @@ class ComposerDraftNavigationAndroidTest {
         composeRule.waitForIdle()
         composeRule.mainClock.autoAdvance = false
         try {
-            field.performTouchInput {
-                down(Offset(center.x, height - 8f))
-                moveTo(Offset(center.x, height / 2f), delayMillis = 16)
-                moveTo(Offset(center.x, 4f), delayMillis = 16)
-                up()
-            }
-            val releaseScroll = scroll()
-            composeRule.mainClock.advanceTimeByFrame()
-            composeRule.waitForIdle()
-            assertTrue("fixture must have active momentum", scroll() > releaseScroll)
+            startReadingFling(field)
             composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed().performClick()
             composeRule.mainClock.advanceTimeByFrame()
             composeRule.waitForIdle()
@@ -118,6 +110,24 @@ class ComposerDraftNavigationAndroidTest {
         } finally {
             composeRule.mainClock.autoAdvance = true
         }
+    }
+
+    /** Allows queued frame startup, then proves movement with the finger released before testing cancellation. */
+    private fun startReadingFling(field: SemanticsNodeInteraction) {
+        field.performTouchInput {
+            down(Offset(center.x, height - 8f))
+            moveTo(Offset(center.x, height / 2f), delayMillis = 16)
+            moveTo(Offset(center.x, 4f), delayMillis = 16)
+            up()
+        }
+        repeat(FLING_STARTUP_FRAMES) {
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+        }
+        val beforeMomentum = scroll()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        assertTrue("fixture must have active momentum after frame startup", scroll() > beforeMomentum)
     }
 
     /** Owns no account, draft store or send transport; only real platform geometry and the production composer. */
@@ -184,13 +194,15 @@ class ComposerDraftNavigationAndroidTest {
             val insets = ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
             val bottom = insets?.getInsets(WindowInsetsCompat.Type.ime())?.bottom ?: return@runOnUiThread false
             insets.isVisible(WindowInsetsCompat.Type.ime()) == show &&
-                (if (show) bottom > 0 else bottom == 0) && !imeAnimationRunning
+                (if (show) bottom > 0 else bottom == 0) &&
+                !imeAnimationRunning
         }
 
     /** Reads the actual platform inset rather than substituting a test-only available-height change. */
     private fun imeVisible(): Boolean =
         composeRule.runOnUiThread {
-            ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView)
+            ViewCompat
+                .getRootWindowInsets(composeRule.activity.window.decorView)
                 ?.isVisible(WindowInsetsCompat.Type.ime()) == true
         }
 
@@ -207,12 +219,16 @@ class ComposerDraftNavigationAndroidTest {
 
     /** Uses the production editor's exported scroll owner to distinguish a live fling from a final-idle result. */
     private fun scroll(): Float =
-        composeRule.onNode(hasSetTextAction()).fetchSemanticsNode()
-            .config[SemanticsProperties.VerticalScrollAxisRange].value()
+        composeRule
+            .onNode(hasSetTextAction())
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+            .value()
 
     private companion object {
         const val KEYBOARD_TIMEOUT_MS = 10_000L
         const val FLING_OBSERVATION_MS = 1000L
+        const val FLING_STARTUP_FRAMES = 3
         val longDraft = (1..80).joinToString("\n") { "Synthetic device draft line $it" } + "\na"
     }
 }
