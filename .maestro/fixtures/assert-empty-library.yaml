@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- assertVisible:
+    id: global.library
+- assertVisible: No files or media found
+- assertNotVisible:
+    id: global.library.loading
+- assertNotVisible:
+    id: global.library.results

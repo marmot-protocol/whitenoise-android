@@ -116,6 +116,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and read_json(leaf / 'verified.json').get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')
+                if (CASES[name]['postcondition'] == 'global-library-empty'
+                        and read_json(leaf / 'verified.json').get('globalLibraryVerified') is not True):
+                    raise ValueError('Actual empty native attachment timelines were not verified')
                 if (CASES[name]['postcondition'].startswith('public-key-copy-')
                         and read_json(leaf / 'verified.json').get('publicKeyCopyVerified') is not True):
                     raise ValueError('Actual public-key clipboard and cleanup were not verified')

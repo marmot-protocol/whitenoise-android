@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- back
+- assertNotVisible:
+    id: global.library
+- assertNotVisible:
+    id: chats.searchField
+- assertVisible: Maestro group

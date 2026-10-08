@@ -24,7 +24,7 @@ internal suspend fun verifyMaestroPublicKeyCopy(
     val expected =
         withContext(Dispatchers.IO) {
             val account = native.listAccounts().single { it.label == target }
-            native.npub(account.accountIdHex)
+            checkNotNull(native.npub(account.accountIdHex)) { "Original SDK public identity is unavailable" }
         }
     check(expected.matches(Regex("npub1[023456789acdefghjklmnpqrstuvwxyz]{58}")))
     return withTimeout(5_000L) {

@@ -69,6 +69,7 @@ private val MAESTRO_POSTCONDITIONS =
         "accounts-retained",
         "public-key-copy-owner",
         "public-key-copy-peer",
+        "global-library-empty",
         "account-action-signed-out",
         "account-action-wiped",
         "contact-private-saved",
@@ -309,6 +310,7 @@ class MaestroRuntimeHostTest {
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
                         .put("publicKeyCopyVerified", publicKeyCopyVerified)
+                        .put("globalLibraryVerified", verifyMaestroEmptyLibrary(native, messageBaseline, postcondition))
                         .put("credentialEvidence", appLockVerification.credentialJsonValue)
                         .put("appLockVerified", appLockVerification.verified)
                         .put(

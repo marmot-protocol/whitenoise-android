@@ -3181,6 +3181,74 @@
       ],
       "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden, switch to Bob and copy his public key before returning to Alice. Native proof requires the exact original SDK Bob npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
       "postcondition": "public-key-copy-peer"
+    },
+    "search-library-empty-all": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Select the actual ANY_ATTACHMENT attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-photos": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Select the actual IMAGES_VIDEO attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-files": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Select the actual FILES_DOCUMENTS attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-audio": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Select the actual VOICE_AUDIO attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-rotation": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008",
+        "NAV-009"
+      ],
+      "assertions": "The actual empty attachment browser and selected all-attachment mode survive handled landscape and portrait, then Android Back restores the original chat list. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-warm-resume": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008",
+        "NAV-010"
+      ],
+      "assertions": "The actual empty attachment browser and selected all-attachment mode survive same-process Home/foreground return; Back restores the original chat list. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-query-clear": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-004",
+        "FIND-008"
+      ],
+      "assertions": "Enter and clear a nonexistent query in the actual photo/video library; both states explicitly remain empty and Back restores the original generated chat list. This empty fixture does not qualify populated-result restoration. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-account-switch": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008",
+        "ACC-017"
+      ],
+      "assertions": "Open the actual empty library for Alice, Carol and restored Alice through real profile switching; Carol remains chatless and returning Alice retains the generated group. This empty fixture does not qualify cross-account populated caches or pending searches. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
     }
   }
 }

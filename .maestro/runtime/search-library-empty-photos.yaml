@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-library-empty-photos
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow:
+    file: ../fixtures/open-empty-library.yaml
+    env:
+      LIBRARY_KIND: IMAGES_VIDEO
+- runFlow:
+    file: ../fixtures/select-library-mode.yaml
+    env:
+      LIBRARY_KIND: Messages
+      LIBRARY_DIRECTION: RIGHT
+- assertNotVisible:
+    id: global.library
+- assertVisible: Maestro group
+- back
+- assertVisible: Maestro group

@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-library-empty-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow:
+    file: ../fixtures/open-empty-library.yaml
+    env:
+      LIBRARY_KIND: ANY_ATTACHMENT
+- setOrientation: LANDSCAPE_LEFT
+- runFlow: ../fixtures/assert-empty-library.yaml
+- setOrientation: PORTRAIT
+- runFlow: ../fixtures/assert-empty-library.yaml
+- assertVisible:
+    id: global.library.mode.ANY_ATTACHMENT
+    selected: true
+- runFlow: ../fixtures/return-from-empty-library.yaml

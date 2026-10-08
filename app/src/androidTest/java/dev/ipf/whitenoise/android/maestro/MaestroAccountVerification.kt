@@ -8,7 +8,7 @@ import kotlinx.coroutines.withTimeout
 
 /** Account cancellation, scanner/lock checks and public-key copy must retain original identities and histories. */
 internal fun requiresMaestroAccountRetentionProof(postcondition: String?): Boolean =
-    postcondition in setOf("accounts-retained", "camera-denied", "app-lock-unavailable") ||
+    postcondition in setOf("accounts-retained", "camera-denied", "app-lock-unavailable", "global-library-empty") ||
         postcondition?.startsWith("app-lock-credential-") == true ||
         postcondition?.startsWith("public-key-copy-") == true
 

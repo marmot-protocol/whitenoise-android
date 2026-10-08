@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- tapOn: Search chats
+- hideKeyboard
+- runFlow:
+    file: select-library-mode.yaml
+    env:
+      LIBRARY_KIND: ${LIBRARY_KIND}
+      LIBRARY_DIRECTION: LEFT
+- runFlow: assert-empty-library.yaml

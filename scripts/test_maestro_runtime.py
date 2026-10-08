@@ -327,6 +327,25 @@ class CampaignSummaryTest(unittest.TestCase):
                     if proof is not True:
                         self.assertIn('public-key clipboard', result['results'][0]['failure'])
 
+    def test_empty_library_needs_typed_native_timeline_proof(self):
+        """Empty visible UI must fail qualification if the actual SDK attachment proof is absent."""
+        for proof in (None, False, 1, 'true', True):
+            with self.subTest(proof=proof), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                leaves, _ = self.prepare(root)
+                name = runtime.case_selection('navigation', 1)[0]
+                path = leaves[0] / 'verified.json'
+                row = json.loads(path.read_text())
+                if proof is not None:
+                    row['globalLibraryVerified'] = proof
+                path.write_text(json.dumps(row))
+                with patch.dict(runtime.CASES, {name: {**runtime.CASES[name],
+                                                      'postcondition': 'global-library-empty'}}):
+                    result = self.result(root)
+                self.assertEqual(result['evidence_complete'], proof is True)
+                if proof is not True:
+                    self.assertIn('empty native attachment timelines', result['results'][0]['failure'])
+
     def test_app_lock_needs_typed_real_credential_state_before_and_after_ui(self):
         """Final OS state cannot certify a fake prerequisite or replace its native postcondition."""
         for phase, field in (('ready', 'appLockFixtureNoCredential'), ('verified', 'appLockVerified')):
@@ -705,10 +724,25 @@ class RuntimeEvidenceTest(unittest.TestCase):
             path.write_text('@Composable fun <T> ColumnScope.GenericDialog(value: T) {}\n'
                             '// @Composable fun PhantomScreen() {}\n'
                             'val example = "@Composable fun QuotedSheet() {}"\n'
+                            '@Composable fun AttachmentBrowser() {}\n'
+                            '// @Composable fun PhantomBrowser() {}\n'
+                            'val browser = "@Composable fun QuotedBrowser() {}"\n'
+                            'fun FormatBrowser() {}\n'
                             'fun FormatDialog() {}\n')
             screens = screen_catalog(root, {'ui': [{'source': source, 'test_ids': ['INT-001']}]}, {})
-            self.assertEqual([screen['symbol'] for screen in screens], ['ColumnScope.GenericDialog'])
+            self.assertEqual([screen['symbol'] for screen in screens],
+                             ['AttachmentBrowser', 'ColumnScope.GenericDialog'])
             self.assertEqual(len(screens[0]['edge_plan']), len(EDGE_DIMENSIONS))
+
+    def test_actual_attachment_browser_has_its_own_unexecuted_edge_plan(self):
+        """A real full-area browser must not disappear from the screen audit due to its suffix."""
+        screens = inventory()['screen_catalog']
+        rows = [row for row in screens if row['symbol'] == 'GlobalAttachmentBrowser']
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]['source'].endswith('ui/chats/GlobalAttachmentBrowser.kt'))
+        self.assertEqual(len(rows[0]['edge_plan']), len(EDGE_DIMENSIONS))
+        self.assertFalse(rows[0]['execution_verified'])
+        self.assertTrue(all(edge['status'] == 'unexecuted' for edge in rows[0]['edge_plan']))
 
     def test_dialogs_outside_ui_package_require_the_same_maintained_edge_plan(self):
         """Speech/platform dialogs cannot disappear because their owner is outside the UI directory."""
@@ -1144,6 +1178,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
             ('account-action-wiped', 'accountActionVerified', 'verified', 'account action'),
             ('public-key-copy-owner', 'publicKeyCopyVerified', 'verified', 'public-key clipboard'),
             ('public-key-copy-peer', 'publicKeyCopyVerified', 'verified', 'public-key clipboard'),
+            ('global-library-empty', 'globalLibraryVerified', 'verified', 'empty native attachment timelines'),
             ('app-lock-unavailable', 'appLockFixtureNoCredential', 'ready', 'app-lock prerequisite'),
             ('app-lock-unavailable', 'appLockVerified', 'verified', 'app-lock state'),
         )
@@ -1349,6 +1384,47 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn('- tapOn: Copy public key', helper)
         self.assertIn('- assertVisible: Public key copied', helper)
         self.assertIn('- assertVisible: Private key hidden', helper)
+
+    def test_empty_library_flows_select_real_modes_and_preserve_native_owner(self):
+        """Empty results, partial-screen chips and lifecycle routes need explicit, bounded UI assertions."""
+        root = runtime.ROOT / '.maestro'
+        cases = {name: case for name, case in runtime.CASES.items() if name.startswith('search-library-empty-')}
+        self.assertEqual(len(cases), 8)
+        kinds = set()
+        for name, case in cases.items():
+            self.assertEqual(case['postcondition'], 'global-library-empty')
+            self.assertEqual(case['suite'], 'search')
+            self.assertIn('FIND-008', case['manual_ids'])
+            commands = list(yaml.safe_load_all((root / 'runtime' / f'{name}.yaml').read_text()))[1]
+            for command in commands:
+                flow = command.get('runFlow') if isinstance(command, dict) else None
+                if isinstance(flow, dict) and flow.get('file') == '../fixtures/open-empty-library.yaml':
+                    kinds.add(flow['env']['LIBRARY_KIND'])
+        self.assertEqual(kinds, {'ANY_ATTACHMENT', 'IMAGES_VIDEO', 'FILES_DOCUMENTS', 'VOICE_AUDIO'})
+        helper = list(yaml.safe_load_all((root / 'fixtures/select-library-mode.yaml').read_text()))[1]
+        repeat = helper[1]['repeat']
+        self.assertEqual(repeat['times'], 6)
+        swipe = repeat['commands'][0]['runFlow']['commands'][0]['swipe']
+        self.assertEqual(swipe['from'], {'id': 'global.library.modes'})
+        self.assertNotIn('start', swipe)
+        self.assertNotIn('end', swipe)
+        self.assertIs(helper[-1]['assertVisible']['selected'], True)
+        empty = list(yaml.safe_load_all((root / 'fixtures/assert-empty-library.yaml').read_text()))[1]
+        self.assertIn({'assertVisible': 'No files or media found'}, empty)
+        self.assertIn({'assertNotVisible': {'id': 'global.library.results'}}, empty)
+        self.assertIn({'assertNotVisible': {'id': 'global.library.loading'}}, empty)
+        rotation = (root / 'runtime/search-library-empty-rotation.yaml').read_text()
+        self.assertIn('LANDSCAPE_LEFT', rotation)
+        self.assertIn('PORTRAIT', rotation)
+        warm = (root / 'runtime/search-library-empty-warm-resume.yaml').read_text()
+        self.assertIn('runtime-warm-resume.yaml', warm)
+        switch = (root / 'runtime/search-library-empty-account-switch.yaml').read_text()
+        self.assertLess(switch.index('- tapOn: Maestro Carol'), switch.index('- tapOn: Maestro Alice'))
+        self.assertIn('- assertVisible: No Chats', switch)
+        self.assertIn('- assertNotVisible: Maestro group', switch)
+        query = (root / 'runtime/search-library-empty-query-clear.yaml').read_text()
+        self.assertIn('- inputText: Maestro absent attachment 934867', query)
+        self.assertIn('- eraseText', query)
 
     def test_settings_entry_uses_real_multi_identity_selector(self):
         """Regress the hosted tree where the avatar says Switch Profile rather than Open settings."""
