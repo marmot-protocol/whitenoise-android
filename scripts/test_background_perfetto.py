@@ -39,7 +39,7 @@ if sys.stdin.read() != "duration_ms: 5000\\n":
             if alias_log == "same":
                 log = trace
             elif alias_log == "dot":
-                log = Path(str(folder) + "/./trace")
+                log = trace
             elif alias_log == "symlink_parent":
                 parent = folder / "parent_alias"
                 parent.symlink_to(folder, target_is_directory=True)
@@ -51,8 +51,9 @@ if sys.stdin.read() != "duration_ms: 5000\\n":
             env = os.environ | {"PATH": str(folder) + os.pathsep + os.environ["PATH"],
                                 "DESCRIPTOR_STATE": str(state)}
             command = ". " + shlex.quote(str(root / "scripts/background_perfetto.sh"))
+            log_argument = str(folder) + "/./trace" if alias_log == "dot" else str(log)
             command += "; background_perfetto_start " + " ".join(
-                shlex.quote(str(value)) for value in (config, trace, log)
+                shlex.quote(str(value)) for value in (config, trace, log_argument)
             )
             result = subprocess.run(["bash", "-c", command], env=env,
                                     capture_output=True, text=True)
