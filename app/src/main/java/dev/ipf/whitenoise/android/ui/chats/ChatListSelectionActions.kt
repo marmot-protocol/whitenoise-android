@@ -33,23 +33,27 @@ internal fun chatListBackHandlerEnabled(
     selectionMode: Boolean,
     searchOpen: Boolean,
     filterSheetOpen: Boolean = false,
-): Boolean = selectionMode || searchOpen || filterSheetOpen
+    folderSelected: Boolean = false,
+): Boolean = selectionMode || searchOpen || filterSheetOpen || folderSelected
 
 internal enum class ChatListBackDismissal {
     ClearSelection,
     DismissFilterSheet,
     CloseSearch,
+    ClearFolder,
 }
 
 /** Back dismisses selection first, then an open filter picker, then search. */
 internal fun chatListBackDismissal(
     selectionMode: Boolean,
     searchState: GlobalSearchState,
+    folderSelected: Boolean = false,
 ): ChatListBackDismissal? =
     when {
         selectionMode -> ChatListBackDismissal.ClearSelection
         searchState.filterSheetOpen -> ChatListBackDismissal.DismissFilterSheet
         searchState.isOpen -> ChatListBackDismissal.CloseSearch
+        folderSelected -> ChatListBackDismissal.ClearFolder
         else -> null
     }
 

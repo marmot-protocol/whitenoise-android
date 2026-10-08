@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="folder_all_chats">Toutes les discussions</string>
+    <string name="folder_exclude_chat">Exclure de ce dossier</string>
+    <string name="folder_sort_title">Trier les discussions par</string>
+    <string name="folder_sort_recent">Activité la plus récente</string>
+    <string name="folder_sort_name">Nom A–Z</string>
+    <string name="folder_sort_unread">Non lues en premier</string>
+    <string name="folder_sort_hint">Les invitations et les discussions épinglées restent en tête. Les discussions épinglées gardent leur ordre manuel.</string>
+    <string name="folder_all_active">Inclure toutes les discussions actives</string>
+</resources>

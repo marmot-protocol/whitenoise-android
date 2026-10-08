@@ -52,8 +52,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
                 "recompute(scheduleBackgroundEnrichment = false)",
                 startIndex = seededCatchUp,
             )
-        // MarmotKit 0.10.0 windows consume their initial replacement inside ChatListWindowSet.open().
-        val firstSnapshot = body.indexOf("ChatListWindowSet.open(")
+        // Both bounded and complete folder sources consume their initial replacement before returning.
+        val firstSnapshot = body.indexOf("liveSubscriptions.openFolderSource(")
         val localRowsReady = body.indexOf("recordAccountSwitchLocalRowsReady", startIndex = firstSnapshot)
         val secondSnapshot = body.indexOf("chatStream.snapshot()")
         val memberProjection = body.indexOf("seedInitialMemberIdProjection(accountRef, bindEpoch)")

@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatFolderSort
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -35,6 +36,27 @@ class ChatFolderEditContentTest {
     val composeRule = createComposeRule()
 
     private val app = ApplicationProvider.getApplicationContext<Context>()
+
+    /** Every sort mode is reachable and the default Chats all-active rule remains editable. */
+    @Test fun sortingAndAllActiveControlsRouteEdits() {
+        val selected = mutableListOf<ChatFolderSort>()
+        var includeAll = true
+        render(
+            editState("Chats").copy(includeAll = true),
+            onSort = { selected += it },
+            onIncludeAll = { includeAll = it },
+        )
+        ChatFolderSort.entries.forEach { sort ->
+            composeRule
+                .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+                .performScrollToNode(hasTestTag("folder.sort.${sort.name}"))
+            composeRule.onNodeWithTag("folder.sort.${sort.name}").performClick()
+        }
+        assertEquals(ChatFolderSort.entries, selected)
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.includeAll"))
+        composeRule.onNodeWithTag("folder.includeAll").assertIsOn().performClick()
+        assertEquals(false, includeAll)
+    }
 
     /** Save is disabled while the name is blank. */
     @Test
@@ -191,6 +213,8 @@ class ChatFolderEditContentTest {
         onSave: () -> Unit = {},
         onDelete: () -> Unit = {},
         onBack: () -> Unit = {},
+        onSort: (ChatFolderSort) -> Unit = {},
+        onIncludeAll: (Boolean) -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -210,6 +234,8 @@ class ChatFolderEditContentTest {
                         onSave = onSave,
                         onDelete = onDelete,
                         onBack = onBack,
+                        onSortChange = onSort,
+                        onIncludeAllChange = onIncludeAll,
                     )
                 }
             }

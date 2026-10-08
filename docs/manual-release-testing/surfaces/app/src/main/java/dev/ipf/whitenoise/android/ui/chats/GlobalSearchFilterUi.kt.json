@@ -183,6 +183,14 @@
           "FIND-008",
           "FIND-012"
         ]
+      },
+      {
+        "surface": "R.string.chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "FLD-001"
+        ]
       }
     ],
     "source_coverage": [

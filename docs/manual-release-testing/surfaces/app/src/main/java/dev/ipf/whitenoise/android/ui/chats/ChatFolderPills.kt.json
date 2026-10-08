@@ -1,0 +1,92 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+  "legacy_sha256": "96849224836d026a3b17f922dfd1529ab3ef2a3e9d5f91029798c5599ec00ad6",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "FolderPillLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "fun FolderPillLabel(",
+        "test_ids": [
+          "FLD-001",
+          "SYS-004"
+        ]
+      },
+      {
+        "surface": "ChatFolderPill",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "fun ChatFolderPill(",
+        "test_ids": [
+          "FLD-001"
+        ]
+      },
+      {
+        "surface": "ChatFolderPills",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "fun ChatFolderPills(",
+        "test_ids": [
+          "FLD-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "R.string.archived",
+        "test_ids": [
+          "FLD-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_filter_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "R.string.chat_list_filter_groups",
+        "test_ids": [
+          "FLD-001"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_filter_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "R.string.chat_list_filter_unread",
+        "test_ids": [
+          "FLD-001"
+        ]
+      },
+      {
+        "surface": "R.string.chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "FLD-001"
+        ]
+      },
+      {
+        "surface": "R.string.edit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "R.string.edit",
+        "test_ids": [
+          "FLD-001"
+        ]
+      },
+      {
+        "surface": "R.string.manage_folders",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "R.string.manage_folders",
+        "test_ids": [
+          "FLD-001"
+        ]
+      },
+      {
+        "surface": "R.string.folder_all_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "R.string.folder_all_chats",
+        "test_ids": [
+          "FLD-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

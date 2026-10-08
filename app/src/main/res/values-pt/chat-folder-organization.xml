@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="folder_all_chats">Todas as conversas</string>
+    <string name="folder_exclude_chat">Excluir desta pasta</string>
+    <string name="folder_sort_title">Ordenar conversas por</string>
+    <string name="folder_sort_recent">Atividade mais recente</string>
+    <string name="folder_sort_name">Nome A–Z</string>
+    <string name="folder_sort_unread">Não lidas primeiro</string>
+    <string name="folder_sort_hint">Os convites e as conversas fixadas ficam no início. As conversas fixadas mantêm a ordem manual.</string>
+    <string name="folder_all_active">Incluir todas as conversas ativas</string>
+</resources>

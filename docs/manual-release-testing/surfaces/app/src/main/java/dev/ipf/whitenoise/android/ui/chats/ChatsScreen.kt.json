@@ -42,7 +42,9 @@
           "CHL-018",
           "CHL-021",
           "FIND-012",
-          "FIND-013"
+          "FIND-013",
+          "FLD-007",
+          "FLD-002"
         ]
       }
     ],
@@ -68,7 +70,9 @@
         "surface": "Removed search target notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.toast_original_message_unavailable",
-        "test_ids": ["FIND-013"]
+        "test_ids": [
+          "FIND-013"
+        ]
       },
       {
         "surface": "string:you",

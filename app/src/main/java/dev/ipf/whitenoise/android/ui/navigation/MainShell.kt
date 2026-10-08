@@ -714,6 +714,16 @@ internal fun MainShell(
     }
     val settingsDetail = settingsDetailName?.let { runCatching { SettingsDetail.valueOf(it) }.getOrNull() }
 
+    val folderState by appState.chatFolderPreferences.state.collectAsState()
+    val completeChatList =
+        folderState[chatListBindAccountRef]
+            ?.folders
+            ?.firstOrNull { it.id == selectedChatListFolderId }
+            ?.sort
+            ?.let { it != dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT } == true
+
+    SideEffect { chatsController.folderSource.complete.value = completeChatList }
+
     LaunchedEffect(
         chatsController,
         chatListBindAccountRef,

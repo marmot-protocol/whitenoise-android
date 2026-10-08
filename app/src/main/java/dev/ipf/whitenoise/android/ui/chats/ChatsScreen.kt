@@ -208,7 +208,8 @@ internal fun ChatsScreen(
     val openNewMessageFlow = { showNewChatFlow = true }
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
-    val actionMenuOwner = remember(appState.activeAccountRef, appState.runtimeGeneration) { ChatContextMenuOwner() }
+    val actionMenuOwner =
+        remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId) { ChatContextMenuOwner() }
     DisposableEffect(actionMenuOwner) {
         onDispose { actionMenuOwner.dispose() }
     }
@@ -288,6 +289,7 @@ internal fun ChatsScreen(
                         chatFolderChatIds(
                             items = sourceItems,
                             manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId),
+                            excludedChatIds = appState.chatFolderPreferences.excludedChats(accountRef, folderId),
                             rule = rule,
                             activeAccountIdHex = appState.activeAccount?.accountIdHex,
                             isMuted = { groupIdHex ->
@@ -366,14 +368,16 @@ internal fun ChatsScreen(
                 selectionMode,
                 searchOpen,
                 globalSearchPresentationState.filterSheetOpen,
+                selectedFolderId != null,
             ),
     ) {
-        when (chatListBackDismissal(selectionMode, globalSearchPresentationState)) {
+        when (chatListBackDismissal(selectionMode, globalSearchPresentationState, selectedFolderId != null)) {
             ChatListBackDismissal.ClearSelection -> clearSelection()
             ChatListBackDismissal.DismissFilterSheet ->
                 onGlobalSearchStateChange(GlobalSearchTransitions::dismissFilterSheet)
             ChatListBackDismissal.CloseSearch ->
                 onGlobalSearchStateChange(GlobalSearchTransitions::closeSearch)
+            ChatListBackDismissal.ClearFolder -> onSelectFolder(null)
             null -> Unit
         }
     }
@@ -686,7 +690,19 @@ internal fun ChatsScreen(
                 throw throwable
             }
         }
-    val visibleItems = remember(searchSections) { searchSections.orderedItems() }
+    val visibleItems =
+        remember(searchSections, selectedFolder, searchActive, appState.profileRevisionForCompose) {
+            val rows = searchSections.orderedItems()
+            if (searchActive) {
+                rows
+            } else {
+                sortFolderChats(
+                    rows,
+                    selectedFolder?.sort ?: dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT,
+                    appState.activeAccount?.accountIdHex,
+                ) { chatListItemDisplayTitle(it, appState, groupTitleCopy) }
+            }
+        }
 
     fun visibleRowId(item: ChatListItem): String =
         if (searchActive) {
@@ -722,7 +738,12 @@ internal fun ChatsScreen(
                 )
             }
         }
-    val ordinaryActiveList = !advancedFolder && !showArchived && !searchActive
+    val ordinaryActiveList =
+        !advancedFolder &&
+            !showArchived &&
+            !searchActive &&
+            (selectedFolder?.sort ?: dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT) ==
+            dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT
     var nextHeadDemotionTransactionId by remember { mutableLongStateOf(0L) }
     var pendingHeadDemotion by
         remember(
@@ -1246,6 +1267,12 @@ internal fun ChatsScreen(
                     appState.activeAccountRef?.let { appState.chatFolderPreferences.folderRule(it, folderId) }
                 },
                 membershipOf = resolveFolderChatIds,
+                excludedOf = { id ->
+                    appState.activeAccountRef
+                        ?.let {
+                            appState.chatFolderPreferences.excludedChats(it, id)
+                        }.orEmpty()
+                },
                 pendingFolderIds = pendingFolderIds,
                 selectedFolderId = selectedFolderId,
             )
@@ -1539,6 +1566,19 @@ internal fun ChatsScreen(
                             onMarkRead = { markChatRead(item, unread = false) },
                             onMarkUnread = { markChatRead(item, unread = true) },
                             onAddToFolder = { openFolderPicker(listOf(item)) },
+                            onExcludeFromFolder =
+                                selectedFolder?.let { folder ->
+                                    {
+                                        // The menu admits the action before dismissing its token.
+                                        if (menuActionsCurrent() && menuAccount != null) {
+                                            appState.chatFolderPreferences.excludeChat(
+                                                menuAccount,
+                                                folder.id,
+                                                item.group.groupIdHex,
+                                            )
+                                        }
+                                    }
+                                },
                             onArchiveToggle = { archiveChats(listOf(item), archive = !item.group.archived) },
                             onMuteToggle = { toggleChatMute(item, muted) },
                             onPinToggle = { toggleChatPin(item) },

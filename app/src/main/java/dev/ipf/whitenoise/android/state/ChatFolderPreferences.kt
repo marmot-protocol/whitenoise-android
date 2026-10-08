@@ -9,8 +9,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-/** The three pre-folder filter chips, seeded as default folders. */
-enum class SystemFolderKind { UNREAD, ARCHIVED, GROUPS }
+/** Standard chat views, seeded as editable default folders. */
+enum class SystemFolderKind { CHATS, UNREAD, ARCHIVED, GROUPS }
+
+enum class ChatFolderSort { RECENT, NAME, UNREAD }
 
 /**
  * [systemKind] marks a folder seeded from a default template. It carries no
@@ -25,6 +27,7 @@ data class ChatFolder(
     val order: Int,
     val systemKind: SystemFolderKind?,
     val showWhenEmpty: Boolean = false,
+    val sort: ChatFolderSort = ChatFolderSort.RECENT,
 )
 
 /**
@@ -45,6 +48,7 @@ data class ChatFolderRule(
     val pinnedOnly: Boolean = false,
     /** Versioned prototype payload. Preserve unsupported versions verbatim rather than opening the rule. */
     val smartFilter: String? = null,
+    val includeAll: Boolean = false,
 )
 
 /** One account's folder state: ordered folders, manual memberships, rules. */
@@ -52,6 +56,7 @@ data class ChatFolderAccountState(
     val folders: List<ChatFolder> = emptyList(),
     val membership: Map<String, Set<String>> = emptyMap(),
     val rules: Map<String, ChatFolderRule> = emptyMap(),
+    val exclusions: Map<String, Set<String>> = emptyMap(),
 )
 
 /**
@@ -125,6 +130,7 @@ class ChatFolderPreferences(
         manualChatIds: Set<String>,
         rule: ChatFolderRule?,
         showWhenEmpty: Boolean? = null,
+        sort: ChatFolderSort? = null,
     ): ChatFolder? {
         val account = normalizedAccount(accountRef)
         val trimmedName = name?.trim()
@@ -136,11 +142,13 @@ class ChatFolderPreferences(
             val existing = folderId?.let { id -> current.folders.firstOrNull { it.id == id } }
             if (folderId != null && existing == null) return@synchronized null
             val visibleWhenEmpty = folderDraftVisibility(showWhenEmpty, existing)
+            val folderSort = folderDraftSort(sort, existing)
             val folder =
                 existing?.copy(
                     name = trimmedName ?: existing.name,
                     description = description.trim(),
                     showWhenEmpty = visibleWhenEmpty,
+                    sort = folderSort,
                 ) ?: ChatFolder(
                     id = UUID.randomUUID().toString(),
                     name = requireNotNull(trimmedName),
@@ -148,6 +156,7 @@ class ChatFolderPreferences(
                     order = (current.folders.maxOfOrNull { it.order } ?: -1) + 1,
                     systemKind = null,
                     showWhenEmpty = visibleWhenEmpty,
+                    sort = folderSort,
                 )
             persistFolderDraft(account, current, folder, existing == null, manualChatIds, rule)
             folder
@@ -158,6 +167,11 @@ class ChatFolderPreferences(
         requested: Boolean?,
         existing: ChatFolder?,
     ): Boolean = requested ?: existing?.showWhenEmpty ?: false
+
+    private fun folderDraftSort(
+        requested: ChatFolderSort?,
+        existing: ChatFolder?,
+    ): ChatFolderSort = requested ?: existing?.sort ?: ChatFolderSort.RECENT
 
     /**
      * Persist the entire draft atomically before publishing its single observable projection; caller holds
@@ -172,7 +186,7 @@ class ChatFolderPreferences(
         manualChatIds: Set<String>,
         rule: ChatFolderRule?,
     ) {
-        val chats = manualChatIds.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+        val chats = manualChatIds.map { it.trim().lowercase(java.util.Locale.ROOT) }.filter { it.isNotEmpty() }.toSet()
         val folders =
             if (isNew) {
                 current.folders + folder
@@ -181,13 +195,21 @@ class ChatFolderPreferences(
                     if (it.id == folder.id) folder else it
                 }
             }
+        val deliberatelyAdded = chats - current.membership[folder.id].orEmpty()
+        val remainingExclusions = current.exclusions[folder.id].orEmpty() - deliberatelyAdded
         val updated =
             current.copy(
                 folders = folders.sortedBy { it.order },
+                exclusions = current.exclusions + (folder.id to remainingExclusions),
                 membership = current.membership + (folder.id to chats),
                 rules = if (rule == null) current.rules - folder.id else current.rules + (folder.id to rule),
             )
         val edit = preferences.edit()
+        if (remainingExclusions.isEmpty()) {
+            edit.remove(exclusionKey(account, folder.id))
+        } else {
+            edit.putStringSet(exclusionKey(account, folder.id), remainingExclusions)
+        }
         edit.putString(foldersKey(account), folderListJson(updated.folders))
         if (chats.isEmpty()) {
             edit.remove(membershipKey(account, folder.id))
@@ -234,6 +256,7 @@ class ChatFolderPreferences(
                 .edit()
                 .remove(ruleKey(account, folderId))
                 .remove(membershipKey(account, folderId))
+                .remove(exclusionKey(account, folderId))
                 .apply()
             persistFolders(
                 account,
@@ -241,6 +264,7 @@ class ChatFolderPreferences(
                     folders = current.folders.filterNot { it.id == folderId },
                     membership = current.membership - folderId,
                     rules = current.rules - folderId,
+                    exclusions = current.exclusions - folderId,
                 ),
             )
             true
@@ -275,15 +299,56 @@ class ChatFolderPreferences(
         included: Boolean,
     ): Boolean {
         val account = normalizedAccount(accountRef)
-        val chat = chatId.trim().lowercase().takeIf { it.isNotEmpty() }
+        val chat = chatId.trim().lowercase(java.util.Locale.ROOT).takeIf { it.isNotEmpty() }
         if (account == null || chat == null) return false
         return synchronized(mutationLock) {
             val current = loadAccount(account)
             if (current.folders.none { it.id == folderId }) return@synchronized false
             val chats = current.membership[folderId].orEmpty()
             val updated = if (included) chats + chat else chats - chat
-            if (updated == chats) return@synchronized false
-            persistFolders(account, current.copy(membership = current.membership + (folderId to updated)))
+            val excluded = current.exclusions[folderId].orEmpty()
+            val remaining = if (included) excluded - chat else excluded
+            if (updated == chats && remaining == excluded) return@synchronized false
+            persistFolders(
+                account,
+                current.copy(
+                    membership = current.membership + (folderId to updated),
+                    exclusions = current.exclusions + (folderId to remaining),
+                ),
+            )
+            true
+        }
+    }
+
+    /** Exact conversation overrides are UI organization, never protocol membership. */
+    fun excludedChats(
+        accountRef: String,
+        folderId: String,
+    ): Set<String> {
+        val account = normalizedAccount(accountRef) ?: return emptySet()
+        return synchronized(mutationLock) { loadAccount(account).exclusions[folderId].orEmpty() }
+    }
+
+    fun excludeChat(
+        accountRef: String,
+        folderId: String,
+        chatId: String,
+    ): Boolean {
+        val account = normalizedAccount(accountRef)
+        val chat = chatId.trim().lowercase(java.util.Locale.ROOT)
+        if (account == null || chat.isEmpty()) return false
+        return synchronized(mutationLock) {
+            val current = _state.value[account] ?: return@synchronized false
+            if (current.folders.none { it.id == folderId }) return@synchronized false
+            val excluded = current.exclusions[folderId].orEmpty()
+            if (chat in excluded) return@synchronized false
+            persistFolders(
+                account,
+                current.copy(
+                    exclusions = current.exclusions + (folderId to (excluded + chat)),
+                    membership = current.membership + (folderId to (current.membership[folderId].orEmpty() - chat)),
+                ),
+            )
             true
         }
     }
@@ -393,6 +458,7 @@ class ChatFolderPreferences(
         val folders =
             (storedFolders?.let(::parseFolders) ?: seedDefaults(account))
                 .also { migrateSeededRules(account, it) }
+                .let { migrateChatsFolder(account, it) }
         val membership =
             folders.associate { folder ->
                 folder.id to
@@ -405,7 +471,12 @@ class ChatFolderPreferences(
             folders
                 .mapNotNull { folder -> readRule(account, folder.id)?.let { folder.id to it } }
                 .toMap()
-        val loaded = ChatFolderAccountState(folders = folders, membership = membership, rules = rules)
+        val exclusions =
+            folders.associate { folder ->
+                folder.id to preferences.getStringSet(exclusionKey(account, folder.id), emptySet()).orEmpty().toSet()
+            }
+        val loaded =
+            ChatFolderAccountState(folders = folders, membership = membership, rules = rules, exclusions = exclusions)
         _state.value = _state.value + (account to loaded)
         return loaded
     }
@@ -432,14 +503,36 @@ class ChatFolderPreferences(
         account: String,
         folders: List<ChatFolder>,
     ) {
-        if (preferences.getInt(versionKey(account), 1) >= STORE_VERSION) return
+        if (preferences.getInt(versionKey(account), 1) >= RULE_STORE_VERSION) return
         val edit = preferences.edit()
         folders
             .filter { it.systemKind != null && !preferences.contains(ruleKey(account, it.id)) }
             .forEach { folder ->
                 edit.putString(ruleKey(account, folder.id), ruleJson(defaultRuleFor(folder.systemKind!!)).toString())
             }
+        edit.putInt(versionKey(account), RULE_STORE_VERSION).apply()
+    }
+
+    private fun migrateChatsFolder(
+        account: String,
+        folders: List<ChatFolder>,
+    ): List<ChatFolder> {
+        if (preferences.getInt(versionKey(account), 1) >= STORE_VERSION) return folders
+        val updated =
+            if (folders.any { it.id == SYSTEM_FOLDER_CHATS_ID }) {
+                folders
+            } else {
+                listOf(systemFolders().first()) + folders.mapIndexed { index, folder -> folder.copy(order = index + 1) }
+            }
+        val edit = preferences.edit().putString(foldersKey(account), folderListJson(updated))
+        if (folders.none { it.id == SYSTEM_FOLDER_CHATS_ID }) {
+            edit.putString(
+                ruleKey(account, SYSTEM_FOLDER_CHATS_ID),
+                ruleJson(defaultRuleFor(SystemFolderKind.CHATS)).toString(),
+            )
+        }
         edit.putInt(versionKey(account), STORE_VERSION).apply()
+        return updated
     }
 
     private fun readRule(
@@ -460,6 +553,7 @@ class ChatFolderPreferences(
                 directChatsOnly = json.optBoolean(RULE_DIRECT_CHATS_ONLY, false),
                 pinnedOnly = json.optBoolean(RULE_PINNED_ONLY, false),
                 smartFilter = if (json.has("smartFilter")) json.getString("smartFilter") else null,
+                includeAll = json.optBoolean("includeAll", false),
             )
         }.getOrNull()
     }
@@ -475,6 +569,7 @@ class ChatFolderPreferences(
                 .put(RULE_UNREAD_MENTIONS_ONLY, rule.unreadMentionsOnly)
                 .put(RULE_DIRECT_CHATS_ONLY, rule.directChatsOnly)
                 .put(RULE_PINNED_ONLY, rule.pinnedOnly)
+                .put("includeAll", rule.includeAll)
         rule.smartFilter?.let { json.put("smartFilter", it) }
         rule.keyword?.takeIf { it.isNotBlank() }?.let { json.put(RULE_KEYWORD, it.trim()) }
         return json
@@ -492,6 +587,13 @@ class ChatFolderPreferences(
                 edit.remove(membershipKey(account, folderId))
             } else {
                 edit.putStringSet(membershipKey(account, folderId), chats)
+            }
+        }
+        normalized.exclusions.forEach { (folderId, chats) ->
+            if (chats.isEmpty()) {
+                edit.remove(exclusionKey(account, folderId))
+            } else {
+                edit.putStringSet(exclusionKey(account, folderId), chats)
             }
         }
         edit.apply()
@@ -518,7 +620,8 @@ class ChatFolderPreferences(
                             .put(FIELD_DESCRIPTION, folder.description)
                             .put(FIELD_SHOW_WHEN_EMPTY, folder.showWhenEmpty)
                             .put(FIELD_ORDER, folder.order)
-                            .put(FIELD_SYSTEM_KIND, folder.systemKind?.name),
+                            .put(FIELD_SYSTEM_KIND, folder.systemKind?.name)
+                            .put("sort", folder.sort.name),
                     )
                 }
             }.toString()
@@ -544,6 +647,9 @@ class ChatFolderPreferences(
                     order = json.optInt(FIELD_ORDER, 0),
                     systemKind = kind,
                     showWhenEmpty = json.optBoolean(FIELD_SHOW_WHEN_EMPTY, false),
+                    sort =
+                        ChatFolderSort.entries.firstOrNull { it.name == json.optString("sort") }
+                            ?: ChatFolderSort.RECENT,
                 )
             }
         }.getOrNull()
@@ -571,19 +677,23 @@ class ChatFolderPreferences(
 
         // Bumped when defaults became first-class folders carrying real rules,
         // so the rule backfill for older accounts runs exactly once.
-        private const val STORE_VERSION = 2
+        private const val RULE_STORE_VERSION = 2
+        private const val STORE_VERSION = 3
+        private const val DEFAULT_GROUPS_ORDER = 3
 
         // Stable ids so the chip row and future deep links can reference the
         // absorbed system folders without a per-account lookup.
+        const val SYSTEM_FOLDER_CHATS_ID = "system:chats"
         const val SYSTEM_FOLDER_UNREAD_ID = "system:unread"
         const val SYSTEM_FOLDER_ARCHIVED_ID = "system:archived"
         const val SYSTEM_FOLDER_GROUPS_ID = "system:groups"
 
         internal fun systemFolders(): List<ChatFolder> =
             listOf(
-                systemFolder(SYSTEM_FOLDER_UNREAD_ID, 0, SystemFolderKind.UNREAD),
-                systemFolder(SYSTEM_FOLDER_ARCHIVED_ID, 1, SystemFolderKind.ARCHIVED),
-                systemFolder(SYSTEM_FOLDER_GROUPS_ID, 2, SystemFolderKind.GROUPS),
+                systemFolder(SYSTEM_FOLDER_CHATS_ID, 0, SystemFolderKind.CHATS).copy(showWhenEmpty = true),
+                systemFolder(SYSTEM_FOLDER_UNREAD_ID, 1, SystemFolderKind.UNREAD),
+                systemFolder(SYSTEM_FOLDER_ARCHIVED_ID, 2, SystemFolderKind.ARCHIVED),
+                systemFolder(SYSTEM_FOLDER_GROUPS_ID, DEFAULT_GROUPS_ORDER, SystemFolderKind.GROUPS),
             )
 
         private fun systemFolder(
@@ -595,6 +705,7 @@ class ChatFolderPreferences(
         /** The rule a default is seeded with — its old hardcoded chip behavior, expressed as a rule. */
         internal fun defaultRuleFor(kind: SystemFolderKind): ChatFolderRule =
             when (kind) {
+                SystemFolderKind.CHATS -> ChatFolderRule(includeAll = true, includeMuted = true)
                 SystemFolderKind.UNREAD -> ChatFolderRule(unreadOnly = true, includeMuted = true)
                 SystemFolderKind.ARCHIVED -> ChatFolderRule(archivedOnly = true, includeMuted = true)
                 SystemFolderKind.GROUPS -> ChatFolderRule(groupsOnly = true, includeMuted = true)
@@ -610,6 +721,11 @@ class ChatFolderPreferences(
             account: String,
             folderId: String,
         ): String = "${accountKeyPrefix(account)}m:$folderId"
+
+        private fun exclusionKey(
+            account: String,
+            folderId: String,
+        ): String = "${accountKeyPrefix(account)}x:$folderId"
 
         private fun ruleKey(
             account: String,
