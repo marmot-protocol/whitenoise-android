@@ -609,20 +609,25 @@ class NotificationPushWakeCatchUpTest {
                     delay(1L)
                 }
             }
-            val reaction =
-                manager.activeNotifications
-                    .single { it.id == LocalNotificationFormatter.REACTION_NOTIFICATION_ID }
-                    .notification
-            assertEquals(
-                "reacted 👍 to: \"Alice added Bob\"",
-                reaction.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
-            )
-            assertEquals(NotificationChannelSpec.REACTIONS.id, reaction.channelId)
+            assertActivityReactionNotification(manager)
         } finally {
             manager.cancelAll()
             store.clearPendingPushWakeCatchUp()
             fixture.close()
         }
+    }
+
+    /** Checks the producer's posted text and channel, so raw kind-1210 fallback cannot pass. */
+    private fun assertActivityReactionNotification(manager: NotificationManager) {
+        val reaction =
+            manager.activeNotifications
+                .single { it.id == LocalNotificationFormatter.REACTION_NOTIFICATION_ID }
+                .notification
+        assertEquals(
+            "reacted 👍 to: \"Alice added Bob\"",
+            reaction.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+        )
+        assertEquals(NotificationChannelSpec.REACTIONS.id, reaction.channelId)
     }
 
     /** Keeps production retry limits while removing wall-clock backoff from the regression. */
