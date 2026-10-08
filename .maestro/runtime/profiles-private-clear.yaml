@@ -60,12 +60,18 @@ name: profiles-private-clear
     element:
       id: person_profile.nickname
     direction: UP
-- tapOn:
+- longPressOn:
     id: person_profile.nickname
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - tapOn: "More options"
+- tapOn: "(?i)select all"
 - assertVisible:
     id: person_profile.nickname
     focused: true
-- eraseText
+- eraseText: 1
 - assertNotVisible:
     id: person_profile.nickname
     text: ".+"
@@ -74,12 +80,18 @@ name: profiles-private-clear
     element:
       id: person_profile.notes
     direction: DOWN
-- tapOn:
+- longPressOn:
     id: person_profile.notes
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - tapOn: "More options"
+- tapOn: "(?i)select all"
 - assertVisible:
     id: person_profile.notes
     focused: true
-- eraseText
+- eraseText: 1
 - assertNotVisible:
     id: person_profile.notes
     text: ".+"

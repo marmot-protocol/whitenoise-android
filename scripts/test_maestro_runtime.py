@@ -660,8 +660,9 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 if not isinstance(command, dict) and command != 'eraseText':
                     continue
                 tap = command.get('tapOn') if isinstance(command, dict) else None
-                self.assertNotIn(tap if isinstance(tap, str) else None, ('Save', 'Cancel'), path.name)
-                if (not isinstance(command, dict) or 'inputText' not in command) and command != 'eraseText':
+                tap_text = tap.get('text') if isinstance(tap, dict) else tap
+                self.assertNotIn(tap_text, ('Save', 'Cancel'), path.name)
+                if not isinstance(command, dict) or not {'inputText', 'eraseText'} & command.keys():
                     continue
                 edits += 1
                 focus = commands[index - 1].get('assertVisible', {})
@@ -669,13 +670,48 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 with self.subTest(flow=path.name, field=tag):
                     self.assertIn(tag, ('person_profile.nickname', 'person_profile.notes'))
                     self.assertIs(focus.get('focused'), True)
-                    self.assertEqual(commands[index - 2], {'tapOn': {'id': tag}})
                     if 'inputText' in command:
+                        self.assertEqual(commands[index - 2], {'tapOn': {'id': tag}})
                         self.assertEqual(commands[index + 1], {'assertVisible': {'id': tag, 'text': command['inputText']}})
                     else:
+                        self.assertEqual(command['eraseText'], 1)
+                        self.assertEqual(commands[index - 2], {'tapOn': '(?i)select all'})
+                        self.assertEqual(commands[index - 4], {'longPressOn': {'id': tag}})
                         self.assertEqual(commands[index + 1], {'assertNotVisible': {'id': tag, 'text': '.+'}})
                     self.assertEqual(commands[index + 2], 'hideKeyboard')
         self.assertEqual(edits, 11)
+
+    def test_private_clear_selects_both_complete_values_before_backspacing(self):
+        """A tap placed the cursor before ve; backspacing a count cannot remove that trailing suffix."""
+        path = runtime.ROOT / '.maestro/runtime/profiles-private-clear.yaml'
+        _, commands = list(yaml.safe_load_all(path.read_text()))
+        selected = []
+        for index, command in enumerate(commands):
+            if not isinstance(command, dict) or 'eraseText' not in command:
+                self.assertNotEqual(command, 'eraseText')
+                continue
+            tag = commands[index - 4]['longPressOn']['id']
+            selected.append(tag)
+            self.assertEqual(commands[index - 3], {'runFlow': {
+                'when': {'notVisible': '(?i)select all'}, 'commands': [{'tapOn': 'More options'}]}})
+            self.assertEqual(commands[index - 2], {'tapOn': '(?i)select all'})
+            self.assertEqual(commands[index - 1], {'assertVisible': {'id': tag, 'focused': True}})
+            self.assertEqual(command, {'eraseText': 1})
+            self.assertEqual(commands[index + 1], {'assertNotVisible': {'id': tag, 'text': '.+'}})
+        self.assertEqual(selected, ['person_profile.nickname', 'person_profile.notes'])
+
+    def test_private_boundary_dismisses_only_the_focused_editors_keyboard(self):
+        """A second hideKeyboard sent Back after the IME closed, dismissing the unsaved dialog."""
+        path = runtime.ROOT / '.maestro/runtime/profiles-private-boundary.yaml'
+        _, commands = list(yaml.safe_load_all(path.read_text()))
+        self.assertEqual(commands.count('hideKeyboard'), 1)
+        index = next(i for i, command in enumerate(commands) if isinstance(command, dict) and 'inputText' in command)
+        self.assertEqual(commands[index], {'inputText': 'M' * 81})
+        self.assertEqual(commands[index + 1], {'assertVisible': {'id': 'person_profile.nickname', 'text': 'M' * 81}})
+        self.assertEqual(commands[index + 2], 'hideKeyboard')
+        self.assertEqual(commands[index + 3]['scrollUntilVisible']['element'], {'id': 'person_profile.private_save'})
+        self.assertIn({'assertVisible': 'M' * 80}, commands)
+        self.assertIn({'assertNotVisible': 'M' * 81}, commands)
 
     def test_private_contact_public_name_anchor_matches_captured_parenthetical_label(self):
         """The actual profile-name label includes parentheses; a literal-free regex cannot find it."""

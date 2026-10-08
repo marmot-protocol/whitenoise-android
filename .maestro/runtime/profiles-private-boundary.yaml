@@ -16,8 +16,6 @@ name: profiles-private-boundary
     id: person_profile.nickname
     text: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
 - hideKeyboard
-- assertVisible: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
-- hideKeyboard
 - scrollUntilVisible:
     element:
       id: person_profile.private_save
