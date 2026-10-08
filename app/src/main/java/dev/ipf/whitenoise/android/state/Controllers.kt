@@ -6295,6 +6295,10 @@ class ConversationController(
         private set
     var replyingTo by mutableStateOf<AppMessageRecordFfi?>(null)
 
+    /** Set by the mounted conversation screen so non-composer senders never drop its staged attachments. */
+    @Volatile
+    internal var stagedAttachmentSender: StagedAttachmentSender? = null
+
     /** Per-target edit history for kind-1009 events, recomputed on every
      * timeline publish. The bubble reads `.latestText` and the "(edited · N)"
      * affordance reads `.count`. Null entry == message never edited. */

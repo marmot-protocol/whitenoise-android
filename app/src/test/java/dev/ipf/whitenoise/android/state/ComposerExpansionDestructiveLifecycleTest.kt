@@ -385,6 +385,68 @@ class ComposerExpansionDestructiveLifecycleTest {
             assertEquals(newer, appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
         }
 
+    /** Dictation Send with attachments on the shelf goes through the composer's attachment send, not a text send. */
+    @Test
+    fun dictationSendWithStagedAttachmentsCarriesThemAndNeverSendsTextOnly() =
+        runBlocking {
+            val fixture = fixture()
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            val captions = mutableListOf<String>()
+            fixture.conversationController.stagedAttachmentSender =
+                StagedAttachmentSender(hasStaged = { true }, isBusy = { false }) { caption, onResult ->
+                    captions += caption
+                    onResult(true)
+                }
+            var pendingCallbacks = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(onPendingShown = { pendingCallbacks += 1 })
+
+            assertTrue(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(listOf("typed spoken"), captions)
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals(1, pendingCallbacks)
+        }
+
+    /** A busy shelf publishes nothing and releases the claim, so the transcript returns to the draft. */
+    @Test
+    fun dictationSendRefusedByTheAttachmentShelfNeverFallsBackToTextOnly() =
+        runBlocking {
+            val fixture = fixture()
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            var dispatches = 0
+            fixture.conversationController.stagedAttachmentSender =
+                StagedAttachmentSender(hasStaged = { true }, isBusy = { true }) { _, _ -> dispatches += 1 }
+            var releasedClaims = 0
+            val request =
+                dictationRequest(fixture.appState, "typed").copy(
+                    onPendingShown = { error("nothing was published") },
+                    onDispatchRejectedBeforeTransport = { releasedClaims += 1 },
+                )
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(0, dispatches)
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals(1, releasedClaims)
+            assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    /** A registered but empty shelf leaves dictation on its ordinary text send. */
+    @Test
+    fun dictationSendWithAnEmptyShelfStaysOnTheTextPath() =
+        runBlocking {
+            val fixture = fixture()
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            fixture.conversationController.stagedAttachmentSender =
+                StagedAttachmentSender(hasStaged = { false }, isBusy = { false }) { _, _ -> error("empty shelf") }
+            val request = dictationRequest(fixture.appState, "typed")
+
+            assertTrue(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(1, fixture.calls.send.get())
+        }
+
     private fun dictationRequest(
         appState: WhiteNoiseAppState,
         text: String = "",
