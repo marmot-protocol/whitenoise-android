@@ -156,6 +156,7 @@ class ProtectedUserLoopTest(unittest.TestCase):
     """Exercise all profiles when an adb-like child consumes its standard input."""
 
     def test_protection_and_restoration_reach_every_installed_profile(self):
+        """Preserve every original override even when a child drains the loop input."""
         root = Path(__file__).resolve().parents[1]
         script = (root / "scripts/run-performance-benchmarks.sh").read_text()
         functions = "\n".join(
@@ -179,9 +180,13 @@ benchmark_user=11
 target_package=dev.ipf.whitenoise.android.dev
 local_output="$FIXTURE_OUTPUT"
 dev_app_apk=preserved-original.apk
+# Model a restored shared APK without accessing any installed device code.
 installed_code_hash() { printf '%s\n' original-hash; }
+# Match the restoration fence to the preserved original artifact.
 sha256_file() { printf '%s\n' original-hash; }
+# Read each simulated profile override after the package-manager mutation.
 fixture_delivery_state() { jq -c . "$FIXTURE_APP_STATE"; }
+# Apply one profile mutation and reproduce adb consuming inherited loop input.
 adb_cmd() {
   [[ "$1 $2 $4 $6" == "shell pm --user $target_package" ]] || return 99
   printf '%s %s\n' "$5" "$3" >>"$FIXTURE_CALLS"

@@ -21,7 +21,6 @@ require_command() {
   fi
 }
 
-
 # Reject absent measurement bytes before counting a collected trace as evidence.
 require_nonempty_trace() {
   if [[ ! -s "$1" ]]; then
@@ -391,6 +390,7 @@ protect_other_users() {
   }
 }
 
+# Restore captured profile overrides only after verifying the original shared APK.
 restore_other_users() {
   local user action observed
   # Do not restart personal accounts with test configuration or competing code.
