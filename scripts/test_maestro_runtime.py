@@ -206,6 +206,24 @@ class CampaignSummaryTest(unittest.TestCase):
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
 
+    def test_generic_native_success_cannot_certify_persisted_speech_rate(self):
+        """Require the actual preference-owner/fresh-reader proof, not a generic native receipt."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            replacement = {**runtime.CASES[name], 'postcondition': 'speech-rate-custom'}
+            with patch.dict(runtime.CASES, {name: replacement}):
+                result = self.result(root)
+                self.assertEqual(result['passed_count'], 5)
+                self.assertFalse(result['evidence_complete'])
+                self.assertIn('speech rate', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['speechRateVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
     def test_future_shard_attempt_cannot_certify_current_run(self):
         """A future artifact is invalid even when older matching evidence passes."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -993,6 +1011,13 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertEqual(target.parent, runtime.ROOT / '.maestro/fixtures')
                     header, _ = list(yaml.safe_load_all(target.read_text()))
                     self.assertEqual(header['appId'], runtime.PACKAGE)
+                    if target.name == 'runtime-warm-resume.yaml':
+                        _, resume = list(yaml.safe_load_all(target.read_text()))
+                        self.assertEqual(resume, [
+                            {'pressKey': 'Home'},
+                            {'launchApp': {'stopApp': False, 'clearState': False, 'permissions': {'all': 'deny'}}},
+                        ])
+                        continue
                     for forbidden in ('launchApp', 'stopApp', 'clearState', 'point:', 'openLink:'):
                         self.assertNotIn(forbidden, target.read_text())
 

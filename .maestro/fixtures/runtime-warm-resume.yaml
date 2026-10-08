@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Preserve the instrumentation owner and its native runtime; this is not process recreation.
+- pressKey: Home
+- launchApp:
+    stopApp: false
+    clearState: false
+    permissions:
+      all: deny

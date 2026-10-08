@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-gestures-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Swipe actions
+    direction: DOWN
+- tapOn: Swipe actions
+- &id001
+  assertVisible:
+    id: gestures.MessageLeft
+- setOrientation: LANDSCAPE_LEFT
+- *id001
+- setOrientation: PORTRAIT
+- *id001
+- back
+- assertVisible: Settings

@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-relays-warm-resume
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Relays
+    direction: DOWN
+- tapOn: Relays
+- &id001
+  assertVisible:
+    id: relays.group
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- *id001
+- back
+- assertVisible: Settings

@@ -30,7 +30,7 @@ on:
         description: Offline retained-APK coverage or opt-in generated-account runtime slice
         required: false
         type: choice
-        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-polls, runtime-folders, runtime-nested, runtime-reader, runtime-composer, runtime-developer, runtime-support, runtime-ballots, runtime-profiles, runtime-chats, runtime-chatstate, runtime-consent, runtime-keys, runtime-search, runtime-permissions, runtime-reports, runtime-acquisition, runtime-speech, runtime-speech-validation, runtime-dictation, runtime-reactions, runtime-alert-dialogs, runtime-smart-folders, runtime-account-guards, runtime-all]
+        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-polls, runtime-folders, runtime-nested, runtime-reader, runtime-composer, runtime-developer, runtime-support, runtime-ballots, runtime-profiles, runtime-chats, runtime-chatstate, runtime-consent, runtime-keys, runtime-search, runtime-permissions, runtime-reports, runtime-acquisition, runtime-speech, runtime-speech-validation, runtime-dictation, runtime-reactions, runtime-alert-dialogs, runtime-smart-folders, runtime-account-guards, runtime-settings-lifecycle, runtime-speech-persistence, runtime-all]
         default: onboarding
       maestro_repetitions:
         description: Suite repetitions (onboarding 1–20, offline 1–3, focused suites 1)

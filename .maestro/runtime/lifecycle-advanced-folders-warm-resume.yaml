@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-folders-warm-resume
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Folders
+    direction: DOWN
+- tapOn: Folders
+- &id001
+  assertVisible:
+    id: chat-folders-content
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- *id001
+- back
+- assertVisible: Settings

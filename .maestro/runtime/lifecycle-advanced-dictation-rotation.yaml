@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-dictation-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Dictation
+    direction: DOWN
+- tapOn: Dictation
+- &id001
+  assertVisible:
+    id: dictation.ostt_recommendation.group
+- setOrientation: LANDSCAPE_LEFT
+- *id001
+- setOrientation: PORTRAIT
+- *id001
+- back
+- assertVisible: Settings

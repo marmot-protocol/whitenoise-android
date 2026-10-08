@@ -1514,7 +1514,7 @@
       "manual_ids": [
         "NTF-033"
       ],
-      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
       "postcondition": "none"
     },
     "alerts-chat-sounds-back": {
@@ -1627,7 +1627,7 @@
       "manual_ids": [
         "MSG-005"
       ],
-      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "assertions": "Filtering to the owner’s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
       "postcondition": "reactions-retained",
       "fixture": "reactions"
     },
@@ -1679,7 +1679,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
+      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
@@ -1703,7 +1703,7 @@
       "manual_ids": [
         "SET-008"
       ],
-      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "assertions": "繁體中文 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
       "postcondition": "language-system"
     },
     "advanced-relay-empty": {
@@ -1859,7 +1859,7 @@
       "manual_ids": [
         "ACC-007"
       ],
-      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice’s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -1887,9 +1887,275 @@
         "ACC-007",
         "NAV-004"
       ],
-      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
+      "assertions": "Save Alice’s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice’s retained private records, every other viewer empty and unchanged public profiles.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
+    },
+    "lifecycle-settings-appearance-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-appearance actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-appearance-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-appearance actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-notifications-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-notifications actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-notifications-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-notifications actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-read-aloud-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-read-aloud actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-read-aloud-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-read-aloud actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-data-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "SET-010",
+        "NAV-009"
+      ],
+      "assertions": "settings-data actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-data-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "SET-010",
+        "NAV-010"
+      ],
+      "assertions": "settings-data actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-privacy-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-privacy actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-privacy-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-privacy actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-connectors-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-016",
+        "NAV-009"
+      ],
+      "assertions": "settings-connectors actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-connectors-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-016",
+        "NAV-010"
+      ],
+      "assertions": "settings-connectors actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-help-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-018",
+        "NAV-009"
+      ],
+      "assertions": "settings-help actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-help-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-018",
+        "NAV-010"
+      ],
+      "assertions": "settings-help actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-profile-keys-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "ACC-009",
+        "NAV-009"
+      ],
+      "assertions": "settings-profile-keys actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-profile-keys-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "ACC-009",
+        "NAV-010"
+      ],
+      "assertions": "settings-profile-keys actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-dictation-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-027",
+        "NAV-009"
+      ],
+      "assertions": "advanced-dictation actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-dictation-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-027",
+        "NAV-010"
+      ],
+      "assertions": "advanced-dictation actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-gestures-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-032",
+        "NAV-009"
+      ],
+      "assertions": "advanced-gestures actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-gestures-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-032",
+        "NAV-010"
+      ],
+      "assertions": "advanced-gestures actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-folders-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-009",
+        "NAV-009"
+      ],
+      "assertions": "advanced-folders actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-folders-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-009",
+        "NAV-010"
+      ],
+      "assertions": "advanced-folders actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-relays-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SYS-001",
+        "NAV-009"
+      ],
+      "assertions": "advanced-relays actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-relays-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SYS-001",
+        "NAV-010"
+      ],
+      "assertions": "advanced-relays actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "speech-apply-rounded-reopen": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate 2.75, verify displayed normalized value and reopen both screen and editor; independent fresh production preference reader verifies persisted rate. Audio output and process restart remain separate.",
+      "postcondition": "speech-rate-custom"
+    },
+    "speech-apply-minimum-reopen": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate 0.1, verify displayed normalized value and reopen both screen and editor; independent fresh production preference reader verifies persisted rate. Audio output and process restart remain separate.",
+      "postcondition": "speech-rate-minimum"
+    },
+    "speech-apply-maximum-reopen": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate 10.0, verify displayed normalized value and reopen both screen and editor; independent fresh production preference reader verifies persisted rate. Audio output and process restart remain separate.",
+      "postcondition": "speech-rate-maximum"
+    },
+    "speech-reset-system": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate then replace with System \\(follow device setting\\); screen re-entry retains the new choice. Independent production preference reload verifies the override is removed. Audio and process-death proof remain separate.",
+      "postcondition": "speech-rate-system"
+    },
+    "speech-preset-replaces-custom": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate then replace with 0\\.5×; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
+      "postcondition": "speech-rate-preset"
+    },
+    "speech-invalid-keeps-saved-rate": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom 2.75, attempt out-of-range 10.01, require exact editor/error and Cancel; re-entry plus fresh preference reader prove the saved normalized2.8 override was not replaced.",
+      "postcondition": "speech-rate-custom"
     }
   }
 }

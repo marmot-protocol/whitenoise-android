@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-help-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Help
+    direction: DOWN
+- tapOn: Help
+- &id001
+  assertVisible:
+    id: help.destinations
+- setOrientation: LANDSCAPE_LEFT
+- *id001
+- setOrientation: PORTRAIT
+- *id001
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

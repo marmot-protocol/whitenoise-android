@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'settings-lifecycle', 'speech-persistence')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 660
 UI_TIMEOUTS = {'polls-question-boundary': 240}
@@ -125,6 +125,9 @@ def run_case(name, reports):
                 record['cleanup_safe'] = True
                 verified = receipt(read('verified'), generation, 'verified')
                 (directory / 'verified.json').write_text(json.dumps(verified, indent=2) + '\n')
+                if (CASES[name]['postcondition'].startswith('speech-rate-')
+                        and verified.get('speechRateVerified') is not True):
+                    raise ValueError('Persisted speech rate was not verified')
                 if process.returncode != 0 or 'OK (1 test)' not in (directory / 'instrumentation.txt').read_text():
                     raise ValueError('Fixture instrumentation or cleanup failed')
                 if failure is None:

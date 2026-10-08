@@ -64,6 +64,11 @@ private val MAESTRO_POSTCONDITIONS =
         "contact-private-saved",
         "contact-private-cleared",
         "contact-private-boundary",
+        "speech-rate-custom",
+        "speech-rate-minimum",
+        "speech-rate-maximum",
+        "speech-rate-preset",
+        "speech-rate-system",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -234,6 +239,7 @@ class MaestroRuntimeHostTest {
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
+                        .put("speechRateVerified", verifyMaestroSpeechRate(context, checkNotNull(state), postcondition))
                         .toString(),
                 )
             } finally {

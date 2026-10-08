@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-profile-keys-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- tapOn: Profile Keys
+- &id001
+  assertVisible: Show private key
+- &id002
+  assertVisible: Private key hidden
+- setOrientation: LANDSCAPE_LEFT
+- *id001
+- *id002
+- setOrientation: PORTRAIT
+- *id001
+- *id002
+- back
+- assertVisible: Settings
