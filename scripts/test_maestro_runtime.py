@@ -648,6 +648,22 @@ class RuntimeEvidenceTest(unittest.TestCase):
                         self.assertIn('- assertVisible:\n    id: "profile_keys.' + field + '"', flow)
                         self.assertIn('- assertNotVisible:\n    id: "profile_keys.' + field + '"\n    text: ".+"', flow)
 
+    def test_optional_pair_cache_cannot_restore_other_jobs_or_bypass_build_validation(self):
+        """Guard the observed foreign release-cache stall without loosening the actual producer gates."""
+        workflow = yaml.safe_load((runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text())
+        build = workflow['jobs']['maestro-runtime-build']
+        setup = next(step for step in build['steps'] if step.get('uses', '').startswith('gradle/actions/setup-gradle@'))
+        self.assertTrue(setup['with']['gradle-home-cache-strict-match'])
+        self.assertFalse(setup['with']['cache-read-only'])
+        self.assertTrue(setup['with'].get('validate-wrappers', True))
+        self.assertEqual(build['timeout-minutes'], 30)
+        self.assertFalse(build.get('continue-on-error', False))
+        self.assertTrue(all(not step.get('continue-on-error', False) for step in build['steps']))
+        compile_step = next(step for step in build['steps'] if step.get('id') == 'fixture')
+        self.assertIn(':app:assembleDevZapstoreDebugAndroidTest', compile_step['run'])
+        self.assertIn('maestro_runtime_pair.py stage', compile_step['run'])
+        self.assertEqual(workflow['jobs']['maestro-runtime']['strategy']['max-parallel'], 2)
+
     def test_every_main_and_settings_route_has_named_cases(self):
         """Reject silent coverage drift in top-level and nested navigation destinations."""
         path = runtime.ROOT / 'config/maestro-screen-coverage.json'
