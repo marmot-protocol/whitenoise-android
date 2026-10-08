@@ -2289,4 +2289,5 @@
     <string name="pinned_shortcut_finish">Conferma nel launcher per aggiungere questa conversazione.</string>
     <string name="pinned_shortcut_unavailable">Questa conversazione non è più disponibile.</string>
     <string name="pinned_shortcut_failed">Impossibile richiedere una scorciatoia. Riprova.</string>
+    <string name="media_set_group_picture">Imposta come foto del gruppo</string>
 </resources>

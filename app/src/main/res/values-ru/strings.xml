@@ -2359,4 +2359,5 @@
     <string name="pinned_shortcut_finish">Подтвердите добавление чата в лаунчере.</string>
     <string name="pinned_shortcut_unavailable">Этот чат больше недоступен.</string>
     <string name="pinned_shortcut_failed">Не удалось запросить ярлык. Повторите попытку.</string>
+    <string name="media_set_group_picture">Установить как фото группы</string>
 </resources>
