@@ -123,8 +123,7 @@ internal suspend fun loadReceivedEmojiArtwork(
     for (attachment in attachments) {
         val codes = defined[attachment.index].orEmpty().filter { selected.add(it) }
         if (codes.isEmpty()) continue
-        val art = load(attachment) ?: continue
-        codes.forEach { artwork[it] = art }
+        load(attachment)?.let { art -> codes.forEach { artwork[it] = art } }
     }
     return artwork
 }
