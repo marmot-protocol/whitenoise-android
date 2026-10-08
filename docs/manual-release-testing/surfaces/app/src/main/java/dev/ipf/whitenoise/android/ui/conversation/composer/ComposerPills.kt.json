@@ -120,7 +120,7 @@
         ]
       },
       {
-        "surface": "Settled draft viewport navigation eligibility",
+        "surface": "Measured-geometry draft navigation remains stable during typing and composing edits",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "val showDraftTop =",
         "test_ids": [

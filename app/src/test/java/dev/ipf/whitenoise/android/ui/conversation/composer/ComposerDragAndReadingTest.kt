@@ -66,6 +66,13 @@ class ComposerDragAndReadingTest {
     private var sends = 0
     private var cancels = 0
 
+    /** Actual edits retain navigation and reserved editor space on every fixed-geometry frame. */
+    @Test
+    fun typingKeepsTheSettledDraftTopAndEditorBounds() {
+        render(longDraft + "\na")
+        assertDraftTopStableDuringTextEdits(composeRule, { observed }, { sends })
+    }
+
     @Test
     fun emptyDraftCanGrowFromItsVisibleGrip() {
         render("")
