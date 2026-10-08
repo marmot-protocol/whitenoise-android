@@ -595,6 +595,53 @@ retention cap, which is where the main-thread apply cost has to be read.
 | `momentumHandoff` | Six flicks 150 ms apart, each landing while the previous fling still coasts. |
 | `olderFlingWhileEngineCatchesUp` | The deep fling started right after a cold process launch, while sync catch-up owns the engine. |
 
+### Unread-mention jump investigation
+
+`jumpToUnreadMentionFromHistory` taps the real @ control and reuses the paging/frame
+trace report. It is opt-in: the normal paging fixture is not an unread-mention fixture.
+Use a private synthetic group and a second account to prepare more than 50 real unread
+messages, with the only unread mention in the final message. The receiving account must
+start at a saved older reading position with a uniquely identifiable synthetic row visible.
+Use exact synthetic start and target text (including the rendered mention) as selectors.
+Record fixture ID, unread count, source/APK hash, device, viewport, thermal/battery state and
+whether the target is already loaded or the window changes during navigation.
+
+```bash
+MENTION_FIXTURE_ID="paired-sample-a" \
+MENTION_START_TEXT="synthetic older anchor" \
+MENTION_TARGET_TEXT="synthetic final mention text" \
+MENTION_UNREAD_COUNT=60 \
+BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.ConversationPagingBenchmark#jumpToUnreadMentionFromHistory" \
+  scripts/run-performance-benchmarks.sh "$GROUP_NAME"
+```
+
+This journey uses `CompilationMode.None()` and exactly one iteration: neither compilation
+warm-up, a tail jump nor repeated open/close may consume the target before measurement.
+Opening or attempting a jump consumes the fixture even if the run fails. Re-provision an
+equivalent fixture through normal message/read flows for every additional sample; do not
+reset native caches or read state. The supplied unread count/final-only condition is a
+fixture declaration, not an automatic audit of the history. A missing start row, @ control
+or target fails the journey. The target text and disappearing sole-mention control verify
+landing/read completion, not smoothness or physical top alignment.
+
+Compare independent samples before/after on matched builds and conditions, including mixed
+tall text/media, cold measurement, keyboard/composer-reduced viewport, window/header changes
+and cancellation. `WhiteNoise.conversation.mention.*` slices separate total, availability,
+bounded approach, initial positioning, animation, layout waits and each correction write;
+existing page window/prepare/apply slices separate runtime and main-thread work. These contain
+operation names only. The report adds phase sums and correction counts to frame P50/P90/P99,
+worst-frame and >32 ms evidence. A missing phase is unmeasured, never proof of zero cost.
+Successful placement or elapsed time alone does not establish smoothness.
+
+On the shared Hermes fixture, the guarded installer permits audited staging or exact-head
+signed stable-preview artifacts, not unsigned dev/benchmark app APKs. Do not run this host
+script there to bypass remote-first builds or the install gate. Use the approved signed
+preview and a guarded manual @ tap/Perfetto capture for that fixture; report missing app
+slices when GrapheneOS cannot emit them. Automated benchmark execution requires an admitted,
+authenticated dev fixture on a compatible host. No additional always-required CI job is added.
+The stutter cause remains unmeasured until these traces are collected; this instrumentation
+is not itself a performance fix.
+
 Beyond the scroll metrics below, each method reports the paging slices from the
 [Conversation history pages](#conversation-history-pages) section: `windowCommandCount`
 (every window command the journey issued — older and newer pages, but also

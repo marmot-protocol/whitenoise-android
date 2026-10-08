@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -33,6 +32,7 @@ import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /** Picking and configuring a new filter never changes the draft until the user saves it. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,7 +61,7 @@ internal fun SmartFolderAddFilter(
             Box(Modifier.onSizeChanged { headerHeight = it.height }) {
                 WhiteNoiseSheetHeader(stringResource(R.string.smart_folder_add), onClose = onDismiss)
             }
-            Column(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())) {
+            Column(Modifier.weight(1f, fill = false).fillMaxWidth().fadingVerticalScroll(rememberScrollState())) {
                 Column(Modifier.fillMaxWidth().height(commonHeight)) {
                     common.forEach { choice ->
                         FilterChoice(choice, Modifier.weight(1f)) { field = choice }

@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
@@ -55,7 +56,7 @@ internal class ConversationTtsFollowHandle internal constructor(
         private set
 
     val showResumeAction: Boolean
-        get() = policy.showResumeAction
+        get() = policy.showResumeAction || sentenceLayouts.needsReveal(policy.currentTarget)
 
     fun suspendForDirectDrag(
         state: TtsState,
@@ -68,6 +69,14 @@ internal class ConversationTtsFollowHandle internal constructor(
     fun resumeFollow() {
         policy.resumeFollow()
         retryGeneration += 1L
+    }
+
+    fun recheckViewport(
+        state: TtsState,
+        ownsSession: Boolean,
+    ) {
+        policy.observe(state, ownsSession)
+        if (policy.recheckViewport()) retryGeneration += 1L
     }
 
     fun revealCurrentPassage(
@@ -292,6 +301,10 @@ internal fun ConversationTtsFollowEffects(
         )
     val ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
 
+    LaunchedEffect(handle.sentenceLayouts.viewportBoundsInWindow, ownsSession) {
+        handle.recheckViewport(appState.ttsController.state.value, ownsSession)
+    }
+
     LaunchedEffect(explicitRevealRequestId, ownsSession) {
         if (explicitRevealRequestId > 0L) {
             handle.revealCurrentPassage(
@@ -350,10 +363,15 @@ internal fun ConversationTtsFollowEffects(
             ) {
                 return@LaunchedEffect
             }
-            val currentProjection =
-                projectConversationTtsEntry(appState, controller, row.record) ?: return@LaunchedEffect
-            if (!isCurrentTarget(target)) return@LaunchedEffect
-            if (target.projectionId.isBlank() || currentProjection.projectionId != target.projectionId) {
+            val source = resolveTtsSpeakableSource(row.record, targetEdit?.latestText)
+            val presentation =
+                appState.ttsController.presentationEntryFor(
+                    target.sessionId,
+                    target.messageIdHex,
+                    target.projectionId,
+                    source?.text,
+                )
+            if (!isCurrentTarget(target) || target.projectionId.isBlank() || presentation == null) {
                 return@LaunchedEffect
             }
 

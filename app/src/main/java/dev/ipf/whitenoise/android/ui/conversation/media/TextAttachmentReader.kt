@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
@@ -66,6 +65,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
@@ -319,7 +319,8 @@ internal fun TextAttachmentReaderScreen(
     ) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding).then(speech.viewportModifier)) {
             val trailingHeight = maxHeight
-            Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+            // Follow can place the active sentence at the viewport edge; keep its highlight legible.
+            Column(Modifier.fillMaxSize().fadingVerticalScroll(scroll, fadeEnabled = playback == null)) {
                 TextAttachmentMetadata(candidate = candidate, byteCount = preview?.byteCount, onCopy = onCopy)
                 HorizontalDivider()
                 TextAttachmentReaderContent(
@@ -411,7 +412,7 @@ private fun TextAttachmentReaderBottomBar(
             .fillMaxWidth()
             .navigationBarsPadding()
             .heightIn(max = maximumHeight)
-            .verticalScroll(rememberScrollState())
+            .fadingVerticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp),
     ) {
         transport()
@@ -498,7 +499,7 @@ private fun TextAttachmentFilenameDialog(
         title = { Text(stringResource(R.string.text_attachment_filename)) },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
             ) {
                 SelectionContainer {
                     Text(

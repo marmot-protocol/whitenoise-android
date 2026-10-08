@@ -4,7 +4,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media.editor
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -23,6 +22,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.NormalizedPoint
 import dev.ipf.whitenoise.android.media.editor.NormalizedRect
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlin.math.roundToInt
 
 private const val PERCENT = 100f
@@ -64,7 +64,7 @@ internal fun PhotoEditorCoordinatesDialog(
         onDismissRequest = onDismiss,
         title = { Text(coordinateDialogTitle(tool)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                 EditorCoordinateSlider(
                     label = stringResource(if (cropMode) R.string.photo_editor_left else R.string.photo_editor_start_x),
                     value = first,

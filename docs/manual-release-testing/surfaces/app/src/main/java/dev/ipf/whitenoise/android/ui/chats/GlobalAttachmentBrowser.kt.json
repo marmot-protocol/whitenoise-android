@@ -1,13 +1,18 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
-  "legacy_sha256": "69bddaf6bfd92aa7303d87345d2acd0973524767c2c591500eddab74185c1dc6",
+  "legacy_sha256": "655f6823b80cd3ebe74cfbe2311ec78135902345b04f18ed8ca7224152374b7d",
   "categories": {
     "composable_surfaces": [
       {
         "surface": "GlobalAttachmentGridCard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
         "anchor": "fun GlobalAttachmentGridCard(",
-        "test_ids": ["NCH-002", "ACC-017", "FIND-012", "FIND-013"]
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
       },
       {
         "surface": "Authored emoji prompt: GlobalAttachmentBrowser",
@@ -107,6 +112,19 @@
           "ACC-017",
           "FIND-012",
           "FIND-013"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Library bounded scroll fades",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "WhiteNoiseLazyVerticalGrid(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

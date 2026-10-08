@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val SOUND_APPEARANCE_OPEN_TAG = "conversation-sound-appearance-open"
@@ -41,7 +41,7 @@ internal fun ConversationSoundAppearanceSheet(
                 Modifier
                     .weight(1f, fill = false)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .fadingVerticalScroll(rememberScrollState())
                     .padding(horizontal = WhiteNoiseSpacing.Section, vertical = WhiteNoiseSpacing.Related)
                     .testTag(SOUND_APPEARANCE_CONTENT_TAG),
             ) {

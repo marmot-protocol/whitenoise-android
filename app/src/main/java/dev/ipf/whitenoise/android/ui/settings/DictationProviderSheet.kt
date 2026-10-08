@@ -4,7 +4,6 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +31,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationProviderCapability
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 
 /** Re-enumerates on entry and return from provider setup. This list belongs only to this UI. */
 @Composable
@@ -78,7 +78,7 @@ internal fun DictationProviderSheet(
     onDismiss: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        LazyColumn(Modifier.selectableGroup().testTag("dictation_provider_choices").padding(bottom = 24.dp)) {
+        WhiteNoiseLazyColumn(Modifier.selectableGroup().testTag("dictation_provider_choices").padding(bottom = 24.dp)) {
             item {
                 Column(Modifier.padding(16.dp)) {
                     Text(stringResource(R.string.dictation_provider_title), style = MaterialTheme.typography.titleLarge)

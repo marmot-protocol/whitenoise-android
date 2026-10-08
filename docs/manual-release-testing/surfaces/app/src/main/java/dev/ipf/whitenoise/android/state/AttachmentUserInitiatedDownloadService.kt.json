@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentUserInitiatedDownloadService.kt",
+  "legacy_sha256": "5807d2e3e8a87f7b3943f4877c2b222a7ebfc4a22c2e4d2f8a689ec37490ce2f",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "Generic attachment download notification title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentUserInitiatedDownloadService.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "Generic attachment download notification body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentUserInitiatedDownloadService.kt",
+        "anchor": "R.string.media_attachment",
+        "test_ids": [
+          "MED-022"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

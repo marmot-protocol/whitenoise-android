@@ -24,12 +24,17 @@ internal suspend fun projectTtsSpeakableEntry(
             source = source,
             parseMarkdown = parseMarkdown,
         )
+    val names = linkedMapOf<String, String?>()
+    val members = linkedMapOf<String, Boolean>()
     val projection =
         speakableProjectionFromDocument(
             source = source.text,
             document = document,
-            mentionDisplayName = mentionDisplayName,
-            isGroupMember = isGroupMember,
+            mentionDisplayName = { key ->
+                if (!names.containsKey(key)) names[key] = mentionDisplayName?.invoke(key)
+                names[key]
+            },
+            isGroupMember = isGroupMember?.let { resolve -> { key -> members.getOrPut(key) { resolve(key) } } },
         ) ?: return null
     return projection.text
         .takeIf(String::isNotBlank)
@@ -44,6 +49,9 @@ internal suspend fun projectTtsSpeakableEntry(
                 projectionId = projection.projectionId,
                 speechRoles = projection.speechRoles,
                 visibleLeaves = projection.visibleLeaves,
+                sourceText = source.text,
+                mentionPresentation =
+                    TtsMentionPresentation(names.toMap(), members.toMap().takeIf { isGroupMember != null }),
             )
         }
 }

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.triStateToggleable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,6 +38,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -91,7 +91,7 @@ internal fun ChatFolderPickerSheet(
         title = { Text(stringResource(R.string.chat_list_action_add_to_folder)) },
         text = {
             Column(
-                Modifier.heightIn(max = FolderPickerMaxHeight).verticalScroll(rememberScrollState()),
+                Modifier.heightIn(max = FolderPickerMaxHeight).fadingVerticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
                 if (failed) Text(stringResource(R.string.folder_save_failed), color = MaterialTheme.colorScheme.error)

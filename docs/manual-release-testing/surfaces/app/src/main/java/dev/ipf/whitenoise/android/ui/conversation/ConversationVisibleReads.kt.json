@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVisibleReads.kt",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Settled visible anchors follow each ready native subscription without requiring another drag",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVisibleReads.kt",
+        "anchor": "internal fun observeConversationVisibleReads(",
+        "test_ids": [
+          "CON-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "94e29e00e8fb8bb0ce4aa134ee205f9f680560aefc3d459bda474b625dac8b51"
+}

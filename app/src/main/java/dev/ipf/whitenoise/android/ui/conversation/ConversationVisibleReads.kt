@@ -9,6 +9,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationTimelineSubscriptionHandle
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isConversationReadVisible
 import dev.ipf.whitenoise.android.state.reportVisibleMessage
@@ -17,8 +18,8 @@ import kotlinx.coroutines.flow.filterNotNull
 
 /**
  * Submits settled anchors only from a resumed, unlocked screen that owns the visible account and group.
- * Visibility reentry and native manual-reminder changes retry reads without scrolling; hidden emissions reset dedupe.
- * Reports each changed visible message ID once per observer, independently of manual-reminder transitions.
+ * Visibility reentry and native manual-reminder changes retry reads without scrolling.
+ * Reports each changed visible message ID once per ready subscription, independently of manual-reminder transitions.
  */
 @Composable
 internal fun observeConversationVisibleReads(
@@ -37,22 +38,28 @@ internal fun observeConversationVisibleReads(
     val currentReadAnchor by rememberUpdatedState(readAnchor)
     LaunchedEffect(controller, lifecycleOwner) {
         var lastReportedMessageId: String? = null
+        var lastReportedSubscription: ConversationTimelineSubscriptionHandle? = null
         snapshotFlow {
             val visible =
                 appState.isConversationReadVisible(controller.boundAccountRef.orEmpty(), controller.group.groupIdHex)
             if (currentResumed && visible) {
-                currentReadAnchor()?.let { it to controller.latestChatListRow?.manuallyMarkedUnread }
+                currentReadAnchor()?.let {
+                    Triple(it, controller.latestChatListRow?.manuallyMarkedUnread, controller.window.readySubscription)
+                }
             } else {
                 null
             }
         }.distinctUntilChanged()
             .filterNotNull()
-            .collect { (messageId, _) ->
+            .collect { (messageId, _, subscription) ->
                 if (messageId.isNotBlank()) {
                     controller.markReadUpTo(messageId)
-                    if (messageId != lastReportedMessageId) {
-                        controller.reportVisibleMessage(messageId)
+                    if (
+                        (messageId != lastReportedMessageId || subscription !== lastReportedSubscription) &&
+                        controller.reportVisibleMessage(messageId, subscription)
+                    ) {
                         lastReportedMessageId = messageId
+                        lastReportedSubscription = subscription
                     }
                 }
             }

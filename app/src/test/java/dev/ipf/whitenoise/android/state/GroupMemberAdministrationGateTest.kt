@@ -325,6 +325,35 @@ class GroupMemberAdministrationGateTest {
         return AppText.Resource(resource, arguments)
     }
 
+    @Test
+    fun avatarAttemptBecomingStaleWhileWaitingForCommitLockSkipsRuntime() =
+        runBlocking {
+            val runtimeAccess = RuntimeAccessRecorder()
+            val appState = appState(runtimeAccess)
+            val controller = readyController(appState)
+            var current = true
+            val lockHeld = CompletableDeferred<Unit>()
+            val releaseLock = CompletableDeferred<Unit>()
+            val holder = holdGroupCommitLock(appState, lockHeld, releaseLock)
+            lockHeld.await()
+            val update =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.updateGroupAvatarUrl(
+                        ScopedGroupImageMutation("https://blossom.example/avatar") { current },
+                    )
+                }
+            assertTrue(update.isActive)
+            current = false
+            releaseLock.complete(Unit)
+
+            assertFalse(update.await())
+            holder.await()
+            assertEquals(0, runtimeAccess.callCount)
+            assertNull(controller.group.avatarUrl)
+            assertNull(controller.lastMutationError)
+            assertNull(appState.toast)
+        }
+
     private fun rosterTracker(controller: ConversationController): GroupRosterLoadTracker {
         val field = ConversationController::class.java.getDeclaredField("memberRosterLoadTracker")
         field.isAccessible = true

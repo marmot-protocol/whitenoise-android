@@ -36,6 +36,14 @@
           "CON-003",
           "MSG-006"
         ]
+      },
+      {
+        "surface": "A replacement native window receives the unchanged settled history anchor and rejects retired replies",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "suspend fun ConversationController.reportVisibleMessage(",
+        "test_ids": [
+          "CON-003"
+        ]
       }
     ]
   },

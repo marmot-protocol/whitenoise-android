@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
@@ -24,6 +23,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** Expressive anchored commands; optional focus leaves a held native row pointer with its original owner. */
@@ -53,7 +53,7 @@ internal fun WhiteNoiseAnchoredMenu(
             modifier = modifier,
             shadowElevation = MenuDefaults.ShadowElevation,
         ) {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                 items.forEachIndexed { index, item ->
                     AnchoredMenuItem(item, index, items.size) {
                         val admitted = canRunAction()

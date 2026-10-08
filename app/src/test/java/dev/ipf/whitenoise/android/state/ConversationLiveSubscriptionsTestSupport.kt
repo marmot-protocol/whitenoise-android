@@ -46,6 +46,7 @@ internal class ScriptedConversationTimelineSubscription(
     private val jumpOutcomes: MutableList<ConversationJumpOutcome> = mutableListOf(),
     /** Optional unmodeled jump failure used to verify the controller keeps loaded content. */
     private val jumpFailure: Throwable? = null,
+    private val anchorPage: TimelinePageFfi? = null,
 ) : ConversationTimelineSubscriptionHandle {
     private val lifecycleEvents = CopyOnWriteArrayList<String>()
     private val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
@@ -53,6 +54,12 @@ internal class ScriptedConversationTimelineSubscription(
 
     /** Holds a page reply while the receive loop commits an independently delivered replacement. */
     var beforeBackwardsReply: suspend () -> Unit = {}
+
+    /** Holds an anchor reply while its controller retires the visible window owner. */
+    var beforeAnchorReply: suspend () -> Unit = {}
+
+    /** Optional command outcomes, including a null native timeout/not-ready reply. */
+    val anchorReplies = mutableListOf<TimelinePageFfi?>()
 
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
@@ -108,7 +115,8 @@ internal class ScriptedConversationTimelineSubscription(
     override suspend fun setVisibleAnchor(messageIdHex: String): TimelinePageFfi? {
         lifecycleEvents += "setVisibleAnchor"
         anchorCalls += messageIdHex
-        return null
+        beforeAnchorReply()
+        return if (anchorReplies.isEmpty()) anchorPage else anchorReplies.removeAt(0)
     }
 
     val forwardsCallCount: Int

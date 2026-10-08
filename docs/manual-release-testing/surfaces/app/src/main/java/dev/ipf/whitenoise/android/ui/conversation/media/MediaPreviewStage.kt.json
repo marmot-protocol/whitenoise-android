@@ -1,0 +1,102 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+  "legacy_sha256": "98e4925d30e2af1ac840c5e868a86055ef316e7ca176de43758c3be2b772eb9c",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MediaPreviewDocumentPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "fun MediaPreviewDocumentPage(",
+        "test_ids": [
+          "MED-001",
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "MediaPreviewFilmstrip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "fun MediaPreviewFilmstrip(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "MediaPreviewImagePage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "fun MediaPreviewImagePage(",
+        "test_ids": [
+          "MED-001",
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "MediaPreviewInclusionButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "fun MediaPreviewInclusionButton(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "MediaPreviewPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "fun MediaPreviewPage(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "MediaPreviewPager",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "fun MediaPreviewPager(",
+        "test_ids": [
+          "MED-001",
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "MediaPreviewThumb",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "fun MediaPreviewThumb(",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:media_excluded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "R.string.media_excluded",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:media_included",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "R.string.media_included",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:media_preview_position_badge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "R.string.media_preview_position_badge",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:photo_editor_prepared",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewStage.kt",
+        "anchor": "R.string.photo_editor_prepared",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -95,6 +95,17 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Scroll boundaries: ConversationDictationRecoveryActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
       }
     ]
   },

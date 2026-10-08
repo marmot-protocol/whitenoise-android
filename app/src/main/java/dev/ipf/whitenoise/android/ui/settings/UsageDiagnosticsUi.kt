@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -35,6 +34,7 @@ import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.launch
@@ -174,7 +174,7 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
             .weight(1f, fill = false)
             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
             .padding(bottom = WhiteNoiseSpacing.Section)
-            .verticalScroll(rememberScrollState()),
+            .fadingVerticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.ConversationCluster),
     ) {
         Surface(
@@ -292,7 +292,7 @@ internal fun AuditUploadConsentContent(
             Text(stringResource(R.string.audit_upload_confirm_title), style = MaterialTheme.typography.headlineSmall)
             Text(
                 stringResource(R.string.audit_upload_disclosure),
-                modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                modifier = Modifier.weight(1f, fill = false).fadingVerticalScroll(rememberScrollState()),
                 style = MaterialTheme.typography.bodyMedium,
             )
             TextButton(modifier = Modifier.fillMaxWidth(), onClick = onConfirm) {

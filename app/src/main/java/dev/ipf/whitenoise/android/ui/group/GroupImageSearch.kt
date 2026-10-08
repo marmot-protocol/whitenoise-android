@@ -25,14 +25,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiEmotions
@@ -90,6 +88,8 @@ import dev.ipf.whitenoise.android.media.ImageSearchException
 import dev.ipf.whitenoise.android.media.ImageSearchResult
 import dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.subtitleRes
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -389,7 +389,7 @@ internal fun ImageSearchSheet(
                 modifier =
                     Modifier
                         .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
+                        .fadingVerticalScroll(rememberScrollState())
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
@@ -524,7 +524,7 @@ internal fun ImageSearchSheet(
                 if (results.isNotEmpty()) {
                     // Bounded height so the grid scrolls inside the sheet rather
                     // than fighting the sheet's own gesture for vertical scrolling.
-                    LazyVerticalGrid(
+                    WhiteNoiseLazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 100.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),

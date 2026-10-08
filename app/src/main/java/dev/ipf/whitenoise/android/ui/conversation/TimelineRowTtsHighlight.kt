@@ -64,6 +64,7 @@ internal data class TimelineRowTtsHighlightState(
     val passage: TtsPassage?,
     val progress: TtsReadAloudProgress?,
     val followTarget: ConversationTtsFollowTarget? = null,
+    val sessionId: Long? = null,
 )
 
 /** Observes row-scoped TTS state and renders the bubble with conversation gesture arbitration. */
@@ -180,6 +181,7 @@ internal fun TimelineRowMessageBubble(
             ttsHighlightPassage = ttsHighlightState.passage,
             ttsReadAloudProgress = ttsHighlightState.progress,
             ttsFollowTarget = ttsHighlightState.followTarget,
+            ttsSessionId = ttsHighlightState.sessionId,
             ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
             ttsSentenceLayoutSink = ttsSentenceLayoutSink,
             onTtsSentenceSeek = onTtsSentenceSeek,
@@ -204,6 +206,8 @@ private fun rememberRowScopedTtsHighlightState(
                 passage = timelineRowTtsHighlightPassage(messageIdHex, state),
                 progress = timelineRowTtsReadAloudProgress(messageIdHex, state),
                 followTarget = timelineRowTtsFollowTarget(messageIdHex, state),
+                // Zero is the first valid playback session, not an idle sentinel.
+                sessionId = state.sessionId.takeUnless { state is TtsState.Idle },
             )
         }.distinctUntilChanged()
         .collect { value = it }

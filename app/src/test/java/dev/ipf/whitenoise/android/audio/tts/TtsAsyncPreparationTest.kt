@@ -65,6 +65,77 @@ class TtsAsyncPreparationTest {
 
     /** Foreground ownership precedes preparation; commitment preserves the preparation session ID. */
     @Test
+    fun naturalCompletionKeepsAnExplicitPendingStartValid() =
+        runTest {
+            val harness = SessionHarness(this)
+            assertTrue(harness.controller.speak(listOf(harness.entry("old")), Locale.US))
+            val canStart = harness.controller.speechStartProjectionGuard()
+            harness.engine.complete(0)
+            assertTrue(harness.controller.state.value is TtsState.Idle)
+            assertTrue(canStart())
+            assertTrue(harness.controller.speak(listOf(harness.entry("new")), Locale.US))
+            assertFalse(canStart())
+        }
+
+    @Test
+    fun explicitStopInvalidatesAPendingStartEvenWhenTheSessionIdIsRetained() =
+        runTest {
+            val harness = SessionHarness(this)
+            assertTrue(harness.controller.speak(listOf(harness.entry("old")), Locale.US))
+            val canStart = harness.controller.speechStartProjectionGuard()
+            harness.controller.stop()
+            assertTrue(harness.controller.state.value is TtsState.Idle)
+            assertFalse(canStart())
+        }
+
+    @Test
+    fun explicitSentenceNavigationInvalidatesAPendingStart() =
+        runTest {
+            val harness = SessionHarness(this)
+            assertTrue(harness.controller.speak(listOf(harness.entry("old", sentences = 2)), Locale.US))
+            val canStart = harness.controller.speechStartProjectionGuard()
+            harness.controller.skipNextSentence()
+            assertFalse(canStart())
+        }
+
+    @Test
+    fun invalidSourceCannotReplaceAnExistingSession() =
+        runTest {
+            val harness = SessionHarness(this)
+            assertTrue(harness.controller.speak(listOf(harness.entry("original")), Locale.US))
+            val originalSession = harness.controller.state.value.sessionId
+            val spoken = harness.spokenTexts()
+            val result =
+                harness.controller.speakAsync(
+                    listOf(harness.entry("stale")),
+                    Locale.US,
+                    isCurrent = { false },
+                ) { error("An invalid source must not acquire preparation ownership") }
+            assertFalse(result)
+            assertEquals(originalSession, harness.controller.state.value.sessionId)
+            assertEquals(spoken, harness.spokenTexts())
+        }
+
+    @Test
+    fun sourceChangedDuringPreparationCannotPublishOldText() =
+        runTest {
+            val harness = SessionHarness(this)
+            var currentSource = true
+            val result =
+                harness.controller.speakAsync(
+                    listOf(harness.entry("edited")),
+                    Locale.US,
+                    isCurrent = { currentSource },
+                ) {
+                    currentSource = false
+                    true
+                }
+            assertFalse(result)
+            assertTrue(harness.controller.state.value is TtsState.Idle)
+            assertTrue(harness.spokenTexts().isEmpty())
+        }
+
+    @Test
     fun preparingOwnsTheServiceBeforeTextWorkAndCommitsTheSameSession() =
         runTest {
             val harness = SessionHarness(this)

@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
-  "legacy_sha256": "54855cf3091f12ce522bc8ba611889265145c89af7246d0ad4bfd63cb66cf241",
+  "legacy_sha256": "7b31896031e7bb9918141e14fc458b37e684cfcfd7969e523ea37a6b39ae7a53",
   "categories": {
     "composable_surfaces": [
       {
@@ -61,6 +61,19 @@
           "FIND-008",
           "FIND-009",
           "INT-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: GlobalSearchDateFilterDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

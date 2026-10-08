@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -169,7 +170,7 @@ class TextAttachmentReadAloudScreenshotTest {
 
     /** Direct dragging suspends follow for the current passage; later progression reveals the next sentence. */
     @Test
-    fun manualDragYieldsThenNextSentenceResumesFollow() {
+    fun manualDragKeepsBrowsingUntilExplicitResume() {
         val longPreview = plainPreview.copy(text = (1..60).joinToString("\n\n") { "Sentence number $it continues." })
         render(longPreview)
         composeRule
@@ -177,7 +178,41 @@ class TextAttachmentReadAloudScreenshotTest {
             .performTouchInput { swipeUp() }
         composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertIsDisplayed()
         composeRule.runOnIdle { harness.engine.complete(0) }
+        composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertIsDisplayed().performClick()
         composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertDoesNotExist()
+    }
+
+    /** Repeated same-reader progression must finish a reveal rather than cancel a claimed request. */
+    @Test
+    fun successiveOffscreenSentencesFinishTheirProductionReaderReveal() {
+        val preview = plainPreview.copy(text = (1..60).joinToString("\n\n") { "Sentence number $it continues." })
+        render(preview)
+        val entry = textAttachmentTtsEntry(preview, "alice", "Alice", "message", 0)
+        val session = harness.controller.state.value.sessionId
+        val scrolling = hasScrollAction() and hasAnyDescendant(hasTestTag(TEXT_ATTACHMENT_READER_BODY_TAG))
+
+        fun scrollOffset() =
+            composeRule
+                .onNode(scrolling)
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.VerticalScrollAxisRange]
+                .value()
+
+        for (sentence in listOf(30, 45)) {
+            val previous = scrollOffset()
+            composeRule.runOnIdle {
+                harness.controller.seekToSentence(entry.messageIdHex, sentence, entry.projectionId)
+            }
+            composeRule.waitUntil(5_000) { scrollOffset() > previous }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertDoesNotExist()
+            assertEquals(session, harness.controller.state.value.sessionId)
+            assertEquals(
+                sentence,
+                harness.controller.state.value.passage
+                    ?.sentenceIndex,
+            )
+        }
     }
 
     /** Starts fixture speech and mounts the reader with theme, direction and font-scale overrides. */

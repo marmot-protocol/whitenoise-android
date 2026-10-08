@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.state.StalenessGuard
+import dev.ipf.whitenoise.android.state.tracedPagingSection
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -755,6 +756,7 @@ internal class ConversationScrollCoordinator(
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
+            traceMentionJump: Boolean = false,
             resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
@@ -763,7 +765,7 @@ internal class ConversationScrollCoordinator(
             while (
                 targetIndex != null &&
                 repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
-                prePositionIfFar(targetIndex)
+                prePositionIfFar(targetIndex, traceMentionJump)
             ) {
                 repositionAttempts++
                 ensureCurrent()
@@ -771,9 +773,13 @@ internal class ConversationScrollCoordinator(
             }
             val resolvedTargetIndex = targetIndex ?: return false
             if (isFar(resolvedTargetIndex)) {
-                writer.scrollToItem(resolvedTargetIndex, scrollOffset)
+                traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.POSITION) {
+                    writer.scrollToItem(resolvedTargetIndex, scrollOffset)
+                }
             } else {
-                writer.animateScrollToItem(resolvedTargetIndex, scrollOffset)
+                traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.ANIMATION) {
+                    writer.animateScrollToItem(resolvedTargetIndex, scrollOffset)
+                }
             }
             return true
         }
@@ -809,7 +815,10 @@ internal class ConversationScrollCoordinator(
             return true
         }
 
-        private suspend fun prePositionIfFar(targetIndex: Int): Boolean {
+        private suspend fun prePositionIfFar(
+            targetIndex: Int,
+            traceMentionJump: Boolean,
+        ): Boolean {
             val currentIndex = writer.firstVisibleItemIndex
             if (!isFar(targetIndex)) return false
             val approachIndex =
@@ -818,8 +827,19 @@ internal class ConversationScrollCoordinator(
                 } else {
                     targetIndex + MAX_ANIMATED_SCROLL_ITEMS
                 }
-            writer.scrollToItem(approachIndex, 0)
+            traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.POSITION) {
+                writer.scrollToItem(approachIndex, 0)
+            }
             return true
+        }
+
+        /** Only mention navigation opts in; other scroll paths retain their existing trace budget. */
+        private suspend inline fun traceMentionWrite(
+            enabled: Boolean,
+            name: String,
+            operation: () -> Unit,
+        ) {
+            if (enabled) tracedPagingSection(name, operation) else operation()
         }
 
         private fun isFar(targetIndex: Int): Boolean {

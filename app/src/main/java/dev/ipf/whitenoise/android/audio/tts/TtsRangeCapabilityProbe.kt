@@ -9,7 +9,7 @@ package dev.ipf.whitenoise.android.audio.tts
  * engine the user selected decides whether engine-driven word highlighting is
  * possible. No client-side code can conjure the callback; instead the engine's
  * behaviour is detected so the estimated schedule can stand in exactly when it
- * is needed and yield permanently the moment a real range arrives.
+ * is needed and yield for the current utterance when a usable real range arrives.
  *
  * "Usable" is the right question and is deliberately narrower than "reported":
  * an engine whose ranges cannot be resolved to a whole visible word — because
@@ -59,6 +59,9 @@ internal class TtsRangeCapabilityProbe(
         get() = reportsRanges == true && isConfirmed
 
     private var sawRangeForCurrentUtterance = false
+
+    /** Native timing takes priority only after this utterance supplies a usable word. */
+    val hasUsableRangeForCurrentUtterance: Boolean get() = sawRangeForCurrentUtterance
     private var silentChars = 0
 
     fun onUtteranceStart() {

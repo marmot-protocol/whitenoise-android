@@ -19,4 +19,6 @@ internal data class TtsQueuedMessage(
     val prepared: dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage? = null,
     /** Non-null marks a document entry, whose filename and sender are never prefixed to its spoken content. */
     val attachmentDisplayName: String? = null,
+    /** The immutable projection submitted to speech, retained only by this bounded queue. */
+    val presentationEntry: TtsSpeakableEntry? = null,
 )

@@ -21,6 +21,14 @@ require_command() {
   fi
 }
 
+# Reject absent measurement bytes before counting a collected trace as evidence.
+require_nonempty_trace() {
+  if [[ ! -s "$1" ]]; then
+    echo "Benchmark trace is missing or empty: $1" >&2
+    return 1
+  fi
+}
+
 require_command jq
 require_command rg
 
@@ -356,6 +364,7 @@ fixture_delivery_state() {
 }
 
 # Other users retain their data but must not bootstrap with fixture configuration.
+# Keep adb shell from consuming the profile list on its inherited standard input.
 protect_other_users() {
   local user action
   original_protected_users="$(fixture_delivery_state --protected-users)" || return 1
@@ -365,7 +374,7 @@ protect_other_users() {
     [[ "$user" =~ ^[0-9]+$ && "$user" != "$benchmark_user" ]] || return 1
     case "$action" in
       default-state | enable)
-        adb_cmd shell pm disable-user --user "$user" "$target_package" >/dev/null || return 1
+        adb_cmd shell pm disable-user --user "$user" "$target_package" </dev/null >/dev/null || return 1
         ;;
       disable | disable-user | disable-until-used) ;;
       *) return 1 ;;
@@ -381,6 +390,7 @@ protect_other_users() {
   }
 }
 
+# Restore captured profile overrides only after verifying the original shared APK.
 restore_other_users() {
   local user action observed
   # Do not restart personal accounts with test configuration or competing code.
@@ -391,7 +401,7 @@ restore_other_users() {
   while IFS=$'\t' read -r user action; do
     [[ "$user" =~ ^[0-9]+$ && "$user" != "$benchmark_user" ]] || return 1
     case "$action" in default-state | enable | disable | disable-user | disable-until-used) ;; *) return 1 ;; esac
-    adb_cmd shell pm "$action" --user "$user" "$target_package" >/dev/null || return 1
+    adb_cmd shell pm "$action" --user "$user" "$target_package" </dev/null >/dev/null || return 1
   done < <(jq -r '.[] | [.user, .action] | @tsv' <<<"$original_protected_users")
   observed="$(fixture_delivery_state --protected-users)" || return 1
   [[ "$observed" == "$original_protected_users" ]] || {
@@ -682,6 +692,16 @@ if [[ -n "$group_name" ]]; then
   instrument_command="$instrument_command \
 -e groupName $(quote_device_shell_arg "$group_name")"
 fi
+# These arguments describe a manually provisioned synthetic fixture, not native read-state resets.
+if [[ -n "${MENTION_FIXTURE_ID:-}" ]]; then
+  instrument_command="$instrument_command \
+-e mentionFixtureId $(quote_device_shell_arg "$MENTION_FIXTURE_ID") \
+-e mentionStartText $(quote_device_shell_arg "${MENTION_START_TEXT:?Missing MENTION_START_TEXT}") \
+-e mentionTargetText $(quote_device_shell_arg "${MENTION_TARGET_TEXT:?Missing MENTION_TARGET_TEXT}") \
+-e mentionUnreadCount $(quote_device_shell_arg "${MENTION_UNREAD_COUNT:?Missing MENTION_UNREAD_COUNT}") \
+-e mentionFinalOnly true"
+fi
+
 if [[ -n "${PAGING_DEEP_FLINGS:-}" ]]; then
   instrument_command="$instrument_command \
 -e pagingDeepFlings $(quote_device_shell_arg "$PAGING_DEEP_FLINGS")"
@@ -775,6 +795,7 @@ done < <(find "$local_output" -type f -name '*-benchmarkData.json' -print)
 
 benchmark_trace_count=0
 while IFS= read -r trace; do
+  require_nonempty_trace "$trace"
   ((benchmark_trace_count += 1))
 done < <(find "$local_output" -type f \( -name '*.perfetto-trace' -o -name '*.trace' \) -print)
 
