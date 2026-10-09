@@ -368,6 +368,7 @@ internal fun ComposerPill(
     composerFocus: FocusRequester,
     emojiPickerOpen: Boolean,
     onValueChange: (TextFieldValue) -> Unit,
+    readAcceptedValue: () -> TextFieldValue = { textFieldValue },
     onEmojiPickerToggle: () -> Unit,
     onAttachmentsToggle: () -> Unit,
     attachmentSheetOpen: Boolean,
@@ -473,8 +474,7 @@ internal fun ComposerPill(
     }
     val allowKeyboardInput = !selectingWithoutKeyboard
     val observeSelectionTouch = !composerFocused || selectingWithoutKeyboard
-    val imeProbe = remember { ComposerImeProbe() }
-    SideEffect { imeProbe.synchronize(textFieldValue) }
+    val latestReadAcceptedValue by rememberUpdatedState(readAcceptedValue)
     val defaultActionFocus = remember { FocusRequester() }
     var showKeyboardAfterTouchTap by remember { mutableStateOf(false) }
     LaunchedEffect(composerFocused, showKeyboardAfterTouchTap) {
@@ -1258,15 +1258,14 @@ internal fun ComposerPill(
                             InterceptPlatformTextInput(
                                 interceptor = { request, nextHandler ->
                                     if (!allowKeyboardInput) awaitCancellation()
-                                    nextHandler.startInputMethod(imeProbe.wrap(request))
+                                    nextHandler.startInputMethod(
+                                        composerInputMethodRequest(request) { latestReadAcceptedValue() },
+                                    )
                                 },
                             ) {
                                 BasicTextField(
                                     value = textFieldValue,
-                                    onValueChange = {
-                                        imeProbe.proposed(it)
-                                        onValueChange(it)
-                                    },
+                                    onValueChange = onValueChange,
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()

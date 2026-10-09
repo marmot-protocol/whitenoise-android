@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import androidx.activity.ComponentActivity
@@ -123,6 +124,42 @@ class ComposerImeEditSequenceTest {
         }
     }
 
+    /** GrapheneOS resumes composition inside the batch that delivered a hardware Backspace. */
+    @Test
+    fun hardwareBackspaceQueryPreservesSeparatorBeforeRecomposition() {
+        render("First mispelled")
+        composeRule.onNode(hasSetTextAction()).performTouchInput { click() }
+        composeRule.waitUntil(10_000) { connection.get() != null }
+        edit { setSelection(15, 15) }
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnUiThread {
+                val input = checkNotNull(connection.get())
+                input.beginBatchEdit()
+                input.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+                input.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+            }
+            composeRule.waitUntil(5_000) { value.text == "First mispelle" }
+            composeRule.runOnUiThread {
+                val input = checkNotNull(connection.get())
+                val before = input.getTextBeforeCursor(40, InputConnection.GET_TEXT_WITH_STYLES).toString()
+                assertEquals("First mispelle", before)
+                val wordStart = before.lastIndexOf(' ') + 1
+                assertEquals(6, wordStart)
+                input.setComposingRegion(wordStart, before.length)
+                input.endBatchEdit()
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.waitForIdle()
+        assertValue("First mispelle", TextRange(14), TextRange(6, 14))
+        for (word in listOf("mispell", "mispel", "mispe")) {
+            edit { setComposingText(word, 1) }
+            assertValue("First $word", TextRange(6 + word.length), TextRange(6, 6 + word.length))
+        }
+    }
+
     /** A trailing-space delete and a composing replacement preserve the earlier separator at each accepted value. */
     @Test
     fun composingReplacementAndBackspacePreserveAdjacentWords() {
@@ -156,7 +193,8 @@ class ComposerImeEditSequenceTest {
 
     private fun nativeAction(label: String) =
         checkNotNull(
-            UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            UiDevice
+                .getInstance(InstrumentationRegistry.getInstrumentation())
                 .wait(Until.findObject(By.text(label)), 5_000),
         ) { "Native $label action was not displayed" }
 
@@ -205,6 +243,7 @@ class ComposerImeEditSequenceTest {
                         ComposerPill(
                             actionColors = accountActionColors(appState = null),
                             textFieldValue = value,
+                            readAcceptedValue = { value },
                             composerFocus = remember { FocusRequester() },
                             emojiPickerOpen = false,
                             onValueChange = { value = repairComposerMentionEdit(value, it, true) },
