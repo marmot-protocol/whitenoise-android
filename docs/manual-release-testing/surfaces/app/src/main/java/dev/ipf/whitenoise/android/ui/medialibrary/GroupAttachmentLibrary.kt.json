@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/GroupAttachmentLibrary.kt",
+  "legacy_sha256": "2e809220b621317dbc2f967100119eee9e308e6e2918e15a2e559187c358506d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberGroupAttachmentPager",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/GroupAttachmentLibrary.kt",
+        "anchor": "internal fun rememberGroupAttachmentPager(",
+        "test_ids": [
+          "GRP-018"
+        ]
+      },
+      {
+        "surface": "Native shared attachment role projection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/GroupAttachmentLibrary.kt",
+        "anchor": "internal fun attachmentLibraryTiles(",
+        "test_ids": [
+          "GRP-018"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

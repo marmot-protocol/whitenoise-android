@@ -6,6 +6,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.Nip30Emoji
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
@@ -68,6 +69,7 @@ internal fun rememberReplyReceivedEmoji(
         ?.let { rememberReceivedEmoji(it, controller, appState) } ?: ReceivedEmoji.None
 }
 
+/** Keeps all artwork slots excluded while materializing just the first image for each shortcode. */
 @Composable
 private fun rememberReceivedEmojiInScope(
     item: TimelineMessage,
@@ -87,29 +89,43 @@ private fun rememberReceivedEmojiInScope(
     val defined = rememberDefinedEmoji(controller, record, attachments)
     val messageArt by produceState(emptyMap<String, EmojiArt>(), record.messageIdHex, defined, allowNetwork) {
         value =
-            defined
-                .flatMap { (index, shortcodes) ->
-                    val reference = attachments.accepted.first { it.index == index }.value
-                    val art =
-                        emojiArt {
-                            imageAttachmentBytes(
-                                controller = controller,
-                                messageIdHex = record.messageIdHex,
-                                attachmentIndex = index,
-                                reference = reference,
-                                mine = mine,
-                                priority = AttachmentDownloadPriority.Automatic,
-                                allowNetwork = allowNetwork,
-                            )
-                        }
-                    // Every alias of one image renders the same artwork.
-                    shortcodes.mapNotNull { shortcode -> art?.let { shortcode to it } }
-                }.toMap()
+            loadReceivedEmojiArtwork(defined, attachments.accepted) { (index, reference) ->
+                emojiArt {
+                    imageAttachmentBytes(
+                        controller = controller,
+                        messageIdHex = record.messageIdHex,
+                        attachmentIndex = index,
+                        reference = reference,
+                        mine = mine,
+                        priority = AttachmentDownloadPriority.Automatic,
+                        allowNetwork = allowNetwork,
+                    )
+                }
+            }
     }
     // Reaction chips stay literal `:code:` text until MDK can resolve a reaction's attachment (mdk#2151).
     return remember(defined, messageArt) {
         ReceivedEmoji(art = messageArt, attachmentIndexes = defined.keys)
     }
+}
+
+/**
+ * Preserves first-image selection in attachment order, independently of tag/map insertion order.
+ * Aliases share one read; an unavailable first image stays literal instead of trying duplicate slots.
+ */
+internal suspend fun loadReceivedEmojiArtwork(
+    defined: Map<Int, List<String>>,
+    attachments: List<IndexedAttachment>,
+    load: suspend (IndexedAttachment) -> EmojiArt?,
+): Map<String, EmojiArt> {
+    val selected = mutableSetOf<String>()
+    val artwork = mutableMapOf<String, EmojiArt>()
+    for (attachment in attachments) {
+        val codes = defined[attachment.index].orEmpty().filter { selected.add(it) }
+        if (codes.isEmpty()) continue
+        load(attachment)?.let { art -> codes.forEach { artwork[it] = art } }
+    }
+    return artwork
 }
 
 /** Which attachments the message's own emoji tags claim, with every alias each carries, keyed by index. */

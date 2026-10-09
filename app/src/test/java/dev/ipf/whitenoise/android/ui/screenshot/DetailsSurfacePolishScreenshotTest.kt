@@ -162,7 +162,7 @@ class DetailsSurfacePolishScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
     }
 
-    /** Composes the details screen for [group]; empty media fixtures have no shared-content rows. */
+    /** Composes the details screen for [group]; empty recent media still exposes the complete-history entry. */
     private fun renderGroupDetails(
         group: AppGroupRecordFfi,
         members: List<AppGroupMemberRecordFfi>,
@@ -189,7 +189,7 @@ class DetailsSurfacePolishScreenshotTest {
             }
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText(app.getString(R.string.shared_content_in_chat)).assertDoesNotExist()
+        composeRule.onNodeWithText(app.getString(R.string.shared_content_in_chat)).assertExists()
     }
 
     /** Captures profile. */

@@ -10,4 +10,8 @@
         <item quantity="one">%1$d elemento</item>
         <item quantity="other">%1$d elementi</item>
     </plurals>
+    <string name="shared_content_browse_history">Sfoglia la cronologia degli allegati condivisi</string>
+    <string name="shared_content_partial">Nessun allegato corrispondente ancora caricato</string>
+    <string name="shared_content_page_failed">Impossibile caricare i contenuti condivisi. Riprova.</string>
+    <string name="shared_content_history_end">Fine della cronologia locale degli allegati</string>
 </resources>

@@ -10,4 +10,8 @@
         <item quantity="one">%1$d Element</item>
         <item quantity="other">%1$d Elemente</item>
     </plurals>
+    <string name="shared_content_browse_history">Geteilte Anhänge durchsuchen</string>
+    <string name="shared_content_partial">Noch keine passenden Anhänge geladen</string>
+    <string name="shared_content_page_failed">Geteilte Inhalte konnten nicht geladen werden. Erneut versuchen.</string>
+    <string name="shared_content_history_end">Ende des lokalen Anhangverlaufs</string>
 </resources>

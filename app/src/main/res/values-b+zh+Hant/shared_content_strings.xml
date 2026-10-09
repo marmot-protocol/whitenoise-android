@@ -9,4 +9,8 @@
     <plurals name="shared_item_count">
         <item quantity="other">%1$d 項</item>
     </plurals>
+    <string name="shared_content_browse_history">瀏覽共享附件記錄</string>
+    <string name="shared_content_partial">尚未載入相符的附件</string>
+    <string name="shared_content_page_failed">無法載入共享內容，請重試。</string>
+    <string name="shared_content_history_end">已到本機附件記錄結尾</string>
 </resources>

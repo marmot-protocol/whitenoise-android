@@ -10,4 +10,8 @@
         <item quantity="one">%1$d öğe</item>
         <item quantity="other">%1$d öğe</item>
     </plurals>
+    <string name="shared_content_browse_history">Paylaşılan ek geçmişine göz at</string>
+    <string name="shared_content_partial">Henüz eşleşen ek yüklenmedi</string>
+    <string name="shared_content_page_failed">Paylaşılan içerik yüklenemedi. Tekrar deneyin.</string>
+    <string name="shared_content_history_end">Yerel ek geçmişinin sonu</string>
 </resources>

@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReceivedMessageEmoji.kt",
+  "legacy_sha256": "58fa3c43ce924626eef649c0c4a866ad56463dbf2d26ebc603e90099fd0c885d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Exact available reply emoji context",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReceivedMessageEmoji.kt",
+        "anchor": "fun rememberReplyReceivedEmoji(",
+        "test_ids": [
+          "MSG-037",
+          "MSG-024"
+        ]
+      },
+      {
+        "surface": "Duplicate artwork exclusion and first-image acquisition",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReceivedMessageEmoji.kt",
+        "anchor": "private fun rememberReceivedEmojiInScope(",
+        "test_ids": [
+          "MSG-034",
+          "GRP-018"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

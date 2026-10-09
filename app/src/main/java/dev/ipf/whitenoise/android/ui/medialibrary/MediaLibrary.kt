@@ -147,6 +147,7 @@ internal data class SharedMediaRow(
 internal data class MediaMonthSection<T>(
     val monthKey: Int,
     val items: List<T>,
+    val sectionKey: String = monthKey.toString(),
 )
 
 internal data class SharedMediaTiles(
@@ -235,7 +236,8 @@ internal fun rememberSharedMediaTiles(
     }
 }
 
-private fun emptySharedMediaTiles() =
+/** Empty display projection used while a new account or library generation is loading. */
+internal fun emptySharedMediaTiles() =
     SharedMediaTiles(
         visuals = emptyList(),
         images = emptyList(),
@@ -469,7 +471,33 @@ internal fun MediaLibraryRoute(
     onJumpToMessage: (String) -> Unit,
 ) {
     key(controller, appState.activeAccountRef, appState.runtimeGeneration, category) {
-        MediaLibraryContent(tiles, controller, appState, category, onBack, onJumpToMessage)
+        if (category == SharedContentCategory.Links) {
+            MediaLibraryContent(tiles, controller, appState, category, onBack, onJumpToMessage)
+        } else {
+            val pager = rememberGroupAttachmentPager(controller, appState)
+            val state = pager?.state ?: GroupAttachmentState()
+            val nativeTiles =
+                key(state.entries, controller.boundAccountIdHex) {
+                    val projected by produceState(emptySharedMediaTiles().copy(isLoading = true)) {
+                        value =
+                            withContext(Dispatchers.Default) {
+                                attachmentLibraryTiles(state.entries, controller.boundAccountIdHex)
+                            }
+                    }
+                    projected
+                }
+            val scope = rememberCoroutineScope()
+            MediaLibraryContent(
+                nativeTiles.copy(isLoading = nativeTiles.isLoading || (state.loading && !state.initialized)),
+                controller,
+                appState,
+                category,
+                onBack,
+                onJumpToMessage,
+                paging = state,
+                onLoadMore = { scope.launch { pager?.loadMore() } },
+            )
+        }
     }
 }
 
@@ -483,6 +511,8 @@ private fun MediaLibraryContent(
     category: SharedContentCategory,
     onBack: () -> Unit,
     onJumpToMessage: (String) -> Unit,
+    paging: GroupAttachmentState? = null,
+    onLoadMore: () -> Unit = {},
 ) {
     var filter by rememberSaveable { mutableStateOf(SharedVisualFilter.All) }
     val viewerSelection = remember { SharedMediaViewerSelection() }
@@ -530,45 +560,58 @@ private fun MediaLibraryContent(
         onFilter = { filter = it },
         onBack = onBack,
         loading = tiles.isLoading,
+        paging = paging,
+        onLoadMore = onLoadMore,
     ) {
-        when (category) {
-            SharedContentCategory.Media ->
-                MediaTileGrid(
-                    sections = sections,
-                    gridState =
-                        when (filter) {
-                            SharedVisualFilter.All -> allGridState
-                            SharedVisualFilter.Images -> imagesGridState
-                            SharedVisualFilter.Videos -> videosGridState
-                        },
-                    controller = controller,
-                    appState = appState,
-                    emptyLabel = stringResource(R.string.shared_content_empty),
-                    onTapTile = { viewerSelection.select(it.messageIdHex, it.attachmentIndex) },
-                )
-            SharedContentCategory.Links ->
-                UrlLibraryTab(
-                    tiles = tiles,
-                    listState = urlsListState,
-                    appState = appState,
-                    onJumpToMessage = onJumpToMessage,
-                )
-            SharedContentCategory.Documents ->
-                FileLibraryTab(
-                    tiles = tiles,
-                    listState = filesListState,
-                    controller = controller,
-                    appState = appState,
-                    onJumpToMessage = onJumpToMessage,
-                )
-            SharedContentCategory.Voice ->
-                VoiceLibraryTab(
-                    tiles = tiles,
-                    listState = voiceListState,
-                    controller = controller,
-                    appState = appState,
-                    onJumpToMessage = onJumpToMessage,
-                )
+        val selectedEmpty =
+            when (category) {
+                SharedContentCategory.Media -> visualTiles.isEmpty()
+                SharedContentCategory.Documents -> tiles.files.isEmpty()
+                SharedContentCategory.Voice -> tiles.voice.isEmpty()
+                SharedContentCategory.Links -> tiles.urls.isEmpty()
+            }
+        if (paging != null && selectedEmpty) {
+            AttachmentLibraryEmptyState(paging)
+        } else {
+            when (category) {
+                SharedContentCategory.Media ->
+                    MediaTileGrid(
+                        sections = sections,
+                        gridState =
+                            when (filter) {
+                                SharedVisualFilter.All -> allGridState
+                                SharedVisualFilter.Images -> imagesGridState
+                                SharedVisualFilter.Videos -> videosGridState
+                            },
+                        controller = controller,
+                        appState = appState,
+                        emptyLabel = stringResource(R.string.shared_content_empty),
+                        onTapTile = { viewerSelection.select(it.messageIdHex, it.attachmentIndex) },
+                    )
+                SharedContentCategory.Links ->
+                    UrlLibraryTab(
+                        tiles = tiles,
+                        listState = urlsListState,
+                        appState = appState,
+                        onJumpToMessage = onJumpToMessage,
+                    )
+                SharedContentCategory.Documents ->
+                    FileLibraryTab(
+                        tiles = tiles,
+                        listState = filesListState,
+                        controller = controller,
+                        appState = appState,
+                        onJumpToMessage = onJumpToMessage,
+                    )
+                SharedContentCategory.Voice ->
+                    VoiceLibraryTab(
+                        tiles = tiles,
+                        listState = voiceListState,
+                        controller = controller,
+                        appState = appState,
+                        onJumpToMessage = onJumpToMessage,
+                    )
+            }
         }
     }
 }
@@ -596,7 +639,7 @@ private fun MediaTileGrid(
         modifier = Modifier.fillMaxSize().trackSharedContentHeader(gridState).testTag("shared.media.grid"),
     ) {
         sections.forEach { section ->
-            item(key = "header-${section.monthKey}", span = { GridItemSpan(maxLineSpan) }) {
+            item(key = "header-${section.sectionKey}", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
                     monthLabel(section.monthKey),
                     style = MaterialTheme.typography.titleSmall,
@@ -703,7 +746,7 @@ internal fun <T> MonthSectionedColumn(
         modifier = Modifier.fillMaxSize().trackWhiteNoiseHeader(listState),
     ) {
         sections.forEach { section ->
-            item(key = "header-${section.monthKey}") {
+            item(key = "header-${section.sectionKey}") {
                 Text(
                     monthLabel(section.monthKey),
                     style = MaterialTheme.typography.titleSmall,

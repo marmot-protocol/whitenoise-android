@@ -1212,6 +1212,18 @@
         "anchor": "fun rememberConversationViewportRestorationOwner(",
         "test_ids": ["CON-027"]
       },
+      {"surface": "string:poll_votes_load_more", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "R.string.poll_votes_load_more", "test_ids": ["GRP-018"]},
+      {"surface": "string:retry", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "R.string.retry", "test_ids": ["GRP-018"]},
+      {"surface": "string:shared_content_browse_history", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "R.string.shared_content_browse_history", "test_ids": ["GRP-018"]},
+      {"surface": "string:shared_content_empty", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "R.string.shared_content_empty", "test_ids": ["GRP-018"]},
+      {"surface": "string:shared_content_history_end", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "R.string.shared_content_history_end", "test_ids": ["GRP-018"]},
+      {"surface": "string:shared_content_loading", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "R.string.shared_content_loading", "test_ids": ["GRP-018"]},
+      {"surface": "string:shared_content_page_failed", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "R.string.shared_content_page_failed", "test_ids": ["GRP-018"]},
+      {"surface": "string:shared_content_partial", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "R.string.shared_content_partial", "test_ids": ["GRP-018"]},
+      {"surface": "string:shared_content_browse_history", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/SharedContentChrome.kt", "anchor": "R.string.shared_content_browse_history", "test_ids": ["GRP-018"]},
+      {"surface": "AttachmentLibraryEmptyState", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "internal fun AttachmentLibraryEmptyState(", "test_ids": ["GRP-018"]},
+      {"surface": "AttachmentLibraryFooter", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "internal fun AttachmentLibraryFooter(", "test_ids": ["GRP-018"]},
+      {"surface": "rememberGroupAttachmentPager", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/GroupAttachmentLibrary.kt", "anchor": "internal fun rememberGroupAttachmentPager(", "test_ids": ["GRP-018"]},
       {
         "surface": "folderDragRowModifier",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",

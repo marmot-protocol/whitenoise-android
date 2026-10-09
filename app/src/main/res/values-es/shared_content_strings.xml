@@ -10,4 +10,8 @@
         <item quantity="one">%1$d elemento</item>
         <item quantity="other">%1$d elementos</item>
     </plurals>
+    <string name="shared_content_browse_history">Explorar el historial de adjuntos compartidos</string>
+    <string name="shared_content_partial">Aún no se han cargado adjuntos coincidentes</string>
+    <string name="shared_content_page_failed">No se pudo cargar el contenido compartido. Inténtalo de nuevo.</string>
+    <string name="shared_content_history_end">Fin del historial local de adjuntos</string>
 </resources>
