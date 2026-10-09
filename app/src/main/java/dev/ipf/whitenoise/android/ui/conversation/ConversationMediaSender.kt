@@ -459,12 +459,6 @@ internal class ConversationMediaSender(
         }
     }
 
-    private data class BudgetedAttachments(
-        val attachments: List<PendingAttachment>,
-        val totalBytes: Long,
-        val overflowed: Boolean,
-    )
-
     private data class PreparedStagedAttachments(
         val images: List<PendingAttachment>,
         val documents: DocumentReadOutcome,
@@ -681,47 +675,6 @@ internal class ConversationMediaSender(
         return VisualReadOutcome(attachments, overflowed)
     }
 
-    private fun limitAttachmentsToBudget(
-        attachments: List<PendingAttachment>,
-        bytesBudget: Long,
-    ): BudgetedAttachments {
-        val accepted = mutableListOf<PendingAttachment>()
-        var totalBytes = 0L
-        var overflowed = false
-        attachments.forEach { attachment ->
-            val nextTotal = totalBytes + attachment.plaintextBytes.size
-            if (nextTotal > bytesBudget) {
-                overflowed = true
-            } else {
-                totalBytes = nextTotal
-                accepted += attachment
-            }
-        }
-        return BudgetedAttachments(accepted, totalBytes, overflowed)
-    }
-
-    private suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>): List<PendingAttachment> =
-        if (attachments.isEmpty()) {
-            emptyList()
-        } else {
-            withContext(Dispatchers.Default) {
-                attachments.map { attachment ->
-                    if (!attachment.mediaType.startsWith("image/", ignoreCase = true) || attachment.thumbhash != null) {
-                        attachment
-                    } else {
-                        val bitmap =
-                            MediaPipeline.decodeSampledBitmap(
-                                attachment.plaintextBytes,
-                                MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                            )
-                        val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
-                        bitmap?.recycle()
-                        attachment.copy(thumbhash = hash)
-                    }
-                }
-            }
-        }
-
     private fun acceptPreparedAttachments(
         prepared: PreparedStagedAttachments,
         imagePickCount: Int,
@@ -794,6 +747,56 @@ internal class ConversationMediaSender(
         return seeded
     }
 }
+
+/** Attachment budget result independent of a conversation or its lifecycle. */
+private data class BudgetedAttachments(
+    val attachments: List<PendingAttachment>,
+    val totalBytes: Long,
+    val overflowed: Boolean,
+)
+
+/** Preserves pick order while rejecting attachments that exceed the remaining native album budget. */
+private fun limitAttachmentsToBudget(
+    attachments: List<PendingAttachment>,
+    bytesBudget: Long,
+): BudgetedAttachments {
+    val accepted = mutableListOf<PendingAttachment>()
+    var totalBytes = 0L
+    var overflowed = false
+    attachments.forEach { attachment ->
+        val nextTotal = totalBytes + attachment.plaintextBytes.size
+        if (nextTotal > bytesBudget) {
+            overflowed = true
+        } else {
+            totalBytes = nextTotal
+            accepted += attachment
+        }
+    }
+    return BudgetedAttachments(accepted, totalBytes, overflowed)
+}
+
+/** Completes missing image metadata off the UI thread without replacing existing thumbhashes. */
+private suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>): List<PendingAttachment> =
+    if (attachments.isEmpty()) {
+        emptyList()
+    } else {
+        withContext(Dispatchers.Default) {
+            attachments.map { attachment ->
+                if (!attachment.mediaType.startsWith("image/", ignoreCase = true) || attachment.thumbhash != null) {
+                    attachment
+                } else {
+                    val bitmap =
+                        MediaPipeline.decodeSampledBitmap(
+                            attachment.plaintextBytes,
+                            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                        )
+                    val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
+                    bitmap?.recycle()
+                    attachment.copy(thumbhash = hash)
+                }
+            }
+        }
+    }
 
 @Composable
 internal fun rememberConversationMediaSender(

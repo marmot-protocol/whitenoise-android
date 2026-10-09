@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,6 +27,31 @@ class StagedMediaSendCompletionTest {
         assertTrue(claim.isHeld)
         assertEquals(listOf(false), results)
         assertEquals(1, settlements)
+    }
+
+    /** Bubble Retry consumes only its original caption and does not repeat the rejected attempt result. */
+    @Test
+    fun durableRetrySettlesCaptionWithoutClearingNewerEdits() {
+        for (replacement in listOf(null, "new caption", "original")) {
+            val state = ComposerTextState(TextFieldValue("original"))
+            val results = mutableListOf<Boolean>()
+            val completion =
+                StagedMediaSendCompletion(
+                    { results += true },
+                    { results += false },
+                    state.captureCaptionSettlement("original"),
+                )
+            completion.reject()
+            assertEquals("original", state.valueState.value.text)
+            if (replacement != null) {
+                state.updateValue(TextFieldValue("intermediate edit"))
+                state.updateValue(TextFieldValue(replacement))
+            }
+            completion.accept()
+            completion.accept()
+            assertEquals(replacement.orEmpty(), state.valueState.value.text)
+            assertEquals(listOf(false), results)
+        }
     }
 
     /** Initial acceptance clears the exact shelf and reports success once, even when durable cleanup repeats. */

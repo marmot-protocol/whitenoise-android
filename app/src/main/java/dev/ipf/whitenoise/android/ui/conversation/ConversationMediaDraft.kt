@@ -126,6 +126,7 @@ internal class ConversationMediaDraftState(
 
     private var restoredDraftRevision: DraftRestorationVersion? = null
     private var inputsRevision = 0L
+    private var editsRevision = 0L
     private val preparationMutex = Mutex()
     private val documentOwnerFence = DraftDocumentOwnerFence()
     private var documentRemovalFence = DraftDocumentRemovalFence()
@@ -206,6 +207,7 @@ internal class ConversationMediaDraftState(
         if (slot.id !in preparingSlotIds) scope.launch { preparePhoto(slot) }
     }
 
+    /** Starts a user quality edit and revokes any earlier send's ownership before replacing native bytes. */
     fun selectQuality(
         slot: PendingMediaSlot,
         requestedQuality: MediaQuality,
@@ -217,6 +219,7 @@ internal class ConversationMediaDraftState(
         val accountRef = currentAccountRef
         if (currentlyStandard == (quality == MediaQuality.Standard) || accountRef == null) return
 
+        editsRevision += 1L
         preparingSlotIds += slot.id
         appState.launchMutation {
             try {
@@ -251,7 +254,9 @@ internal class ConversationMediaDraftState(
         }
     }
 
+    /** Revokes send ownership immediately, including removal before background preparation has completed. */
     fun releasePreparedPhoto(slotId: String) {
+        editsRevision += 1L
         val photo = backedPhotos[slotId]
         val prepared = preparedPhotos[slotId]
         if (photo == null && prepared == null) return
@@ -274,11 +279,13 @@ internal class ConversationMediaDraftState(
         activeEditor = null
     }
 
+    /** Fences an accepted crop or quality edit before its asynchronous native write begins. */
     fun saveEditor(
         editor: ActivePhotoEditor,
         recipe: PhotoEditRecipe,
         quality: MediaQuality,
     ) {
+        if (recipe != editor.photo.recipe || quality != editor.photo.quality) editsRevision += 1L
         scope.launch {
             if (recipe == editor.photo.recipe && quality == editor.photo.quality) {
                 dismissEditor(editor)
@@ -332,24 +339,23 @@ internal class ConversationMediaDraftState(
     }
 
     /**
-     * Captures the shelf and byte owners for a later durable send completion. A rejected attempt can
-     * release its UI claim; its eventual Retry completion must leave any replacement or edit intact.
+     * Captures picker occurrences and explicit edits for a later durable send completion. Background
+     * preparation may populate bytes without replacing that owner; user edits and replacements invalidate it.
      */
     fun captureSendSettlement(): () -> Boolean {
         val revision = inputsRevision
         val account = currentAccountRef
-        val photos = preparedAttachments()
-        val documents = preparedDocumentAttachments()
+        val edits = editsRevision
         return {
             val sameOwner =
                 revision == inputsRevision && account == currentAccountRef && account == appState.activeAccountRef
-            val sameBytes = photos == preparedAttachments() && documents == preparedDocumentAttachments()
-            sameOwner && sameBytes
+            sameOwner && edits == editsRevision
         }
     }
 
     /** Removes a document only after an explicit shelf action, never because the screen was disposed. */
     fun releasePreparedDocument(uri: Uri) {
+        editsRevision += 1L
         val uriString = uri.toString()
         val removalFence = documentRemovalFence
         val ownedRemoval = documentOwnerFence.recordRemoval(uriString, removalFence) ?: return
@@ -973,12 +979,12 @@ internal fun ConversationMediaDraftContent(
                 },
                 onRemoveAt = { index ->
                     mediaSlots.getOrNull(index)?.id?.let(state::releasePreparedPhoto)
-                    onMediaSlotsChange(mediaSlots.toMutableList().apply { if (index in indices) removeAt(index) })
+                    onMediaSlotsChange(mediaSlots.filterIndexed { itemIndex, _ -> itemIndex != index })
                 },
                 onRemoveDocumentAt = { index ->
                     documentUris.getOrNull(index)?.let(state::releasePreparedDocument)
                     onDocumentUrisChange(
-                        documentUris.toMutableList().apply { if (index in indices) removeAt(index) },
+                        documentUris.filterIndexed { itemIndex, _ -> itemIndex != index },
                     )
                 },
                 onAddPhotos = onAddPhotos,

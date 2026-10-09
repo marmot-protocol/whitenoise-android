@@ -101,6 +101,15 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Durable media retry clears only its captured composer caption generation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "fun captureCaptionSettlement(",
+        "test_ids": [
+          "MSG-021",
+          "MED-009"
+        ]
       }
     ]
   },
