@@ -53,17 +53,35 @@ class AiAgentsScreenScreenshotTest {
 
     /** Goose uses the same scrollable setup sheet in both themes. */
     @Test
-    fun gooseSetupSheetLight() =
-        captureSheet("ai_agents_goose_setup_light", dark = false, amoled = false, connector = "goose")
+    fun gooseSetupSheetLight() {
+        captureSheet(
+            "ai_agents_goose_setup_light",
+            dark = false,
+            amoled = false,
+            connector = "goose",
+        )
+    }
 
     @Test
-    fun gooseSetupSheetDark() =
-        captureSheet("ai_agents_goose_setup_dark", dark = true, amoled = false, connector = "goose")
+    fun gooseSetupSheetDark() {
+        captureSheet(
+            "ai_agents_goose_setup_dark",
+            dark = true,
+            amoled = false,
+            connector = "goose",
+        )
+    }
 
     @Test
     @Config(qualifiers = "ar-w360dp-h780dp-mdpi")
-    fun gooseSetupSheetRtl() =
-        captureSheet("ai_agents_goose_setup_rtl", dark = false, amoled = false, connector = "goose")
+    fun gooseSetupSheetRtl() {
+        captureSheet(
+            "ai_agents_goose_setup_rtl",
+            dark = false,
+            amoled = false,
+            connector = "goose",
+        )
+    }
 
     @Test
     fun gooseSetupSheetLargeFont() =

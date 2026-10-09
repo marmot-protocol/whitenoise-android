@@ -136,7 +136,8 @@ class ComposerAutofillMenuTest {
         assertTrue(menuKeys().contains(TextContextMenuKeys.CopyKey))
         assertTrue(menuKeys().contains(TextContextMenuKeys.PasteKey))
         assertEquals(TextToolbarStatus.Hidden, unfocusedToolbar.status)
-        composeRule.onNodeWithTag(ROOT_TAG)
+        composeRule
+            .onNodeWithTag(ROOT_TAG)
             .captureRoboImage("src/test/snapshots/composer_hidden_keyboard_selection.png")
     }
 

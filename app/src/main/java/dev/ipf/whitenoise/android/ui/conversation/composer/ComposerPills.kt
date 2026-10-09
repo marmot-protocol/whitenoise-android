@@ -473,6 +473,8 @@ internal fun ComposerPill(
     }
     val allowKeyboardInput = !selectingWithoutKeyboard
     val observeSelectionTouch = !composerFocused || selectingWithoutKeyboard
+    val imeProbe = remember { ComposerImeProbe() }
+    SideEffect { imeProbe.synchronize(textFieldValue) }
     val defaultActionFocus = remember { FocusRequester() }
     var showKeyboardAfterTouchTap by remember { mutableStateOf(false) }
     LaunchedEffect(composerFocused, showKeyboardAfterTouchTap) {
@@ -1256,12 +1258,15 @@ internal fun ComposerPill(
                             InterceptPlatformTextInput(
                                 interceptor = { request, nextHandler ->
                                     if (!allowKeyboardInput) awaitCancellation()
-                                    nextHandler.startInputMethod(request)
+                                    nextHandler.startInputMethod(imeProbe.wrap(request))
                                 },
                             ) {
                                 BasicTextField(
                                     value = textFieldValue,
-                                    onValueChange = onValueChange,
+                                    onValueChange = {
+                                        imeProbe.proposed(it)
+                                        onValueChange(it)
+                                    },
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
@@ -1337,7 +1342,11 @@ internal fun ComposerPill(
                                                 fadeEnabled = !composerFocused && textFieldValue.selection.collapsed,
                                             ).verticalScroll(composerScrollState)
                                             .onGloballyPositioned { editorBounds = it.boundsInWindow() }
-                                            .pointerInput(inputContentVisible, inputFocusEnabled, observeSelectionTouch) {
+                                            .pointerInput(
+                                                inputContentVisible,
+                                                inputFocusEnabled,
+                                                observeSelectionTouch,
+                                            ) {
                                                 if (inputContentVisible && inputFocusEnabled && observeSelectionTouch) {
                                                     composerNativeSelectionTouchGestures(
                                                         onPress = {

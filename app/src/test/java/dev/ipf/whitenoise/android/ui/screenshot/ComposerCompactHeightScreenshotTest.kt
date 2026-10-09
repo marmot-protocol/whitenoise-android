@@ -11,11 +11,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextRange
@@ -131,7 +132,13 @@ class ComposerCompactHeightScreenshotTest {
             }
         }
         composeRule.waitForIdle()
-        composeRule.onNode(hasSetTextAction()).performClick()
+        // Focus and place the caret without opening a native cursor-handle popup.
+        // Native touch selection is covered separately; this fixture measures resize overflow.
+        composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.OnClick)
+        val cursor = draft.indexOf("\nDraft line 38")
+        composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.SetSelection) {
+            it(cursor, cursor, true)
+        }
         composeRule.onNode(hasSetTextAction()).assertIsFocused()
         composeRule.waitForIdle()
         composeRule
