@@ -4619,6 +4619,36 @@
         "test_ids": ["CON-019"]
       },
       {
+        "surface": "GroupSystemActionLifetime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "private fun GroupSystemActionLifetime(",
+        "test_ids": ["GRP-023"]
+      },
+      {
+        "surface": "GroupSystemFocusedActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "private fun GroupSystemFocusedActions(",
+        "test_ids": ["GRP-023"]
+      },
+      {
+        "surface": "GroupSystemReactionSheets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "private fun GroupSystemReactionSheets(",
+        "test_ids": ["GRP-023"]
+      },
+      {
+        "surface": "GroupSystemTimelineRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "internal fun GroupSystemTimelineRow(",
+        "test_ids": ["GRP-023"]
+      },
+      {
+        "surface": "ReactionPillFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "internal fun ReactionPillFlow(",
+        "test_ids": ["GRP-023"]
+      },
+      {
         "surface": "GroupSystemRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
         "anchor": "fun GroupSystemRow(",

@@ -220,10 +220,10 @@ private fun ReactionParticipantRow(
             overflow = TextOverflow.Ellipsis,
         )
     }
-    val tapToRemove = stringResource(R.string.reaction_tap_to_remove)
-    val supportingText = if (mine) tapToRemove else shortIdentity.takeUnless { it == displayName }
+    val removeHint = stringResource(R.string.reaction_tap_to_remove)
+    val subtitle = if (mine) removeHint.takeIf { onRemove != null } else shortIdentity.takeUnless { it == displayName }
     val supporting: (@Composable () -> Unit)? =
-        supportingText?.let { text ->
+        subtitle?.let { text ->
             { ReactionParticipantSupportingText(text) }
         }
     val leading: @Composable () -> Unit = {

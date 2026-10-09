@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.Manifest
 import android.app.Application
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.SharedPreferences
@@ -556,7 +557,7 @@ class NotificationPushWakeCatchUpTest {
             }
         }
 
-    /** Injects failure at the native fetch boundary, then verifies both Android notification types. */
+    /** Recovers a failed fetch and posts the native activity preview through reaction first-post resolution. */
     private suspend fun assertTransientRecovery(warm: Boolean) {
         val context: Application = RuntimeEnvironment.getApplication()
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -576,7 +577,8 @@ class NotificationPushWakeCatchUpTest {
                         fixture.update.copy(
                             notificationKey = "reaction:account-a:message-a",
                             reactionEmoji = "👍",
-                            reactedToPreview = "Original message",
+                            previewText = "{\"kind\":1210,\"op\":\"add_member\"}",
+                            reactedToPreview = "Alice added Bob",
                         ),
                     )
                 },
@@ -607,11 +609,25 @@ class NotificationPushWakeCatchUpTest {
                     delay(1L)
                 }
             }
+            assertActivityReactionNotification(manager)
         } finally {
             manager.cancelAll()
             store.clearPendingPushWakeCatchUp()
             fixture.close()
         }
+    }
+
+    /** Checks the producer's posted text and channel, so raw kind-1210 fallback cannot pass. */
+    private fun assertActivityReactionNotification(manager: NotificationManager) {
+        val reaction =
+            manager.activeNotifications
+                .single { it.id == LocalNotificationFormatter.REACTION_NOTIFICATION_ID }
+                .notification
+        assertEquals(
+            "reacted 👍 to: \"Alice added Bob\"",
+            reaction.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+        )
+        assertEquals(NotificationChannelSpec.REACTIONS.id, reaction.channelId)
     }
 
     /** Keeps production retry limits while removing wall-clock backoff from the regression. */
