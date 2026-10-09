@@ -2258,4 +2258,7 @@
     <string name="pinned_shortcut_unavailable">此聊天已無法使用。</string>
     <string name="pinned_shortcut_failed">無法要求主螢幕捷徑。請重試。</string>
     <string name="media_set_group_picture">設為群組圖片</string>
+    <plurals name="media_downloading_count">
+        <item quantity="other">正在下載 %1$d 個附件</item>
+    </plurals>
 </resources>

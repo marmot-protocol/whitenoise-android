@@ -2290,4 +2290,8 @@
     <string name="pinned_shortcut_unavailable">Questa conversazione non è più disponibile.</string>
     <string name="pinned_shortcut_failed">Impossibile richiedere una scorciatoia. Riprova.</string>
     <string name="media_set_group_picture">Imposta come foto del gruppo</string>
+    <plurals name="media_downloading_count">
+        <item quantity="one">%1$d allegato in download</item>
+        <item quantity="other">%1$d allegati in download</item>
+    </plurals>
 </resources>
