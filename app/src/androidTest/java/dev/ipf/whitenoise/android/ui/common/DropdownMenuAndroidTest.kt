@@ -59,6 +59,8 @@ class DropdownMenuAndroidTest {
         render(rows, appMenu, expanded) { selected = it }
         rule.onNodeWithText("Open menu").performClick()
         rule.onNodeWithText("Choice 0").assertIsDisplayed()
+        // Exported window nodes depend on Android draws as well as Compose animation frames.
+        rule.waitUntil(10_000) { DropdownMenuWindowProbe.visibleText("Choice 0") != null }
         DropdownMenuWindowProbe.assertFirstRowPainted(rule.density.density)
         val last = rule.onNodeWithText("Choice ${rows - 1}")
         last.performScrollTo().assertIsDisplayed().performClick()

@@ -13,5 +13,5 @@ name: search-library-empty-rotation
 - runFlow: ../fixtures/assert-empty-library.yaml
 - assertVisible:
     id: global.library.mode.ANY_ATTACHMENT
-    selected: true
+    checked: true
 - runFlow: ../fixtures/return-from-empty-library.yaml

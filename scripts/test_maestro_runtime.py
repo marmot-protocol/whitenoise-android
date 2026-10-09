@@ -701,7 +701,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(len(paths), 9)
         for path in paths:
             text = path.read_text()
-            self.assertNotIn('id: qr_scanner', text)
+            self.assertNotIn('id: qr_scanner.screen', text)
             self.assertIn('^Scan QR Code$', text)
             if path.parent.name == 'runtime':
                 self.assertEqual(runtime.CASES[path.stem]['postcondition'], 'camera-denied')
@@ -709,8 +709,17 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 if 'rotation' in path.stem:
                     self.assertIn('NAV-009', runtime.CASES[path.stem]['manual_ids'])
         initial = list(yaml.safe_load_all(paths[0].read_text()))[1]
-        self.assertIn({'assertVisible': {'enabled': True, 'containsChild': {'text': '^(Allow Camera|Open settings)$'}}}, initial)
+        self.assertIn({'assertVisible': {'id': 'qr_scanner.recovery', 'enabled': True,
+                                        'containsChild': {'text': '^(Allow Camera|Open settings)$'}}}, initial)
         self.assertIn({'assertVisible': {'text': '^Allow Camera$'}}, initial)
+        chrome = (runtime.ROOT / 'app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt').read_text()
+        self.assertIn('.exposePerformanceTestTags()', chrome)
+        self.assertIn('.testTag("qr_scanner.recovery")', chrome)
+        captured = json.loads((runtime.ROOT / 'scripts/test-fixtures/'
+                               'maestro-2.11.0-qr-recovery-button.json').read_text())
+        self.assertIs(captured['node']['enabled'], True)
+        self.assertIs(captured['node']['clickable'], True)
+        self.assertEqual(captured['node']['children'][0]['attributes']['text'], 'Allow Camera')
 
     def test_lightning_clear_retaps_remaining_suffix_and_requires_empty_actual_field(self):
         """A word selection deleted the prefix and left /path in the observed failure."""
@@ -1539,7 +1548,13 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     node = command.get(key)
                     if isinstance(node, dict) and 'checked' in node:
                         self.assertNotIn('text', node, path.name)
-                        self.assertTrue(node.get('containsChild', {}).get('text'), path.name)
+                        if 'id' in node:
+                            self.assertIn((path.name, node['id']), {
+                                ('select-library-mode.yaml', 'global.library.mode.${LIBRARY_KIND}'),
+                                ('select-library-messages.yaml', 'global.library.mode.Messages'),
+                            })
+                        else:
+                            self.assertTrue(node.get('containsChild', {}).get('text'), path.name)
                         checked += 1
         self.assertGreaterEqual(checked, 10)
 
@@ -1591,12 +1606,23 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(swipe['direction'], 'LEFT')
         self.assertNotIn('start', swipe)
         self.assertNotIn('end', swipe)
-        self.assertIs(helper[-1]['assertVisible']['selected'], True)
+        self.assertIs(helper[-1]['assertVisible']['checked'], True)
+        capture = json.loads((runtime.ROOT / 'scripts/test-fixtures/'
+                              'maestro-2.11.0-library-chip-hierarchy.json').read_text())
+        self.assertEqual(capture['maestro_version'], '2.11.0')
+        self.assertEqual(capture['case'], 'search-library-empty-all')
+        chosen = capture['nodes']['global.library.mode.ANY_ATTACHMENT']['attributes']
+        self.assertEqual(chosen['checked'], 'true')
+        self.assertEqual(chosen['selected'], 'false')
+        self.assertNotIn('selected', helper[-1]['assertVisible'])
+        for tag, node in capture['nodes'].items():
+            if tag != 'global.library.mode.ANY_ATTACHMENT':
+                self.assertEqual(node['attributes']['checked'], 'false')
         messages = list(yaml.safe_load_all((root / 'fixtures/select-library-messages.yaml').read_text()))[1]
         self.assertEqual(messages[1]['repeat']['times'], 6)
         return_swipe = messages[1]['repeat']['commands'][0]['runFlow']['commands'][0]['swipe']
         self.assertEqual(return_swipe, {'from': {'id': 'global.library.modes'}, 'direction': 'RIGHT'})
-        self.assertEqual(messages[-1]['assertVisible'], {'id': 'global.library.mode.Messages', 'selected': True})
+        self.assertEqual(messages[-1]['assertVisible'], {'id': 'global.library.mode.Messages', 'checked': True})
         for kind in ('all', 'photos', 'files', 'audio'):
             text = (root / 'runtime' / f'search-library-empty-{kind}.yaml').read_text()
             self.assertIn('file: ../fixtures/select-library-messages.yaml', text)
@@ -1610,6 +1636,9 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn('PORTRAIT', rotation)
         warm = (root / 'runtime/search-library-empty-warm-resume.yaml').read_text()
         self.assertIn('runtime-warm-resume.yaml', warm)
+        for text in (rotation, warm):
+            commands = list(yaml.safe_load_all(text))[1]
+            self.assertIn({'assertVisible': {'id': 'global.library.mode.ANY_ATTACHMENT', 'checked': True}}, commands)
         switch = (root / 'runtime/search-library-empty-account-switch.yaml').read_text()
         self.assertLess(switch.index('- tapOn: Maestro Carol'), switch.index('- tapOn: Maestro Alice'))
         self.assertIn('- assertVisible: No Chats', switch)

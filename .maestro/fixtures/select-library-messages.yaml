@@ -19,4 +19,4 @@ appId: dev.ipf.whitenoise.android.maestrolab
     id: global.library.mode.Messages
 - assertVisible:
     id: global.library.mode.Messages
-    selected: true
+    checked: true

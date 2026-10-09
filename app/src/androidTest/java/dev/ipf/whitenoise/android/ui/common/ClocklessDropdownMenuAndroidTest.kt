@@ -37,10 +37,24 @@ class ClocklessDropdownMenuAndroidTest {
     @Test
     fun fittingMaterialControlPaintsAndSelectsWithNaturalFrames() = exerciseMenu(appMenu = false)
 
-    private fun exerciseMenu(appMenu: Boolean) {
+    @Test
+    fun overflowingAppMenuPaintsAndSelectsWithNaturalFrames() = exerciseMenu(appMenu = true, rows = 30)
+
+    @Test
+    fun actionSizedAppAnchorPaintsAndSelectsWithNaturalFrames() = exerciseMenu(appMenu = true, actionSizedAnchor = true)
+
+    @Test
+    fun actionSizedMaterialAnchorPaintsAndSelectsWithNaturalFrames() =
+        exerciseMenu(appMenu = false, actionSizedAnchor = true)
+
+    private fun exerciseMenu(
+        appMenu: Boolean,
+        rows: Int = 3,
+        actionSizedAnchor: Boolean = false,
+    ) {
         val expanded = mutableStateOf(false)
         val selected = mutableStateOf(-1)
-        val density = renderMenu(appMenu, expanded, selected)
+        val density = renderMenu(appMenu, rows, actionSizedAnchor, expanded, selected)
         DropdownMenuWindowProbe.clickText("Open menu")
         DropdownMenuWindowProbe.assertFirstRowPainted(density)
         DropdownMenuWindowProbe.clickText("Choice 2")
@@ -54,6 +68,8 @@ class ClocklessDropdownMenuAndroidTest {
 
     private fun renderMenu(
         appMenu: Boolean,
+        rows: Int,
+        actionSizedAnchor: Boolean,
         expanded: MutableState<Boolean>,
         selected: MutableState<Int>,
     ): Float {
@@ -64,31 +80,33 @@ class ClocklessDropdownMenuAndroidTest {
             activity.setContent {
                 WhiteNoiseTheme {
                     Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                        Button(onClick = { expanded.value = true }) { Text("Open menu") }
-                        if (appMenu) {
-                            WhiteNoiseDropdownMenu(
-                                expanded = expanded.value,
-                                onDismissRequest = { expanded.value = false },
-                                items =
-                                    List(3) { index ->
-                                        WhiteNoiseMenuItem(
-                                            "Choice $index",
-                                            onClick = { selected.value = index },
+                        Box(if (actionSizedAnchor) Modifier else Modifier.fillMaxSize()) {
+                            Button(onClick = { expanded.value = true }) { Text("Open menu") }
+                            if (appMenu) {
+                                WhiteNoiseDropdownMenu(
+                                    expanded = expanded.value,
+                                    onDismissRequest = { expanded.value = false },
+                                    items =
+                                        List(rows) { index ->
+                                            WhiteNoiseMenuItem(
+                                                "Choice $index",
+                                                onClick = { selected.value = index },
+                                                modifier = Modifier.background(Color.Cyan),
+                                            )
+                                        },
+                                )
+                            } else {
+                                DropdownMenu(expanded.value, onDismissRequest = { expanded.value = false }) {
+                                    repeat(rows) { index ->
+                                        DropdownMenuItem(
+                                            text = { Text("Choice $index") },
+                                            onClick = {
+                                                selected.value = index
+                                                expanded.value = false
+                                            },
                                             modifier = Modifier.background(Color.Cyan),
                                         )
-                                    },
-                            )
-                        } else {
-                            DropdownMenu(expanded.value, onDismissRequest = { expanded.value = false }) {
-                                repeat(3) { index ->
-                                    DropdownMenuItem(
-                                        text = { Text("Choice $index") },
-                                        onClick = {
-                                            selected.value = index
-                                            expanded.value = false
-                                        },
-                                        modifier = Modifier.background(Color.Cyan),
-                                    )
+                                    }
                                 }
                             }
                         }
