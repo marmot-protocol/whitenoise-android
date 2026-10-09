@@ -83,7 +83,8 @@ internal class MainShellSectionState(
     }
 
     private fun validSection(value: String?): String {
-        return MainSection.entries.firstOrNull { it.name == value }?.name ?: MainSection.Chats.name
+        val entry = MainSection.entries.firstOrNull { it.name == value }
+        return entry?.name ?: MainSection.Chats.name
     }
 
     private fun validDetail(value: String?): String? = SettingsDetail.entries.firstOrNull { it.name == value }?.name
