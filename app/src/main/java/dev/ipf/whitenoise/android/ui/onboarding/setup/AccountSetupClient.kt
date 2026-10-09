@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingSubscription
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.core.MarmotClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -49,6 +50,7 @@ internal data class SetupRequest(
     val writeRelays: List<String> = emptyList(),
     val profile: UserProfileMetadataFfi? = null,
     val recoveryEpoch: String? = null,
+    val resetRelays: Boolean = false,
 )
 
 /** Holds one runtime instance for its entire lifetime; replacement runtimes get a new client. */
@@ -120,18 +122,32 @@ internal class MarmotAccountSetupClient(
             if (result == null || cancelledRelayDraft) result else defaults.advance(result)
         }
 
+    /** Keeps full replacement an explicit action separate from the default native minimal preview. */
+    private suspend fun proposeRelayRepair(request: SetupRequest): OnboardingSnapshotFfi =
+        if (request.resetRelays) {
+            marmot.proposeOnboardingRelays(
+                account,
+                request.step,
+                if (request.step == OnboardingStepFfi.INBOX_RELAYS) {
+                    MarmotClient.bootstrapRelays
+                } else {
+                    MarmotClient.accountRelays
+                },
+                if (request.step == OnboardingStepFfi.RELAYS) MarmotClient.accountRelays else emptyList(),
+            )
+        } else {
+            marmot.proposeOnboardingRelayRepair(account, request.step)
+        }
+
     /** Maps each explicit decision to the published native command. */
     private suspend fun dispatch(request: SetupRequest): OnboardingSnapshotFfi? =
         with(request) {
             when (action) {
                 OnboardingActionFfi.RETRY -> marmot.retryOnboardingStep(account, step)
                 OnboardingActionFfi.CONTINUE_WITHOUT -> marmot.continueOnboardingWithout(account, step)
-                // MDK appends defaults while preserving the checked list and its NIP-65 roles.
+                // A preview never signs; reset is a separately reviewed, explicit full replacement.
                 OnboardingActionFfi.USE_RECOMMENDED_RELAYS ->
-                    marmot.proposeOnboardingRecommendedRelays(
-                        account,
-                        step,
-                    )
+                    proposeRelayRepair(request)
                 OnboardingActionFfi.EDIT_RELAYS ->
                     marmot.proposeOnboardingRelays(
                         account,

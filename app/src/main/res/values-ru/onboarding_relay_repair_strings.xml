@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">Сбросить до рекомендуемых реле</string>
+    <string name="setup_repair_preview">Проверьте исправление реле перед публикацией. Другие ваши приложения Nostr увидят то же изменение.</string>
+    <string name="setup_repair_manual">Эти данные реле требуют ручной проверки. Автоматическое исправление не будет опубликовано.</string>
+    <string name="setup_repair_before">Текущая декларация</string>
+    <string name="setup_repair_after">Предлагаемая декларация</string>
+    <string name="setup_repair_retained">Сохранить</string>
+    <string name="setup_repair_removed">Удалить</string>
+    <string name="setup_repair_added">Добавить</string>
+    <string name="setup_repair_read">Чтение</string>
+    <string name="setup_repair_write">Публикация</string>
+    <string name="setup_repair_both">Чтение и публикация</string>
+    <string name="setup_repair_inbox">Получение приглашений</string>
+    <string name="setup_repair_other">Другие метаданные</string>
+    <string name="setup_repair_content">Содержимое события</string>
+    <string name="setup_repair_edit_unavailable">Эта декларация содержит данные, которые ручной редактор не может сохранить. Используйте точный предпросмотр исправления или проверьте её в клиенте с поддержкой этих данных.</string>
+    <string name="setup_repair_edit_unchanged">Измените реле, прежде чем проверять замену. Ничего не будет опубликовано без вашего подтверждения.</string>
+</resources>

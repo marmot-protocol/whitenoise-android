@@ -67,37 +67,16 @@ internal fun SetupEditorContent(
     randomName: (String?) -> String,
 ) {
     if (editor.action == OnboardingActionFfi.EDIT_PROFILE) {
-        WhiteNoiseTextField(
-            state = fields.displayName,
-            emojiAction = true,
-            enabled = !busy,
-            lineLimits = TextFieldLineLimits.SingleLine,
-            label = { Text(stringResource(R.string.setup_display_name)) },
-            trailingIcon = {
-                RandomProfileNameButton(
-                    enabled = !busy,
-                    onClick = {
-                        fields.displayName.setTextAndPlaceCursorAtEnd(randomName(fields.displayName.text.toString()))
-                    },
-                    modifier = Modifier.testTag("setup.profile.suggest_name"),
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        WhiteNoiseTextField(
-            state = fields.about,
-            emojiAction = true,
-            enabled = !busy,
-            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6),
-            label = { Text(stringResource(R.string.setup_about)) },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        SetupProfileFields(fields, busy, randomName)
     } else {
+        if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
+            Text(stringResource(editor.relayEditHelp()))
+        }
         val discovery = editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
         Text(stringResource(if (discovery) R.string.setup_discovery_help else R.string.setup_relays_help))
         WhiteNoiseTextField(
             state = fields.reads,
-            enabled = !busy,
+            enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.preservesRelayDeclaration),
             lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
             label = {
                 Text(
@@ -115,11 +94,51 @@ internal fun SetupEditorContent(
         if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
             WhiteNoiseTextField(
                 state = fields.writes,
-                enabled = !busy,
+                enabled = !busy && editor.preservesRelayDeclaration,
                 lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                 label = { Text(stringResource(R.string.setup_write_list)) },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
     }
+}
+
+/** Preserves the existing profile fields and name suggestion action alongside the relay editor. */
+@Composable
+private fun SetupProfileFields(
+    fields: SetupEditorFields,
+    busy: Boolean,
+    randomName: (String?) -> String,
+) {
+    WhiteNoiseTextField(
+        state = fields.displayName,
+        emojiAction = true,
+        enabled = !busy,
+        lineLimits = TextFieldLineLimits.SingleLine,
+        label = { Text(stringResource(R.string.setup_display_name)) },
+        trailingIcon = {
+            RandomProfileNameButton(
+                enabled = !busy,
+                onClick = {
+                    fields.displayName.setTextAndPlaceCursorAtEnd(randomName(fields.displayName.text.toString()))
+                },
+                modifier = Modifier.testTag("setup.profile.suggest_name"),
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    WhiteNoiseTextField(
+        state = fields.about,
+        emojiAction = true,
+        enabled = !busy,
+        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6),
+        label = { Text(stringResource(R.string.setup_about)) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/** Explains whether the current artifact can safely submit this exact declaration. */
+private fun SetupEditor.relayEditHelp(): Int {
+    if (preservesRelayDeclaration) return R.string.setup_repair_edit_unchanged
+    return R.string.setup_repair_edit_unavailable
 }

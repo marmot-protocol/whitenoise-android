@@ -27,6 +27,18 @@ internal class LoopbackNostrRelay : Closeable {
     private val events = LinkedHashMap<String, JSONObject>()
     private val clients = ConcurrentHashMap.newKeySet<Client>()
 
+    /** Test-controlled visibility models an advertised outbox without a discovery-only package. */
+    @Volatile var hiddenKinds: Set<Int> = emptySet()
+
+    /** Counts exact kind reads so recovery tests can prove the actual route used. */
+    val kindReads = ConcurrentHashMap<Int, java.util.concurrent.atomic.AtomicInteger>()
+
+    /** Returns immutable copies of fixture events without exposing user-owned storage. */
+    fun recordedEvents(kind: Int): List<JSONObject> =
+        synchronized(lock) {
+            events.values.filter { it.optInt("kind") == kind }.map { JSONObject(it.toString()) }
+        }
+
     /** The relay's WebSocket endpoint. */
     val url: String = "ws://$LOOPBACK:${server.localPort}"
 
@@ -131,6 +143,18 @@ internal class LoopbackNostrRelay : Closeable {
                 "REQ" -> {
                     val id = message.getString(1)
                     val filters = (2 until message.length()).map(message::getJSONObject)
+                    filters.forEach { filter ->
+                        val kinds = filter.optJSONArray("kinds")
+                        if (kinds != null) {
+                            for (index in 0 until kinds.length()) {
+                                kindReads
+                                    .computeIfAbsent(kinds.getInt(index)) {
+                                        java.util.concurrent.atomic
+                                            .AtomicInteger()
+                                    }.incrementAndGet()
+                            }
+                        }
+                    }
                     synchronized(lock) {
                         subscriptions[id] = filters
                         stored(filters).forEach { sendJson(JSONArray().put("EVENT").put(id).put(it)) }
@@ -147,7 +171,7 @@ internal class LoopbackNostrRelay : Closeable {
             val selected = LinkedHashMap<String, JSONObject>()
             filters.forEach { filter ->
                 newestFirst
-                    .filter { matches(it, filter) }
+                    .filter { it.optInt("kind") !in hiddenKinds && matches(it, filter) }
                     .take(filter.optInt("limit", Int.MAX_VALUE))
                     .forEach { selected[it.getString("id")] = it }
             }
@@ -156,6 +180,7 @@ internal class LoopbackNostrRelay : Closeable {
 
         /** Pushes a newly accepted event to each matching live subscription. */
         fun deliver(event: JSONObject) {
+            if (event.optInt("kind") in hiddenKinds) return
             subscriptions.forEach { (id, filters) ->
                 if (filters.any { matches(event, it) }) sendJson(JSONArray().put("EVENT").put(id).put(event))
             }

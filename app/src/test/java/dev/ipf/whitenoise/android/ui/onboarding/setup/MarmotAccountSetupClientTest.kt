@@ -181,6 +181,31 @@ class MarmotAccountSetupClientTest {
             assertEquals(listOf("cancelOnboardingRepair"), calls)
         }
 
+    /** Minimal repair uses the typed native preview; no approval or signing call is made. */
+    @Test fun minimalRepairUsesLosslessNativeProposal() =
+        runTest {
+            val calls = mutableListOf<String>()
+            val client = MarmotAccountSetupClient(nativeBoundary { name, _ -> calls += name }, SETUP_TEST_ACCOUNT) {}
+            client.execute(SetupRequest(3uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.USE_RECOMMENDED_RELAYS))
+            assertEquals(listOf("proposeOnboardingRelayRepair"), calls)
+        }
+
+    /** Explicit reset reaches the full replacement path, never masquerading as minimal repair. */
+    @Test fun fullResetUsesAnExplicitReplacementProposal() =
+        runTest {
+            val calls = mutableListOf<String>()
+            val client = MarmotAccountSetupClient(nativeBoundary { name, _ -> calls += name }, SETUP_TEST_ACCOUNT) {}
+            client.execute(
+                SetupRequest(
+                    3uL,
+                    OnboardingStepFfi.INBOX_RELAYS,
+                    OnboardingActionFfi.USE_RECOMMENDED_RELAYS,
+                    resetRelays = true,
+                ),
+            )
+            assertEquals(listOf("proposeOnboardingRelays"), calls)
+        }
+
     /** Builds a strict proxy that records the native method and arguments under test. */
     private fun nativeBoundary(onCall: (String, Array<out Any?>) -> Unit): MarmotInterface {
         val nativeType = MarmotInterface::class.java

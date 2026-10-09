@@ -34,6 +34,32 @@
           "ONB-021",
           "ONB-023"
         ]
+      },
+      {
+        "surface": "R.string.setup_repair_edit_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_repair_edit_unavailable",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_repair_edit_unchanged",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_repair_edit_unchanged",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "SetupProfileFields",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun SetupProfileFields(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-023",
+          "PRO-010"
+        ]
       }
     ],
     "source_coverage": [

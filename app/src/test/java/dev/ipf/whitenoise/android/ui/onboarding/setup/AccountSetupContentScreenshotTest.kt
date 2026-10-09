@@ -12,6 +12,12 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
+import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
+import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
+import dev.ipf.marmotkit.OnboardingRelayTagChangeFfi
+import dev.ipf.marmotkit.OnboardingRelayTagDispositionFfi
+import dev.ipf.marmotkit.OnboardingRelayTagFfi
+import dev.ipf.marmotkit.OnboardingRelayTagRoleFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
@@ -29,6 +35,45 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36], qualifiers = "en-w360dp-h1000dp-mdpi")
 class AccountSetupContentScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
+
+    /** Both explicit choices are visible without opening diagnostic details. */
+    @Test fun relayRepairChoices() =
+        capture(
+            "relay_repair_choices",
+            AccountSetupState(
+                snapshot =
+                    relayDecision().apply {
+                        steps
+                            .first {
+                                it.step ==
+                                    OnboardingStepFfi.RELAYS
+                            }.findings =
+                            listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, null))
+                    },
+            ),
+        )
+
+    /** Records the exact declaration and native change labels before consent. */
+    @Test fun relayRepairPreview() = capture("relay_repair_preview", AccountSetupState(snapshot = relayDiffSnapshot()))
+
+    /** Long exact source strings remain inspectable in a large-text mirrored viewport. */
+    @Test fun relayRepairPreviewDarkRtlLarge() =
+        capture(
+            "relay_repair_preview_dark_rtl_large",
+            AccountSetupState(snapshot = relayDiffSnapshot()),
+            dark = true,
+            rtl = true,
+            fontScale = 2f,
+        )
+
+    /** A manual-review outcome cannot be confused with an approved publication still pending. */
+    @Test fun relayRepairManualReview() {
+        val snapshot = relayDiffSnapshot()
+        snapshot.proposal!!.relayRepair!!.mode = dev.ipf.marmotkit.OnboardingRelayRepairModeFfi.MANUAL_REVIEW
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.actions =
+            listOf(OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.CANCEL_REPAIR)
+        capture("relay_repair_manual", AccountSetupState(snapshot = snapshot))
+    }
 
     /** Captures the busy preflight state with the current decision and checklist visible. */
     @Test fun progress() = capture("progress", AccountSetupState(snapshot = setupSnapshot(), busy = true))
@@ -105,8 +150,8 @@ class AccountSetupContentScreenshotTest {
                         3uL,
                         OnboardingStepFfi.INBOX_RELAYS,
                         OnboardingActionFfi.EDIT_RELAYS,
-                        reads = "wss://inbox.example",
-                    ),
+                    ).withRelayDeclaration(relayRepairFixture().copy(beforeTags = emptyList()))
+                        .copy(reads = "wss://inbox.example"),
             ),
         )
 
@@ -274,6 +319,65 @@ class AccountSetupContentScreenshotTest {
         }
         capture("device_retry", AccountSetupState(snapshot = snapshot))
     }
+
+    /** Includes real occurrence changes so the visual fixture exercises every native disposition. */
+    private fun relayDiffSnapshot() =
+        relayPreviewSnapshot().apply {
+            val read =
+                OnboardingRelayTagFfi(
+                    listOf("r", "wss://read.example", "read"),
+                    "wss://read.example",
+                    OnboardingRelayTagRoleFfi.READ,
+                )
+            val old =
+                OnboardingRelayTagFfi(
+                    listOf("r", "wss://old.example", "write"),
+                    "wss://old.example",
+                    OnboardingRelayTagRoleFfi.WRITE,
+                )
+            val added =
+                OnboardingRelayTagFfi(
+                    listOf("r", "wss://new.example", "write"),
+                    "wss://new.example",
+                    OnboardingRelayTagRoleFfi.WRITE,
+                )
+            proposal!!.relayRepair =
+                relayRepairFixture().copy(
+                    mode = OnboardingRelayRepairModeFfi.REMOVAL_AND_ADDITIVE,
+                    beforeTags = listOf(read, old),
+                    afterTags = listOf(read, added),
+                    changes =
+                        listOf(
+                            OnboardingRelayTagChangeFfi(
+                                OnboardingRelayTagDispositionFfi.RETAINED,
+                                0uL,
+                                0uL,
+                                read.fields,
+                                read.endpoint,
+                                read.role,
+                                OnboardingRelayCapabilityFfi.NONE,
+                            ),
+                            OnboardingRelayTagChangeFfi(
+                                OnboardingRelayTagDispositionFfi.REMOVED,
+                                1uL,
+                                null,
+                                old.fields,
+                                old.endpoint,
+                                old.role,
+                                OnboardingRelayCapabilityFfi.NONE,
+                            ),
+                            OnboardingRelayTagChangeFfi(
+                                OnboardingRelayTagDispositionFfi.ADDED,
+                                null,
+                                1uL,
+                                added.fields,
+                                added.endpoint,
+                                added.role,
+                                OnboardingRelayCapabilityFfi.WRITE,
+                            ),
+                        ),
+                )
+        }
 
     /** Freezes animation time and records the supplied state with explicit theme, direction, and density. */
     private fun capture(

@@ -38,6 +38,27 @@ class AccountSetupContentTest {
     private var reconnected = 0
     private var details = 0
 
+    /** Both recovery choices are visible together; neither publishes before a separate approval. */
+    @Test fun relayChoicesDoNotRequireExpandedDetails() {
+        show(AccountSetupState(snapshot = relayDecision()))
+        composeRule.onNodeWithText("Fix relay setup").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Review relays").assertIsDisplayed().performClick()
+        assertEquals(OnboardingActionFfi.USE_RECOMMENDED_RELAYS, actions.single().action)
+        assertEquals(listOf(OnboardingActionFfi.EDIT_RELAYS), edits)
+        composeRule.onNodeWithTag("setup-reset-relays").assertDoesNotExist()
+    }
+
+    /** A manual-review preview does not masquerade as signed work or offer an approval. */
+    @Test fun manualReviewHasNoPublishActionOrPendingPublicationClaim() {
+        val snapshot = relayPreviewSnapshot()
+        snapshot.proposal!!.relayRepair!!.mode = dev.ipf.marmotkit.OnboardingRelayRepairModeFfi.MANUAL_REVIEW
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.actions =
+            listOf(OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.CANCEL_REPAIR)
+        show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithTag("setup-action-APPROVE_REPAIR").assertDoesNotExist()
+        composeRule.onNodeWithText("These relay details need manual review.", substring = true).assertExists()
+    }
+
     /** The dice edits only the profile draft; native publication still requires Save and approval. */
     @Test
     fun profileEditorDiceStagesSuggestedName() {
@@ -166,7 +187,9 @@ class AccountSetupContentTest {
         show(
             AccountSetupState(
                 snapshot = setupSnapshot(OnboardingStepFfi.INBOX_RELAYS),
-                editor = SetupEditor(3uL, OnboardingStepFfi.INBOX_RELAYS, OnboardingActionFfi.EDIT_RELAYS),
+                editor =
+                    SetupEditor(3uL, OnboardingStepFfi.INBOX_RELAYS, OnboardingActionFfi.EDIT_RELAYS)
+                        .withRelayDeclaration(relayRepairFixture().copy(beforeTags = emptyList())),
             ),
         )
         composeRule.onNode(hasSetTextAction() and hasText("Inbox relays")).assertExists()
