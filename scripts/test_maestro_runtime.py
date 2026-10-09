@@ -21,6 +21,22 @@ from scripts.maestro_runtime_selection import selection, matrix_selection
 from scripts.manual_test_fragments import definitions, load_guide
 
 
+def expanded_flow_commands(path, parents=()):
+    """Inspect the actual mandatory commands when a journey uses a shared entry fixture."""
+    path = path.resolve()
+    if path in parents:
+        raise ValueError('Cyclic Maestro fixture')
+    commands = list(yaml.safe_load_all(path.read_text()))[1]
+    result = []
+    for command in commands:
+        child = command.get('runFlow') if isinstance(command, dict) else None
+        if isinstance(child, str):
+            result.extend(expanded_flow_commands(path.parent / child, (*parents, path)))
+        else:
+            result.append(command)
+    return result
+
+
 class CampaignSummaryTest(unittest.TestCase):
     def test_matrix_cli_works_outside_package_import_context(self):
         """Regress the hosted summary's direct-script import without a repository PYTHONPATH."""
@@ -658,7 +674,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(label['attributes']['enabled'], 'true')
         checked = 0
         for path in (root / '.maestro/runtime').glob('inbound-share-*.yaml'):
-            commands = list(yaml.safe_load_all(path.read_text()))[1]
+            commands = expanded_flow_commands(path)
             for command in commands:
                 selector = command.get('assertVisible', {}) if isinstance(command, dict) else {}
                 if isinstance(selector, dict) and selector.get('enabled') is False:
@@ -674,7 +690,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         paths.append(runtime.ROOT / '.maestro/runtime/folder-rules-empty-group-blocks-save.yaml')
         for path in paths:
             text = 'Add group' if path.name.startswith('folder-') else 'Add relay'
-            commands = list(yaml.safe_load_all(path.read_text()))[1]
+            commands = expanded_flow_commands(path)
             tap = commands.index({'tapOn': text})
             self.assertEqual(commands[tap - 1], {
                 'scrollUntilVisible': {'element': {'text': f'^{text}$'}, 'direction': 'DOWN'}})
@@ -722,7 +738,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for path in paths:
             text = path.read_text()
             self.assertNotIn('id: qr_scanner.screen', text)
-            self.assertIn('^Scan QR Code$', text)
+            self.assertTrue('^Scan QR Code$' in text or
+                            'runFlow: ../fixtures/runtime-qr-denied-ready.yaml' in text)
             for command in list(yaml.safe_load_all(text))[1]:
                 selector = command.get('assertVisible') if isinstance(command, dict) else None
                 if isinstance(selector, dict) and selector.get('containsChild') == {
@@ -731,6 +748,10 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertEqual(selector.get('id'), 'qr_scanner.recovery', path.name)
                     self.assertIs(selector['enabled'], True)
             if path.parent.name == 'runtime':
+                commands = list(yaml.safe_load_all(text))[1]
+                self.assertNotIn({'assertNotVisible': {'text': '^Scan QR Code$'}}, commands)
+                for control in ('qr_scanner.recovery', 'qr_scanner.close'):
+                    self.assertIn({'assertNotVisible': {'id': control}}, commands)
                 self.assertEqual(runtime.CASES[path.stem]['postcondition'], 'camera-denied')
                 self.assertNotIn('no target/torch', runtime.CASES[path.stem]['assertions'])
                 if 'rotation' in path.stem:
@@ -1670,7 +1691,12 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn('LANDSCAPE_LEFT', rotated)
         self.assertIn('PORTRAIT', rotated)
         helper = (root / 'fixtures/copy-fixture-public-key.yaml').read_text()
-        self.assertIn('- tapOn: Copy public key', helper)
+        commands = list(yaml.safe_load_all(helper))[1]
+        tap = next(command['tapOn'] for command in commands if 'tapOn' in command)
+        self.assertEqual(tap['text'], 'Copy public key')
+        self.assertIs(type(tap['waitToSettleTimeoutMs']), int)
+        self.assertGreaterEqual(tap['waitToSettleTimeoutMs'], 0)
+        self.assertLess(tap['waitToSettleTimeoutMs'], 2000)
         self.assertIn('- assertVisible: Public key copied', helper)
         self.assertIn('- assertVisible: Private key hidden', helper)
 
@@ -1731,6 +1757,18 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for text in (rotation, warm):
             commands = list(yaml.safe_load_all(text))[1]
             self.assertIn({'assertVisible': {'id': 'global.library.mode.ANY_ATTACHMENT', 'checked': True}}, commands)
+        returned = list(yaml.safe_load_all((root / 'fixtures/return-from-empty-library.yaml').read_text()))[1]
+        self.assertNotIn('hideKeyboard', returned)
+        guarded = returned[0]['runFlow']
+        keyboard_pattern = guarded['when']['visible']['id']
+        self.assertRegex('com.google.android.inputmethod.latin:id/keyboard_view', keyboard_pattern)
+        self.assertNotRegex('dev.ipf.whitenoise.android.maestrolab:id/chats.searchField', keyboard_pattern)
+        self.assertEqual(guarded['commands'], ['hideKeyboard'])
+        self.assertEqual(returned[1:3], [{'assertVisible': {'id': 'global.library'}}, 'back'])
+        self.assertEqual(returned.count('back'), 1)
+        self.assertIn({'assertNotVisible': {'id': 'global.library'}}, returned)
+        self.assertIn({'assertNotVisible': {'id': 'chats.searchField'}}, returned)
+        self.assertEqual(returned[-1], {'assertVisible': 'Maestro group'})
         switch = (root / 'runtime/search-library-empty-account-switch.yaml').read_text()
         self.assertLess(switch.index('- tapOn: Maestro Carol'), switch.index('- tapOn: Maestro Alice'))
         self.assertIn('- assertVisible: No Chats', switch)

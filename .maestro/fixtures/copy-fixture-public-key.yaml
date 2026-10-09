@@ -4,7 +4,10 @@ appId: dev.ipf.whitenoise.android.maestrolab
     element:
       text: Copy public key
     direction: UP
-- tapOn: Copy public key
+# Assert the two-second acknowledgement before it expires.
+- tapOn:
+    text: Copy public key
+    waitToSettleTimeoutMs: 100
 - assertVisible: Public key copied
 - scrollUntilVisible:
     element:

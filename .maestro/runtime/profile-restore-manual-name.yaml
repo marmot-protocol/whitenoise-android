@@ -1,37 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: profile-restore-manual-name
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: Maestro group
-- runFlow: ../fixtures/open-settings.yaml
-- assertVisible: Settings
-- tapOn: Profile
-- assertVisible:
-    id: profile.edit
-- tapOn:
-    id: profile.edit
-- scrollUntilVisible:
-    element:
-      id: profile.name_field
-    direction: DOWN
-- assertVisible:
-    id: profile.name_field
-- tapOn:
-    id: profile.name_field
-- longPressOn:
-    id: profile.name_field
-- runFlow:
-    when:
-      visible: (?i)select all
-    commands:
-    - tapOn: (?i)select all
-- assertVisible:
-    id: profile.name_field
-    focused: true
-- eraseText: 100
-- assertNotVisible:
-    id: profile.name_field
-    text: .+
+- runFlow: ../fixtures/open-fixture-empty-profile-name.yaml
 - inputText: Maestro unsaved name
 - assertVisible:
     id: profile.name_field

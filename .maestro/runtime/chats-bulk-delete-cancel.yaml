@@ -9,9 +9,12 @@ name: chats-bulk-delete-cancel
 - tapOn: "Select"
 - assertVisible:
     id: "chats.selectionControls"
-- tapOn: "Delete"
-- assertVisible: "Delete from this device"
+- tapOn: "Leave and delete"
+- assertVisible: "Leave and delete"
+- assertVisible: "Review 1 selected chats.*"
+- assertVisible: "Cancel"
 - tapOn: "Cancel"
+- assertNotVisible: "Review 1 selected chats.*"
 - assertVisible: "Maestro group"
 - back
 - assertNotVisible:

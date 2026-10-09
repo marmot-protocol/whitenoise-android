@@ -1,15 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: inbound-share-documents-multiple-cancel
 ---
-- runFlow: ../fixtures/runtime-share-text-ready.yaml
-- assertVisible:
-    id: performance.share_picker
-- assertVisible:
-    text: ^Maestro group$
-- assertVisible:
-    enabled: false
-    containsChild:
-      text: ^Share$
+- runFlow: ../fixtures/runtime-share-picker-ready.yaml
 - tapOn: Close
 - assertNotVisible:
     id: performance.share_picker

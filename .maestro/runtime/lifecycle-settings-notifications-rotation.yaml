@@ -1,15 +1,10 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: lifecycle-settings-notifications-rotation
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: Maestro group
-- runFlow: ../fixtures/open-settings.yaml
-- assertVisible: Settings
-- scrollUntilVisible:
-    element:
-      text: Notifications
-    direction: DOWN
-- tapOn: Notifications
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Notifications
 - assertVisible:
     id: notifications.permission.group
 - setOrientation: LANDSCAPE_LEFT

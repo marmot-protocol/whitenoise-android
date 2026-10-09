@@ -223,6 +223,7 @@ internal class MainShellStateHolder(
     private val processState: MainShellProcessState = MainShellProcessState(appState),
 ) : ViewModel() {
     private val composerExpansionStateSubscription: AutoCloseable
+    val sectionState = MainShellSectionState(savedStateHandle)
 
     init {
         appState.composerExpansionStateRetention.restoreIfEmpty(
@@ -345,7 +346,10 @@ internal class MainShellStateHolder(
     fun chatsController(
         accountRef: String?,
         runtimeGeneration: Int,
-    ): ChatsController = processState.chatsController(accountRef, runtimeGeneration)
+    ): ChatsController {
+        sectionState.bind(accountRef, runtimeGeneration)
+        return processState.chatsController(accountRef, runtimeGeneration)
+    }
 
     /** Resolve a process-restored route only after the active account's local projection is authoritative. */
     fun restoreConversationIfReady(
@@ -436,8 +440,10 @@ internal class MainShellStateHolder(
         when {
             phase == AppPhase.Ready && !appLockScreenVisible ->
                 chatsController(activeAccountRef, runtimeGeneration)
-            phase == AppPhase.Onboarding || phase is AppPhase.Failed ->
+            phase == AppPhase.Onboarding || phase is AppPhase.Failed -> {
+                sectionState.clear()
                 processState.release()
+            }
         }
         return firstUsefulFrameReady(
             phase = phase,
@@ -505,6 +511,7 @@ internal class MainShellStateHolder(
     /** Releases manually-owned holders used by isolated composable tests. */
     fun release() {
         composerExpansionStateSubscription.close()
+        sectionState.clear()
         processState.release()
     }
 

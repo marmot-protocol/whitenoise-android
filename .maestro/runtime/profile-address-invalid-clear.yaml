@@ -1,15 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: profile-address-invalid-clear
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: Maestro group
-- runFlow: ../fixtures/open-settings.yaml
-- assertVisible: Settings
-- tapOn: Profile
-- assertVisible:
-    id: profile.edit
-- tapOn:
-    id: profile.edit
+- runFlow: ../fixtures/open-fixture-profile-editor.yaml
 - scrollUntilVisible:
     element:
       id: profile.address_field

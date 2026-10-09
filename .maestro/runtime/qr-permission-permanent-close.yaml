@@ -22,7 +22,9 @@ name: qr-permission-permanent-close
 - tapOn:
     text: ^Close$
 - assertNotVisible:
-    text: ^Scan QR Code$
+    id: qr_scanner.recovery
+- assertNotVisible:
+    id: qr_scanner.close
 - assertVisible:
     id: share_connect.screen
 - assertVisible: Maestro Alice

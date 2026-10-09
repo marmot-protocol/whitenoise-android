@@ -2,26 +2,11 @@ appId: dev.ipf.whitenoise.android.maestrolab
 name: inbound-share-partial-error-rotation
 ---
 - runFlow: ../fixtures/runtime-share-error-ready.yaml
-- assertVisible:
-    text: Some files could not be imported
-- assertVisible:
-    text: Only content-provider files are supported.
-- assertVisible:
-    text: '^Files not imported: 1$'
+- runFlow: ../fixtures/assert-unsupported-share-error.yaml
 - setOrientation: LANDSCAPE_LEFT
-- assertVisible:
-    text: Some files could not be imported
-- assertVisible:
-    text: Only content-provider files are supported.
-- assertVisible:
-    text: '^Files not imported: 1$'
+- runFlow: ../fixtures/assert-unsupported-share-error.yaml
 - setOrientation: PORTRAIT
-- assertVisible:
-    text: Some files could not be imported
-- assertVisible:
-    text: Only content-provider files are supported.
-- assertVisible:
-    text: '^Files not imported: 1$'
+- runFlow: ../fixtures/assert-unsupported-share-error.yaml
 - tapOn: Cancel
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:

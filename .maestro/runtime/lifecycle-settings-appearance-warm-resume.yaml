@@ -1,15 +1,10 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: lifecycle-settings-appearance-warm-resume
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: Maestro group
-- runFlow: ../fixtures/open-settings.yaml
-- assertVisible: Settings
-- scrollUntilVisible:
-    element:
-      text: Appearance
-    direction: DOWN
-- tapOn: Appearance
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Appearance
 - assertVisible:
     id: appearance.theme.group
 - runFlow: ../fixtures/runtime-warm-resume.yaml

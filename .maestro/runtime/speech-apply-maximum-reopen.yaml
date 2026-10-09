@@ -1,38 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: speech-apply-maximum-reopen
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: Maestro group
-- runFlow: ../fixtures/open-settings.yaml
-- assertVisible: Settings
-- scrollUntilVisible:
-    element:
-      text: Read Aloud
-    direction: DOWN
-- tapOn: Read Aloud
-- assertVisible:
-    id: speech.engine.group
-- tapOn: Speech rate
-- runFlow: ../fixtures/scroll-speech-custom.yaml
-- tapOn: Custom
-- assertVisible:
-    id: speech.custom_rate
-- tapOn:
-    id: speech.custom_rate
-- longPressOn:
-    id: speech.custom_rate
-- runFlow:
-    when:
-      visible: (?i)select all
-    commands:
-    - tapOn: (?i)select all
-- assertVisible:
-    id: speech.custom_rate
-    focused: true
-- eraseText: 100
-- assertNotVisible:
-    id: speech.custom_rate
-    text: .+
+- runFlow: ../fixtures/open-fixture-empty-custom-rate.yaml
 - inputText: '10.0'
 - assertVisible:
     id: speech.custom_rate

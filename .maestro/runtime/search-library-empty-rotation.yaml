@@ -11,6 +11,19 @@ name: search-library-empty-rotation
 - runFlow: ../fixtures/assert-empty-library.yaml
 - setOrientation: PORTRAIT
 - runFlow: ../fixtures/assert-empty-library.yaml
+# Reveal the retained chip without tapping it and masking a lost selection.
+- repeat:
+    times: 6
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: global.library.mode.ANY_ATTACHMENT
+          commands:
+            - swipe:
+                from:
+                  id: global.library.modes
+                direction: LEFT
 - assertVisible:
     id: global.library.mode.ANY_ATTACHMENT
     checked: true

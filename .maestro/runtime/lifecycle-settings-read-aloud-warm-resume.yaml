@@ -1,15 +1,10 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: lifecycle-settings-read-aloud-warm-resume
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: Maestro group
-- runFlow: ../fixtures/open-settings.yaml
-- assertVisible: Settings
-- scrollUntilVisible:
-    element:
-      text: Read Aloud
-    direction: DOWN
-- tapOn: Read Aloud
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Read Aloud
 - assertVisible:
     id: speech.engine.group
 - runFlow: ../fixtures/runtime-warm-resume.yaml

@@ -965,8 +965,8 @@
         "CHL-011",
         "CHL-012"
       ],
-      "assertions": "Cancel from selection deletion preserves the row and permits normal navigation.",
-      "postcondition": "none"
+      "assertions": "Cancel bulk group departure preserves all three accounts, both native chat rows and their original histories, then exits selection mode.",
+      "postcondition": "accounts-retained"
     },
     "chatstate-pin": {
       "suite": "chatstate",

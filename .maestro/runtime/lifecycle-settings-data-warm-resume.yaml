@@ -1,15 +1,10 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: lifecycle-settings-data-warm-resume
 ---
-- runFlow: ../fixtures/runtime-ready.yaml
-- assertVisible: Maestro group
-- runFlow: ../fixtures/open-settings.yaml
-- assertVisible: Settings
-- scrollUntilVisible:
-    element:
-      text: Data Usage
-    direction: DOWN
-- tapOn: Data Usage
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Data Usage
 - assertVisible:
     id: data_usage.downloads.group
 - runFlow: ../fixtures/runtime-warm-resume.yaml

@@ -1,23 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: inbound-share-account-switch-clears
 ---
-- runFlow: ../fixtures/runtime-share-text-ready.yaml
-- assertVisible:
-    id: performance.share_picker
-- assertVisible:
-    text: ^Maestro group$
-- assertVisible:
-    enabled: false
-    containsChild:
-      text: ^Share$
-- tapOn: Maestro group
-- assertVisible:
-    id: performance.share_picker
-- assertVisible:
-    text: ^Maestro group$
-- assertVisible:
-    enabled: true
-    text: ^Share to 1 chat$
+- runFlow: ../fixtures/select-fixture-share-recipient.yaml
 - tapOn: Choose sending account
 - assertVisible:
     text: ^Choose which signed-in account will own these shared drafts\.$

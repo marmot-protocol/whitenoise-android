@@ -1,20 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: folder-rules-replace-saved-confirm
 ---
-- runFlow: ../fixtures/open-named-smart-folder.yaml
-- scrollUntilVisible:
-    element:
-      id: folder.presetRead
-    direction: DOWN
-- tapOn:
-    id: folder.presetRead
-- scrollUntilVisible:
-    element:
-      id: folder.condition.2
-    direction: DOWN
-- assertVisible:
-    id: folder.condition.2
-- assertVisible: '^Read status: No unread messages$'
+- runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
 - runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
 - scrollUntilVisible:
     element:

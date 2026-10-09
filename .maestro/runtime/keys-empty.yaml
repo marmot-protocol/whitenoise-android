@@ -7,7 +7,7 @@ name: keys-empty
 - assertVisible: "Settings"
 - tapOn: "Profile Keys"
 - assertVisible: "Private key hidden"
-- tapOn: "Export Encrypted Private Key"
+- runFlow: ../fixtures/open-encrypted-key-editor.yaml
 - assertVisible: "Encrypted Private Key"
 - assertVisible:
     id: "profile_keys.export_password"

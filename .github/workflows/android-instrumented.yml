@@ -548,11 +548,11 @@ jobs:
           target: ${{ inputs.maestro_android_api == '37.0' && 'google_apis_ps16k' || 'google_apis' }}
           arch: x86_64
           profile: ${{ inputs.maestro_android_api == '37.0' && 'pixel_6' || '' }}
-          ram-size: ${{ inputs.maestro_android_api == '37.0' && '4096M' || '2048M' }}
+          ram-size: 4096M
           disk-size: 8G
           pre-emulator-launch-script: ${{ inputs.maestro_android_api == '37.0' && './scripts/stabilize-android17-emulator.sh' || 'true' }}
           disable-animations: true
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none ${{ inputs.maestro_android_api == '37.0' && '-feature GLDirectMem' || '' }}
+          emulator-options: -no-snapshot-save -no-window -gpu swangle -noaudio -no-boot-anim -camera-back none ${{ inputs.maestro_android_api == '37.0' && '-feature GLDirectMem' || '' }}
           script: |
             python3 scripts/maestro_environment.py configure --api "$MAESTRO_ANDROID_API" --navigation "$MAESTRO_NAVIGATION_MODE" --output build/maestro-runtime-environment.json
             python3 scripts/maestro_apk.py locale

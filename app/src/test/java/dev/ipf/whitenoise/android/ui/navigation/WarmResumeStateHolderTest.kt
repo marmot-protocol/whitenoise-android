@@ -74,6 +74,8 @@ class WarmResumeStateHolderTest {
         val processState = MainShellProcessState(state)
         val holder = MainShellStateHolder(state, SavedStateHandle(), processState)
         holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        holder.sectionState.sectionName = MainSection.Settings.name
+        holder.sectionState.settingsDetailName = SettingsDetail.DevicePrivacy.name
         val snapshotController =
             ChatsController(
                 appState = state,
@@ -92,6 +94,8 @@ class WarmResumeStateHolderTest {
             )
 
         assertTrue(onboardingFrameReady)
+        assertEquals(MainSection.Chats.name, holder.sectionState.sectionName)
+        assertNull(holder.sectionState.settingsDetailName)
         assertNull(holder.selectedChat.value)
         assertFalse(holder.localProjectionAvailable(ACCOUNT_REF, runtimeGeneration = 4))
         snapshotController.onCleared()
@@ -113,6 +117,35 @@ class WarmResumeStateHolderTest {
         assertTrue(lockFrameReady)
         assertFalse(holder.localProjectionAvailable(ACCOUNT_REF, runtimeGeneration = 4))
         holder.release()
+    }
+
+    @Test
+    fun unlockCannotRestoreSettingsFromAReplacedAccount() {
+        val holder = MainShellStateHolder(appState(), SavedStateHandle())
+        try {
+            holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+            holder.sectionState.sectionName = MainSection.Settings.name
+            holder.sectionState.settingsDetailName = SettingsDetail.AccountKeys.name
+            holder.prepareFirstUsefulFrame(
+                phase = AppPhase.Ready,
+                activeAccountRef = "second-account",
+                runtimeGeneration = 4,
+                appLockScreenVisible = true,
+            )
+            assertFalse(holder.localProjectionAvailable("second-account", runtimeGeneration = 4))
+
+            holder.prepareFirstUsefulFrame(
+                phase = AppPhase.Ready,
+                activeAccountRef = "second-account",
+                runtimeGeneration = 4,
+                appLockScreenVisible = false,
+            )
+
+            assertEquals(MainSection.Chats.name, holder.sectionState.sectionName)
+            assertNull(holder.sectionState.settingsDetailName)
+        } finally {
+            holder.release()
+        }
     }
 
     @Test
