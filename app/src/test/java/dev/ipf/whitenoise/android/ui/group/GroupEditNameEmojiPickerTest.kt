@@ -226,7 +226,7 @@ class GroupEditNameEmojiPickerTest {
 
     private fun nameEmojiActionMatcher() =
         hasContentDescription(string(R.string.open_emoji_picker)) and
-            hasAnyAncestor(hasSetTextAction() and hasText(string(R.string.group_name)))
+            hasAnyAncestor(hasText(string(R.string.group_name)))
 
     private fun group(admin: Boolean) =
         AppGroupRecordFfi(

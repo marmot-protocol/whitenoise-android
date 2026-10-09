@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
@@ -15,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -25,6 +28,8 @@ import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -129,10 +134,17 @@ class AccountKeysPresentationTest {
 
     @Test
     fun regularSignOutCanBeCancelledWithoutStartingTeardown() {
-        render(localSigning = false)
+        val appState = render(localSigning = false)
         composeRule.onNodeWithTag("profile_keys.sign_out").performClick()
-        composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.sign_out_sheet_title)).assertIsDisplayed()
+        composeRule
+            .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
+            .performSemanticsAction(SemanticsActions.Dismiss)
+        composeRule.onNodeWithText(app.getString(R.string.sign_out_sheet_title)).assertDoesNotExist()
         composeRule.onNodeWithTag("profile_keys.sign_out").assertIsDisplayed()
+        assertEquals(ACCOUNT_REF, appState.activeAccountRef)
+        assertFalse(appState.signOutInProgress)
+        assertFalse(appState.accounts.single().signedOut)
     }
 
     /** Composes the surface under test with the given fixture. */
@@ -141,7 +153,7 @@ class AccountKeysPresentationTest {
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         contentWindowInsets: WindowInsets = WindowInsets(0.dp),
         localSigning: Boolean = true,
-    ) {
+    ): WhiteNoiseAppState {
         val appState = appStateWithNpub(CANONICAL_NPUB, localSigning)
         composeRule.setContent {
             val density = LocalDensity.current
@@ -154,6 +166,7 @@ class AccountKeysPresentationTest {
                 }
             }
         }
+        return appState
     }
 
     /** App state with npub. */

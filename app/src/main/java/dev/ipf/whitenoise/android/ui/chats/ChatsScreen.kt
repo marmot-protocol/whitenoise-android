@@ -2104,7 +2104,11 @@ internal fun ChatsScreen(
                     canStart = { request.targets.none { it.groupId in leavingAndDeleting } },
                     onBusyChange = { busy ->
                         request.targets.forEach { target ->
-                            if (busy) leavingAndDeleting.add(target.groupId) else leavingAndDeleting.remove(target.groupId)
+                            if (busy) {
+                                leavingAndDeleting.add(target.groupId)
+                            } else {
+                                leavingAndDeleting.remove(target.groupId)
+                            }
                         }
                     },
                 ),

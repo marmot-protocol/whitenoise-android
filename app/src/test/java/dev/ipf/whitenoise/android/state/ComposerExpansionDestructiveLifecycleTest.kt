@@ -878,7 +878,11 @@ class ComposerExpansionDestructiveLifecycleTest {
             try {
                 assertTrue(controller.prepareChatListDeparture(GROUP_ID).isEmpty())
                 assertTrue(controller.leaveAndDeleteFromChatList(GROUP_ID))
-                assertEquals(listOf("delete"), fixture.calls.order)
+                // Exact native absence retires the projection without replaying a destructive command.
+                assertTrue(fixture.calls.order.isEmpty())
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+                assertTrue(controller.items.isEmpty())
+                assertFalse(fixture.appState.localGroupDeleteCleanupJournal.hasPending())
             } finally {
                 controller.onCleared()
             }
@@ -995,7 +999,7 @@ class ComposerExpansionDestructiveLifecycleTest {
     ): MarmotInterface {
         var localGroupPresent = true
         var left = false
-        var authoritativeGroup = groupRecord
+        val projection = LifecycleGroupProjection(groupRecord, soleMember, failRosterRead, missingProjection)
         return Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
@@ -1007,37 +1011,11 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
-                "groupDetails" ->
-                    if (missingProjection.returnsUnknownGroup) {
-                        val target = if (missingProjection == MissingProjection.UNKNOWN_GROUP) GROUP_ID else OTHER_GROUP
-                        failNativeCall(arguments, MarmotKitException.UnknownGroup(target))
-                    } else if (failRosterRead) {
-                        failNativeCall(arguments, IllegalStateException("roster unavailable"))
-                    } else {
-                        lifecycleGroupDetails(authoritativeGroup, soleMember)
-                    }
-                "promoteAdminDetailed" -> {
-                    calls.order.add("promote")
-                    authoritativeGroup =
-                        authoritativeGroup.copy(admins = authoritativeGroup.admins + (arguments!![2] as String))
-                    lifecycleGroupMutation(authoritativeGroup, soleMember)
-                }
-                "selfDemoteAdminDetailed" -> {
-                    calls.order.add("demote")
-                    authoritativeGroup =
-                        authoritativeGroup.copy(admins = authoritativeGroup.admins.filterNot { it == ACCOUNT_ID })
-                    lifecycleGroupMutation(authoritativeGroup, soleMember)
-                }
+                "groupDetails", "promoteAdminDetailed", "selfDemoteAdminDetailed" ->
+                    lifecycleAdminCommand(method.name.substringBefore('-'), projection, calls, arguments)
                 "listMedia" -> emptyList<Any>()
                 "catchUpAccounts" -> Unit
-                "chatListRow" -> {
-                    calls.chatListRow.incrementAndGet()
-                    if (missingProjection != MissingProjection.NONE && !left) {
-                        null
-                    } else {
-                        lifecycleChatRows(localGroupPresent, left).firstOrNull { it.groupIdHex == arguments?.get(1) }
-                    }
-                }
+                "chatListRow" -> lifecycleProjectionRow(projection, calls, localGroupPresent, left, arguments)
                 "chatList" -> {
                     calls.chatList.incrementAndGet()
                     lifecycleChatRows(localGroupPresent, left)
@@ -1077,6 +1055,60 @@ class ComposerExpansionDestructiveLifecycleTest {
                 else -> throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+    }
+
+    private class LifecycleGroupProjection(
+        var group: AppGroupRecordFfi,
+        val soleMember: Boolean,
+        val failRosterRead: Boolean,
+        val missing: MissingProjection,
+    )
+
+    private fun lifecycleAdminCommand(
+        method: String,
+        projection: LifecycleGroupProjection,
+        calls: LifecycleCalls,
+        arguments: Array<out Any?>?,
+    ): Any =
+        when (method) {
+            "groupDetails" -> {
+                if (projection.missing.returnsUnknownGroup) {
+                    val target = if (projection.missing == MissingProjection.UNKNOWN_GROUP) GROUP_ID else OTHER_GROUP
+                    failNativeCall(arguments, MarmotKitException.UnknownGroup(target))
+                } else if (projection.failRosterRead) {
+                    failNativeCall(arguments, IllegalStateException("roster unavailable"))
+                } else {
+                    lifecycleGroupDetails(projection.group, projection.soleMember)
+                }
+            }
+            "promoteAdminDetailed" -> {
+                calls.order.add("promote")
+                projection.group = projection.group.copy(admins = projection.group.admins + (arguments!![2] as String))
+                lifecycleGroupMutation(projection.group, projection.soleMember)
+            }
+            else -> {
+                calls.order.add("demote")
+                projection.group =
+                    projection.group.copy(
+                        admins = projection.group.admins.filterNot { it == ACCOUNT_ID },
+                    )
+                lifecycleGroupMutation(projection.group, projection.soleMember)
+            }
+        }
+
+    private fun lifecycleProjectionRow(
+        projection: LifecycleGroupProjection,
+        calls: LifecycleCalls,
+        present: Boolean,
+        left: Boolean,
+        arguments: Array<out Any?>?,
+    ): ChatListRowFfi? {
+        calls.chatListRow.incrementAndGet()
+        return if (projection.missing != MissingProjection.NONE && !left) {
+            null
+        } else {
+            lifecycleChatRows(present, left).firstOrNull { it.groupIdHex == arguments?.get(1) }
+        }
     }
 
     private fun acceptedTextSend(

@@ -4599,26 +4599,7 @@ class ChatsController private constructor(
         if (!attempt.isCurrent()) return false
         onStage(ChatDepartureStage.CHECKING)
         return runCatchingCancellable {
-            val departed =
-                appState.withGroupCommitLock(account, groupIdHex) {
-                    if (!attempt.isCurrent()) return@withGroupCommitLock false
-                    val row = appState.marmotIo { chatListRow(account, groupIdHex) }
-                    if (!attempt.isCurrent()) return@withGroupCommitLock false
-                    when {
-                        row != null && row.selfMembership.isNonMember() -> {
-                            foldChatRow(row)
-                            attempt.cleanupOnly = true
-                            onStage(ChatDepartureStage.LEFT)
-                            true
-                        }
-                        row == null -> departWithoutChatRow(attempt, deleteAfterLeave)
-                        row.leaveRequestPending -> {
-                            appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
-                            false
-                        }
-                        else -> departJoinedChat(attempt, deleteAfterLeave)
-                    }
-                }
+            val departed = departCapturedChat(attempt, deleteAfterLeave)
             if (!departed || !attempt.isCurrent()) return@runCatchingCancellable false
             attempt.soleMemberResult?.let { return@runCatchingCancellable it }
             if (attempt.cleanupOnly && deleteAfterLeave) {
@@ -4640,6 +4621,31 @@ class ChatsController private constructor(
             }
         }.getOrDefault(false)
     }
+
+    /** Resolve membership under the native commit lock before selecting a departure branch. */
+    private suspend fun departCapturedChat(
+        attempt: ChatListDepartureAttempt,
+        deleteAfterLeave: Boolean,
+    ): Boolean =
+        appState.withGroupCommitLock(attempt.account, attempt.groupId) {
+            if (!attempt.isCurrent()) return@withGroupCommitLock false
+            val row = appState.marmotIo { chatListRow(attempt.account, attempt.groupId) }
+            if (!attempt.isCurrent()) return@withGroupCommitLock false
+            when {
+                row != null && row.selfMembership.isNonMember() -> {
+                    foldChatRow(row)
+                    attempt.cleanupOnly = true
+                    attempt.onStage(ChatDepartureStage.LEFT)
+                    true
+                }
+                row == null -> departWithoutChatRow(attempt, deleteAfterLeave)
+                row.leaveRequestPending -> {
+                    appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+                    false
+                }
+                else -> departJoinedChat(attempt, deleteAfterLeave)
+            }
+        }
 
     /** A wiped app projection does not prove that the native MLS group has been left. */
     private suspend fun departWithoutChatRow(
@@ -4906,18 +4912,34 @@ class ChatsController private constructor(
                 }
                 false
             } else if (isCurrent()) {
-                appState.dismissLocalDeleteFailure(account, groupIdHex)
-                removeChatRow(groupIdHex)
-                finishRemovedChatRowClientState(groupIdHex)
-                if (!wipe.getOrDefault(false)) observer.onCleanupDeferred()
-                if (notify && wipe.getOrDefault(false)) {
-                    appState.presentTransient(R.string.toast_chat_deleted_local)
-                }
+                completeChatLocalRemoval(account, groupIdHex, wipe.getOrDefault(false), notify, observer)
                 true
             } else {
                 false
             }
         } ?: false
+
+    private fun completeChatLocalRemoval(
+        account: String,
+        groupIdHex: String,
+        cleanupComplete: Boolean,
+        notify: Boolean,
+        observer: LocalChatDeleteObserver,
+    ) {
+        appState.dismissLocalDeleteFailure(account, groupIdHex)
+        removeChatRow(groupIdHex)
+        finishRemovedChatRowClientState(groupIdHex)
+        if (!cleanupComplete) observer.onCleanupDeferred()
+        if (notify && cleanupComplete) appState.presentTransient(R.string.toast_chat_deleted_local)
+    }
+
+    private fun requireChatListDepartureCurrent(
+        account: String,
+        epoch: Long,
+        runtime: Int,
+    ) {
+        if (!chatListDepartureIsCurrent(account, epoch, runtime)) throw CancellationException("Account replaced")
+    }
 
     /** A failed or inconsistent authoritative read is an error, never an inferred normal-member path. */
     internal suspend fun prepareChatListDeparture(groupIdHex: String): List<AppGroupMemberRecordFfi> {
@@ -4926,11 +4948,11 @@ class ChatsController private constructor(
         val runtime = appState.runtimeGeneration
         val activeId = boundAccountIdHex()
         val row = appState.marmotIo { chatListRow(account, groupIdHex) }
-        if (!chatListDepartureIsCurrent(account, epoch, runtime)) throw CancellationException("Account replaced")
+        requireChatListDepartureCurrent(account, epoch, runtime)
         if (row?.selfMembership?.isNonMember() == true) return emptyList()
         check(row?.leaveRequestPending != true) { "Departure is awaiting native confirmation" }
         val details = chatDepartureGroupDetails(account, groupIdHex)
-        if (!chatListDepartureIsCurrent(account, epoch, runtime)) throw CancellationException("Account replaced")
+        requireChatListDepartureCurrent(account, epoch, runtime)
         return if (details == null) {
             check(row == null) { "Native group changed during departure preparation" }
             emptyList()

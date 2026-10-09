@@ -45,6 +45,32 @@
         "test_ids": [
           "GRP-028"
         ]
+      },
+      {
+        "surface": "GroupSystemDebugDetails",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "fun GroupSystemDebugDetails(",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "GroupSystemSummaryAndWave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "fun GroupSystemSummaryAndWave(",
+        "test_ids": [
+          "CON-026",
+          "GRP-028"
+        ]
+      },
+      {
+        "surface": "GroupSystemSummaryMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "fun GroupSystemSummaryMenu(",
+        "test_ids": [
+          "MSG-008",
+          "GRP-023"
+        ]
       }
     ],
     "source_coverage": [

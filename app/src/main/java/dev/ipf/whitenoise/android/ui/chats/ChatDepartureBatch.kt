@@ -48,16 +48,17 @@ internal suspend fun runChatDepartureBatch(
     callbacks: ChatDepartureCallbacks,
 ): ChatDepartureBatchResult {
     val prepared = prepareChatDepartures(targets, isCurrent, callbacks)
-    for (target in targets) {
+    for (target in targets.filter { it.groupId in prepared.successors }) {
         if (!isCurrent()) break
-        if (target.groupId !in prepared.successors) continue
         val completed = prepared.outcomes.values.count { it == ChatDepartureOutcome.COMPLETED }
         callbacks.onProgress(target.title, completed, targets.size)
         val removed =
             departureStep { callbacks.remove(target, prepared.successors[target.groupId]) }.getOrDefault(false)
         // Replaced accounts cannot receive a late success or a retry bound to the replacement.
-        if (!isCurrent()) break
-        prepared.outcomes[target.groupId] = if (removed) ChatDepartureOutcome.COMPLETED else ChatDepartureOutcome.FAILED
+        if (isCurrent()) {
+            val outcome = if (removed) ChatDepartureOutcome.COMPLETED else ChatDepartureOutcome.FAILED
+            prepared.outcomes[target.groupId] = outcome
+        }
     }
     return ChatDepartureBatchResult(prepared.outcomes.toMap())
 }
@@ -72,22 +73,32 @@ private suspend fun prepareChatDepartures(
     for (target in targets) {
         if (!isCurrent()) break
         callbacks.onProgress(target.title, 0, targets.size)
-        val preflight = departureStep { if (target.isDm) emptyList() else callbacks.prepare(target.groupId) }
-        if (!isCurrent()) break
-        if (preflight.isFailure) {
-            prepared.outcomes[target.groupId] = ChatDepartureOutcome.FAILED
-            continue
-        }
-        val candidates = preflight.getOrThrow()
-        val successor = if (candidates.isEmpty()) null else callbacks.choose(target, candidates)
-        if (!isCurrent()) break
-        if (candidates.isNotEmpty() && successor == null) {
-            prepared.outcomes[target.groupId] = ChatDepartureOutcome.SKIPPED
-        } else {
-            prepared.successors[target.groupId] = successor
-        }
+        prepareChatDeparture(target, isCurrent, callbacks, prepared)
     }
     return prepared
+}
+
+private suspend fun prepareChatDeparture(
+    target: ChatDepartureTarget,
+    isCurrent: () -> Boolean,
+    callbacks: ChatDepartureCallbacks,
+    prepared: ChatDeparturePreparation,
+) {
+    val preflight = departureStep { if (target.isDm) emptyList() else callbacks.prepare(target.groupId) }
+    if (!isCurrent()) return
+    if (preflight.isFailure) {
+        prepared.outcomes[target.groupId] = ChatDepartureOutcome.FAILED
+    } else {
+        val candidates = preflight.getOrThrow()
+        val successor = if (candidates.isEmpty()) null else callbacks.choose(target, candidates)
+        if (isCurrent()) {
+            if (candidates.isNotEmpty() && successor == null) {
+                prepared.outcomes[target.groupId] = ChatDepartureOutcome.SKIPPED
+            } else {
+                prepared.successors[target.groupId] = successor
+            }
+        }
+    }
 }
 
 /** A UI deadline means unfinished/uncertain; retry reconciles native state before any further mutation. */

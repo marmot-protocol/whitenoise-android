@@ -92,7 +92,6 @@ internal fun GroupSystemRow(
     reactionContent: @Composable () -> Unit = {},
     loadWaveDismissal: (suspend (String) -> WaveHiDismissal)? = null,
 ) {
-    val copy = rememberGroupSystemCopy()
     val event =
         remember(record.plaintext, record.direction, groupSystem) {
             GroupSystemEvents.resolve(record, groupSystem)
@@ -102,48 +101,18 @@ internal fun GroupSystemRow(
     val retentionLabel = event?.newRetentionSeconds?.takeIf { it > 0uL }?.let { disappearingMessagesLabel(it.toLong()) }
     val selfHex = appState.activeAccount?.accountIdHex
     val target = waveTarget(event, selfHex)
-    val context = LocalContext.current.applicationContext
-    val waveKey =
-        waveAccountRef?.takeIf { record.messageIdHex.isNotBlank() }?.let { account ->
-            "${account.length}:$account:${record.groupIdHex}:${record.messageIdHex}"
-        }
     val waveState =
-        if (target != null && onWave != null && waveKey != null) {
-            rememberWaveHiPreparation("${appState.runtimeGeneration}:$waveKey") {
-                loadWaveDismissal?.invoke(waveKey) ?: loadWaveHiDismissal(context, waveKey)
-            }
-        } else {
-            null
-        }
+        rememberGroupSystemWave(
+            record,
+            appState.runtimeGeneration,
+            waveAccountRef,
+            target != null && onWave != null,
+            loadWaveDismissal,
+        )
     // Measure the complete eligible row while preparing, but expose neither text nor actions.
     // Its first visible frame has the same geometry; a local failure offers a bounded retry.
     val preparing = waveState != null && waveState.dismissal == null
-    val summary =
-        if (event != null) {
-            val actorHex = GroupSystemEvents.actorHex(event, record.sender)
-            val subjectName =
-                GroupSystemEvents.preferredName(
-                    event.subject?.let { appState.displayName(it) },
-                    event.subjectDisplayName,
-                )
-            GroupSystemSubjectLink.summary(event, selfHex, subjectName) { shownSubject ->
-                GroupSystemEvents.summary(
-                    event = event,
-                    actorName =
-                        GroupSystemEvents.preferredName(
-                            actorHex?.let { appState.displayName(it) },
-                            event.actorDisplayName,
-                        ),
-                    subjectName = shownSubject,
-                    actorIsSelf = GroupSystemEvents.isSelf(selfHex, actorHex),
-                    subjectIsSelf = GroupSystemEvents.isSelf(selfHex, event.subject),
-                    retentionLabel = retentionLabel,
-                    copy = copy,
-                )
-            }
-        } else {
-            GroupSystemLinkedSummary(copy.fallback)
-        }
+    val summary = groupSystemLinkedSummary(record, appState, event, retentionLabel)
     val summaryText =
         if (onOpenProfile == null) {
             AnnotatedString(summary.text)
@@ -157,9 +126,6 @@ internal fun GroupSystemRow(
                 }
             }
         }
-    var actionMenuOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var summaryBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
-    val actionLabel = stringResource(R.string.message_actions)
     // The prototype gives every event row a flat 8.dp above and below inside a
     // full-width centred box; the transcript's own 2.dp row arrangement then
     // reads as the 18.dp the prototype leaves between adjacent events.
@@ -172,99 +138,210 @@ internal fun GroupSystemRow(
                     .then(if (preparing) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            FlowRow(
-                horizontalArrangement = Arrangement.Center,
-                itemVerticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box {
-                    Text(
-                        text = summaryText,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier =
-                            Modifier
-                                .widthIn(max = 440.dp)
-                                .onGloballyPositioned { summaryBounds = it.boundsInWindow().roundToIntRect() }
-                                .then(
-                                    groupSystemActionsModifier(
-                                        record.messageIdHex,
-                                        !preparing && (onOpenActions != null || onDeleteForMe != null),
-                                        actionLabel,
-                                    ) {
-                                        if (onOpenActions != null) {
-                                            onOpenActions(summary.text, summaryBounds)
-                                        } else {
-                                            actionMenuOpen = true
-                                        }
-                                    },
-                                ),
-                    )
-                    val menuScrollState = rememberScrollState()
-                    DropdownMenu(
-                        scrollState = menuScrollState,
-                        modifier = Modifier.scrollEdgeFade(menuScrollState),
-                        expanded = actionMenuOpen && !preparing,
-                        onDismissRequest = { actionMenuOpen = false },
-                        shape = MenuDefaults.shape,
-                        border = amoledSurfaceBorderStroke(),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.delete_for_me)) },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                            onClick = {
-                                actionMenuOpen = false
-                                onDeleteForMe?.invoke()
-                            },
-                        )
-                    }
-                }
-                if (target != null && onWave != null && waveState != null) {
-                    WaveHiButton(appState, waveAccountRef, target, waveState, onWave)
-                }
-            }
+            GroupSystemSummaryAndWave(
+                record,
+                appState,
+                waveAccountRef,
+                GroupSystemRowContent(summary, summaryText, target, waveState, preparing),
+                GroupSystemRowActions(onDeleteForMe, onWave, onOpenActions),
+            )
             if (!preparing) reactionContent()
             // Developer-mode only: keep the one-line summary as the default and tuck
             // the MLS commit dump behind a per-row tap (#857). Saveable row-keyed UI
             // state lets an expanded row survive lazy-list disposal without leaking to others.
-            if (!preparing && appState.streamingDebugEnabled) {
-                var detailsExpanded by rememberSaveable(record.messageIdHex) { mutableStateOf(false) }
-                val debugStyle = remember(record) { MessageDebugClassifier.debugStyle(record) }
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { detailsExpanded = !detailsExpanded }
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text =
-                            stringResource(
-                                if (detailsExpanded) {
-                                    R.string.group_system_hide_details
-                                } else {
-                                    R.string.group_system_show_details
-                                },
-                            ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Icon(
-                        imageVector = if (detailsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                if (detailsExpanded) {
-                    Spacer(Modifier.height(4.dp))
-                    MessageDebugRow(style = debugStyle, record = record)
-                }
-            }
+            if (!preparing && appState.streamingDebugEnabled) GroupSystemDebugDetails(record)
         }
         if (preparing) WaveHiPreparingRow(requireNotNull(waveState), Modifier.matchParentSize())
+    }
+}
+
+@Composable
+private fun rememberGroupSystemWave(
+    record: AppMessageRecordFfi,
+    runtime: Int,
+    waveAccountRef: String?,
+    enabled: Boolean,
+    loadWaveDismissal: (suspend (String) -> WaveHiDismissal)?,
+): WaveHiPreparation? {
+    val context = LocalContext.current.applicationContext
+    val waveKey =
+        waveAccountRef?.takeIf { record.messageIdHex.isNotBlank() }?.let { account ->
+            "${account.length}:$account:${record.groupIdHex}:${record.messageIdHex}"
+        }
+    return if (enabled && waveKey != null) {
+        rememberWaveHiPreparation("$runtime:$waveKey") {
+            loadWaveDismissal?.invoke(waveKey) ?: loadWaveHiDismissal(context, waveKey)
+        }
+    } else {
+        null
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupSystemDebugDetails(record: AppMessageRecordFfi) {
+    var detailsExpanded by rememberSaveable(record.messageIdHex) { mutableStateOf(false) }
+    val debugStyle = remember(record) { MessageDebugClassifier.debugStyle(record) }
+    Spacer(Modifier.height(4.dp))
+    Row(
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { detailsExpanded = !detailsExpanded }
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text =
+                stringResource(
+                    if (detailsExpanded) {
+                        R.string.group_system_hide_details
+                    } else {
+                        R.string.group_system_show_details
+                    },
+                ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Icon(
+            imageVector = if (detailsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp),
+        )
+    }
+    if (detailsExpanded) {
+        Spacer(Modifier.height(4.dp))
+        MessageDebugRow(style = debugStyle, record = record)
+    }
+}
+
+@Composable
+private fun groupSystemLinkedSummary(
+    record: AppMessageRecordFfi,
+    appState: WhiteNoiseAppState,
+    event: GroupSystemEvent?,
+    retentionLabel: String?,
+): GroupSystemLinkedSummary {
+    val copy = rememberGroupSystemCopy()
+    val selfHex = appState.activeAccount?.accountIdHex
+    return if (event != null) {
+        val actorHex = GroupSystemEvents.actorHex(event, record.sender)
+        val subjectName =
+            GroupSystemEvents.preferredName(
+                event.subject?.let { appState.displayName(it) },
+                event.subjectDisplayName,
+            )
+        GroupSystemSubjectLink.summary(event, selfHex, subjectName) { shownSubject ->
+            GroupSystemEvents.summary(
+                event = event,
+                actorName =
+                    GroupSystemEvents.preferredName(
+                        actorHex?.let { appState.displayName(it) },
+                        event.actorDisplayName,
+                    ),
+                subjectName = shownSubject,
+                actorIsSelf = GroupSystemEvents.isSelf(selfHex, actorHex),
+                subjectIsSelf = GroupSystemEvents.isSelf(selfHex, event.subject),
+                retentionLabel = retentionLabel,
+                copy = copy,
+            )
+        }
+    } else {
+        GroupSystemLinkedSummary(copy.fallback)
+    }
+}
+
+private data class GroupSystemRowContent(
+    val summary: GroupSystemLinkedSummary,
+    val text: AnnotatedString,
+    val target: String?,
+    val wave: WaveHiPreparation?,
+    val preparing: Boolean,
+)
+
+private class GroupSystemRowActions(
+    val delete: (() -> Unit)?,
+    val wave: (suspend (String, () -> Unit) -> Unit)?,
+    val open: ((String, IntRect?) -> Unit)?,
+)
+
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupSystemSummaryAndWave(
+    record: AppMessageRecordFfi,
+    appState: WhiteNoiseAppState,
+    accountRef: String?,
+    content: GroupSystemRowContent,
+    actions: GroupSystemRowActions,
+) {
+    var actionMenuOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var summaryBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
+    val actionLabel = stringResource(R.string.message_actions)
+    FlowRow(
+        horizontalArrangement = Arrangement.Center,
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box {
+            Text(
+                text = content.text,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier
+                        .widthIn(max = 440.dp)
+                        .onGloballyPositioned { summaryBounds = it.boundsInWindow().roundToIntRect() }
+                        .then(
+                            groupSystemActionsModifier(
+                                record.messageIdHex,
+                                !content.preparing && (actions.open != null || actions.delete != null),
+                                actionLabel,
+                            ) {
+                                if (actions.open != null) {
+                                    actions.open(content.summary.text, summaryBounds)
+                                } else {
+                                    actionMenuOpen = true
+                                }
+                            },
+                        ),
+            )
+            GroupSystemSummaryMenu(
+                actionMenuOpen && !content.preparing,
+                { actionMenuOpen = false },
+                actions.delete,
+            )
+        }
+        if (content.target != null && actions.wave != null && content.wave != null) {
+            WaveHiButton(appState, accountRef, content.target, content.wave, actions.wave)
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupSystemSummaryMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onDelete: (() -> Unit)?,
+) {
+    val menuScrollState = rememberScrollState()
+    DropdownMenu(
+        scrollState = menuScrollState,
+        modifier = Modifier.scrollEdgeFade(menuScrollState),
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = MenuDefaults.shape,
+        border = amoledSurfaceBorderStroke(),
+    ) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.delete_for_me)) },
+            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                onDelete?.invoke()
+            },
+        )
     }
 }
 
