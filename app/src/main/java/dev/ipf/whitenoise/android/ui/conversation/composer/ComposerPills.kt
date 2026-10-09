@@ -472,6 +472,7 @@ internal fun ComposerPill(
         if (!composerFocused) selectingWithoutKeyboard = false
     }
     val allowKeyboardInput = !selectingWithoutKeyboard
+    val observeSelectionTouch = !composerFocused || selectingWithoutKeyboard
     val defaultActionFocus = remember { FocusRequester() }
     var showKeyboardAfterTouchTap by remember { mutableStateOf(false) }
     LaunchedEffect(composerFocused, showKeyboardAfterTouchTap) {
@@ -1336,8 +1337,8 @@ internal fun ComposerPill(
                                                 fadeEnabled = !composerFocused && textFieldValue.selection.collapsed,
                                             ).verticalScroll(composerScrollState)
                                             .onGloballyPositioned { editorBounds = it.boundsInWindow() }
-                                            .pointerInput(inputContentVisible, inputFocusEnabled) {
-                                                if (inputContentVisible && inputFocusEnabled) {
+                                            .pointerInput(inputContentVisible, inputFocusEnabled, observeSelectionTouch) {
+                                                if (inputContentVisible && inputFocusEnabled && observeSelectionTouch) {
                                                     composerNativeSelectionTouchGestures(
                                                         onPress = {
                                                             val hiddenDraft =

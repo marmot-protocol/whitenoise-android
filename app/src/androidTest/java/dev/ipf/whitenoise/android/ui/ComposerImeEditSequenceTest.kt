@@ -27,12 +27,11 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.action.ViewActions
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
@@ -91,7 +90,8 @@ class ComposerImeEditSequenceTest {
     fun emptyHiddenComposerPastesThroughNativeToolbar() {
         render("", liveIme = true)
         composeRule.runOnUiThread {
-            composeRule.activity.getSystemService(ClipboardManager::class.java)
+            composeRule.activity
+                .getSystemService(ClipboardManager::class.java)
                 .setPrimaryClip(ClipData.newPlainText("composer test", "first second"))
         }
         val editor = composeRule.onNode(hasSetTextAction())
@@ -100,7 +100,7 @@ class ComposerImeEditSequenceTest {
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
             up()
         }
-        nativeAction("Paste").perform(ViewActions.click())
+        nativeAction("Paste").click()
         composeRule.waitUntil(10_000) { value.text == "first second" }
         editor.assertIsNotFocused()
         assertFalse(imeVisible())
@@ -154,7 +154,11 @@ class ComposerImeEditSequenceTest {
         composeRule.waitForIdle()
     }
 
-    private fun nativeAction(label: String) = onView(withText(label)).check(matches(isDisplayed()))
+    private fun nativeAction(label: String) =
+        checkNotNull(
+            UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                .wait(Until.findObject(By.text(label)), 5_000),
+        ) { "Native $label action was not displayed" }
 
     private fun imeVisible(): Boolean =
         composeRule.runOnUiThread {
@@ -162,7 +166,11 @@ class ComposerImeEditSequenceTest {
                 .isVisible(WindowInsetsCompat.Type.ime())
         }
 
-    private fun assertValue(text: String, selection: TextRange, composition: TextRange?) {
+    private fun assertValue(
+        text: String,
+        selection: TextRange,
+        composition: TextRange?,
+    ) {
         composeRule.runOnIdle {
             assertEquals(text, value.text)
             assertEquals(selection, value.selection)
@@ -170,7 +178,10 @@ class ComposerImeEditSequenceTest {
         }
     }
 
-    private fun render(text: String, liveIme: Boolean = false) {
+    private fun render(
+        text: String,
+        liveIme: Boolean = false,
+    ) {
         value = TextFieldValue(text)
         composeRule.setContent {
             InterceptPlatformTextInput(
