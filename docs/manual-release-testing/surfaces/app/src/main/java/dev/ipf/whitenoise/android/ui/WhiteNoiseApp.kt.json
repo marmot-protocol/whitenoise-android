@@ -1,0 +1,140 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+  "legacy_sha256": "ff503283b8842bdec95b99bde59f05a6ed4b67a6533ab7d9f237a0dfab1c924b",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Local-delete snackbar retry action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Offline speech disclosure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_offline_title",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Offline speech disclosure message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_offline_message",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Speech disclosure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_title",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Speech disclosure message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_message",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "GlobalTransientNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "fun GlobalTransientNotice(",
+        "test_ids": [
+          "INT-004",
+          "SET-023"
+        ]
+      },
+      {
+        "surface": "ShellTransientNoticeLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "fun ShellTransientNoticeLayout(",
+        "test_ids": [
+          "INT-004",
+          "SET-023"
+        ]
+      },
+      {
+        "surface": "Global transient notice bottom obstruction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "val globalTransientNoticeInsets: WindowInsets",
+        "test_ids": [
+          "PRO-001",
+          "SET-023"
+        ]
+      },
+      {
+        "surface": "TransientNoticeTimeoutEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "fun TransientNoticeTimeoutEffect(",
+        "test_ids": [
+          "INT-004",
+          "SET-023"
+        ]
+      },
+      {
+        "surface": "WarmResumeFrameSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "fun WarmResumeFrameSurface(",
+        "test_ids": [
+          "INT-005"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseApp",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "fun WhiteNoiseApp(",
+        "test_ids": [
+          "INT-002",
+          "NAV-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Imported-account setup: R.string.white_noise_couldnt_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.white_noise_couldnt_start",
+        "test_ids": [
+          "ONB-013",
+          "ONB-019",
+          "ONB-021"
+        ]
+      },
+      {
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "WhiteNoiseApp",
+        "test_ids": [
+          "INT-001",
+          "INT-002",
+          "INT-003",
+          "INT-004",
+          "INT-005",
+          "INT-006",
+          "INT-007",
+          "INT-008",
+          "INT-009",
+          "INT-010"
+        ]
+      },
+      {
+        "surface": "Optional dictation recovery does not take persistent app controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "state.requiresCompletionControls(recoveryHandedToComposer)",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

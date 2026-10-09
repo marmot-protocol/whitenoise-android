@@ -194,6 +194,13 @@ def validate_journal(journal):
                 raise Held('not-sent-proof-required')
             if attempts == 0 or (record['state'] == 'not-sent-exhausted' and attempts < budget):
                 raise Held('invalid-not-sent-attempts')
+        withdrawal = record.get('exhaustion_withdrawal')
+        if withdrawal is not None and (
+                record['state'] not in {'not-sent', 'not-sent-exhausted'}
+                or attempts < budget or not isinstance(withdrawal, dict)
+                or not DIGEST.fullmatch(str(withdrawal.get('proof_sha256', '')))
+                or not isinstance(withdrawal.get('owner'), dict) or not withdrawal['owner']):
+            raise Held('invalid-exhaustion-withdrawal')
         if record.get('state')=='retired-closed' and (not DIGEST.fullmatch(str(record.get('terminal_proof_sha256',''))) or not isinstance(record.get('retired_by'),dict) or record.get('terminal_unmerged') is not True):
             raise Held('retired-terminal-proof-required')
         payload = record['payload']
@@ -219,25 +226,35 @@ def previous_result(record):
     return None
 
 
+def exhaustion_unresolved(journal, record):
+    """One shared latch predicate for policy and adapter selection retirement."""
+    exhausted = record['state'] == 'not-sent-exhausted' or (
+        record['state'] == 'not-sent'
+        and record['not_sent_attempts'] >= MAX_NOT_SENT_ATTEMPTS)
+    if not exhausted or record.get('exhaustion_withdrawal') is not None:
+        return False
+    previous = record['payload']
+    identity = previous['identity']
+    return not any(
+        newer['state'] == 'confirmed'
+        and newer['payload']['kind'] == previous['kind']
+        and newer['payload']['identity']['number'] == identity['number']
+        and newer['payload']['identity']['pull_request_id'] == identity['pull_request_id']
+        and newer['payload']['generation'] > previous['generation']
+        for newer in journal['effects'].values())
+
+
 def exhausted_selection_result(journal, effect):
     """An exhausted selection cannot silently become another PR or proof key."""
+    # A held admission must not prevent revoking its authorization or draining
+    # a different known entry. Per-effect retry budgets still apply below.
+    if effect is not None and effect.kind in {'revoke-integration', 'dequeue'}:
+        return None
     for record in journal['effects'].values():
-        exhausted = record['state'] == 'not-sent-exhausted' or (
-            record['state'] == 'not-sent'
-            and record['not_sent_attempts'] >= MAX_NOT_SENT_ATTEMPTS)
-        if not exhausted:
+        if not exhaustion_unresolved(journal, record):
             continue
         previous = record['payload']
         identity = previous['identity']
-        recovered = any(
-            newer['state'] == 'confirmed'
-            and newer['payload']['kind'] == previous['kind']
-            and newer['payload']['identity']['number'] == identity['number']
-            and newer['payload']['identity']['pull_request_id'] == identity['pull_request_id']
-            and newer['payload']['generation'] > previous['generation']
-            for newer in journal['effects'].values())
-        if recovered:
-            continue
         if (effect is None or effect.identity.number != identity['number']
                 or effect.identity.pull_request_id != identity['pull_request_id']
                 or effect.generation <= previous['generation']):

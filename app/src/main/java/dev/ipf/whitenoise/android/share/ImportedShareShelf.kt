@@ -13,7 +13,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Restores only the captured account/chat intake shelf, then commits each explicit shelf change. */
+/** Restores the captured intake shelf before enabling persistence of the host's updated URI projection. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ImportedShareShelf(
@@ -46,7 +46,6 @@ internal fun ImportedShareShelf(
             }
         retained.onSuccess {
             previous = it.mediaUris + it.documentUris
-            loadedRevision = revision
         }
         restore(
             retained.map { staging ->
@@ -58,6 +57,8 @@ internal fun ImportedShareShelf(
                 )
             },
         )
+        // The host must apply restored URIs before a recomposition can persist its shelf projection.
+        retained.onSuccess { loadedRevision = revision }
     }
     // Bind the write gate to this composition's URI projection. An initial empty projection must
     // not become eligible merely because a faster restore has changed the live state before launch.

@@ -69,19 +69,20 @@ class SharedContentScreensScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_categories_light.png")
     }
 
-    /** A chat with no loaded content has neither category rows nor an empty section heading. */
+    /** Attachment history remains reachable when the loaded chat has no content. */
     @Test
-    fun emptyChatHidesSharedContentSection() {
+    fun emptyChatKeepsAttachmentHistoryReachable() {
         renderCategories(emptyTiles())
-        composeRule.onNodeWithText("Shared in Chat").assertDoesNotExist()
-        SharedContentCategory.entries.forEach { category ->
-            composeRule.onNodeWithTag("shared.category.${category.name}").assertDoesNotExist()
+        composeRule.onNodeWithText("Shared in Chat").assertIsDisplayed()
+        listOf("Media", "Documents", "Voice").forEach { category ->
+            composeRule.onNodeWithTag("shared.category.$category").assertIsDisplayed()
         }
+        composeRule.onNodeWithTag("shared.category.Links").assertDoesNotExist()
     }
 
-    /** A picture-only chat has one category, including at large font scale and in RTL. */
+    /** A picture-only loaded window still offers the other historical attachment categories. */
     @Test
-    fun pictureOnlyChatShowsOnlyMediaRtlLargeFont() {
+    fun pictureOnlyChatKeepsHistoryCategoriesRtlLargeFont() {
         val tile = sampleTile()
         renderCategories(
             emptyTiles().copy(visuals = listOf(tile), images = listOf(tile)),
@@ -90,9 +91,10 @@ class SharedContentScreensScreenshotTest {
         )
         composeRule.onNodeWithText("Shared in Chat").assertIsDisplayed()
         composeRule.onNodeWithTag("shared.category.Media").assertIsDisplayed()
-        listOf("Links", "Documents", "Voice").forEach { category ->
-            composeRule.onNodeWithTag("shared.category.$category").assertDoesNotExist()
+        listOf("Media", "Documents", "Voice").forEach { category ->
+            composeRule.onNodeWithTag("shared.category.$category").assertIsDisplayed()
         }
+        composeRule.onNodeWithTag("shared.category.Links").assertDoesNotExist()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/shared_content_media_only_rtl_200.png")
     }
 

@@ -51,6 +51,19 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
         assertFalse(channel.canShowBadge())
         assertEquals(context.getString(R.string.notification_channel_dictation_description), channel.description)
         assertEquals(NotificationManager.IMPORTANCE_LOW, channel.importance)
+        val notice = shadowOf(manager).allNotifications.single()
+        assertEquals(
+            context.getString(R.string.dictation_recovery_expired_text),
+            notice.extras.getString(Notification.EXTRA_TEXT),
+        )
+        assertFalse(
+            notice
+                .extras
+                .getString(Notification.EXTRA_TEXT)
+                .orEmpty()
+                .contains("cleared"),
+        )
+        assertTrue(notice.contentIntent != null)
     }
 
     /** Stopping connection while Android still queues the host cannot cancel microphone ownership. */
@@ -180,6 +193,59 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
         }
         harness.conversationDictation.cancel()
     }
+
+    /** A previously displayed drawer Retry cannot resend a saved prefix when audio reads become unavailable. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun displayedAudioRetryFailsClosedAfterPendingAudioReadStartsThrowing() =
+        runTest {
+            val harness = Harness(this)
+            harness.acceptSend = false
+            harness.platform.pendingCallerAudio = true
+            ConversationDictationForegroundService.hostResolver = { harness }
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            try {
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                harness.platform.listener.onResult("first")
+                shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+                harness.conversationDictation.send()
+                repeat(2) {
+                    harness.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+                    shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+                }
+                harness.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+                runCurrent()
+                val failed = harness.conversationDictation.state as ConversationDictationState.Failed
+                assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+                assertTrue(harness.conversationDictation.recoveryHandedToComposer)
+                assertFalse(harness.conversationDictation.foregroundMicrophoneRequired)
+                service.foreground.dictation.refreshNotification()
+                val notice =
+                    service
+                        .getSystemService(NotificationManager::class.java)
+                        .activeNotifications
+                        .single { it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID }
+                        .notification
+                val retry = notice.actions.single { it.title == service.getString(R.string.retry) }.actionIntent
+                val command = shadowOf(retry).savedIntent
+                val sessions = harness.platform.sessionsCreated
+                val captures = harness.platform.captureSessionsStarted
+                harness.acceptSend = true
+                harness.platform.callerAudioStateFailure = IllegalStateException("audio state unavailable")
+                service.onStartCommand(command, 0, 2)
+                shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+                runCurrent()
+                assertTrue(harness.conversationDictation.state === failed)
+                assertEquals(sessions, harness.platform.sessionsCreated)
+                assertEquals(captures, harness.platform.captureSessionsStarted)
+                assertTrue(harness.platform.pendingCallerAudio)
+                assertTrue(harness.sent.isEmpty())
+                assertEquals("first", harness.draft.text)
+            } finally {
+                lifecycle.destroy()
+            }
+        }
 
     /** Connection readiness is invalidated even when microphone ownership keeps the host alive. */
     @Test
@@ -541,10 +607,10 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 internal class ConversationDictationNotificationSuppressionTest : ConversationDictationNotificationTestFixture() {
-    /** Rejected notification Send keeps a control-free recovery card until the composer is opened. */
+    /** A verified text-only fallback retires the dictation card even after a queued notification refresh. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun rejectedBackgroundSendKeepsItsOpenAppCardAfterDraftRecovery() =
+    fun rejectedBackgroundSendReleasesDictationCardAfterVerifiedDraftRecovery() =
         runTest {
             val harness = Harness(this)
             harness.acceptSend = false
@@ -564,19 +630,17 @@ internal class ConversationDictationNotificationSuppressionTest : ConversationDi
                 runCurrent()
                 Snapshot.sendApplyNotifications()
                 shadowOf(Looper.getMainLooper()).idle()
-                val failed = harness.conversationDictation.state as ConversationDictationState.Failed
-                assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
-                assertTrue(failed.draftRecovered)
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
                 assertEquals("recognized", harness.draft.text)
                 assertTrue(harness.sent.isEmpty())
-                assertTrue(harness.conversationDictation.hasDurableSession)
+                assertFalse(harness.conversationDictation.hasDurableSession)
                 assertFalse(harness.conversationDictation.foregroundMicrophoneRequired)
-                val card = manager.activeNotifications.single().notification
-                assertEquals(
-                    service.getString(R.string.dictation_recovery_title),
-                    card.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+                service.foreground.dictation.refreshNotification()
+                assertFalse(
+                    manager.activeNotifications.any {
+                        it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                    },
                 )
-                assertEquals(service.getString(R.string.dictation_recovery_open), card.actions.single().title)
                 harness.conversationDictation.onAppForegrounded()
                 runCurrent()
                 assertFalse(harness.conversationDictation.hasDurableSession)
@@ -792,9 +856,18 @@ internal abstract class ConversationDictationNotificationTestFixture {
 
     protected class FakePlatform : ConversationDictationPlatform {
         var sessionsCreated = 0
+        var captureSessionsStarted = 0
         var pendingCallerAudio = false
+        var callerAudioStateFailure: RuntimeException? = null
 
-        override fun callerAudioHasPending(): Boolean = pendingCallerAudio
+        override fun beginCaptureSession() {
+            captureSessionsStarted++
+        }
+
+        override fun callerAudioHasPending(): Boolean {
+            callerAudioStateFailure?.let { throw it }
+            return pendingCallerAudio
+        }
 
         lateinit var listener: ConversationDictationRecognitionListener
 

@@ -94,18 +94,20 @@ class LocalNotificationFormatterTest {
         assertEquals("Invite from Bob", content?.body)
     }
 
+    /** Ordinary message and native activity previews share the same safe reaction notification path. */
     @Test
-    fun reactionWithPreviewReadsAsAReactionLine() {
-        val content =
-            content(
-                update(
-                    trigger = NotificationTriggerFfi.NEW_MESSAGE,
-                    reactionEmoji = "👍",
-                    reactedToPreview = "Lunch at 1?",
-                ),
-            )
-
-        assertEquals("reacted 👍 to: \"Lunch at 1?\"", content?.body)
+    fun reactionWithMessageOrNativeActivityPreviewReadsAsAReactionLine() {
+        for (preview in listOf("Lunch at 1?", "Alice added Bob")) {
+            val content =
+                content(
+                    update(
+                        trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                        reactionEmoji = "👍",
+                        reactedToPreview = preview,
+                    ),
+                )
+            assertEquals("reacted 👍 to: \"$preview\"", content?.body)
+        }
     }
 
     @Test

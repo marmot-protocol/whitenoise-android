@@ -149,6 +149,7 @@ class AccountSwitchFirstFrameDurableAvatarTest {
         /** Each account's single unnamed direct chat, with a peer-sourced stored avatar. */
         fun presentedRow(accountRef: String): PresentedChatRowFfi =
             PresentedChatRowFfi(
+                draftVersion = null,
                 preview = emptyChatRowPreview(),
                 actions = noChatRowActions(),
                 row =

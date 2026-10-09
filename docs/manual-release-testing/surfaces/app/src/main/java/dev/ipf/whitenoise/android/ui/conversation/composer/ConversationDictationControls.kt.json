@@ -1,0 +1,218 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+  "legacy_sha256": "491d3655929e46dd98c7ecb07fa9915d9ad130edf399c5dda2f1a90dbc6a81d7",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationDictationEmptyRecognitionStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_no_speech",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationAudioBufferFull",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_audio_buffer_full",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationProviderAccessRejected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_provider_access_rejected",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationActiveActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationActiveActions(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationCompactActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationCompactActions(",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "ConversationDictationDismissAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationDismissAction(",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "ConversationDictationListeningIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationListeningIndicator(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationPersistentControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationPersistentControl(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002",
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "ConversationDictationPrimaryAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationPrimaryAction(",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "ConversationDictationMicrophoneDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationMicrophoneDialog(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:dictation_send_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_send_blocked",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:delivery_not_confirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.delivery_not_confirmed",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_audio_focus_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_audio_focus_unavailable",
+        "test_ids": [
+          "DIC-007"
+        ]
+      },
+      {
+        "surface": "string:dictation_listening",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_listening",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_processing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_processing",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_provider_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_provider_unavailable",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:message_status_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.message_status_pending",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.paste",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.send",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_microphone_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_microphone_muted",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_microphone_muted_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_microphone_muted_help",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:open_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.open_settings",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Saved recovery and background tail Retry do not render completion controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "state.requiresCompletionControls(controller.recoveryHandedToComposer)",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

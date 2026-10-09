@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+  "legacy_sha256": "0174ea3c0f2fdaaa20daeb51e6b73f1b1afba3e50f89cf9be076d41febfb7b0a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupSystemActionLifetime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "private fun GroupSystemActionLifetime(",
+        "test_ids": [
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "GroupSystemFocusedActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "private fun GroupSystemFocusedActions(",
+        "test_ids": [
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "GroupSystemReactionSheets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "private fun GroupSystemReactionSheets(",
+        "test_ids": [
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "GroupSystemTimelineRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "internal fun GroupSystemTimelineRow(",
+        "test_ids": [
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "Activity reaction action: delete_for_me",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "R.string.delete_for_me",
+        "test_ids": [
+          "GRP-023"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,0 +1,92 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+  "legacy_sha256": "2367de998286f6838b7322781fffc819092b82f67838063975a8bb16f608a0f3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Reaction artwork source isolation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "ReceivedEmoji.None",
+        "test_ids": [
+          "MSG-037",
+          "MSG-024"
+        ]
+      },
+      {
+        "surface": "ReactionPillFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "internal fun ReactionPillFlow(",
+        "test_ids": [
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "ReactionPillItem",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "fun ReactionPillItem(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionPillRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "fun ReactionPillRow(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionPillSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "fun ReactionPillSurface(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "Activity reaction action: message_react",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "R.string.message_react",
+        "test_ids": [
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "Activity reaction action: reaction_tap_to_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "R.string.reaction_tap_to_remove",
+        "test_ids": [
+          "GRP-023"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:selection_state_not_selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "R.string.selection_state_not_selected",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:selection_state_selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "R.string.selection_state_selected",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:view_reactors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "R.string.view_reactors",
+        "test_ids": [
+          "MSG-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

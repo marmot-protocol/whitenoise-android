@@ -57,6 +57,7 @@ class Nip30EmojiTest {
                 tag("emojis", "x", "https://a/x"),
                 tag("emoji", "clip", "https://a/v"),
                 tag("emoji", "elsewhere", "https://a/other"),
+                tag("emoji", "x", "https://a/x", "set", "extra"),
             )
         assertEquals(emptyMap<Int, List<String>>(), Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
@@ -78,6 +79,35 @@ class Nip30EmojiTest {
             )
         val expected = mapOf(0 to listOf(":one:", ":again:"), 1 to listOf(":Two-2:"))
         assertEquals(expected, Nip30Emoji.attachmentShortcodes(tags, attachments))
+    }
+
+    /** Native history marks every matching image slot, including duplicates and aliased artwork. */
+    @Test
+    fun duplicateArtworkClaimsEveryOriginalSlot() {
+        val artwork = reference("image/png", "https://a/art")
+        val attachments =
+            listOf(
+                IndexedValue(0, artwork),
+                IndexedValue(2, artwork),
+                IndexedValue(5, reference("image/png", "https://a/photo")),
+            )
+        val tags = listOf(tag("emoji", "x", "https://a/art"), tag("emoji", "alias", "https://a/art", "set"))
+        assertEquals(
+            mapOf(0 to listOf(":x:", ":alias:"), 2 to listOf(":x:", ":alias:")),
+            Nip30Emoji.attachmentShortcodes(tags, attachments),
+        )
+    }
+
+    /** A malformed definition cannot reserve a shortcode ahead of a later valid three-field tag. */
+    @Test
+    fun oversizedTagDoesNotShadowAValidDefinition() {
+        val attachments = listOf(IndexedValue(3, reference("image/png", "https://a/art")))
+        val tags =
+            listOf(
+                tag("emoji", "x", "https://a/missing", "set", "extra"),
+                tag("emoji", "x", "https://a/art"),
+            )
+        assertEquals(mapOf(3 to listOf(":x:")), Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
 
     @Test

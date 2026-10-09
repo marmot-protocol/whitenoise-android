@@ -161,6 +161,7 @@ class ChatListDirectPeerPresentationLifecycleTest {
         row: ChatListRowFfi,
         presentation: ConversationPresentationFfi,
     ) = PresentedChatRowFfi(
+        draftVersion = null,
         preview = emptyChatRowPreview(),
         actions = noChatRowActions(),
         row = row,

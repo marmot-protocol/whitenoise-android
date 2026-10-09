@@ -37,7 +37,7 @@ class LargeGroupInviteWarningUiTest {
     @Test
     fun warningTracksSelectionAndAuthoritativeRosterChanges() {
         var rosterReady by mutableStateOf(false)
-        var existing by mutableStateOf(49)
+        var existing by mutableStateOf(149)
         var selected by mutableStateOf(emptyList<String>())
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -61,7 +61,7 @@ class LargeGroupInviteWarningUiTest {
         val semantics = composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).fetchSemanticsNode().config
         assertEquals(LiveRegionMode.Polite, semantics[SemanticsProperties.LiveRegion])
         assertTrue(semantics[SemanticsProperties.Text].isNotEmpty())
-        composeRule.runOnIdle { existing = 48 }
+        composeRule.runOnIdle { existing = 148 }
         composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertDoesNotExist()
     }
 
@@ -120,7 +120,7 @@ class LargeGroupInviteWarningUiTest {
                 val projection =
                     largeGroupInviteProjection(
                         rosterReady = true,
-                        authoritativeMemberIds = memberIds(49),
+                        authoritativeMemberIds = memberIds(149),
                         activeAccountIdHex = "member-0",
                         pendingInviteMemberIds = emptyList(),
                         stagedRecipientIds = selection.map { it.accountIdHex },

@@ -40,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -49,7 +51,9 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.roundToIntRect
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.whitenoise.android.R
@@ -86,6 +90,8 @@ internal fun GroupSystemRow(
     onWave: (suspend (String, () -> Unit) -> Unit)? = null,
     waveAccountRef: String? = appState.activeAccountRef,
     onOpenProfile: ((accountIdHex: String) -> Unit)? = null,
+    onOpenActions: ((String, IntRect?) -> Unit)? = null,
+    reactionContent: @Composable () -> Unit = {},
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
@@ -134,6 +140,8 @@ internal fun GroupSystemRow(
             }
         }
     var actionMenuOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    var summaryBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
+    val actionLabel = stringResource(R.string.message_actions)
     // The prototype gives every event row a flat 8.dp above and below inside a
     // full-width centred box; the transcript's own 2.dp row arrangement then
     // reads as the 18.dp the prototype leaves between adjacent events.
@@ -157,14 +165,18 @@ internal fun GroupSystemRow(
                     modifier =
                         Modifier
                             .widthIn(max = 440.dp)
+                            .onGloballyPositioned { summaryBounds = it.boundsInWindow().roundToIntRect() }
                             .then(
-                                if (onDeleteForMe != null && record.messageIdHex.isNotBlank()) {
-                                    Modifier.combinedClickable(
-                                        onClick = {},
-                                        onLongClick = { actionMenuOpen = true },
-                                    )
-                                } else {
-                                    Modifier
+                                groupSystemActionsModifier(
+                                    record.messageIdHex,
+                                    onOpenActions != null || onDeleteForMe != null,
+                                    actionLabel,
+                                ) {
+                                    if (onOpenActions != null) {
+                                        onOpenActions(summary.text, summaryBounds)
+                                    } else {
+                                        actionMenuOpen = true
+                                    }
                                 },
                             ),
                 )
@@ -192,6 +204,7 @@ internal fun GroupSystemRow(
                 WaveHiButton(record, appState, waveAccountRef, waveTarget, onWave)
             }
         }
+        reactionContent()
         // Developer-mode only: keep the one-line summary as the default and tuck
         // the MLS commit dump behind a per-row tap (#857). Saveable row-keyed UI
         // state lets an expanded row survive lazy-list disposal without leaking to others.
@@ -326,3 +339,16 @@ private fun waveTarget(
     }
     return event.subject?.takeIf { it.isNotBlank() && !GroupSystemEvents.isSelf(selfAccountId, it) }
 }
+
+/** Gives touch, TalkBack and keyboard a single named long-press action without affecting profile links. */
+private fun groupSystemActionsModifier(
+    messageId: String,
+    actionable: Boolean,
+    label: String,
+    onOpen: () -> Unit,
+): Modifier =
+    if (actionable && messageId.isNotBlank()) {
+        Modifier.combinedClickable(onClick = {}, onLongClickLabel = label, onLongClick = onOpen)
+    } else {
+        Modifier
+    }

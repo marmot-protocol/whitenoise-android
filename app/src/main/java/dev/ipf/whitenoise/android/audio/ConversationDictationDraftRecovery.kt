@@ -72,6 +72,28 @@ internal class ConversationDictationDraftRecovery(
         }
     }
 
+    /** Submitted text remains represented even after its composer was cleared or subsequently edited. */
+    fun consumeSubmittedTranscript(
+        session: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+    ) {
+        val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
+        val snapshot = current ?: ConversationDictationDraftSnapshot(TextFieldValue(""), Long.MIN_VALUE)
+        receipt =
+            Receipt(
+                session = session,
+                target = target,
+                transcript = transcript.trim(),
+                draft = snapshot,
+                sendEligible = false,
+                base = snapshot.value,
+                baseTranscript = transcript.trim(),
+                appendOnly = true,
+                recoveryUnavailable = current == null,
+            )
+    }
+
     data class Options(
         val restoreCapturedPrefix: Boolean = false,
         val ownedEmptyRevision: Long? = null,
@@ -214,7 +236,7 @@ internal class ConversationDictationDraftRecovery(
         options: Options,
     ): Insertion? =
         if (previous != null && sameDictationRecoveryDraft(previous.draft, current)) {
-            representedPrefixLength(previous.baseTranscript, text)?.let { prefixLength ->
+            dictationRecoveryRepresentedPrefixLength(previous.baseTranscript, text)?.let { prefixLength ->
                 Insertion(
                     previous.base,
                     prefixLength,
@@ -227,7 +249,7 @@ internal class ConversationDictationDraftRecovery(
             val restoringPayload = previous?.emptiedRevision != null || options.restoreCapturedPrefix
             val represented = previous?.transcript?.takeIf { !restoringPayload }.orEmpty()
             // A rewrite already mixed with editor changes remains retained, never appended twice.
-            representedPrefixLength(represented, text)?.let { prefixLength ->
+            dictationRecoveryRepresentedPrefixLength(represented, text)?.let { prefixLength ->
                 Insertion(current.value, prefixLength, represented, previous != null, restoringPayload)
             }
         }
@@ -275,23 +297,23 @@ internal class ConversationDictationDraftRecovery(
             }
         }
     }
+}
 
-    /** The base's entire represented transcript must survive before any suffix can be appended. */
-    private fun representedPrefixLength(
-        previous: String,
-        current: String,
-    ): Int? {
-        val before = dictationRecoveryWords(previous)
-        val after = dictationRecoveryWords(current)
-        val represented =
-            before.isNotEmpty() &&
-                after.size >= before.size &&
-                before.indices.all { before[it].first == after[it].first }
-        return when {
-            previous.isEmpty() -> 0
-            represented -> after.getOrNull(before.size)?.second ?: current.length
-            else -> null
-        }
+/** The base's entire represented transcript must survive before any suffix can be appended. */
+private fun dictationRecoveryRepresentedPrefixLength(
+    previous: String,
+    current: String,
+): Int? {
+    val before = dictationRecoveryWords(previous)
+    val after = dictationRecoveryWords(current)
+    val represented =
+        before.isNotEmpty() &&
+            after.size >= before.size &&
+            before.indices.all { before[it].first == after[it].first }
+    return when {
+        previous.isEmpty() -> 0
+        represented -> after.getOrNull(before.size)?.second ?: current.length
+        else -> null
     }
 }
 

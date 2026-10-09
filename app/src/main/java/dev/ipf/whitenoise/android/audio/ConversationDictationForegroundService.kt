@@ -97,18 +97,13 @@ internal class ConversationDictationForegroundService(
                 }
                 return Service.START_NOT_STICKY
             }
-            if (intent.action in setOf(ACTION_CANCEL, ACTION_PASTE, ACTION_SEND) &&
-                (
-                    controller.state is ConversationDictationState.Failed ||
-                        intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration
-                )
-            ) {
-                return Service.START_NOT_STICKY
-            }
+            if (isStaleCompletionCommand(intent, controller)) return Service.START_NOT_STICKY
             when (intent.action) {
                 ACTION_CANCEL -> controller.cancel()
                 ACTION_PASTE -> controller.paste()
                 ACTION_SEND -> controller.send()
+                ACTION_RETRY_AUDIO -> controller.retryRetainedAudioIfAvailable()
+                ACTION_DISCARD_RECOVERY -> controller.cancel()
             }
             // A completion received before the queued start must not promote stale controls
             // or open the microphone. Android posts foreground notifications asynchronously.
@@ -313,8 +308,25 @@ internal class ConversationDictationForegroundService(
         internal const val ACTION_CANCEL = "dev.ipf.whitenoise.android.dictation.CANCEL"
         internal const val ACTION_PASTE = "dev.ipf.whitenoise.android.dictation.PASTE"
         internal const val ACTION_SEND = "dev.ipf.whitenoise.android.dictation.SEND"
+        internal const val ACTION_RETRY_AUDIO = "dev.ipf.whitenoise.android.dictation.RETRY_AUDIO"
+        internal const val ACTION_DISCARD_RECOVERY = "dev.ipf.whitenoise.android.dictation.DISCARD_RECOVERY"
         internal const val EXTRA_SESSION_TOKEN = "dictation_session_token"
         internal const val EXTRA_ACTION_GENERATION = "dictation_action_generation"
+
+        /** Completion actions belong to the controls and action generation that created them. */
+        private fun isStaleCompletionCommand(
+            intent: Intent,
+            controller: ConversationDictationController,
+        ): Boolean {
+            val staleGeneration =
+                intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration
+            return when (intent.action) {
+                ACTION_CANCEL, ACTION_PASTE, ACTION_SEND ->
+                    controller.state is ConversationDictationState.Failed || staleGeneration
+                ACTION_RETRY_AUDIO, ACTION_DISCARD_RECOVERY -> !controller.recoveryHandedToComposer || staleGeneration
+                else -> false
+            }
+        }
 
         /** A foreground service can run even when Android hides all of its drawer actions. */
         internal fun notificationControlsAvailable(context: Context): Boolean {
@@ -370,7 +382,15 @@ internal class ConversationDictationForegroundService(
         internal const val ACTION_START = "dev.ipf.whitenoise.android.dictation.START"
 
         internal fun isCommand(intent: Intent?): Boolean =
-            intent?.action in setOf(ACTION_START, ACTION_CANCEL, ACTION_PASTE, ACTION_SEND) ||
+            intent?.action in
+                setOf(
+                    ACTION_START,
+                    ACTION_CANCEL,
+                    ACTION_PASTE,
+                    ACTION_SEND,
+                    ACTION_RETRY_AUDIO,
+                    ACTION_DISCARD_RECOVERY,
+                ) ||
                 intent?.hasExtra(EXTRA_SESSION_TOKEN) == true
 
         /** Creates the low-importance, badge-free channel once per installation. */
@@ -389,6 +409,11 @@ internal class ConversationDictationForegroundService(
             )
         }
     }
+}
+
+/** Rechecks a drawer action's audio and closure prerequisites at the moment it is handled. */
+private fun ConversationDictationController.retryRetainedAudioIfAvailable() {
+    if (canRetryRetainedAudio && !foregroundMicrophoneRequired) retry()
 }
 
 /** Recognizes API 31+'s explicit foreground-start rejection without resolving that class on older Android. */

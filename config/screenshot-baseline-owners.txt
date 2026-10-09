@@ -148,3 +148,7 @@
 *.ChatContextMenuFlowTest.directFolderEditorRetainsPlaybackControls
 
 *.ComposerDraftTopSettlementTest.clearingScrolledManualDraftRemovesTopAction
+
+# Dictation recovery preserves both ordinary composer layouts and exposes app-local resolution.
+*.ConversationDictationDraftPresentationTest.retainedAudioKeepsDictateVisibleAndOrdinarySendUsableWithoutNotifications
+*.ConversationDictationDraftPresentationTest.expandedComposerSettingsReturnOffersDraftOnlyRemainingAudioRetry
