@@ -667,6 +667,16 @@ class TtsHistorySessionTest {
             harness.loadTimeline("m1", "m2")
             // Detached start: the queue holds m1 while the timeline tail is m2.
             harness.speakConversation("m1")
+            var reattached = false
+            val waiter =
+                backgroundScope.launch {
+                    harness.session.edgeState.first {
+                        !harness.session.liveAppendDeferred &&
+                            harness.session.allowsLiveAppend(reconciledNativeWindow = true)
+                    }
+                    reattached = true
+                }
+            runCurrent()
             harness.pager.onProjectSpeakable = { id ->
                 if (id == "m2") {
                     harness.pager.loaded.add(harness.record("m3"))
@@ -680,12 +690,17 @@ class TtsHistorySessionTest {
             // The arrival landed between the walk and the apply: the final
             // window may not hold it, so the session must stay detached.
             assertFalse(harness.session.allowsLiveAppend())
+            runCurrent()
+            assertFalse(reattached)
 
             harness.session.nextMessage()
             advanceUntilIdle()
+            runCurrent()
 
             assertEquals(listOf("m1", "m2", "m3"), harness.controller.queuedMessageIds())
             assertTrue(harness.session.allowsLiveAppend())
+            assertTrue(reattached)
+            waiter.join()
         }
 
     @Test

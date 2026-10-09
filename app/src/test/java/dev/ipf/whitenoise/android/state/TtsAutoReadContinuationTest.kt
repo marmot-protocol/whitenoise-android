@@ -104,6 +104,83 @@ class TtsAutoReadContinuationTest {
         }
 
     @Test
+    fun aDetachedArrivalIsReplayedOnReattachmentWithoutAnotherNativeUpdate() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.attached.value = false
+            host.initial = page("m1", "m2", "m3")
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            // History has already queued m2; only the native window knows about m3.
+            host.controller.appendSpeech(entry("m2"), Locale.US)
+            host.attached.value = true
+            runCurrent()
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            assertEquals(3, host.engine.spoken.size)
+            assertEquals(2, host.reads)
+            host.controller.stop()
+            runCurrent()
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun nativeDeletionStillRevokesSpeechWhileTheLiveTailIsDetached() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.attached.value = false
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            val deleted = timelineRecord("m1", 0uL, "Text m1.").copy(deleted = true)
+            host.windows.send(timelinePage(deleted))
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun aDetachedFeedClosureRevokesSpeechAndCancelsTheReadinessWait() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.attached.value = false
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            host.windows.close()
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertEquals(1, host.closes)
+            host.attached.value = true
+            runCurrent()
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+        }
+
+    @Test
+    fun detachmentDuringProjectionDoesNotConsumeTheArrival() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.beforeProject = { host.attached.value = false }
+            host.initial = page("m1", "m2")
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            host.beforeProject = null
+            host.attached.value = true
+            runCurrent()
+            assertEquals(listOf("m1", "m2"), host.controller.queuedMessageIds())
+            host.controller.stop()
+            runCurrent()
+            assertEquals(1, host.closes)
+        }
+
+    @Test
     fun anEditDuringAnEdgeDeferralRevokesSpeechInsteadOfAppendingTheStaleSnapshot() =
         runTest {
             val host = Host(page("m1"))
@@ -312,8 +389,10 @@ class TtsAutoReadContinuationTest {
         override val controller = TtsController(FakeSessionFocus(), maxChunkLength = 4_000)
         val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
         val deferred = MutableStateFlow(false)
+        val attached = MutableStateFlow(true)
         var owned = true
         var opens = 0
+        var reads = 0
         var closes = 0
         var pages = 0
         val jumps = mutableListOf<String>()
@@ -349,7 +428,13 @@ class TtsAutoReadContinuationTest {
             deferred.first { !it }
         }
 
-        override fun allowsAppend(): Boolean = !appendDeferred
+        override suspend fun awaitTailAttachment() {
+            kotlinx.coroutines.flow
+                .combine(deferred, attached) { waiting, live -> !waiting && live }
+                .first { it }
+        }
+
+        override fun allowsAppend(): Boolean = attached.value && !appendDeferred
 
         override suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry? {
             beforeProject?.invoke()
@@ -369,7 +454,10 @@ class TtsAutoReadContinuationTest {
             return object : ConversationTimelineSubscriptionHandle {
                 override fun snapshot(): TimelinePageFfi = initial
 
-                override suspend fun nextWindow(): TimelinePageFfi? = windows.receiveCatching().getOrNull()
+                override suspend fun nextWindow(): TimelinePageFfi? {
+                    reads++
+                    return windows.receiveCatching().getOrNull()
+                }
 
                 override suspend fun paginateBackwards(count: UInt): TimelinePageOutcome = unchanged()
 

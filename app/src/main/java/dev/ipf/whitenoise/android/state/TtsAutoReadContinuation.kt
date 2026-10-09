@@ -11,16 +11,19 @@ import dev.ipf.whitenoise.android.core.TimelineProjector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
@@ -56,6 +59,8 @@ internal interface TtsAutoReadContinuationHost {
 
     suspend fun awaitAppendReadiness()
 
+    suspend fun awaitTailAttachment()
+
     fun allowsAppend(): Boolean
 
     suspend fun open(
@@ -86,6 +91,10 @@ internal fun createTtsAutoReadContinuation(appState: WhiteNoiseAppState): TtsAut
 
             override suspend fun awaitAppendReadiness() {
                 appState.ttsHistorySession.edgeState.first { !appendDeferred }
+            }
+
+            override suspend fun awaitTailAttachment() {
+                appState.ttsHistorySession.edgeState.first { !appendDeferred && allowsAppend() }
             }
 
             override fun allowsAppend(): Boolean =
@@ -120,11 +129,18 @@ private data class TtsAutoReadRun(
     val session: Long,
     val tail: TtsAutoReadTail,
     val locale: Locale,
+    var detached: Boolean = false,
+)
+
+private data class TtsAutoReadUpdate(
+    val page: TimelinePageFfi?,
+    val nativeWindowConsumed: Boolean,
 )
 
 private enum class TtsLiveAppendResult {
     Accepted,
     Deferred,
+    Detached,
     Stopped,
 }
 
@@ -190,9 +206,17 @@ internal class TtsAutoReadContinuation(
             currentCoroutineContext().ensureActive()
             val initial = withContext(io) { active.snapshot() }
             var reading = initial == null || appendPage(active, initial, run)
-            while (reading && owns(run, host.controller.state.value)) {
-                val page = withContext(io) { active.nextWindow() }
-                reading = page != null && appendPage(active, page, run)
+            coroutineScope {
+                var nextWindow = async(io) { active.nextWindow() }
+                try {
+                    while (reading && owns(run, host.controller.state.value)) {
+                        val update = awaitTtsAutoReadUpdate(host, io, active, nextWindow, run.detached)
+                        reading = update.page?.let { appendPage(active, it, run) } == true
+                        if (reading && update.nativeWindowConsumed) nextWindow = async(io) { active.nextWindow() }
+                    }
+                } finally {
+                    nextWindow.cancelAndJoin()
+                }
             }
             // No disconnected retained text may reach the engine through Resume.
             if (owns(run, host.controller.state.value)) host.controller.stop()
@@ -220,7 +244,8 @@ internal class TtsAutoReadContinuation(
         initial: TimelinePageFfi,
         run: TtsAutoReadRun,
     ): Boolean {
-        var page = reconcileAnchor(subscription, initial, run) ?: return stopForGap(run)
+        val reconciled = if (reattachAutoReadTail(host, run)) reconcileAnchor(subscription, initial, run) else null
+        var page = reconciled ?: return stopForGap(run)
         var complete = false
         var healthy = true
         while (healthy && !complete && owns(run, host.controller.state.value)) {
@@ -237,17 +262,17 @@ internal class TtsAutoReadContinuation(
                     if (reconciled == null) healthy = stopForGap(run) else page = reconciled
                     continue
                 }
-                healthy = appended == TtsLiveAppendResult.Accepted
-                if (healthy && page.hasMoreAfter) {
-                    val next = withContext(io) { subscription.paginateForwards(CONVERSATION_WINDOW_MAX_ROWS) }
-                    val advanced = (next as? TimelinePageOutcome.Advanced)?.page
-                    if (advanced != null && run.tail.following(advanced)?.isEmpty() == false) {
-                        page = advanced
-                    } else {
-                        healthy = stopForGap(run)
-                    }
+                if (appended == TtsLiveAppendResult.Detached) {
+                    run.detached = true
+                    complete = true
                 } else {
-                    complete = healthy
+                    healthy = appended == TtsLiveAppendResult.Accepted
+                    if (healthy && page.hasMoreAfter) {
+                        val advanced = advanceNativePage(subscription, run)
+                        if (advanced == null) healthy = stopForGap(run) else page = advanced
+                    } else {
+                        complete = healthy
+                    }
                 }
             }
         }
@@ -287,7 +312,8 @@ internal class TtsAutoReadContinuation(
     ): TtsLiveAppendResult {
         if (host.appendDeferred) return TtsLiveAppendResult.Deferred
         return when {
-            !host.allowsAppend() || record.deleted || record.invalidationStatus != null -> TtsLiveAppendResult.Accepted
+            !host.allowsAppend() -> TtsLiveAppendResult.Detached
+            record.deleted || record.invalidationStatus != null -> TtsLiveAppendResult.Accepted
             record.plaintext.length > maxRetainedTextChars -> {
                 stopForGap(run)
                 TtsLiveAppendResult.Stopped
@@ -296,6 +322,7 @@ internal class TtsAutoReadContinuation(
                 val entry = withContext(io) { host.project(record) }
                 when {
                     host.appendDeferred -> TtsLiveAppendResult.Deferred
+                    !host.allowsAppend() -> TtsLiveAppendResult.Detached
                     entry == null || !owns(run, host.controller.state.value) -> TtsLiveAppendResult.Accepted
                     !canRetain(entry) -> {
                         stopForGap(run)
@@ -336,14 +363,58 @@ internal class TtsAutoReadContinuation(
         return queued.size < maxRetainedMessages && retainedTextChars(queued) + incomingChars <= maxRetainedTextChars
     }
 
-    private fun retainedTextChars(queued: List<TtsQueuedMessage>): Long =
-        queued.sumOf { message ->
-            message.presentationEntry?.let { maxOf(it.text.length, it.sourceText?.length ?: 0).toLong() }
-                ?: message.chunks.sumOf { it.text.length.toLong() }
-        }
+    private suspend fun advanceNativePage(
+        subscription: ConversationTimelineSubscriptionHandle,
+        run: TtsAutoReadRun,
+    ): TimelinePageFfi? {
+        val next = withContext(io) { subscription.paginateForwards(CONVERSATION_WINDOW_MAX_ROWS) }
+        val advanced = (next as? TimelinePageOutcome.Advanced)?.page
+        return advanced?.takeIf { run.tail.following(it)?.isEmpty() == false }
+    }
 
     private fun stopForGap(run: TtsAutoReadRun): Boolean {
         if (owns(run, host.controller.state.value)) host.controller.stop()
         return false
     }
+}
+
+/** Keep native revocation live while history owns a detached speech window. */
+private suspend fun awaitTtsAutoReadUpdate(
+    host: TtsAutoReadContinuationHost,
+    io: CoroutineDispatcher,
+    subscription: ConversationTimelineSubscriptionHandle,
+    nextWindow: Deferred<TimelinePageFfi?>,
+    detached: Boolean,
+): TtsAutoReadUpdate =
+    coroutineScope {
+        if (!detached) return@coroutineScope TtsAutoReadUpdate(nextWindow.await(), true)
+        val readiness = async { host.awaitTailAttachment() }
+        try {
+            select {
+                nextWindow.onAwait { TtsAutoReadUpdate(it, true) }
+                readiness.onAwait {
+                    TtsAutoReadUpdate(withContext(io) { subscription.snapshot() }, false)
+                }
+            }
+        } finally {
+            readiness.cancelAndJoin()
+        }
+    }
+
+private fun retainedTextChars(queued: List<TtsQueuedMessage>): Long =
+    queued.sumOf { message ->
+        message.presentationEntry?.let { maxOf(it.text.length, it.sourceText?.length ?: 0).toLong() }
+            ?: message.chunks.sumOf { it.text.length.toLong() }
+    }
+
+private fun reattachAutoReadTail(
+    host: TtsAutoReadContinuationHost,
+    run: TtsAutoReadRun,
+): Boolean {
+    if (run.detached && host.allowsAppend()) {
+        val tail = host.controller.queuedMessageIds().lastOrNull() ?: return false
+        run.tail.accepted(tail)
+        run.detached = false
+    }
+    return true
 }

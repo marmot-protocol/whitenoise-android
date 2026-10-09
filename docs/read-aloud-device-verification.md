@@ -77,6 +77,11 @@ messages. Include incoming and outgoing messages from different senders.
 - [ ] Recreate the OS process. This implementation retains no persisted speech
   queue or recovery cache: the non-sticky service starts idle. Playback never
   reconstructs decrypted text or resumes automatically after process death.
+- [ ] Start a capped backlog or seek into older history, then deliver newer
+  messages before the visible timeline catches up. Return to the live tail:
+  arrivals are queued exactly once without another incoming message. Delete or
+  edit queued text and disconnect the native feed while detached; captured
+  speech is still revoked.
 - [ ] Lose the native timeline feed or exceed its retention budget during pause.
   Speech stops and discards the captured queue; Resume cannot submit stale text.
   A fresh playback start reloads authoritative content.

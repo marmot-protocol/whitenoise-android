@@ -4,7 +4,7 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Process-owned chronological auto-read continuation",
+        "surface": "Process-owned chronological auto-read continuation and history reattachment",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TtsAutoReadContinuation.kt",
         "anchor": "fun start(",
         "test_ids": [
