@@ -6293,7 +6293,18 @@ class ConversationController(
     // so removed IDs do not become a second long-lived message index.
     var pendingTimelineRemovedMessageIds by mutableStateOf<Set<String>>(emptySet())
         private set
-    var replyingTo by mutableStateOf<AppMessageRecordFfi?>(null)
+    private var replySelection by mutableStateOf<AppMessageRecordFfi?>(null)
+
+    /** Distinguishes a new selection of the same message from the reply an in-flight send captured. */
+    internal var replySelectionVersion = 0L
+        private set
+
+    var replyingTo: AppMessageRecordFfi?
+        get() = replySelection
+        set(value) {
+            replySelectionVersion += 1
+            replySelection = value
+        }
 
     /** Set by the mounted conversation screen so non-composer senders never drop its staged attachments. */
     @Volatile
@@ -8638,6 +8649,8 @@ class ConversationController(
         caption: String?,
         canQueue: () -> Boolean = { true },
         outboundVisibleStartedAtElapsedMs: Long = SystemClock.elapsedRealtime(),
+        replyTarget: String? = replyingTo?.messageIdHex,
+        replyVersion: Long = replySelectionVersion,
     ): QueuedAttachmentSend? {
         if (!canQueue()) return null
         val account =
@@ -8682,6 +8695,7 @@ class ConversationController(
                         body = body,
                         attachments = attachments,
                         now = now,
+                        replyTarget = replyTarget,
                     )
                 }
             } catch (throwable: Throwable) {
@@ -8689,13 +8703,45 @@ class ConversationController(
                 throw throwable
             }
         // Markdown preparation can suspend: a reviewed take must still belong to its visible owner.
-        if (!canQueue()) {
+        if (
+            !canQueue() || !shouldAcceptMediaUploadForAccount(
+                account,
+                mediaUploadSessionEpoch,
+                appState.activeAccountRef,
+                appState.mediaUploadSessionEpoch(),
+            )
+        ) {
             outboundVisibleAttempt.cancel()
             return null
         }
+        val replyRevision =
+            if (replyTarget != null) {
+                val revision =
+                    runCatchingCancellable {
+                        appState.marmotIo {
+                            stageMediaReply(account, group.groupIdHex, replyTarget, trimmedCaption, attachments)
+                        }
+                    }.getOrNull()
+                if (
+                    revision == null || !canQueue() || !canSendMessages ||
+                    !shouldAcceptMediaUploadForAccount(
+                        account,
+                        mediaUploadSessionEpoch,
+                        appState.activeAccountRef,
+                        appState.mediaUploadSessionEpoch(),
+                    )
+                ) {
+                    outboundVisibleAttempt.cancel()
+                    appState.present(R.string.media_reply_draft_conflict)
+                    return null
+                }
+                revision
+            } else {
+                null
+            }
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, retentionSnapshot)
         val optimisticOrder = nextOptimisticTimelineOrder()
-        retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption))
+        retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption, replyTarget, replyRevision, replyVersion))
         // Mark this slot as "still needed by a pending send" so the screen
         // dispose hook's `clearRetainedUploads` won't wipe bytes for slots
         // queued behind the one currently uploading.
@@ -8735,6 +8781,7 @@ class ConversationController(
         body: String,
         attachments: List<PendingAttachment>,
         now: ULong,
+        replyTarget: String?,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = tempId,
@@ -8747,7 +8794,7 @@ class ConversationController(
             tags =
                 attachments.map {
                     MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
-                },
+                } + replyTarget?.let { listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it)) }.orEmpty(),
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
@@ -8892,6 +8939,7 @@ class ConversationController(
                                                             group.groupIdHex,
                                                             request,
                                                             tempId,
+                                                            capturedReply = retained.replyRevision != null,
                                                         )
                                                     }
                                                 outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
@@ -8946,6 +8994,7 @@ class ConversationController(
                                                     references,
                                                     retained.caption,
                                                     tempId,
+                                                    replyRevision = retained.replyRevision,
                                                 )
                                             }
                                     recordOptimisticSendAcceptance(key, accepted)
@@ -8953,6 +9002,7 @@ class ConversationController(
                                 }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
                         }
                 completeDurableAcceptance(key)
+                if (retained.replyTarget != null && replySelectionVersion == retained.replyVersion) replyingTo = null
                 sendHostAttempt.success()
                 val canonicalId = summary.messageIds.firstOrNull()
                 diagnostics.alias(tempId, canonicalId)
@@ -9121,7 +9171,7 @@ class ConversationController(
                                 // sent), not the "📎 filename" optimistic placeholder, so
                                 // the bridge bubble is identical to the projected one.
                                 plaintext = retained.caption.orEmpty(),
-                                tags = imetaTags,
+                                tags = imetaTags + optimistic.tags.filter { it.values.firstOrNull() != "_media_pending" },
                                 sourceEpoch = references.firstOrNull()?.sourceEpoch,
                             )
                         messageById[confirmedId] = confirmedRecord

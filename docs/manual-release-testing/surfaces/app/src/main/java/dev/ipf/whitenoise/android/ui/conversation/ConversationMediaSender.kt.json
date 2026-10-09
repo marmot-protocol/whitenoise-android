@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+  "legacy_sha256": "2c88f5d8624da9c3a6988821ab6a54037d132de9a7fc3b9041dbf76caf6ce714",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Private share send lease storage failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Empty document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_empty",
+        "test_ids": [
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "Unreadable document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_unreadable",
+        "test_ids": [
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "Oversized document send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_too_large",
+        "test_ids": [
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "Unprocessable document image feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.toast_couldnt_decode_image",
+        "test_ids": [
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "Preserved media reply and conflicting draft feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_reply_draft_conflict",
+        "test_ids": [
+          "MSG-021",
+          "MED-008",
+          "MED-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

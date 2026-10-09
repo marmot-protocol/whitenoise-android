@@ -224,6 +224,16 @@
         "test_ids": [
           "GRP-021"
         ]
+      },
+      {
+        "surface": "Preserved media reply and conflicting draft feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.media_reply_draft_conflict",
+        "test_ids": [
+          "MSG-021",
+          "MED-008",
+          "MED-009"
+        ]
       }
     ],
     "settings_controls": [

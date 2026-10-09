@@ -109,13 +109,15 @@ internal data class DurableComposerMediaUpload(
 
 /**
  * Uses draft admission when MDK owns matching staged bytes, otherwise asks the
- * token-aware upload call to admit draft-less voice notes and contact cards.
+ * token-aware upload call to admit draft-less non-reply voice notes and contact cards.
+ * A captured reply is always upload-only until its original revision can be admitted.
  */
 internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
     account: String,
     group: String,
     request: MediaUploadRequestFfi,
     token: String,
+    capturedReply: Boolean = false,
 ): DurableComposerMediaUpload {
     require(!request.send) { "controller request must begin as upload-only" }
     recoveredLocalSend(account, group, token)?.let { recovered ->
@@ -129,9 +131,9 @@ internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
         )
     }
     val draftBacked =
-        selectedDraftOrNull(account, group)
+        capturedReply || selectedDraftOrNull(account, group)
             ?.draft
-            ?.let { draftDescribesUpload(it, request.attachments) } == true
+            ?.let { it.replyToMessageIdHex == null && draftDescribesUpload(it, request.attachments) } == true
     val submission = uploadMediaWithClientToken(account, group, request.copy(send = !draftBacked), token)
     val acceptance =
         submission.acceptance?.also {

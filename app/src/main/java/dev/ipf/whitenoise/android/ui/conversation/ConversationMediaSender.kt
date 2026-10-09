@@ -370,7 +370,10 @@ internal class ConversationMediaSender(
 ) {
     private val attachmentReader = ConversationAttachmentReader(appState, context)
 
+    /** Captures the reply before contact serialization can suspend. */
     fun sendSharedContact(contact: SharedContact) {
+        val replyTarget = controller.replyingTo?.messageIdHex
+        val replyVersion = controller.replySelectionVersion
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             val vcardBytes =
@@ -392,7 +395,10 @@ internal class ConversationMediaSender(
                 controller.queueAttachments(
                     attachments = listOf(attachment),
                     caption = caption,
+                    canQueue = { controller.replySelectionVersion == replyVersion },
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                    replyTarget = replyTarget,
+                    replyVersion = replyVersion,
                 ) ?: return@launchMutation
             onRevealSent()
             controller.uploadQueued(seeded)
@@ -406,6 +412,8 @@ internal class ConversationMediaSender(
         canSend: () -> Boolean,
         onQueued: (Boolean) -> Unit,
     ) {
+        val replyTarget = controller.replyingTo?.messageIdHex
+        val replyVersion = controller.replySelectionVersion
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             var accepted = false
@@ -427,13 +435,22 @@ internal class ConversationMediaSender(
                     controller.queueAttachments(
                         listOf(attachment),
                         null,
-                        canQueue = { canSend() && controller.canSendMessages },
+                        canQueue = { canSend() && controller.canSendMessages && controller.replySelectionVersion == replyVersion },
                         outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                        replyTarget = replyTarget,
+                        replyVersion = replyVersion,
                     ) ?: return@launchMutation
-                accepted = true
-                onQueued(true)
+                if (replyTarget == null) {
+                    accepted = true
+                    onQueued(true)
+                }
                 onRevealSent()
-                controller.uploadQueued(seeded)
+                controller.uploadQueued(seeded) {
+                    if (replyTarget != null) {
+                        accepted = true
+                        if (canSend()) onQueued(true)
+                    }
+                }
             } finally {
                 if (!accepted) onQueued(false)
             }
@@ -471,6 +488,8 @@ internal class ConversationMediaSender(
             onRejected()
             return
         }
+        val replyTarget = controller.replyingTo?.messageIdHex
+        val replyVersion = controller.replySelectionVersion
         val pendingDraftClear =
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
@@ -492,6 +511,13 @@ internal class ConversationMediaSender(
                         preparedImageAttachments,
                         preparedDocumentAttachments,
                     )
+                if (
+                    replyTarget != null &&
+                    (prepared.images.size != imageSlots.size || prepared.documents.attachments.size != documentUris.size)
+                ) {
+                    appState.present(R.string.media_reply_draft_conflict)
+                    return@launchMutation
+                }
                 if (!acceptPreparedAttachments(prepared, imageSlots.size)) {
                     return@launchMutation
                 }
@@ -504,19 +530,26 @@ internal class ConversationMediaSender(
                         prepared.copy(documents = readyDocuments),
                         trimmedCaption,
                         outboundVisibleStartedAtElapsedMs,
+                        replyTarget,
+                        replyVersion,
                     )
                 if (seeded.isEmpty()) {
                     return@launchMutation
                 }
                 val sourceReleases = retainStagedSources(appState, controller, sourceLease, seeded)
                 accepted = true
-                onAccepted()
+                if (replyTarget == null) onAccepted()
                 onAfterSend()
-                val clearDraftAfterDurableAcceptance: (() -> Unit)? =
-                    pendingDraftClear?.let { pendingClear ->
-                        { appState.clearDraftAfterSuccessfulSend(pendingClear) }
+                var replyAccepted = false
+                val clearDraftAfterDurableAcceptance: () -> Unit = {
+                    if (replyTarget != null) {
+                        replyAccepted = true
+                        onAccepted()
                     }
+                    pendingDraftClear?.let(appState::clearDraftAfterSuccessfulSend)
+                }
                 uploadStagedAttachments(seeded, sourceReleases, clearDraftAfterDurableAcceptance)
+                if (replyTarget != null && !replyAccepted) onRejected()
             } finally {
                 if (!accepted) {
                     withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { sourceLease?.release() }
@@ -688,17 +721,33 @@ internal class ConversationMediaSender(
         return !prepared.isEmpty
     }
 
+    /** One reply owns one native draft/album; ordinary sends retain the existing document grouping. */
     private suspend fun seedPreparedAttachments(
         prepared: PreparedStagedAttachments,
         caption: String?,
         outboundVisibleStartedAtElapsedMs: Long,
+        replyTarget: String?,
+        replyVersion: Long,
     ): List<ConversationController.QueuedAttachmentSend> {
+        if (replyTarget != null) {
+            return listOfNotNull(
+                controller.queueAttachments(
+                    attachments = prepared.images + prepared.documents.attachments,
+                    caption = caption,
+                    canQueue = { controller.replySelectionVersion == replyVersion },
+                    outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                    replyTarget = replyTarget,
+                    replyVersion = replyVersion,
+                ),
+            )
+        }
         val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
         if (prepared.images.isNotEmpty()) {
             controller
                 .queueAttachments(
                     attachments = prepared.images,
                     caption = caption,
+                    replyTarget = null,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                 )?.let(seeded::add)
         }
@@ -715,6 +764,7 @@ internal class ConversationMediaSender(
                 .queueAttachments(
                     attachments = listOf(itemAttachment),
                     caption = itemCaption,
+                    replyTarget = null,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                 )?.let(seeded::add)
         }
