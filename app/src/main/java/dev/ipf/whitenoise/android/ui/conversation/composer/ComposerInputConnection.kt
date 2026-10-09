@@ -64,9 +64,8 @@ internal class ComposerInputConnection(
     }
 
     override fun getExtractedText(request: ExtractedTextRequest?, flags: Int): ExtractedText? {
-        if (!active) return null
-        // Preserve Compose's registration of extracted-text monitoring.
-        if (super.getExtractedText(request, flags) == null) return null
+        // Preserve Compose's registration of extracted-text monitoring for active connections.
+        if (!active || super.getExtractedText(request, flags) == null) return null
         val value = readAcceptedValue()
         return ExtractedText().apply {
             text = value.text
