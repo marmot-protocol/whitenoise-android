@@ -75,12 +75,20 @@ messages. Include incoming and outgoing messages from different senders.
 - [ ] Recreate the OS process. This implementation retains no persisted speech
   queue or recovery cache: the non-sticky service starts idle. Playback never
   reconstructs decrypted text or resumes automatically after process death.
+- [ ] Lose the native timeline feed or exceed its retention budget during pause.
+  Speech stops and discards the captured queue; Resume cannot submit stale text.
+  A fresh playback start reloads authoritative content.
 
 The process-owned auto-read subscription follows MDK's ordered window and pages
 through a missing tail instead of jumping past unseen messages. A native gap or
-subscription failure pauses the retained queue. Resume explicitly reconnects;
-there is no automatic retry loop. Native edits/deletions invalidate captured
+subscription failure ends the session so disconnected captured text cannot be
+resumed before revalidation. A fresh playback start is required. Native edits/deletions invalidate captured
 speech even while the conversation screen is absent.
+
+Live continuation retains at most the native window's 200 messages and 1,048,576
+UTF-16 units across each message's authored/spoken text, using the larger length.
+Exceeding either cumulative budget stops and discards the session instead of
+dropping unfinished messages or growing an unattended queue indefinitely.
 
 ## Results and closure
 

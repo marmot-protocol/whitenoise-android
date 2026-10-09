@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsController
+import dev.ipf.whitenoise.android.audio.tts.TtsQueuedMessage
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -115,6 +116,8 @@ internal class TtsAutoReadContinuation(
     private val host: TtsAutoReadContinuationHost,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val maxRetainedMessages: Int = CONVERSATION_WINDOW_MAX_ROWS.toInt(),
+    private val maxRetainedTextChars: Int = 1_048_576,
 ) {
     private var job: Job? = null
 
@@ -125,11 +128,15 @@ internal class TtsAutoReadContinuation(
     ) {
         job?.cancel()
         val session = host.controller.state.value.sessionId
+        val queued = host.controller.queuedMessagesSnapshot()
+        if (queued.size > maxRetainedMessages || retainedTextChars(queued) > maxRetainedTextChars) {
+            host.controller.stop()
+            return
+        }
         // The initial projection may exceed the controller's bounded queue.
         // Anchor to what was accepted, never to a row that has not been queued.
         val anchor =
-            host.controller
-                .queuedMessagesSnapshot()
+            queued
                 .lastOrNull()
                 ?.messageIdHex
                 ?.takeIf(String::isNotEmpty) ?: return
@@ -139,15 +146,7 @@ internal class TtsAutoReadContinuation(
                 coroutineScope {
                     val consumer =
                         launch {
-                            while (owns(run, host.controller.state.value)) {
-                                consume(run)
-                                if (owns(run, host.controller.state.value)) {
-                                    host.controller.pause()
-                                    host.controller.state.first {
-                                        it is TtsState.Speaking || !owns(run, it)
-                                    }
-                                }
-                            }
+                            consume(run)
                         }
                     host.controller.state.first { !owns(run, it) }
                     consumer.cancelAndJoin()
@@ -163,7 +162,7 @@ internal class TtsAutoReadContinuation(
             state.sessionId == run.session &&
             (state is TtsState.Speaking || state is TtsState.Paused)
 
-    @Suppress("TooGenericExceptionCaught") // A native subscription failure retains speech for explicit recovery.
+    @Suppress("TooGenericExceptionCaught") // Native authority loss must revoke captured speech.
     private suspend fun consume(run: TtsAutoReadRun) {
         var subscription: ConversationTimelineSubscriptionHandle? = null
         try {
@@ -179,10 +178,12 @@ internal class TtsAutoReadContinuation(
                 val page = withContext(io) { active.nextWindow() }
                 reading = page != null && appendPage(active, page, run)
             }
+            // No disconnected retained text may reach the engine through Resume.
+            if (owns(run, host.controller.state.value)) host.controller.stop()
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (_: Exception) {
-            if (owns(run, host.controller.state.value)) host.controller.pause()
+            if (owns(run, host.controller.state.value)) host.controller.stop()
         } finally {
             withContext(NonCancellable + io) {
                 try {
@@ -192,7 +193,7 @@ internal class TtsAutoReadContinuation(
                         subscription?.close()
                     }
                 } catch (_: Exception) {
-                    if (owns(run, host.controller.state.value)) host.controller.pause()
+                    if (owns(run, host.controller.state.value)) host.controller.stop()
                 }
             }
         }
@@ -203,7 +204,7 @@ internal class TtsAutoReadContinuation(
         initial: TimelinePageFfi,
         run: TtsAutoReadRun,
     ): Boolean {
-        var page = reconcileAnchor(subscription, initial, run) ?: return pauseForGap(run)
+        var page = reconcileAnchor(subscription, initial, run) ?: return stopForGap(run)
         var complete = false
         var healthy = true
         while (healthy && !complete && owns(run, host.controller.state.value)) {
@@ -218,7 +219,7 @@ internal class TtsAutoReadContinuation(
                     if (advanced != null && run.tail.following(advanced)?.isEmpty() == false) {
                         page = advanced
                     } else {
-                        healthy = pauseForGap(run)
+                        healthy = stopForGap(run)
                     }
                 } else {
                     complete = healthy
@@ -243,20 +244,38 @@ internal class TtsAutoReadContinuation(
         page: TimelinePageFfi,
         run: TtsAutoReadRun,
     ): Boolean {
-        val following = run.tail.following(page) ?: return pauseForGap(run)
+        val following = run.tail.following(page) ?: return stopForGap(run)
         val records = following.iterator()
-        while (records.hasNext() && owns(run, host.controller.state.value)) {
+        var healthy = true
+        while (records.hasNext() && healthy && owns(run, host.controller.state.value)) {
             currentCoroutineContext().ensureActive()
             val record = records.next()
-            if (host.allowsAppend() && !record.deleted && record.invalidationStatus == null) {
-                val entry = withContext(io) { host.project(record) }
-                if (owns(run, host.controller.state.value)) {
-                    entry?.let { host.controller.appendSpeech(it, run.locale) }
-                }
-            }
-            run.tail.accepted(record.messageIdHex)
+            healthy = appendRecord(record, run)
+            if (healthy) run.tail.accepted(record.messageIdHex)
         }
-        return owns(run, host.controller.state.value)
+        return healthy && owns(run, host.controller.state.value)
+    }
+
+    private suspend fun appendRecord(
+        record: TimelineMessageRecordFfi,
+        run: TtsAutoReadRun,
+    ): Boolean {
+        if (!host.allowsAppend() || record.deleted || record.invalidationStatus != null) return true
+        return if (record.plaintext.length > maxRetainedTextChars) {
+            stopForGap(run)
+        } else {
+            val entry = withContext(io) { host.project(record) }
+            if (entry != null && owns(run, host.controller.state.value)) {
+                if (canRetain(entry)) {
+                    host.controller.appendSpeech(entry, run.locale)
+                    owns(run, host.controller.state.value)
+                } else {
+                    stopForGap(run)
+                }
+            } else {
+                owns(run, host.controller.state.value)
+            }
+        }
     }
 
     /**
@@ -277,8 +296,22 @@ internal class TtsAutoReadContinuation(
         }
     }
 
-    private fun pauseForGap(run: TtsAutoReadRun): Boolean {
-        if (owns(run, host.controller.state.value)) host.controller.pause()
+    /** Bound transient speech retention while an unattended session is paused. */
+    private fun canRetain(entry: TtsSpeakableEntry): Boolean {
+        val queued = host.controller.queuedMessagesSnapshot()
+        if (queued.any { it.messageIdHex == entry.messageIdHex }) return true
+        val incomingChars = maxOf(entry.text.length, entry.sourceText?.length ?: 0)
+        return queued.size < maxRetainedMessages && retainedTextChars(queued) + incomingChars <= maxRetainedTextChars
+    }
+
+    private fun retainedTextChars(queued: List<TtsQueuedMessage>): Long =
+        queued.sumOf { message ->
+            message.presentationEntry?.let { maxOf(it.text.length, it.sourceText?.length ?: 0).toLong() }
+                ?: message.chunks.sumOf { it.text.length.toLong() }
+        }
+
+    private fun stopForGap(run: TtsAutoReadRun): Boolean {
+        if (owns(run, host.controller.state.value)) host.controller.stop()
         return false
     }
 }

@@ -76,25 +76,75 @@ class TtsAutoReadContinuationTest {
         }
 
     @Test
-    fun anUnrecoverableGapPausesAndOnlyAnExplicitResumeReopensTheFeed() =
+    fun anUnrecoverableGapRevokesSpeechBeforeResumeCanSubmitCapturedText() =
         runTest {
             val host = Host(page("m3"))
             host.start(this)
             runCurrent()
-            assertTrue(host.controller.state.value is TtsState.Paused)
-            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
             assertEquals(1, host.opens)
             assertEquals(1, host.closes)
             runCurrent()
             assertEquals(1, host.opens)
 
-            host.initial = page("m1", "m2", "m3")
+            val submissions = host.engine.spoken.size
             host.controller.resume()
             runCurrent()
-            assertEquals(2, host.opens)
-            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
-            host.controller.stop()
+            assertEquals(1, host.opens)
+            assertEquals(submissions, host.engine.spoken.size)
+        }
+
+    @Test
+    fun aClosedNativeFeedCannotResumeCapturedText() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
             runCurrent()
+            host.controller.pause()
+            host.windows.close()
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            val submissions = host.engine.spoken.size
+            host.controller.resume()
+            assertEquals(submissions, host.engine.spoken.size)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun pausedDistinctArrivalsCannotExceedTheRetainedMessageBudget() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this, maxMessages = 2)
+            runCurrent()
+            host.controller.pause()
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            assertEquals(listOf("m1", "m2"), host.controller.queuedMessageIds())
+            assertTrue(host.controller.state.value is TtsState.Paused)
+            host.windows.send(page("m1", "m2", "m3"))
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.engine.spoken.size)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun pausedArrivalsCannotExceedTheCumulativeTextBudget() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this, maxChars = 15)
+            runCurrent()
+            host.controller.pause()
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.engine.spoken.size)
+            assertEquals(1, host.closes)
         }
 
     @Test
@@ -198,9 +248,14 @@ class TtsAutoReadContinuationTest {
             check(controller.speak(listOf(entry("m1")), Locale.US))
         }
 
-        fun start(scope: TestScope) {
+        fun start(
+            scope: TestScope,
+            maxMessages: Int = 200,
+            maxChars: Int = 1_048_576,
+        ) {
             val dispatcher = StandardTestDispatcher(scope.testScheduler)
-            TtsAutoReadContinuation(this, scope.backgroundScope, dispatcher).start("account", "group", Locale.US)
+            TtsAutoReadContinuation(this, scope.backgroundScope, dispatcher, maxMessages, maxChars)
+                .start("account", "group", Locale.US)
         }
 
         override fun owns(
