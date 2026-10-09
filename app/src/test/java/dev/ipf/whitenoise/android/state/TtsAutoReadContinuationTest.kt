@@ -217,7 +217,7 @@ class TtsAutoReadContinuationTest {
                 message = TimelineProjector.toAppMessageRecord(record),
                 editedText = null,
                 senderDisplayName = "Alice",
-                parseMarkdown = { emptyMarkdown() },
+                parseMarkdown = { record.contentTokens },
             )
         }
 
