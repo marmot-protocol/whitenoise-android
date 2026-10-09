@@ -270,6 +270,30 @@ private class TimestampTextState {
             null
         }
     }
+
+    fun timestampTap(
+        change: androidx.compose.ui.input.pointer.PointerInputChange,
+        origin: Offset?,
+        downAt: Long,
+        ranges: List<AnnotatedString.Range<String>>,
+        viewConfiguration: androidx.compose.ui.platform.ViewConfiguration,
+    ) {
+        if (origin == null || change.isConsumed) {
+            return
+        }
+        val range = hit(change.position, ranges) ?: return
+        val moved = (change.position - origin).getDistance() >= viewConfiguration.touchSlop
+        val held = change.uptimeMillis - downAt >= viewConfiguration.longPressTimeoutMillis
+        if (!moved && !held) {
+            val offset = layout?.getOffsetForPosition(change.position) ?: -1
+            // Linked labels navigate normally; the clock has its own disclosure target.
+            val links = layout?.layoutInput?.text?.getLinkAnnotations(offset, offset + 1)
+            if (links?.isEmpty() == true) {
+                tapped = range.item
+                change.consume()
+            }
+        }
+    }
 }
 
 @Composable
@@ -315,41 +339,13 @@ private fun Modifier.timestampPointers(
                         downAt = change.uptimeMillis
                     }
                     PointerEventType.Release -> {
-                        timestampTap(change, down, downAt, ranges, state)
+                        state.timestampTap(change, down, downAt, ranges, viewConfiguration)
                         down = null
                     }
                 }
             }
         }
     }
-
-private fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.timestampTap(
-    change: androidx.compose.ui.input.pointer.PointerInputChange,
-    origin: Offset?,
-    downAt: Long,
-    ranges: List<AnnotatedString.Range<String>>,
-    state: TimestampTextState,
-) {
-    if (origin == null || change.isConsumed) {
-        return
-    }
-    val range = state.hit(change.position, ranges) ?: return
-    val moved = (change.position - origin).getDistance() >= viewConfiguration.touchSlop
-    val held = change.uptimeMillis - downAt >= viewConfiguration.longPressTimeoutMillis
-    if (!moved && !held) {
-        val offset = state.layout?.getOffsetForPosition(change.position) ?: -1
-        // Linked labels navigate normally; the clock has its own disclosure target.
-        val links =
-            state.layout
-                ?.layoutInput
-                ?.text
-                ?.getLinkAnnotations(offset, offset + 1)
-        if (links?.isEmpty() == true) {
-            state.tapped = range.item
-            change.consume()
-        }
-    }
-}
 
 @Suppress("FunctionNaming")
 @Composable
