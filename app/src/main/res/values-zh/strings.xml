@@ -2268,4 +2268,10 @@
     <string name="chat_departure_confirm">检查所选的 %1$d 个聊天。将退出已加入的群组并从此设备删除；私聊仅在本地删除。其他成员保留其副本。删除前会确认所需的管理员移交。</string>
     <string name="chat_departure_result">%1$d 个已完成 · %2$d 个未完成 · %3$d 个已跳过。重试会检查成员身份，仅继续未完成的操作。</string>
     <string name="chat_departure_admin_granted">管理员权限已转移。退出群组尚未完成。</string>
+    <string name="reaction_details_loading">正在加载回应…</string>
+    <string name="reaction_details_load_failed">无法加载回应。</string>
+    <string name="group_create_remove_and_continue">移除此人并继续</string>
+    <string name="group_create_edit_members">编辑成员</string>
+    <string name="group_create_unattributed_failure">无法确定受影响的成员。请重试或编辑成员列表。</string>
+    <string name="media_reply_draft_conflict">草稿已更改。请保留此回复并重试，或在发送前取消回复。</string>
 </resources>

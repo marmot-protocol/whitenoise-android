@@ -2374,4 +2374,10 @@
     <string name="chat_departure_confirm">Проверьте %1$d выбранных чатов. Вы выйдете из групп и удалите их с этого устройства; личные чаты удаляются локально. Другие участники сохранят свои копии. Перед удалением потребуется подтвердить передачу прав администратора.</string>
     <string name="chat_departure_result">%1$d завершено · %2$d не завершено · %3$d пропущено. Повторная попытка проверяет участие и продолжает только незавершённые действия.</string>
     <string name="chat_departure_admin_granted">Права администратора переданы. Выход из группы ещё не завершён.</string>
+    <string name="reaction_details_loading">Загрузка реакций…</string>
+    <string name="reaction_details_load_failed">Не удалось загрузить реакции.</string>
+    <string name="group_create_remove_and_continue">Удалить этого участника и продолжить</string>
+    <string name="group_create_edit_members">Изменить участников</string>
+    <string name="group_create_unattributed_failure">Не удалось определить, у кого возникла проблема. Повторите попытку или измените список участников.</string>
+    <string name="media_reply_draft_conflict">Ваш черновик изменился. Сохраните этот ответ и повторите попытку или отмените ответ перед отправкой.</string>
 </resources>

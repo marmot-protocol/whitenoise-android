@@ -2319,4 +2319,10 @@
     <string name="chat_departure_confirm">%1$d ausgewählte Chats prüfen. Beigetretene Gruppen werden verlassen und von diesem Gerät gelöscht; Direktchats werden lokal gelöscht. Andere Mitglieder behalten ihre Kopien. Erforderliche Admin-Übergaben werden vor der Löschung bestätigt.</string>
     <string name="chat_departure_result">%1$d abgeschlossen · %2$d unvollständig · %3$d übersprungen. Ein erneuter Versuch prüft die Mitgliedschaft und setzt nur unvollständige Schritte fort.</string>
     <string name="chat_departure_admin_granted">Die Admin-Übertragung war erfolgreich. Das Verlassen der Gruppe ist noch nicht abgeschlossen.</string>
+    <string name="reaction_details_loading">Reaktionen werden geladen…</string>
+    <string name="reaction_details_load_failed">Reaktionen konnten nicht geladen werden.</string>
+    <string name="group_create_remove_and_continue">Diese Person entfernen und fortfahren</string>
+    <string name="group_create_edit_members">Mitglieder bearbeiten</string>
+    <string name="group_create_unattributed_failure">Wir konnten keine betroffene Person ermitteln. Versuche es erneut oder bearbeite die Mitglieder.</string>
+    <string name="media_reply_draft_conflict">Dein Entwurf wurde geändert. Behalte diese Antwort und versuche es erneut, oder brich die Antwort vor dem Senden ab.</string>
 </resources>

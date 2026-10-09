@@ -77,3 +77,15 @@ internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
     }
 
 internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean = groupCreateFailureCopyable(throwable)
+
+/** Founding-roster recovery names only a recipient matched to the submitted selection. */
+internal fun groupCreateSelectionFailureDetail(
+    throwable: Throwable,
+    recipientName: String?,
+): AppText =
+    when {
+        recipientName != null -> groupCreateFailureDetail(throwable) { recipientName }
+        throwable is MissingKeyPackage -> AppText.Resource(R.string.error_missing_key_package)
+        throwable is MarmotKitException.MissingMemberInboxRoute -> AppText.Resource(R.string.error_missing_member_inbox)
+        else -> groupCreateFailureDetail(throwable) { "" }
+    }

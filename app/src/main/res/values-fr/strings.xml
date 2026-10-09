@@ -2302,4 +2302,10 @@
     <string name="chat_departure_confirm">Vérifiez les %1$d discussions sélectionnées. Les groupes rejoints seront quittés et supprimés de cet appareil ; les discussions directes sont supprimées localement. Les autres membres gardent leurs copies. Les transferts administratifs seront confirmés avant la suppression.</string>
     <string name="chat_departure_result">%1$d terminées · %2$d inachevées · %3$d ignorées. Réessayer vérifie les appartenances et reprend uniquement les étapes inachevées.</string>
     <string name="chat_departure_admin_granted">Le transfert des droits a réussi. La sortie du groupe reste inachevée.</string>
+    <string name="reaction_details_loading">Chargement des réactions…</string>
+    <string name="reaction_details_load_failed">Impossible de charger les réactions.</string>
+    <string name="group_create_remove_and_continue">Retirer cette personne et continuer</string>
+    <string name="group_create_edit_members">Modifier les membres</string>
+    <string name="group_create_unattributed_failure">Impossible d’identifier la personne concernée. Réessayez ou modifiez les membres.</string>
+    <string name="media_reply_draft_conflict">Votre brouillon a changé. Conservez cette réponse et réessayez, ou annulez la réponse avant l’envoi.</string>
 </resources>

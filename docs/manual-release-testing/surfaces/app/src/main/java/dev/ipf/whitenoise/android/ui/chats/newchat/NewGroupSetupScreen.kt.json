@@ -1,0 +1,79 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+  "legacy_sha256": "5ec27f045374f4863c891aaf365e66d15540db68f23c4f2895b07f0817685af3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NewGroupSetupAccountScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "fun NewGroupSetupAccountScreen(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "NewGroupSetupScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "fun NewGroupSetupScreen(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "SET-028",
+          "GRP-025"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:toast_chat_created",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "R.string.toast_chat_created",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "setting:group_avatar_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "R.string.group_avatar_url",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:group_image_search_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "R.string.group_image_search_title",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:toast_couldnt_prepare_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "R.string.toast_couldnt_prepare_image",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Captured founding submission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "fun captureNewGroupSubmission(",
+        "test_ids": [
+          "NCH-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

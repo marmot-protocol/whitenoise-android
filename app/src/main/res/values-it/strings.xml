@@ -2302,4 +2302,10 @@
     <string name="chat_departure_confirm">Rivedi %1$d chat selezionate. I gruppi verranno abbandonati ed eliminati da questo dispositivo; le chat dirette vengono eliminate localmente. Gli altri membri conservano le loro copie. I passaggi di amministrazione saranno confermati prima di eliminare.</string>
     <string name="chat_departure_result">%1$d completate · %2$d incomplete · %3$d saltate. Riprova verifica le appartenenze e continua solo le operazioni incomplete.</string>
     <string name="chat_departure_admin_granted">Il trasferimento dei diritti è riuscito. L’uscita dal gruppo non è ancora completata.</string>
+    <string name="reaction_details_loading">Caricamento delle reazioni…</string>
+    <string name="reaction_details_load_failed">Impossibile caricare le reazioni.</string>
+    <string name="group_create_remove_and_continue">Rimuovi questa persona e continua</string>
+    <string name="group_create_edit_members">Modifica membri</string>
+    <string name="group_create_unattributed_failure">Non è stato possibile identificare la persona interessata. Riprova o modifica i membri.</string>
+    <string name="media_reply_draft_conflict">La bozza è cambiata. Mantieni questa risposta e riprova, oppure annulla la risposta prima di inviare.</string>
 </resources>

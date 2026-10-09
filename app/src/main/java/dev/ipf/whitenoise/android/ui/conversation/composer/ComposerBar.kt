@@ -314,6 +314,12 @@ internal class ComposerTextState(
             contentRevision = contentRevision,
         )
 
+    /** Retains exact caption ownership until durable acceptance, including a failed bubble's later Retry. */
+    fun captureCaptionSettlement(caption: String): () -> Unit {
+        val token = acceptanceToken()
+        return { if (token.text == caption) clearAccepted(token) }
+    }
+
     /** Applies field state while advancing acceptance ownership only for content edits. */
     fun updateValue(value: TextFieldValue) {
         if (value.text != valueState.value.text) {

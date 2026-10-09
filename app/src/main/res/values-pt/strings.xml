@@ -2302,4 +2302,10 @@
     <string name="chat_departure_confirm">Revise %1$d conversas selecionadas. Os grupos serão abandonados e eliminados deste dispositivo; as conversas diretas são eliminadas localmente. Os outros membros mantêm as suas cópias. As transferências de administração serão confirmadas antes da eliminação.</string>
     <string name="chat_departure_result">%1$d concluídas · %2$d por concluir · %3$d ignoradas. Tentar novamente verifica a participação e continua apenas o trabalho pendente.</string>
     <string name="chat_departure_admin_granted">A transferência de administrador foi concluída. A saída do grupo está pendente.</string>
+    <string name="reaction_details_loading">Carregando reações…</string>
+    <string name="reaction_details_load_failed">Não foi possível carregar as reações.</string>
+    <string name="group_create_remove_and_continue">Remover esta pessoa e continuar</string>
+    <string name="group_create_edit_members">Editar membros</string>
+    <string name="group_create_unattributed_failure">Não foi possível identificar a pessoa afetada. Tente novamente ou edite os membros.</string>
+    <string name="media_reply_draft_conflict">Seu rascunho mudou. Mantenha esta resposta e tente novamente, ou cancele a resposta antes de enviar.</string>
 </resources>
