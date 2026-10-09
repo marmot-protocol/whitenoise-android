@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from scripts import maestro_runtime as runtime
 
@@ -52,6 +52,82 @@ class RunnerMemoryTest(unittest.TestCase):
             with self.assertRaises(subprocess.TimeoutExpired) as observed:
                 runtime.run_ui('folders-delete-confirm', Path(temporary))
         self.assertIs(observed.exception, timeout)
+
+
+class FixtureDiagnosticTimingTest(unittest.TestCase):
+    def exercise(self, directory, ui_failure=False, diagnostic_failure=False, native_failure=False, native_hang=False):
+        name = 'inbound-share-document-warm-resume'
+        generation = 'a' * 32
+        finished = False
+        waits = 0
+        process = Mock(returncode=0)
+        process.poll.side_effect = lambda: 0 if finished else None
+        def wait(**kwargs):
+            nonlocal finished, waits
+            waits += 1
+            if native_hang and waits == 1:
+                raise subprocess.TimeoutExpired("instrumentation", 60)
+            finished = True
+            (directory / 'instrumentation.txt').write_text('OK (1 test)')
+        process.wait.side_effect = wait
+        def command(arguments, **kwargs):
+            if arguments[-3:] == ['pm', 'clear', runtime.PACKAGE]:
+                return 'Success'
+            if 'logcat' in arguments:
+                self.assertTrue(finished, 'Native verifier must finish before diagnostic read')
+                if diagnostic_failure:
+                    raise subprocess.TimeoutExpired(arguments, 30)
+                return 'MaestroShareProof: shelves=false copies=true removed=true ownership=false'
+            for flag in ['ready', 'closed', 'verified']:
+                if arguments[-1].endswith(f'/{flag}.json'):
+                    row = {'generation': generation, flag: True}
+                    if flag == 'ready':
+                        row.update(accounts=3, fixture=runtime.CASES[name]['fixture'], uiObserver='maestro')
+                    if flag == 'verified':
+                        row['shareImportVerified'] = not native_failure
+                    return json.dumps(row)
+            if arguments[-1].endswith('/setup.json'):
+                self.assertFalse(finished, 'Setup snapshot must precede teardown/deletion')
+                return '{}'
+            return ''
+        with patch.object(runtime, 'command', side_effect=command), \
+                patch.object(runtime.subprocess, 'Popen', return_value=process), \
+                patch.object(runtime, 'run_ui', return_value=subprocess.CompletedProcess([], 1 if ui_failure else 0)), \
+                patch.object(runtime, 'ui_result', return_value=1):
+            return runtime.run_fixture(name, directory, generation)
+
+    def test_retains_native_failure_diagnostic_after_verification_finishes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            result = self.exercise(directory, native_failure=True)
+            self.assertIn('shelves=false', (directory / 'emulator-errors.txt').read_text())
+            self.assertIn('inbound share', result['cleanup_failure'])
+            self.assertFalse(result['passed'])
+            self.assertTrue(result['cleanup_safe'])
+
+    def test_optional_diagnostic_timeout_preserves_original_ui_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result = self.exercise(Path(temporary), ui_failure=True, diagnostic_failure=True)
+        self.assertEqual(result['failure'], 'ValueError: Maestro exit 1')
+        self.assertEqual(result['diagnostic_failures'], ['emulator-errors.txt: TimeoutExpired'])
+        self.assertFalse(result['passed'])
+        self.assertTrue(result['cleanup_safe'])
+
+    def test_hung_native_verifier_remains_unsafe_and_logs_follow_termination(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            result = self.exercise(directory, native_hang=True)
+            self.assertIn('MaestroShareProof', (directory / 'emulator-errors.txt').read_text())
+        self.assertIn('TimeoutExpired', result['cleanup_failure'])
+        self.assertFalse(result['passed'])
+        self.assertFalse(result['cleanup_safe'])
+
+    def test_optional_diagnostic_timeout_does_not_invalidate_completed_proof(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result = self.exercise(Path(temporary), diagnostic_failure=True)
+        self.assertTrue(result['passed'])
+        self.assertTrue(result['cleanup_safe'])
+        self.assertEqual(result['diagnostic_failures'], ['emulator-errors.txt: TimeoutExpired'])
 
 
 if __name__ == '__main__':

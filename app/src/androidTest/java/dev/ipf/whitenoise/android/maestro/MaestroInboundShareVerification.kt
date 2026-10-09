@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.createPendingShareRequestStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.stagedDocumentAttachmentId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -129,7 +130,7 @@ internal suspend fun verifyMaestroInboundShare(
                 cleared = cleared && withContext(Dispatchers.IO) { store.load(before.requestId) == null }
                 if (cleared) {
                     localState = maestroShareLocalStateMatches(state, before, expectedDraft)
-                    histories = maestroShareHistoriesMatch(native, before, expectedDraft)
+                    histories = maestroShareHistoriesMatch(native, before, expectedDraft, postcondition)
                     fileProof = verifyMaestroShareFiles(context, before, postcondition)
                 }
                 matches = cleared && localState == true && histories == true && fileProof?.verified == true
@@ -166,13 +167,29 @@ private suspend fun maestroShareHistoriesMatch(
     native: Marmot,
     before: MaestroInboundShareBaseline,
     expectedDraft: String?,
+    postcondition: String,
 ): Boolean =
     withContext(Dispatchers.IO) {
+        val retained = if (postcondition == "share-request-staged") before.files else emptyList()
+        val expectedAttachments =
+            retained.map {
+                MaestroExpectedShareAttachment(
+                    stagedDocumentAttachmentId(before.owner, before.group, it.uri.toString()),
+                    it.name,
+                    it.mime,
+                )
+            }
         native.listAccounts().associate { it.label to it.accountIdHex } == before.accountIds &&
             before.messages.all { (account, messages) ->
                 val draft = if (account == before.owner) expectedDraft else null
+                val attachments = if (account == before.owner) expectedAttachments else emptyList()
                 maestroSharedMessageSnapshot(native, account, before.group) == messages &&
-                    native.messageDraft(account, before.group)?.content == draft
+                    maestroShareDraftMatches(
+                        native.messageDraft(account, before.group),
+                        before.group,
+                        draft,
+                        attachments,
+                    )
             }
     }
 

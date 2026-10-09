@@ -136,19 +136,9 @@ def run_fixture(name, directory, generation):
             failure = error
             record['failure'] = f'{type(error).__name__}: {error}'
         finally:
-            # Preserve readiness diagnostics even when Maestro never started.
-            diagnostics = [
-                ('setup.json', adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/setup.json']),
-                ('emulator-errors.txt', adb + ['logcat', '-d', '-v', 'brief', 'AndroidRuntime:E', 'TestRunner:V', 'MaestroShareProof:W',
-                                              'UiAutomation:V', 'UiAutomationConnection:V', 'AccessibilityManagerService:V',
-                                              'ActivityManager:I', 'Maestro:V', '*:S']),
-            ]
-            for filename, arguments in diagnostics:
-                try:
-                    diagnostic = command(arguments)
-                    (directory / filename).write_text(diagnostic[-256000:])
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
-                    record.setdefault('diagnostic_failures', []).append(f'{filename}: {type(error).__name__}')
+            # Setup lives in the generation directory removed after successful verification.
+            retain_fixture_diagnostic(directory, record, 'setup.json',
+                                      adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/setup.json'])
             # Stop only this generated host; do not reset an installed user package.
             try:
                 if process.poll() is None:
@@ -222,8 +212,25 @@ def run_fixture(name, directory, generation):
                         except subprocess.TimeoutExpired:
                             process.kill()
                             process.wait(timeout=10)
+                # Native verification starts only after finish. Capture its warnings after that
+                # process ends, including failed cleanup, rather than before issuing finish.
+                retain_fixture_diagnostic(
+                    directory, record, 'emulator-errors.txt',
+                    adb + ['logcat', '-d', '-v', 'brief', 'AndroidRuntime:E', 'TestRunner:V', 'MaestroShareProof:W',
+                           'UiAutomation:V', 'UiAutomationConnection:V', 'AccessibilityManagerService:V',
+                           'ActivityManager:I', 'Maestro:V', '*:S'],
+                )
                 (directory / 'result.json').write_text(json.dumps(record, indent=2) + '\n')
     return record
+
+
+def retain_fixture_diagnostic(directory, record, filename, arguments):
+    """Optional bounded diagnostics preserve the original UI/native failure and cleanup verdict."""
+    try:
+        diagnostic = command(arguments)
+        (directory / filename).write_text(diagnostic[-256000:])
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
+        record.setdefault('diagnostic_failures', []).append(f'{filename}: {type(error).__name__}')
 
 
 def private_ui_result(source, destination, name):

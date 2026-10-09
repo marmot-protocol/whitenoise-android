@@ -125,7 +125,12 @@ class ScrollEdgeFadeMenuScreenshotTest {
     @Test
     fun amoledRtlLargeActionAnchorHasVisibleRows() {
         openActionAnchor(MenuOptions(dark = true, amoled = true, rtl = true, fontScale = 2f))
-        assertTrue(rule.onNodeWithText("Choice 0").fetchSemanticsNode().boundsInRoot.height >= 32f)
+        val firstRowHeight =
+            rule
+                .onNodeWithText("Choice 0")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertTrue(firstRowHeight >= 32f)
         val node = rule.onNodeWithTag(MENU)
         assertEquals(Color.Cyan, node.captureToImage().toPixelMap()[8, 14])
         node.captureRoboImage("src/test/snapshots/scroll_edges_native_menu_action_amoled_rtl_large.png")
