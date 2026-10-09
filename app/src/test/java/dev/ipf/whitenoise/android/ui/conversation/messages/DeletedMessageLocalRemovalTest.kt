@@ -185,7 +185,9 @@ class DeletedMessageLocalRemovalTest {
         composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performClick()
         val reactionFilterAll = "${string(R.string.reaction_filter_all)} · 1"
         composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
-            runCatching { composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsSelected() }.isSuccess
+            runCatching {
+                composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsSelected()
+            }.isSuccess
         }
         composeRule.onNodeWithText("👍 1", substring = false).assertIsDisplayed()
 
@@ -522,7 +524,10 @@ class DeletedMessageLocalRemovalTest {
     /** Supplies the canonical read for reactor UI tests without opening a native runtime. */
     private fun reactionRuntime(reactions: List<TimelineUserReactionFfi>): AppMarmotRuntime {
         val native =
-            Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { _, method, _ ->
+            Proxy.newProxyInstance(
+                MarmotInterface::class.java.classLoader,
+                arrayOf(MarmotInterface::class.java),
+            ) { _, method, _ ->
                 when (method.name.substringBefore('-')) {
                     "messageReactions" -> reactions
                     else -> null

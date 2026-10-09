@@ -99,7 +99,8 @@ internal fun ReactionDetailsSheet(
     appState: WhiteNoiseAppState,
     onRemoveOwnReaction: ((String) -> Unit)?,
     onDismissRequest: () -> Unit,
-    readState: ReactionDetailsReadState = ReactionDetailsReadState(viewerAccountId = appState.activeAccount?.accountIdHex),
+    readState: ReactionDetailsReadState =
+        ReactionDetailsReadState(viewerAccountId = appState.activeAccount?.accountIdHex),
 ) {
     KeyboardSafePopup(
         expanded = true,
@@ -122,7 +123,8 @@ internal fun ReactionDetailsContent(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
     onRemoveOwnReaction: ((String) -> Unit)?,
-    readState: ReactionDetailsReadState = ReactionDetailsReadState(viewerAccountId = appState.activeAccount?.accountIdHex),
+    readState: ReactionDetailsReadState =
+        ReactionDetailsReadState(viewerAccountId = appState.activeAccount?.accountIdHex),
 ) {
     var selectedEmoji by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(participants, selectedEmoji) {

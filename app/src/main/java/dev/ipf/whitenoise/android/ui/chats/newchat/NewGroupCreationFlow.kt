@@ -79,9 +79,7 @@ private fun NewGroupAccountFlow(
             members = selected,
             draft = draft,
             onRemoveMember = { accountId ->
-                if (current() && draft.retryGroupIdHex == null) {
-                    selected.removeAll { it.accountIdHex == accountId }
-                }
+                removeUnacceptedGroupMember(current(), draft.retryGroupIdHex, selected, accountId)
             },
             onBack = {
                 if (current()) {
@@ -114,6 +112,18 @@ private fun NewGroupAccountFlow(
             },
             onConfirm = { if (current()) setupOpen = true },
         )
+    }
+}
+
+/** Edits only a still-owned, unaccepted founding roster; accepted native membership is immutable here. */
+private fun removeUnacceptedGroupMember(
+    current: Boolean,
+    canonicalGroupId: String?,
+    selected: MutableList<RecipientSearch.Candidate>,
+    accountId: String,
+) {
+    if (current && canonicalGroupId == null) {
+        selected.removeAll { it.accountIdHex == accountId }
     }
 }
 

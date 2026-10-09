@@ -2368,4 +2368,8 @@
     </plurals>
     <string name="reaction_details_loading">Загрузка реакций…</string>
     <string name="reaction_details_load_failed">Не удалось загрузить реакции.</string>
+    <string name="group_create_remove_and_continue">Удалить этого участника и продолжить</string>
+    <string name="group_create_edit_members">Изменить участников</string>
+    <string name="group_create_unattributed_failure">Не удалось определить, у кого возникла проблема. Повторите попытку или измените список участников.</string>
+    <string name="media_reply_draft_conflict">Ваш черновик изменился. Сохраните этот ответ и повторите попытку или отмените ответ перед отправкой.</string>
 </resources>

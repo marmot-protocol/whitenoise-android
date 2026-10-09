@@ -31,7 +31,7 @@ class GroupCreationRecoveryTest {
         ).forEach { assertNull(groupCreationRecovery(it, 1, members).recipient) }
     }
 
-    /** Repeat taps, edited selections, accepted groups, cancellation and replacement owners cannot consume old errors. */
+    /** Edited selections, accepted groups and replacement owners cannot consume old errors or repeated taps. */
     @Test fun staleOrAcceptedFailureCannotRemoveMembers() {
         val failure = groupCreationRecovery(MarmotKitException.MissingKeyPackage("3"), 1, members)
         val owner = GroupCreationSession { true }

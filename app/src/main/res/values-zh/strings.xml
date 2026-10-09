@@ -2262,4 +2262,8 @@
     </plurals>
     <string name="reaction_details_loading">正在加载回应…</string>
     <string name="reaction_details_load_failed">无法加载回应。</string>
+    <string name="group_create_remove_and_continue">移除此人并继续</string>
+    <string name="group_create_edit_members">编辑成员</string>
+    <string name="group_create_unattributed_failure">无法确定受影响的成员。请重试或编辑成员列表。</string>
+    <string name="media_reply_draft_conflict">草稿已更改。请保留此回复并重试，或在发送前取消回复。</string>
 </resources>

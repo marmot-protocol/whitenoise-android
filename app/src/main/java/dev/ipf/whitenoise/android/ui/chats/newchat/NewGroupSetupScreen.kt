@@ -393,7 +393,10 @@ private fun NewGroupSetupAccountScreen(
                             val captured = groupCreationRecovery(failure, submittedAttempt, submittedMembers)
                             recovery = captured
                             error =
-                                groupCreateSelectionFailureDetail(failure, captured.recipient?.displayName).resolve(context)
+                                groupCreateSelectionFailureDetail(
+                                    failure,
+                                    captured.recipient?.displayName,
+                                ).resolve(context)
                         }
                     },
                     onCreateCompletedOpen = { item, token ->
@@ -496,7 +499,8 @@ private fun NewGroupSetupAccountScreen(
                 error = error,
                 retentionLabel = disappearingMessagesLabel(retentionSecs),
                 emojiOpen = showEmojiPicker,
-                recoveryRecipient = recovery?.recipient?.let { "${it.displayName} · ${appState.shortNpub(it.accountIdHex)}" },
+                recoveryRecipient =
+                    recovery?.recipient?.let { "${it.displayName} · ${appState.shortNpub(it.accountIdHex)}" },
                 hasUnacceptedFailure = recovery != null && retryGroupIdHex == null,
             ),
         actions =

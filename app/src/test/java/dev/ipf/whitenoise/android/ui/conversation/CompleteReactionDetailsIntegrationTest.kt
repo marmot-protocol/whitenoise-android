@@ -53,7 +53,9 @@ class CompleteReactionDetailsIntegrationTest : GroupSystemReactionTestFixtures()
         composeRule.runOnIdle {
             reactionDetailsResponder = { replacement }
             pollController.window.install(
-                MarmotWindowTestFakes.conversationFrame("group").copy(revision = ConversationWindowRevisionFfi("details", 2uL)),
+                MarmotWindowTestFakes.conversationFrame("group").copy(
+                    revision = ConversationWindowRevisionFfi("details", 2uL),
+                ),
             )
         }
         awaitText(participantLabel(replacement[2].sender))
@@ -101,6 +103,12 @@ class CompleteReactionDetailsIntegrationTest : GroupSystemReactionTestFixtures()
         third: String,
     ): List<TimelineUserReactionFfi> =
         listOf("01", "02", third, "04").mapIndexed { index, id ->
-            TimelineUserReactionFfi("${index + 1}".repeat(64), target, id + "00".repeat(31), if (index == 3) "🔥" else "👍", 1uL)
+            TimelineUserReactionFfi(
+                "${index + 1}".repeat(64),
+                target,
+                id + "00".repeat(31),
+                if (index == 3) "🔥" else "👍",
+                1uL,
+            )
         }
 }
