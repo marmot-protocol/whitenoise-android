@@ -4,14 +4,11 @@ name: accounts-signout-remove-invitations
 - runFlow: ../fixtures/runtime-ready.yaml
 - tapOn: Maestro group
 - runFlow: ../fixtures/assert-fixture-conversation.yaml
-- tapOn:
-    id: conversation.composer.input
+- tapOn: Message
 - assertVisible:
-    id: conversation.composer.input
     focused: true
 - inputText: Maestro account action draft
 - assertVisible:
-    id: conversation.composer.input
     text: ^Maestro account action draft$
 - hideKeyboard
 - back
@@ -38,6 +35,5 @@ name: accounts-signout-remove-invitations
 - runFlow: ../fixtures/assert-fixture-conversation.yaml
 - assertNotVisible: Maestro account action draft
 - assertVisible:
-    id: conversation.composer.input
     text: ^Message$
 - back

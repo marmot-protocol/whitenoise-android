@@ -8,7 +8,8 @@ name: inbound-share-account-return-clears
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Maestro group
 - assertVisible:
     id: performance.share_picker
@@ -31,7 +32,8 @@ name: inbound-share-account-return-clears
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Choose sending account
 - assertVisible:
     text: ^Choose which signed-in account will own these shared drafts\.$
@@ -45,7 +47,8 @@ name: inbound-share-account-return-clears
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Close
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:

@@ -8,7 +8,8 @@ name: inbound-share-documents-multiple-cancel
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Close
 - assertNotVisible:
     id: performance.share_picker

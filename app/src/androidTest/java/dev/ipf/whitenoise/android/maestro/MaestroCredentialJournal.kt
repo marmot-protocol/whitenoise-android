@@ -113,13 +113,15 @@ internal class MaestroCredentialJournal(
     private fun verifyRotation(cancelled: Int) {
         val landscape =
             observations.withIndex().firstOrNull { (index, row) ->
-                index > cancelled && cancelledSecure(row) &&
+                index > cancelled &&
+                    cancelledSecure(row) &&
                     row.getInt("orientation") == Configuration.ORIENTATION_LANDSCAPE
             }
         checkNotNull(landscape) { "Cancelled secure landscape cover was not observed" }
         check(
             observations.withIndex().any { (index, row) ->
-                index > landscape.index && cancelledSecure(row) &&
+                index > landscape.index &&
+                    cancelledSecure(row) &&
                     row.getInt("orientation") == Configuration.ORIENTATION_PORTRAIT
             },
         ) { "Cancelled secure portrait cover was not restored" }
@@ -141,10 +143,12 @@ internal class MaestroCredentialJournal(
         var previous = -1
         for (value in AppLockDelay.entries.map { it.preferenceValue }) {
             val index =
-                observations.withIndex().firstOrNull { (index, row) ->
-                    val matches = row.getString("delay") == value && row.optString("storedDelay") == value
-                    index > previous && row.getBoolean("required") && matches
-                }?.index
+                observations
+                    .withIndex()
+                    .firstOrNull { (index, row) ->
+                        val matches = row.getString("delay") == value && row.optString("storedDelay") == value
+                        index > previous && row.getBoolean("required") && matches
+                    }?.index
             previous = checkNotNull(index) { "Actual persisted delay choice was not observed: $value" }
         }
     }

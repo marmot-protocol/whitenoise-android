@@ -9,14 +9,14 @@ appId: dev.ipf.whitenoise.android.maestrolab
       - runFlow:
           when:
             notVisible:
-              id: global.library.mode.${LIBRARY_KIND}
+              id: global.library.mode.Messages
           commands:
             - swipe:
                 from:
                   id: global.library.modes
-                direction: LEFT
+                direction: RIGHT
 - tapOn:
-    id: global.library.mode.${LIBRARY_KIND}
+    id: global.library.mode.Messages
 - assertVisible:
-    id: global.library.mode.${LIBRARY_KIND}
+    id: global.library.mode.Messages
     selected: true

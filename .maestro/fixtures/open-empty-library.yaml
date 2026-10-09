@@ -6,5 +6,4 @@ appId: dev.ipf.whitenoise.android.maestrolab
     file: select-library-mode.yaml
     env:
       LIBRARY_KIND: ${LIBRARY_KIND}
-      LIBRARY_DIRECTION: LEFT
 - runFlow: assert-empty-library.yaml

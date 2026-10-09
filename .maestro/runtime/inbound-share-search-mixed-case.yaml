@@ -8,7 +8,8 @@ name: inbound-share-search-mixed-case
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Search chats
 - assertVisible:
     focused: true
@@ -23,7 +24,8 @@ name: inbound-share-search-mixed-case
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Maestro group
 - assertVisible:
     id: performance.share_picker

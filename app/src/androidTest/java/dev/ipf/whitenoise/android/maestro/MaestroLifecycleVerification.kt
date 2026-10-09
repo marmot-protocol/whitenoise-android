@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.maestro
 
-import androidx.test.core.app.ActivityScenario
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
@@ -8,7 +7,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 internal suspend fun verifyMaestroComposerRecreated(
     state: WhiteNoiseAppState,
     group: String,
-    activity: ActivityScenario<MainActivity>,
+    activity: MaestroActivityOwner,
     originalActivity: MainActivity?,
     postcondition: String?,
 ): Boolean {

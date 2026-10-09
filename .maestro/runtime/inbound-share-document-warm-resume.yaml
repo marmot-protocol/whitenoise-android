@@ -8,7 +8,8 @@ name: inbound-share-document-warm-resume
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Maestro group
 - assertVisible:
     enabled: true

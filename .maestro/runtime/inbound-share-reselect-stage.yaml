@@ -8,7 +8,8 @@ name: inbound-share-reselect-stage
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Maestro group
 - assertVisible:
     id: performance.share_picker
@@ -24,7 +25,8 @@ name: inbound-share-reselect-stage
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Maestro group
 - assertVisible:
     id: performance.share_picker

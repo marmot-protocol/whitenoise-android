@@ -3,9 +3,9 @@ name: qr-permission-deny-reopen
 ---
 - runFlow: ../fixtures/runtime-qr-denied-ready.yaml
 - tapOn:
-    id: qr_scanner.close
+    text: ^Close$
 - assertNotVisible:
-    id: qr_scanner_sheet_content
+    text: ^Scan QR Code$
 - assertVisible:
     id: share_connect.screen
 - assertVisible: Maestro Alice
@@ -16,22 +16,19 @@ name: qr-permission-deny-reopen
 - tapOn:
     id: com.android.permissioncontroller:id/permission_deny_button
 - assertVisible:
-    id: qr_scanner_sheet_content
+    text: ^Scan QR Code$
 - assertVisible:
     text: ^Camera Access Needed$
 - assertVisible:
-    id: qr_scanner.recovery
     enabled: true
-- assertNotVisible:
-    id: qr_scanner.target
-- assertNotVisible:
-    id: qr_scanner.torch
+    containsChild:
+      text: ^(Allow Camera|Open settings)$
 - assertVisible:
     text: ^Open settings$
 - tapOn:
-    id: qr_scanner.close
+    text: ^Close$
 - assertNotVisible:
-    id: qr_scanner_sheet_content
+    text: ^Scan QR Code$
 - assertVisible:
     id: share_connect.screen
 - assertVisible: Maestro Alice

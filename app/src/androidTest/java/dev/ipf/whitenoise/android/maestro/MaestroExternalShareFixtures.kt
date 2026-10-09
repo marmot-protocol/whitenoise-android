@@ -2,18 +2,23 @@ package dev.ipf.whitenoise.android.maestro
 
 import android.content.Context
 import android.content.Intent
-import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.share.ExternalShareDispatchActivity
 
 /** The provider and sender execute in the real test APK UID, outside the instrumented app. */
-internal fun launchMaestroRuntimeActivity(
+internal suspend fun launchMaestroRuntimeActivity(
     context: Context,
     fixture: String,
-): ActivityScenario<MainActivity> {
-    val scenario = ActivityScenario.launch<MainActivity>(maestroRuntimeLaunchIntent(context, fixture))
-    if (!fixture.startsWith("share-external-")) return scenario
+    activity: MaestroActivityOwner,
+) {
+    activity.launch(maestroRuntimeLaunchIntent(context, fixture))
+    if (fixture.startsWith("share-external-")) dispatchMaestroExternalShare(context, fixture)
+}
+
+private fun dispatchMaestroExternalShare(
+    context: Context,
+    fixture: String,
+) {
     val external = InstrumentationRegistry.getInstrumentation().context
     val streams = maestroExternalShareNames(fixture).toTypedArray()
     external.startActivity(
@@ -25,7 +30,6 @@ internal fun launchMaestroRuntimeActivity(
             .putExtra(ExternalShareDispatchActivity.EXTRA_EMPTY_STREAM, fixture.contains("empty"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
     )
-    return scenario
 }
 
 internal fun maestroExternalShareNames(fixture: String): List<String> =

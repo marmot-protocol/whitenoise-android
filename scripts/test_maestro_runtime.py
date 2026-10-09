@@ -596,6 +596,10 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 self.assertEqual(len(command), 1)
                 name, args = next(iter(command.items()))
                 self.assertNotIn(name, ('hideKeyboard', 'back'))
+                if name == 'swipe' and isinstance(args, dict) and 'direction' in args:
+                    # Maestro 2.11.0 deserializes this enum before script evaluation.
+                    self.assertIsInstance(args['direction'], str)
+                    self.assertIn(args['direction'].upper(), ('LEFT', 'RIGHT', 'UP', 'DOWN'))
                 if name in ('retry', 'repeat') or (
                         name == 'runFlow' and isinstance(args, dict) and 'commands' in args):
                     validate(args['commands'])
@@ -606,7 +610,10 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 if path.name != 'config.yaml':
                     self.assertEqual(len(documents), 2)
                     validate(documents[1])
-        for invalid in ([{'hideKeyboard'}], [{'back': None}], [{'tapOn': 'X', 'hideKeyboard': None}]):
+        for invalid in ([{'hideKeyboard'}], [{'back': None}], [{'tapOn': 'X', 'hideKeyboard': None}],
+                        [{'swipe': {'direction': '${LIBRARY_DIRECTION}'}}],
+                        [{'swipe': {'direction': 'SIDEWAYS'}}], [{'swipe': {'direction': True}}],
+                        [{'repeat': {'times': 1, 'commands': [{'swipe': {'direction': '${DIRECTION}'}}]}}]):
             with self.subTest(invalid=invalid), self.assertRaises(AssertionError):
                 validate(invalid)
         for text in ('- &repeat\n  assertVisible: Settings\n- *repeat\n',
@@ -628,6 +635,117 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(commands[typing - 1], {'assertVisible': {'focused': True}})
         self.assertEqual(commands[typing + 1], {
             'assertVisible': {'focused': True, 'text': '^Maestro$'}})
+
+    def test_captured_parent_controls_keep_child_text_and_button_state_separate(self):
+        """Regress actual accessibility subtrees from the failed hosted run, not flattened UI labels."""
+        root = runtime.ROOT
+        capture = json.loads((root / 'scripts/test-fixtures/maestro-2.11.0-control-hierarchy.json').read_text())
+        self.assertEqual(capture['maestro_version'], '2.11.0')
+        for name, tag, text in (
+                ('folder-rules-match-any-reopen', 'folder.match.', '^Match any$'),
+                ('folder-rules-exclusion-reopen', 'folder.not.', '^Exclude chats that match this group$'),
+                ('folder-rules-edit-read-status', 'folder.mode', '^Has unread messages$')):
+            node = capture['nodes'][tag]
+            self.assertNotIn('text', node['attributes'])
+            self.assertTrue(any(re.fullmatch(text, child['attributes'].get('text', ''))
+                                for child in node['children']))
+            commands = list(yaml.safe_load_all((root / '.maestro/runtime' / f'{name}.yaml').read_text()))[1]
+            expected = {'assertVisible': {'id': tag, 'containsChild': {'text': text}}}
+            self.assertIn(expected, commands)
+        button = capture['nodes']['Share']
+        self.assertEqual(button['attributes']['enabled'], 'false')
+        label = next(child for child in button['children'] if child['attributes'].get('text') == 'Share')
+        self.assertEqual(label['attributes']['enabled'], 'true')
+        checked = 0
+        for path in (root / '.maestro/runtime').glob('inbound-share-*.yaml'):
+            commands = list(yaml.safe_load_all(path.read_text()))[1]
+            for command in commands:
+                selector = command.get('assertVisible', {}) if isinstance(command, dict) else {}
+                if isinstance(selector, dict) and selector.get('enabled') is False:
+                    self.assertNotEqual(selector.get('text'), '^Share$')
+                    if selector.get('containsChild') == {'text': '^Share$'}:
+                        checked += 1
+        self.assertGreater(checked, 30)
+
+    def test_editor_controls_are_scrolled_into_view_before_tapping(self):
+        """A tag or label elsewhere in a scrollable screen is not proof its control can be tapped."""
+        paths = list((runtime.ROOT / '.maestro/runtime').glob('relay-add-*.yaml'))
+        self.assertEqual(len(paths), 14)
+        paths.append(runtime.ROOT / '.maestro/runtime/folder-rules-empty-group-blocks-save.yaml')
+        for path in paths:
+            text = 'Add group' if path.name.startswith('folder-') else 'Add relay'
+            commands = list(yaml.safe_load_all(path.read_text()))[1]
+            tap = commands.index({'tapOn': text})
+            self.assertEqual(commands[tap - 1], {
+                'scrollUntilVisible': {'element': {'text': f'^{text}$'}, 'direction': 'DOWN'}})
+
+    def test_account_action_drafts_use_the_shipping_composer_control(self):
+        """The real composer exports Message, not the nonexistent conversation.composer.input tag."""
+        root = runtime.ROOT / '.maestro/runtime'
+        paths = [root / f'{name}.yaml' for name, case in runtime.CASES.items()
+                 if case['postcondition'].startswith('account-action-')]
+        self.assertEqual(len(paths), 4)
+        for path in paths:
+            text = path.read_text()
+            self.assertNotIn('conversation.composer.input', text)
+            commands = list(yaml.safe_load_all(text))[1]
+            tap = commands.index({'tapOn': 'Message'})
+            self.assertEqual(commands[tap + 1], {'assertVisible': {'focused': True}})
+            self.assertEqual(commands[tap + 2], {'inputText': 'Maestro account action draft'})
+            self.assertIn({'assertVisible': {'text': '^Message$'}}, commands)
+
+    def test_scanner_popup_uses_exported_recovery_controls_and_native_permission_proof(self):
+        """Modal tags missing from the captured tree cannot qualify visible or absent scanner state."""
+        root = runtime.ROOT / '.maestro'
+        paths = [root / 'fixtures/runtime-qr-denied-ready.yaml', *list((root / 'runtime').glob('qr-permission-*.yaml'))]
+        self.assertEqual(len(paths), 9)
+        for path in paths:
+            text = path.read_text()
+            self.assertNotIn('id: qr_scanner', text)
+            self.assertIn('^Scan QR Code$', text)
+            if path.parent.name == 'runtime':
+                self.assertEqual(runtime.CASES[path.stem]['postcondition'], 'camera-denied')
+        initial = list(yaml.safe_load_all(paths[0].read_text()))[1]
+        self.assertIn({'assertVisible': {'enabled': True, 'containsChild': {'text': '^(Allow Camera|Open settings)$'}}}, initial)
+        self.assertIn({'assertVisible': {'text': '^Allow Camera$'}}, initial)
+
+    def test_lightning_clear_retaps_remaining_suffix_and_requires_empty_actual_field(self):
+        """A word selection deleted the prefix and left /path in the observed failure."""
+        root = runtime.ROOT / '.maestro'
+        commands = list(yaml.safe_load_all((root / 'fixtures/clear-profile-lightning.yaml').read_text()))[1]
+        repeated = commands[2]['repeat']
+        self.assertEqual(repeated['times'], 4)
+        flow = repeated['commands'][0]['runFlow']
+        self.assertEqual(flow['when'], {'visible': {'id': 'profile.lightning_field', 'text': '.+'}})
+        self.assertEqual(flow['commands'], [
+            {'tapOn': {'id': 'profile.lightning_field'}},
+            {'assertVisible': {'id': 'profile.lightning_field', 'focused': True}}, {'eraseText': 100}])
+        self.assertEqual(commands[-1], {'assertNotVisible': {'id': 'profile.lightning_field', 'text': '.+'}})
+        for name in ('profile-lightning-invalid-clear', 'profile-lightning-malformed-correction-cancel'):
+            text = (root / 'runtime' / f'{name}.yaml').read_text()
+            self.assertEqual(text.count('runFlow: ../fixtures/clear-profile-lightning.yaml'), 2)
+            self.assertNotIn('longPressOn', text)
+
+    def test_runtime_lifecycle_owner_keeps_actual_activity_identity_and_destroyed_cleanup(self):
+        """Consumed share/launcher Intents must not break ownership or weaken cleanup certification."""
+        root = runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro'
+        owner = (root / 'MaestroActivityOwner.kt').read_text()
+        for required in ('ActivityLifecycleMonitorRegistry.getInstance()', 'activity.application === application',
+                         'application.fixtureState === fixtureState', 'observed[activity] = stage',
+                         'monitor.addLifecycleCallback(callback)', 'monitor.removeLifecycleCallback(callback)',
+                         'observed.isNotEmpty()', 'it.finish()', 'observed.values.all { it == Stage.DESTROYED }',
+                         'filterValues { it == Stage.RESUMED }.keys.single()', 'withTimeout(30_000L)',
+                         'withTimeout(10_000L)'):
+            self.assertIn(required, owner)
+        self.assertNotIn('setIntent(', owner)
+        self.assertNotIn('ActivityScenario', owner)
+        host = (root / 'MaestroRuntimeHostTest.kt').read_text()
+        self.assertLess(host.index('activity = MaestroActivityOwner'), host.index('launchMaestroRuntimeActivity(context'))
+        self.assertLess(host.index('activity?.close()'), host.index('"closed.json"'))
+        for stage in ('activityClosed', 'listenerStopped', 'nativeClosed'):
+            self.assertLess(host.index(f'check({stage}.isSuccess)'), host.index('"closed.json"'))
+        recreation = (root / 'MaestroLifecycleVerification.kt').read_text()
+        self.assertIn('recreated = it !== original', recreation)
 
     def test_share_account_sheet_dismissal_distinguishes_the_persistent_open_button(self):
         """The opener's accessible label survives dismissal and cannot certify an absent sheet."""
@@ -1377,7 +1495,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
             for command in commands:
                 node = command.get('assertVisible') if isinstance(command, dict) else None
                 if isinstance(node, dict) and (node.get('id') == 'profile_keys.signout_invitation_keys'
-                                              or node.get('text') == 'Require device authentication'):
+                                              or node.get('containsChild', {}).get('text') == '^Require device authentication$'):
                     self.assertNotIn('selected', node)
                     self.assertIs(type(node.get('checked')), bool)
                     states.append(node['checked'])
@@ -1428,9 +1546,19 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(repeat['times'], 6)
         swipe = repeat['commands'][0]['runFlow']['commands'][0]['swipe']
         self.assertEqual(swipe['from'], {'id': 'global.library.modes'})
+        self.assertEqual(swipe['direction'], 'LEFT')
         self.assertNotIn('start', swipe)
         self.assertNotIn('end', swipe)
         self.assertIs(helper[-1]['assertVisible']['selected'], True)
+        messages = list(yaml.safe_load_all((root / 'fixtures/select-library-messages.yaml').read_text()))[1]
+        self.assertEqual(messages[1]['repeat']['times'], 6)
+        return_swipe = messages[1]['repeat']['commands'][0]['runFlow']['commands'][0]['swipe']
+        self.assertEqual(return_swipe, {'from': {'id': 'global.library.modes'}, 'direction': 'RIGHT'})
+        self.assertEqual(messages[-1]['assertVisible'], {'id': 'global.library.mode.Messages', 'selected': True})
+        for kind in ('all', 'photos', 'files', 'audio'):
+            text = (root / 'runtime' / f'search-library-empty-{kind}.yaml').read_text()
+            self.assertIn('file: ../fixtures/select-library-messages.yaml', text)
+            self.assertNotIn('LIBRARY_DIRECTION', text)
         empty = list(yaml.safe_load_all((root / 'fixtures/assert-empty-library.yaml').read_text()))[1]
         self.assertIn({'assertVisible': 'No files or media found'}, empty)
         self.assertIn({'assertNotVisible': {'id': 'global.library.results'}}, empty)

@@ -12,6 +12,10 @@ name: relay-add-nonstandard-port-reject-cancel
 - tapOn: Relays
 - assertVisible:
     id: relays.group
+- scrollUntilVisible:
+    element:
+      text: ^Add relay$
+    direction: DOWN
 - tapOn: Add relay
 - assertVisible:
     id: relay.add.url

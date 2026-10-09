@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.maestro
 
 import android.content.Context
 import android.os.Process
-import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
@@ -129,7 +128,7 @@ class MaestroRuntimeHostTest {
                     MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
                 )
             var state: WhiteNoiseAppState? = null
-            var activity: ActivityScenario<MainActivity>? = null
+            var activity: MaestroActivityOwner? = null
             var originalActivity: MainActivity? = null
             var peerLabel: String? = null
             var groupId: String? = null
@@ -239,7 +238,8 @@ class MaestroRuntimeHostTest {
                             .put("title", nativeRow.presentation.title.toString())
                             .toString(),
                     )
-                    activity = launchMaestroRuntimeActivity(context, fixture)
+                    activity = MaestroActivityOwner(context.applicationContext as MaestroFixtureApplication)
+                    launchMaestroRuntimeActivity(context, fixture, checkNotNull(activity))
                     checkNotNull(activity).onActivity { originalActivity = it }
                     inboundShareBaseline =
                         captureMaestroInboundShare(native, app, checkNotNull(activity), group, fixture)
@@ -322,8 +322,7 @@ class MaestroRuntimeHostTest {
                                 messageBaseline,
                                 postcondition,
                             ),
-                        )
-                        .put("credentialEvidence", appLockVerification.credentialJsonValue)
+                        ).put("credentialEvidence", appLockVerification.credentialJsonValue)
                         .put("appLockVerified", appLockVerification.verified)
                         .put(
                             "accountActionVerified",
@@ -390,9 +389,9 @@ class MaestroRuntimeHostTest {
                 val relayClosed = runCatching { relay.close() }
                 val preferencesRemoved = runCatching { context.deleteSharedPreferences(directory.name) }
                 val rootRemoved = nativeClosed.isSuccess && root.deleteRecursively()
-                check(activityClosed.isSuccess && listenerStopped.isSuccess && nativeClosed.isSuccess) {
-                    "Fixture owner teardown failed"
-                }
+                check(activityClosed.isSuccess) { "Fixture Activity teardown failed" }
+                check(listenerStopped.isSuccess) { "Fixture notification listener teardown failed" }
+                check(nativeClosed.isSuccess) { "Fixture native runtime teardown failed" }
                 check(relayClosed.isSuccess && preferencesRemoved.isSuccess && rootRemoved) {
                     "Fixture storage cleanup failed"
                 }

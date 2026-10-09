@@ -25,7 +25,8 @@ name: folder-rules-edit-read-status
 - tapOn: Has unread messages
 - assertVisible:
     id: folder.mode
-    text: ^Has unread messages$
+    containsChild:
+      text: ^Has unread messages$
 - tapOn:
     id: folder.conditionDone
 - assertNotVisible:

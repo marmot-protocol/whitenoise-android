@@ -30,7 +30,8 @@ name: folder-rules-exclusion-reopen
 - tapOn: Exclude chats that match this group
 - assertVisible:
     id: folder.not.
-    text: ^Exclude chats that match this group$
+    containsChild:
+      text: ^Exclude chats that match this group$
 - runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
 - scrollUntilVisible:
     element:
@@ -38,7 +39,8 @@ name: folder-rules-exclusion-reopen
     direction: DOWN
 - assertVisible:
     id: folder.not.
-    text: ^Exclude chats that match this group$
+    containsChild:
+      text: ^Exclude chats that match this group$
 - back
 - assertVisible:
     id: chat-folders-content

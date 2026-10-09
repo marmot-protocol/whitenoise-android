@@ -4,7 +4,7 @@ name: qr-permission-deny-back
 - runFlow: ../fixtures/runtime-qr-denied-ready.yaml
 - back
 - assertNotVisible:
-    id: qr_scanner_sheet_content
+    text: ^Scan QR Code$
 - assertVisible:
     id: share_connect.screen
 - assertVisible: Maestro Alice

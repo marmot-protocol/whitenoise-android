@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# A long press can select only the address prefix, leaving a suffix after deletion.
+# Re-tap the actual shortened field before each bounded deletion; require actual emptiness.
+- tapOn:
+    id: profile.lightning_field
+- assertVisible:
+    id: profile.lightning_field
+    focused: true
+- repeat:
+    times: 4
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: profile.lightning_field
+              text: .+
+          commands:
+            - tapOn:
+                id: profile.lightning_field
+            - assertVisible:
+                id: profile.lightning_field
+                focused: true
+            - eraseText: 100
+- assertNotVisible:
+    id: profile.lightning_field
+    text: .+

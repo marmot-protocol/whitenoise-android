@@ -21,6 +21,10 @@ name: folder-rules-empty-group-blocks-save
     direction: DOWN
 - tapOn:
     id: folder.options.
+- scrollUntilVisible:
+    element:
+      text: ^Add group$
+    direction: DOWN
 - tapOn: Add group
 - scrollUntilVisible:
     element:

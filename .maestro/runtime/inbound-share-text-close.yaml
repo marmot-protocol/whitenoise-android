@@ -7,8 +7,9 @@ name: inbound-share-text-close
     id: performance.share_picker
 - assertVisible: Maestro group
 - assertVisible:
-    text: ^Share$
     enabled: false
+    containsChild:
+      text: ^Share$
 - tapOn: Close
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:

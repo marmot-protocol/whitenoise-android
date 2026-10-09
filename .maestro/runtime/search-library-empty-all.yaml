@@ -8,10 +8,7 @@ name: search-library-empty-all
     env:
       LIBRARY_KIND: ANY_ATTACHMENT
 - runFlow:
-    file: ../fixtures/select-library-mode.yaml
-    env:
-      LIBRARY_KIND: Messages
-      LIBRARY_DIRECTION: RIGHT
+    file: ../fixtures/select-library-messages.yaml
 - assertNotVisible:
     id: global.library
 - assertVisible: Maestro group

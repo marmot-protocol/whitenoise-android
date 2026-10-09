@@ -8,7 +8,8 @@ name: inbound-share-deselect-cancel
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Maestro group
 - assertVisible:
     id: performance.share_picker
@@ -24,7 +25,8 @@ name: inbound-share-deselect-cancel
     text: ^Maestro group$
 - assertVisible:
     enabled: false
-    text: ^Share$
+    containsChild:
+      text: ^Share$
 - tapOn: Close
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:

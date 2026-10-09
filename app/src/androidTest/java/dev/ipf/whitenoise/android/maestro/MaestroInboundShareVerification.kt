@@ -3,10 +3,8 @@ package dev.ipf.whitenoise.android.maestro
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
-import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.createPendingShareRequestStore
@@ -46,7 +44,7 @@ internal fun maestroRuntimeLaunchIntent(
 internal suspend fun captureMaestroInboundShare(
     native: Marmot,
     state: WhiteNoiseAppState,
-    activity: ActivityScenario<MainActivity>,
+    activity: MaestroActivityOwner,
     group: String,
     fixture: String,
 ): MaestroInboundShareBaseline? {
@@ -87,7 +85,7 @@ internal suspend fun captureMaestroInboundShare(
     )
 }
 
-private suspend fun awaitMaestroImportedShare(activity: ActivityScenario<MainActivity>): ShareRequest =
+private suspend fun awaitMaestroImportedShare(activity: MaestroActivityOwner): ShareRequest =
     withTimeout(30_000L) {
         var request: ShareRequest? = null
         while (request?.payload?.importReady != true) {
@@ -101,7 +99,7 @@ private suspend fun awaitMaestroImportedShare(activity: ActivityScenario<MainAct
 internal suspend fun verifyMaestroInboundShare(
     native: Marmot,
     state: WhiteNoiseAppState,
-    activity: ActivityScenario<MainActivity>,
+    activity: MaestroActivityOwner,
     baseline: MaestroInboundShareBaseline?,
     postcondition: String?,
 ): Boolean {

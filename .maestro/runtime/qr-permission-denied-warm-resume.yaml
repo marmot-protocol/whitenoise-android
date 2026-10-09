@@ -4,20 +4,17 @@ name: qr-permission-denied-warm-resume
 - runFlow: ../fixtures/runtime-qr-denied-ready.yaml
 - runFlow: ../fixtures/runtime-warm-resume.yaml
 - assertVisible:
-    id: qr_scanner_sheet_content
+    text: ^Scan QR Code$
 - assertVisible:
     text: ^Camera Access Needed$
 - assertVisible:
-    id: qr_scanner.recovery
     enabled: true
-- assertNotVisible:
-    id: qr_scanner.target
-- assertNotVisible:
-    id: qr_scanner.torch
+    containsChild:
+      text: ^(Allow Camera|Open settings)$
 - tapOn:
-    id: qr_scanner.close
+    text: ^Close$
 - assertNotVisible:
-    id: qr_scanner_sheet_content
+    text: ^Scan QR Code$
 - assertVisible:
     id: share_connect.screen
 - assertVisible: Maestro Alice

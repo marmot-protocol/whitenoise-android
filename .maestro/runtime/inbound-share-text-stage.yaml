@@ -7,8 +7,9 @@ name: inbound-share-text-stage
     id: performance.share_picker
 - assertVisible: Maestro group
 - assertVisible:
-    text: ^Share$
     enabled: false
+    containsChild:
+      text: ^Share$
 - tapOn: Maestro group
 - assertVisible:
     text: ^Share to 1 chat$
