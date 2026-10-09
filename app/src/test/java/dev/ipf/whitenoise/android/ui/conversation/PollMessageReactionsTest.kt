@@ -221,7 +221,8 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             val owner = PollMessageActionOwner("personal", pollController.group.groupIdHex, messageId)
             val admission =
                 composeRule.runOnIdle {
-                    "canSend=${pollController.canSendMessages}, target=${currentPollActionTarget(pollController, owner)}"
+                    val target = currentPollActionTarget(pollController, owner)
+                    "canSend=${pollController.canSendMessages}, target=$target"
                 }
             val roots = composeRule.onAllNodes(isRoot(), useUnmergedTree = true)
             val semantics = roots.fetchSemanticsNodes().indices.joinToString("\n") { roots[it].printToString() }
