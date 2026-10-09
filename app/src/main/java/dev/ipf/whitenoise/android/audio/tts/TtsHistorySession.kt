@@ -75,6 +75,10 @@ class TtsHistorySession internal constructor(
     private val pending = TtsHistoryPendingRequest { _edgeState.value = null }
     private var liveTailAttached = true
 
+    /** A transient audible-window reservation, unlike permanent tail detachment. */
+    internal val liveAppendDeferred: Boolean
+        get() = pending.playbackDeferral && !pending.renderedSeek
+
     /** Optional barrier used by concurrency tests at the guarded settlement boundary. */
     @VisibleForTesting
     internal var settlementAwaiterForTests: (() -> Unit)? = null

@@ -55,6 +55,8 @@ messages. Include incoming and outgoing messages from different senders.
 - [ ] Deliver several eligible messages in one native update while speaking,
   then while paused. Every new message joins oldest first exactly once.
   Repeated snapshots do not add duplicates. Paused arrivals wait for Resume.
+  Deliver an arrival during a Previous/Next history-edge load; it waits for
+  settlement and is revalidated from the native snapshot without being skipped.
 - [ ] Pause/Resume/Stop from the app, notification and lock screen agree with
   one playback owner. Exercise an actual compatible headset and record it;
   simulated media keys alone do not prove headset support.

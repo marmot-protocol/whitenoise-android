@@ -98,7 +98,7 @@ class TtsAutoReadWiringCoverageTest {
         assertTrue("live speech must consume complete native windows", "active.nextWindow()" in body)
         assertTrue(
             "live speech must append rather than replace",
-            "host.controller.appendSpeech(it, run.locale)" in body,
+            "host.controller.appendSpeech(entry, run.locale)" in body,
         )
         assertFalse(
             "the disposed screen must not own a competing live collector",

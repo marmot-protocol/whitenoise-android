@@ -11,6 +11,8 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -57,6 +59,66 @@ class TtsAutoReadContinuationTest {
             assertEquals(1, host.opens)
             host.controller.stop()
             runCurrent()
+        }
+
+    @Test
+    fun aTransientEdgeDeferralPreservesArrivalsUntilItsNativeSnapshotIsRevalidated() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.controller.pause()
+            host.deferred.value = true
+            host.initial = page("m1", "m2", "m3")
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            host.deferred.value = false
+            runCurrent()
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            assertEquals(1, host.engine.spoken.size)
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            host.controller.stop()
+            runCurrent()
+        }
+
+    @Test
+    fun aDeferralThatStartsDuringProjectionDoesNotConsumeTheArrival() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.beforeProject = { host.deferred.value = true }
+            host.initial = page("m1", "m2")
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            host.beforeProject = null
+            host.deferred.value = false
+            runCurrent()
+            assertEquals(listOf("m1", "m2"), host.controller.queuedMessageIds())
+            host.controller.stop()
+            runCurrent()
+        }
+
+    @Test
+    fun anEditDuringAnEdgeDeferralRevokesSpeechInsteadOfAppendingTheStaleSnapshot() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.deferred.value = true
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            host.initial = timelinePage(timelineRecord("m1", 0uL, "Changed while waiting."))
+            host.deferred.value = false
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.engine.spoken.size)
+            assertEquals(1, host.closes)
         }
 
     @Test
@@ -234,6 +296,7 @@ class TtsAutoReadContinuationTest {
         val engine = FakeSessionEngine()
         override val controller = TtsController(FakeSessionFocus(), maxChunkLength = 4_000)
         val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
+        val deferred = MutableStateFlow(false)
         var owned = true
         var opens = 0
         var closes = 0
@@ -264,7 +327,14 @@ class TtsAutoReadContinuationTest {
             session: Long,
         ): Boolean = owned
 
-        override fun allowsAppend(): Boolean = true
+        override val appendDeferred: Boolean
+            get() = deferred.value
+
+        override suspend fun awaitAppendReadiness() {
+            deferred.first { !it }
+        }
+
+        override fun allowsAppend(): Boolean = !appendDeferred
 
         override suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry? {
             beforeProject?.invoke()

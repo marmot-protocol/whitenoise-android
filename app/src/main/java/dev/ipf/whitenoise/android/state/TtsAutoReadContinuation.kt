@@ -52,6 +52,10 @@ internal interface TtsAutoReadContinuationHost {
         session: Long,
     ): Boolean
 
+    val appendDeferred: Boolean
+
+    suspend fun awaitAppendReadiness()
+
     fun allowsAppend(): Boolean
 
     suspend fun open(
@@ -76,6 +80,13 @@ internal fun createTtsAutoReadContinuation(appState: WhiteNoiseAppState): TtsAut
                 appState.activeAccountRef == account &&
                     appState.ownsTtsAutoReadSession(group) &&
                     controller.state.value.sessionId == session
+
+            override val appendDeferred: Boolean
+                get() = appState.ttsHistorySession.liveAppendDeferred
+
+            override suspend fun awaitAppendReadiness() {
+                appState.ttsHistorySession.edgeState.first { !appendDeferred }
+            }
 
             override fun allowsAppend(): Boolean =
                 appState.ttsHistorySession.allowsLiveAppend(
@@ -110,6 +121,12 @@ private data class TtsAutoReadRun(
     val tail: TtsAutoReadTail,
     val locale: Locale,
 )
+
+private enum class TtsLiveAppendResult {
+    Accepted,
+    Deferred,
+    Stopped,
+}
 
 /** One native subscription owned by speech, independent of the visible conversation's lifecycle. */
 internal class TtsAutoReadContinuation(
@@ -212,7 +229,16 @@ internal class TtsAutoReadContinuation(
                 host.controller.stop()
                 healthy = false
             } else {
-                healthy = appendFollowing(page, run)
+                val appended = appendFollowing(page, run)
+                if (appended == TtsLiveAppendResult.Deferred) {
+                    host.awaitAppendReadiness()
+                    // Revalidate native edits/deletions rather than retrying captured rows.
+                    val fresh = withContext(io) { subscription.snapshot() }
+                    val reconciled = fresh?.let { reconcileAnchor(subscription, it, run) }
+                    if (reconciled == null) healthy = stopForGap(run) else page = reconciled
+                    continue
+                }
+                healthy = appended == TtsLiveAppendResult.Accepted
                 if (healthy && page.hasMoreAfter) {
                     val next = withContext(io) { subscription.paginateForwards(CONVERSATION_WINDOW_MAX_ROWS) }
                     val advanced = (next as? TimelinePageOutcome.Advanced)?.page
@@ -243,37 +269,44 @@ internal class TtsAutoReadContinuation(
     private suspend fun appendFollowing(
         page: TimelinePageFfi,
         run: TtsAutoReadRun,
-    ): Boolean {
-        val following = run.tail.following(page) ?: return stopForGap(run)
+    ): TtsLiveAppendResult {
+        val following = run.tail.following(page) ?: return TtsLiveAppendResult.Stopped
         val records = following.iterator()
-        var healthy = true
-        while (records.hasNext() && healthy && owns(run, host.controller.state.value)) {
+        var result = TtsLiveAppendResult.Accepted
+        while (records.hasNext() && result == TtsLiveAppendResult.Accepted && owns(run, host.controller.state.value)) {
             currentCoroutineContext().ensureActive()
             val record = records.next()
-            healthy = appendRecord(record, run)
-            if (healthy) run.tail.accepted(record.messageIdHex)
+            result = appendRecord(record, run)
+            if (result == TtsLiveAppendResult.Accepted) run.tail.accepted(record.messageIdHex)
         }
-        return healthy && owns(run, host.controller.state.value)
+        return if (owns(run, host.controller.state.value)) result else TtsLiveAppendResult.Stopped
     }
 
     private suspend fun appendRecord(
         record: TimelineMessageRecordFfi,
         run: TtsAutoReadRun,
-    ): Boolean {
-        if (!host.allowsAppend() || record.deleted || record.invalidationStatus != null) return true
-        return if (record.plaintext.length > maxRetainedTextChars) {
-            stopForGap(run)
-        } else {
-            val entry = withContext(io) { host.project(record) }
-            if (entry != null && owns(run, host.controller.state.value)) {
-                if (canRetain(entry)) {
-                    host.controller.appendSpeech(entry, run.locale)
-                    owns(run, host.controller.state.value)
-                } else {
-                    stopForGap(run)
+    ): TtsLiveAppendResult {
+        if (host.appendDeferred) return TtsLiveAppendResult.Deferred
+        return when {
+            !host.allowsAppend() || record.deleted || record.invalidationStatus != null -> TtsLiveAppendResult.Accepted
+            record.plaintext.length > maxRetainedTextChars -> {
+                stopForGap(run)
+                TtsLiveAppendResult.Stopped
+            }
+            else -> {
+                val entry = withContext(io) { host.project(record) }
+                when {
+                    host.appendDeferred -> TtsLiveAppendResult.Deferred
+                    entry == null || !owns(run, host.controller.state.value) -> TtsLiveAppendResult.Accepted
+                    !canRetain(entry) -> {
+                        stopForGap(run)
+                        TtsLiveAppendResult.Stopped
+                    }
+                    else -> {
+                        host.controller.appendSpeech(entry, run.locale)
+                        TtsLiveAppendResult.Accepted
+                    }
                 }
-            } else {
-                owns(run, host.controller.state.value)
             }
         }
     }

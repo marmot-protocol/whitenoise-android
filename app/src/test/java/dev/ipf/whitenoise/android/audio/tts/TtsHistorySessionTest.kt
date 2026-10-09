@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -508,10 +510,22 @@ class TtsHistorySessionTest {
 
             harness.session.previousMessage()
             assertFalse(harness.session.allowsLiveAppend())
+            assertTrue(harness.session.liveAppendDeferred)
+            var settled = false
+            val waiter =
+                launch {
+                    harness.session.edgeState.first { !harness.session.liveAppendDeferred }
+                    settled = true
+                }
+            runCurrent()
+            assertFalse(settled)
 
             gate.complete(Unit)
             advanceUntilIdle()
             assertTrue(harness.session.allowsLiveAppend())
+            assertFalse(harness.session.liveAppendDeferred)
+            assertTrue(settled)
+            waiter.join()
         }
 
     @Test
