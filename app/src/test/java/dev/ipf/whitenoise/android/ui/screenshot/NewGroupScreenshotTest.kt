@@ -93,11 +93,19 @@ class NewGroupScreenshotTest {
 
     /** Dark recovery uses the same named error and deliberate actions. */
     @Test fun setupRecipientRecoveryDark() =
-        setup("group_setup_recipient_recovery_dark.png", recovery = true, dark = true)
+        setup(
+            "group_setup_recipient_recovery_dark.png",
+            recovery = true,
+            dark = true,
+        )
 
     /** Long duplicate names and public-key disambiguation wrap without obscuring the actions. */
     @Test fun setupRecipientRecoveryLargeRtl() =
-        setup("group_setup_recipient_recovery_large_rtl.png", recovery = true, largeRtl = true)
+        setup(
+            "group_setup_recipient_recovery_large_rtl.png",
+            recovery = true,
+            largeRtl = true,
+        )
 
     /** A keyboard-compressed visible viewport keeps recovery scrollable and Retry pinned. */
     @Test

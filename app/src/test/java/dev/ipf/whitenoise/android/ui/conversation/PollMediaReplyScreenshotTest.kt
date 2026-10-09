@@ -48,10 +48,11 @@ class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
 
     /** Pins timestamp rendering and gives the real timeline dispatcher its authoritative membership. */
     @Before
-    fun bindRoster() = runTest {
-        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-        pollController.retryMembers()
-    }
+    fun bindRoster() =
+        runTest {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+            pollController.retryMembers()
+        }
 
     /** No native stream or time-zone override survives a screenshot fixture. */
     @After

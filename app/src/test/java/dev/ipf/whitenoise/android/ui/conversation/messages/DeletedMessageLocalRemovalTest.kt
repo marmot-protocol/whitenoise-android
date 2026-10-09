@@ -499,29 +499,28 @@ class DeletedMessageLocalRemovalTest {
     private fun appState(
         preferences: SharedPreferences,
         reactions: List<TimelineUserReactionFfi>? = null,
-    ) =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence()),
-            accountIdHexResolver = { null },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
+    ) = WhiteNoiseAppState(
+        context = context,
+        draftStore = DraftStore(EmptyDraftPersistence()),
+        accountIdHexResolver = { null },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = ACCOUNT_REF,
+                    accountIdHex = ACCOUNT_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
                 ),
-            activeAccountRef = ACCOUNT_REF,
-            profileReader = { null },
-            profileDisplayNameReader = { null },
-            profileRefreshRequest = {},
-            preferences = preferences,
-            initialMarmotRuntime = reactions?.let(::reactionRuntime),
-        )
+            ),
+        activeAccountRef = ACCOUNT_REF,
+        profileReader = { null },
+        profileDisplayNameReader = { null },
+        profileRefreshRequest = {},
+        preferences = preferences,
+        initialMarmotRuntime = reactions?.let(::reactionRuntime),
+    )
 
     /** Supplies the canonical read for reactor UI tests without opening a native runtime. */
     private fun reactionRuntime(reactions: List<TimelineUserReactionFfi>): AppMarmotRuntime {

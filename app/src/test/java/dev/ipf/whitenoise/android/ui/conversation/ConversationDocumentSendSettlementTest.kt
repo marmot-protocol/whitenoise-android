@@ -104,7 +104,10 @@ private class SettlementDraftGateway : MessageDraftGateway {
     private var current: MessageDraftFfi? = null
     var beforeSave: () -> Unit = {}
 
-    override fun read(accountRef: String, groupIdHex: String): MessageDraftFfi? = current
+    override fun read(
+        accountRef: String,
+        groupIdHex: String,
+    ): MessageDraftFfi? = current
 
     override fun save(
         accountRef: String,
@@ -118,7 +121,10 @@ private class SettlementDraftGateway : MessageDraftGateway {
             .also { current = it }
     }
 
-    override fun delete(accountRef: String, groupIdHex: String) {
+    override fun delete(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
         current = null
     }
 
@@ -128,12 +134,18 @@ private class SettlementDraftGateway : MessageDraftGateway {
 /** Keeps editor sessions independent of device preferences. */
 private object SettlementStrings : EditorStringStore {
     override fun readAll(): Map<String, String> = emptyMap()
+
     override fun replaceAll(values: Map<String, String>) = true
+
     override fun clear() = Unit
 }
 
 /** Keeps unrelated composer text persistence in memory. */
 private object SettlementDrafts : DraftPersistence {
     override fun read(): Map<String, String> = emptyMap()
-    override fun write(key: String, value: String?) = Unit
+
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
 }

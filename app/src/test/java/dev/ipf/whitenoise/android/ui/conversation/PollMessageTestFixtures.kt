@@ -156,6 +156,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             initialMarmotRuntime = AppMarmotRuntime("test", native),
             marmotIoDispatcher = dispatcher,
         )
+
     protected val pollController =
         ConversationController(
             appState = pollState,

@@ -526,7 +526,11 @@ class ConversationDraftRestoreRemovalTest {
                 val controller = ConversationController(appState = app, initialGroup = group)
                 val owner =
                     ConversationMediaDraftState(
-                        app, controller, context, backgroundScope, PhotoEditorMessages("", "", "", ""),
+                        app,
+                        controller,
+                        context,
+                        backgroundScope,
+                        PhotoEditorMessages("", "", "", ""),
                     )
                 val uri = Uri.parse("content://picker/document/same-name")
                 owner.updateInputs(emptyList(), listOf(uri), "account")

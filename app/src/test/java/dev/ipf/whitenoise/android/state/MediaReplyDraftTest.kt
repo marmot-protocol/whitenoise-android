@@ -152,7 +152,16 @@ class MediaReplyDraftTest {
 
     /** A selected file fixture uses its opaque native attachment identity. */
     private fun descriptor() =
-        SelectedMessageDraftAttachmentFfi("id", "pick", "image/jpeg", 1uL, null, null, null, emptyList())
+        SelectedMessageDraftAttachmentFfi(
+            "id",
+            "pick",
+            "image/jpeg",
+            1uL,
+            null,
+            null,
+            null,
+            emptyList(),
+        )
 
     /** Minimal staged plaintext whose identity is compared using the selected revision. */
     private fun attachment() = PendingAttachment(byteArrayOf(1), "image/jpeg", "pick")

@@ -26,6 +26,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /** Drives the exact production Compose read observer without manual mark-read calls. */
 @RunWith(RobolectricTestRunner::class)
@@ -96,19 +97,19 @@ class ConversationVisibleReadObserverTest {
             installObserver(state, controller, ReadLifecycleOwner()) { observing }
             activate(state, row.groupIdHex)
             composeRule.waitUntil(5_000) {
-                shadowOf(Looper.getMainLooper()).idle()
+                advanceAndroidWork()
                 commandStarted.isCompleted
             }
             composeRule.runOnIdle { state.setAppInForeground(false) }
             releaseCommand.complete(Unit)
             composeRule.waitUntil(5_000) {
-                shadowOf(Looper.getMainLooper()).idle()
+                advanceAndroidWork()
                 !controller.timelineSubscriptionActiveCallMutex.isLocked
             }
             composeRule.waitForIdle()
             composeRule.runOnIdle { state.setAppInForeground(true, dismissRetainedVisibleConversation = false) }
             composeRule.waitUntil(5_000) {
-                shadowOf(Looper.getMainLooper()).idle()
+                advanceAndroidWork()
                 subscription.anchorReports.size == 2
             }
             assertEquals(List(2) { ConversationTimelineTestIds.MESSAGE_B }, subscription.anchorReports)
@@ -184,7 +185,7 @@ class ConversationVisibleReadObserverTest {
             awaitAnchor(first)
             first.endWindows()
             composeRule.waitUntil(timeoutMillis = 5_000) {
-                shadowOf(Looper.getMainLooper()).idle()
+                advanceAndroidWork()
                 first.closeCallCount == 1
             }
             // Use the same public retry signal as the existing reconnect fixtures,
@@ -306,6 +307,7 @@ class ConversationVisibleReadObserverTest {
         subscription: ScriptedConversationTimelineSubscription,
     ) = runBlocking {
         awaitConversationCondition {
+            advanceAndroidWork()
             controller.timelineSubscription === subscription &&
                 controller.window.readySubscription === subscription &&
                 controller.retainsTimelineRecord(ConversationTimelineTestIds.MESSAGE_B)
@@ -315,7 +317,7 @@ class ConversationVisibleReadObserverTest {
     /** Pumps Android work until the production observer reports its first native visible anchor. */
     private fun awaitAnchor(subscription: ScriptedConversationTimelineSubscription) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            shadowOf(Looper.getMainLooper()).idle()
+            advanceAndroidWork()
             subscription.anchorReports.isNotEmpty()
         }
     }
@@ -373,14 +375,19 @@ class ConversationVisibleReadObserverTest {
         count: Int,
     ) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            // The native bootstrap fixture posts platform work to Robolectric's
-            // paused Android looper, separate from Compose's test clock.
-            shadowOf(Looper.getMainLooper()).idle()
-            Snapshot.sendApplyNotifications()
+            advanceAndroidWork()
             fixture.markReadCalls.get() >= count && controller.latestChatListRow?.manuallyMarkedUnread == false
         }
         composeRule.waitForIdle()
         assertEquals(count, fixture.markReadCalls.get())
+    }
+
+    /** Advances host timeline batching and delivers pending snapshot notifications. */
+    private fun advanceAndroidWork() {
+        // Compose's test clock does not advance the paused Android handler's
+        // six-millisecond window batching timeout or publish background snapshots.
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+        Snapshot.sendApplyNotifications()
     }
 
     /** Builds the running local account used by both the native fixture and controller ownership checks. */

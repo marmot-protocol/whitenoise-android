@@ -62,20 +62,21 @@ class NewGroupSubmissionTest {
             for (attempt in 1..3) {
                 val submitted = selected.toList()
                 val request = captureNewGroupSubmission(draft, selected, draft.imageDraft, draft.retentionSecs)
-                val result = runCatching {
-                    request.createWith { name, members, options ->
-                        seenSizes += members.size
-                        assertEquals("Team", name)
-                        assertEquals("Plans", options.description)
-                        assertEquals(300uL, options.disappearingMessageSecs)
-                        assertArrayEquals(byteArrayOf(1, 2), options.initialImage!!.plaintext)
-                        when (attempt) {
-                            1 -> throw MarmotKitException.MissingKeyPackage("3")
-                            2 -> throw MarmotKitException.MissingMemberInboxRoute("7")
-                            else -> "canonical"
+                val result =
+                    runCatching {
+                        request.createWith { name, members, options ->
+                            seenSizes += members.size
+                            assertEquals("Team", name)
+                            assertEquals("Plans", options.description)
+                            assertEquals(300uL, options.disappearingMessageSecs)
+                            assertArrayEquals(byteArrayOf(1, 2), options.initialImage!!.plaintext)
+                            when (attempt) {
+                                1 -> throw MarmotKitException.MissingKeyPackage("3")
+                                2 -> throw MarmotKitException.MissingMemberInboxRoute("7")
+                                else -> "canonical"
+                            }
                         }
                     }
-                }
                 result.exceptionOrNull()?.let { error ->
                     val failure = groupCreationRecovery(error, attempt, submitted)
                     assertEquals(submitted, selected)

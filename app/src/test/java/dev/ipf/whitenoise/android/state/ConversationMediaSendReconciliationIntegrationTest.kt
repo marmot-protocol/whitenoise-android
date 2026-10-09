@@ -52,8 +52,6 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
-import java.lang.reflect.Proxy
-import java.time.Duration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -81,6 +79,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.lang.reflect.Proxy
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -645,8 +645,6 @@ class ConversationMediaSendReconciliationIntegrationTest {
     @Test
     fun voiceReplyKeepsOriginalTargetWhenSelectionChangesDuringUpload() =
         assertDraftlessMediaUsesTokenBoundNativeAdmission("audio/mp4", "voice.m4a", replyTarget = "poll-original")
-
-
 }
 
 /** Covers native echo ordering while host-only thumbnail decoding suspends. */
@@ -1038,7 +1036,11 @@ private fun assertDraftlessMediaUsesTokenBoundNativeAdmission(
         mediaAdmissionBoundary(replyTarget, reference, calls) { request ->
             uploadedRequest = request
             if (replyTarget != null) {
-                controller.replyingTo = controller.timeline.single().record.copy(messageIdHex = "newer-poll")
+                controller.replyingTo =
+                    controller.timeline
+                        .single()
+                        .record
+                        .copy(messageIdHex = "newer-poll")
             }
         }
     val appState =
@@ -1154,23 +1156,29 @@ class ConversationVoiceReplyRetryTest {
             val target = "e1".repeat(32)
             val reference = mediaReference().copy(fileName = "voice-1000ms.m4a", mediaType = "audio/mp4")
             var uploads = 0
-            val engine = mediaAdmissionBoundary(target, reference, calls) {
-                uploads++
-                if (uploads == 1) error("controlled upload failure")
-            }
-            WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }
+            val engine =
+                mediaAdmissionBoundary(target, reference, calls) {
+                    uploads++
+                    if (uploads == 1) error("controlled upload failure")
+                }
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("marmotRuntime")
+                .apply { isAccessible = true }
                 .set(state, AppMarmotRuntime("test", engine))
             val controller = voiceRetryController(state)
             val sender = ConversationMediaSender(state, controller, ApplicationProvider.getApplicationContext()) {}
             val rejected = CompletableDeferred<Unit>()
             val review = voiceRetryReview(this, sender, rejected)
             val recording =
-                java.io.File.createTempFile("voice-reply", ".m4a").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+                java.io.File
+                    .createTempFile("voice-reply", ".m4a")
+                    .apply { writeBytes(byteArrayOf(1, 2, 3)) }
             try {
                 controller.retryMembers()
                 assertTrue("The fixture must admit media before testing upload Retry", controller.canSendMessages)
                 controller.replyingTo =
-                    TimelineProjector.toAppMessageRecord(projectedMediaMessage(1uL, reference))
+                    TimelineProjector
+                        .toAppMessageRecord(projectedMediaMessage(1uL, reference))
                         .copy(messageIdHex = target)
                 review.offer(recording, 1_000L)
                 val clip = checkNotNull(review.clip)
@@ -1215,14 +1223,13 @@ private fun voiceRetryReview(
     scope: CoroutineScope,
     sender: ConversationMediaSender,
     rejected: CompletableDeferred<Unit>,
-) =
-    VoiceRecordingReview(
-        scope = scope,
-        ownerIsCurrent = { true },
-        send = { file, duration, guard, complete ->
-            sender.sendVoiceAttachment(file, duration, guard) { accepted ->
-                complete(accepted)
-                if (!accepted) rejected.complete(Unit)
-            }
-        },
-    )
+) = VoiceRecordingReview(
+    scope = scope,
+    ownerIsCurrent = { true },
+    send = { file, duration, guard, complete ->
+        sender.sendVoiceAttachment(file, duration, guard) { accepted ->
+            complete(accepted)
+            if (!accepted) rejected.complete(Unit)
+        }
+    },
+)
