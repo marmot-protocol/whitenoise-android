@@ -10,4 +10,8 @@
         <item quantity="one">%1$d élément</item>
         <item quantity="other">%1$d éléments</item>
     </plurals>
+    <string name="shared_content_browse_history">Parcourir les pièces jointes partagées</string>
+    <string name="shared_content_partial">Aucune pièce jointe correspondante chargée</string>
+    <string name="shared_content_page_failed">Impossible de charger le contenu partagé. Réessayez.</string>
+    <string name="shared_content_history_end">Fin des pièces jointes locales</string>
 </resources>

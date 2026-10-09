@@ -12,4 +12,8 @@
         <item quantity="many">%1$d элементов</item>
         <item quantity="other">%1$d элемента</item>
     </plurals>
+    <string name="shared_content_browse_history">Просмотреть историю общих вложений</string>
+    <string name="shared_content_partial">Подходящие вложения ещё не загружены</string>
+    <string name="shared_content_page_failed">Не удалось загрузить общие материалы. Повторите попытку.</string>
+    <string name="shared_content_history_end">Конец локальной истории вложений</string>
 </resources>

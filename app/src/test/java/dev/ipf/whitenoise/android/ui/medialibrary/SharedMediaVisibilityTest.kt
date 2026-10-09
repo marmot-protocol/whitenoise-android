@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.ui.medialibrary
 
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
@@ -164,6 +166,46 @@ class SharedMediaVisibilityTest {
         assertEquals(listOf(1), tiles.images.map { it.attachmentIndex })
         assertEquals(listOf(1), tiles.visuals.toConversationViewerPages().map { it.attachmentIndex })
         assertEquals(listOf(1), tiles.visuals.toGalleryViewerPages().map { it.attachmentIndex })
+    }
+
+    /** Recent tiles and native history exclude every duplicate artwork slot without renumbering photos. */
+    @Test
+    fun duplicateArtworkAgreesWithNativeGalleryRoles() {
+        val original = emojiMessage("m")
+        val projected = requireNotNull(original.projected)
+        val artwork = projected.media[0] as MediaAttachmentOutcomeFfi.Accepted
+        val photo = projected.media[1] as MediaAttachmentOutcomeFfi.Accepted
+        val media = listOf(artwork, artwork.copy(attachmentIndex = 2u), photo.copy(attachmentIndex = 5u))
+        val message = original.copy(projected = projected.copy(media = media))
+        val recent = buildVisibleSharedMediaTiles(listOf(message), null, emptySet(), emptySet(), 100uL)
+        val entries =
+            media.map { slot ->
+                historyEntry(
+                    1,
+                    slot.attachmentIndex,
+                    role = if (slot.attachmentIndex == 5u) AttachmentRoleFfi.SHARED else AttachmentRoleFfi.INLINE_EMOJI,
+                ).copy(attachment = slot)
+            }
+        val history = attachmentLibraryTiles(entries, null)
+        assertEquals(listOf(5), recent.images.map { it.attachmentIndex })
+        assertEquals(listOf(5), history.images.map { it.attachmentIndex })
+        assertEquals(listOf(photo.reference), recent.images.map { it.reference })
+        assertEquals(listOf(photo.reference), history.images.map { it.reference })
+    }
+
+    /** Native Shared roles for malformed long tags must not disagree with the recent-media strip. */
+    @Test
+    fun malformedEmojiTagLeavesTheImageSharedOnBothSurfaces() {
+        val original = emojiMessage("m")
+        val tags = listOf(MessageTagFfi(listOf("emoji", "party", "https://blob/party", "set", "extra")))
+        val message = original.copy(record = original.record.copy(tags = tags))
+        val recent = buildVisibleSharedMediaTiles(listOf(message), null, emptySet(), emptySet(), 100uL)
+        val entries =
+            requireNotNull(message.projected).media.map { slot ->
+                historyEntry(1, (slot as MediaAttachmentOutcomeFfi.Accepted).attachmentIndex).copy(attachment = slot)
+            }
+        assertEquals(listOf(0, 1), recent.images.map { it.attachmentIndex })
+        assertEquals(listOf(0, 1), attachmentLibraryTiles(entries, null).images.map { it.attachmentIndex })
     }
 
     /** A tag that matches no attachment claims nothing, so every image stays shared media. */

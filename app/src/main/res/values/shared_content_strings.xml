@@ -10,4 +10,8 @@
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
     </plurals>
+    <string name="shared_content_browse_history">Browse shared attachment history</string>
+    <string name="shared_content_partial">No matching attachments loaded yet</string>
+    <string name="shared_content_page_failed">Couldn’t load shared content. Try again.</string>
+    <string name="shared_content_history_end">End of local attachment history</string>
 </resources>

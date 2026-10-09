@@ -60,7 +60,7 @@ internal fun SharedMediaTiles.visualsFor(filter: SharedVisualFilter): List<Share
         SharedVisualFilter.Videos -> videos
     }
 
-/** Counts and destinations share the same bounded, visibility-filtered native conversation projection. */
+/** Attachment destinations stay reachable without loading chat history; links retain their bounded count. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun SharedContentCategories(
@@ -77,9 +77,8 @@ internal fun SharedContentCategories(
                     SharedContentCategory.Documents -> tiles.files.size
                     SharedContentCategory.Voice -> tiles.voice.size
                 }
-            if (count > 0) category to count else null
+            if (count > 0 || category != SharedContentCategory.Links) category to count else null
         }
-    if (categories.isEmpty()) return
 
     SettingsSection(stringResource(R.string.shared_content_in_chat))
     SettingsGroup(modifier = modifier) {
@@ -96,7 +95,9 @@ internal fun SharedContentCategories(
                     context = it,
                     title = stringResource(category.titleRes),
                     subtitle =
-                        if (tiles.isLoading) {
+                        if (category != SharedContentCategory.Links) {
+                            stringResource(R.string.shared_content_browse_history)
+                        } else if (tiles.isLoading) {
                             stringResource(R.string.shared_content_loading)
                         } else {
                             pluralStringResource(R.plurals.shared_item_count, count, count)
@@ -119,6 +120,8 @@ internal fun SharedContentScaffold(
     onFilter: (SharedVisualFilter) -> Unit,
     onBack: () -> Unit,
     loading: Boolean,
+    paging: GroupAttachmentState? = null,
+    onLoadMore: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     SettingsScaffold(title = stringResource(category.titleRes), onBack = onBack) {
@@ -139,7 +142,7 @@ internal fun SharedContentScaffold(
                 }
             }
             if (loading) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(Modifier.size(24.dp))
                         Text(stringResource(R.string.shared_content_loading), Modifier.padding(16.dp))
@@ -148,6 +151,7 @@ internal fun SharedContentScaffold(
             } else {
                 Box(Modifier.weight(1f).fillMaxWidth()) { content() }
             }
+            if (paging != null && (!loading || paging.initialized)) AttachmentLibraryFooter(paging, onLoadMore)
         }
     }
 }
