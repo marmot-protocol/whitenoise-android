@@ -233,7 +233,9 @@ internal class TtsAutoReadContinuation(
                         subscription?.close()
                     }
                 } catch (_: Exception) {
-                    if (owns(run, host.controller.state.value)) host.controller.stop()
+                    withContext(scope.coroutineContext + NonCancellable) {
+                        if (owns(run, host.controller.state.value)) host.controller.stop()
+                    }
                 }
             }
         }

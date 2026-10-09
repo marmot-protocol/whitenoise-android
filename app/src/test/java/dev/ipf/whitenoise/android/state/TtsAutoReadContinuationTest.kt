@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -21,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
+import kotlin.coroutines.CoroutineContext
 
 class TtsAutoReadContinuationTest {
     @Test
@@ -266,6 +268,39 @@ class TtsAutoReadContinuationTest {
         }
 
     @Test
+    fun aNativeCloseFailureRechecksPlaybackOwnershipOnTheOwnerDispatcher() =
+        runTest {
+            val host = Host(page("m1"))
+            val nativeThread = ThreadLocal.withInitial { false }
+            val native =
+                object : CoroutineDispatcher() {
+                    val delegate = StandardTestDispatcher(testScheduler)
+
+                    override fun dispatch(
+                        context: CoroutineContext,
+                        block: Runnable,
+                    ) {
+                        delegate.dispatch(context) {
+                            nativeThread.set(true)
+                            try {
+                                block.run()
+                            } finally {
+                                nativeThread.set(false)
+                            }
+                        }
+                    }
+                }
+            host.beforeOwns = { assertTrue("ownership must remain on its owner dispatcher", !nativeThread.get()) }
+            host.failClose = true
+            host.start(this, nativeDispatcher = native)
+            runCurrent()
+            host.windows.close()
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
     fun pausedDistinctArrivalsCannotExceedTheRetainedMessageBudget() =
         runTest {
             val host = Host(page("m1"))
@@ -399,6 +434,8 @@ class TtsAutoReadContinuationTest {
         var jump: TimelinePageFfi? = null
         var forward: TimelinePageFfi? = null
         var beforeProject: (() -> Unit)? = null
+        var beforeOwns: (() -> Unit)? = null
+        var failClose = false
 
         init {
             controller.attachEngine(engine)
@@ -409,8 +446,9 @@ class TtsAutoReadContinuationTest {
             scope: TestScope,
             maxMessages: Int = 200,
             maxChars: Int = 1_048_576,
+            nativeDispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
         ) {
-            val dispatcher = StandardTestDispatcher(scope.testScheduler)
+            val dispatcher = nativeDispatcher
             TtsAutoReadContinuation(this, scope.backgroundScope, dispatcher, maxMessages, maxChars)
                 .start("account", "group", Locale.US)
         }
@@ -419,7 +457,10 @@ class TtsAutoReadContinuationTest {
             account: String,
             group: String,
             session: Long,
-        ): Boolean = owned
+        ): Boolean {
+            beforeOwns?.invoke()
+            return owned
+        }
 
         override val appendDeferred: Boolean
             get() = deferred.value
@@ -474,6 +515,7 @@ class TtsAutoReadContinuationTest {
 
                 override fun close() {
                     closes++
+                    if (failClose) error("Synthetic native cleanup failure")
                 }
 
                 private fun unchanged() =
