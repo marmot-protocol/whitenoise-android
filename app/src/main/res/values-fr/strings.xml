@@ -2294,6 +2294,14 @@
         <item quantity="one">%1$d pièce jointe en cours de téléchargement</item>
         <item quantity="other">%1$d pièces jointes en cours de téléchargement</item>
     </plurals>
+    <string name="account_keys_local_signing">Signature locale</string>
+    <string name="account_keys_external_signing">Signataire externe</string>
+    <string name="account_keys_session_running">Session du compte active</string>
+    <string name="account_keys_session_stopped">Session du compte arrêtée</string>
+    <string name="account_keys_session">Session du compte</string>
+    <string name="chat_departure_confirm">Vérifiez les %1$d discussions sélectionnées. Les groupes rejoints seront quittés et supprimés de cet appareil ; les discussions directes sont supprimées localement. Les autres membres gardent leurs copies. Les transferts administratifs seront confirmés avant la suppression.</string>
+    <string name="chat_departure_result">%1$d terminées · %2$d inachevées · %3$d ignorées. Réessayer vérifie les appartenances et reprend uniquement les étapes inachevées.</string>
+    <string name="chat_departure_admin_granted">Le transfert des droits a réussi. La sortie du groupe reste inachevée.</string>
     <string name="reaction_details_loading">Chargement des réactions…</string>
     <string name="reaction_details_load_failed">Impossible de charger les réactions.</string>
     <string name="group_create_remove_and_continue">Retirer cette personne et continuer</string>

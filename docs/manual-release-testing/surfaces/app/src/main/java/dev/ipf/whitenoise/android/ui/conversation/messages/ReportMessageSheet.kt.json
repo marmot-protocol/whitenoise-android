@@ -24,7 +24,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
         "anchor": "fun ReportMessageForm(",
         "test_ids": [
-          "MSG-016"
+          "MSG-016",
+          "PRO-010"
         ]
       },
       {

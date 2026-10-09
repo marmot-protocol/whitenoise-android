@@ -64,6 +64,27 @@ class AccountKeysScreenScreenshotTest {
     @Test
     fun profileKeysAmberLight() = capture("profile_keys_amber_light", darkTheme = false, localSigning = false)
 
+    @Test
+    fun profileKeysAmberDark() = capture("profile_keys_amber_dark", darkTheme = true, localSigning = false)
+
+    @Test
+    fun profileKeysAmberAmoled() =
+        capture(
+            "profile_keys_amber_amoled",
+            darkTheme = true,
+            amoled = true,
+            localSigning = false,
+        )
+
+    @Test
+    fun noActiveAccountShowsNoKeyOrSignOutActions() = capture("profile_keys_empty", darkTheme = false, empty = true)
+
+    @Test
+    fun noActiveAccountDark() = capture("profile_keys_empty_dark", darkTheme = true, empty = true)
+
+    @Test
+    fun noActiveAccountAmoled() = capture("profile_keys_empty_amoled", darkTheme = true, amoled = true, empty = true)
+
     /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         snapshotName: String,
@@ -73,8 +94,20 @@ class AccountKeysScreenScreenshotTest {
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         scrollToWipe: Boolean = false,
         localSigning: Boolean = true,
+        empty: Boolean = false,
     ) {
-        val appState = accountState(localSigning)
+        val appState =
+            if (empty) {
+                WhiteNoiseAppState(
+                    context = app,
+                    draftStore = DraftStore.forContext(app),
+                    accountIdHexResolver = { null },
+                    accounts = emptyList(),
+                    activeAccountRef = "missing-fixture-account",
+                )
+            } else {
+                accountState(localSigning)
+            }
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(

@@ -199,6 +199,26 @@
         "test_ids": [
           "FLD-002"
         ]
+      },
+      {
+        "surface": "R.plurals.chat_list_bulk_delete_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.plurals.chat_list_bulk_delete_confirm",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.delete_group_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.delete_group_confirm",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
       }
     ]
   },

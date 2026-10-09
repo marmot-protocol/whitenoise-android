@@ -1,0 +1,177 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatDepartureBatchDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "fun ChatDepartureBatchDialog(",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "ChatDepartureSuccessor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "fun ChatDepartureSuccessor(",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "ChatDepartureResultContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "fun ChatDepartureResultContent(",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.chat_departure_admin_granted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.chat_departure_admin_granted",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.chat_departure_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.chat_departure_confirm",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.chat_departure_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.chat_departure_result",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_sole_admin_transfer_then_leave_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.confirm_sole_admin_transfer_then_leave_message",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_transfer_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.confirm_transfer_admin_title",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.leave_and_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.leave_and_delete",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_demoted_but_couldnt_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.toast_demoted_but_couldnt_leave",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_leave_not_confirmed_history_kept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.toast_leave_not_confirmed_history_kept",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_left_chat_delete_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.toast_left_chat_delete_failed",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.transfer_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.transfer_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_delete_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.toast_couldnt_delete_chat",
+        "test_ids": [
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.delete_from_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.delete_from_device",
+        "test_ids": [
+          "CHL-026"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

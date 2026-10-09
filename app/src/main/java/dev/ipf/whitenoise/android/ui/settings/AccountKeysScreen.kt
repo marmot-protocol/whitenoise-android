@@ -227,6 +227,7 @@ internal fun AccountKeysScreen(
     val accountRef = appState.activeAccountRef
     val runtimeGeneration = appState.runtimeGeneration
     val ui = remember(accountIdHex, accountRef, runtimeGeneration) { ProfileKeysUiState() }
+    var showSignOut by remember(accountIdHex, accountRef, runtimeGeneration) { mutableStateOf(false) }
 
     /** True while the screen still shows the active account. */
     fun ownsAccount(): Boolean =
@@ -339,6 +340,17 @@ internal fun AccountKeysScreen(
         contentWindowInsets = contentWindowInsets,
     ) {
         ProfileKeysList(
+            identity =
+                active?.let {
+                    AccountKeysIdentity(
+                        appState.displayName(it.accountIdHex),
+                        npub,
+                        appState.avatarUrl(it.accountIdHex),
+                        it.localSigning,
+                        it.running,
+                        accountKeysConnectionLabel(appState),
+                    )
+                },
             npub = npub,
             hasLocalKey = hasLocalKey,
             showWipe = WIPE_ENGINE_FFI_AVAILABLE && active != null,
@@ -379,6 +391,7 @@ internal fun AccountKeysScreen(
             onExportEncrypted = { ui.passwordDialog = true },
             onExportRaw = { ui.rawExportDialog = true },
             onWipe = { ui.wipeSheet = true },
+            onSignOut = { if (ownsAccount()) showSignOut = true },
         )
     }
     ProfileKeysDialogs(
@@ -405,6 +418,15 @@ internal fun AccountKeysScreen(
         },
     )
     AccountWipeFlow(appState = appState, ui = ui)
+    if (showSignOut) {
+        SignOutSheet(
+            onConfirm = { deleteKeyPackages ->
+                showSignOut = false
+                if (ownsAccount()) signOutActiveAccount(appState, deleteKeyPackages)
+            },
+            onDismiss = { showSignOut = false },
+        )
+    }
 }
 
 /** Reveal loading and expiry, pending-export expiry, copied-glyph reset, and hiding everything sensitive on stop. */
@@ -457,6 +479,7 @@ private fun ProfileKeysEffects(
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 private fun ProfileKeysList(
+    identity: AccountKeysIdentity?,
     npub: String,
     hasLocalKey: Boolean,
     showWipe: Boolean,
@@ -467,10 +490,16 @@ private fun ProfileKeysList(
     onExportEncrypted: () -> Unit,
     onExportRaw: () -> Unit,
     onWipe: () -> Unit,
+    onSignOut: () -> Unit,
 ) {
     val revealed = ui.privateKey != null
     val exportsEnabled = ui.pendingExport == null && !ui.exportBusy
     SettingsList {
+        if (identity == null) {
+            item { SettingsExplainer(stringResource(R.string.no_active_account_period)) }
+            return@SettingsList
+        }
+        item { AccountKeysIdentityHeader(identity) }
         item { SettingsSection(stringResource(R.string.public_key)) }
         item {
             SettingsGroup {
@@ -549,6 +578,19 @@ private fun ProfileKeysList(
                             leading = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
                         )
                     }
+                }
+            }
+        }
+        item { SettingsSection(stringResource(R.string.account_keys_session)) }
+        item {
+            SettingsGroup {
+                row("sign_out") { context ->
+                    SettingsAction(
+                        context = context,
+                        title = stringResource(R.string.sign_out),
+                        onClick = onSignOut,
+                        modifier = Modifier.testTag("profile_keys.sign_out"),
+                    )
                 }
             }
         }

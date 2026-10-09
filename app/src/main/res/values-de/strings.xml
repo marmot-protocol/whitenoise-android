@@ -2311,6 +2311,14 @@
         <item quantity="one">%1$d Anhang wird geladen</item>
         <item quantity="other">%1$d Anhänge werden geladen</item>
     </plurals>
+    <string name="account_keys_local_signing">Lokale Signierung</string>
+    <string name="account_keys_external_signing">Externer Signierer</string>
+    <string name="account_keys_session_running">Kontositzung aktiv</string>
+    <string name="account_keys_session_stopped">Kontositzung angehalten</string>
+    <string name="account_keys_session">Kontositzung</string>
+    <string name="chat_departure_confirm">%1$d ausgewählte Chats prüfen. Beigetretene Gruppen werden verlassen und von diesem Gerät gelöscht; Direktchats werden lokal gelöscht. Andere Mitglieder behalten ihre Kopien. Erforderliche Admin-Übergaben werden vor der Löschung bestätigt.</string>
+    <string name="chat_departure_result">%1$d abgeschlossen · %2$d unvollständig · %3$d übersprungen. Ein erneuter Versuch prüft die Mitgliedschaft und setzt nur unvollständige Schritte fort.</string>
+    <string name="chat_departure_admin_granted">Die Admin-Übertragung war erfolgreich. Das Verlassen der Gruppe ist noch nicht abgeschlossen.</string>
     <string name="reaction_details_loading">Reaktionen werden geladen…</string>
     <string name="reaction_details_load_failed">Reaktionen konnten nicht geladen werden.</string>
     <string name="group_create_remove_and_continue">Diese Person entfernen und fortfahren</string>

@@ -146,6 +146,7 @@ internal fun NewGroupSetupContent(
                     )
                     WhiteNoiseTextField(
                         state = draft.description,
+                        emojiAction = true,
                         enabled = state.detailsEditable,
                         modifier = Modifier.fillMaxWidth().testTag("group_setup.description"),
                         label = { Text(stringResource(R.string.description)) },

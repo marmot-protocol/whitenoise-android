@@ -327,6 +327,48 @@ class LocalGroupDeleteControllerTest {
             }
         }
 
+    @Test
+    fun lastMemberForgetUsesTheSameDurableCleanupJournalAndRetryDoesNotForgetAgain() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture("selectedMessageDraft")
+                var commits = 0
+                var deferred = 0
+                assertTrue(
+                    fixture.controller.deleteGroupLocalFromChatList(
+                        GROUP,
+                        notify = false,
+                        forgetProtocol = true,
+                        observer =
+                            LocalChatDeleteObserver(
+                                onNativeCommitted = { commits++ },
+                                onCleanupDeferred = { deferred++ },
+                            ),
+                    ),
+                )
+                assertEquals(1, commits)
+                assertEquals(1, deferred)
+                assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
+                assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" || it == "leaveGroup" })
+                assertTrue(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                fixture.failureMethod.set(null)
+                assertTrue(
+                    fixture.controller.deleteGroupLocalFromChatList(
+                        GROUP,
+                        notify = false,
+                        forgetProtocol = true,
+                    ),
+                )
+                assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                flushChatRows()
+                assertTrue(fixture.controller.items.none { it.id == GROUP })
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
     private fun TestScope.fixture(
         failing: String? = null,
         onRowRead: () -> Unit = {},
@@ -389,7 +431,7 @@ class LocalGroupDeleteControllerTest {
                 }
                 "listMedia" -> emptyList<Any>()
                 "catchUpAccounts" -> Unit
-                "deleteGroupLocal" -> {
+                "deleteGroupLocal", "forgetGroupLocal" -> {
                     present.set(false)
                     true
                 }

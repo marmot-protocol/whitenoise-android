@@ -87,6 +87,7 @@ internal fun WhiteNoiseTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     onKeyboardAction: KeyboardActionHandler? = null,
     lineLimits: TextFieldLineLimits = TextFieldLineLimits.Default,
+    emojiAction: Boolean = false,
 ) {
     val isError = errorMessage != null
     val interactionSource = remember { MutableInteractionSource() }
@@ -127,7 +128,20 @@ internal fun WhiteNoiseTextField(
                     labelPosition = TextFieldLabelPosition.Above(),
                     label = label?.let(::insetLabel),
                     placeholder = placeholder,
-                    leadingIcon = leadingIcon,
+                    leadingIcon =
+                        if (emojiAction) {
+                            {
+                                androidx.compose.runtime.key(state) {
+                                    TextEntryEmojiFieldAction(
+                                        androidx.compose.ui.text.input
+                                            .TextFieldValue(state.text.toString(), state.selection),
+                                        enabled && !readOnly,
+                                    ) { value -> insertTextEntryEmoji(state, value, inputTransformation) }
+                                }
+                            }
+                        } else {
+                            leadingIcon
+                        },
                     trailingIcon = trailingIcon,
                     supportingText = supportingText,
                     isError = isError,
