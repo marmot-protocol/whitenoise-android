@@ -103,6 +103,102 @@ class MediaReplyDraftTest {
         assertSame(saved, engine.stageMediaReply("account", "group", "poll-original", "caption", listOf(attachment())))
     }
 
+    /** Composer whitespace follows outbound trimming without weakening the captured native revision. */
+    @Test
+    fun matchingDraftAllowsOutboundCaptionWhitespace() {
+        for (rawCaption in listOf(" \n\t ", " \ncaption\t ")) {
+            val original = revision()
+            val saved = revision()
+            val caption = rawCaption.trim().takeIf { it.isNotEmpty() }
+            val engine =
+                nativeBoundary { method, args ->
+                    when (method) {
+                        "selectedMessageDraft" ->
+                            SelectedMessageDraftFfi(original, content(rawCaption, attachments = listOf(descriptor())))
+                        "messageDraftAttachmentIfRevision" -> {
+                            assertSame(original, args[1])
+                            byteArrayOf(1)
+                        }
+                        "saveMessageDraftIfRevision" -> {
+                            assertSame(original, args[1])
+                            assertEquals(caption.orEmpty(), args[2])
+                            assertEquals("poll-original", args[3])
+                            assertEquals("id", ((args[4] as List<*>).single() as MessageDraftAttachmentFfi).id)
+                            SelectedMessageDraftFfi(saved, null)
+                        }
+                        else -> error(method)
+                    }
+                }
+            assertSame(
+                saved,
+                engine.stageMediaReply("account", "group", "poll-original", caption, listOf(attachment())),
+            )
+        }
+    }
+
+    /** Matching media cannot authorize replacing a caption whose meaningful content changed. */
+    @Test
+    fun matchingAttachmentsPreserveDifferentCaption() {
+        val engine =
+            nativeBoundary { method, _ ->
+                when (method) {
+                    "selectedMessageDraft" ->
+                        SelectedMessageDraftFfi(
+                            revision(),
+                            content(" newer caption ", attachments = listOf(descriptor())),
+                        )
+                    "messageDraftAttachmentIfRevision" -> byteArrayOf(1)
+                    else -> error("Changed content must not be saved: $method")
+                }
+            }
+        assertNull(engine.stageMediaReply("account", "group", "poll-original", "caption", listOf(attachment())))
+    }
+
+    /** A document picked before a photo keeps both native identities when the visual is sent first. */
+    @Test
+    fun reorderedAttachmentsKeepTheirNativeIds() {
+        val document = PendingAttachment(byteArrayOf(2), "text/plain", "proof.txt")
+        val image = attachment().copy(dim = "256x256", thumbhash = "image-hash")
+        assertAttachmentAdmission(
+            listOf("document" to document, "image" to image),
+            listOf(image, document),
+            listOf("image", "document"),
+        )
+    }
+
+    /** Identical files remain distinct occurrences; one selected identity cannot satisfy two picks. */
+    @Test
+    fun duplicateBytesConsumeDistinctNativeAttachments() {
+        val first = attachment()
+        val second = first.copy(plaintextBytes = byteArrayOf(2))
+        assertAttachmentAdmission(
+            listOf("first" to first, "second" to first),
+            listOf(first, first),
+            listOf("first", "second"),
+        )
+        assertAttachmentAdmission(listOf("first" to first, "second" to second), listOf(first, first), null)
+        assertAttachmentAdmission(listOf("same-id" to first, "same-id" to first), listOf(first, first), null)
+    }
+
+    /** Reordering cannot hide changed bytes, edited metadata, or extra/missing native selections. */
+    @Test
+    fun reorderedDraftPreservesChangedOrForeignAttachments() {
+        val document = PendingAttachment(byteArrayOf(2), "text/plain", "proof.txt")
+        val image = attachment().copy(dim = "256x256", thumbhash = "image-hash")
+        val selected = listOf("document" to document, "image" to image)
+        val changedImages =
+            listOf(
+                image.copy(plaintextBytes = byteArrayOf(9)),
+                image.copy(fileName = "replacement"),
+                image.copy(mediaType = "image/png"),
+                image.copy(dim = "128x128"),
+                image.copy(thumbhash = "edited-hash"),
+            )
+        for (changed in changedImages) assertAttachmentAdmission(selected, listOf(changed, document), null)
+        assertAttachmentAdmission(selected, listOf(image), null)
+        assertAttachmentAdmission(selected, listOf(image, document, document), null)
+    }
+
     /** A later reply selection is not consulted after upload; native receives the captured revision and token. */
     @Test
     fun mediaPublishUsesCapturedRevisionWithoutRereadingComposer() =
@@ -150,18 +246,66 @@ class MediaReplyDraftTest {
             assertFalse(calls.contains("selectedMessageDraft"))
         }
 
-    /** A selected file fixture uses its opaque native attachment identity. */
-    private fun descriptor() =
-        SelectedMessageDraftAttachmentFfi(
-            "id",
-            "pick",
-            "image/jpeg",
-            1uL,
-            null,
-            null,
-            null,
-            emptyList(),
-        )
+    /** Exercises the real admission seam with native staging order independent of outbound order. */
+    private fun assertAttachmentAdmission(
+        nativeAttachments: List<Pair<String, PendingAttachment>>,
+        outgoing: List<PendingAttachment>,
+        expectedIds: List<String>?,
+    ) {
+        val original = revision()
+        val saved = revision()
+        var submitted: List<MessageDraftAttachmentFfi>? = null
+        val engine =
+            nativeBoundary { method, args ->
+                when (method) {
+                    "selectedMessageDraft" ->
+                        SelectedMessageDraftFfi(
+                            original,
+                            content(
+                                "caption",
+                                attachments = nativeAttachments.map { (id, pick) -> descriptor(id, pick) },
+                            ),
+                        )
+                    "messageDraftAttachmentIfRevision" -> {
+                        assertSame(original, args[1])
+                        nativeAttachments.single { it.first == args[2] }.second.plaintextBytes
+                    }
+                    "saveMessageDraftIfRevision" -> {
+                        assertSame(original, args[1])
+                        assertEquals("caption", args[2])
+                        assertEquals("poll-original", args[3])
+                        submitted = (args[4] as List<*>).map { it as MessageDraftAttachmentFfi }
+                        SelectedMessageDraftFfi(saved, null)
+                    }
+                    else -> error(method)
+                }
+            }
+        val actual = engine.stageMediaReply("account", "group", "poll-original", "caption", outgoing)
+        assertSame(if (expectedIds == null) null else saved, actual)
+        assertEquals(expectedIds, submitted?.map { it.id })
+        submitted?.zip(outgoing)?.forEach { (native, pick) ->
+            assertTrue(native.plaintext.contentEquals(pick.plaintextBytes))
+            assertEquals(pick.fileName, native.fileName)
+            assertEquals(pick.mediaType, native.mediaType)
+            assertEquals(pick.dim, native.dim)
+            assertEquals(pick.thumbhash, native.thumbhash)
+        }
+    }
+
+    /** A selected file fixture uses its opaque native attachment identity and exact stored metadata. */
+    private fun descriptor(
+        id: String = "id",
+        pick: PendingAttachment = attachment(),
+    ) = SelectedMessageDraftAttachmentFfi(
+        id,
+        pick.fileName,
+        pick.mediaType,
+        pick.plaintextBytes.size.toULong(),
+        pick.dim,
+        pick.thumbhash,
+        null,
+        emptyList(),
+    )
 
     /** Minimal staged plaintext whose identity is compared using the selected revision. */
     private fun attachment() = PendingAttachment(byteArrayOf(1), "image/jpeg", "pick")
