@@ -80,6 +80,10 @@ messages. Include incoming and outgoing messages from different senders.
 - [ ] Lose the native timeline feed or exceed its retention budget during pause.
   Speech stops and discards the captured queue; Resume cannot submit stale text.
   A fresh playback start reloads authoritative content.
+- [ ] Switch accounts while speech is playing and while paused after an engine
+  failure. The old queue is discarded before activation; notification/headset
+  Resume and returning to the original account cannot revive it. A fresh start
+  on the replacement account speaks only its newly selected text.
 
 The process-owned auto-read subscription follows MDK's ordered window and pages
 through a missing tail instead of jumping past unseen messages. A native gap or

@@ -6472,6 +6472,8 @@ class WhiteNoiseAppState private constructor(
      */
     private fun clearCrossAccountCaches() {
         assertMainThread { "clearCrossAccountCaches" }
+        // Revoke decrypted speech before another identity can use platform Resume.
+        stopSpeaking()
         diagnostics.observations.invalidate()
         marmotRuntime?.marmot?.let { engine ->
             notificationScope.launch { diagnostics.activity(engine, ProductAnalyticsActivityFfi.ACCOUNT_CHANGED) }
