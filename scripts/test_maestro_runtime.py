@@ -866,6 +866,33 @@ class RuntimeEvidenceTest(unittest.TestCase):
             with self.subTest(source=path.name):
                 self.assertNotRegex(path.read_text(), r'\.\s*uiAutomation|\bgetUiAutomation\s*\(|\bUiDevice\b')
 
+    def test_generated_readiness_resets_a_failed_predecessors_orientation(self):
+        """A failed landscape journey must not silently change the next case's initial viewport."""
+        path = runtime.ROOT / '.maestro/fixtures/runtime-ready.yaml'
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        self.assertEqual(commands[0], {'setOrientation': 'PORTRAIT'})
+        self.assertIn({'runFlow': 'emulator-interruption.yaml'}, commands[1:])
+
+    def test_relay_lifecycle_requires_visible_real_rows_and_native_unchanged_lists(self):
+        """Lazy relay controls below publication warnings need scrolling, including in landscape."""
+        root = runtime.ROOT / '.maestro'
+        helper = list(yaml.safe_load_all((root / 'fixtures/assert-relays-list.yaml').read_text()))[1]
+        self.assertEqual(helper[0], {'assertVisible': 'Relays'})
+        scroll = helper[1]['scrollUntilVisible']
+        self.assertEqual(scroll['element'], {'id': r'^relays\.row\..+'})
+        self.assertEqual(scroll['direction'], 'DOWN')
+        self.assertEqual(scroll['timeout'], 15000)
+        self.assertEqual(helper[2], {'assertVisible': {'id': 'relays.group'}})
+        for name in ('lifecycle-advanced-relays-rotation', 'lifecycle-advanced-relays-warm-resume'):
+            commands = list(yaml.safe_load_all((root / 'runtime' / f'{name}.yaml').read_text()))[1]
+            proof = {'runFlow': '../fixtures/assert-relays-list.yaml'}
+            self.assertEqual(runtime.CASES[name]['postcondition'], 'relay-lists-unchanged')
+            self.assertEqual(commands.count(proof), 3 if name.endswith('rotation') else 2)
+            for index, command in enumerate(commands):
+                if 'setOrientation' in command or command == {'runFlow': '../fixtures/runtime-warm-resume.yaml'}:
+                    self.assertEqual(commands[index + 1], proof)
+            self.assertEqual(commands[-1], {'assertVisible': 'Settings'})
+
     def test_rotation_commands_use_supported_pinned_cli_orientations(self):
         """Reject flow parse failures before requesting an emulator; include every offline and runtime flow."""
         # https://docs.maestro.dev/reference/commands-available/setorientation

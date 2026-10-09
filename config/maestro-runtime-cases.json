@@ -2098,8 +2098,8 @@
         "SYS-001",
         "NAV-009"
       ],
-      "assertions": "advanced-relays actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
-      "postcondition": "none"
+      "assertions": "advanced-relays actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed. Bounded scrolling exposes a real relay row and its group in each viewport; native verification requires every generated identity's complete relay projection and the active owner to remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
     },
     "lifecycle-advanced-relays-warm-resume": {
       "suite": "settings-lifecycle",
@@ -2107,8 +2107,8 @@
         "SYS-001",
         "NAV-010"
       ],
-      "assertions": "advanced-relays actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
-      "postcondition": "none"
+      "assertions": "advanced-relays actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed. Bounded scrolling exposes a real relay row and its group in each viewport; native verification requires every generated identity's complete relay projection and the active owner to remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
     },
     "speech-apply-rounded-reopen": {
       "suite": "speech-persistence",

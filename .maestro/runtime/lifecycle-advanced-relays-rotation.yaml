@@ -10,13 +10,10 @@ name: lifecycle-advanced-relays-rotation
       text: Relays
     direction: DOWN
 - tapOn: Relays
-- assertVisible:
-    id: relays.group
+- runFlow: ../fixtures/assert-relays-list.yaml
 - setOrientation: LANDSCAPE_LEFT
-- assertVisible:
-    id: relays.group
+- runFlow: ../fixtures/assert-relays-list.yaml
 - setOrientation: PORTRAIT
-- assertVisible:
-    id: relays.group
+- runFlow: ../fixtures/assert-relays-list.yaml
 - back
 - assertVisible: Settings

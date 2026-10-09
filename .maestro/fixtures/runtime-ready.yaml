@@ -1,5 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 ---
+# A failed rotation in the preceding generated case must not change this case's baseline.
+- setOrientation: PORTRAIT
 - runFlow: emulator-interruption.yaml
 # Bound only initial consent/permission readiness; never retry the journey itself.
 - retry:

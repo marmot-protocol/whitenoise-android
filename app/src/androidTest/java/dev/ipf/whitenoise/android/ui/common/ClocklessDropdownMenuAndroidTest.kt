@@ -99,15 +99,18 @@ class ClocklessDropdownMenuAndroidTest {
         val selected = mutableStateOf(-1)
         val configuration = MenuConfiguration(appMenu, rows, actionSizedAnchor, controlLayer)
         val density = renderMenu(configuration, expanded, selected)
-        DropdownMenuWindowProbe.clickText("Open menu")
-        DropdownMenuWindowProbe.assertFirstRowPainted(density)
-        DropdownMenuWindowProbe.clickText("Choice 2")
-        DropdownMenuWindowProbe.waitForText("Open menu")
-        scenario.scenario.onActivity { assertEquals(2, selected.value) }
-        assertTrue(
-            "selection must dismiss the actual popup",
-            DropdownMenuWindowProbe.visibleText("Choice 2") == null,
-        )
+        repeat(2) {
+            scenario.scenario.onActivity { selected.value = -1 }
+            DropdownMenuWindowProbe.clickText("Open menu")
+            DropdownMenuWindowProbe.assertFirstRowPainted(density)
+            DropdownMenuWindowProbe.clickText("Choice 2")
+            DropdownMenuWindowProbe.waitForText("Open menu")
+            scenario.scenario.onActivity { assertEquals(2, selected.value) }
+            assertTrue(
+                "selection must dismiss the actual popup before reopening",
+                DropdownMenuWindowProbe.visibleText("Choice 2") == null,
+            )
+        }
     }
 
     private fun renderMenu(

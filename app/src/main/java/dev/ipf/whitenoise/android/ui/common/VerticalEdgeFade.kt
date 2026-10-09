@@ -85,12 +85,9 @@ internal fun Modifier.verticalEdgeFade(
     this
         .graphicsLayer {
             outsets = SCROLL_LAYER_OUTSETS
-            compositingStrategy =
-                if (topFade() > 0.dp || bottomFade() > 0.dp || bottomInset() > 0.dp) {
-                    CompositingStrategy.Offscreen
-                } else {
-                    CompositingStrategy.Auto
-                }
+            // Keep the mask's render target stable as animated edge bands reach or leave zero.
+            // Popup content must remain drawable through those transitions.
+            compositingStrategy = CompositingStrategy.Offscreen
         }.drawWithCache {
             val stops =
                 verticalEdgeFadeStops(

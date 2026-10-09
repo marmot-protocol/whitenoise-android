@@ -10,10 +10,8 @@ name: lifecycle-advanced-relays-warm-resume
       text: Relays
     direction: DOWN
 - tapOn: Relays
-- assertVisible:
-    id: relays.group
+- runFlow: ../fixtures/assert-relays-list.yaml
 - runFlow: ../fixtures/runtime-warm-resume.yaml
-- assertVisible:
-    id: relays.group
+- runFlow: ../fixtures/assert-relays-list.yaml
 - back
 - assertVisible: Settings
