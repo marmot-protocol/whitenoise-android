@@ -5,6 +5,7 @@ appId: dev.ipf.whitenoise.android.maestrolab
       text: '^After 15 minutes$'
     direction: DOWN
 - assertVisible:
-    text: '^After 15 minutes$'
     checked: true
+    containsChild:
+      text: '^After 15 minutes$'
 - assertVisible: Cancel

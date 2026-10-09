@@ -1501,6 +1501,24 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     states.append(node['checked'])
             self.assertEqual(states, expected)
 
+    def test_credential_helpers_check_the_actual_switch_and_radio_parent(self):
+        """Shared retry/reopen helpers must not reintroduce state checks on plain text labels."""
+        root = runtime.ROOT / '.maestro'
+        paths = list((root / 'fixtures').glob('*.yaml')) + list((root / 'runtime').glob('app-lock-*.yaml'))
+        checked = 0
+        for path in paths:
+            documents = list(yaml.safe_load_all(path.read_text()))
+            for command in documents[1]:
+                if not isinstance(command, dict):
+                    continue
+                for key in ('assertVisible', 'tapOn'):
+                    node = command.get(key)
+                    if isinstance(node, dict) and 'checked' in node:
+                        self.assertNotIn('text', node, path.name)
+                        self.assertTrue(node.get('containsChild', {}).get('text'), path.name)
+                        checked += 1
+        self.assertGreaterEqual(checked, 10)
+
     def test_public_key_copy_flows_use_acknowledged_real_controls_and_keep_private_key_hidden(self):
         """Regress copy/account/lifecycle routes without crediting the raw-key or external-share criteria."""
         names = ('keys-public-copy', 'keys-public-copy-rotation-return',
@@ -1627,6 +1645,66 @@ class RuntimeEvidenceTest(unittest.TestCase):
             self.assertNotIn('- tapOn: Share', text)
             self.assertIn('- assertNotVisible: Keep Your Private Key Safe', text)
             self.assertEqual(runtime.CASES['keys-raw-export-' + action]['postcondition'], 'accounts-retained')
+
+    def test_private_ui_diagnostics_are_discarded_even_when_cli_fails_or_times_out(self):
+        """A broken secure-window regression must not publish the revealed disposable secret."""
+        name = 'keys-private-reveal-hide-copy'
+        for outcome in ('pass', 'failure', 'timeout'):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                captures = []
+                def cli(arguments, **options):
+                    target = Path(arguments[arguments.index('--output') + 1]).parent
+                    captures.append(target)
+                    self.assertNotEqual(target, directory)
+                    (target / 'debug').mkdir()
+                    (target / 'debug/screenshot.png').write_bytes(b'synthetic-secret')
+                    options['stdout'].write('synthetic-secret')
+                    failed = outcome != 'pass'
+                    (target / 'junit.xml').write_text(
+                        f'<testsuite><testcase name="{name}" status="{("FAILURE" if failed else "SUCCESS")}" '
+                        f'time="2.5" secret="synthetic-secret">'
+                        + ('<failure message="synthetic-secret">synthetic-secret</failure>' if failed else '')
+                        + '<system-out>synthetic-secret</system-out></testcase></testsuite>')
+                    if outcome == 'timeout':
+                        raise subprocess.TimeoutExpired(arguments, 120)
+                    return subprocess.CompletedProcess(arguments, int(failed))
+                with patch.object(runtime.subprocess, 'run', side_effect=cli):
+                    if outcome == 'timeout':
+                        with self.assertRaises(subprocess.TimeoutExpired):
+                            runtime.run_ui(name, directory)
+                    else:
+                        self.assertEqual(runtime.run_ui(name, directory).returncode, int(outcome == 'failure'))
+                self.assertTrue(captures)
+                self.assertFalse(captures[0].exists())
+                self.assertEqual([p.name for p in directory.iterdir()], ['junit.xml'])
+                self.assertNotIn('synthetic-secret', (directory / 'junit.xml').read_text())
+                if outcome == 'pass':
+                    self.assertEqual(runtime.ui_result(directory / 'junit.xml', name), 2.5)
+                else:
+                    with self.assertRaises(ValueError):
+                        runtime.ui_result(directory / 'junit.xml', name)
+
+    def test_private_ui_report_preserves_invalid_or_missing_results_as_failures(self):
+        """Redaction cannot manufacture a passed case from absent, duplicate, foreign or invalid XML."""
+        name = 'keys-private-reveal-hide-copy'
+        records = ['<testsuite/>',
+                   '<testsuite><testcase name="foreign" status="SUCCESS"/></testsuite>',
+                   f'<testsuite><testcase name="{name}" status="SUCCESS" time="NaN"/></testsuite>',
+                   f'<testsuite><testcase name="{name}" status="SUCCESS"><skipped/></testcase></testsuite>',
+                   '<testsuite>' + f'<testcase name="{name}" status="SUCCESS"/>' * 2 + '</testsuite>']
+        with tempfile.TemporaryDirectory() as temporary:
+            source, destination = Path(temporary) / 'source.xml', Path(temporary) / 'result.xml'
+            runtime.private_ui_result(source, destination, name)
+            self.assertFalse(destination.exists())
+            for text in records:
+                source.write_text(text)
+                runtime.private_ui_result(source, destination, name)
+                with self.assertRaises(ValueError):
+                    runtime.ui_result(destination, name)
+            source.write_text('not XML')
+            with self.assertRaises(ET.ParseError):
+                runtime.private_ui_result(source, destination, name)
 
     def test_private_key_verifier_keeps_secret_values_out_of_native_evidence(self):
         """A raw-key assertion must not introduce a logging/output route or value-printing comparison."""

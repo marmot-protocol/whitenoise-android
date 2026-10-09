@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import time
 import uuid
 import xml.etree.ElementTree as ET
@@ -225,8 +226,46 @@ def run_fixture(name, directory, generation):
     return record
 
 
+def private_ui_result(source, destination, name):
+    """Retain actual case count/status/time and failure markers without raw UI diagnostics."""
+    if not source.exists():
+        return
+    if source.stat().st_size > 1_048_576:
+        raise ValueError('Private UI report exceeds its bound')
+    original = list(ET.parse(source).getroot().iter('testcase'))
+    report = ET.Element('testsuite')
+    for case in original:
+        seconds = case.get('time', '0')
+        try:
+            valid_time = math.isfinite(float(seconds)) and float(seconds) >= 0
+        except ValueError:
+            valid_time = False
+        status = case.get('status')
+        safe = ET.SubElement(report, 'testcase', {
+            'name': name if case.get('name') == name else 'Unexpected private UI case',
+            'status': status if status in ('SUCCESS', 'FAILURE', 'ERROR', 'SKIPPED') else 'INVALID',
+            'time': seconds if valid_time else 'INVALID',
+        })
+        for child in case:
+            if child.tag in ('failure', 'error', 'skipped'):
+                ET.SubElement(safe, child.tag).text = 'Private UI diagnostic withheld'
+    ET.ElementTree(report).write(destination, encoding='utf-8', xml_declaration=True)
+
+
 def run_ui(name, directory):
-    """Retain bounded CLI stdout and stderr, including parse failures that produce no JUnit."""
+    """Run once; private-key UI captures stay temporary even on failure or timeout."""
+    if CASES[name]['postcondition'].startswith('private-key-copy-'):
+        with tempfile.TemporaryDirectory(prefix='maestro-private-ui-') as temporary:
+            private = Path(temporary)
+            try:
+                return invoke_ui(name, private)
+            finally:
+                private_ui_result(private / 'junit.xml', directory / 'junit.xml', name)
+    return invoke_ui(name, directory)
+
+
+def invoke_ui(name, directory):
+    """Bound the real CLI, including parse errors which produce no JUnit."""
     navigation = os.environ.get('MAESTRO_NAVIGATION_MODE', 'button')
     if navigation not in ('button', 'gesture'):
         raise ValueError('Qualified navigation mode required')

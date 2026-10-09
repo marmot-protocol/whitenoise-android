@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
+import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.createPendingShareRequestStore

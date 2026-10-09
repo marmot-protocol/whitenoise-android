@@ -10,9 +10,10 @@ appId: dev.ipf.whitenoise.android.maestrolab
       text: '(?s).*Require device authentication.*'
     direction: UP
 - assertVisible:
-    text: '(?s).*Require device authentication.*'
     enabled: true
     checked: true
+    containsChild:
+      text: '(?s).*Require device authentication.*'
 - assertVisible: Auto-lock
 - tapOn: Back
 - assertVisible: Settings
