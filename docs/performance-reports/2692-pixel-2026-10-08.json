@@ -409,7 +409,18 @@
     "reviewed_budget_provenance",
     "before_after_attribution"
   ],
-  "canonical_timeline_after_foreground_reopen": {
+  "reconnect_attempt": {
+    "qualified": false,
+    "completed_captures": 0,
+    "queued_distinct_bodies": 5,
+    "failure": "worker stopped at collector invocation; no collector PID or usable trace, completion marker absent",
+    "cleanup_verified": {
+      "airplane_disabled": true,
+      "wifi_enabled": true,
+      "shell_partial_wakelock_held": false
+    }
+  },
+  "intermediate_36_body_timeline_readback": {
     "expected_sent_distinct_bodies": 36,
     "canonical_timeline_delivered_distinct_bodies": 36,
     "canonical_timeline_missing_distinct_bodies": 0,
@@ -424,15 +435,46 @@
     "history_start_reached": true,
     "raw_database_count_available": false
   },
-  "reconnect_attempt": {
-    "qualified": false,
-    "completed_captures": 0,
-    "queued_distinct_bodies": 5,
-    "failure": "worker stopped at collector invocation; no collector PID or usable trace, completion marker absent",
-    "cleanup_verified": {
-      "airplane_disabled": true,
-      "wifi_enabled": true,
-      "shell_partial_wakelock_held": false
+  "final_44_body_timeline_readback": {
+    "expected_sent_distinct_bodies": 44,
+    "canonical_timeline_delivered_distinct_bodies": 44,
+    "canonical_timeline_missing_distinct_bodies": 0,
+    "canonical_timeline_duplicate_ids": 0,
+    "canonical_fifth_burst_counts": [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "history_start_reached": true,
+    "raw_database_count_available": false,
+    "foreground_open_before_observation": true
+  },
+  "usb_functional_checks": [
+    {
+      "row": "force_stop_explicit_reopen",
+      "mode": "push",
+      "usb_powered_functional_only": true,
+      "stopped_before_reopen": true,
+      "unstopped_after_reopen": true,
+      "fresh_post_within_60s": true
+    },
+    {
+      "row": "force_stop_explicit_reopen",
+      "mode": "local",
+      "usb_powered_functional_only": true,
+      "stopped_before_reopen": true,
+      "unstopped_after_reopen": true,
+      "fresh_post_within_60s": true
+    },
+    {
+      "row": "permission_restored",
+      "mode": "push",
+      "usb_powered_functional_only": true,
+      "fresh_post_within_60s": true,
+      "permission_loss_settings_capture_only": true
     }
-  }
+  ],
+  "original_sample_report": "../performance-data/background-battery-pixel-2026-10-08.json"
 }

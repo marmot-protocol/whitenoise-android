@@ -16,7 +16,6 @@
       ],
       "observed_trace_seconds": 59.861882,
       "fixture_cpu_ms": null,
-      "fixture_process_count": 0,
       "cpu_rails_j": 4.350885,
       "network_rails_j": 7.43352,
       "memory_rails_j": 3.616304,
@@ -50,7 +49,8 @@
       "wake_lock_ms": null,
       "service_ownership_ms": null,
       "recovery_attempts": null,
-      "native_fcm_transport_proven": false
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 0
     },
     {
       "scenario": "push_idle",
@@ -61,7 +61,6 @@
       ],
       "observed_trace_seconds": 59.878837,
       "fixture_cpu_ms": 299.486333,
-      "fixture_process_count": 1,
       "cpu_rails_j": 4.43831,
       "network_rails_j": 7.068616,
       "memory_rails_j": 3.630595,
@@ -95,7 +94,8 @@
       "wake_lock_ms": null,
       "service_ownership_ms": null,
       "recovery_attempts": null,
-      "native_fcm_transport_proven": false
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 1
     },
     {
       "scenario": "local_idle",
@@ -106,7 +106,6 @@
       ],
       "observed_trace_seconds": 59.887815,
       "fixture_cpu_ms": 660.965784,
-      "fixture_process_count": 1,
       "cpu_rails_j": 4.184388,
       "network_rails_j": 7.084949,
       "memory_rails_j": 3.547351,
@@ -140,7 +139,8 @@
       "wake_lock_ms": null,
       "service_ownership_ms": null,
       "recovery_attempts": null,
-      "native_fcm_transport_proven": false
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 1
     },
     {
       "scenario": "reconnect",
@@ -151,7 +151,6 @@
       ],
       "observed_trace_seconds": 59.848248,
       "fixture_cpu_ms": 872.05755,
-      "fixture_process_count": 1,
       "cpu_rails_j": 21.914837,
       "network_rails_j": 19.377865,
       "memory_rails_j": 7.399937,
@@ -204,7 +203,8 @@
       "wake_lock_ms": null,
       "service_ownership_ms": null,
       "recovery_attempts": null,
-      "native_fcm_transport_proven": false
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 1
     },
     {
       "scenario": "push_burst",
@@ -216,7 +216,6 @@
       ],
       "observed_trace_seconds": 59.879308,
       "fixture_cpu_ms": 2781.142647,
-      "fixture_process_count": 1,
       "cpu_rails_j": 5.841398,
       "network_rails_j": 8.621257,
       "memory_rails_j": 4.023368,
@@ -283,7 +282,8 @@
       "wake_lock_ms": null,
       "service_ownership_ms": null,
       "recovery_attempts": null,
-      "native_fcm_transport_proven": false
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 1
     },
     {
       "scenario": "local_burst",
@@ -324,5 +324,6 @@
     "fixture_original_local_mode_verified": true,
     "owned_sender_emulator_stopped_data_retained": true,
     "uninstall_or_data_clear_performed": false
-  }
+  },
+  "fixture_cpu_query_count_scope": "process entries with cpu_cycles_per_process rows; not continuous process presence"
 }
