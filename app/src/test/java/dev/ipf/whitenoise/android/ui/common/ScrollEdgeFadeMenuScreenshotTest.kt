@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -143,6 +145,7 @@ class ScrollEdgeFadeMenuScreenshotTest {
         rule.waitForIdle()
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     private fun render(
         actionSizedAnchor: Boolean = false,
         options: MenuOptions = MenuOptions(),
@@ -155,7 +158,11 @@ class ScrollEdgeFadeMenuScreenshotTest {
                     Box(Modifier.fillMaxSize()) {
                         if (actionSizedAnchor) {
                             Box {
-                                Button(onClick = { expanded.value = true }) { Text("Open menu") }
+                                // The anchor is a fixture; its native ripple must not race popup goldens.
+                                // Keep the actual menu outside this provider so its rendering stays tested.
+                                CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                                    Button(onClick = { expanded.value = true }) { Text("Open menu") }
+                                }
                                 MenuContent()
                             }
                         } else {
