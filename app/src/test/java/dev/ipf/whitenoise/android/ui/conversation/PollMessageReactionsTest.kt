@@ -59,6 +59,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
         composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").performClick()
+        composeRule.waitUntil { composeRule.onAllNodesWithText("Tap to remove").fetchSemanticsNodes().size == 1 }
         composeRule.onNodeWithText("Tap to remove").performClick()
         advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "deleteMessage" } }

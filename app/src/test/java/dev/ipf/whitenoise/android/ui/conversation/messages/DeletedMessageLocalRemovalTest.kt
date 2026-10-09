@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -41,6 +42,7 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUserReactionFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -63,6 +65,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.lang.reflect.Proxy
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -181,7 +184,9 @@ class DeletedMessageLocalRemovalTest {
             }
         composeRule.onNode(viewReactorsAction, useUnmergedTree = true).performClick()
         val reactionFilterAll = "${string(R.string.reaction_filter_all)} · 1"
-        composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsSelected()
+        composeRule.waitUntil(timeoutMillis = ASYNC_TIMEOUT_MILLIS) {
+            runCatching { composeRule.onNodeWithText(reactionFilterAll, substring = false).assertIsSelected() }.isSuccess
+        }
         composeRule.onNodeWithText("👍 1", substring = false).assertIsDisplayed()
 
         composeRule.mainClock.autoAdvance = false
@@ -416,7 +421,7 @@ class DeletedMessageLocalRemovalTest {
         collapseLongMessages: Boolean = false,
         reactions: TimelineReactionSummaryFfi = emptyReactionSummary(),
     ): LiveTestSurface {
-        val appState = appState(backingPreferences)
+        val appState = appState(backingPreferences, reactions.userReactions)
         val controller = ConversationController(appState = appState, initialGroup = group())
         val projected = messageRecord(body = body, deleted = false, reactions = reactions)
         val item =
@@ -486,7 +491,11 @@ class DeletedMessageLocalRemovalTest {
         return LiveTestSurface { composeRule.runOnUiThread { markDeleted() } }
     }
 
-    private fun appState(preferences: SharedPreferences) =
+    /** Creates a state fixture, optionally serving complete canonical reactions for the live details check. */
+    private fun appState(
+        preferences: SharedPreferences,
+        reactions: List<TimelineUserReactionFfi>? = null,
+    ) =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore(EmptyDraftPersistence()),
@@ -507,7 +516,20 @@ class DeletedMessageLocalRemovalTest {
             profileDisplayNameReader = { null },
             profileRefreshRequest = {},
             preferences = preferences,
+            initialMarmotRuntime = reactions?.let(::reactionRuntime),
         )
+
+    /** Supplies the canonical read for reactor UI tests without opening a native runtime. */
+    private fun reactionRuntime(reactions: List<TimelineUserReactionFfi>): AppMarmotRuntime {
+        val native =
+            Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { _, method, _ ->
+                when (method.name.substringBefore('-')) {
+                    "messageReactions" -> reactions
+                    else -> null
+                }
+            } as MarmotInterface
+        return AppMarmotRuntime("reaction-details", native)
+    }
 
     private fun integrationAppState(
         accountRef: String,

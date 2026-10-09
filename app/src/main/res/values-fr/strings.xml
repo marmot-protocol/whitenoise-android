@@ -2294,4 +2294,6 @@
         <item quantity="one">%1$d pièce jointe en cours de téléchargement</item>
         <item quantity="other">%1$d pièces jointes en cours de téléchargement</item>
     </plurals>
+    <string name="reaction_details_loading">Chargement des réactions…</string>
+    <string name="reaction_details_load_failed">Impossible de charger les réactions.</string>
 </resources>

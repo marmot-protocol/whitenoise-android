@@ -2366,4 +2366,6 @@
         <item quantity="many">Загружается %1$d вложений</item>
         <item quantity="other">Загружается %1$d вложения</item>
     </plurals>
+    <string name="reaction_details_loading">Загрузка реакций…</string>
+    <string name="reaction_details_load_failed">Не удалось загрузить реакции.</string>
 </resources>

@@ -13591,48 +13591,30 @@ class ConversationController(
         )
     }
 
-    /** Who reacted to one message; in window mode MDK's bounded reactor preview plus the viewer's pending changes. */
-    fun reactionParticipantsFor(targetMessageId: String): List<ReactionParticipant> {
-        val mine = conversationAccountIdHex
-        val changes = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId }
-        window.references(targetMessageId)?.let { return windowReactionParticipants(it.reactions, mine, changes) }
+    /** Reads and maps a complete canonical reaction snapshot off the UI thread for this conversation. */
+    internal suspend fun loadReactionParticipants(targetMessageId: String): List<ReactionParticipant> {
+        val account = requireNotNull(conversationAccountRef)
+        check(acceptsConversationActionOwner(account, group.groupIdHex))
         val participants =
-            timelineRecords[targetMessageId]
-                ?.reactions
-                ?.userReactions
-                ?.map {
-                    ReactionParticipant(
-                        sender = it.sender,
-                        emoji = it.emoji,
-                        reactedAt = it.reactedAt,
-                    )
-                }?.toMutableList() ?: mutableListOf()
-
-        if (mine != null) {
-            optimisticReactionChanges.values
-                .filter { it.targetMessageId == targetMessageId }
-                .forEach { change ->
-                    participants.removeAll {
-                        it.sender.equals(mine, ignoreCase = true) && it.emoji == change.emoji
-                    }
-                    if (change.add) {
-                        participants +=
-                            ReactionParticipant(
-                                sender = mine,
-                                emoji = change.emoji,
-                                reactedAt = nowSeconds(),
-                            )
-                    }
-                }
-        }
-
-        return participants.sortedWith(
-            compareBy<ReactionParticipant> { !it.sender.equals(mine, ignoreCase = true) }
-                .thenBy { it.reactedAt }
-                .thenBy { it.sender.lowercase() }
-                .thenBy { it.emoji },
-        )
+            appState.marmotIo {
+                messageReactions(account, group.groupIdHex, targetMessageId)
+                    .map { ReactionParticipant(sender = it.sender, emoji = it.emoji, reactedAt = it.reactedAt) }
+            }
+        check(acceptsConversationActionOwner(account, group.groupIdHex))
+        return participants
     }
+
+    /** Overlays pending own mutations onto a complete snapshot; never expands the chip preview. */
+    internal fun reactionParticipantsFor(
+        targetMessageId: String,
+        confirmed: List<ReactionParticipant>,
+    ): List<ReactionParticipant> =
+        reactionDetailsParticipants(
+            confirmed = confirmed,
+            mine = conversationAccountIdHex,
+            changes = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId },
+            now = nowSeconds(),
+        )
 
     private fun baseReactionSenders(): LinkedHashMap<String, LinkedHashMap<String, MutableSet<String>>> {
         val result = linkedMapOf<String, LinkedHashMap<String, MutableSet<String>>>()

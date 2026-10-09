@@ -2292,4 +2292,6 @@
         <item quantity="one">%1$d ek indiriliyor</item>
         <item quantity="other">%1$d ek indiriliyor</item>
     </plurals>
+    <string name="reaction_details_loading">Tepkiler yükleniyor…</string>
+    <string name="reaction_details_load_failed">Tepkiler yüklenemedi.</string>
 </resources>

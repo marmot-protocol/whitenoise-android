@@ -12,11 +12,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -81,6 +83,15 @@ internal fun Modifier.reactionSummaryAttachment(outgoing: Boolean): Modifier =
         }
     }
 
+/** Transient read status and retry action for an already scoped complete-reaction sheet. */
+internal data class ReactionDetailsReadState(
+    val loading: Boolean = false,
+    val failed: Boolean = false,
+    val hasSnapshot: Boolean = true,
+    val viewerAccountId: String? = null,
+    val onRetry: () -> Unit = {},
+)
+
 /** Shows every reactor and always starts on the All filter. */
 @Composable
 internal fun ReactionDetailsSheet(
@@ -88,6 +99,7 @@ internal fun ReactionDetailsSheet(
     appState: WhiteNoiseAppState,
     onRemoveOwnReaction: ((String) -> Unit)?,
     onDismissRequest: () -> Unit,
+    readState: ReactionDetailsReadState = ReactionDetailsReadState(viewerAccountId = appState.activeAccount?.accountIdHex),
 ) {
     KeyboardSafePopup(
         expanded = true,
@@ -98,24 +110,25 @@ internal fun ReactionDetailsSheet(
             participants = participants,
             appState = appState,
             onRemoveOwnReaction = onRemoveOwnReaction,
+            readState = readState,
         )
     }
 }
 
-/** Renders the stateful reactor filters and rows independently of the popup window that owns them. */
+/** Renders complete reactor snapshots, preserving filters during refresh and offering Retry after failed reads. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun ReactionDetailsContent(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
     onRemoveOwnReaction: ((String) -> Unit)?,
+    readState: ReactionDetailsReadState = ReactionDetailsReadState(viewerAccountId = appState.activeAccount?.accountIdHex),
 ) {
     var selectedEmoji by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(participants, selectedEmoji) {
         val retainedFilter = retainedReactionFilter(selectedEmoji, participants)
         if (retainedFilter != selectedEmoji) selectedEmoji = retainedFilter
     }
-    val activeAccountId = appState.activeAccount?.accountIdHex
     val emojiCounts = remember(participants) { reactionEmojiCounts(participants) }
     val visibleParticipants =
         remember(participants, selectedEmoji) { filteredReactionParticipants(participants, selectedEmoji) }
@@ -133,34 +146,68 @@ internal fun ReactionDetailsContent(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            ReactionFilterChips(
-                selectedEmoji = selectedEmoji,
-                emojiCounts = emojiCounts,
-                participantCount = participants.size,
-                onSelectedEmoji = { selectedEmoji = it },
-            )
-            WhiteNoiseLazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
-            ) {
-                items(
-                    visibleParticipants,
-                    key = { participant -> "${participant.sender}:${participant.emoji}:${participant.reactedAt}" },
-                ) { participant ->
-                    val isMine = activeAccountId != null && participant.sender.equals(activeAccountId, ignoreCase = true)
-                    ReactionParticipantRow(
-                        participant = participant,
-                        appState = appState,
-                        mine = isMine,
-                        onRemove =
-                            if (isMine && onRemoveOwnReaction != null) {
-                                { onRemoveOwnReaction(participant.emoji) }
-                            } else {
-                                null
-                            },
-                    )
-                }
+            ReactionDetailsReadStatus(readState.loading, readState.failed, readState.hasSnapshot, readState.onRetry)
+            if (readState.hasSnapshot) {
+                ReactionFilterChips(
+                    selectedEmoji = selectedEmoji,
+                    emojiCounts = emojiCounts,
+                    participantCount = participants.size,
+                    onSelectedEmoji = { selectedEmoji = it },
+                )
             }
+            ReactionParticipantList(visibleParticipants, appState, readState.viewerAccountId, onRemoveOwnReaction)
         }
+    }
+}
+
+/** Keeps stable user/emoji row identities across complete-snapshot refreshes. */
+@Composable
+@Suppress("FunctionNaming")
+private fun ReactionParticipantList(
+    participants: List<ReactionParticipant>,
+    appState: WhiteNoiseAppState,
+    viewerAccountId: String?,
+    onRemoveOwnReaction: ((String) -> Unit)?,
+) {
+    WhiteNoiseLazyColumn(
+        modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+    ) {
+        items(
+            participants,
+            key = { participant -> "${participant.sender.lowercase()}:${participant.emoji}" },
+        ) { participant ->
+            val isMine = viewerAccountId?.equals(participant.sender, ignoreCase = true) == true
+            ReactionParticipantRow(
+                participant = participant,
+                appState = appState,
+                mine = isMine,
+                onRemove =
+                    if (isMine && onRemoveOwnReaction != null) {
+                        { onRemoveOwnReaction(participant.emoji) }
+                    } else {
+                        null
+                    },
+            )
+        }
+    }
+}
+
+/** Distinguishes an unfinished or failed local read from a successfully empty participant list. */
+@Composable
+@Suppress("FunctionNaming")
+private fun ReactionDetailsReadStatus(
+    loading: Boolean,
+    failed: Boolean,
+    hasSnapshot: Boolean,
+    onRetry: () -> Unit,
+) {
+    if (loading) {
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (!hasSnapshot) Text(stringResource(R.string.reaction_details_loading))
+    }
+    if (failed) {
+        Text(stringResource(R.string.reaction_details_load_failed))
+        TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
     }
 }
 

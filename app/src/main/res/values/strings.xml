@@ -2453,4 +2453,6 @@
         <item quantity="one">%1$d attachment downloading</item>
         <item quantity="other">%1$d attachments downloading</item>
     </plurals>
+    <string name="reaction_details_loading">Loading reactions…</string>
+    <string name="reaction_details_load_failed">Couldn\'t load reactions.</string>
 </resources>

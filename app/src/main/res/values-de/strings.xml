@@ -2311,4 +2311,6 @@
         <item quantity="one">%1$d Anhang wird geladen</item>
         <item quantity="other">%1$d Anhänge werden geladen</item>
     </plurals>
+    <string name="reaction_details_loading">Reaktionen werden geladen…</string>
+    <string name="reaction_details_load_failed">Reaktionen konnten nicht geladen werden.</string>
 </resources>

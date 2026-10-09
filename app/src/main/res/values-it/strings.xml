@@ -2294,4 +2294,6 @@
         <item quantity="one">%1$d allegato in download</item>
         <item quantity="other">%1$d allegati in download</item>
     </plurals>
+    <string name="reaction_details_loading">Caricamento delle reazioni…</string>
+    <string name="reaction_details_load_failed">Impossibile caricare le reazioni.</string>
 </resources>

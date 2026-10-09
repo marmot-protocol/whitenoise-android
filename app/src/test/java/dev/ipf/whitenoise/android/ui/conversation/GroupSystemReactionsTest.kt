@@ -156,6 +156,7 @@ class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
         composeRule
             .onNodeWithTag("$REACTION_PILL_TEST_TAG:0")
             .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        composeRule.waitUntil { composeRule.onAllNodesWithText("Tap to remove").fetchSemanticsNodes().size == 1 }
         composeRule.onNodeWithText("Tap to remove").performClick()
         composeRule.onNodeWithText("Tap to remove").assertDoesNotExist()
         assertTrue(recordedCalls().none { it.first == "deleteMessage" })

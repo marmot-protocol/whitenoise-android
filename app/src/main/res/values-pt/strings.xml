@@ -2294,4 +2294,6 @@
         <item quantity="one">Baixando %1$d anexo</item>
         <item quantity="other">Baixando %1$d anexos</item>
     </plurals>
+    <string name="reaction_details_loading">Carregando reações…</string>
+    <string name="reaction_details_load_failed">Não foi possível carregar as reações.</string>
 </resources>

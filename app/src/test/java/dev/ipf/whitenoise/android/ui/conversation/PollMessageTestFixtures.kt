@@ -18,6 +18,7 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.TimelineUserReactionFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -45,6 +46,9 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
 
     /** Answers `pollVotes` with the fixture's scripted per-voter page; the default is an empty page. */
     protected var pollVotesResponder: (List<Any?>) -> PollVotePageFfi = { PollVotePageFfi(emptyList(), false) }
+
+    /** Complete exact-message reactions returned by the native read, independently of chip previews. */
+    protected var reactionDetailsResponder: (List<Any?>) -> List<TimelineUserReactionFfi> = { emptyList() }
 
     /** The controller's wall clock, so disappearing-message deadlines can be crossed deterministically. */
     protected var pollClockMillis: Long = 1_000_000_000_000L
@@ -119,6 +123,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                             LocalSendAcceptanceFfi(args.orEmpty()[4] as String, "bb".repeat(32))
                         "subscribeEvents" -> queuedEventsSubscription()
                         "pollVotes" -> pollVotesResponder(args.orEmpty().toList())
+                        "messageReactions" -> reactionDetailsResponder(args.orEmpty().toList())
                         "parseMarkdown" -> markdown(args.orEmpty().first() as String)
                         "messages" -> emptyList<dev.ipf.marmotkit.AppMessageRecordFfi>()
                         else -> null
