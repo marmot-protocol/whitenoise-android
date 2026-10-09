@@ -193,8 +193,13 @@ internal fun MarkdownTimestampText(
     val ranges = remember(text) { text.getStringAnnotations(TIMESTAMP_TAG, 0, text.length) }
     var layout by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
     var hovered by remember(text) { mutableStateOf<String?>(null) }
-    var tapped by remember(text) { mutableStateOf<String?>(null) }
+    var tapped by remember { mutableStateOf<String?>(null) }
     var hoverPosition by remember(text) { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(ranges) {
+        if (ranges.none { it.item == tapped }) {
+            tapped = null
+        }
+    }
     val clockContent =
         remember(ranges) {
             ranges.associate { range ->
