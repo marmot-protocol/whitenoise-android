@@ -3,11 +3,9 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.ChatDepartureStage
@@ -57,10 +55,9 @@ class ChatDepartureStatusScreenshotTest {
             )
         composeRule.setContent {
             CompositionLocalProvider(
-                LocalDensity provides Density(1f, scale),
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
                     WhiteNoiseAlertDialog(
                         {},
                         confirmButton = { TextButton({}) { Text("Retry") } },

@@ -8,7 +8,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
@@ -16,7 +15,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.SecureFlagPolicy
@@ -56,10 +54,9 @@ class ContactPrivateDetailsViewportScreenshotTest {
         var saved = 0
         composeRule.setContent {
             CompositionLocalProvider(
-                LocalDensity provides Density(1f, scale),
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
                     ContactPrivateDetailsFrame(
                         SecureFlagPolicy.SecureOff,
                         {},
