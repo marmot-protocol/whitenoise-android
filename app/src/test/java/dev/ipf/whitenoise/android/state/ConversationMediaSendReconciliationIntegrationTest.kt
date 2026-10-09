@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
 import java.lang.reflect.Proxy
 import java.time.Duration
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,6 +65,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -1146,7 +1148,7 @@ class ConversationVoiceReplyRetryTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     fun failedVoiceReplySettlesReviewAfterBubbleRetry() =
         runTest {
-            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
             val calls = mutableListOf<String>()
             val target = "e1".repeat(32)
@@ -1161,28 +1163,24 @@ class ConversationVoiceReplyRetryTest {
             val controller = voiceRetryController(state)
             val sender = ConversationMediaSender(state, controller, ApplicationProvider.getApplicationContext()) {}
             val rejected = CompletableDeferred<Unit>()
-            val review =
-                VoiceRecordingReview(
-                    this,
-                    { true },
-                    { file, duration, guard, complete ->
-                        sender.sendVoiceAttachment(file, duration, guard) { accepted ->
-                            complete(accepted)
-                            if (!accepted) rejected.complete(Unit)
-                        }
-                    },
-                )
+            val review = voiceRetryReview(this, sender, rejected)
             val recording =
                 java.io.File.createTempFile("voice-reply", ".m4a").apply { writeBytes(byteArrayOf(1, 2, 3)) }
             try {
                 controller.retryMembers()
+                assertTrue("The fixture must admit media before testing upload Retry", controller.canSendMessages)
                 controller.replyingTo =
                     TimelineProjector.toAppMessageRecord(projectedMediaMessage(1uL, reference))
                         .copy(messageIdHex = target)
                 review.offer(recording, 1_000L)
                 val clip = checkNotNull(review.clip)
-                review.send(clip)
+                assertTrue(review.send(clip))
                 rejected.await()
+                assertEquals("Expected rejection at upload, native calls: $calls", 1, uploads)
+                assertTrue(
+                    "The reply must be staged before upload failure",
+                    calls.contains("saveMessageDraftIfRevision"),
+                )
                 assertTrue(review.clip === clip)
                 assertTrue(recording.exists())
                 val failed = controller.timeline.single()
@@ -1208,5 +1206,23 @@ private fun voiceRetryController(state: WhiteNoiseAppState) =
         initialGroup = group(),
         initialMemberSnapshot = memberSnapshot(),
         groupRosterReader = { _, _ -> authoritativeRoster() },
+        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
         markdownParser = { emptyMarkdownDocument() },
+    )
+
+/** Signals the failed attempt only after the real review owner has retained its original recording. */
+private fun voiceRetryReview(
+    scope: CoroutineScope,
+    sender: ConversationMediaSender,
+    rejected: CompletableDeferred<Unit>,
+) =
+    VoiceRecordingReview(
+        scope = scope,
+        ownerIsCurrent = { true },
+        send = { file, duration, guard, complete ->
+            sender.sendVoiceAttachment(file, duration, guard) { accepted ->
+                complete(accepted)
+                if (!accepted) rejected.complete(Unit)
+            }
+        },
     )

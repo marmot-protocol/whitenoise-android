@@ -6,13 +6,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.printToString
 import dev.ipf.marmotkit.TimelineUserReactionFfi
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_REACTION_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
@@ -71,12 +75,12 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
                 ),
             )
         }
-        composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").performClick()
+        // Exercise the pill's action contract independently of the retiring menu and chip entry animation.
+        composeRule
+            .onNodeWithTag("$REACTION_PILL_TEST_TAG:0")
+            .performSemanticsAction(SemanticsActions.OnClick) { it() }
         // Canonical details now load on IO; settle its continuation as well as the Compose frame.
-        composeRule.waitUntil(5_000) {
-            shadowOf(Looper.getMainLooper()).idle()
-            composeRule.onAllNodesWithText("Tap to remove").fetchSemanticsNodes().size == 1
-        }
+        awaitOwnReactionRow(item.record.messageIdHex)
         composeRule.onNodeWithText("Tap to remove").performClick()
         advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "deleteMessage" } }
@@ -206,6 +210,28 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             assertTrue(pollController.reactions[item.record.messageIdHex].isNullOrEmpty())
             assertTrue(recordedCalls().none { it.first == "reactToMessage" })
         }
+
+    /** Reports the native-read and poll-admission state if the complete-details row does not appear. */
+    private fun awaitOwnReactionRow(messageId: String) {
+        try {
+            composeRule.waitUntil(5_000) {
+                shadowOf(Looper.getMainLooper()).idle()
+                composeRule.onAllNodesWithText("Tap to remove").fetchSemanticsNodes().size == 1
+            }
+        } catch (failure: ComposeTimeoutException) {
+            val owner = PollMessageActionOwner("personal", pollController.group.groupIdHex, messageId)
+            val admission =
+                composeRule.runOnIdle {
+                    "canSend=${pollController.canSendMessages}, target=${currentPollActionTarget(pollController, owner)}"
+                }
+            val roots = composeRule.onAllNodes(isRoot(), useUnmergedTree = true)
+            val semantics = roots.fetchSemanticsNodes().indices.joinToString("\n") { roots[it].printToString() }
+            throw AssertionError(
+                "Reaction details did not show own removal. $admission\nNative calls: ${recordedCalls()}\n$semantics",
+                failure,
+            )
+        }
+    }
 
     private fun assertQueuedReactionDiscarded(target: String) {
         advanceReactionQuietPeriod()
