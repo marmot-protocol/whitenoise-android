@@ -1,0 +1,329 @@
+{
+  "source_sha": "202abaa5b1c20059cf24c2b3d08c340afab15fa8",
+  "samples_per_scenario": 1,
+  "energy_scope": "system_wide_hardware_rails",
+  "app_cpu_scope": "disposable_profile_uid",
+  "budgets_reviewed": false,
+  "tracker_complete": false,
+  "resource_campaign_passed": false,
+  "rows": [
+    {
+      "scenario": "disabled_idle",
+      "row": "q1-disabled_idle",
+      "completed": true,
+      "rejection_reasons": [
+        "continuous_screen_state_not_available"
+      ],
+      "observed_trace_seconds": 59.861882,
+      "fixture_cpu_ms": null,
+      "cpu_rails_j": 4.350885,
+      "network_rails_j": 7.43352,
+      "memory_rails_j": 3.616304,
+      "display_rail_j": 0.0,
+      "screen_state_intervals": [],
+      "screen_state_coverage_available": false,
+      "trace_quality_flags": [],
+      "suspend_states": [
+        {
+          "power_state": "awake",
+          "seconds": "59.861882"
+        }
+      ],
+      "charging_flags_false_at_endpoints": true,
+      "physical_display_off_before_trace": true,
+      "same_fixture_process_at_endpoints": true,
+      "observer_connected_at_finish": true,
+      "observer_clock_stable": true,
+      "observer_error": "",
+      "expected_fresh_bodies": 0,
+      "fresh_bodies_posted_inside_trace": 0,
+      "fresh_bodies_seen_within_observer_window": 0,
+      "bodies_observed_on_multiple_card_keys": 0,
+      "receipt_timing_matches_trace_clock": true,
+      "submit_to_first_post_observation_ms": [],
+      "sender_native_sent_acknowledgements": 0,
+      "anonymous_phase_counts_in_window": {},
+      "fcm_callback_markers_in_window": 0,
+      "persistent_stream_service_present_before": false,
+      "persistent_stream_service_present_after": false,
+      "wake_lock_ms": null,
+      "service_ownership_ms": null,
+      "recovery_attempts": null,
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 0
+    },
+    {
+      "scenario": "push_idle",
+      "row": "q2-push_idle",
+      "completed": true,
+      "rejection_reasons": [
+        "continuous_screen_state_not_available"
+      ],
+      "observed_trace_seconds": 59.878837,
+      "fixture_cpu_ms": 299.486333,
+      "cpu_rails_j": 4.43831,
+      "network_rails_j": 7.068616,
+      "memory_rails_j": 3.630595,
+      "display_rail_j": 0.0,
+      "screen_state_intervals": [],
+      "screen_state_coverage_available": false,
+      "trace_quality_flags": [],
+      "suspend_states": [
+        {
+          "power_state": "awake",
+          "seconds": "59.878837"
+        }
+      ],
+      "charging_flags_false_at_endpoints": true,
+      "physical_display_off_before_trace": true,
+      "same_fixture_process_at_endpoints": true,
+      "observer_connected_at_finish": true,
+      "observer_clock_stable": true,
+      "observer_error": "",
+      "expected_fresh_bodies": 0,
+      "fresh_bodies_posted_inside_trace": 0,
+      "fresh_bodies_seen_within_observer_window": 0,
+      "bodies_observed_on_multiple_card_keys": 0,
+      "receipt_timing_matches_trace_clock": true,
+      "submit_to_first_post_observation_ms": [],
+      "sender_native_sent_acknowledgements": 0,
+      "anonymous_phase_counts_in_window": {},
+      "fcm_callback_markers_in_window": 0,
+      "persistent_stream_service_present_before": false,
+      "persistent_stream_service_present_after": false,
+      "wake_lock_ms": null,
+      "service_ownership_ms": null,
+      "recovery_attempts": null,
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 1
+    },
+    {
+      "scenario": "local_idle",
+      "row": "q3-local_idle",
+      "completed": true,
+      "rejection_reasons": [
+        "continuous_screen_state_not_available"
+      ],
+      "observed_trace_seconds": 59.887815,
+      "fixture_cpu_ms": 660.965784,
+      "cpu_rails_j": 4.184388,
+      "network_rails_j": 7.084949,
+      "memory_rails_j": 3.547351,
+      "display_rail_j": 0.0,
+      "screen_state_intervals": [],
+      "screen_state_coverage_available": false,
+      "trace_quality_flags": [],
+      "suspend_states": [
+        {
+          "power_state": "awake",
+          "seconds": "59.887815"
+        }
+      ],
+      "charging_flags_false_at_endpoints": true,
+      "physical_display_off_before_trace": true,
+      "same_fixture_process_at_endpoints": true,
+      "observer_connected_at_finish": true,
+      "observer_clock_stable": true,
+      "observer_error": "",
+      "expected_fresh_bodies": 0,
+      "fresh_bodies_posted_inside_trace": 0,
+      "fresh_bodies_seen_within_observer_window": 0,
+      "bodies_observed_on_multiple_card_keys": 0,
+      "receipt_timing_matches_trace_clock": true,
+      "submit_to_first_post_observation_ms": [],
+      "sender_native_sent_acknowledgements": 0,
+      "anonymous_phase_counts_in_window": {},
+      "fcm_callback_markers_in_window": 0,
+      "persistent_stream_service_present_before": true,
+      "persistent_stream_service_present_after": true,
+      "wake_lock_ms": null,
+      "service_ownership_ms": null,
+      "recovery_attempts": null,
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 1
+    },
+    {
+      "scenario": "reconnect",
+      "row": "q4-reconnect",
+      "completed": true,
+      "rejection_reasons": [
+        "deliberate_in_window_display_wake_diagnostic_only"
+      ],
+      "observed_trace_seconds": 59.848248,
+      "fixture_cpu_ms": 872.05755,
+      "cpu_rails_j": 21.914837,
+      "network_rails_j": 19.377865,
+      "memory_rails_j": 7.399937,
+      "display_rail_j": 3.720552,
+      "screen_state_intervals": [
+        {
+          "physical_display_state": "1.000000",
+          "seconds": "49.320823"
+        },
+        {
+          "physical_display_state": "2.000000",
+          "seconds": "10.527425"
+        }
+      ],
+      "screen_state_coverage_available": true,
+      "trace_quality_flags": [],
+      "suspend_states": [
+        {
+          "power_state": "awake",
+          "seconds": "59.848248"
+        }
+      ],
+      "charging_flags_false_at_endpoints": true,
+      "physical_display_off_before_trace": true,
+      "same_fixture_process_at_endpoints": true,
+      "observer_connected_at_finish": true,
+      "observer_clock_stable": true,
+      "observer_error": "",
+      "expected_fresh_bodies": 0,
+      "fresh_bodies_posted_inside_trace": 0,
+      "fresh_bodies_seen_within_observer_window": 0,
+      "bodies_observed_on_multiple_card_keys": 0,
+      "receipt_timing_matches_trace_clock": true,
+      "submit_to_first_post_observation_ms": [],
+      "sender_native_sent_acknowledgements": 0,
+      "anonymous_phase_counts_in_window": {
+        "network_restored": 1,
+        "recovery_attempt": 1,
+        "connectivity_wake_ready": 1,
+        "notification_receiver_ready": 1,
+        "account_catch_up_start": 2,
+        "account_catch_up_ready": 2,
+        "account_subscription_activated": 1,
+        "current_replay_complete": 1,
+        "durable_ingest_ready": 1
+      },
+      "fcm_callback_markers_in_window": 0,
+      "persistent_stream_service_present_before": false,
+      "persistent_stream_service_present_after": false,
+      "wake_lock_ms": null,
+      "service_ownership_ms": null,
+      "recovery_attempts": null,
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 1
+    },
+    {
+      "scenario": "push_burst",
+      "row": "q5-push_burst",
+      "completed": true,
+      "rejection_reasons": [
+        "physical_display_on_during_trace",
+        "five_message_posting_not_verified"
+      ],
+      "observed_trace_seconds": 59.879308,
+      "fixture_cpu_ms": 2781.142647,
+      "cpu_rails_j": 5.841398,
+      "network_rails_j": 8.621257,
+      "memory_rails_j": 4.023368,
+      "display_rail_j": 0.15965,
+      "screen_state_intervals": [
+        {
+          "physical_display_state": "1.000000",
+          "seconds": "59.189894"
+        },
+        {
+          "physical_display_state": "2.000000",
+          "seconds": "0.689414"
+        }
+      ],
+      "screen_state_coverage_available": true,
+      "trace_quality_flags": [],
+      "suspend_states": [
+        {
+          "power_state": "awake",
+          "seconds": "59.879308"
+        }
+      ],
+      "charging_flags_false_at_endpoints": true,
+      "physical_display_off_before_trace": true,
+      "same_fixture_process_at_endpoints": true,
+      "observer_connected_at_finish": true,
+      "observer_clock_stable": true,
+      "observer_error": "",
+      "expected_fresh_bodies": 5,
+      "fresh_bodies_posted_inside_trace": 3,
+      "fresh_bodies_seen_within_observer_window": 3,
+      "bodies_observed_on_multiple_card_keys": 0,
+      "receipt_timing_matches_trace_clock": true,
+      "submit_to_first_post_observation_ms": [
+        {
+          "index": 0,
+          "ms": 9280
+        },
+        {
+          "index": 1,
+          "ms": 1164
+        },
+        {
+          "index": 2,
+          "ms": 1404
+        }
+      ],
+      "sender_native_sent_acknowledgements": 5,
+      "anonymous_phase_counts_in_window": {
+        "push_received_high": 1,
+        "push_original_high": 1,
+        "push_service_accepted": 1,
+        "push_service_started": 1,
+        "push_attempt_started": 1,
+        "account_catch_up_start": 1,
+        "account_catch_up_ready": 1,
+        "push_attempt_succeeded": 1,
+        "push_candidate": 1,
+        "push_posted": 1
+      },
+      "fcm_callback_markers_in_window": 1,
+      "persistent_stream_service_present_before": false,
+      "persistent_stream_service_present_after": false,
+      "wake_lock_ms": null,
+      "service_ownership_ms": null,
+      "recovery_attempts": null,
+      "native_fcm_transport_proven": false,
+      "fixture_cpu_cycle_table_process_count": 1
+    },
+    {
+      "scenario": "local_burst",
+      "row": "q6-local_burst",
+      "completed": false,
+      "rejection_reasons": [
+        "capture_not_completed"
+      ]
+    }
+  ],
+  "mdk_sha": "7692e26649193bd0bfba5f6a425a80b7c2e8f502",
+  "artifact_sha256": "5538d0b39f7d83b143ca5dcf44f85d4bd2720ed771d0a01e0c5a9be50e5b7c41",
+  "device": {
+    "model": "Pixel 9 Pro XL",
+    "api": 37,
+    "os": "stock Android 17"
+  },
+  "policy": "optimized",
+  "report_kind": "diagnostic_measurements_without_acceptance_budgets",
+  "unknown_resource_fields_remain_null": true,
+  "canonical_readback": {
+    "expected_fresh_bodies": 10,
+    "bodies_with_canonical_rows": 10,
+    "observed_duplicate_canonical_rows": 0,
+    "verified_after_fixture_cold_reopen": true,
+    "proves_in_window_posting": false,
+    "proves_native_fcm_transport": false
+  },
+  "restoration": {
+    "original_shared_apks_verified": true,
+    "protected_user_overrides_restored": true,
+    "platform_settings_restored": true,
+    "temporary_wireless_debugging_restored": true,
+    "temporary_observer_disabled_and_access_revoked": true,
+    "original_owner_files_byte_identical": 401,
+    "owner_account_count": 5,
+    "owner_chat_list_verified_after_unlock": true,
+    "fixture_original_local_mode_verified": true,
+    "owned_sender_emulator_stopped_data_retained": true,
+    "uninstall_or_data_clear_performed": false
+  },
+  "fixture_cpu_query_count_scope": "process entries with cpu_cycles_per_process rows; not continuous process presence"
+}

@@ -1,0 +1,38 @@
+{
+  "source_sha": "471e7bdcb5f6b1a2a2eb75f9c727752bcee19ac8",
+  "tracker_complete": false,
+  "campaigns": [
+    {
+      "campaign": "physical-v2",
+      "completed_windows": 0,
+      "sender_published_fresh_messages": 25,
+      "failure": "unread_suffix_changed_settings_accessibility_label",
+      "failure_before_first_measurement": true,
+      "battery_result_claimed": false
+    },
+    {
+      "campaign": "physical-v3",
+      "completed_windows": 0,
+      "failure_before_first_measurement": true,
+      "guard": "screen_off_setup",
+      "wakefulness": "Awake",
+      "physical_display": "ON",
+      "calls_idle": true,
+      "fresh_sender_native_sent_observations": 25,
+      "battery_result_claimed": false,
+      "first_setup_was_verified_before_unplugging": true,
+      "missing_step": "reassert_screen_off_and_wait_for_stable_display_after_real_unplug"
+    },
+    {
+      "source_sha": "202abaa5b1c20059cf24c2b3d08c340afab15fa8",
+      "completed_windows": 5,
+      "failed_extra_window": "local_burst",
+      "observed_failure": "fixture_notifications_navigation_target_absent_after_settings_tap",
+      "failure_before_local_mode_selection": true,
+      "local_burst_trace_captured": false,
+      "local_timing_proven": false,
+      "root_cause_established": false,
+      "production_root_cause_established": false
+    }
+  ]
+}
