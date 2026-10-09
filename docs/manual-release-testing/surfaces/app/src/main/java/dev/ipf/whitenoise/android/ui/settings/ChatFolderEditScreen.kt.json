@@ -16,7 +16,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "private fun folderDescription(",
         "test_ids": [
-          "FLD-004"
+          "FLD-004",
+          "PRO-010"
         ]
       },
       {
@@ -80,7 +81,8 @@
           "FLD-002",
           "ACC-017",
           "FLD-003",
-          "FLD-007"
+          "FLD-007",
+          "PRO-010"
         ]
       },
       {

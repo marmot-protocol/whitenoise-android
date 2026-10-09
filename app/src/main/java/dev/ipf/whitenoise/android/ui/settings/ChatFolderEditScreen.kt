@@ -561,6 +561,7 @@ internal fun ChatFolderEditContent(
                 ) {
                     WhiteNoiseTextField(
                         state = state.name,
+                        emojiAction = true,
                         modifier = Modifier.fillMaxWidth().testTag("folder.name"),
                         label = { Text(stringResource(R.string.chat_folder_name)) },
                         lineLimits = TextFieldLineLimits.SingleLine,
@@ -773,6 +774,7 @@ private fun folderDescription(
     if (!compact || expanded || description.text.isNotEmpty()) {
         WhiteNoiseTextField(
             state = description,
+            emojiAction = true,
             modifier = Modifier.fillMaxWidth().testTag("folder.description"),
             label = { Text(stringResource(R.string.chat_folder_description_label)) },
             lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 2, maxHeightInLines = 4),

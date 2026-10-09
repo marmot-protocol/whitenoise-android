@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.state.POLL_DAY_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
+import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import java.util.Locale
@@ -172,7 +173,7 @@ internal fun PollCreateForm(
         Modifier.heightIn(max = 400.dp).fadingVerticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedTextField(
+        ProseTextField(
             value = question,
             onValueChange = onQuestionChange,
             label = { Text(stringResource(R.string.poll_question)) },
@@ -196,8 +197,9 @@ internal fun PollCreateForm(
         }
         options.forEachIndexed { index, value ->
             Row {
-                OutlinedTextField(
+                ProseTextField(
                     value = value,
+                    emojiOwner = options.toList(),
                     onValueChange = { onOptionChange(index, it) },
                     label = { Text(stringResource(R.string.poll_option, index + 1)) },
                     modifier = Modifier.weight(1f),

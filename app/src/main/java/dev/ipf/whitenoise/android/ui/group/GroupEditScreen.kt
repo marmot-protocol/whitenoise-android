@@ -20,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
@@ -453,8 +453,9 @@ internal fun GroupEditScreen(
                         enabled = nameEditable,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    TextField(
+                    ProseTextField(
                         value = description,
+                        filled = true,
                         onValueChange = { description = it },
                         label = { Text(stringResource(R.string.group_description)) },
                         minLines = 3,

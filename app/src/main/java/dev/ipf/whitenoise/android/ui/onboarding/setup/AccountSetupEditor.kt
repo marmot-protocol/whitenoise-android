@@ -69,6 +69,7 @@ internal fun SetupEditorContent(
     if (editor.action == OnboardingActionFfi.EDIT_PROFILE) {
         WhiteNoiseTextField(
             state = fields.displayName,
+            emojiAction = true,
             enabled = !busy,
             lineLimits = TextFieldLineLimits.SingleLine,
             label = { Text(stringResource(R.string.setup_display_name)) },
@@ -85,6 +86,7 @@ internal fun SetupEditorContent(
         )
         WhiteNoiseTextField(
             state = fields.about,
+            emojiAction = true,
             enabled = !busy,
             lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 3, maxHeightInLines = 6),
             label = { Text(stringResource(R.string.setup_about)) },

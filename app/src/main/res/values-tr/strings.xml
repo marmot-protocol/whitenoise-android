@@ -2292,6 +2292,14 @@
         <item quantity="one">%1$d ek indiriliyor</item>
         <item quantity="other">%1$d ek indiriliyor</item>
     </plurals>
+    <string name="account_keys_local_signing">Yerel imzalama</string>
+    <string name="account_keys_external_signing">Harici imzalayıcı</string>
+    <string name="account_keys_session_running">Hesap oturumu çalışıyor</string>
+    <string name="account_keys_session_stopped">Hesap oturumu durduruldu</string>
+    <string name="account_keys_session">Hesap oturumu</string>
+    <string name="chat_departure_confirm">Seçilen %1$d sohbeti gözden geçirin. Katıldığınız gruplardan çıkılacak ve bu cihazdan silinecek; doğrudan sohbetler yerel olarak silinir. Diğer üyeler kopyalarını korur. Gerekli yönetici devirleri silme başlamadan önce onaylanır.</string>
+    <string name="chat_departure_result">%1$d tamamlandı · %2$d bitmedi · %3$d atlandı. Yeniden deneme üyeliği kontrol eder ve yalnızca bitmemiş işlemleri sürdürür.</string>
+    <string name="chat_departure_admin_granted">Yönetici devri başarılı. Gruptan ayrılma henüz tamamlanmadı.</string>
     <string name="reaction_details_loading">Tepkiler yükleniyor…</string>
     <string name="reaction_details_load_failed">Tepkiler yüklenemedi.</string>
     <string name="group_create_remove_and_continue">Bu kişiyi kaldır ve devam et</string>

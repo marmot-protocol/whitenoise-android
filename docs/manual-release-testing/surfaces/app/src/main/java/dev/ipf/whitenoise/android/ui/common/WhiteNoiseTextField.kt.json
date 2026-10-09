@@ -1,0 +1,32 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+  "legacy_sha256": "d4a2ae58515acdba4ddc616843562bb75406b27d45645caaa24463a03f3f34f4",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WhiteNoiseSecureTextField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun WhiteNoiseSecureTextField(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseTextField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun WhiteNoiseTextField(",
+        "test_ids": [],
+        "coverage_exception": "Shared form field with no release-build user path yet. Covered by WhiteNoiseTextFieldScreenshotTest and WhiteNoiseTextFieldBehaviorTest; assign permanent manual route IDs when a form flow adopts it."
+      },
+      {
+        "surface": "WhiteNoiseTextFieldContainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
+        "anchor": "fun WhiteNoiseTextFieldContainer(",
+        "test_ids": [],
+        "coverage_exception": "Shared form field with no release-build user path yet. Covered by WhiteNoiseTextFieldScreenshotTest and WhiteNoiseTextFieldBehaviorTest; assign permanent manual route IDs when a form flow adopts it."
+      }
+    ],
+    "settings_controls": []
+  },
+  "discovery_exceptions": []
+}

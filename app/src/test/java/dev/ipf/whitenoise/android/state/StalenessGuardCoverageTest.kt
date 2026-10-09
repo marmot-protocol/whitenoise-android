@@ -136,6 +136,9 @@ class StalenessGuardCoverageTest {
                 "NativePushFallbackRuntime.kt:disableNativePushAfterFallbackReady" to
                     listOf("recordPendingRegistrationClear", "ensureActive", "ownerIsCurrent", "fallbackIsReady"),
                 "Controllers.kt:bind" to listOf("bindLifetime.advance", "bindEpoch"),
+                // The captured attempt fences account, bind epoch and runtime before applying native roles.
+                "Controllers.kt:departJoinedChat" to
+                    listOf("attempt.isCurrent()", "resolveAuthoritativeGroupRoster"),
                 "Controllers.kt:schedulePendingMemberFetches" to
                     listOf("bindEpoch", "memberCacheEpoch", "memberCacheLifetime.isCurrent"),
                 "Controllers.kt:applyFetchedMemberSnapshot" to

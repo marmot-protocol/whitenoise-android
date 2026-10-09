@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
         "anchor": "private fun WaveHiButton(",
         "test_ids": [
-          "CON-019"
+          "CON-019",
+          "GRP-028"
         ]
       },
       {
@@ -17,7 +18,8 @@
         "anchor": "fun GroupSystemRow(",
         "test_ids": [
           "CON-001",
-          "CON-026"
+          "CON-026",
+          "GRP-028"
         ]
       },
       {
@@ -33,6 +35,40 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
         "anchor": "R.string.message_actions",
         "test_ids": [
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "WaveHiPreparingRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "fun WaveHiPreparingRow(",
+        "test_ids": [
+          "GRP-028"
+        ]
+      },
+      {
+        "surface": "GroupSystemDebugDetails",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "fun GroupSystemDebugDetails(",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "GroupSystemSummaryAndWave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "fun GroupSystemSummaryAndWave(",
+        "test_ids": [
+          "CON-026",
+          "GRP-028"
+        ]
+      },
+      {
+        "surface": "GroupSystemSummaryMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "fun GroupSystemSummaryMenu(",
+        "test_ids": [
+          "MSG-008",
           "GRP-023"
         ]
       }
@@ -79,6 +115,16 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-028"
         ]
       }
     ]

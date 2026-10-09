@@ -45,7 +45,8 @@
         "anchor": "fun NewGroupSetupContent(",
         "test_ids": [
           "NCH-002",
-          "ACC-017"
+          "ACC-017",
+          "PRO-010"
         ]
       },
       {
