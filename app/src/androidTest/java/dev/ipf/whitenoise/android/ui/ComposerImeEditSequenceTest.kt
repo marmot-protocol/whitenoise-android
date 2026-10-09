@@ -82,7 +82,12 @@ class ComposerImeEditSequenceTest {
         nativeAction("Copy").click()
         composeRule.runOnUiThread {
             val clipboard = composeRule.activity.getSystemService(ClipboardManager::class.java)
-            assertEquals("second", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+            val copiedText =
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString()
+            assertEquals("second", copiedText)
         }
         assertFalse(imeVisible())
         editor.performTouchInput { click() }
