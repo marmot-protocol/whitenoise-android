@@ -655,8 +655,7 @@ private data class MappedText(
 
 /** True when a speakable segment already ends with authored punctuation or an emoji. */
 @Suppress("MaxLineLength")
-internal fun String.endsWithSpeakableSentenceTerminal(): Boolean =
-    hasAuthoredSpeakableTerminalPunctuation() || endsWithSpeakableEmojiSequence()
+internal fun String.endsWithSpeakableSentenceTerminal(): Boolean = hasAuthoredSpeakableTerminalPunctuation() || endsWithSpeakableEmojiSequence()
 
 private fun String.hasAuthoredSpeakableTerminalPunctuation(): Boolean = isEmpty() || last() in ".!?;:,"
 

@@ -683,8 +683,7 @@ internal fun markdownElisionLeafId(
     }
 
 @Suppress("MaxLineLength")
-internal fun markdownTableHeaderCellElisionLeafId(rowPath: String): String =
-    markdownElisionLeafId("$rowPath/h", sourceIndexOffset = null)
+internal fun markdownTableHeaderCellElisionLeafId(rowPath: String): String = markdownElisionLeafId("$rowPath/h", sourceIndexOffset = null)
 
 /** Authored blank lines beyond the single one the paragraph gap already represents. */
 internal fun markdownExtraBlankLines(
@@ -705,8 +704,7 @@ internal fun markdownExtraBlankLines(
  * without it the first extra line would cost one whole spacing more than each
  * one after it.
  */
-internal fun markdownBlankRunSpacerHeight(extraBlankLines: Int): Dp =
-    (MARKDOWN_BLANK_LINE_HEIGHT * extraBlankLines - MARKDOWN_BLOCK_SPACING).coerceAtLeast(0.dp)
+internal fun markdownBlankRunSpacerHeight(extraBlankLines: Int): Dp = (MARKDOWN_BLANK_LINE_HEIGHT * extraBlankLines - MARKDOWN_BLOCK_SPACING).coerceAtLeast(0.dp)
 
 @Composable
 private fun MarkdownElisionMarker(
@@ -982,8 +980,7 @@ internal fun groupMarkdownDetailsBlocksWithSource(blocks: List<MarkdownBlockFfi>
  * inline via [markdownDetailsSection]. An opener with no matching close renders
  * literally (stays Plain), so unterminated markup never swallows the rest.
  */
-internal fun groupMarkdownDetailsBlocks(blocks: List<MarkdownBlockFfi>): List<MarkdownRenderGroup> =
-    groupMarkdownDetailsBlocksWithSource(blocks).groups
+internal fun groupMarkdownDetailsBlocks(blocks: List<MarkdownBlockFfi>): List<MarkdownRenderGroup> = groupMarkdownDetailsBlocksWithSource(blocks).groups
 
 // A Paragraph whose only lines are the <details> tag (optional same-line
 // summary) and optionally an own-line <summary>. Residual content on the
@@ -2008,8 +2005,7 @@ internal fun parsedOpenableMarkdownLink(dest: String): ParsedOpenableMarkdownLin
 internal fun isOpenableMarkdownLink(dest: String): Boolean = parsedOpenableMarkdownLink(dest) != null
 
 /** Security-relevant authority shown separately from the truncated full URL. */
-internal fun markdownLinkEffectiveAuthority(dest: String): String? =
-    parsedOpenableMarkdownLink(dest)?.effectiveAuthority
+internal fun markdownLinkEffectiveAuthority(dest: String): String? = parsedOpenableMarkdownLink(dest)?.effectiveAuthority
 
 private fun parsedHttpMarkdownLink(uri: URI): ParsedOpenableMarkdownLink? {
     val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: return null
