@@ -36,11 +36,15 @@ internal class ComposerInputConnection(
 ) : InputConnectionWrapper(target, false) {
     private var active = true
 
-    override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence? =
-        if (active) readAcceptedValue().getTextBeforeSelection(length).toString() else null
+    override fun getTextBeforeCursor(
+        length: Int,
+        flags: Int,
+    ): CharSequence? = if (active) readAcceptedValue().getTextBeforeSelection(length).toString() else null
 
-    override fun getTextAfterCursor(length: Int, flags: Int): CharSequence? =
-        if (active) readAcceptedValue().getTextAfterSelection(length).toString() else null
+    override fun getTextAfterCursor(
+        length: Int,
+        flags: Int,
+    ): CharSequence? = if (active) readAcceptedValue().getTextAfterSelection(length).toString() else null
 
     override fun getSelectedText(flags: Int): CharSequence? {
         if (!active) return null
@@ -49,7 +53,11 @@ internal class ComposerInputConnection(
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
-    override fun getSurroundingText(beforeLength: Int, afterLength: Int, flags: Int): SurroundingText? {
+    override fun getSurroundingText(
+        beforeLength: Int,
+        afterLength: Int,
+        flags: Int,
+    ): SurroundingText? {
         if (!active) return null
         val value = readAcceptedValue()
         val before = value.getTextBeforeSelection(beforeLength).toString()
@@ -63,7 +71,10 @@ internal class ComposerInputConnection(
         )
     }
 
-    override fun getExtractedText(request: ExtractedTextRequest?, flags: Int): ExtractedText? {
+    override fun getExtractedText(
+        request: ExtractedTextRequest?,
+        flags: Int,
+    ): ExtractedText? {
         // Preserve Compose's registration of extracted-text monitoring for active connections.
         if (!active || super.getExtractedText(request, flags) == null) return null
         val value = readAcceptedValue()

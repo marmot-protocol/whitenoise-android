@@ -114,9 +114,15 @@ class ComposerInputConnectionTest {
         var extractRequest: ExtractedTextRequest? = null
         var extractFlags = 0
 
-        override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence = "First mispelled"
+        override fun getTextBeforeCursor(
+            length: Int,
+            flags: Int,
+        ): CharSequence = "First mispelled"
 
-        override fun getExtractedText(request: ExtractedTextRequest?, flags: Int): ExtractedText {
+        override fun getExtractedText(
+            request: ExtractedTextRequest?,
+            flags: Int,
+        ): ExtractedText {
             extractRequest = request
             extractFlags = flags
             return ExtractedText()
@@ -127,17 +133,26 @@ class ComposerInputConnectionTest {
             return true
         }
 
-        override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+        override fun deleteSurroundingText(
+            beforeLength: Int,
+            afterLength: Int,
+        ): Boolean {
             calls += "delete:$beforeLength,$afterLength"
             return true
         }
 
-        override fun setComposingRegion(start: Int, end: Int): Boolean {
+        override fun setComposingRegion(
+            start: Int,
+            end: Int,
+        ): Boolean {
             calls += "region:$start,$end"
             return true
         }
 
-        override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
+        override fun setComposingText(
+            text: CharSequence?,
+            newCursorPosition: Int,
+        ): Boolean {
             calls += "compose:$text,$newCursorPosition"
             return true
         }
