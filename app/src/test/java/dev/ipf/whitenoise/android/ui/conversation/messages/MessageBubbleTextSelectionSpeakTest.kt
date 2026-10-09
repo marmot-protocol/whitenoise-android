@@ -519,12 +519,6 @@ class MessageBubbleTextSelectionSpeakTest {
     fun unmappableRenderedTargetDoesNotPauseOrChangeCurrentSpeech() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
-        // Keep the native continuation healthy while testing only the unmappable rendered hit.
-        appState.liveSubscriptionOverrides.conversation =
-            ScriptedConversationLiveSubscriptions(
-                timelineScripts = listOf(ScriptedConversationTimelineSubscription(snapshotPage = null)),
-                group = group(),
-            ).subscriptions
         val item = timelineMessage("First sentence. Second sentence.")
         val entry = projectedTtsEntry(item)
         assertTrue(appState.speakAloudAutoRead(GROUP_ID, listOf(entry), Locale.getDefault()))
@@ -1015,6 +1009,12 @@ class MessageBubbleTextSelectionSpeakTest {
                     ),
                 activeAccountRef = ACCOUNT_REF,
             )
+        // Gesture tests require a healthy native feed; feed loss is covered separately.
+        appState.liveSubscriptionOverrides.conversation =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = listOf(ScriptedConversationTimelineSubscription(snapshotPage = null)),
+                group = group(),
+            ).subscriptions
         appState.forceUsableTtsResolutionForTests()
         appState.ttsController.attachEngine(engine)
         return appState
