@@ -70,7 +70,9 @@ class WhiteNoiseAppStateReaderSpeechTest {
             assertFalse(appState.ownsCurrentAccountSpeech())
             assertEquals(spoken, engine.spoken.size)
 
-            assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("s", "Sender", "Fresh private speech.")), Locale.US))
+            assertTrue(
+                appState.speakAloud(listOf(TtsSpeakableEntry("s", "Sender", "Fresh private speech.")), Locale.US),
+            )
             assertEquals(spoken + 1, engine.spoken.size)
             assertTrue(appState.ownsCurrentAccountSpeech())
             appState.stopSpeaking()
