@@ -189,8 +189,7 @@ internal class TtsAutoReadContinuation(
             subscription = active
             currentCoroutineContext().ensureActive()
             val initial = withContext(io) { active.snapshot() }
-            if (initial != null && !appendPage(active, initial, run)) return
-            var reading = true
+            var reading = initial == null || appendPage(active, initial, run)
             while (reading && owns(run, host.controller.state.value)) {
                 val page = withContext(io) { active.nextWindow() }
                 reading = page != null && appendPage(active, page, run)

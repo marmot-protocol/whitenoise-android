@@ -158,6 +158,21 @@ class TtsAutoReadContinuationTest {
         }
 
     @Test
+    fun aJumpWindowWithoutItsRequestedAnchorAlsoRevokesCapturedSpeech() =
+        runTest {
+            val host = Host(page("m3"))
+            host.jump = page("m2", "m3")
+            host.start(this)
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.closes)
+            val submissions = host.engine.spoken.size
+            host.controller.resume()
+            assertEquals(submissions, host.engine.spoken.size)
+        }
+
+    @Test
     fun aClosedNativeFeedCannotResumeCapturedText() =
         runTest {
             val host = Host(page("m1"))
