@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
@@ -38,8 +39,10 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -62,7 +65,7 @@ import org.robolectric.annotation.Implements
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi", shadows = [ComposerMagnifierShadow::class])
 class ComposerAutofillMenuTest {
     @get:Rule val composeRule = createComposeRule()
 
@@ -111,14 +114,6 @@ class ComposerAutofillMenuTest {
         editor.assertIsNotFocused()
         editor.performTouchInput {
             down(center)
-            moveBy(Offset(2f, 2f))
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            up()
-        }
-        editor.assertIsNotFocused()
-        assertEquals(null, menuProvider.dataProvider)
-        editor.performTouchInput {
-            down(center)
             moveBy(Offset(0f, -40f))
             up()
         }
@@ -129,21 +124,21 @@ class ComposerAutofillMenuTest {
     }
 
     @Test
-    fun unfocusedLongPressReplacesOnlySelectedText() {
+    fun unfocusedDraftLongPressSelectsAWordAndOffersNativeActions() {
         clipboard.setPrimaryClip(ClipData.newPlainText("test", "new"))
         render("Old draft")
-        composeRule.runOnIdle { value = value.copy(selection = TextRange(0, 3)) }
-        composeRule.onNode(hasSetTextAction()).performTouchInput {
-            down(center)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            up()
-        }
-        composeRule.runOnIdle { unfocusedToolbar.selectPaste() }
+        longPressWord(4)
+        composeRule.onNode(hasSetTextAction()).assertIsFocused()
         composeRule.runOnIdle {
-            assertEquals("new draft", value.text)
-            assertEquals(TextRange(3), value.selection)
+            assertFalse(value.selection.collapsed)
+            assertEquals("Old draft", value.text)
         }
-        composeRule.onNode(hasSetTextAction()).assertIsNotFocused()
+        assertTrue(menuKeys().contains(TextContextMenuKeys.CopyKey))
+        assertTrue(menuKeys().contains(TextContextMenuKeys.PasteKey))
+        assertEquals(TextToolbarStatus.Hidden, unfocusedToolbar.status)
+        composeRule
+            .onNodeWithTag(ROOT_TAG)
+            .captureRoboImage("src/test/snapshots/composer_hidden_keyboard_selection.png")
     }
 
     @Test
@@ -161,7 +156,6 @@ class ComposerAutofillMenuTest {
     }
 
     @Test
-    @Config(shadows = [ComposerMagnifierShadow::class])
     fun focusedDraftLongPressKeepsTheTextMenu() {
         render("Draft message")
         val editor = composeRule.onNode(hasSetTextAction())
@@ -170,7 +164,7 @@ class ComposerAutofillMenuTest {
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
             up()
         }
-        editor.assertIsNotFocused()
+        editor.assertIsFocused()
         editor.performTouchInput { click() }
         editor.assertIsFocused()
         longPressEditor()
@@ -253,6 +247,19 @@ class ComposerAutofillMenuTest {
                 }
             }
         }
+    }
+
+    private fun longPressWord(index: Int) {
+        val editor = composeRule.onNode(hasSetTextAction())
+        val layouts = mutableListOf<TextLayoutResult>()
+        editor.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val position = layouts.single().getBoundingBox(index).center
+        editor.performTouchInput {
+            down(position)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) { menuProvider.dataProvider != null }
     }
 
     private fun longPressEditor() {

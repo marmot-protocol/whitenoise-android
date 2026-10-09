@@ -1,0 +1,72 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+  "legacy_sha256": "2c79edcddecb4e2fdb87d3967709ecf660fad6995ca2622cacdd2fa68c47c322",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "string:agent_connector_claude_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_name",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:agent_connector_claude_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_subtitle",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:agent_connector_claude_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_prompt",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:agent_connector_hermes_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_hermes_prompt",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:agent_connector_goose_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_goose_name",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:agent_connector_goose_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_goose_subtitle",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:agent_connector_goose_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_goose_prompt",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

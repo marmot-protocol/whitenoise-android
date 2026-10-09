@@ -156,3 +156,5 @@
 # Dictation recovery preserves both ordinary composer layouts and exposes app-local resolution.
 *.ConversationDictationDraftPresentationTest.retainedAudioKeepsDictateVisibleAndOrdinarySendUsableWithoutNotifications
 *.ConversationDictationDraftPresentationTest.expandedComposerSettingsReturnOffersDraftOnlyRemainingAudioRetry
+
+*.ComposerAutofillMenuTest.unfocusedDraftLongPressSelectsAWordAndOffersNativeActions
