@@ -1,14 +1,11 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.settings.AiAgentsContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -127,11 +124,8 @@ class AiAgentsScreenScreenshotTest {
         fontScale: Float = 1f,
     ) {
         composeRule.setContent {
-            val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
-                    AiAgentsContent(npub = npub, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
-                }
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
+                AiAgentsContent(npub = npub, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
             }
         }
     }
