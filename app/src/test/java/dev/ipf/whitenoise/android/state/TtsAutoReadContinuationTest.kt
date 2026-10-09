@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.TimelineEditSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
@@ -7,6 +8,8 @@ import dev.ipf.whitenoise.android.audio.tts.FakeSessionFocus
 import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.core.TimelineProjector
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -110,6 +113,54 @@ class TtsAutoReadContinuationTest {
         }
 
     @Test
+    fun nativeAcceptedEditsRemainReadableWithoutAVisibleControllerOverlay() =
+        runTest {
+            val edited =
+                timelineRecord("m1", 1uL, "Already edited.").copy(
+                    edit = TimelineEditSummaryFfi(1uL, "edit-m1", 2uL),
+                )
+            val initial = timelinePage(edited)
+            val host = Host(initial)
+            host.controller.speak(listOf(entry("m1", edited.plaintext)), Locale.US)
+            host.start(this)
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Speaking)
+
+            val incoming =
+                timelineRecord("m2", 3uL, "New accepted edit.").copy(
+                    edit = TimelineEditSummaryFfi(1uL, "edit-m2", 4uL),
+                )
+            host.windows.send(timelinePage(edited, incoming))
+            runCurrent()
+            assertEquals(listOf("m1", "m2"), host.controller.queuedMessageIds())
+            assertTrue(
+                host.engine.spoken
+                    .last()
+                    .text
+                    .endsWith(incoming.plaintext),
+            )
+            host.controller.stop()
+            runCurrent()
+        }
+
+    @Test
+    fun aLaterAcceptedNativeEditRevokesThePreviouslyCapturedBody() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            val changed =
+                timelineRecord("m1", 0uL, "Changed after capture.").copy(
+                    edit = TimelineEditSummaryFfi(1uL, "edit-m1", 2uL),
+                )
+            host.windows.send(timelinePage(changed))
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.closes)
+        }
+
+    @Test
     fun aProjectionThatReturnsAfterAccountReplacementCannotAppendToTheNewOwner() =
         runTest {
             val host = Host(page("m1"))
@@ -160,9 +211,14 @@ class TtsAutoReadContinuationTest {
 
         override fun allowsAppend(): Boolean = true
 
-        override suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry {
+        override suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry? {
             beforeProject?.invoke()
-            return entry(record.messageIdHex)
+            return projectTtsSpeakableEntry(
+                message = TimelineProjector.toAppMessageRecord(record),
+                editedText = null,
+                senderDisplayName = "Alice",
+                parseMarkdown = { emptyMarkdown() },
+            )
         }
 
         override suspend fun open(
@@ -202,7 +258,10 @@ class TtsAutoReadContinuationTest {
     }
 
     companion object {
-        private fun entry(id: String) = TtsSpeakableEntry("alice", "Alice", "Text $id.", messageIdHex = id)
+        private fun entry(
+            id: String,
+            text: String = "Text $id.",
+        ) = TtsSpeakableEntry("alice", "Alice", text, messageIdHex = id, sourceText = text)
 
         private fun page(vararg ids: String) =
             TimelinePageFfi(

@@ -115,6 +115,33 @@ class NotificationDelayedRosterOwnershipTest : NotificationDelayedRosterFixture(
     }
 }
 
+/** Keeps UI and each speech session on independent scripted native subscription handles. */
+private fun delayedRosterTimelineScripts(withSpeech: Boolean): List<ScriptedConversationTimelineSubscription> {
+    val visible = ScriptedConversationTimelineSubscription(delayedRosterTimelinePage(MESSAGE_ID to NOTIFIED_BODY))
+    val playback =
+        if (withSpeech) {
+            listOf(
+                ScriptedConversationTimelineSubscription(
+                    delayedRosterTimelinePage(
+                        MESSAGE_ID to NOTIFIED_BODY,
+                        HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
+                    ),
+                ),
+                ScriptedConversationTimelineSubscription(
+                    delayedRosterTimelinePage(
+                        MESSAGE_ID to NOTIFIED_BODY,
+                        HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
+                        LIVE_MESSAGE_ID to LIVE_BODY,
+                        RESUMED_MESSAGE_ID to RESUMED_BODY,
+                    ),
+                ),
+            )
+        } else {
+            emptyList()
+        }
+    return listOf(visible) + playback
+}
+
 /** Owns the production-shell fixture shared by the two independently ordered roster cases. */
 abstract class NotificationDelayedRosterFixture {
     @get:Rule
@@ -276,32 +303,7 @@ abstract class NotificationDelayedRosterFixture {
     ): DelayedRosterFixture {
         val subscriptions =
             ScriptedConversationLiveSubscriptions(
-                timelineScripts =
-                    listOf(
-                        ScriptedConversationTimelineSubscription(
-                            delayedRosterTimelinePage(MESSAGE_ID to NOTIFIED_BODY),
-                        ),
-                    ) +
-                        if (withSpeech) {
-                            listOf(
-                                ScriptedConversationTimelineSubscription(
-                                    delayedRosterTimelinePage(
-                                        MESSAGE_ID to NOTIFIED_BODY,
-                                        HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
-                                    ),
-                                ),
-                                ScriptedConversationTimelineSubscription(
-                                    delayedRosterTimelinePage(
-                                        MESSAGE_ID to NOTIFIED_BODY,
-                                        HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
-                                        LIVE_MESSAGE_ID to LIVE_BODY,
-                                        RESUMED_MESSAGE_ID to RESUMED_BODY,
-                                    ),
-                                ),
-                            )
-                        } else {
-                            emptyList()
-                        },
+                timelineScripts = delayedRosterTimelineScripts(withSpeech),
                 group = group(),
             )
         val gate = RouteOrderGate(preloadFinishesFirst, targetRosterFailures)

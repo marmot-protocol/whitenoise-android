@@ -244,22 +244,26 @@ internal class TtsAutoReadContinuation(
         run: TtsAutoReadRun,
     ): Boolean {
         val following = run.tail.following(page) ?: return pauseForGap(run)
-        for (record in following) {
+        val records = following.iterator()
+        while (records.hasNext() && owns(run, host.controller.state.value)) {
             currentCoroutineContext().ensureActive()
-            if (owns(run, host.controller.state.value)) {
-                if (host.allowsAppend() && !record.deleted && record.invalidationStatus == null) {
-                    val entry = withContext(io) { host.project(record) }
-                    if (owns(run, host.controller.state.value)) {
-                        entry?.let { host.controller.appendSpeech(it, run.locale) }
-                    }
+            val record = records.next()
+            if (host.allowsAppend() && !record.deleted && record.invalidationStatus == null) {
+                val entry = withContext(io) { host.project(record) }
+                if (owns(run, host.controller.state.value)) {
+                    entry?.let { host.controller.appendSpeech(it, run.locale) }
                 }
-                run.tail.accepted(record.messageIdHex)
             }
+            run.tail.accepted(record.messageIdHex)
         }
         return owns(run, host.controller.state.value)
     }
 
-    /** Native edits, deletion and invalidation revoke captured speech even with no screen mounted. */
+    /**
+     * MDK supplies the accepted edited body in plaintext (and parses its content tokens).
+     * Compare that effective body, not a raw event or a visible controller's optimistic overlay.
+     * A subsequent native edit, deletion or invalidation revokes captured speech without a screen.
+     */
     private fun invalidatesQueuedSpeech(page: TimelinePageFfi): Boolean {
         val queued = host.controller.queuedMessagesSnapshot().associateBy { it.messageIdHex }
         return page.messages.any { record ->
