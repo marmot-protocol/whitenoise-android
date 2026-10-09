@@ -2449,4 +2449,8 @@
     <string name="pinned_shortcut_unavailable">This conversation is no longer available.</string>
     <string name="pinned_shortcut_failed">Could not request a Home screen shortcut. Try again.</string>
     <string name="media_set_group_picture">Set as group picture</string>
+    <plurals name="media_downloading_count">
+        <item quantity="one">%1$d attachment downloading</item>
+        <item quantity="other">%1$d attachments downloading</item>
+    </plurals>
 </resources>

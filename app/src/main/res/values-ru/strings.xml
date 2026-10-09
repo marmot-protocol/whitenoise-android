@@ -2360,4 +2360,10 @@
     <string name="pinned_shortcut_unavailable">Этот чат больше недоступен.</string>
     <string name="pinned_shortcut_failed">Не удалось запросить ярлык. Повторите попытку.</string>
     <string name="media_set_group_picture">Установить как фото группы</string>
+    <plurals name="media_downloading_count">
+        <item quantity="one">Загружается %1$d вложение</item>
+        <item quantity="few">Загружаются %1$d вложения</item>
+        <item quantity="many">Загружается %1$d вложений</item>
+        <item quantity="other">Загружается %1$d вложения</item>
+    </plurals>
 </resources>

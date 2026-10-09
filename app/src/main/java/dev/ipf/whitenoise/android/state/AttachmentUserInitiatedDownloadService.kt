@@ -138,7 +138,7 @@ internal object AttachmentUserInitiatedDownloads {
  * badge and sound. The earlier channel is therefore replaced, unless the user blocked it: turning the transfer
  * card off stays honored instead of being undone by the new id.
  */
-private fun ensureAttachmentDownloadChannel(context: Context): String {
+internal fun ensureAttachmentDownloadChannel(context: Context): String {
     val manager = context.getSystemService(NotificationManager::class.java)
     val legacy = manager.getNotificationChannel(LEGACY_CHANNEL_ID)
     if (legacy != null && legacy.importance == NotificationManager.IMPORTANCE_NONE) return LEGACY_CHANNEL_ID
@@ -174,6 +174,8 @@ internal fun attachmentDownloadNotification(context: Context): Notification =
         .setContentText(context.getString(R.string.media_attachment))
         .setCategory(Notification.CATEGORY_PROGRESS)
         .setProgress(0, 0, true)
+        .setGroup(ATTACHMENT_TRANSFER_GROUP)
+        .setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setLocalOnly(true)
@@ -188,6 +190,7 @@ internal fun attachmentDownloadNotification(context: Context): Notification =
 class AttachmentUserInitiatedDownloadService : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val runs = AttachmentDownloadJobRuns(scope)
+    private val transfers = UserInitiatedTransfers { AttachmentTransfers.ledger }
 
     /** Posts the quiet transfer card for the job, then runs its explicit download until the job finishes or stops. */
     override fun onStartJob(params: JobParameters): Boolean {
@@ -197,6 +200,7 @@ class AttachmentUserInitiatedDownloadService : JobService() {
             return false
         }
         Log.i(TAG, "attachment_user_job_started")
+        transfers.began(params.jobId)
         setNotification(
             params,
             params.jobId,
@@ -208,6 +212,7 @@ class AttachmentUserInitiatedDownloadService : JobService() {
             download = { runDownload(request) },
             onFinished = {
                 attachmentIntentStore(applicationContext).setInteractive(request, interactive = false)
+                transfers.finished(params.jobId)
                 AttachmentDownloadJobEvents.changed()
                 jobFinished(params, false)
             },
@@ -241,17 +246,21 @@ class AttachmentUserInitiatedDownloadService : JobService() {
         }
     }
 
+    /** Ends the job's run as stopped and keeps retry ownership with the scheduler when the reader still wants it. */
     override fun onStopJob(params: JobParameters): Boolean {
         Log.w(TAG, "attachment_user_job_stopped reason=${params.stopReason}")
         runs.stop(params.jobId)
+        transfers.stopped(params.jobId)
         AttachmentDownloadJobEvents.changed()
         return decodeAttachmentJobExtras(params.extras)?.let { request ->
             attachmentIntentStore(applicationContext).isInteractive(request)
         } == true
     }
 
+    /** Cancels the service's work and releases every transfer it still counted, so no card count outlives it. */
     override fun onDestroy() {
         scope.cancel()
+        transfers.stoppedAll()
         super.onDestroy()
     }
 }

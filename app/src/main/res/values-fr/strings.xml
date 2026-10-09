@@ -2290,4 +2290,8 @@
     <string name="pinned_shortcut_unavailable">Cette discussion n’est plus disponible.</string>
     <string name="pinned_shortcut_failed">Impossible de demander un raccourci. Réessayez.</string>
     <string name="media_set_group_picture">Définir comme photo du groupe</string>
+    <plurals name="media_downloading_count">
+        <item quantity="one">%1$d pièce jointe en cours de téléchargement</item>
+        <item quantity="other">%1$d pièces jointes en cours de téléchargement</item>
+    </plurals>
 </resources>

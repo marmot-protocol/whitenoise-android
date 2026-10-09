@@ -2307,4 +2307,8 @@
     <string name="pinned_shortcut_unavailable">Diese Unterhaltung ist nicht mehr verfügbar.</string>
     <string name="pinned_shortcut_failed">Die Verknüpfung konnte nicht angefordert werden. Versuche es erneut.</string>
     <string name="media_set_group_picture">Als Gruppenbild festlegen</string>
+    <plurals name="media_downloading_count">
+        <item quantity="one">%1$d Anhang wird geladen</item>
+        <item quantity="other">%1$d Anhänge werden geladen</item>
+    </plurals>
 </resources>
