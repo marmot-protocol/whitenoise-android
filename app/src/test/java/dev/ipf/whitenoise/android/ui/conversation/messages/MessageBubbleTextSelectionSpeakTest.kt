@@ -59,6 +59,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
+import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -517,6 +519,12 @@ class MessageBubbleTextSelectionSpeakTest {
     fun unmappableRenderedTargetDoesNotPauseOrChangeCurrentSpeech() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
+        // Keep the native continuation healthy while testing only the unmappable rendered hit.
+        appState.liveSubscriptionOverrides.conversation =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = listOf(ScriptedConversationTimelineSubscription(snapshotPage = null)),
+                group = group(),
+            ).subscriptions
         val item = timelineMessage("First sentence. Second sentence.")
         val entry = projectedTtsEntry(item)
         assertTrue(appState.speakAloudAutoRead(GROUP_ID, listOf(entry), Locale.getDefault()))
@@ -548,6 +556,7 @@ class MessageBubbleTextSelectionSpeakTest {
         }
         assertEquals(state, appState.ttsController.state.value)
         assertEquals(spoken, engine.spoken.size)
+        appState.stopSpeaking()
     }
 
     @Test

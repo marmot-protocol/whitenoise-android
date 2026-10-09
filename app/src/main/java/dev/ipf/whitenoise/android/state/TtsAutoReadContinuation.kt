@@ -76,12 +76,20 @@ internal fun createTtsAutoReadContinuation(appState: WhiteNoiseAppState): TtsAut
                     appState.ownsTtsAutoReadSession(group) &&
                     controller.state.value.sessionId == session
 
-            override fun allowsAppend(): Boolean = appState.ttsHistorySession.allowsOrderedLiveAppend()
+            override fun allowsAppend(): Boolean =
+                appState.ttsHistorySession.allowsLiveAppend(
+                    reconciledNativeWindow = true,
+                )
 
             override suspend fun open(
                 account: String,
                 group: String,
-            ): ConversationTimelineSubscriptionHandle = appState.conversationLiveSubscriptions().openTimeline(account, group, CONVERSATION_WINDOW_MAX_ROWS)
+            ): ConversationTimelineSubscriptionHandle =
+                appState.conversationLiveSubscriptions().openTimeline(
+                    account,
+                    group,
+                    CONVERSATION_WINDOW_MAX_ROWS,
+                )
 
             override suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry? =
                 projectTtsSpeakableEntry(
@@ -166,9 +174,10 @@ internal class TtsAutoReadContinuation(
             currentCoroutineContext().ensureActive()
             val initial = withContext(io) { active.snapshot() }
             if (initial != null && !appendPage(active, initial, run)) return
-            while (owns(run, host.controller.state.value)) {
-                val page = withContext(io) { active.nextWindow() } ?: break
-                if (!appendPage(active, page, run)) break
+            var reading = true
+            while (reading && owns(run, host.controller.state.value)) {
+                val page = withContext(io) { active.nextWindow() }
+                reading = page != null && appendPage(active, page, run)
             }
         } catch (cancel: CancellationException) {
             throw cancel

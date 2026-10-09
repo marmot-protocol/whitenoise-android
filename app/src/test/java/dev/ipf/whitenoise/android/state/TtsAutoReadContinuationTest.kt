@@ -100,7 +100,8 @@ class TtsAutoReadContinuationTest {
             val host = Host(page("m1"))
             host.start(this)
             runCurrent()
-            host.windows.send(page("m1").let { it.copy(messages = it.messages.map { row -> row.copy(deleted = true) }) })
+            val initial = page("m1")
+            host.windows.send(initial.copy(messages = initial.messages.map { it.copy(deleted = true) }))
             runCurrent()
 
             assertTrue(host.controller.state.value is TtsState.Idle)

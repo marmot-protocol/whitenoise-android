@@ -79,10 +79,17 @@ private class EngineProbe(
     fun verify(expectedRanges: Boolean) {
         assertTrue("Engine did not finish within 60 seconds", complete.await(60, TimeUnit.SECONDS))
         assertEquals("Engine reported a synthesis failure", 0, failures.get())
-        assertEquals("Observed engine capability must match the recorded fixture", expectedRanges, nativeRanges.get() > 0)
+        assertEquals(
+            "Observed engine capability must match the recorded fixture",
+            expectedRanges,
+            nativeRanges.get() > 0,
+        )
         assertTrue("No visible words were produced", words.isNotEmpty())
         assertTrue(words.all { it.leafId == "body" && it.start >= 0 && it.end <= text.length })
-        assertTrue("Sender narration must not displace body coordinates", words.any { text.substring(it.start, it.end) == "Café" })
+        assertTrue(
+            "Sender narration must not displace body coordinates",
+            words.any { text.substring(it.start, it.end) == "Café" },
+        )
     }
 
     private fun recordingEngine(): TtsSpeechEngine {

@@ -41,7 +41,7 @@ class TtsAutoReadWiringCoverageTest {
     fun conversationTtsEffectsOpenIdleTriggerUsesRevealedBacklogAndAutoReadOwnership() {
         val body = source("ui/conversation/ConversationTtsEffects.kt")
         val openEffectStart = body.indexOf("LaunchedEffect(controller, chatId, transcriptReadyToReveal)")
-        val openEffectEnd = body.indexOf("// Live continuation", openEffectStart)
+        val openEffectEnd = body.indexOf("// The process-owned continuation", openEffectStart)
         val openEffect = body.substring(openEffectStart, openEffectEnd)
 
         assertTrue(
@@ -72,31 +72,37 @@ class TtsAutoReadWiringCoverageTest {
     }
 
     @Test
-    fun conversationTtsEffectsLiveContinuationSkipsSeedAndRequiresOwnedSession() {
-        val body = source("ui/conversation/ConversationTtsEffects.kt")
-        val liveEffectStart = body.indexOf("LaunchedEffect(controller, chatId, transcriptReadyToReveal) {")
-        val liveEffectEnd = body.indexOf("// On a real foreground return", liveEffectStart)
-        val liveEffect = body.substring(liveEffectStart, liveEffectEnd)
+    fun processOwnedLiveContinuationUsesNativeWindowsAndRejectsReplacedSessions() {
+        val body = source("state/TtsAutoReadContinuation.kt")
+        val app = source("state/AppState.kt")
 
         assertTrue(
-            "live continuation must seed the current tail without speaking",
-            "if (!seededLastId)" in liveEffect,
+            "both auto-read starts must attach their own native continuation",
+            app.split("ttsAutoReadContinuation.start(").size == 3,
         )
         assertTrue(
-            "live continuation must gate on session ownership",
-            "ownsTtsAutoReadSession(controller.group.groupIdHex)" in liveEffect,
+            "live speech must use the existing native window seam",
+            "conversationLiveSubscriptions().openTimeline(" in body,
         )
         assertTrue(
-            "live continuation must reject a withheld transcript",
-            "if (!transcriptReadyToReveal) return@collect" in liveEffect,
+            "the anchor must come from the accepted speech queue",
+            ".queuedMessagesSnapshot()" in body.functionBody("start"),
         )
+        assertTrue("live speech must retain the exact account owner", "appState.activeAccountRef == account" in body)
+        assertTrue("live speech must retain the exact conversation owner", "ownsTtsAutoReadSession(group)" in body)
+        assertTrue("replacement playback must invalidate the native consumer", "state.sessionId == run.session" in body)
         assertTrue(
-            "live continuation must only extend active speech",
-            "TtsState.Speaking" in liveEffect && "TtsState.Paused" in liveEffect,
+            "only speaking and paused sessions may append",
+            "state is TtsState.Speaking || state is TtsState.Paused" in body,
         )
+        assertTrue("live speech must consume complete native windows", "active.nextWindow()" in body)
         assertTrue(
-            "live continuation must append rather than replace",
-            "appendSpeech(entry" in liveEffect,
+            "live speech must append rather than replace",
+            "host.controller.appendSpeech(it, run.locale)" in body,
+        )
+        assertFalse(
+            "the disposed screen must not own a competing live collector",
+            "if (!seededLastId)" in source("ui/conversation/ConversationTtsEffects.kt"),
         )
     }
 
@@ -114,7 +120,7 @@ class TtsAutoReadWiringCoverageTest {
             "open-time auto-read must restart only for a revealed transcript",
             effects
                 .split("LaunchedEffect(controller, chatId, transcriptReadyToReveal)")
-                .size > 2,
+                .size == 2,
         )
         assertTrue(
             "foreground-return auto-read must retry when the withheld transcript reveals",
@@ -131,8 +137,8 @@ class TtsAutoReadWiringCoverageTest {
                 .size > 2,
         )
         assertTrue(
-            "live continuation must reject hidden rows before appending speech",
-            "if (!transcriptReadyToReveal) return@collect" in effects,
+            "reveal must not replace an already owned background queue",
+            "if (appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@LaunchedEffect" in effects,
         )
     }
 

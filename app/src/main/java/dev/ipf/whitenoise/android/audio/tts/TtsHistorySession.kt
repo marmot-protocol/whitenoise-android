@@ -145,23 +145,27 @@ class TtsHistorySession internal constructor(
      * refuses while a deferred edge load owns the window. Rendered-hit preparation
      * leaves the audible window available for live continuation until it commits.
      */
-    fun allowsLiveAppend(): Boolean {
-        val convo = conversation ?: return true
+    fun allowsLiveAppend(reconciledNativeWindow: Boolean = false): Boolean {
         val consultTimeline = liveTailAttached && (!pending.playbackDeferral || pending.renderedSeek)
-        val records =
-            if (consultTimeline) {
-                resolvePager(convo.accountRef, convo.groupIdHex)?.timelineRecords().orEmpty()
-            } else {
-                emptyList()
+        val convo = conversation
+        return when {
+            // A process-owned native window has already reconciled its ordered tail and gaps.
+            reconciledNativeWindow -> consultTimeline
+            convo == null -> true
+            else -> {
+                val records =
+                    if (consultTimeline) {
+                        resolvePager(convo.accountRef, convo.groupIdHex)?.timelineRecords().orEmpty()
+                    } else {
+                        emptyList()
+                    }
+                val knownTail = lastKnownTimelineTailId
+                val accepted = knownTail != null && records.any { it.messageIdHex == knownTail }
+                if (accepted) lastKnownTimelineTailId = records.last().messageIdHex
+                accepted
             }
-        val knownTail = lastKnownTimelineTailId
-        val accepted = knownTail != null && records.any { it.messageIdHex == knownTail }
-        if (accepted) lastKnownTimelineTailId = records.last().messageIdHex
-        return accepted
+        }
     }
-
-    /** A separate native continuation has already reconciled its ordered tail and window gaps. */
-    internal fun allowsOrderedLiveAppend(): Boolean = liveTailAttached && (!pending.playbackDeferral || pending.renderedSeek)
 
     /** Latest target wins; the old audible cursor remains untouched while loading. */
     fun requestSentenceSeek(
