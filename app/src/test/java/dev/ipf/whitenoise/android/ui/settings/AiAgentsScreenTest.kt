@@ -51,9 +51,10 @@ class AiAgentsScreenTest {
     /** Claude Code joins the existing connectors without changing the Codex row's position. */
     @Test
     fun agentConnectorsAppendClaudeAfterCodex() {
-        assertEquals(5, agentConnectors.size)
+        assertEquals(6, agentConnectors.size)
         assertEquals("codex", agentConnectors[3].id)
         assertEquals("claude", agentConnectors[4].id)
+        assertEquals("goose", agentConnectors[5].id)
     }
 
     /** Every connector prompt carries the account's npub and leaves no placeholder behind. */
@@ -114,6 +115,25 @@ class AiAgentsScreenTest {
         assertTrue(prompt.contains("install-claude-marmot.sh"))
         assertTrue(prompt.contains("wn-claude --version"))
         composeRule.onNodeWithTag("ai_agents.copy_feedback").assertExists()
+    }
+
+    /** Goose copies only the active public key and explains the harness's execution limitations. */
+    @Test
+    fun gooseSetupCopiesTheExactActiveAccountPrompt() {
+        render()
+        openSetupSheet("goose")
+        composeRule.onNodeWithTag("ai_agents.copy.goose").performClick()
+        val prompt = app.getString(R.string.agent_connector_goose_prompt, TEST_NPUB)
+        composeRule.runOnIdle { assertEquals(prompt, copies.single().second) }
+        assertEquals(1, prompt.windowed(TEST_NPUB.length).count { it == TEST_NPUB })
+        assertTrue(prompt.contains("integrations/goose/marmot/README.md"))
+        assertTrue(prompt.contains("install-goose-marmot.sh"))
+        assertTrue(prompt.contains("Goose CLI 1.53.0"))
+        assertTrue(prompt.contains("wn-goose"))
+        assertTrue(prompt.contains("ask for approval before changing anything"))
+        assertTrue(prompt.contains("explicit acknowledgement and external isolation"))
+        assertTrue(prompt.contains("Non-empty attachment batches are unsupported"))
+        assertTrue(prompt.contains("Do not report setup complete until wn-goose returns a reply through White Noise"))
     }
 
     /** An account change closes the old setup sheet before its public-key prompt can be copied. */

@@ -18,6 +18,55 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
+/** Observe intent without consuming native word-selection and handle gestures. */
+internal suspend fun PointerInputScope.composerNativeSelectionTouchGestures(
+    onPress: () -> Unit,
+    onFinished: () -> Unit,
+    onTap: () -> Unit,
+) {
+    val touchSlop = viewConfiguration.touchSlop
+    val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
+    awaitPointerEventScope {
+        var pointer: PointerId? = null
+        var pressedAt = 0L
+        var origin = Offset.Zero
+        var moved = false
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val change = event.changes.firstOrNull { it.id == pointer }
+            when (event.type) {
+                PointerEventType.Press -> {
+                    val down = event.changes.firstOrNull { it.pressed && it.type == PointerType.Touch }
+                    if (down != null && pointer == null) {
+                        pointer = down.id
+                        pressedAt = down.uptimeMillis
+                        origin = down.position
+                        moved = false
+                        onPress()
+                    } else if (pointer != null) {
+                        moved = true
+                    }
+                }
+                PointerEventType.Move -> {
+                    if (change != null) {
+                        moved = moved || change.isConsumed || (change.position - origin).getDistance() > touchSlop
+                    }
+                }
+                PointerEventType.Release -> {
+                    if (change != null && !change.pressed) {
+                        if (!moved && !change.isConsumed && change.uptimeMillis - pressedAt < longPressTimeoutMillis) {
+                            onTap()
+                        }
+                        onFinished()
+                        pointer = null
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+}
+
 /**
  * Let a short finger tap enter the unfocused editor and a stationary hold open Paste, while
  * keeping both gestures away from BasicTextField's focus and selection handlers. Once focused,

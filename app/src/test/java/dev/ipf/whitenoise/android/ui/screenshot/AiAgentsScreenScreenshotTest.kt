@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -48,6 +51,21 @@ class AiAgentsScreenScreenshotTest {
     @Test
     fun aiAgentsSetupSheetDark() = captureSheet("ai_agents_setup_sheet_dark", dark = true, amoled = false)
 
+    /** Goose uses the same scrollable setup sheet in both themes. */
+    @Test
+    fun gooseSetupSheetLight() = captureSheet("ai_agents_goose_setup_light", dark = false, amoled = false, connector = "goose")
+
+    @Test
+    fun gooseSetupSheetDark() = captureSheet("ai_agents_goose_setup_dark", dark = true, amoled = false, connector = "goose")
+
+    @Test
+    @Config(qualifiers = "ar-w360dp-h780dp-mdpi")
+    fun gooseSetupSheetRtl() = captureSheet("ai_agents_goose_setup_rtl", dark = false, amoled = false, connector = "goose")
+
+    @Test
+    fun gooseSetupSheetLargeFont() =
+        captureSheet("ai_agents_goose_setup_large_font", dark = false, amoled = false, connector = "goose", fontScale = 1.6f)
+
     /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         name: String,
@@ -64,10 +82,12 @@ class AiAgentsScreenScreenshotTest {
         name: String,
         dark: Boolean,
         amoled: Boolean,
+        connector: String = "codex",
+        fontScale: Float = 1f,
     ) {
-        render(dark, amoled, PREVIEW_NPUB)
-        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("ai_agents.connector.codex"))
-        composeRule.onNodeWithTag("ai_agents.connector.codex").performClick()
+        render(dark, amoled, PREVIEW_NPUB, fontScale)
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("ai_agents.connector.$connector"))
+        composeRule.onNodeWithTag("ai_agents.connector.$connector").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("sheet.surface").captureRoboImage("src/test/snapshots/$name.png")
     }
@@ -77,10 +97,14 @@ class AiAgentsScreenScreenshotTest {
         dark: Boolean,
         amoled: Boolean,
         npub: String?,
+        fontScale: Float = 1f,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
-                AiAgentsContent(npub = npub, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                    AiAgentsContent(npub = npub, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
+                }
             }
         }
     }

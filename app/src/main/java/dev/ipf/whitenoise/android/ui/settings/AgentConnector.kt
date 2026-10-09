@@ -42,4 +42,10 @@ internal val agentConnectors =
             subtitleRes = R.string.agent_connector_claude_subtitle,
             promptRes = R.string.agent_connector_claude_prompt,
         ),
+        AgentConnector(
+            id = "goose",
+            nameRes = R.string.agent_connector_goose_name,
+            subtitleRes = R.string.agent_connector_goose_subtitle,
+            promptRes = R.string.agent_connector_goose_prompt,
+        ),
     )
