@@ -143,7 +143,7 @@ internal fun GroupSystemRow(
                 appState,
                 waveAccountRef,
                 GroupSystemRowContent(summary, summaryText, target, waveState, preparing),
-                GroupSystemRowActions(onDeleteForMe, onWave, onOpenActions),
+                GroupSystemPresentationActions(onDeleteForMe, onWave, onOpenActions),
             )
             if (!preparing) reactionContent()
             // Developer-mode only: keep the one-line summary as the default and tuck
@@ -260,7 +260,7 @@ private data class GroupSystemRowContent(
     val preparing: Boolean,
 )
 
-private class GroupSystemRowActions(
+private class GroupSystemPresentationActions(
     val delete: (() -> Unit)?,
     val wave: (suspend (String, () -> Unit) -> Unit)?,
     val open: ((String, IntRect?) -> Unit)?,
@@ -273,7 +273,7 @@ private fun GroupSystemSummaryAndWave(
     appState: WhiteNoiseAppState,
     accountRef: String?,
     content: GroupSystemRowContent,
-    actions: GroupSystemRowActions,
+    actions: GroupSystemPresentationActions,
 ) {
     var actionMenuOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var summaryBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
