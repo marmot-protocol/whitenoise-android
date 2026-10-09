@@ -244,8 +244,7 @@ internal class TtsAutoReadContinuation(
         initial: TimelinePageFfi,
         run: TtsAutoReadRun,
     ): Boolean {
-        val reconciled = if (reattachAutoReadTail(host, run)) reconcileAnchor(subscription, initial, run) else null
-        var page = reconciled ?: return stopForGap(run)
+        var page = reconcileAnchor(subscription, initial, run) ?: return stopForGap(run)
         var complete = false
         var healthy = true
         while (healthy && !complete && owns(run, host.controller.state.value)) {
@@ -253,26 +252,25 @@ internal class TtsAutoReadContinuation(
                 host.controller.stop()
                 healthy = false
             } else {
-                val appended = appendFollowing(page, run)
-                if (appended == TtsLiveAppendResult.Deferred) {
-                    host.awaitAppendReadiness()
-                    // Revalidate native edits/deletions rather than retrying captured rows.
-                    val fresh = withContext(io) { subscription.snapshot() }
-                    val reconciled = fresh?.let { reconcileAnchor(subscription, it, run) }
-                    if (reconciled == null) healthy = stopForGap(run) else page = reconciled
-                    continue
-                }
-                if (appended == TtsLiveAppendResult.Detached) {
-                    run.detached = true
-                    complete = true
-                } else {
-                    healthy = appended == TtsLiveAppendResult.Accepted
-                    if (healthy && page.hasMoreAfter) {
-                        val advanced = advanceNativePage(subscription, run)
-                        if (advanced == null) healthy = stopForGap(run) else page = advanced
-                    } else {
-                        complete = healthy
+                when (appendFollowing(page, run)) {
+                    TtsLiveAppendResult.Deferred -> {
+                        val fresh = retryDeferredPage(subscription, run)
+                        healthy = fresh != null
+                        page = fresh ?: page
                     }
+                    TtsLiveAppendResult.Detached -> {
+                        run.detached = true
+                        complete = true
+                    }
+                    TtsLiveAppendResult.Stopped -> healthy = false
+                    TtsLiveAppendResult.Accepted ->
+                        if (page.hasMoreAfter) {
+                            val advanced = advanceNativePage(subscription, run)
+                            healthy = advanced != null
+                            page = advanced ?: page
+                        } else {
+                            complete = true
+                        }
                 }
             }
         }
@@ -283,12 +281,16 @@ internal class TtsAutoReadContinuation(
         subscription: ConversationTimelineSubscriptionHandle,
         initial: TimelinePageFfi,
         run: TtsAutoReadRun,
-    ): TimelinePageFfi? {
-        if (run.tail.following(initial) != null) return initial
-        val jump = withContext(io) { subscription.jumpToMessage(requireNotNull(run.tail.messageId)) }
-        val outcome = (jump as? ConversationJumpOutcome.Window)?.outcome as? TimelinePageOutcome.Advanced
-        return outcome?.page
-    }
+    ): TimelinePageFfi? =
+        when {
+            !reattachAutoReadTail(host, run) -> null
+            run.tail.following(initial) != null -> initial
+            else -> {
+                val jump = withContext(io) { subscription.jumpToMessage(requireNotNull(run.tail.messageId)) }
+                val outcome = (jump as? ConversationJumpOutcome.Window)?.outcome as? TimelinePageOutcome.Advanced
+                outcome?.page
+            }
+        }
 
     private suspend fun appendFollowing(
         page: TimelinePageFfi,
@@ -324,7 +326,7 @@ internal class TtsAutoReadContinuation(
                     host.appendDeferred -> TtsLiveAppendResult.Deferred
                     !host.allowsAppend() -> TtsLiveAppendResult.Detached
                     entry == null || !owns(run, host.controller.state.value) -> TtsLiveAppendResult.Accepted
-                    !canRetain(entry) -> {
+                    !canRetainSpeech(host.controller, entry, maxRetainedMessages, maxRetainedTextChars) -> {
                         stopForGap(run)
                         TtsLiveAppendResult.Stopped
                     }
@@ -355,12 +357,16 @@ internal class TtsAutoReadContinuation(
         }
     }
 
-    /** Bound transient speech retention while an unattended session is paused. */
-    private fun canRetain(entry: TtsSpeakableEntry): Boolean {
-        val queued = host.controller.queuedMessagesSnapshot()
-        if (queued.any { it.messageIdHex == entry.messageIdHex }) return true
-        val incomingChars = maxOf(entry.text.length, entry.sourceText?.length ?: 0)
-        return queued.size < maxRetainedMessages && retainedTextChars(queued) + incomingChars <= maxRetainedTextChars
+    private suspend fun retryDeferredPage(
+        subscription: ConversationTimelineSubscriptionHandle,
+        run: TtsAutoReadRun,
+    ): TimelinePageFfi? {
+        host.awaitAppendReadiness()
+        // Revalidate native edits/deletions rather than retrying captured rows.
+        val fresh = withContext(io) { subscription.snapshot() }
+        val reconciled = fresh?.let { reconcileAnchor(subscription, it, run) }
+        if (reconciled == null) stopForGap(run)
+        return reconciled
     }
 
     private suspend fun advanceNativePage(
@@ -369,7 +375,9 @@ internal class TtsAutoReadContinuation(
     ): TimelinePageFfi? {
         val next = withContext(io) { subscription.paginateForwards(CONVERSATION_WINDOW_MAX_ROWS) }
         val advanced = (next as? TimelinePageOutcome.Advanced)?.page
-        return advanced?.takeIf { run.tail.following(it)?.isEmpty() == false }
+        val valid = advanced?.takeIf { run.tail.following(it)?.isEmpty() == false }
+        if (valid == null) stopForGap(run)
+        return valid
     }
 
     private fun stopForGap(run: TtsAutoReadRun): Boolean {
@@ -417,4 +425,17 @@ private fun reattachAutoReadTail(
         run.detached = false
     }
     return true
+}
+
+/** Bound transient speech retention while an unattended session is paused. */
+private fun canRetainSpeech(
+    controller: TtsController,
+    entry: TtsSpeakableEntry,
+    maxRetainedMessages: Int,
+    maxRetainedTextChars: Int,
+): Boolean {
+    val queued = controller.queuedMessagesSnapshot()
+    if (queued.any { it.messageIdHex == entry.messageIdHex }) return true
+    val incomingChars = maxOf(entry.text.length, entry.sourceText?.length ?: 0)
+    return queued.size < maxRetainedMessages && retainedTextChars(queued) + incomingChars <= maxRetainedTextChars
 }
