@@ -44,6 +44,42 @@ class MainShellSectionStateTest {
     }
 
     @Test
+    fun previousProcessCounterCanRestartWithoutPoppingTheSavedDestination() {
+        val route =
+            MainShellSectionState(
+                SavedStateHandle(
+                    mapOf(
+                        "main_shell_section_account" to "personal",
+                        "main_shell_section_runtime" to 13,
+                        "main_shell_section_process" to "previous-process",
+                        "main_shell_section_name" to MainSection.Settings.name,
+                        "main_shell_section_detail" to SettingsDetail.DevicePrivacy.name,
+                    ),
+                ),
+            )
+        route.bind("personal", 1)
+        assertEquals(MainSection.Settings.name, route.sectionName)
+        assertEquals(SettingsDetail.DevicePrivacy.name, route.settingsDetailName)
+
+        route.bind("personal", 2)
+        assertChats(route)
+    }
+
+    @Test
+    fun restoredHolderStillRejectsRuntimeReplacementWithinTheSameProcess() {
+        val savedState = SavedStateHandle()
+        val first = MainShellSectionState(savedState)
+        first.bind("personal", 4)
+        first.sectionName = MainSection.Settings.name
+        first.settingsDetailName = SettingsDetail.DevicePrivacy.name
+
+        val restored =
+            MainShellSectionState(SavedStateHandle(savedState.keys().associateWith { savedState.get<Any?>(it) }))
+        restored.bind("personal", 5)
+        assertChats(restored)
+    }
+
+    @Test
     fun signedOutScopeCannotSaveOrRecoverAProtectedDestination() {
         val route = privacyDestination()
         route.bind(null, 4)

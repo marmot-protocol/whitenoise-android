@@ -78,7 +78,12 @@ private fun maestroAccountActionNativeMatches(
         members.all { maestroAccountActionHistoryMatches(native, before, it, wiped) } &&
         members.all {
             if (it == before.owner) {
-                native.messageDraft(it, before.group)?.content == ACCOUNT_ACTION_DRAFT
+                maestroShareDraftMatches(
+                    native.messageDraft(it, before.group),
+                    before.group,
+                    ACCOUNT_ACTION_DRAFT,
+                    emptyList(),
+                )
             } else {
                 native.messageDraft(it, before.group) == before.drafts[it]
             }

@@ -1678,7 +1678,9 @@ class RuntimeEvidenceTest(unittest.TestCase):
         root = runtime.ROOT / '.maestro'
         for name in names:
             text = (root / 'runtime' / f'{name}.yaml').read_text()
-            self.assertIn('runFlow: ../fixtures/open-fixture-profile-keys.yaml', text)
+            commands = expanded_flow_commands(root / 'runtime' / f'{name}.yaml')
+            self.assertIn({'tapOn': 'Profile Keys'}, commands)
+            self.assertIn({'assertVisible': 'Private key hidden'}, commands)
             self.assertIn('runFlow: ../fixtures/copy-fixture-public-key.yaml', text)
             self.assertIn('ACC-010', runtime.CASES[name]['manual_ids'])
             self.assertNotIn('Show private key', text)
@@ -1807,7 +1809,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 self.assertIn('- tapOn: Hide private key', text)
             elif route == 'departure':
                 self.assertIn('- assertVisible: Maestro group', text)
-                self.assertEqual(text.count('open-fixture-profile-keys.yaml'), 2)
+                commands = expanded_flow_commands(root / 'runtime' / f'keys-private-reveal-{route}-copy.yaml')
+                self.assertEqual(commands.count({'tapOn': 'Profile Keys'}), 2)
             else:
                 commands = list(yaml.safe_load_all(text))[1]
                 waits = [row['extendedWaitUntil'] for row in commands if isinstance(row, dict)

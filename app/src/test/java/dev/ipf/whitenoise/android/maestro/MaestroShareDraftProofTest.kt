@@ -40,6 +40,10 @@ class MaestroShareDraftProofTest {
         assertTrue(maestroShareDraftMatches(draft(emptyList(), "caption"), "group", "caption", emptyList()))
         assertFalse(maestroShareDraftMatches(draft(listOf(first), "caption"), "group", "caption", emptyList()))
         assertFalse(maestroShareDraftMatches(null, "group", "caption", emptyList()))
+        val original = draft(emptyList(), "caption")
+        for (invalid in listOf(original.copy(groupIdHex = "other"), original.copy(replyToMessageIdHex = "reply"))) {
+            assertFalse(maestroShareDraftMatches(invalid, "group", "caption", emptyList()))
+        }
     }
 
     @Test

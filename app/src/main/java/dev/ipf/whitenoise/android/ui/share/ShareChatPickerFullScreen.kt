@@ -276,61 +276,63 @@ private fun ShareChatPickerContent(
         val compactHeight = maxHeight < 480.dp
         val horizontalFilters = compactHeight && maxWidth >= 600.dp
         val selectedAccount = pickerState.selectedAccount
-        Column(
+        ShareChatPickerTargetList(
+            pickerState = pickerState,
+            filteredTargets = filteredTargets,
+            browsingFiltered = filter.folderId != null || filter.reviewingSelected,
+            targetsComplete = folderComplete,
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(if (compactHeight) 8.dp else 12.dp),
+            listState = listState,
         ) {
-            if (compactHeight && selectedAccount != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+            // Keep focused search in the same scrolling header as IME height changes.
+            Column(
+                modifier = Modifier.padding(bottom = if (compactHeight) 8.dp else 12.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compactHeight) 8.dp else 12.dp),
+            ) {
+                if (compactHeight && selectedAccount != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ShareChatPickerPreview(
+                            previewText = pickerState.previewText,
+                            attachmentCount = pickerState.attachmentCount,
+                            compact = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        ShareChatPickerAccountRow(
+                            pickerState = pickerState,
+                            account = selectedAccount,
+                            compact = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else {
                     ShareChatPickerPreview(
                         previewText = pickerState.previewText,
                         attachmentCount = pickerState.attachmentCount,
-                        compact = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    ShareChatPickerAccountRow(
-                        pickerState = pickerState,
-                        account = selectedAccount,
-                        compact = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            } else {
-                ShareChatPickerPreview(
-                    previewText = pickerState.previewText,
-                    attachmentCount = pickerState.attachmentCount,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                )
-                selectedAccount?.let { account ->
-                    ShareChatPickerAccountRow(
-                        pickerState = pickerState,
-                        account = account,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
                     )
+                    selectedAccount?.let { account ->
+                        ShareChatPickerAccountRow(
+                            pickerState = pickerState,
+                            account = account,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+                        )
+                    }
                 }
+                DestinationPickerSearch(
+                    query = pickerState.query,
+                    onQueryChange = { pickerState.query = it },
+                    placeholder = R.string.share_search_chats,
+                    folders = folders,
+                    filter = filter,
+                    selected = pickerState.selected,
+                    horizontal = horizontalFilters,
+                    onFocusChange = { pickerState.searchFocused = it },
+                )
             }
-            DestinationPickerSearch(
-                query = pickerState.query,
-                onQueryChange = { pickerState.query = it },
-                placeholder = R.string.share_search_chats,
-                folders = folders,
-                filter = filter,
-                selected = pickerState.selected,
-                horizontal = horizontalFilters,
-                onFocusChange = { pickerState.searchFocused = it },
-            )
-            ShareChatPickerTargetList(
-                pickerState = pickerState,
-                filteredTargets = filteredTargets,
-                browsingFiltered = filter.folderId != null || filter.reviewingSelected,
-                targetsComplete = folderComplete,
-                modifier = Modifier.weight(1f),
-                listState = listState,
-            )
         }
     }
 }
@@ -344,6 +346,7 @@ private fun ShareChatPickerTargetList(
     targetsComplete: Boolean,
     modifier: Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState,
+    controls: @Composable () -> Unit,
 ) {
     PreparedVisibleGroupAvatarContent(
         pickerState.appState,
@@ -358,6 +361,7 @@ private fun ShareChatPickerTargetList(
             state = listState,
             contentPadding = PaddingValues(bottom = Dimens.spaceLg),
         ) {
+            item(key = "share-picker-controls") { controls() }
             pickerState.error?.let { failure ->
                 item(key = "share-picker-load-error") {
                     InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
