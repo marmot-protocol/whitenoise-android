@@ -404,7 +404,7 @@ class TtsControllerTest {
     }
 
     @Test
-    fun navigationIsIgnoredWhileIdleAndErrored() {
+    fun navigationWhileIdleDoesNotAcquireFocusOrSubmitSpeech() {
         val engine = FakeTtsSpeechEngine()
         val focus = FakeTtsAudioFocus()
         val controller = controller(focus)
@@ -418,18 +418,26 @@ class TtsControllerTest {
         assertTrue(controller.state.value is TtsState.Idle)
         assertTrue(engine.spoken.isEmpty())
         assertEquals(0, focus.acquireCalls)
+    }
 
-        controller.speak("One.", Locale.US)
-        engine.fail(0, TextToSpeech.ERROR_NETWORK)
-        val errored = controller.state.value
-        val spokenAfterError = engine.spoken.size
+    @Test
+    fun engineFailureReleasesFocusAndResumeReacquiresItWithoutReplacingTheSession() {
+        val engine = FakeTtsSpeechEngine()
+        val focus = FakeTtsAudioFocus()
+        val controller = controller(focus)
+        controller.attachEngine(engine)
+        controller.speak("One. Two.", Locale.US)
+        val session = controller.state.value.sessionId
+        engine.fail(1, TextToSpeech.ERROR_SYNTHESIS)
+        assertEquals(1, focus.releaseCalls)
+        assertEquals(0, controller.state.value.chunkIndex)
 
-        controller.skipNextSentence()
-        controller.skipNextMessage()
+        controller.resume()
 
-        assertEquals(errored, controller.state.value)
-        assertEquals(spokenAfterError, engine.spoken.size)
-        assertEquals(1, focus.acquireCalls)
+        assertEquals(2, focus.acquireCalls)
+        assertEquals(session, controller.state.value.sessionId)
+        assertTrue(controller.state.value is TtsState.Speaking)
+        assertEquals(listOf("One.", "Two."), engine.spoken.takeLast(2).map { it.text })
     }
 
     @Test
@@ -443,7 +451,9 @@ class TtsControllerTest {
         engine.fail(0, TextToSpeech.ERROR_NETWORK)
 
         assertEquals(
-            errorTts(TtsError.Network, 0, 1, 0, 1, "One.", sentenceIndex = 0, sentenceCount = 1),
+            pausedTts(0, 1, 0, 1, "One.", sentenceIndex = 0, sentenceCount = 1).copy(
+                error = TtsError.Network,
+            ),
             controller.state.value,
         )
         assertEquals(1, focus.releaseCalls)

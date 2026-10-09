@@ -55,6 +55,7 @@ sealed interface TtsState {
     ) : TtsState
 
     data class Paused(
+        val error: TtsError? = null,
         override val sessionId: Long = 0L,
         override val chunkIndex: Int,
         override val chunkCount: Int,
@@ -146,6 +147,7 @@ internal class TtsPlaybackQueue(
     private val stopEngine: () -> Unit,
     private val enqueue: (chunk: TtsChunk, utteranceId: String) -> Int,
     private val onTerminal: () -> Unit = {},
+    private val onInterrupted: () -> Unit = {},
 ) {
     private val _state = MutableStateFlow<TtsState>(TtsState.Idle())
     val state: StateFlow<TtsState> = _state.asStateFlow()
@@ -359,8 +361,8 @@ internal class TtsPlaybackQueue(
                 is TtsState.Preparing -> (current.retained as? TtsState.Speaking)?.passage
                 else -> null
             }
-        stopEngine()
         playbackCallbacks.advance()
+        stopEngine()
         progress.clearSpokenPayloads()
         rangeTracker.clear()
         // Resume re-reads the rate per utterance anyway, a leaked flag would
@@ -707,26 +709,12 @@ internal class TtsPlaybackQueue(
 
                 else -> TtsError.Synthesis
             }
-        val messageIndex = projection.messageIndexForChunk(failedIndex)
-        fail(
-            error = error,
-            chunkIndex = failedIndex,
-            chunkCount = chunks.size,
-            messageIndex = messageIndex,
-            messageCount = messages.size,
-            sentenceIndex = chunks[failedIndex].sentenceIndex,
-            sentenceCount = messageSentenceCount[messageIndex],
-            messagePreview = messages.getOrNull(messageIndex)?.preview.orEmpty(),
-            messageProgressFraction =
-                if (messageIndex == activeState.messageIndex) {
-                    maxOf(
-                        activeState.messageProgressFraction,
-                        sentenceFallbackProgress(failedIndex),
-                    )
-                } else {
-                    sentenceFallbackProgress(failedIndex)
-                },
-        )
+        // A prebuffered later utterance can fail before earlier speech finishes.
+        // Retain the earliest unfinished sentence, rather than skipping to the failed one.
+        pauseAt(currentIndex)
+        val paused = _state.value as TtsState.Paused
+        _state.value = paused.copy(error = error, passage = null)
+        onInterrupted()
     }
 
     /**
@@ -1113,6 +1101,7 @@ internal class TtsPlaybackQueue(
     private fun publishPaused(
         chunkIndex: Int,
         passage: TtsPassage? = rangeTracker.fallbackPassage(chunks[chunkIndex]),
+        error: TtsError? = (_state.value as? TtsState.Paused)?.error,
     ) {
         val messageIndex = projection.messageIndexForChunk(chunkIndex)
         progress.syncBaseline(
@@ -1123,6 +1112,7 @@ internal class TtsPlaybackQueue(
         )
         _state.value =
             TtsState.Paused(
+                error = error,
                 sessionId = playbackSessionId,
                 chunkIndex = chunkIndex,
                 chunkCount = chunks.size,

@@ -160,6 +160,9 @@ class TtsHistorySession internal constructor(
         return accepted
     }
 
+    /** A separate native continuation has already reconciled its ordered tail and window gaps. */
+    internal fun allowsOrderedLiveAppend(): Boolean = liveTailAttached && (!pending.playbackDeferral || pending.renderedSeek)
+
     /** Latest target wins; the old audible cursor remains untouched while loading. */
     fun requestSentenceSeek(
         messageIdHex: String,

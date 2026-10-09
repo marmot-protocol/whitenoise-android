@@ -1542,6 +1542,7 @@ class WhiteNoiseAppState private constructor(
     // ends the session; another chat's — or another ACCOUNT'S view of the
     // same group — must never extend it.
     private var ttsAutoReadSessionKey by mutableStateOf<String?>(null)
+    private val ttsAutoReadContinuation by lazy { createTtsAutoReadContinuation(this) }
 
     // Manual speech deliberately has no auto-read session key, but it still
     // owns decrypted text that must stop when its account is removed.
@@ -1601,6 +1602,7 @@ class WhiteNoiseAppState private constructor(
         if (started) {
             ttsAutoReadSessionKey = owner
             ttsHistorySession.onConversationSessionStarted(activeAccountRef, groupIdHex)
+            activeAccountRef?.let { ttsAutoReadContinuation.start(it, groupIdHex, locale) }
         }
         return started
     }
@@ -1686,6 +1688,7 @@ class WhiteNoiseAppState private constructor(
                     if (started) {
                         ttsAutoReadSessionKey = owner
                         ttsHistorySession.onConversationSessionStarted(ownerAccount, groupIdHex)
+                        ownerAccount?.let { ttsAutoReadContinuation.start(it, groupIdHex, locale) }
                     }
                 }
             } ?: false

@@ -457,8 +457,8 @@ class TtsPlaybackQueueTest {
             queue.onError(harness.utteranceId(0), errorCode)
 
             val failure = queue.state.value
-            assertTrue(failure is TtsState.Error)
-            assertEquals(TtsError.Network, (failure as TtsState.Error).error)
+            assertTrue(failure is TtsState.Paused)
+            assertEquals(TtsError.Network, (failure as TtsState.Paused).error)
             assertEquals(0, failure.chunkIndex)
             assertEquals(1, failure.chunkCount)
             assertEquals(0, failure.sentenceIndexWithinMessage)
@@ -474,10 +474,10 @@ class TtsPlaybackQueueTest {
         queue.start(ttsMessages(ttsMessage("", "", "One.")))
 
         val failure = queue.state.value
-        assertTrue(failure is TtsState.Error)
-        assertEquals(TtsError.Synthesis, (failure as TtsState.Error).error)
+        assertTrue(failure is TtsState.Paused)
+        assertEquals(TtsError.Synthesis, (failure as TtsState.Paused).error)
         assertEquals(2, harness.stopCalls)
-        assertEquals(1, harness.terminalCalls)
+        assertEquals(0, harness.terminalCalls)
     }
 
     @Test
