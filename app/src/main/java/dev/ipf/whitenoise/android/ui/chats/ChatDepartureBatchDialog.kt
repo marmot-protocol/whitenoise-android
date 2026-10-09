@@ -59,6 +59,13 @@ private class ChatDepartureDecision(
     val answer = CompletableDeferred<AppGroupMemberRecordFfi?>()
 }
 
+internal class ChatDepartureActions(
+    val onDismiss: () -> Unit,
+    val onAccepted: () -> Unit = {},
+    val canStart: () -> Boolean = { true },
+    val onBusyChange: (Boolean) -> Unit = {},
+)
+
 /** The same captured selection drives single-row and bulk departure, with per-group skip and scoped retry. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -66,10 +73,7 @@ internal fun ChatDepartureBatchDialog(
     request: PendingChatDeparture,
     appState: WhiteNoiseAppState,
     controller: ChatsController,
-    onDismiss: () -> Unit,
-    onAccepted: () -> Unit = {},
-    canStart: () -> Boolean = { true },
-    onBusyChange: (Boolean) -> Unit = {},
+    actions: ChatDepartureActions,
 ) {
     val ui = remember(request) { ChatDepartureUi() }
     val actionLabel =
@@ -86,11 +90,11 @@ internal fun ChatDepartureBatchDialog(
     }
 
     fun start(targets: List<ChatDepartureTarget>) {
-        if (ui.busy || !isCurrent() || !canStart()) return
-        if (!ui.confirmed) onAccepted()
+        if (ui.busy || !isCurrent() || !actions.canStart()) return
+        if (!ui.confirmed) actions.onAccepted()
         ui.confirmed = true
         ui.busy = true
-        onBusyChange(true)
+        actions.onBusyChange(true)
         ui.result = null
         appState.launchMutation {
             try {
@@ -100,44 +104,9 @@ internal fun ChatDepartureBatchDialog(
                         isCurrent,
                         ChatDepartureCallbacks(
                             controller::prepareChatListDeparture,
-                            choose = { target, members ->
-                                if (!ui.active) {
-                                    null
-                                } else {
-                                    val decision = ChatDepartureDecision(target, members)
-                                    ui.selected = members.singleOrNull()
-                                    ui.decision = decision
-                                    decision.answer.await().also { ui.decision = null }
-                                }
-                            },
+                            choose = { target, members -> chooseDepartureSuccessor(ui, target, members) },
                             remove = { target, successor ->
-                                when {
-                                    target.isDm -> {
-                                        var deferred = false
-                                        val deleted =
-                                            controller.deleteGroupLocalFromChatList(
-                                                target.groupId,
-                                                notify = false,
-                                                observer =
-                                                    LocalChatDeleteObserver(onCleanupDeferred = {
-                                                        deferred = true
-                                                        if (isCurrent()) {
-                                                            ui.stages[target.groupId] =
-                                                                ChatDepartureStage.CLEANUP_PENDING
-                                                        }
-                                                    }),
-                                            )
-                                        deleted && !deferred
-                                    }
-                                    successor != null ->
-                                        controller.transferAdminThenDeleteFromChatList(target.groupId, successor) {
-                                            if (isCurrent()) ui.stages[target.groupId] = it
-                                        }
-                                    else ->
-                                        controller.leaveAndDeleteFromChatList(target.groupId) {
-                                            if (isCurrent()) ui.stages[target.groupId] = it
-                                        }
-                                }
+                                removeChatDepartureTarget(target, successor, controller, ui, isCurrent)
                             },
                             onProgress = { title, completed, total -> ui.progress = "$completed / $total · $title" },
                         ),
@@ -145,7 +114,7 @@ internal fun ChatDepartureBatchDialog(
                 if (isCurrent()) ui.result = result
             } finally {
                 ui.busy = false
-                onBusyChange(false)
+                actions.onBusyChange(false)
                 ui.decision?.answer?.complete(null)
                 ui.decision = null
             }
@@ -158,13 +127,13 @@ internal fun ChatDepartureBatchDialog(
             confirmLabel = actionLabel,
             destructive = true,
             onConfirm = { start(request.targets) },
-            onDismiss = onDismiss,
+            onDismiss = actions.onDismiss,
         )
     } else if (ui.decision != null) {
         ChatDepartureSuccessor(ui, appState)
     } else {
         WhiteNoiseAlertDialog(
-            onDismissRequest = onDismiss,
+            onDismissRequest = actions.onDismiss,
             modifier = Modifier.testTag("chat.departure.progress"),
             title = { Text(actionLabel) },
             text = {
@@ -183,10 +152,54 @@ internal fun ChatDepartureBatchDialog(
                     }
                 }
             },
-            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
+            dismissButton = { TextButton(onClick = actions.onDismiss) { Text(stringResource(R.string.close)) } },
         )
     }
 }
+
+private suspend fun chooseDepartureSuccessor(
+    ui: ChatDepartureUi,
+    target: ChatDepartureTarget,
+    members: List<AppGroupMemberRecordFfi>,
+): AppGroupMemberRecordFfi? {
+    if (!ui.active) return null
+    val decision = ChatDepartureDecision(target, members)
+    ui.selected = members.singleOrNull()
+    ui.decision = decision
+    return decision.answer.await().also { ui.decision = null }
+}
+
+private suspend fun removeChatDepartureTarget(
+    target: ChatDepartureTarget,
+    successor: AppGroupMemberRecordFfi?,
+    controller: ChatsController,
+    ui: ChatDepartureUi,
+    isCurrent: () -> Boolean,
+): Boolean =
+    when {
+        target.isDm -> {
+            var deferred = false
+            val deleted =
+                controller.deleteGroupLocalFromChatList(
+                    target.groupId,
+                    notify = false,
+                    observer =
+                        LocalChatDeleteObserver(onCleanupDeferred = {
+                            deferred = true
+                            if (isCurrent()) ui.stages[target.groupId] = ChatDepartureStage.CLEANUP_PENDING
+                        }),
+                )
+            deleted && !deferred
+        }
+        successor != null ->
+            controller.transferAdminThenDeleteFromChatList(target.groupId, successor) {
+                if (isCurrent()) ui.stages[target.groupId] = it
+            }
+        else ->
+            controller.leaveAndDeleteFromChatList(target.groupId) {
+                if (isCurrent()) ui.stages[target.groupId] = it
+            }
+    }
 
 @Composable
 @Suppress("FunctionNaming")

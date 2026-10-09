@@ -2094,14 +2094,17 @@ internal fun ChatsScreen(
             request = request,
             appState = appState,
             controller = controller,
-            onDismiss = { pendingLeaveAndDelete = null },
-            onAccepted = ::clearSelection,
-            canStart = { request.targets.none { it.groupId in leavingAndDeleting } },
-            onBusyChange = { busy ->
-                request.targets.forEach { target ->
-                    if (busy) leavingAndDeleting.add(target.groupId) else leavingAndDeleting.remove(target.groupId)
-                }
-            },
+            actions =
+                ChatDepartureActions(
+                    onDismiss = { pendingLeaveAndDelete = null },
+                    onAccepted = ::clearSelection,
+                    canStart = { request.targets.none { it.groupId in leavingAndDeleting } },
+                    onBusyChange = { busy ->
+                        request.targets.forEach { target ->
+                            if (busy) leavingAndDeleting.add(target.groupId) else leavingAndDeleting.remove(target.groupId)
+                        }
+                    },
+                ),
         )
     }
 

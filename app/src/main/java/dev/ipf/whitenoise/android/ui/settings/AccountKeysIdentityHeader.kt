@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ConnectivityBannerTarget
 import dev.ipf.whitenoise.android.ui.chats.connectivityBannerTarget
@@ -75,12 +76,13 @@ internal fun AccountKeysIdentityHeader(identity: AccountKeysIdentity) {
 @Composable
 internal fun accountKeysConnectionLabel(appState: WhiteNoiseAppState): Int {
     val signals by appState.connectivitySignals.collectAsState()
+    val connection = appState.activeAccountRef?.let(appState::boundChats)?.connectionState ?: ChatListConnectionState()
     return when (
         connectivityBannerTarget(
             signals.hasValidatedInternet,
             appState.activeAccountRef,
             appState.runtimeGeneration,
-            appState.chats.connectionState,
+            connection,
         )
     ) {
         ConnectivityBannerTarget.Offline -> R.string.connectivity_offline
