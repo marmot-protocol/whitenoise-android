@@ -822,6 +822,92 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    @Test
+    fun missingProjectionStillLeavesJoinedNativeGroupBeforeDeleting() =
+        runBlocking {
+            val fixture = fixture(missingProjection = MissingProjection.JOINED)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.prepareChatListDeparture(GROUP_ID).isEmpty())
+                assertTrue(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("leave", "delete"), fixture.calls.order)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun missingProjectionStillRequiresAdministratorHandover() =
+        runBlocking {
+            val fixture =
+                fixture(
+                    missingProjection = MissingProjection.JOINED,
+                    groupRecord = group().copy(admins = listOf(ACCOUNT_ID)),
+                )
+            val controller = fixture.seededChatsController()
+            try {
+                val candidate = controller.prepareChatListDeparture(GROUP_ID).single()
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertTrue(fixture.calls.order.isEmpty())
+                assertTrue(controller.transferAdminThenDeleteFromChatList(GROUP_ID, candidate))
+                assertEquals(listOf("promote", "demote", "leave", "delete"), fixture.calls.order)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun missingProjectionWithUnavailableRosterPreservesHistory() =
+        runBlocking {
+            val fixture = fixture(missingProjection = MissingProjection.JOINED, failRosterRead = true)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(runCatching { controller.prepareChatListDeparture(GROUP_ID) }.isFailure)
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertTrue(fixture.calls.order.isEmpty())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun exactNativeAbsenceAllowsCleanupWithoutRepeatedLeave() =
+        runBlocking {
+            val fixture = fixture(missingProjection = MissingProjection.UNKNOWN_GROUP)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.prepareChatListDeparture(GROUP_ID).isEmpty())
+                assertTrue(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("delete"), fixture.calls.order)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun unknownGroupForAnotherTargetNeverAuthorizesDeletion() =
+        runBlocking {
+            val fixture = fixture(missingProjection = MissingProjection.WRONG_GROUP)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(runCatching { controller.prepareChatListDeparture(GROUP_ID) }.isFailure)
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertTrue(fixture.calls.order.isEmpty())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    private enum class MissingProjection {
+        NONE,
+        JOINED,
+        UNKNOWN_GROUP,
+        WRONG_GROUP,
+        ;
+
+        val returnsUnknownGroup get() = this == UNKNOWN_GROUP || this == WRONG_GROUP
+    }
+
     /** Creates one isolated app/runtime pair with controllable native leave and delete commits. */
     private fun fixture(
         failLeave: Boolean = false,
@@ -836,6 +922,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         soleMember: Boolean = false,
         leaveResultHook: () -> Unit = {},
         groupRecord: AppGroupRecordFfi = group(),
+        missingProjection: MissingProjection = MissingProjection.NONE,
     ): LifecycleFixture {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appState =
@@ -861,6 +948,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 leaveResultHook,
                 groupRecord,
                 failRosterRead,
+                missingProjection,
             )
         WhiteNoiseAppState::class.java
             .getDeclaredField("marmotRuntime")
@@ -903,6 +991,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         leaveResultHook: () -> Unit,
         groupRecord: AppGroupRecordFfi,
         failRosterRead: Boolean,
+        missingProjection: MissingProjection,
     ): MarmotInterface {
         var localGroupPresent = true
         var left = false
@@ -919,7 +1008,10 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
                 "groupDetails" ->
-                    if (failRosterRead) {
+                    if (missingProjection.returnsUnknownGroup) {
+                        val target = if (missingProjection == MissingProjection.UNKNOWN_GROUP) GROUP_ID else OTHER_GROUP
+                        failNativeCall(arguments, MarmotKitException.UnknownGroup(target))
+                    } else if (failRosterRead) {
                         failNativeCall(arguments, IllegalStateException("roster unavailable"))
                     } else {
                         lifecycleGroupDetails(authoritativeGroup, soleMember)
@@ -940,7 +1032,11 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "catchUpAccounts" -> Unit
                 "chatListRow" -> {
                     calls.chatListRow.incrementAndGet()
-                    lifecycleChatRows(localGroupPresent, left).firstOrNull { it.groupIdHex == arguments?.get(1) }
+                    if (missingProjection != MissingProjection.NONE && !left) {
+                        null
+                    } else {
+                        lifecycleChatRows(localGroupPresent, left).firstOrNull { it.groupIdHex == arguments?.get(1) }
+                    }
                 }
                 "chatList" -> {
                     calls.chatList.incrementAndGet()

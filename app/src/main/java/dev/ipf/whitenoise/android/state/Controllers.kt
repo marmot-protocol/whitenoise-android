@@ -4605,12 +4605,13 @@ class ChatsController private constructor(
                     val row = appState.marmotIo { chatListRow(account, groupIdHex) }
                     if (!attempt.isCurrent()) return@withGroupCommitLock false
                     when {
-                        row == null || row.selfMembership.isNonMember() -> {
-                            row?.let(::foldChatRow)
+                        row != null && row.selfMembership.isNonMember() -> {
+                            foldChatRow(row)
                             attempt.cleanupOnly = true
-                            if (row != null) onStage(ChatDepartureStage.LEFT)
+                            onStage(ChatDepartureStage.LEFT)
                             true
                         }
+                        row == null -> departWithoutChatRow(attempt, deleteAfterLeave)
                         row.leaveRequestPending -> {
                             appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
                             false
@@ -4640,12 +4641,40 @@ class ChatsController private constructor(
         }.getOrDefault(false)
     }
 
+    /** A wiped app projection does not prove that the native MLS group has been left. */
+    private suspend fun departWithoutChatRow(
+        attempt: ChatListDepartureAttempt,
+        deleteAfterLeave: Boolean,
+    ): Boolean {
+        val details = chatDepartureGroupDetails(attempt.account, attempt.groupId)
+        if (!attempt.isCurrent()) return false
+        return if (details == null) {
+            attempt.cleanupOnly = true
+            true
+        } else {
+            departJoinedChat(attempt, deleteAfterLeave, details)
+        }
+    }
+
+    /** Only an exact native UnknownGroup proves absence; transport and hydration failures preserve history. */
+    private suspend fun chatDepartureGroupDetails(
+        account: String,
+        groupIdHex: String,
+    ): GroupDetailsFfi? =
+        try {
+            appState.marmotIo { groupDetails(account, groupIdHex) }
+        } catch (failure: MarmotKitException.UnknownGroup) {
+            if (!failure.groupIdHex.equals(groupIdHex, ignoreCase = true)) throw failure
+            null
+        }
+
     /** Read roles at the commit boundary; Android never invents a roster after a failed native read. */
     private suspend fun departJoinedChat(
         attempt: ChatListDepartureAttempt,
         deleteAfterLeave: Boolean,
+        preparedDetails: GroupDetailsFfi? = null,
     ): Boolean {
-        val details = appState.marmotIo { groupDetails(attempt.account, attempt.groupId) }
+        val details = preparedDetails ?: appState.marmotIo { groupDetails(attempt.account, attempt.groupId) }
         if (!attempt.isCurrent()) return false
         val resolution = resolveAuthoritativeGroupRoster(details, attempt.activeAccountId)
         check(details.group.groupIdHex.equals(attempt.groupId, ignoreCase = true) && resolution.invariant == null) {
@@ -4898,24 +4927,29 @@ class ChatsController private constructor(
         val activeId = boundAccountIdHex()
         val row = appState.marmotIo { chatListRow(account, groupIdHex) }
         if (!chatListDepartureIsCurrent(account, epoch, runtime)) throw CancellationException("Account replaced")
-        if (row == null || row.selfMembership.isNonMember()) return emptyList()
-        check(!row.leaveRequestPending) { "Departure is awaiting native confirmation" }
-        val details = appState.marmotIo { groupDetails(account, groupIdHex) }
+        if (row?.selfMembership?.isNonMember() == true) return emptyList()
+        check(row?.leaveRequestPending != true) { "Departure is awaiting native confirmation" }
+        val details = chatDepartureGroupDetails(account, groupIdHex)
         if (!chatListDepartureIsCurrent(account, epoch, runtime)) throw CancellationException("Account replaced")
-        val resolution = resolveAuthoritativeGroupRoster(details, activeId)
-        check(details.group.groupIdHex.equals(groupIdHex, ignoreCase = true) && resolution.invariant == null) {
-            "Authoritative group roster unavailable"
-        }
-        val applied = resolution.applied
-        val handoverRequired =
-            !GroupProjector.shouldDissolveAsSoleMember(applied.members, activeId) &&
-                GroupProjector.isSoleAdminWithOtherMembers(applied.group, activeId, resolution.uniqueMemberCount)
-        return if (handoverRequired) {
-            applied.members
-                .filter { GroupProjector.canTransferAdminTo(applied.group, it, activeId) }
-                .also { check(it.isNotEmpty()) { "No eligible administrator successor" } }
-        } else {
+        return if (details == null) {
+            check(row == null) { "Native group changed during departure preparation" }
             emptyList()
+        } else {
+            val resolution = resolveAuthoritativeGroupRoster(details, activeId)
+            check(details.group.groupIdHex.equals(groupIdHex, ignoreCase = true) && resolution.invariant == null) {
+                "Authoritative group roster unavailable"
+            }
+            val applied = resolution.applied
+            val handoverRequired =
+                !GroupProjector.shouldDissolveAsSoleMember(applied.members, activeId) &&
+                    GroupProjector.isSoleAdminWithOtherMembers(applied.group, activeId, resolution.uniqueMemberCount)
+            if (handoverRequired) {
+                applied.members
+                    .filter { GroupProjector.canTransferAdminTo(applied.group, it, activeId) }
+                    .also { check(it.isNotEmpty()) { "No eligible administrator successor" } }
+            } else {
+                emptyList()
+            }
         }
     }
 
