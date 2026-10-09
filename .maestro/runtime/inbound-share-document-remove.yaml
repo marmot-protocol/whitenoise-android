@@ -28,5 +28,6 @@ name: inbound-share-document-remove
 - assertNotVisible:
     id: conversation.composer.attachment.0
 - assertVisible:
-    enabled: false
+    text: ^Message$
+- assertNotVisible:
     text: ^Send$

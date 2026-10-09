@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.maestro
 
 import android.content.Intent
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleCallback
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -45,13 +44,23 @@ internal class MaestroActivityOwner(
         }
     }
 
-    /** Select only the actual sole resumed instance; recreation checks still compare object identity. */
-    fun onActivity(action: (MainActivity) -> Unit) {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            check(registered && application.fixtureState === fixtureState)
-            val activity = observed.filterValues { it == Stage.RESUMED }.keys.single()
-            check(!activity.isDestroyed && !activity.isFinishing)
-            action(activity)
+    /** External dispatch can temporarily pause MainActivity; observe its actual resumed owner before reading. */
+    suspend fun onActivity(action: (MainActivity) -> Unit) {
+        withTimeout(30_000L) {
+            while (true) {
+                val invoked =
+                    withContext(Dispatchers.Main.immediate) {
+                        check(registered && application.fixtureState === fixtureState)
+                        val resumed = observed.filterValues { it == Stage.RESUMED }.keys
+                        check(resumed.size <= 1) { "Multiple resumed fixture activities" }
+                        val activity = resumed.singleOrNull() ?: return@withContext false
+                        check(!activity.isDestroyed && !activity.isFinishing)
+                        action(activity)
+                        true
+                    }
+                if (invoked) return@withTimeout
+                delay(100L)
+            }
         }
     }
 

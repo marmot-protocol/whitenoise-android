@@ -2981,7 +2981,7 @@
       "manual_ids": [
         "ACC-003"
       ],
-      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. deny close. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. deny close. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
     },
     "qr-permission-deny-back": {
@@ -2989,7 +2989,7 @@
       "manual_ids": [
         "ACC-003"
       ],
-      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. deny back. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. deny back. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
     },
     "qr-permission-deny-reopen": {
@@ -2997,15 +2997,16 @@
       "manual_ids": [
         "ACC-003"
       ],
-      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. deny reopen. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. deny reopen. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
     },
     "qr-permission-denied-rotation": {
       "suite": "acquisition",
       "manual_ids": [
-        "ACC-003"
+        "ACC-003",
+        "NAV-009"
       ],
-      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. denied rotation. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. denied rotation. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
     },
     "qr-permission-denied-warm-resume": {
@@ -3014,7 +3015,7 @@
         "ACC-003",
         "NAV-010"
       ],
-      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. denied warm resume. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. denied warm resume. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
     },
     "qr-permission-permanent-close": {
@@ -3022,7 +3023,7 @@
       "manual_ids": [
         "ACC-003"
       ],
-      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. permanent close. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. permanent close. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
     },
     "qr-permission-permanent-back": {
@@ -3030,7 +3031,7 @@
       "manual_ids": [
         "ACC-003"
       ],
-      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. permanent back. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. permanent back. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
     },
     "qr-permission-permanent-reopen": {
@@ -3038,7 +3039,7 @@
       "manual_ids": [
         "ACC-003"
       ],
-      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. permanent reopen. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. permanent reopen. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
     },
     "accounts-signout-keep-invitations": {

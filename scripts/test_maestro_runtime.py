@@ -705,6 +705,9 @@ class RuntimeEvidenceTest(unittest.TestCase):
             self.assertIn('^Scan QR Code$', text)
             if path.parent.name == 'runtime':
                 self.assertEqual(runtime.CASES[path.stem]['postcondition'], 'camera-denied')
+                self.assertNotIn('no target/torch', runtime.CASES[path.stem]['assertions'])
+                if 'rotation' in path.stem:
+                    self.assertIn('NAV-009', runtime.CASES[path.stem]['manual_ids'])
         initial = list(yaml.safe_load_all(paths[0].read_text()))[1]
         self.assertIn({'assertVisible': {'enabled': True, 'containsChild': {'text': '^(Allow Camera|Open settings)$'}}}, initial)
         self.assertIn({'assertVisible': {'text': '^Allow Camera$'}}, initial)
@@ -734,11 +737,16 @@ class RuntimeEvidenceTest(unittest.TestCase):
                          'application.fixtureState === fixtureState', 'observed[activity] = stage',
                          'monitor.addLifecycleCallback(callback)', 'monitor.removeLifecycleCallback(callback)',
                          'observed.isNotEmpty()', 'it.finish()', 'observed.values.all { it == Stage.DESTROYED }',
-                         'filterValues { it == Stage.RESUMED }.keys.single()', 'withTimeout(30_000L)',
+                         'filterValues { it == Stage.RESUMED }.keys', 'resumed.singleOrNull()',
+                         'check(resumed.size <= 1)', 'suspend fun onActivity', 'withTimeout(30_000L)',
                          'withTimeout(10_000L)'):
             self.assertIn(required, owner)
         self.assertNotIn('setIntent(', owner)
         self.assertNotIn('ActivityScenario', owner)
+        self.assertNotIn('runOnMainSync', owner)
+        read = owner[owner.index('suspend fun onActivity'):owner.index('suspend fun close')]
+        self.assertIn('if (invoked) return@withTimeout', read)
+        self.assertIn('delay(100L)', read)
         host = (root / 'MaestroRuntimeHostTest.kt').read_text()
         self.assertLess(host.index('activity = MaestroActivityOwner'), host.index('launchMaestroRuntimeActivity(context'))
         self.assertLess(host.index('activity?.close()'), host.index('"closed.json"'))
@@ -757,6 +765,22 @@ class RuntimeEvidenceTest(unittest.TestCase):
             case = runtime.CASES[path.stem]
             self.assertEqual(case['fixture'], 'share-text')
             self.assertEqual(case['postcondition'], 'share-request-cancelled')
+
+    def test_share_removal_requires_the_empty_composer_without_a_send_action(self):
+        """Removing all content restores Message/microphone, rather than a disabled Send button."""
+        for name, removed in (('inbound-share-document-remove', ['maestro-document.md']),
+                              ('inbound-share-documents-multiple-remove', ['maestro-document.md', 'maestro-table.csv'])):
+            with self.subTest(case=name):
+                case = runtime.CASES[name]
+                self.assertEqual(case['postcondition'], 'share-request-files-removed')
+                commands = list(yaml.safe_load_all(
+                    (runtime.ROOT / '.maestro/runtime' / f'{name}.yaml').read_text()))[1]
+                for filename in removed:
+                    self.assertIn({'tapOn': 'Remove attachment: ' + filename}, commands)
+                    self.assertIn({'assertNotVisible': 'Remove attachment: ' + filename}, commands)
+                self.assertEqual(commands[-3:], [
+                    {'assertNotVisible': {'id': 'conversation.composer.attachment.0'}},
+                    {'assertVisible': {'text': '^Message$'}}, {'assertNotVisible': {'text': '^Send$'}}])
 
     def test_long_press_uses_a_command_not_an_unsupported_tap_property(self):
         """Regress the actual CLI parse failure that prevented all contextual-menu journeys."""
