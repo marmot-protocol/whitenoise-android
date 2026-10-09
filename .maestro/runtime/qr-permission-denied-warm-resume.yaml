@@ -8,6 +8,7 @@ name: qr-permission-denied-warm-resume
 - assertVisible:
     text: ^Camera Access Needed$
 - assertVisible:
+    id: qr_scanner.recovery
     enabled: true
     containsChild:
       text: ^(Allow Camera|Open settings)$

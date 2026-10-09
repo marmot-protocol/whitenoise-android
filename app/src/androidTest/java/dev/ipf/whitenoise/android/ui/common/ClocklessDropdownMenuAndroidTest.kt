@@ -7,18 +7,26 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.LayerOutsets
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -41,20 +49,35 @@ class ClocklessDropdownMenuAndroidTest {
     fun overflowingAppMenuPaintsAndSelectsWithNaturalFrames() = exerciseMenu(appMenu = true, rows = 30)
 
     @Test
+    fun overflowingMaterialControlPaintsAndSelectsWithNaturalFrames() = exerciseMenu(appMenu = false, rows = 30)
+
+    @Test
     fun actionSizedAppAnchorPaintsAndSelectsWithNaturalFrames() = exerciseMenu(appMenu = true, actionSizedAnchor = true)
 
     @Test
-    fun actionSizedMaterialAnchorPaintsAndSelectsWithNaturalFrames() =
-        exerciseMenu(appMenu = false, actionSizedAnchor = true)
+    fun actionSizedMaterialAnchorPaintsAndSelectsWithNaturalFrames() = exerciseMenu(
+        appMenu = false,
+        actionSizedAnchor = true,
+    )
+
+    @Test
+    fun ordinaryLayerMaterialAnchorPaintsAndSelectsWithNaturalFrames() =
+        exerciseMenu(appMenu = false, actionSizedAnchor = true, controlLayer = ControlLayer.PLAIN)
+
+    @Test
+    fun shadowOutsetMaterialAnchorPaintsAndSelectsWithNaturalFrames() =
+        exerciseMenu(appMenu = false, actionSizedAnchor = true, controlLayer = ControlLayer.SHADOW_OUTSETS)
 
     private fun exerciseMenu(
         appMenu: Boolean,
         rows: Int = 3,
         actionSizedAnchor: Boolean = false,
+        controlLayer: ControlLayer = ControlLayer.NONE,
     ) {
         val expanded = mutableStateOf(false)
         val selected = mutableStateOf(-1)
-        val density = renderMenu(appMenu, rows, actionSizedAnchor, expanded, selected)
+        val configuration = MenuConfiguration(appMenu, rows, actionSizedAnchor, controlLayer)
+        val density = renderMenu(configuration, expanded, selected)
         DropdownMenuWindowProbe.clickText("Open menu")
         DropdownMenuWindowProbe.assertFirstRowPainted(density)
         DropdownMenuWindowProbe.clickText("Choice 2")
@@ -67,9 +90,7 @@ class ClocklessDropdownMenuAndroidTest {
     }
 
     private fun renderMenu(
-        appMenu: Boolean,
-        rows: Int,
-        actionSizedAnchor: Boolean,
+        configuration: MenuConfiguration,
         expanded: MutableState<Boolean>,
         selected: MutableState<Int>,
     ): Float {
@@ -80,14 +101,14 @@ class ClocklessDropdownMenuAndroidTest {
             activity.setContent {
                 WhiteNoiseTheme {
                     Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                        Box(if (actionSizedAnchor) Modifier else Modifier.fillMaxSize()) {
+                        Box(if (configuration.actionSizedAnchor) Modifier else Modifier.fillMaxSize()) {
                             Button(onClick = { expanded.value = true }) { Text("Open menu") }
-                            if (appMenu) {
+                            if (configuration.appMenu) {
                                 WhiteNoiseDropdownMenu(
                                     expanded = expanded.value,
                                     onDismissRequest = { expanded.value = false },
                                     items =
-                                        List(rows) { index ->
+                                        List(configuration.rows) { index ->
                                             WhiteNoiseMenuItem(
                                                 "Choice $index",
                                                 onClick = { selected.value = index },
@@ -96,18 +117,7 @@ class ClocklessDropdownMenuAndroidTest {
                                         },
                                 )
                             } else {
-                                DropdownMenu(expanded.value, onDismissRequest = { expanded.value = false }) {
-                                    repeat(rows) { index ->
-                                        DropdownMenuItem(
-                                            text = { Text("Choice $index") },
-                                            onClick = {
-                                                selected.value = index
-                                                expanded.value = false
-                                            },
-                                            modifier = Modifier.background(Color.Cyan),
-                                        )
-                                    }
-                                }
+                                MaterialControl(configuration, expanded, selected)
                             }
                         }
                     }
@@ -116,4 +126,59 @@ class ClocklessDropdownMenuAndroidTest {
         }
         return density
     }
+
+    @Composable
+    private fun MaterialControl(
+        configuration: MenuConfiguration,
+        expanded: MutableState<Boolean>,
+        selected: MutableState<Int>,
+    ) {
+        DropdownMenu(
+            expanded = expanded.value,
+            onDismissRequest = { expanded.value = false },
+            scrollState = rememberScrollState(),
+            modifier = controlModifier(configuration.controlLayer),
+            shape = MaterialTheme.shapes.medium,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = amoledOutlineBorder(),
+        ) {
+            repeat(configuration.rows) { index ->
+                DropdownMenuItem(
+                    text = { Text("Choice $index") },
+                    onClick = {
+                        selected.value = index
+                        expanded.value = false
+                    },
+                    modifier = Modifier.background(Color.Cyan),
+                    colors =
+                        MenuDefaults.itemColors(
+                            textColor = MaterialTheme.colorScheme.onSurface,
+                            leadingIconColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                )
+            }
+        }
+    }
+
+    private fun controlModifier(layer: ControlLayer): Modifier =
+        when (layer) {
+            ControlLayer.NONE -> Modifier
+            ControlLayer.PLAIN -> Modifier.graphicsLayer()
+            ControlLayer.SHADOW_OUTSETS -> Modifier.graphicsLayer {
+                outsets = LayerOutsets(left = 30.dp, right = 30.dp)
+            }
+        }
+
+    private enum class ControlLayer {
+        NONE,
+        PLAIN,
+        SHADOW_OUTSETS,
+    }
+
+    private data class MenuConfiguration(
+        val appMenu: Boolean,
+        val rows: Int,
+        val actionSizedAnchor: Boolean,
+        val controlLayer: ControlLayer,
+    )
 }

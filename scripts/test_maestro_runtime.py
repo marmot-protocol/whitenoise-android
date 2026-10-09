@@ -703,6 +703,13 @@ class RuntimeEvidenceTest(unittest.TestCase):
             text = path.read_text()
             self.assertNotIn('id: qr_scanner.screen', text)
             self.assertIn('^Scan QR Code$', text)
+            for command in list(yaml.safe_load_all(text))[1]:
+                selector = command.get('assertVisible') if isinstance(command, dict) else None
+                if isinstance(selector, dict) and selector.get('containsChild') == {
+                    'text': '^(Allow Camera|Open settings)$'
+                }:
+                    self.assertEqual(selector.get('id'), 'qr_scanner.recovery', path.name)
+                    self.assertIs(selector['enabled'], True)
             if path.parent.name == 'runtime':
                 self.assertEqual(runtime.CASES[path.stem]['postcondition'], 'camera-denied')
                 self.assertNotIn('no target/torch', runtime.CASES[path.stem]['assertions'])
@@ -1548,7 +1555,10 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     node = command.get(key)
                     if isinstance(node, dict) and 'checked' in node:
                         self.assertNotIn('text', node, path.name)
-                        if 'id' in node:
+                        label = node.get('containsChild', {}).get('text', '')
+                        if 'Require device authentication' in label:
+                            self.assertEqual(node.get('id'), 'privacy.device_authentication', path.name)
+                        elif 'id' in node:
                             self.assertIn((path.name, node['id']), {
                                 ('select-library-mode.yaml', 'global.library.mode.${LIBRARY_KIND}'),
                                 ('select-library-messages.yaml', 'global.library.mode.Messages'),
@@ -1557,6 +1567,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
                             self.assertTrue(node.get('containsChild', {}).get('text'), path.name)
                         checked += 1
         self.assertGreaterEqual(checked, 10)
+        source = (runtime.ROOT / 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt').read_text()
+        self.assertIn('modifier = Modifier.testTag("privacy.device_authentication"),', source)
 
     def test_public_key_copy_flows_use_acknowledged_real_controls_and_keep_private_key_hidden(self):
         """Regress copy/account/lifecycle routes without crediting the raw-key or external-share criteria."""

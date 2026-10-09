@@ -8,6 +8,7 @@ name: qr-permission-denied-rotation
 - assertVisible:
     text: ^Camera Access Needed$
 - assertVisible:
+    id: qr_scanner.recovery
     enabled: true
     containsChild:
       text: ^(Allow Camera|Open settings)$
@@ -17,6 +18,7 @@ name: qr-permission-denied-rotation
 - assertVisible:
     text: ^Camera Access Needed$
 - assertVisible:
+    id: qr_scanner.recovery
     enabled: true
     containsChild:
       text: ^(Allow Camera|Open settings)$

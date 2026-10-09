@@ -1,0 +1,343 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+  "legacy_sha256": "247695a1d2e8c67a4e8bfc3cd2220f275e68d696786be7cd810cb0e4609054d8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Privacy blocked users link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.blocked_users",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "DevicePrivacyScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "fun DevicePrivacyScreen(",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007",
+          "SET-028"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:allow_chat_screenshots",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.allow_chat_screenshots",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:allow_chat_screenshots_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.allow_chat_screenshots_subtitle",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:app_lock_enabled_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.app_lock_enabled_detail",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:app_lock_setup_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.app_lock_setup_detail",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:auto_lock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.auto_lock",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:device_protection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.device_protection",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "setting:default_disappearing_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:default_disappearing_messages_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages_detail",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:default_disappearing_messages_picker_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.default_disappearing_messages_picker_detail",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:message_privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.message_privacy",
+        "test_ids": [
+          "SET-028"
+        ]
+      },
+      {
+        "surface": "string:diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_controls_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_controls_detail",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_improvements",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_improvements",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_summary_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_summary_logs",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_summary_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_summary_on",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_summary_usage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.diagnostics_summary_usage",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "setting:force_incognito_keyboard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.force_incognito_keyboard",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:incognito_keyboard_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.incognito_keyboard_detail",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:open_android_security_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.open_android_security_settings",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:require_device_authentication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.require_device_authentication",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:settings_privacy_security",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.settings_privacy_security",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": "R.string.usage_diagnostics_off",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004",
+          "SEC-005",
+          "SEC-006",
+          "SEC-007"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Actual device authentication switch accessibility state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+        "anchor": ".testTag(\"privacy.device_authentication\")",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002",
+          "SEC-003",
+          "SEC-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

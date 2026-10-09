@@ -92,6 +92,7 @@ internal fun DevicePrivacyScreen(
                             context = rowContext,
                             title = stringResource(R.string.require_device_authentication),
                             checked = authenticationEnabled,
+                            modifier = Modifier.testTag("privacy.device_authentication"),
                             onCheckedChange = { appState.updateRequireAppUnlock(it) },
                             subtitle =
                                 stringResource(
