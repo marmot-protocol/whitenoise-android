@@ -2294,4 +2294,12 @@
         <item quantity="one">Baixando %1$d anexo</item>
         <item quantity="other">Baixando %1$d anexos</item>
     </plurals>
+    <string name="account_keys_local_signing">Assinatura local</string>
+    <string name="account_keys_external_signing">Assinante externo</string>
+    <string name="account_keys_session_running">Sessão da conta ativa</string>
+    <string name="account_keys_session_stopped">Sessão da conta parada</string>
+    <string name="account_keys_session">Sessão da conta</string>
+    <string name="chat_departure_confirm">Revise %1$d conversas selecionadas. Os grupos serão abandonados e eliminados deste dispositivo; as conversas diretas são eliminadas localmente. Os outros membros mantêm as suas cópias. As transferências de administração serão confirmadas antes da eliminação.</string>
+    <string name="chat_departure_result">%1$d concluídas · %2$d por concluir · %3$d ignoradas. Tentar novamente verifica a participação e continua apenas o trabalho pendente.</string>
+    <string name="chat_departure_admin_granted">A transferência de administrador foi concluída. A saída do grupo está pendente.</string>
 </resources>

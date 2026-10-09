@@ -222,7 +222,7 @@ internal fun ChatsScreen(
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
     var pendingLeaveAndDelete by remember(appState.activeAccountRef, appState.runtimeGeneration) {
-        mutableStateOf<ChatListItem?>(null)
+        mutableStateOf<PendingChatDeparture?>(null)
     }
     val leavingAndDeleting =
         remember(appState.activeAccountRef, appState.runtimeGeneration) {
@@ -1557,7 +1557,7 @@ internal fun ChatsScreen(
                                     !item.group.leaveRequestPending &&
                                     item.projection?.leaveRequestPending != true
                                 ) {
-                                    { pendingLeaveAndDelete = item }
+                                    { pendingLeaveAndDelete = PendingChatDeparture(listOf(item), controller, appState) }
                                 } else {
                                     null
                                 },
@@ -1661,6 +1661,14 @@ internal fun ChatsScreen(
                 ) {
                     ChatListSelectionControls(
                         count = selectedChatIds.size,
+                        deleteLabel =
+                            stringResource(
+                                if (selectedVisibleItems.any { !it.isDm() }) {
+                                    R.string.leave_and_delete
+                                } else {
+                                    R.string.delete_from_device
+                                },
+                            ),
                         archiveAction = bulkArchiveAction,
                         actionsEnabled =
                             selectedVisibleItems.isNotEmpty() &&
@@ -1692,10 +1700,10 @@ internal fun ChatsScreen(
                             if (selectedVisibleItems.any { it.group.groupIdHex in leavingAndDeleting }) {
                                 return@ChatListSelectionControls
                             }
-                            pendingBulkDelete =
+                            pendingLeaveAndDelete =
                                 selectedVisibleItems
                                     .takeIf { it.isNotEmpty() }
-                                    ?.let { PendingLocalChatDelete.capture(it, controller, appState) }
+                                    ?.let { PendingChatDeparture(it, controller, appState) }
                         },
                         onAddToFolder = {
                             openFolderPicker(selectedVisibleItems)
@@ -2081,28 +2089,19 @@ internal fun ChatsScreen(
         )
     }
 
-    pendingLeaveAndDelete?.let { item ->
-        val originAccount = appState.activeAccountRef
-        val originRuntime = appState.runtimeGeneration
-        ChatLeaveAndDeleteConfirmationDialog(
-            onConfirm = {
-                pendingLeaveAndDelete = null
-                val groupId = item.group.groupIdHex
-                if (!leavingAndDeleting.add(groupId)) return@ChatLeaveAndDeleteConfirmationDialog
-                appState.launchMutation {
-                    try {
-                        val originChanged =
-                            appState.activeAccountRef != originAccount || appState.runtimeGeneration != originRuntime
-                        if (originChanged || appState.signOutInProgress || appState.wipeInProgress) {
-                            return@launchMutation
-                        }
-                        controller.leaveAndDeleteFromChatList(groupId)
-                    } finally {
-                        leavingAndDeleting.remove(groupId)
-                    }
+    pendingLeaveAndDelete?.let { request ->
+        ChatDepartureBatchDialog(
+            request = request,
+            appState = appState,
+            controller = controller,
+            onDismiss = { pendingLeaveAndDelete = null },
+            onAccepted = ::clearSelection,
+            canStart = { request.targets.none { it.groupId in leavingAndDeleting } },
+            onBusyChange = { busy ->
+                request.targets.forEach { target ->
+                    if (busy) leavingAndDeleting.add(target.groupId) else leavingAndDeleting.remove(target.groupId)
                 }
             },
-            onDismiss = { pendingLeaveAndDelete = null },
         )
     }
 

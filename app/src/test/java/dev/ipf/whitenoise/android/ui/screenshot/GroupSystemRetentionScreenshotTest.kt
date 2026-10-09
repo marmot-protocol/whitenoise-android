@@ -35,6 +35,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT
 import dev.ipf.whitenoise.android.ui.conversation.DaySeparator
 import dev.ipf.whitenoise.android.ui.conversation.GroupSystemRow
+import dev.ipf.whitenoise.android.ui.conversation.WaveHiDismissal
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -239,6 +240,70 @@ class GroupSystemRetentionScreenshotTest {
         composeRule.runOnIdle { accountRef = ACCOUNT_REF }
         composeRule.waitForIdle()
         button.assertDoesNotExist()
+    }
+
+    /** An eligible summary and action first appear together, even with delayed disk preparation. */
+    @Test
+    fun delayedDismissalReadDoesNotExposeSummaryWithoutItsAction() {
+        val ready = CompletableDeferred<WaveHiDismissal>()
+        val appState = testAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).padding(16.dp).testTag(SCREENSHOT_TAG)) {
+                    GroupSystemRow(
+                        retentionChangeRecord(),
+                        appState,
+                        addedMemberEvent(),
+                        onWave = { _, _ -> },
+                        loadWaveDismissal = { ready.await() },
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithText(context.getString(R.string.wave_hi)).assertDoesNotExist()
+        composeRule.onAllNodesWithText("Bob", substring = true).fetchSemanticsNodes().let { assertTrue(it.isEmpty()) }
+        val preparedHeight =
+            composeRule
+                .onNodeWithTag(SCREENSHOT_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        ready.complete(WaveHiDismissal(false) {})
+        awaitWaveButton()
+        val summaries = composeRule.onAllNodesWithText("Bob", substring = true).fetchSemanticsNodes()
+        assertTrue(summaries.isNotEmpty())
+        assertEquals(
+            preparedHeight,
+            composeRule
+                .onNodeWithTag(SCREENSHOT_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.height,
+            0.1f,
+        )
+    }
+
+    /** Failed local preparation offers a bounded row retry, never a misleading half-prepared row. */
+    @Test
+    fun failedPreparationRetriesAndDismissedRowsNeverOfferWave() {
+        var attempts = 0
+        val appState = testAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupSystemRow(
+                    retentionChangeRecord(),
+                    appState,
+                    addedMemberEvent(),
+                    onWave = { _, _ -> error("dismissed") },
+                    loadWaveDismissal = {
+                        if (++attempts == 1) error("preference read") else WaveHiDismissal(true) {}
+                    },
+                )
+            }
+        }
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(2, attempts)
+        composeRule.onNodeWithText(context.getString(R.string.wave_hi)).assertDoesNotExist()
+        assertTrue(composeRule.onAllNodesWithText("Bob", substring = true).fetchSemanticsNodes().isNotEmpty())
     }
 
     private fun awaitWaveButton() {

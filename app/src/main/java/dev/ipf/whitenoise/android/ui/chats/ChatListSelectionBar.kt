@@ -83,6 +83,7 @@ internal fun ChatListSelectionControls(
     onSelectAll: () -> Unit,
     onDeselectAll: () -> Unit,
     isCurrent: () -> Boolean = { true },
+    deleteLabel: String = stringResource(R.string.delete),
 ) {
     var active by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { active = false } }
@@ -205,7 +206,7 @@ internal fun ChatListSelectionControls(
             }
         }
         DirectSelectionAction(
-            label = stringResource(R.string.delete),
+            label = deleteLabel,
             icon = R.drawable.ic_delete,
             enabled = actionsEnabled,
             destructive = true,

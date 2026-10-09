@@ -2294,4 +2294,12 @@
         <item quantity="one">%1$d allegato in download</item>
         <item quantity="other">%1$d allegati in download</item>
     </plurals>
+    <string name="account_keys_local_signing">Firma locale</string>
+    <string name="account_keys_external_signing">Firmatario esterno</string>
+    <string name="account_keys_session_running">Sessione account attiva</string>
+    <string name="account_keys_session_stopped">Sessione account arrestata</string>
+    <string name="account_keys_session">Sessione account</string>
+    <string name="chat_departure_confirm">Rivedi %1$d chat selezionate. I gruppi verranno abbandonati ed eliminati da questo dispositivo; le chat dirette vengono eliminate localmente. Gli altri membri conservano le loro copie. I passaggi di amministrazione saranno confermati prima di eliminare.</string>
+    <string name="chat_departure_result">%1$d completate · %2$d incomplete · %3$d saltate. Riprova verifica le appartenenze e continua solo le operazioni incomplete.</string>
+    <string name="chat_departure_admin_granted">Il trasferimento dei diritti è riuscito. L’uscita dal gruppo non è ancora completata.</string>
 </resources>

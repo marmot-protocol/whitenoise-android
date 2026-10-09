@@ -2366,4 +2366,12 @@
         <item quantity="many">Загружается %1$d вложений</item>
         <item quantity="other">Загружается %1$d вложения</item>
     </plurals>
+    <string name="account_keys_local_signing">Локальная подпись</string>
+    <string name="account_keys_external_signing">Внешнее приложение подписи</string>
+    <string name="account_keys_session_running">Сеанс аккаунта работает</string>
+    <string name="account_keys_session_stopped">Сеанс аккаунта остановлен</string>
+    <string name="account_keys_session">Сеанс аккаунта</string>
+    <string name="chat_departure_confirm">Проверьте %1$d выбранных чатов. Вы выйдете из групп и удалите их с этого устройства; личные чаты удаляются локально. Другие участники сохранят свои копии. Перед удалением потребуется подтвердить передачу прав администратора.</string>
+    <string name="chat_departure_result">%1$d завершено · %2$d не завершено · %3$d пропущено. Повторная попытка проверяет участие и продолжает только незавершённые действия.</string>
+    <string name="chat_departure_admin_granted">Права администратора переданы. Выход из группы ещё не завершён.</string>
 </resources>

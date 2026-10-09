@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -22,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -30,7 +29,6 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,12 +36,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -67,8 +67,6 @@ import dev.ipf.whitenoise.android.ui.common.rememberGroupSystemCopy
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /** Flat inset the prototype gives a system-event row on both sides. */
 private val GroupSystemRowVerticalPadding = 8.dp
@@ -92,6 +90,7 @@ internal fun GroupSystemRow(
     onOpenProfile: ((accountIdHex: String) -> Unit)? = null,
     onOpenActions: ((String, IntRect?) -> Unit)? = null,
     reactionContent: @Composable () -> Unit = {},
+    loadWaveDismissal: (suspend (String) -> WaveHiDismissal)? = null,
 ) {
     val copy = rememberGroupSystemCopy()
     val event =
@@ -102,6 +101,23 @@ internal fun GroupSystemRow(
     // when the event isn't a timer-on change (off/other rows need no duration).
     val retentionLabel = event?.newRetentionSeconds?.takeIf { it > 0uL }?.let { disappearingMessagesLabel(it.toLong()) }
     val selfHex = appState.activeAccount?.accountIdHex
+    val target = waveTarget(event, selfHex)
+    val context = LocalContext.current.applicationContext
+    val waveKey =
+        waveAccountRef?.takeIf { record.messageIdHex.isNotBlank() }?.let { account ->
+            "${account.length}:$account:${record.groupIdHex}:${record.messageIdHex}"
+        }
+    val waveState =
+        if (target != null && onWave != null && waveKey != null) {
+            rememberWaveHiPreparation("${appState.runtimeGeneration}:$waveKey") {
+                loadWaveDismissal?.invoke(waveKey) ?: loadWaveHiDismissal(context, waveKey)
+            }
+        } else {
+            null
+        }
+    // Measure the complete eligible row while preparing, but expose neither text nor actions.
+    // Its first visible frame has the same geometry; a local failure offers a bounded retry.
+    val preparing = waveState != null && waveState.dismissal == null
     val summary =
         if (event != null) {
             val actorHex = GroupSystemEvents.actorHex(event, record.sender)
@@ -129,7 +145,7 @@ internal fun GroupSystemRow(
             GroupSystemLinkedSummary(copy.fallback)
         }
     val summaryText =
-        if (onOpenProfile == null) {
+        if (onOpenProfile == null || preparing) {
             AnnotatedString(summary.text)
         } else {
             groupSystemSummaryText(summary, MaterialTheme.colorScheme.primary) { subject ->
@@ -145,104 +161,122 @@ internal fun GroupSystemRow(
     // The prototype gives every event row a flat 8.dp above and below inside a
     // full-width centred box; the transcript's own 2.dp row arrangement then
     // reads as the 18.dp the prototype leaves between adjacent events.
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = GroupSystemRowVerticalPadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        FlowRow(
-            horizontalArrangement = Arrangement.Center,
-            itemVerticalAlignment = Alignment.CenterVertically,
+    Box(Modifier.fillMaxWidth()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = GroupSystemRowVerticalPadding)
+                    .then(if (preparing) Modifier.alpha(0f).clearAndSetSemantics {} else Modifier),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box {
-                Text(
-                    text = summaryText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier =
-                        Modifier
-                            .widthIn(max = 440.dp)
-                            .onGloballyPositioned { summaryBounds = it.boundsInWindow().roundToIntRect() }
-                            .then(
-                                groupSystemActionsModifier(
-                                    record.messageIdHex,
-                                    onOpenActions != null || onDeleteForMe != null,
-                                    actionLabel,
-                                ) {
-                                    if (onOpenActions != null) {
-                                        onOpenActions(summary.text, summaryBounds)
-                                    } else {
-                                        actionMenuOpen = true
-                                    }
-                                },
-                            ),
-                )
-                val menuScrollState = rememberScrollState()
-                DropdownMenu(
-                    scrollState = menuScrollState,
-                    modifier = Modifier.scrollEdgeFade(menuScrollState),
-                    expanded = actionMenuOpen,
-                    onDismissRequest = { actionMenuOpen = false },
-                    shape = MenuDefaults.shape,
-                    border = amoledSurfaceBorderStroke(),
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.delete_for_me)) },
-                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                        onClick = {
-                            actionMenuOpen = false
-                            onDeleteForMe?.invoke()
-                        },
+            FlowRow(
+                horizontalArrangement = Arrangement.Center,
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box {
+                    Text(
+                        text = summaryText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier =
+                            Modifier
+                                .widthIn(max = 440.dp)
+                                .onGloballyPositioned { summaryBounds = it.boundsInWindow().roundToIntRect() }
+                                .then(
+                                    groupSystemActionsModifier(
+                                        record.messageIdHex,
+                                        !preparing && (onOpenActions != null || onDeleteForMe != null),
+                                        actionLabel,
+                                    ) {
+                                        if (onOpenActions != null) {
+                                            onOpenActions(summary.text, summaryBounds)
+                                        } else {
+                                            actionMenuOpen = true
+                                        }
+                                    },
+                                ),
                     )
+                    val menuScrollState = rememberScrollState()
+                    DropdownMenu(
+                        scrollState = menuScrollState,
+                        modifier = Modifier.scrollEdgeFade(menuScrollState),
+                        expanded = actionMenuOpen && !preparing,
+                        onDismissRequest = { actionMenuOpen = false },
+                        shape = MenuDefaults.shape,
+                        border = amoledSurfaceBorderStroke(),
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.delete_for_me)) },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                            onClick = {
+                                actionMenuOpen = false
+                                onDeleteForMe?.invoke()
+                            },
+                        )
+                    }
+                }
+                if (target != null && onWave != null && waveState != null) {
+                    WaveHiButton(appState, waveAccountRef, target, waveState, onWave)
                 }
             }
-            val waveTarget = waveTarget(event, selfHex)
-            if (waveTarget != null && onWave != null) {
-                WaveHiButton(record, appState, waveAccountRef, waveTarget, onWave)
+            if (!preparing) reactionContent()
+            // Developer-mode only: keep the one-line summary as the default and tuck
+            // the MLS commit dump behind a per-row tap (#857). Saveable row-keyed UI
+            // state lets an expanded row survive lazy-list disposal without leaking to others.
+            if (!preparing && appState.streamingDebugEnabled) {
+                var detailsExpanded by rememberSaveable(record.messageIdHex) { mutableStateOf(false) }
+                val debugStyle = remember(record) { MessageDebugClassifier.debugStyle(record) }
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { detailsExpanded = !detailsExpanded }
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text =
+                            stringResource(
+                                if (detailsExpanded) {
+                                    R.string.group_system_hide_details
+                                } else {
+                                    R.string.group_system_show_details
+                                },
+                            ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Icon(
+                        imageVector = if (detailsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                if (detailsExpanded) {
+                    Spacer(Modifier.height(4.dp))
+                    MessageDebugRow(style = debugStyle, record = record)
+                }
             }
         }
-        reactionContent()
-        // Developer-mode only: keep the one-line summary as the default and tuck
-        // the MLS commit dump behind a per-row tap (#857). Saveable row-keyed UI
-        // state lets an expanded row survive lazy-list disposal without leaking to others.
-        if (appState.streamingDebugEnabled) {
-            var detailsExpanded by rememberSaveable(record.messageIdHex) { mutableStateOf(false) }
-            val debugStyle = remember(record) { MessageDebugClassifier.debugStyle(record) }
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { detailsExpanded = !detailsExpanded }
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text =
-                        stringResource(
-                            if (detailsExpanded) {
-                                R.string.group_system_hide_details
-                            } else {
-                                R.string.group_system_show_details
-                            },
-                        ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Icon(
-                    imageVector = if (detailsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-            if (detailsExpanded) {
-                Spacer(Modifier.height(4.dp))
-                MessageDebugRow(style = debugStyle, record = record)
-            }
+        if (preparing) WaveHiPreparingRow(requireNotNull(waveState), Modifier.matchParentSize())
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun WaveHiPreparingRow(
+    state: WaveHiPreparation,
+    modifier: Modifier,
+) {
+    Box(modifier, Alignment.Center) {
+        if (state.failed) {
+            TextButton(onClick = { state.retry += 1 }) { Text(stringResource(R.string.retry)) }
+        } else {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
         }
     }
 }
@@ -250,49 +284,35 @@ internal fun GroupSystemRow(
 @Composable
 @Suppress("FunctionNaming")
 private fun WaveHiButton(
-    record: AppMessageRecordFfi,
     appState: WhiteNoiseAppState,
     accountRef: String?,
     target: String,
+    state: WaveHiPreparation,
     onWave: suspend (String, () -> Unit) -> Unit,
 ) {
-    if (accountRef == null || record.messageIdHex.isBlank()) {
+    val dismissal = state.dismissal
+    if (dismissal == null) {
+        // Disabled, transparent measurement only; no speculative greeting or tappable action.
+        TextButton(onClick = {}, enabled = false) { Text(stringResource(R.string.wave_hi)) }
         return
     }
-    val context = LocalContext.current.applicationContext
-    val key = "${accountRef.length}:$accountRef:${record.groupIdHex}:${record.messageIdHex}"
-    var preferences by remember(key) { mutableStateOf<SharedPreferences?>(null) }
-    var dismissed by remember(key) { mutableStateOf(true) }
-    var sending by remember(key) { mutableStateOf(false) }
-    LaunchedEffect(context, key) {
-        // This is a local action dismissal, like Delete for me, not message or delivery data.
-        val stored =
-            withContext(Dispatchers.IO) {
-                context.getSharedPreferences("whitenoise.wave_dismissals", Context.MODE_PRIVATE).let {
-                    it to it.getBoolean(key, false)
-                }
-            }
-        preferences = stored.first
-        dismissed = stored.second
-    }
-    if (dismissed) {
-        return
-    }
+    if (dismissal.dismissed || state.accepted) return
+    val runtime = appState.runtimeGeneration
     TextButton(
-        enabled = !sending,
+        enabled = !state.sending,
         onClick = wave@{
-            if (sending) {
+            if (state.sending || appState.activeAccountRef != accountRef || appState.runtimeGeneration != runtime) {
                 return@wave
             }
-            sending = true
+            state.sending = true
             appState.launchMutation {
                 try {
                     onWave(target) {
-                        dismissed = true
-                        requireNotNull(preferences).edit().putBoolean(key, true).apply()
+                        state.accepted = true
+                        dismissal.persistDismissal()
                     }
                 } finally {
-                    sending = false
+                    state.sending = false
                 }
             }
         },

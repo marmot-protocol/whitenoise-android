@@ -1,0 +1,251 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+  "legacy_sha256": "742740d77df07f502462328a68e9a2f878cff891d95cc23ebb453c0733bef43b",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupEditPhotoMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "fun GroupEditPhotoMenu(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "GroupEditScaffold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "fun GroupEditScaffold(",
+        "test_ids": [
+          "GRP-002",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "GroupEditScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "fun GroupEditScreen(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025",
+          "PRO-010"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:add_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.add_photo",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:change_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.change_photo",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:choose_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.choose_files",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:choose_photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.choose_photos",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:edit_group_info_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.edit_group_info_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:find_web_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.find_web_image",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_avatar_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_avatar_url",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_description",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_emoji_create",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_emoji_create",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_image_search_edit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_image_search_edit",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_image_search_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_image_search_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_name",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_private_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_private_image",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_private_image_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_private_image_detail",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:profile_picture_invalid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.profile_picture_invalid",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:profile_view_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.profile_view_picture",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:remove_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.remove_photo",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:save_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.save_group",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:saving_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.saving_group",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_prepare_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.toast_couldnt_prepare_image",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_upload_group_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.toast_couldnt_upload_group_image",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.edit_group_info_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.edit_group_info_title",
+        "test_ids": [
+          "GRP-002",
+          "GRP-003",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: GroupEditScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": ".whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

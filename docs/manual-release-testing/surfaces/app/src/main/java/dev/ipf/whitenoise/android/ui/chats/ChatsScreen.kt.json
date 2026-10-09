@@ -44,7 +44,10 @@
           "FIND-012",
           "FIND-013",
           "FLD-007",
-          "FLD-002"
+          "FLD-002",
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
         ]
       }
     ],
@@ -53,19 +56,26 @@
         "surface": "string:couldnt_load_chats",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.couldnt_load_chats",
-        "test_ids": ["CHL-001", "FIND-015"]
+        "test_ids": [
+          "CHL-001",
+          "FIND-015"
+        ]
       },
       {
         "surface": "Global body lookup Retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "onRetry = { bodySearchRetry++ }",
-        "test_ids": ["FIND-015"]
+        "test_ids": [
+          "FIND-015"
+        ]
       },
       {
         "surface": "Global attachment lookup Retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "onRetry = { libraryRetry++ }",
-        "test_ids": ["FIND-015"]
+        "test_ids": [
+          "FIND-015"
+        ]
       },
       {
         "surface": "string:chat_list_startup_slow",
@@ -99,6 +109,96 @@
         "test_ids": [
           "FIND-008",
           "FIND-012"
+        ]
+      },
+      {
+        "surface": "R.plurals.toast_chat_list_chats_archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.plurals.toast_chat_list_chats_archived",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.plurals.toast_chat_list_chats_deleted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.plurals.toast_chat_list_chats_deleted",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.plurals.toast_chat_list_chats_restored",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.plurals.toast_chat_list_chats_restored",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_invalid_npub",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_search_invalid_npub",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_nip05_not_found",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_search_nip05_not_found",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_search_resolving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_search_resolving",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.delete_from_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.delete_from_device",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.leave_and_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.leave_and_delete",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.scroll_to_top",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.scroll_to_top",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
         ]
       }
     ],

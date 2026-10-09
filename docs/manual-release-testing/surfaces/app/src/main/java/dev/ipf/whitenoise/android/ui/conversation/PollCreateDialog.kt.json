@@ -1,0 +1,258 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+  "legacy_sha256": "ad2d28d4e936980112cfbe6815077d909dc832bdd7c1479116f31be719ce7a95",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PollCreateDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "fun PollCreateDialog(",
+        "test_ids": [
+          "MSG-021",
+          "MSG-025"
+        ]
+      },
+      {
+        "surface": "PollCreateForm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "internal fun PollCreateForm(",
+        "test_ids": [
+          "MSG-021",
+          "MSG-025",
+          "PRO-010"
+        ]
+      },
+      {
+        "surface": "PollDeadlineChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "private fun PollDeadlineChoices(",
+        "test_ids": [
+          "MSG-021",
+          "MSG-025"
+        ]
+      },
+      {
+        "surface": "string:poll_cancel_custom_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_cancel_custom_time",
+        "test_ids": [
+          "MSG-025"
+        ]
+      },
+      {
+        "surface": "string:poll_custom_duration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_custom_duration",
+        "test_ids": [
+          "MSG-025"
+        ]
+      },
+      {
+        "surface": "string:poll_custom_duration_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_custom_duration_error",
+        "test_ids": [
+          "MSG-025"
+        ]
+      },
+      {
+        "surface": "string:poll_custom_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_custom_preview",
+        "test_ids": [
+          "MSG-025"
+        ]
+      },
+      {
+        "surface": "string:poll_custom_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_custom_time",
+        "test_ids": [
+          "MSG-025"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_duration_5_minutes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duration_5_minutes",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_duration_1_day",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duration_1_day",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_duration_1_hour",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duration_1_hour",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_duration_1_week",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duration_1_week",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_30_days",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_30_days",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_add_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_add_option",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_add_two_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_add_two_options",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_create",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_create",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_deadline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_deadline",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_duplicate_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_duplicate_option",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_enter_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_enter_question",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_multiple_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_multiple_choice",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_no_deadline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_no_deadline",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_option",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_option_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_option_too_long",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_question",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_question_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_question_too_long",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_remove_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_remove_option",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_single_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_single_choice",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_submit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.poll_submit",
+        "test_ids": [
+          "MSG-021"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: PollCreateDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

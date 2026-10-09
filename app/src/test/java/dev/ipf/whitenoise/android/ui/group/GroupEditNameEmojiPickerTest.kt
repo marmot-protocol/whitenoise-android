@@ -10,12 +10,13 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -75,7 +76,10 @@ class GroupEditNameEmojiPickerTest {
 
         val fieldMatcher = hasSetTextAction() and hasText("Marmot team")
         val field = composeRule.onNode(fieldMatcher)
-        val action = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
+        val action =
+            composeRule.onNode(
+                nameEmojiActionMatcher(),
+            )
         field.assertIsDisplayed()
         action.assertIsDisplayed().assertHasClickAction()
         action.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
@@ -99,7 +103,10 @@ class GroupEditNameEmojiPickerTest {
         composeRule
             .onNode(hasSetTextAction() and hasText("A${family}B"))
             .performTextInputSelection(TextRange(4))
-        composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker)).performClick()
+        composeRule
+            .onNode(
+                nameEmojiActionMatcher(),
+            ).performClick()
         waitForEmoji("😀")
         composeRule.onAllNodesWithText("😀")[0].performClick()
 
@@ -117,7 +124,7 @@ class GroupEditNameEmojiPickerTest {
         render(admin = false)
 
         composeRule
-            .onNodeWithContentDescription(string(R.string.open_emoji_picker))
+            .onNode(nameEmojiActionMatcher())
             .assertIsNotEnabled()
             .performClick()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
@@ -216,6 +223,10 @@ class GroupEditNameEmojiPickerTest {
                 ),
             ),
     )
+
+    private fun nameEmojiActionMatcher() =
+        hasContentDescription(string(R.string.open_emoji_picker)) and
+            hasAnyAncestor(hasSetTextAction() and hasText(string(R.string.group_name)))
 
     private fun group(admin: Boolean) =
         AppGroupRecordFfi(

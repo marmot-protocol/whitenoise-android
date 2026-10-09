@@ -2260,4 +2260,12 @@
     <plurals name="media_downloading_count">
         <item quantity="other">正在下载 %1$d 个附件</item>
     </plurals>
+    <string name="account_keys_local_signing">本地签名</string>
+    <string name="account_keys_external_signing">外部签名器</string>
+    <string name="account_keys_session_running">账户会话运行中</string>
+    <string name="account_keys_session_stopped">账户会话已停止</string>
+    <string name="account_keys_session">账户会话</string>
+    <string name="chat_departure_confirm">检查所选的 %1$d 个聊天。将退出已加入的群组并从此设备删除；私聊仅在本地删除。其他成员保留其副本。删除前会确认所需的管理员移交。</string>
+    <string name="chat_departure_result">%1$d 个已完成 · %2$d 个未完成 · %3$d 个已跳过。重试会检查成员身份，仅继续未完成的操作。</string>
+    <string name="chat_departure_admin_granted">管理员权限已转移。退出群组尚未完成。</string>
 </resources>

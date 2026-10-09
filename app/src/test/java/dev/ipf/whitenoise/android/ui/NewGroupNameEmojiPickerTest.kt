@@ -11,12 +11,14 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -67,7 +69,7 @@ class NewGroupNameEmojiPickerTest {
     fun emojiActionIsAccessibleAndOpensSharedPicker() {
         renderScreen()
 
-        val action = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
+        val action = composeRule.onNode(nameEmojiActionMatcher())
         action.assertIsDisplayed().assertHasClickAction()
         val bounds = action.getUnclippedBoundsInRoot()
         val fieldBounds = composeRule.onNodeWithTag("group_setup.name").getUnclippedBoundsInRoot()
@@ -93,7 +95,7 @@ class NewGroupNameEmojiPickerTest {
 
         val rootBounds = composeRule.onRoot().getUnclippedBoundsInRoot()
         val nameField = composeRule.onNodeWithTag("group_setup.name").performScrollTo()
-        val emojiAction = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
+        val emojiAction = composeRule.onNode(nameEmojiActionMatcher())
 
         listOf(nameField, emojiAction).forEach { node ->
             node.assertIsDisplayed()
@@ -119,7 +121,7 @@ class NewGroupNameEmojiPickerTest {
         val field = composeRule.onNodeWithTag("group_setup.name")
         field.performTextReplacement("hello world")
         field.performTextInputSelection(TextRange(6, 11))
-        composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker)).performClick()
+        composeRule.onNode(nameEmojiActionMatcher()).performClick()
         waitForEmoji("😀")
 
         composeRule.onAllNodesWithText("😀")[0].performClick()
@@ -182,7 +184,7 @@ class NewGroupNameEmojiPickerTest {
     @Test
     fun picksUseTheSharedRecentEmojiPath() {
         renderScreen()
-        composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker)).performClick()
+        composeRule.onNode(nameEmojiActionMatcher()).performClick()
         waitForEmoji("😀")
 
         composeRule.onAllNodesWithText("😀")[0].performClick()
@@ -209,7 +211,7 @@ class NewGroupNameEmojiPickerTest {
         val field = composeRule.onNodeWithTag("group_setup.name")
         field.performTextReplacement("Team 😀 name")
         field.performTextInputSelection(TextRange(5, 7))
-        composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker)).performClick()
+        composeRule.onNode(nameEmojiActionMatcher()).performClick()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
 
         restorationTester.emulateSavedInstanceStateRestore()
@@ -230,7 +232,7 @@ class NewGroupNameEmojiPickerTest {
     fun lockedRetryStateDisablesTheEmojiActionAndCannotOpenThePicker() {
         renderScreen(initialRetryGroupIdHex = "created-group")
 
-        val action = composeRule.onNodeWithContentDescription(string(R.string.open_emoji_picker))
+        val action = composeRule.onNode(nameEmojiActionMatcher())
         action.assertIsNotEnabled().performClick()
 
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
@@ -308,6 +310,10 @@ class NewGroupNameEmojiPickerTest {
             accounts = listOf(activeAccount()),
             activeAccountRef = ACCOUNT_REF,
         )
+
+    private fun nameEmojiActionMatcher() =
+        hasContentDescription(string(R.string.open_emoji_picker)) and
+            hasAnyAncestor(hasTestTag("group_setup.name"))
 
     private fun activeAccount() =
         AccountSummaryFfi(

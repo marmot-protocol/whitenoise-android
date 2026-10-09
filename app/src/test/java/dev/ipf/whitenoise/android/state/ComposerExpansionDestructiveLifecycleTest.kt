@@ -8,12 +8,17 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.GroupManagementStateFfi
+import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
@@ -759,6 +764,64 @@ class ComposerExpansionDestructiveLifecycleTest {
             assertEquals(0, fixture.calls.delete.get())
         }
 
+    @Test
+    fun failedAuthoritativeRosterNeverMutatesEvenWhenCachedMembersExist() =
+        runBlocking {
+            val fixture = fixture(failRosterRead = true)
+            val controller = fixture.seededChatsController()
+            try {
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertTrue(fixture.calls.order.isEmpty())
+                assertFalse(controller.items.isEmpty())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun administratorWithAnotherAdminDemotesBeforeLeavingAndDeleting() =
+        runBlocking {
+            val fixture = fixture(groupRecord = group().copy(admins = listOf(ACCOUNT_ID, PEER_ID)))
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("demote", "leave", "delete"), fixture.calls.order)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun acceptedHandoverAndDemotionAreNotRepeatedAfterRejectedLeave() =
+        runBlocking {
+            val fixture = fixture(failLeave = true, groupRecord = group().copy(admins = listOf(ACCOUNT_ID)))
+            val controller = fixture.seededChatsController()
+            try {
+                val candidate = controller.prepareChatListDeparture(GROUP_ID).single()
+                assertFalse(controller.transferAdminThenDeleteFromChatList(GROUP_ID, candidate))
+                assertEquals(listOf("promote", "demote", "leave"), fixture.calls.order)
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("promote", "demote", "leave", "leave"), fixture.calls.order)
+                assertEquals(0, fixture.calls.delete.get())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    @Test
+    fun staleAdministratorSuccessorCannotBeGrantedOrDeleted() =
+        runBlocking {
+            val fixture = fixture(groupRecord = group().copy(admins = listOf(ACCOUNT_ID)))
+            val controller = fixture.seededChatsController()
+            try {
+                val stale = AppGroupMemberRecordFfi(memberIdHex = "departed-member", account = null, local = false)
+                assertFalse(controller.transferAdminThenDeleteFromChatList(GROUP_ID, stale))
+                assertTrue(fixture.calls.order.isEmpty())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     /** Creates one isolated app/runtime pair with controllable native leave and delete commits. */
     private fun fixture(
         failLeave: Boolean = false,
@@ -766,6 +829,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         deleteTransportFailures: Int = 0,
         commitBeforeTransportFailure: Boolean = false,
         failDraftDelete: Boolean = false,
+        failRosterRead: Boolean = false,
         sendResult: () -> SendSummaryFfi = ::successfulSendSummary,
         attachConversationController: Boolean = true,
         leaveConfirmed: Boolean = true,
@@ -795,6 +859,8 @@ class ComposerExpansionDestructiveLifecycleTest {
                 leaveConfirmed,
                 soleMember,
                 leaveResultHook,
+                groupRecord,
+                failRosterRead,
             )
         WhiteNoiseAppState::class.java
             .getDeclaredField("marmotRuntime")
@@ -835,9 +901,12 @@ class ComposerExpansionDestructiveLifecycleTest {
         leaveConfirmed: Boolean,
         soleMember: Boolean,
         leaveResultHook: () -> Unit,
+        groupRecord: AppGroupRecordFfi,
+        failRosterRead: Boolean,
     ): MarmotInterface {
         var localGroupPresent = true
         var left = false
+        var authoritativeGroup = groupRecord
         return Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
@@ -849,6 +918,24 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
+                "groupDetails" ->
+                    if (failRosterRead) {
+                        failNativeCall(arguments, IllegalStateException("roster unavailable"))
+                    } else {
+                        lifecycleGroupDetails(authoritativeGroup, soleMember)
+                    }
+                "promoteAdminDetailed" -> {
+                    calls.order.add("promote")
+                    authoritativeGroup =
+                        authoritativeGroup.copy(admins = authoritativeGroup.admins + (arguments!![2] as String))
+                    lifecycleGroupMutation(authoritativeGroup, soleMember)
+                }
+                "selfDemoteAdminDetailed" -> {
+                    calls.order.add("demote")
+                    authoritativeGroup =
+                        authoritativeGroup.copy(admins = authoritativeGroup.admins.filterNot { it == ACCOUNT_ID })
+                    lifecycleGroupMutation(authoritativeGroup, soleMember)
+                }
                 "listMedia" -> emptyList<Any>()
                 "catchUpAccounts" -> Unit
                 "chatListRow" -> {
@@ -943,6 +1030,70 @@ class ComposerExpansionDestructiveLifecycleTest {
             signedOut = false,
             running = true,
         )
+
+    private fun lifecycleGroupMutation(
+        group: AppGroupRecordFfi,
+        soleMember: Boolean,
+    ) = GroupMutationResultFfi(
+        summary = successfulSendSummary(),
+        details = lifecycleGroupDetails(group, soleMember),
+        managementState =
+            GroupManagementStateFfi(
+                myAccountIdHex = ACCOUNT_ID,
+                isSelfAdmin = ACCOUNT_ID in group.admins,
+                isLastAdmin = group.admins == listOf(ACCOUNT_ID),
+                canInvite = ACCOUNT_ID in group.admins,
+                canLeave = ACCOUNT_ID !in group.admins,
+                requiresSelfDemoteBeforeLeave = ACCOUNT_ID in group.admins,
+                leaveRequestPending = false,
+                leaveRequestedAtMs = null,
+                lifecycleState = GroupLifecycleStateFfi.STABLE,
+                disbandingEnabled = false,
+                disbanding = false,
+                canEnableDisbanding = false,
+                canDisband = false,
+                disbandingBlockers = emptyList(),
+                disbandRequest = null,
+                memberActions = emptyList(),
+            ),
+    )
+
+    /** Authoritative native details agree on roles, local identity and MLS member count. */
+    private fun lifecycleGroupDetails(
+        groupRecord: AppGroupRecordFfi,
+        soleMember: Boolean,
+    ): GroupDetailsFfi {
+        val roster = if (soleMember) members().take(1) else members()
+        return GroupDetailsFfi(
+            group = groupRecord,
+            members =
+                roster.map { member ->
+                    GroupMemberDetailsFfi(
+                        memberIdHex = member.memberIdHex,
+                        account = member.account,
+                        local = member.local,
+                        isAdmin = member.memberIdHex in groupRecord.admins,
+                        isSelf = member.memberIdHex == ACCOUNT_ID,
+                        npub = "npub-${member.memberIdHex}",
+                        displayName = null,
+                    )
+                },
+            mlsState =
+                AppGroupMlsStateFfi(
+                    groupIdHex = GROUP_ID,
+                    protocolProfile = AppProtocolProfileFfi.LEGACY,
+                    lifecycleState = GroupLifecycleStateFfi.STABLE,
+                    epoch = 0uL,
+                    memberCount = roster.size.toUInt(),
+                    unrecoverable = false,
+                    requiredAppComponents = emptyList(),
+                    disbandingEnabled = false,
+                    disbanding = false,
+                    disbandingBlockers = emptyList(),
+                    disbandRequest = null,
+                ),
+        )
+    }
 
     /** Supplies a non-sole-member roster so leave uses the real remote commit path. */
     private fun members() =

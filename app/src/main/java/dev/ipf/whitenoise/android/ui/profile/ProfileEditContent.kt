@@ -239,6 +239,7 @@ internal fun ProfileEditContent(
             }
             WhiteNoiseTextField(
                 state = fields.name,
+                emojiAction = true,
                 modifier = Modifier.fillMaxWidth().testTag("profile.name_field"),
                 enabled = !busy,
                 readOnly = !editing,
@@ -339,6 +340,7 @@ internal fun ProfileEditContent(
             )
             WhiteNoiseTextField(
                 state = fields.about,
+                emojiAction = true,
                 modifier = Modifier.fillMaxWidth().testTag("profile.about_field"),
                 enabled = !busy,
                 readOnly = !editing,

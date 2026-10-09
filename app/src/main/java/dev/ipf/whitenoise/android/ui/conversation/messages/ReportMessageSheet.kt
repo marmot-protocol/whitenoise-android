@@ -18,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +43,7 @@ import dev.ipf.whitenoise.android.state.REPORT_EXPLANATION_LIMIT
 import dev.ipf.whitenoise.android.state.REPORT_REASONS
 import dev.ipf.whitenoise.android.state.boundedExplanation
 import dev.ipf.whitenoise.android.state.reportReasonLabel
+import dev.ipf.whitenoise.android.ui.common.ProseTextField
 
 internal const val REPORT_SHEET_TEST_TAG = "message.report"
 internal const val REPORT_BODY_TEST_TAG = "message.report.body"
@@ -125,6 +125,7 @@ internal fun ReportMessageForm(
                 explanation,
                 onExplanationChange,
                 Modifier.weight(1f, fill = false),
+                enabled = !sending,
             )
             Button(
                 onClick = { onSubmit(reason, boundedExplanation(explanation)) },
@@ -146,6 +147,7 @@ private fun ReportMessageBody(
     explanation: String,
     onExplanationChange: (String) -> Unit,
     modifier: Modifier,
+    enabled: Boolean,
 ) {
     Column(
         modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()).testTag(REPORT_BODY_TEST_TAG),
@@ -166,8 +168,10 @@ private fun ReportMessageBody(
                 )
             }
         }
-        OutlinedTextField(
+        ProseTextField(
             value = explanation,
+            enabled = enabled,
+            emojiMaxLength = REPORT_EXPLANATION_LIMIT,
             onValueChange = { onExplanationChange(it.take(REPORT_EXPLANATION_LIMIT)) },
             label = { Text(stringResource(R.string.report_message_explanation_hint)) },
             modifier = Modifier.fillMaxWidth().testTag("message.report.explanation"),

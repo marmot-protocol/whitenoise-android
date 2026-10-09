@@ -1,0 +1,186 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+  "legacy_sha256": "e09ce5655b3b451e61e8ede658189064fd060bb9b940d7b6b2dedaaedcd596ac",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListSelectionBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "fun ChatListSelectionBar(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      },
+      {
+        "surface": "ChatListSelectionControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "fun ChatListSelectionControls(",
+        "test_ids": [
+          "CHL-001",
+          "CHL-011",
+          "CHL-012",
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "DirectSelectionAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "fun DirectSelectionAction(",
+        "test_ids": [
+          "CHL-011",
+          "CHL-012"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.archive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.archive",
+        "test_ids": [
+          "CHL-007",
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_action_add_to_folder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_list_action_add_to_folder",
+        "test_ids": [
+          "FLD-002"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_deselect_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_list_deselect_all",
+        "test_ids": [
+          "CHL-011"
+        ]
+      },
+      {
+        "surface": "R.string.chat_list_select_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_list_select_all",
+        "test_ids": [
+          "CHL-011"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mark_read",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mark_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_row_action_mark_unread",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_move_down",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_row_action_move_down",
+        "test_ids": [
+          "CHL-006",
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_move_up",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_row_action_move_up",
+        "test_ids": [
+          "CHL-006",
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_row_action_mute",
+        "test_ids": [
+          "CHL-009"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_pin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_row_action_pin",
+        "test_ids": [
+          "CHL-006"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_unmute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_row_action_unmute",
+        "test_ids": [
+          "CHL-009"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_unpin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_row_action_unpin",
+        "test_ids": [
+          "CHL-006"
+        ]
+      },
+      {
+        "surface": "R.string.chat_selection_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.chat_selection_title",
+        "test_ids": [
+          "CHL-011"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "CHL-011"
+        ]
+      },
+      {
+        "surface": "R.string.delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.delete",
+        "test_ids": [
+          "CHL-010",
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.unarchive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.unarchive",
+        "test_ids": [
+          "CHL-007",
+          "CHL-012"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.plurals.chat_list_selected_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.plurals.chat_list_selected_count",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

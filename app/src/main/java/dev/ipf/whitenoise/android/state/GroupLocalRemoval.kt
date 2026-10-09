@@ -55,15 +55,24 @@ internal suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     }
 }
 
-/** The recoverable wipe preserves client data until commit; launcher authority is revoked before the native attempt. */
+internal data class LocalGroupRemovalRequest(
+    val account: String,
+    val groupIdHex: String,
+    val forgetProtocol: Boolean,
+)
+
+/**
+ * Preserve client data until native commit, then retry trailing Android cleanup without another mutation.
+ */
 internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
-    account: String,
-    groupIdHex: String,
+    request: LocalGroupRemovalRequest,
     isCurrent: () -> Boolean,
     readinessBudget: LocalGroupDeleteReadinessBudget,
     onNativeCommitted: () -> Unit,
 ): Boolean =
     localGroupDeleteCleanupMutex.withLock {
+        val account = request.account
+        val groupIdHex = request.groupIdHex
         val attempt =
             LocalGroupDeleteAttempt(
                 isCurrent = isCurrent,
@@ -85,7 +94,15 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
                         withRevokedPinnedTarget(
                             accountRef = account,
                             groupIdHex = groupIdHex,
-                        ) { marmotIo { deleteGroupLocal(account, groupIdHex) } }
+                        ) {
+                            marmotIo {
+                                if (request.forgetProtocol) {
+                                    forgetGroupLocal(account, groupIdHex)
+                                } else {
+                                    deleteGroupLocal(account, groupIdHex)
+                                }
+                            }
+                        }
                     },
                 ),
             )

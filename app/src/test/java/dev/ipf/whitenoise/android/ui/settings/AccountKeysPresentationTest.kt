@@ -119,6 +119,22 @@ class AccountKeysPresentationTest {
         )
     }
 
+    @Test
+    fun identityNamesSigningMethodAndSessionBeforeTheKeyActions() {
+        render()
+        composeRule.onNodeWithTag("profile_keys.identity").assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.account_keys_local_signing)).assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.account_keys_session_running)).assertIsDisplayed()
+    }
+
+    @Test
+    fun regularSignOutCanBeCancelledWithoutStartingTeardown() {
+        render(localSigning = false)
+        composeRule.onNodeWithTag("profile_keys.sign_out").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
+        composeRule.onNodeWithTag("profile_keys.sign_out").assertIsDisplayed()
+    }
+
     /** Composes the surface under test with the given fixture. */
     private fun render(
         fontScale: Float = 1f,

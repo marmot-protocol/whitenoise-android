@@ -1,0 +1,163 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+  "legacy_sha256": "76249d42c00c1da29de663b19ce61c6b38efe0e6b7d9ece56bf46fbe837457f9",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SetupEditorContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun SetupEditorContent(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023",
+          "ONB-025",
+          "PRO-010"
+        ]
+      },
+      {
+        "surface": "rememberSetupEditorFields",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun rememberSetupEditorFields(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Native setup presentation: R.string.setup_about",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_about",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_discovery_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_discovery_help",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_discovery_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_discovery_list",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_display_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_display_name",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_inbox_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_inbox_list",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_read_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_read_list",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_relays_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_relays_help",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      },
+      {
+        "surface": "Native setup presentation: R.string.setup_write_list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_write_list",
+        "test_ids": [
+          "ONB-013",
+          "ONB-014",
+          "ONB-015",
+          "ONB-016",
+          "ONB-018",
+          "ONB-019",
+          "ONB-021",
+          "ONB-023"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
