@@ -24,6 +24,10 @@ label refreshes and closes on dismissal or when its token leaves the content.
 Calendar values outside `java.time`'s range
 remain visible as their exact canonical token rather than wrapping or crashing.
 
+`MarkdownTimestampText` uses the caller's inline artwork map when one is supplied.
+Chat previews combine built-in emoji with attachment icons; reply previews keep
+the quoted message's emoji map instead of inheriting the containing message's map.
+
 ## 1. Select and inspect the release
 
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,

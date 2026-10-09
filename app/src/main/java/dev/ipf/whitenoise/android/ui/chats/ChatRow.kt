@@ -557,7 +557,7 @@ internal fun ChatRowPreviewLine(
         }
     dev.ipf.whitenoise.android.ui.MarkdownTimestampText(
         text = remember(text) { EmojiShortcodes.annotate(text) },
-        inlineContent = inlineContent,
+        inlineContent = EmojiShortcodes.content() + inlineContent,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         fontStyle = fontStyle,
