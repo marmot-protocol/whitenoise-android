@@ -253,8 +253,9 @@ class GroupSystemRetentionScreenshotTest {
                     GroupSystemRow(
                         retentionChangeRecord(),
                         appState,
-                        addedMemberEvent(),
+                        addedMemberEvent().copy(subjectDisplayName = "Bob with a long linked display name"),
                         onWave = { _, _ -> },
+                        onOpenProfile = { error("The preparation must not expose profile navigation") },
                         loadWaveDismissal = { ready.await() },
                     )
                 }

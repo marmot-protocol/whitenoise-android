@@ -1557,7 +1557,10 @@ internal fun ChatsScreen(
                                     !item.group.leaveRequestPending &&
                                     item.projection?.leaveRequestPending != true
                                 ) {
-                                    { pendingLeaveAndDelete = PendingChatDeparture(listOf(item), controller, appState) }
+                                    {
+                                        pendingLeaveAndDelete =
+                                            PendingChatDeparture(listOf(item), controller, appState, groupTitleCopy)
+                                    }
                                 } else {
                                     null
                                 },
@@ -1703,7 +1706,7 @@ internal fun ChatsScreen(
                             pendingLeaveAndDelete =
                                 selectedVisibleItems
                                     .takeIf { it.isNotEmpty() }
-                                    ?.let { PendingChatDeparture(it, controller, appState) }
+                                    ?.let { PendingChatDeparture(it, controller, appState, groupTitleCopy) }
                         },
                         onAddToFolder = {
                             openFolderPicker(selectedVisibleItems)

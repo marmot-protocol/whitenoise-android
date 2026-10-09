@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
@@ -147,7 +148,7 @@ class ChatListSelectionBarScreenshotTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val selectAllLabel = context.getString(R.string.chat_list_select_all)
         composeRule.onNodeWithText(selectAllLabel, useUnmergedTree = true).assertIsDisplayed()
-        departureLabel?.let { composeRule.onNodeWithText(context.getString(it)).assertIsDisplayed() }
+        departureLabel?.let { composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed() }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 }

@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatDepartureStage
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -33,11 +35,12 @@ internal class PendingChatDeparture(
     items: List<ChatListItem>,
     controller: ChatsController,
     appState: WhiteNoiseAppState,
+    titleCopy: GroupTitleCopy,
 ) {
     val owner = PendingLocalChatDelete.capture(items, controller, appState)
     val targets =
         items.distinctBy { it.group.groupIdHex.lowercase() }.map {
-            ChatDepartureTarget(it.group.groupIdHex, it.group.name.orEmpty(), it.isDm())
+            ChatDepartureTarget(it.group.groupIdHex, chatListItemDisplayTitle(it, appState, titleCopy), it.isDm())
         }
 }
 
@@ -238,6 +241,7 @@ private fun ChatDepartureSuccessor(
 
 /** Readable per-group partial stages stay scrollable without pushing the dialog actions out of reach. */
 @Composable
+@Suppress("FunctionNaming")
 internal fun ChatDepartureResultContent(
     result: ChatDepartureBatchResult,
     targets: List<ChatDepartureTarget>,

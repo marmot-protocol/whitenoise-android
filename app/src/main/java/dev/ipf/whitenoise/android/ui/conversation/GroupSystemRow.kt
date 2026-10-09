@@ -145,14 +145,16 @@ internal fun GroupSystemRow(
             GroupSystemLinkedSummary(copy.fallback)
         }
     val summaryText =
-        if (onOpenProfile == null || preparing) {
+        if (onOpenProfile == null) {
             AnnotatedString(summary.text)
         } else {
             groupSystemSummaryText(summary, MaterialTheme.colorScheme.primary) { subject ->
                 // Navigation only, and only under the account this row was rendered for (#2957).
-                GroupSystemSubjectLink
-                    .openTarget(subject, waveAccountRef, appState.activeAccountRef)
-                    ?.let(onOpenProfile)
+                if (!preparing) {
+                    GroupSystemSubjectLink
+                        .openTarget(subject, waveAccountRef, appState.activeAccountRef)
+                        ?.let(onOpenProfile)
+                }
             }
         }
     var actionMenuOpen by remember(record.messageIdHex) { mutableStateOf(false) }

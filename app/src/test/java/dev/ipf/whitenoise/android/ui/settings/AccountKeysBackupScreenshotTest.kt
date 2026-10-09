@@ -6,13 +6,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
@@ -110,12 +112,12 @@ class AccountKeysBackupScreenshotTest {
             }
         }
         if (stage == Stage.Raw) {
-            composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
+            composeRule.onNode(hasScrollAction()).performScrollToNode(hasTestTag("profile_keys.export_raw"))
+            composeRule.onNodeWithTag("profile_keys.export_raw").performClick()
         } else {
-            composeRule
-                .onNodeWithText(context.getString(R.string.export_encrypted_private_key))
-                .performScrollTo()
-                .performClick()
+            val exportLabel = context.getString(R.string.export_encrypted_private_key)
+            composeRule.onNode(hasScrollAction()).performScrollToNode(hasText(exportLabel))
+            composeRule.onNodeWithText(exportLabel).performClick()
             if (stage == Stage.Preview) {
                 composeRule.onNodeWithTag("profile_keys.export_password").performTextInput("Synthetic passphrase 48!")
                 composeRule
