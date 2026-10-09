@@ -3,9 +3,11 @@ package dev.ipf.whitenoise.android.maestro
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.share.PRIVATE_SHARE_DIRECTORY
 import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.share.createPendingShareRequestStore
@@ -15,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 
 internal const val MAESTRO_SHARE_TEXT = "  Maestro café 👋\nsecond line  "
 
@@ -114,21 +117,35 @@ internal suspend fun verifyMaestroInboundShare(
         }
     val context = InstrumentationRegistry.getInstrumentation().targetContext
     val store = createPendingShareRequestStore(context)
-    return withTimeoutOrNull(15_000L) {
-        var matches = false
-        while (!matches) {
-            var cleared = false
-            activity.onActivity { cleared = it.pendingInboundShareRequestForTest == null }
-            cleared = cleared && withContext(Dispatchers.IO) { store.load(before.requestId) == null }
-            matches =
-                cleared &&
-                maestroShareLocalStateMatches(state, before, expectedDraft) &&
-                maestroShareHistoriesMatch(native, before, expectedDraft) &&
-                verifyMaestroShareFiles(context, before, postcondition)
-            if (!matches) delay(100L)
-        }
-        true
-    } ?: false
+    var cleared = false
+    var localState: Boolean? = null
+    var histories: Boolean? = null
+    var fileProof: MaestroShareFileProof? = null
+    val verified =
+        withTimeoutOrNull(15_000L) {
+            var matches = false
+            while (!matches) {
+                activity.onActivity { cleared = it.pendingInboundShareRequestForTest == null }
+                cleared = cleared && withContext(Dispatchers.IO) { store.load(before.requestId) == null }
+                if (cleared) {
+                    localState = maestroShareLocalStateMatches(state, before, expectedDraft)
+                    histories = maestroShareHistoriesMatch(native, before, expectedDraft)
+                    fileProof = verifyMaestroShareFiles(context, before, postcondition)
+                }
+                matches = cleared && localState == true && histories == true && fileProof?.verified == true
+                if (!matches) delay(100L)
+            }
+            true
+        } ?: false
+    if (!verified) {
+        Log.w(
+            "MaestroShareProof",
+            "cleared=$cleared local=$localState histories=$histories " +
+                "shelves=${fileProof?.shelvesMatch} copies=${fileProof?.copiesMatch} " +
+                "removed=${fileProof?.removed} ownership=${fileProof?.ownershipMatches}",
+        )
+    }
+    return verified
 }
 
 private suspend fun maestroShareLocalStateMatches(
@@ -182,3 +199,15 @@ private fun maestroExpectedShareErrors(fixture: String): List<ShareImportError> 
         fixture == "share-text" || fixture.startsWith("share-external-") -> emptyList()
         else -> listOf(ShareImportError.Scheme)
     }
+
+/** Cleanup follows proof and Activity destruction, confined to the disposable lab's private Android intake. */
+internal suspend fun clearMaestroInboundShareFixture(context: Context) {
+    check(context.packageName == MaestroFixtureRunner.FIXTURE_PACKAGE)
+    val store = createPendingShareRequestStore(context)
+    withContext(Dispatchers.IO) {
+        store.clear()
+        val directory = File(context.noBackupFilesDir, PRIVATE_SHARE_DIRECTORY)
+        check(!directory.exists() || directory.deleteRecursively()) { "Fixture private share cleanup failed" }
+        check(!directory.exists()) { "Fixture private share files remain" }
+    }
+}

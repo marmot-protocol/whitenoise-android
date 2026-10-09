@@ -54,12 +54,22 @@ private fun revokeMaestroSourceReadGrant(context: Context) {
     )
 }
 
+/** Only bounded predicate outcomes are retained; identities, URIs and file contents stay out of diagnostics. */
+internal data class MaestroShareFileProof(
+    val shelvesMatch: Boolean,
+    val copiesMatch: Boolean,
+    val removed: Boolean,
+    val ownershipMatches: Boolean,
+) {
+    val verified: Boolean get() = shelvesMatch && copiesMatch && removed && ownershipMatches
+}
+
 /** Fresh production lease reads require exact owner/order/bytes or deletion, with no orphan copies after removal. */
 internal suspend fun verifyMaestroShareFiles(
     context: Context,
     before: MaestroInboundShareBaseline,
     postcondition: String,
-): Boolean =
+): MaestroShareFileProof =
     withContext(Dispatchers.IO) {
         val files = PrivateShareFiles(context)
         val retained = if (postcondition == "share-request-staged") before.files else emptyList()
@@ -70,10 +80,12 @@ internal suspend fun verifyMaestroShareFiles(
             }
         val copiesMatch = retained.all { maestroPrivateCopyMatches(files, it) }
         val removed = before.files.filterNot(retained::contains).all { files.resolve(it.uri) == null }
-        shelvesMatch &&
-            copiesMatch &&
-            removed &&
-            maestroShareDiskOwnershipMatches(context, files, retained, checkNotNull(before.accountIds[before.owner]))
+        MaestroShareFileProof(
+            shelvesMatch,
+            copiesMatch,
+            removed,
+            maestroShareDiskOwnershipMatches(context, files, retained, checkNotNull(before.accountIds[before.owner])),
+        )
     }
 
 private fun maestroShareDiskOwnershipMatches(

@@ -387,11 +387,14 @@ class MaestroRuntimeHostTest {
                         }
                     }
                 val relayClosed = runCatching { relay.close() }
+                val shareStorageCleared =
+                    runCatching { withTimeout(15_000L) { clearMaestroInboundShareFixture(context) } }
                 val preferencesRemoved = runCatching { context.deleteSharedPreferences(directory.name) }
                 val rootRemoved = nativeClosed.isSuccess && root.deleteRecursively()
                 check(activityClosed.isSuccess) { "Fixture Activity teardown failed" }
                 check(listenerStopped.isSuccess) { "Fixture notification listener teardown failed" }
                 check(nativeClosed.isSuccess) { "Fixture native runtime teardown failed" }
+                check(shareStorageCleared.isSuccess) { "Fixture Android share storage cleanup failed" }
                 check(relayClosed.isSuccess && preferencesRemoved.isSuccess && rootRemoved) {
                     "Fixture storage cleanup failed"
                 }

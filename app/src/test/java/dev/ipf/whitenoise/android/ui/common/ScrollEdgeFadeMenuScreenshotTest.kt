@@ -12,7 +12,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
@@ -22,7 +21,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -127,6 +125,7 @@ class ScrollEdgeFadeMenuScreenshotTest {
     @Test
     fun amoledRtlLargeActionAnchorHasVisibleRows() {
         openActionAnchor(MenuOptions(dark = true, amoled = true, rtl = true, fontScale = 2f))
+        assertTrue(rule.onNodeWithText("Choice 0").fetchSemanticsNode().boundsInRoot.height >= 32f)
         val node = rule.onNodeWithTag(MENU)
         assertEquals(Color.Cyan, node.captureToImage().toPixelMap()[8, 14])
         node.captureRoboImage("src/test/snapshots/scroll_edges_native_menu_action_amoled_rtl_large.png")
@@ -145,10 +144,9 @@ class ScrollEdgeFadeMenuScreenshotTest {
     ) {
         rule.setContent {
             CompositionLocalProvider(
-                LocalDensity provides Density(LocalDensity.current.density, options.fontScale),
                 LocalLayoutDirection provides if (options.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = options.dark, amoled = options.amoled) {
+                WhiteNoiseTheme(darkTheme = options.dark, amoled = options.amoled, fontScale = options.fontScale) {
                     Box(Modifier.fillMaxSize()) {
                         if (actionSizedAnchor) {
                             Box {

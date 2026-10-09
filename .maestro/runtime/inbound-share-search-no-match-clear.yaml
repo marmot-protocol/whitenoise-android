@@ -17,7 +17,8 @@ name: inbound-share-search-no-match-clear
 - assertVisible:
     focused: true
     text: ^ZZZMaestroNoDestination$
-- hideKeyboard
+# Search submits this single-line field without invoking the picker's cancellation Back.
+- pressKey: Enter
 - assertVisible:
     text: ^No chats match your search.$
 - assertVisible:
@@ -28,7 +29,8 @@ name: inbound-share-search-no-match-clear
 - assertVisible:
     focused: true
 - eraseText: 100
-- hideKeyboard
+# Search submits this single-line field without invoking the picker's cancellation Back.
+- pressKey: Enter
 - assertVisible:
     id: performance.share_picker
 - assertVisible:

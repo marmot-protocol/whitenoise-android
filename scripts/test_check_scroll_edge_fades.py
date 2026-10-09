@@ -15,6 +15,20 @@ class ScrollEdgeInventoryTests(unittest.TestCase):
     def test_repository_coverage(self):
         self.assertEqual([], inventory_errors())
 
+    def test_native_menu_binding_accepts_only_its_actual_state_and_known_stable_option(self):
+        for call in ('.scrollEdgeFade(menuScrollState)',
+                     '.scrollEdgeFade(menuScrollState, stableRenderTarget = true)',
+                     '.scrollEdgeFade(\n menuScrollState,\n stableRenderTarget = true\n)'):
+            with self.subTest(call=call):
+                self.assertTrue(MODULE.menu_scroll_state_bound('scrollState = menuScrollState; ' + call))
+        for source in ('scrollState = otherState; .scrollEdgeFade(menuScrollState)',
+                       'scrollState = menuScrollState; .scrollEdgeFade(otherState)',
+                       'scrollState = menuScrollState; .scrollEdgeFade(menuScrollState, fadeEnabled = false)',
+                       'scrollState = menuScrollState; // .scrollEdgeFade(menuScrollState)',
+                       'scrollState = menuScrollState; val label = ".scrollEdgeFade(menuScrollState)"'):
+            with self.subTest(source=source):
+                self.assertFalse(MODULE.menu_scroll_state_bound(source))
+
     def test_qualified_and_aliased_raw_calls_cannot_hide(self):
         source = '''import androidx.compose.foundation.lazy.LazyColumn as HiddenList
         HiddenList { item { Text("sample") } }

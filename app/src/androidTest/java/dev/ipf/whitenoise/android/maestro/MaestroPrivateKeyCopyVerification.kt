@@ -74,12 +74,19 @@ private fun clearMatchedMaestroPrivateClip(
     if (matched) {
         checkNotNull(clip)
         checkNotNull(item)
-        check(clip.description.label.toString() == label)
-        check(clip.description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN))
-        check(clip.description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false) == true)
-        check(item.uri == null && item.intent == null && item.htmlText == null)
-        clipboard.clearPrimaryClip()
-        check(clipboard.primaryClip == null && !clipboard.hasPrimaryClip())
+        try {
+            check(clip.description.label.toString() == label)
+            check(clip.description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN))
+            check(clip.description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false) == true)
+            check(item.uri == null && item.intent == null && item.htmlText == null)
+        } finally {
+            // A bad metadata verdict must still clean this disposable secret, preserving a replaced clip.
+            val current = clipboard.primaryClip
+            if (current?.itemCount == 1 && current.getItemAt(0).text?.toString() == expected) {
+                clipboard.clearPrimaryClip()
+                check(clipboard.primaryClip == null && !clipboard.hasPrimaryClip())
+            }
+        }
     }
     return matched
 }
