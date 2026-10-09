@@ -18,7 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.LayerOutsets
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -67,6 +69,34 @@ class ClocklessDropdownMenuAndroidTest {
     @Test
     fun shadowOutsetMaterialAnchorPaintsAndSelectsWithNaturalFrames() =
         exerciseMenu(appMenu = false, actionSizedAnchor = true, controlLayer = ControlLayer.SHADOW_OUTSETS)
+
+    @Test
+    fun offscreenMaterialAnchorPaintsAndSelectsWithNaturalFrames() = exerciseMenu(
+        appMenu = false,
+        actionSizedAnchor = true,
+        controlLayer = ControlLayer.OFFSCREEN,
+    )
+
+    @Test
+    fun cachedDrawMaterialAnchorPaintsAndSelectsWithNaturalFrames() = exerciseMenu(
+        appMenu = false,
+        actionSizedAnchor = true,
+        controlLayer = ControlLayer.CACHED_DRAW,
+    )
+
+    @Test
+    fun zeroFadeMaterialAnchorPaintsAndSelectsWithNaturalFrames() = exerciseMenu(
+        appMenu = false,
+        actionSizedAnchor = true,
+        controlLayer = ControlLayer.ZERO_FADE,
+    )
+
+    @Test
+    fun fixedFadeMaterialAnchorPaintsAndSelectsWithNaturalFrames() = exerciseMenu(
+        appMenu = false,
+        actionSizedAnchor = true,
+        controlLayer = ControlLayer.FIXED_FADE,
+    )
 
     private fun exerciseMenu(
         appMenu: Boolean,
@@ -167,12 +197,27 @@ class ClocklessDropdownMenuAndroidTest {
             ControlLayer.SHADOW_OUTSETS -> Modifier.graphicsLayer {
                 outsets = LayerOutsets(left = 30.dp, right = 30.dp)
             }
+            ControlLayer.OFFSCREEN -> Modifier.graphicsLayer {
+                outsets = LayerOutsets(left = 30.dp, right = 30.dp)
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            ControlLayer.CACHED_DRAW ->
+                Modifier
+                    .graphicsLayer {
+                        outsets = LayerOutsets(left = 30.dp, right = 30.dp)
+                    }.drawWithCache { onDrawWithContent { drawContent() } }
+            ControlLayer.ZERO_FADE -> Modifier.verticalEdgeFade(0.dp, 0.dp)
+            ControlLayer.FIXED_FADE -> Modifier.verticalEdgeFade(0.dp, 28.dp)
         }
 
     private enum class ControlLayer {
         NONE,
         PLAIN,
         SHADOW_OUTSETS,
+        OFFSCREEN,
+        CACHED_DRAW,
+        ZERO_FADE,
+        FIXED_FADE,
     }
 
     private data class MenuConfiguration(
