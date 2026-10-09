@@ -227,6 +227,24 @@ if [[ "$aab_abis" != "arm64-v8a,armeabi-v7a,x86,x86_64" ]]; then
   exit 1
 fi
 
+# SDK preparation guards MarmotKit; final packaging must also guard every other
+# native dependency and bundletool's delivered APK layout. Keep this receipt
+# outside the immutable candidate inventory consumed by distribution tooling.
+sdk_dir="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+zipalign_bin="$(android_build_tool zipalign)"
+objdump_bin="$(find "$sdk_dir/ndk" -type f -name llvm-objdump | sort | tail -1)"
+if [[ -z "$zipalign_bin" || ! -x "$zipalign_bin" || -z "$objdump_bin" || ! -x "$objdump_bin" ]]; then
+  echo 'error: zipalign and NDK llvm-objdump are required for 16 KB release verification' >&2
+  exit 1
+fi
+page_size_report_dir="$(mktemp -d "$repo_dir/build/page-size-verification.XXXXXX")"
+python3 "$repo_dir/scripts/verify_android_page_sizes.py" \
+  --apk "$apk_source" --aab "$aab_source" --bundletool "$bundletool" \
+  --llvm-objdump "$objdump_bin" --zipalign "$zipalign_bin" \
+  --report "$page_size_report_dir/page-sizes.json"
+mkdir -p "$repo_dir/build/reports/release-page-sizes"
+cp "$page_size_report_dir/page-sizes.json" "$repo_dir/build/reports/release-page-sizes/page-sizes.json"
+
 [[ "$(git -C "$repo_dir" rev-parse HEAD)" == "$source_sha" ]] || {
   echo 'error: source commit changed during build' >&2; exit 1;
 }

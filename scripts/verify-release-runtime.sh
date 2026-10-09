@@ -40,6 +40,9 @@ if [[ "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" != "1" ]]; then
   exit 1
 fi
 
+bash "$(dirname "$0")/verify-runtime-page-size.sh" \
+  "${REQUIRED_PAGE_SIZE_BYTES:-}" "$report_dir/page-size.txt"
+
 wait_for_android17_emulator_stabilization() {
   local request_path="$report_dir/android17-emulator-stabilize.request"
   local status_path="$report_dir/android17-emulator-stabilize.status"

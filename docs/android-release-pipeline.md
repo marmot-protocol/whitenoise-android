@@ -172,6 +172,22 @@ not load the app-signing keystore into the publication job.
    Retain the artifact for qualification. An expired artifact cannot be promoted;
    a new build is a new candidate requiring another review.
 
+The production build also retains `android-page-sizes-<source>-<run>-<attempt>`.
+Its `page-sizes.json` binds the direct APK and Play AAB hashes to checks of every
+packaged ARM64/x86_64 library's `PT_LOAD` alignment, `PAGE_ALIGNMENT_16K` in the
+bundle configuration, and `zipalign -c -P 16 -v 4` on both the direct APK and a
+bundletool-generated universal APK. The generated APK uses a disposable signing
+key for packaging verification; it is not a distributable release. Keep this
+receipt beside the candidate, outside its fixed file inventory.
+
+The Android 17 runtime lane requires `getconf PAGE_SIZE` to return `16384` before
+installation and retains `page-size.txt` with its ART/launch report. A configured
+`google_apis_ps16k` image alone is not evidence of its actual kernel page size.
+This emulator qualification remains distinct from the exact production APK/AAB
+packaging check and Google Play's bundle readback. Before completing #2729,
+record Play Console's 16 KB compatibility result for the same uploaded version
+code and AAB; local/tooling success cannot substitute for that store result.
+
 ### Operator commands: build to Play internal
 
 Run these from the repository with authenticated `gh`, Python 3, and Git.

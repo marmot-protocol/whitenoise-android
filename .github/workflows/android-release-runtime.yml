@@ -360,6 +360,7 @@ jobs:
           disable-animations: true
           script: >-
             REQUIRE_ANDROID17_EMULATOR_STABILIZED=true
+            REQUIRED_PAGE_SIZE_BYTES=16384
             ./scripts/verify-release-runtime.sh
             '${{ steps.apks.outputs.x86_64_path }}'
             dev.ipf.whitenoise.android.staging
