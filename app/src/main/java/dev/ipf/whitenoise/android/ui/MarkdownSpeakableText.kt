@@ -371,7 +371,13 @@ private fun MappedTextBuilder.appendSpeakableInlines(
             is MarkdownInlineFfi.Math ->
                 append(collector.visibleLeaf(inline.content, inlinePath, maxChars - length))
             is MarkdownInlineFfi.Timestamp ->
-                append(collector.visibleLeaf(markdownTimestampLabel(inline.unixSeconds, inline.style.code()), inlinePath, maxChars - length))
+                append(
+                    collector.visibleLeaf(
+                        markdownTimestampLabel(inline.unixSeconds, inline.style.code()),
+                        inlinePath,
+                        maxChars - length,
+                    ),
+                )
             is MarkdownInlineFfi.NostrMention ->
                 appendSpeakableNostrEntity(
                     entity = inline.entity,
@@ -649,7 +655,8 @@ private data class MappedText(
 
 /** True when a speakable segment already ends with authored punctuation or an emoji. */
 @Suppress("MaxLineLength")
-internal fun String.endsWithSpeakableSentenceTerminal(): Boolean = hasAuthoredSpeakableTerminalPunctuation() || endsWithSpeakableEmojiSequence()
+internal fun String.endsWithSpeakableSentenceTerminal(): Boolean =
+    hasAuthoredSpeakableTerminalPunctuation() || endsWithSpeakableEmojiSequence()
 
 private fun String.hasAuthoredSpeakableTerminalPunctuation(): Boolean = isEmpty() || last() in ".!?;:,"
 

@@ -69,7 +69,11 @@ internal fun focusedMessagePreviewText(
             buildAnnotatedString {
                 append(styled.text)
                 (styled.spanStyles + inertLinkStyles).forEach { addStyle(it.item, it.start, it.end) }
-                styled.getStringAnnotations(0, styled.length).forEach { addStringAnnotation(it.tag, it.item, it.start, it.end) }
+                styled
+                    .getStringAnnotations(
+                        0,
+                        styled.length,
+                    ).forEach { addStringAnnotation(it.tag, it.item, it.start, it.end) }
             },
         )
     } else {

@@ -683,7 +683,8 @@ internal fun markdownElisionLeafId(
     }
 
 @Suppress("MaxLineLength")
-internal fun markdownTableHeaderCellElisionLeafId(rowPath: String): String = markdownElisionLeafId("$rowPath/h", sourceIndexOffset = null)
+internal fun markdownTableHeaderCellElisionLeafId(rowPath: String): String =
+    markdownElisionLeafId("$rowPath/h", sourceIndexOffset = null)
 
 /** Authored blank lines beyond the single one the paragraph gap already represents. */
 internal fun markdownExtraBlankLines(
@@ -981,7 +982,8 @@ internal fun groupMarkdownDetailsBlocksWithSource(blocks: List<MarkdownBlockFfi>
  * inline via [markdownDetailsSection]. An opener with no matching close renders
  * literally (stays Plain), so unterminated markup never swallows the rest.
  */
-internal fun groupMarkdownDetailsBlocks(blocks: List<MarkdownBlockFfi>): List<MarkdownRenderGroup> = groupMarkdownDetailsBlocksWithSource(blocks).groups
+internal fun groupMarkdownDetailsBlocks(blocks: List<MarkdownBlockFfi>): List<MarkdownRenderGroup> =
+    groupMarkdownDetailsBlocksWithSource(blocks).groups
 
 // A Paragraph whose only lines are the <details> tag (optional same-line
 // summary) and optionally an own-line <summary>. Residual content on the
@@ -1349,7 +1351,13 @@ private fun rememberMarkdownInlineText(
     val mentionBech32s = remember(inlines) { markdownInlineMentionBech32s(inlines) }
     val mentionNames = resolveMentionNames(mentionBech32s, ctx.mentionDisplayName)
     val hasTimestamp = remember(inlines) { markdownInlinesHaveTimestamp(inlines) }
-    val timestampRevision = rememberTimestampRevision(hasTimestamp, remember(inlines) { markdownInlinesHaveTimestamp(inlines, relativeOnly = true) })
+    val timestampRevision =
+        rememberTimestampRevision(
+            hasTimestamp,
+            remember(inlines) {
+                markdownInlinesHaveTimestamp(inlines, relativeOnly = true)
+            },
+        )
     // Links must derive from the content color like every other accent:
     // colorScheme.primary disappears on the outgoing bubble, whose container
     // IS primary. Underline alone carries the affordance on both surfaces.
@@ -1494,7 +1502,10 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
             // newline (not the CommonMark collapse-to-space) to match how the
             // plaintext fallback has always displayed.
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append('\n')
-            is MarkdownInlineFfi.Code -> withStyle(ctx.codeStyle) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
+            is MarkdownInlineFfi.Code ->
+                withStyle(
+                    ctx.codeStyle,
+                ) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                     appendMarkdownInlines(inline.children, ctx, depth + 1)
@@ -1517,7 +1528,13 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
             is MarkdownInlineFfi.Autolink -> {
                 val parsedLink = parsedOpenableMarkdownLink(markdownAutolinkDestination(inline.url, inline.kind))
                 if (parsedLink != null) {
-                    withLink(LinkAnnotation.Url(parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
+                    withLink(
+                        LinkAnnotation.Url(
+                            parsedLink.destination,
+                            TextLinkStyles(style = ctx.linkStyle),
+                            ctx.linkListener,
+                        ),
+                    ) {
                         append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                     }
                 } else {
@@ -1525,7 +1542,10 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
                     append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                 }
             }
-            is MarkdownInlineFfi.Math -> withStyle(ctx.codeStyle) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
+            is MarkdownInlineFfi.Math ->
+                withStyle(
+                    ctx.codeStyle,
+                ) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
             is MarkdownInlineFfi.NostrMention -> appendNostrEntity(inline.entity, mention = true, ctx)
             is MarkdownInlineFfi.NostrUri -> appendNostrEntity(inline.entity, mention = false, ctx)
             is MarkdownInlineFfi.Timestamp -> appendMarkdownTimestamp(inline)
@@ -1715,7 +1735,11 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
         // confirmation dialog that shows the real URL.
         val annotation =
             if (shouldConfirmMarkdownLink(markdownInlinePlainText(visible), parsedLink.destination)) {
-                LinkAnnotation.Clickable(CONFIRM_LINK_TAG_PREFIX + parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)
+                LinkAnnotation.Clickable(
+                    CONFIRM_LINK_TAG_PREFIX + parsedLink.destination,
+                    TextLinkStyles(style = ctx.linkStyle),
+                    ctx.linkListener,
+                )
             } else {
                 LinkAnnotation.Url(parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)
             }
@@ -1814,7 +1838,10 @@ internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
                     is MarkdownInlineFfi.Text -> append(inline.content)
                     is MarkdownInlineFfi.Code -> append(inline.content)
                     is MarkdownInlineFfi.Math -> append(inline.content)
-                    is MarkdownInlineFfi.Timestamp -> append(markdownTimestampLabel(inline.unixSeconds, inline.style.code()))
+                    is MarkdownInlineFfi.Timestamp ->
+                        append(
+                            markdownTimestampLabel(inline.unixSeconds, inline.style.code()),
+                        )
                     is MarkdownInlineFfi.Autolink -> append(inline.url)
                     is MarkdownInlineFfi.Emph -> walk(inline.children)
                     is MarkdownInlineFfi.Strong -> walk(inline.children)
@@ -1911,7 +1938,12 @@ internal fun markdownDocumentToPreviewAnnotatedString(
                 }
                 range.timestampToken?.let { token ->
                     addStringAnnotation(TIMESTAMP_TAG, token, range.start, range.end)
-                    addStringAnnotation(markdownTimestampInlineContentTag, "markdown-timestamp-clock:" + token, range.start, range.start + 1)
+                    addStringAnnotation(
+                        markdownTimestampInlineContentTag,
+                        "markdown-timestamp-clock:" + token,
+                        range.start,
+                        range.start + 1,
+                    )
                 }
             }
         },
@@ -1976,7 +2008,8 @@ internal fun parsedOpenableMarkdownLink(dest: String): ParsedOpenableMarkdownLin
 internal fun isOpenableMarkdownLink(dest: String): Boolean = parsedOpenableMarkdownLink(dest) != null
 
 /** Security-relevant authority shown separately from the truncated full URL. */
-internal fun markdownLinkEffectiveAuthority(dest: String): String? = parsedOpenableMarkdownLink(dest)?.effectiveAuthority
+internal fun markdownLinkEffectiveAuthority(dest: String): String? =
+    parsedOpenableMarkdownLink(dest)?.effectiveAuthority
 
 private fun parsedHttpMarkdownLink(uri: URI): ParsedOpenableMarkdownLink? {
     val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: return null
@@ -2043,7 +2076,11 @@ private fun openMarkdownLink(
     // Re-parse at launch so ACTION_VIEW receives the same canonical target the
     // annotation and confirmation UI were built from.
     val parsedLink = parsedOpenableMarkdownLink(url) ?: return
-    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(parsedLink.destination))
+    val intent =
+        android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse(parsedLink.destination),
+        )
     try {
         context.startActivity(intent)
     } catch (_: android.content.ActivityNotFoundException) {

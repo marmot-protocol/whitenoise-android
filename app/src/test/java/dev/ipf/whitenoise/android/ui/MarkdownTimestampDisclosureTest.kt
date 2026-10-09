@@ -26,7 +26,10 @@ class MarkdownTimestampDisclosureTest {
 
     private val token = "<t:0:R>"
     private val disclosure = markdownTimestampAbsolute(0, 'F') + "\n" + token
-    private val dismiss = ApplicationProvider.getApplicationContext<android.content.Context>().getString(R.string.dismiss)
+    private val dismiss =
+        ApplicationProvider.getApplicationContext<android.content.Context>().getString(
+            R.string.dismiss,
+        )
 
     @Test
     fun disclosureSurvivesRefresh() {

@@ -8,6 +8,18 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
         "anchor": "fun MarkdownTimestampText(",
         "test_ids": ["MSG-002"]
+      },
+      {
+        "surface": "Timestamp disclosure dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": ["MSG-002"]
+      },
+      {
+        "surface": "TimestampOverlays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
+        "anchor": "fun TimestampOverlays(",
+        "test_ids": ["MSG-002"]
       }
     ],
     "source_coverage": [
