@@ -8765,7 +8765,8 @@ class ConversationController(
         account: String,
         canQueue: () -> Boolean,
     ): Boolean =
-        canQueue() && canSendMessages &&
+        canQueue() &&
+            canSendMessages &&
             shouldAcceptMediaUploadForAccount(
                 account,
                 mediaUploadSessionEpoch,
@@ -9181,9 +9182,10 @@ class ConversationController(
                                 // the bridge bubble is identical to the projected one.
                                 plaintext = retained.caption.orEmpty(),
                                 tags =
-                                    imetaTags + optimistic.tags.filter {
-                                        it.values.firstOrNull() != "_media_pending"
-                                    },
+                                    imetaTags +
+                                        optimistic.tags.filter {
+                                            it.values.firstOrNull() != "_media_pending"
+                                        },
                                 sourceEpoch = references.firstOrNull()?.sourceEpoch,
                             )
                         messageById[confirmedId] = confirmedRecord

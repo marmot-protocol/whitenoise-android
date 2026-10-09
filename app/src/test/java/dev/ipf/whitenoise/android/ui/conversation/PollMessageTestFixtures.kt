@@ -29,6 +29,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFileAttachmentFixtures
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.lang.reflect.Proxy
 import java.util.Locale
@@ -131,7 +133,10 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                 }
             }
         } as MarmotInterface
-    protected val pollState =
+    protected val pollState = stateWithNativeDispatcher()
+
+    /** Reuses the native fixture with a dispatcher that can deterministically complete a read inline. */
+    protected fun stateWithNativeDispatcher(dispatcher: CoroutineDispatcher = Dispatchers.IO) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
             draftStore =
@@ -149,6 +154,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             accounts = listOf(AccountSummaryFfi("personal", "01" + "00".repeat(31), true, false, false, true)),
             activeAccountRef = "personal",
             initialMarmotRuntime = AppMarmotRuntime("test", native),
+            marmotIoDispatcher = dispatcher,
         )
     protected val pollController =
         ConversationController(

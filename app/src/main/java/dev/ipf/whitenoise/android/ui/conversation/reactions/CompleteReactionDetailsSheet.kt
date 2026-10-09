@@ -34,8 +34,11 @@ internal fun CompleteReactionDetailsSheet(
             details.refresh { controller.loadReactionParticipants(messageId) }
         }
         val participants = details.participants?.let { controller.reactionParticipantsFor(messageId, it) }.orEmpty()
-        LaunchedEffect(details.ready, participants.isEmpty()) {
-            if (details.ready && participants.isEmpty()) onDismissRequest()
+        // Keep readiness and emptiness from the same composition. A fast read can finish before an older
+        // effect runs; reading live readiness there would pair it with that effect's captured empty list.
+        val shouldDismiss = details.ready && participants.isEmpty()
+        LaunchedEffect(shouldDismiss) {
+            if (shouldDismiss) onDismissRequest()
         }
         ReactionDetailsSheet(
             participants = participants,

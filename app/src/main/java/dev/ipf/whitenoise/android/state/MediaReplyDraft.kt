@@ -31,7 +31,9 @@ internal fun MarmotInterface.stageMediaReply(
                     if (sameAttachments) {
                         checkNotNull(draft).mediaAttachments[index].id
                     } else {
-                        java.util.UUID.randomUUID().toString()
+                        java.util.UUID
+                            .randomUUID()
+                            .toString()
                     },
                 fileName = attachment.fileName,
                 mediaType = attachment.mediaType,
@@ -55,7 +57,8 @@ private fun MarmotInterface.replyDraftMatchesBytes(
     return descriptors.size == attachments.size &&
         descriptors.zip(attachments).all { (descriptor, attachment) ->
             val sameMetadata =
-                descriptor.fileName == attachment.fileName && descriptor.mediaType == attachment.mediaType &&
+                descriptor.fileName == attachment.fileName &&
+                    descriptor.mediaType == attachment.mediaType &&
                     descriptor.dim == attachment.dim
             val sameBytes =
                 messageDraftAttachmentIfRevision(account, selected.revision, descriptor.id)

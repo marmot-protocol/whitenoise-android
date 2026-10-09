@@ -9,9 +9,11 @@ import androidx.compose.ui.test.performClick
 import dev.ipf.marmotkit.ConversationWindowRevisionFfi
 import dev.ipf.marmotkit.TimelineUserReactionFfi
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CompleteReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.Dispatchers
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,6 +31,35 @@ class CompleteReactionDetailsIntegrationTest : GroupSystemReactionTestFixtures()
 
     /** Releases the owner and its coroutines after each composition. */
     @After fun clearController() = pollController.onCleared()
+
+    /** An inline native completion must not let the initial empty composition dismiss a populated sheet. */
+    @Test fun fastInitialReadCannotDismissTheLoadedParticipants() {
+        val item = activity()
+        reactionDetailsResponder = { reactions(item.record.messageIdHex, "03") }
+        val state = stateWithNativeDispatcher(Dispatchers.Unconfined)
+        val controller =
+            ConversationController(
+                appState = state,
+                initialGroup = group(),
+                initialMemberSnapshot = memberSnapshot(),
+            )
+        val dismissed = mutableStateOf(false)
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    if (!dismissed.value) {
+                        CompleteReactionDetailsSheet(item, controller, state, null, { dismissed.value = true })
+                    }
+                }
+            }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithText("All · 4").assertIsSelected()
+            assertFalse(dismissed.value)
+            assertEquals(1, recordedCalls().count { it.first == "messageReactions" })
+        } finally {
+            controller.onCleared()
+        }
+    }
 
     /** Activity details read the exact target and re-read when only the authoritative window revision changes. */
     @Test fun activityDetailsUseCanonicalReadAndRefreshBeyondThePreview() {

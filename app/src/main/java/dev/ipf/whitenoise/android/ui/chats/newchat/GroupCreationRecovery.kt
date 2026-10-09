@@ -17,7 +17,9 @@ internal data class GroupCreationRecovery(
         canonicalId: String?,
     ): RecipientSearch.Candidate? =
         recipient?.takeIf {
-            owner.isCurrent() && canonicalId == null && currentAttempt == attempt &&
+            owner.isCurrent() &&
+                canonicalId == null &&
+                currentAttempt == attempt &&
                 members.map { member -> member.accountIdHex } == submittedMembers
         }
 }

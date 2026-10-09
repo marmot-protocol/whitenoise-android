@@ -131,9 +131,10 @@ internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
         )
     }
     val draftBacked =
-        capturedReply || selectedDraftOrNull(account, group)
-            ?.draft
-            ?.let { it.replyToMessageIdHex == null && draftDescribesUpload(it, request.attachments) } == true
+        capturedReply ||
+            selectedDraftOrNull(account, group)
+                ?.draft
+                ?.let { it.replyToMessageIdHex == null && draftDescribesUpload(it, request.attachments) } == true
     val submission = uploadMediaWithClientToken(account, group, request.copy(send = !draftBacked), token)
     val acceptance =
         submission.acceptance?.also {
