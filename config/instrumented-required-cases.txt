@@ -36,5 +36,6 @@ dev.ipf.whitenoise.android.ui.conversation.TimelineRowTtsHighlightPaintAndroidTe
 
 # Hidden-keyboard native selection and legal IME edit sequences.
 dev.ipf.whitenoise.android.ui.ComposerImeEditSequenceTest#hiddenKeyboardSelectionDefersInputConnectionUntilTap
+dev.ipf.whitenoise.android.ui.ComposerImeEditSequenceTest#emptyHiddenComposerPastesThroughNativeToolbar
 dev.ipf.whitenoise.android.ui.ComposerImeEditSequenceTest#composingReplacementAndBackspacePreserveAdjacentWords
 dev.ipf.whitenoise.android.ui.ComposerImeEditSequenceTest#deletionQuerySeesAcceptedTextBeforeNextComposeFrame

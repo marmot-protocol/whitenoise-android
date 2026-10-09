@@ -65,7 +65,7 @@ import org.robolectric.annotation.Implements
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi", shadows = [ComposerMagnifierShadow::class])
 class ComposerAutofillMenuTest {
     @get:Rule val composeRule = createComposeRule()
 
@@ -124,7 +124,6 @@ class ComposerAutofillMenuTest {
     }
 
     @Test
-    @Config(shadows = [ComposerMagnifierShadow::class])
     fun unfocusedDraftLongPressSelectsAWordAndOffersNativeActions() {
         clipboard.setPrimaryClip(ClipData.newPlainText("test", "new"))
         render("Old draft")
@@ -137,7 +136,8 @@ class ComposerAutofillMenuTest {
         assertTrue(menuKeys().contains(TextContextMenuKeys.CopyKey))
         assertTrue(menuKeys().contains(TextContextMenuKeys.PasteKey))
         assertEquals(TextToolbarStatus.Hidden, unfocusedToolbar.status)
-        composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/composer_hidden_keyboard_selection.png")
+        composeRule.onNodeWithTag(ROOT_TAG)
+            .captureRoboImage("src/test/snapshots/composer_hidden_keyboard_selection.png")
     }
 
     @Test
@@ -155,7 +155,6 @@ class ComposerAutofillMenuTest {
     }
 
     @Test
-    @Config(shadows = [ComposerMagnifierShadow::class])
     fun focusedDraftLongPressKeepsTheTextMenu() {
         render("Draft message")
         val editor = composeRule.onNode(hasSetTextAction())

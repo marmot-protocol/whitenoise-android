@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import androidx.activity.ComponentActivity
@@ -14,6 +16,7 @@ import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.PlatformTextInputMethodRequest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -22,19 +25,28 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
 import dev.ipf.whitenoise.android.ui.conversation.composer.repairComposerMentionEdit
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.atomic.AtomicReference
 
 /** Representative legal commands through the actual composer input connection, not an IME reproduction claim. */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -50,7 +62,7 @@ class ComposerImeEditSequenceTest {
     /** Native selection acquires focus without starting an input method; a subsequent tap enables typing. */
     @Test
     fun hiddenKeyboardSelectionDefersInputConnectionUntilTap() {
-        render("first second")
+        render("first second", liveIme = true)
         val editor = composeRule.onNode(hasSetTextAction())
         val layouts = mutableListOf<TextLayoutResult>()
         editor.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
@@ -63,10 +75,36 @@ class ComposerImeEditSequenceTest {
         editor.assertIsFocused()
         composeRule.runOnIdle {
             assertFalse(value.selection.collapsed)
+            assertEquals("second", value.text.substring(value.selection.min, value.selection.max))
             assertNull(connection.get())
         }
+        assertFalse(imeVisible())
+        nativeAction("Copy")
+        assertFalse(imeVisible())
         editor.performTouchInput { click() }
         composeRule.waitUntil(10_000) { connection.get() != null }
+        composeRule.waitUntil(10_000) { imeVisible() }
+    }
+
+    /** The actual Android Paste action stays available before the editor acquires focus. */
+    @Test
+    fun emptyHiddenComposerPastesThroughNativeToolbar() {
+        render("", liveIme = true)
+        composeRule.runOnUiThread {
+            composeRule.activity.getSystemService(ClipboardManager::class.java)
+                .setPrimaryClip(ClipData.newPlainText("composer test", "first second"))
+        }
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+        nativeAction("Paste").perform(ViewActions.click())
+        composeRule.waitUntil(10_000) { value.text == "first second" }
+        editor.assertIsNotFocused()
+        assertFalse(imeVisible())
+        assertValue("first second", TextRange(12), null)
     }
 
     /** Detects stale surrounding-text queries without giving recomposition a frame to hide the boundary. */
@@ -75,6 +113,7 @@ class ComposerImeEditSequenceTest {
         render("first second")
         composeRule.onNode(hasSetTextAction()).performTouchInput { click() }
         composeRule.waitUntil(10_000) { connection.get() != null }
+        edit { setSelection(12, 12) }
         composeRule.runOnIdle {
             val input = checkNotNull(connection.get())
             assertEquals("first second", input.getTextBeforeCursor(100, 0).toString())
@@ -111,9 +150,17 @@ class ComposerImeEditSequenceTest {
     }
 
     private fun edit(command: InputConnection.() -> Boolean) {
-        composeRule.runOnIdle { checkNotNull(connection.get()).command() }
+        composeRule.runOnIdle { assertTrue(checkNotNull(connection.get()).command()) }
         composeRule.waitForIdle()
     }
+
+    private fun nativeAction(label: String) = onView(withText(label)).check(matches(isDisplayed()))
+
+    private fun imeVisible(): Boolean =
+        composeRule.runOnUiThread {
+            checkNotNull(ViewCompat.getRootWindowInsets(composeRule.activity.window.decorView))
+                .isVisible(WindowInsetsCompat.Type.ime())
+        }
 
     private fun assertValue(text: String, selection: TextRange, composition: TextRange?) {
         composeRule.runOnIdle {
@@ -123,17 +170,23 @@ class ComposerImeEditSequenceTest {
         }
     }
 
-    private fun render(text: String) {
+    private fun render(text: String, liveIme: Boolean = false) {
         value = TextFieldValue(text)
         composeRule.setContent {
             InterceptPlatformTextInput(
                 interceptor = { request, nextHandler ->
-                    nextHandler.startInputMethod(
-                        object : PlatformTextInputMethodRequest {
-                            override fun createInputConnection(outAttributes: EditorInfo): InputConnection =
-                                request.createInputConnection(outAttributes).also { connection.set(it) }
-                        },
-                    )
+                    if (liveIme) {
+                        nextHandler.startInputMethod(
+                            object : PlatformTextInputMethodRequest {
+                                override fun createInputConnection(outAttributes: EditorInfo): InputConnection =
+                                    request.createInputConnection(outAttributes).also { connection.set(it) }
+                            },
+                        )
+                    } else {
+                        // Exercise the real editor connection without a second IME composing concurrently.
+                        connection.set(request.createInputConnection(EditorInfo()))
+                        awaitCancellation()
+                    }
                 },
             ) {
                 WhiteNoiseTheme {

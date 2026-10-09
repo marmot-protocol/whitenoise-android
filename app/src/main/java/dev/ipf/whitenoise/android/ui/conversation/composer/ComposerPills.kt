@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.net.Uri
@@ -69,7 +71,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -360,7 +361,7 @@ private class ComposerLayoutCaretCorrectionGate {
  * Draft navigation admission follows measured geometry and owner changes, while same-size typing
  * retains the admitted button and its reserved space.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ComposerPill(
     textFieldValue: TextFieldValue,
@@ -1339,7 +1340,10 @@ internal fun ComposerPill(
                                                 if (inputContentVisible && inputFocusEnabled) {
                                                     composerNativeSelectionTouchGestures(
                                                         onPress = {
-                                                            if (!latestComposerFocused && latestTextFieldValue.text.isNotEmpty()) {
+                                                            val hiddenDraft =
+                                                                !latestComposerFocused &&
+                                                                    latestTextFieldValue.text.isNotEmpty()
+                                                            if (hiddenDraft) {
                                                                 selectingWithoutKeyboard = true
                                                             }
                                                         },
@@ -1347,8 +1351,10 @@ internal fun ComposerPill(
                                                             if (!latestComposerFocused) selectingWithoutKeyboard = false
                                                         },
                                                         onTap = {
-                                                            selectingWithoutKeyboard = false
-                                                            showKeyboardAfterTouchTap = true
+                                                            if (selectingWithoutKeyboard) {
+                                                                selectingWithoutKeyboard = false
+                                                                showKeyboardAfterTouchTap = true
+                                                            }
                                                         },
                                                     )
                                                 }
@@ -1358,10 +1364,9 @@ internal fun ComposerPill(
                                                 inputFocusEnabled,
                                                 textFieldValue.text.isEmpty(),
                                             ) {
-                                                if (
-                                                    !composerFocused && inputContentVisible && inputFocusEnabled &&
-                                                    latestTextFieldValue.text.isEmpty()
-                                                ) {
+                                                val emptyInputVisible =
+                                                    inputContentVisible && latestTextFieldValue.text.isEmpty()
+                                                if (!composerFocused && inputFocusEnabled && emptyInputVisible) {
                                                     composerUnfocusedTouchFocusGestures(
                                                         onTap = { position ->
                                                             textToolbar.hide()

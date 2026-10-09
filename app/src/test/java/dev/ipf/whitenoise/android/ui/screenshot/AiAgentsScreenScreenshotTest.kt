@@ -2,13 +2,13 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.settings.AiAgentsContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -53,18 +53,27 @@ class AiAgentsScreenScreenshotTest {
 
     /** Goose uses the same scrollable setup sheet in both themes. */
     @Test
-    fun gooseSetupSheetLight() = captureSheet("ai_agents_goose_setup_light", dark = false, amoled = false, connector = "goose")
+    fun gooseSetupSheetLight() =
+        captureSheet("ai_agents_goose_setup_light", dark = false, amoled = false, connector = "goose")
 
     @Test
-    fun gooseSetupSheetDark() = captureSheet("ai_agents_goose_setup_dark", dark = true, amoled = false, connector = "goose")
+    fun gooseSetupSheetDark() =
+        captureSheet("ai_agents_goose_setup_dark", dark = true, amoled = false, connector = "goose")
 
     @Test
     @Config(qualifiers = "ar-w360dp-h780dp-mdpi")
-    fun gooseSetupSheetRtl() = captureSheet("ai_agents_goose_setup_rtl", dark = false, amoled = false, connector = "goose")
+    fun gooseSetupSheetRtl() =
+        captureSheet("ai_agents_goose_setup_rtl", dark = false, amoled = false, connector = "goose")
 
     @Test
     fun gooseSetupSheetLargeFont() =
-        captureSheet("ai_agents_goose_setup_large_font", dark = false, amoled = false, connector = "goose", fontScale = 1.6f)
+        captureSheet(
+            "ai_agents_goose_setup_large_font",
+            dark = false,
+            amoled = false,
+            connector = "goose",
+            fontScale = 1.6f,
+        )
 
     /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
