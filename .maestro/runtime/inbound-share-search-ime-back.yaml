@@ -11,7 +11,4 @@ name: inbound-share-search-ime-back
     text: ^Maestro$
 # The picker intentionally consumes focused Back as request cancellation.
 - back
-- assertNotVisible: Some files could not be imported
-- assertNotVisible:
-    id: performance.share_picker
-- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/share-closed.yaml

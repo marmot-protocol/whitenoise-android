@@ -19,7 +19,4 @@ name: inbound-share-account-sheet-back
     enabled: true
     text: ^Share to 1 chat$
 - tapOn: Close
-- assertNotVisible: Some files could not be imported
-- assertNotVisible:
-    id: performance.share_picker
-- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/share-closed.yaml

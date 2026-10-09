@@ -6,7 +6,4 @@ name: inbound-share-owned-error-close
 - assertVisible: 'Files not imported: 1'
 - assertNotVisible: Share to
 - tapOn: Close
-- assertNotVisible: Some files could not be imported
-- assertNotVisible:
-    id: performance.share_picker
-- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/share-closed.yaml

@@ -30,15 +30,4 @@ name: qr-permission-deny-reopen
     text: ^Open settings$
 - tapOn:
     text: ^Close$
-- assertNotVisible:
-    id: qr_scanner.recovery
-- assertNotVisible:
-    id: qr_scanner.close
-- assertVisible:
-    id: share_connect.screen
-- assertVisible: Maestro Alice
-- back
-- assertVisible: Settings
-- assertVisible: Maestro Alice
-- back
-- assertVisible: Maestro group
+- runFlow: ../fixtures/qr-return.yaml

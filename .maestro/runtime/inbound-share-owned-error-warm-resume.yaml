@@ -6,7 +6,4 @@ name: inbound-share-owned-error-warm-resume
 - runFlow: ../fixtures/runtime-warm-resume.yaml
 - runFlow: ../fixtures/assert-unsupported-share-error.yaml
 - tapOn: Close
-- assertNotVisible: Some files could not be imported
-- assertNotVisible:
-    id: performance.share_picker
-- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/share-closed.yaml

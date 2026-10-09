@@ -20,7 +20,4 @@ name: inbound-share-picker-rotation
     containsChild:
       text: ^Share$
 - tapOn: Close
-- assertNotVisible: Some files could not be imported
-- assertNotVisible:
-    id: performance.share_picker
-- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/share-closed.yaml

@@ -164,9 +164,9 @@ Non-secret UI runs retain numerical `runner-memory-before.json` and `runner-memo
 
 Capture native logs after instrumentation ends, preserving late `emulator-errors.txt` failures/setup snapshot before deletion. Share-timeout logs expose only request/state/history/shelf/copy/removal/ownership predicates, never identity/URI/content. Missing logs or diagnostic timeout cannot certify cleanup or override failure.
 
-Landscape share cases scroll the actual `share.destinations` list; the screen center can hit fixed controls. Bounded recipient search must find the real group and correct Share enabled state before portrait return. No-match recovery uses Clear and requires the empty Search chats placeholder, original recipient and absent no-match state. Cursor-based deletion cannot prove a cleared query.
+Landscape share cases scroll `share.destinations`, avoiding fixed controls. Within the existing bound, require the real group and correct Share enabled state before portrait. No-match recovery uses Clear; require empty Search chats, original recipient and absent no-match state. Cursor deletion cannot prove clearing.
 
-Track actual MainActivity owners through consumed share Intents/warm launches. Passively await the sole resumed owner within existing deadlines; missing/multiple/foreign owners fail. Recreation compares actual identities. Require destroyed callbacks for every observed Activity before listener/runtime/storage teardown; missing/substituted cleanup fails.
+Track actual MainActivity owners through consumed share Intents/warm launches. Passively await one resumed owner within existing deadlines; absent/multiple/foreign owners fail. Recreation compares identities. Require every observed Activity’s destroyed callback before listener/runtime/storage teardown; missing/substituted cleanup fails.
 
 ## Additional campaign contracts
 
@@ -176,7 +176,7 @@ Backup correction requires focused secure editors, exact synthetic values and wh
 
 Nine smart-folder Cancel journeys require returned editor, no picker/condition, bounded scroll to unchanged empty Name, disabled Save and native `folder-absent`. NAV-009 permits dialog dismissal/restoration on rotation: prove opening, inspect both orientations, cancel any restored dialog and check the outer form. Never apply a rule tree. Keep Editing retains the exact named draft before Discard. Rerun 22 keys and nine smart-folder cases on the corrected source.
 
-The pinned CLI rejected YAML aliases. Preserve expanded parsed assertions; tooling rejects anchors/aliases/malformed commands in runtime/helpers/offline. Quoted literal ampersands/asterisks remain valid. Retain failures; guards cannot replace hosted execution.
+The pinned CLI rejects YAML aliases. Preserve expanded assertions; tooling rejects anchors/aliases/malformed runtime/helper/offline commands. Quoted ampersands/asterisks stay valid. Retain failures; guards cannot replace hosted execution.
 
 ### Settings lifecycle and persisted speech rates
 

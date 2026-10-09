@@ -11,7 +11,4 @@ name: inbound-share-text-back
     containsChild:
       text: ^Share$
 - back
-- assertNotVisible: Some files could not be imported
-- assertNotVisible:
-    id: performance.share_picker
-- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/share-closed.yaml

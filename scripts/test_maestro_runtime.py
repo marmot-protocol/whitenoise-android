@@ -748,7 +748,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertEqual(selector.get('id'), 'qr_scanner.recovery', path.name)
                     self.assertIs(selector['enabled'], True)
             if path.parent.name == 'runtime':
-                commands = list(yaml.safe_load_all(text))[1]
+                commands = expanded_flow_commands(path)
                 self.assertNotIn({'assertNotVisible': {'text': '^Scan QR Code$'}}, commands)
                 for control in ('qr_scanner.recovery', 'qr_scanner.close'):
                     self.assertIn({'assertNotVisible': {'id': control}}, commands)

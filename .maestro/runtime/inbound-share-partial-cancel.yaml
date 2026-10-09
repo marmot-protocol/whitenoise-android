@@ -7,7 +7,4 @@ name: inbound-share-partial-cancel
 - assertVisible: Share to
 - assertVisible: Cancel
 - tapOn: Cancel
-- assertNotVisible: Some files could not be imported
-- assertNotVisible:
-    id: performance.share_picker
-- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/share-closed.yaml
