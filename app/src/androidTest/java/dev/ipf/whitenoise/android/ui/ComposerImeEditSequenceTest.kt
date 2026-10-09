@@ -169,6 +169,74 @@ class ComposerImeEditSequenceTest {
         }
     }
 
+    /** Before-frame queries preserve the untouched suffix, newline, markup, chip and UTF-16 offsets. */
+    @Test
+    fun hardwareDeletionQueriesPreserveMiddleMultilineAndMentionDrafts() {
+        render("")
+        composeRule.onNode(hasSetTextAction()).performTouchInput { click() }
+        composeRule.waitUntil(10_000) { connection.get() != null }
+        val mention = "@npub1" + "q".repeat(58)
+        val drafts =
+            listOf(
+                "first second| third" to "first secon| third",
+                "first\nsecond| third" to "first\nsecon| third",
+                "first\n|second" to "first|second",
+                "**first** second| _third_" to "**first** secon| _third_",
+                "$mention first second|" to "$mention first secon|",
+                "😀 first second|" to "😀 first secon|",
+            )
+        for ((before, after) in drafts) {
+            composeRule.runOnIdle { value = valueAtMarkedCaret(before) }
+            composeRule.waitForIdle()
+            assertBeforeFrameHardwareDeletion(valueAtMarkedCaret(after))
+        }
+    }
+
+    /** Repeated key events update the queried prefix while the untouched suffix and prior line remain intact. */
+    @Test
+    fun repeatedHardwareDeletionQueriesPreserveNeighboringWords() {
+        render("first\nsecond third")
+        composeRule.onNode(hasSetTextAction()).performTouchInput { click() }
+        composeRule.waitUntil(10_000) { connection.get() != null }
+        edit { setSelection(12, 12) }
+        val expectedDrafts = listOf("first\nsecon| third", "first\nseco| third", "first\nsec| third")
+        expectedDrafts.forEachIndexed { index, text ->
+            assertBeforeFrameHardwareDeletion(valueAtMarkedCaret(text), repeatCount = index + 1)
+        }
+    }
+
+    private fun valueAtMarkedCaret(text: String): TextFieldValue =
+        TextFieldValue(text.replace("|", ""), selection = TextRange(text.indexOf('|')))
+
+    private fun assertBeforeFrameHardwareDeletion(
+        expected: TextFieldValue,
+        repeatCount: Int = 0,
+    ) {
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnUiThread {
+                val input = checkNotNull(connection.get())
+                input.beginBatchEdit()
+                input.sendKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL, repeatCount))
+                input.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+            }
+            composeRule.waitUntil(5_000) { value.text == expected.text }
+            composeRule.runOnUiThread {
+                val input = checkNotNull(connection.get())
+                val cursor = expected.selection.start
+                assertEquals(expected.selection, value.selection)
+                assertNull(value.composition)
+                assertEquals(expected.text.take(cursor), input.getTextBeforeCursor(500, 0).toString())
+                assertEquals(expected.text.substring(cursor), input.getTextAfterCursor(500, 0).toString())
+                input.endBatchEdit()
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.waitForIdle()
+        assertValue(expected.text, expected.selection, null)
+    }
+
     /** A trailing-space delete and a composing replacement preserve the earlier separator at each accepted value. */
     @Test
     fun composingReplacementAndBackspacePreserveAdjacentWords() {
