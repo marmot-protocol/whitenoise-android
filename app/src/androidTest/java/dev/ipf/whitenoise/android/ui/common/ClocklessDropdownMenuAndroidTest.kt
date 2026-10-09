@@ -1,8 +1,5 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import android.graphics.Rect
-import android.os.SystemClock
-import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,10 +15,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -35,7 +30,6 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ClocklessDropdownMenuAndroidTest {
     @get:Rule val scenario = ActivityScenarioRule(ComponentActivity::class.java)
-    private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
 
     @Test
     fun fittingAppMenuPaintsAndSelectsWithNaturalFrames() = exerciseMenu(appMenu = true)
@@ -47,16 +41,14 @@ class ClocklessDropdownMenuAndroidTest {
         val expanded = mutableStateOf(false)
         val selected = mutableStateOf(-1)
         val density = renderMenu(appMenu, expanded, selected)
-        clickText("Open menu")
-        val first = clickable(waitForText("Choice 0"))
-        val bounds = Rect().also(first::getBoundsInScreen)
-        assertPainted(bounds, density)
-        clickText("Choice 2")
-        waitForText("Open menu")
+        DropdownMenuWindowProbe.clickText("Open menu")
+        DropdownMenuWindowProbe.assertFirstRowPainted(density)
+        DropdownMenuWindowProbe.clickText("Choice 2")
+        DropdownMenuWindowProbe.waitForText("Open menu")
         scenario.scenario.onActivity { assertEquals(2, selected.value) }
         assertTrue(
             "selection must dismiss the actual popup",
-            automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Choice 2").orEmpty().isEmpty(),
+            DropdownMenuWindowProbe.visibleText("Choice 2") == null,
         )
     }
 
@@ -105,49 +97,5 @@ class ClocklessDropdownMenuAndroidTest {
             }
         }
         return density
-    }
-
-    private fun waitForText(label: String): AccessibilityNodeInfo {
-        val deadline = SystemClock.uptimeMillis() + WINDOW_TIMEOUT_MS
-        do {
-            val node = automation.rootInActiveWindow?.findAccessibilityNodeInfosByText(label)
-                ?.firstOrNull { it.text?.toString() == label && it.isVisibleToUser }
-            if (node != null) return node
-            SystemClock.sleep(50)
-        } while (SystemClock.uptimeMillis() < deadline)
-        error("Actual Android window did not expose $label")
-    }
-
-    private fun clickable(node: AccessibilityNodeInfo): AccessibilityNodeInfo {
-        var current = node
-        while (!current.isClickable) current = checkNotNull(current.parent) { "No actual clickable ancestor" }
-        return current
-    }
-
-    private fun clickText(label: String) {
-        assertTrue(
-            "actual Android click rejected for $label",
-            clickable(waitForText(label)).performAction(AccessibilityNodeInfo.ACTION_CLICK),
-        )
-    }
-
-    private fun assertPainted(bounds: Rect, density: Float) {
-        val deadline = SystemClock.uptimeMillis() + WINDOW_TIMEOUT_MS
-        var pixel = 0
-        do {
-            val image = checkNotNull(automation.takeScreenshot()) { "Actual window screenshot unavailable" }
-            try {
-                pixel = image.getPixel(bounds.left + (8 * density).toInt(), bounds.centerY())
-                if (pixel == Color.Cyan.toArgb()) return
-            } finally {
-                image.recycle()
-            }
-            SystemClock.sleep(50)
-        } while (SystemClock.uptimeMillis() < deadline)
-        assertEquals("actual first action must be painted cyan", Color.Cyan.toArgb(), pixel)
-    }
-
-    private companion object {
-        const val WINDOW_TIMEOUT_MS = 10_000L
     }
 }

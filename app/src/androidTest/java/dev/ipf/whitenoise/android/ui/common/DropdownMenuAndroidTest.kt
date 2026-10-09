@@ -14,21 +14,17 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -63,11 +59,7 @@ class DropdownMenuAndroidTest {
         render(rows, appMenu, expanded) { selected = it }
         rule.onNodeWithText("Open menu").performClick()
         rule.onNodeWithText("Choice 0").assertIsDisplayed()
-        val pixels = rule.onNodeWithTag("${ITEM_PREFIX}0").captureToImage().toPixelMap()
-        val inset = with(rule.density) { 8.dp.roundToPx() }
-        val painted = pixels[inset, pixels.height / 2]
-        assertTrue("first action must be painted cyan: $painted", painted.green > 0.95f && painted.blue > 0.95f)
-        assertTrue("first action must remain opaque cyan: $painted", painted.red < 0.05f)
+        DropdownMenuWindowProbe.assertFirstRowPainted(rule.density.density)
         val last = rule.onNodeWithText("Choice ${rows - 1}")
         last.performScrollTo().assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(rows - 1, selected) }
