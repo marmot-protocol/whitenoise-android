@@ -1,0 +1,141 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+  "legacy_sha256": "cc5360812a31e97e71d55b83cd86b9248f2600b1a0a96627476cd6ebca2276b2",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: Reactions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ReactionDetailsSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionDetailsSheet(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionDetailsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionDetailsContent(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionFilterChips",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionFilterChips(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionParticipantRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionParticipantRow(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionParticipantSupportingText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionParticipantSupportingText(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionDetailsReadStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionDetailsReadStatus(",
+        "test_ids": [
+          "MSG-005",
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "Reaction details loading and retry: R.string.reaction_details_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.reaction_details_loading",
+        "test_ids": [
+          "MSG-005",
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "Reaction details loading and retry: R.string.reaction_details_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.reaction_details_load_failed",
+        "test_ids": [
+          "MSG-005",
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "Reaction details loading and retry: R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "MSG-005",
+          "GRP-023"
+        ]
+      },
+      {
+        "surface": "ReactionParticipantList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "fun ReactionParticipantList(",
+        "test_ids": [
+          "MSG-005",
+          "GRP-023"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:reaction_filter_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.reaction_filter_all",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:reaction_tap_to_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.reaction_tap_to_remove",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "R.string.you",
+        "test_ids": [
+          "MSG-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: Reactions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

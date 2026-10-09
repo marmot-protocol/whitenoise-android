@@ -117,6 +117,52 @@ class NewGroupPresentationTest {
         composeRule.onNodeWithText(context.getString(R.string.new_message_open_chat)).assertIsDisplayed()
     }
 
+    /** Targeted recovery names the captured public identity and keeps independent retry/edit actions. */
+    @Test fun recipientFailureOffersRemovalRetryAndEdit() {
+        val actions = mutableListOf<String>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NewGroupSetupContent(
+                    NewGroupDraft(TextFieldState("Plans")),
+                    presentation().copy(
+                        members = listOf(person),
+                        error = "Missing messaging setup",
+                        recoveryRecipient = "Ada · npub1…ada",
+                        hasUnacceptedFailure = true,
+                    ),
+                    NewGroupSetupActions(
+                        { actions += "edit" },
+                        { actions += "retry" },
+                        {},
+                        {},
+                        {},
+                        { actions += "remove" },
+                    ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Ada · npub1…ada").assertIsDisplayed()
+        composeRule.onNodeWithTag("group_setup.removeFailedRecipient").performClick()
+        composeRule.onNodeWithTag("group_setup.editMembers").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        assertEquals(listOf("remove", "edit", "retry"), actions)
+    }
+
+    /** After removal of the last invitee, the user must choose the explicitly labeled solo action. */
+    @Test fun emptySetupRequiresExplicitSoloAction() {
+        setup(NewGroupDraft(TextFieldState("Notes")), presentation())
+        composeRule.onNodeWithText(context.getString(R.string.group_create_solo)).assertIsDisplayed()
+        composeRule.onNodeWithTag("group_setup.removeFailedRecipient").assertDoesNotExist()
+    }
+
+    /** Unsupported attribution never renders a removal button, and accepted groups suppress the whole panel. */
+    @Test fun unknownFailureOffersOnlyHonestManualRecovery() {
+        setup(NewGroupDraft(), presentation().copy(hasUnacceptedFailure = true, error = "Try again"))
+        composeRule.onNodeWithText(context.getString(R.string.group_create_unattributed_failure)).assertIsDisplayed()
+        composeRule.onNodeWithTag("group_setup.editMembers").assertIsDisplayed()
+        composeRule.onNodeWithTag("group_setup.removeFailedRecipient").assertDoesNotExist()
+    }
+
     /** Restoring a draft retains text/selection/timer/canonical identity but never serializes prepared image bytes. */
     @Test fun restorationRetainsAuthoredStateAndRequiresPhotoReselection() {
         val restoration = StateRestorationTester(composeRule)

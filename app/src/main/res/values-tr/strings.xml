@@ -2292,4 +2292,10 @@
         <item quantity="one">%1$d ek indiriliyor</item>
         <item quantity="other">%1$d ek indiriliyor</item>
     </plurals>
+    <string name="reaction_details_loading">Tepkiler yükleniyor…</string>
+    <string name="reaction_details_load_failed">Tepkiler yüklenemedi.</string>
+    <string name="group_create_remove_and_continue">Bu kişiyi kaldır ve devam et</string>
+    <string name="group_create_edit_members">Üyeleri düzenle</string>
+    <string name="group_create_unattributed_failure">Sorunun hangi kişide olduğunu belirleyemedik. Yeniden deneyin veya üyeleri düzenleyin.</string>
+    <string name="media_reply_draft_conflict">Taslağınız değişti. Bu yanıtı koruyup yeniden deneyin veya göndermeden önce yanıtı iptal edin.</string>
 </resources>

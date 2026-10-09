@@ -2261,4 +2261,10 @@
     <plurals name="media_downloading_count">
         <item quantity="other">正在下載 %1$d 個附件</item>
     </plurals>
+    <string name="reaction_details_loading">正在載入回應…</string>
+    <string name="reaction_details_load_failed">無法載入回應。</string>
+    <string name="group_create_remove_and_continue">移除此人並繼續</string>
+    <string name="group_create_edit_members">編輯成員</string>
+    <string name="group_create_unattributed_failure">無法確定受影響的成員。請重試或編輯成員清單。</string>
+    <string name="media_reply_draft_conflict">草稿已變更。請保留此回覆並重試，或在傳送前取消回覆。</string>
 </resources>

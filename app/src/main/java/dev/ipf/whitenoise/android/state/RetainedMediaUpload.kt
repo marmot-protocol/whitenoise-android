@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 
 /**
@@ -13,6 +14,9 @@ import dev.ipf.marmotkit.SendSummaryFfi
 internal class RetainedMediaUpload(
     val attachments: List<PendingAttachment>,
     val caption: String?,
+    val replyTarget: String? = null,
+    val replyRevision: MessageDraftRevisionFfi? = null,
+    val replyVersion: Long = 0L,
 ) {
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null
     var localAcceptance: SendSummaryFfi? = null

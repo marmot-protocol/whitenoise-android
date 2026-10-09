@@ -2294,4 +2294,10 @@
         <item quantity="one">Descargando %1$d archivo adjunto</item>
         <item quantity="other">Descargando %1$d archivos adjuntos</item>
     </plurals>
+    <string name="reaction_details_loading">Cargando reacciones…</string>
+    <string name="reaction_details_load_failed">No se pudieron cargar las reacciones.</string>
+    <string name="group_create_remove_and_continue">Quitar a esta persona y continuar</string>
+    <string name="group_create_edit_members">Editar miembros</string>
+    <string name="group_create_unattributed_failure">No pudimos identificar a la persona afectada. Vuelve a intentarlo o edita los miembros.</string>
+    <string name="media_reply_draft_conflict">Tu borrador ha cambiado. Conserva esta respuesta y vuelve a intentarlo, o cancela la respuesta antes de enviar.</string>
 </resources>

@@ -2453,4 +2453,10 @@
         <item quantity="one">%1$d attachment downloading</item>
         <item quantity="other">%1$d attachments downloading</item>
     </plurals>
+    <string name="reaction_details_loading">Loading reactions…</string>
+    <string name="reaction_details_load_failed">Couldn\'t load reactions.</string>
+    <string name="group_create_remove_and_continue">Remove this person and continue</string>
+    <string name="group_create_edit_members">Edit members</string>
+    <string name="group_create_unattributed_failure">We could not identify an affected person. Retry or edit your members.</string>
+    <string name="media_reply_draft_conflict">Your draft changed. Keep this reply and try again, or cancel the reply before sending.</string>
 </resources>

@@ -2294,4 +2294,10 @@
         <item quantity="one">%1$d pièce jointe en cours de téléchargement</item>
         <item quantity="other">%1$d pièces jointes en cours de téléchargement</item>
     </plurals>
+    <string name="reaction_details_loading">Chargement des réactions…</string>
+    <string name="reaction_details_load_failed">Impossible de charger les réactions.</string>
+    <string name="group_create_remove_and_continue">Retirer cette personne et continuer</string>
+    <string name="group_create_edit_members">Modifier les membres</string>
+    <string name="group_create_unattributed_failure">Impossible d’identifier la personne concernée. Réessayez ou modifiez les membres.</string>
+    <string name="media_reply_draft_conflict">Votre brouillon a changé. Conservez cette réponse et réessayez, ou annulez la réponse avant l’envoi.</string>
 </resources>

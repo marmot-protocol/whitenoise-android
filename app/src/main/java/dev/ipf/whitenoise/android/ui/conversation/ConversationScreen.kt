@@ -3325,11 +3325,13 @@ internal fun ConversationScreen(
      *
      * The send is claimed once here, before the shelf is captured, so a keyboard Send and a dictation Send
      * that overlap cannot both queue the same attachments. A refused send reports false and leaves the
-     * earlier send's claim alone.
+     * earlier send's claim alone. [onCaptionSettled] retains independent caption ownership when a
+     * rejected attempt is later accepted through its failed bubble's Retry action.
      */
     fun sendStagedAttachmentsWithCaption(
         caption: String,
         onResult: (Boolean) -> Unit,
+        onCaptionSettled: () -> Unit = {},
     ) {
         attachmentSendClaim.send(
             onResult = onResult,
@@ -3347,23 +3349,27 @@ internal fun ConversationScreen(
         ) { onAccepted, onRejected ->
             val sendingMedia = pendingMediaSlots
             val sendingDocuments = pendingDocumentUris
+            val canSettle = mediaDraftState.captureSendSettlement()
             mediaSender.sendStagedAttachments(
                 sendingMedia,
                 sendingDocuments,
                 caption,
                 preparedImageAttachments = mediaDraftState.preparedAttachments(),
                 preparedDocumentAttachments = mediaDraftState.preparedDocumentAttachments(),
-                onAccepted = {
-                    val acceptedIds = sendingMedia.map { it.id }.toSet()
-                    mediaDraftState.forgetAcceptedAttachments(
-                        acceptedIds,
-                        sendingDocuments.toSet(),
-                    )
-                    pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
-                    pendingDocumentUris =
-                        removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)
-                    onAccepted()
+                onSettled = {
+                    onCaptionSettled()
+                    if (canSettle() && pendingMediaSlots == sendingMedia && pendingDocumentUris == sendingDocuments) {
+                        val acceptedIds = sendingMedia.map { it.id }.toSet()
+                        mediaDraftState.forgetAcceptedAttachments(
+                            acceptedIds,
+                            sendingDocuments.toSet(),
+                        )
+                        pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
+                        pendingDocumentUris =
+                            removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)
+                    }
                 },
+                onAccepted = onAccepted,
                 onRejected = onRejected,
                 onAfterSend = {
                     acceptedSendRevealedTranscript = true
@@ -3870,7 +3876,13 @@ internal fun ConversationScreen(
                     } else {
                         null
                     },
-                onSendAttachments = { caption, onResult -> sendStagedAttachmentsWithCaption(caption, onResult) },
+                onSendAttachments = { caption, onResult ->
+                    sendStagedAttachmentsWithCaption(
+                        caption,
+                        onResult,
+                        composerTextState.captureCaptionSettlement(caption),
+                    )
+                },
                 onAfterSend = {
                     acceptedSendRevealedTranscript = true
                     revealSentMessage()
