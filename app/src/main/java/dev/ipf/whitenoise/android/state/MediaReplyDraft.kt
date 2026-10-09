@@ -21,7 +21,7 @@ internal fun MarmotInterface.stageMediaReply(
     val draft = selected.draft
     val sameAttachments = replyDraftMatchesBytes(account, selected, attachments)
     val emptySlot = draft == null || (draft.content.isBlank() && draft.mediaAttachments.isEmpty())
-    val conflictingContent = !emptySlot && (!sameAttachments || draft?.content != caption.orEmpty())
+    val conflictingContent = !emptySlot && (!sameAttachments || draft.content != caption.orEmpty())
     val conflictingReply = draft?.replyToMessageIdHex != null && draft.replyToMessageIdHex != target
     if (conflictingContent || conflictingReply) return null
     val staged =

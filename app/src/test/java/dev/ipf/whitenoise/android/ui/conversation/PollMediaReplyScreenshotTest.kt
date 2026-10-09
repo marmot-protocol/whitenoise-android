@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.os.Looper
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -18,6 +19,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,8 +31,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /** Real attachment bubbles keep the safe poll quote in pending and delivered states. */
 @RunWith(RobolectricTestRunner::class)
@@ -40,11 +44,21 @@ import org.robolectric.annotation.GraphicsMode
 class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
     @get:Rule val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
 
-    /** Gives the real timeline dispatcher its authoritative membership. */
-    @Before fun bindRoster() = runTest { pollController.retryMembers() }
+    private val originalTimeZone = TimeZone.getDefault()
 
-    /** No native stream or controller survives a screenshot fixture. */
-    @After fun clearController() = pollController.onCleared()
+    /** Pins timestamp rendering and gives the real timeline dispatcher its authoritative membership. */
+    @Before
+    fun bindRoster() = runTest {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        pollController.retryMembers()
+    }
+
+    /** No native stream or time-zone override survives a screenshot fixture. */
+    @After
+    fun clearController() {
+        pollController.onCleared()
+        TimeZone.setDefault(originalTimeZone)
+    }
 
     /** Default presentation includes both pending and delivered media discussion. */
     @Test fun pollMediaReplyLight() = render(false)
@@ -99,9 +113,24 @@ class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
                 }
             }
         }
+        awaitFailedTransfers(items.map { it.record.messageIdHex })
         val name = if (largeRtl) "amoled_rtl_large" else "light"
         composeRule
             .onNodeWithTag("poll-media-replies")
             .captureRoboImage("src/test/snapshots/poll_media_replies_$name.png")
+    }
+
+    /** Waits for the scripted unavailable files to settle before capturing their reply presentation. */
+    private fun awaitFailedTransfers(messageIds: List<String>) {
+        val transfers = messageIds.map { pollController.attachmentTransferState(it, 0, false) }
+        try {
+            composeRule.waitUntil(5_000) {
+                shadowOf(Looper.getMainLooper()).idle()
+                transfers.all { it.value == AttachmentTransferState.Failed }
+            }
+            composeRule.waitForIdle()
+        } finally {
+            messageIds.forEach { pollController.releaseAttachmentTransferState(it, 0) }
+        }
     }
 }

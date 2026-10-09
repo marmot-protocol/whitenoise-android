@@ -341,8 +341,10 @@ internal class ConversationMediaDraftState(
         val photos = preparedAttachments()
         val documents = preparedDocumentAttachments()
         return {
-            revision == inputsRevision && account == currentAccountRef && account == appState.activeAccountRef &&
-                photos == preparedAttachments() && documents == preparedDocumentAttachments()
+            val sameOwner =
+                revision == inputsRevision && account == currentAccountRef && account == appState.activeAccountRef
+            val sameBytes = photos == preparedAttachments() && documents == preparedDocumentAttachments()
+            sameOwner && sameBytes
         }
     }
 

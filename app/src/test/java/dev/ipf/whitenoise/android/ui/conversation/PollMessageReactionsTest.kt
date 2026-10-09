@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import dev.ipf.marmotkit.TimelineUserReactionFfi
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_REACTION_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
@@ -58,12 +59,32 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
         advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "reactToMessage" } }
+        // The complete read must reflect the successful publication, independently of the chip/optimistic preview.
+        reactionDetailsResponder = {
+            listOf(
+                TimelineUserReactionFfi(
+                    reactionMessageIdHex = "aa".repeat(32),
+                    targetMessageIdHex = item.record.messageIdHex,
+                    sender = requireNotNull(pollController.boundAccountIdHex),
+                    emoji = "👍",
+                    reactedAt = 1uL,
+                ),
+            )
+        }
         composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").performClick()
-        composeRule.waitUntil { composeRule.onAllNodesWithText("Tap to remove").fetchSemanticsNodes().size == 1 }
+        // Canonical details now load on IO; settle its continuation as well as the Compose frame.
+        composeRule.waitUntil(5_000) {
+            shadowOf(Looper.getMainLooper()).idle()
+            composeRule.onAllNodesWithText("Tap to remove").fetchSemanticsNodes().size == 1
+        }
         composeRule.onNodeWithText("Tap to remove").performClick()
         advanceReactionQuietPeriod()
         composeRule.waitUntil { recordedCalls().any { it.first == "deleteMessage" } }
         composeRule.runOnIdle {
+            assertEquals(
+                listOf("personal", item.record.groupIdHex, item.record.messageIdHex),
+                recordedCalls().first { it.first == "messageReactions" }.second,
+            )
             assertEquals(
                 listOf("personal", item.record.groupIdHex, item.record.messageIdHex, "👍"),
                 recordedCalls().first { it.first == "reactToMessage" }.second.take(4),

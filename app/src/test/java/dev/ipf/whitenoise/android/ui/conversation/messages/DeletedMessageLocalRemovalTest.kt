@@ -32,7 +32,9 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -527,14 +529,28 @@ class DeletedMessageLocalRemovalTest {
             Proxy.newProxyInstance(
                 MarmotInterface::class.java.classLoader,
                 arrayOf(MarmotInterface::class.java),
-            ) { _, method, _ ->
+            ) { _, method, args ->
                 when (method.name.substringBefore('-')) {
                     "messageReactions" -> reactions
+                    "parseMarkdown" -> liveMessageMarkdown(args.orEmpty().first() as String)
                     else -> null
                 }
             } as MarmotInterface
         return AppMarmotRuntime("reaction-details", native)
     }
+
+    /** Keeps live text visible when the reaction-runtime seam also receives the bubble's fallback parse. */
+    private fun liveMessageMarkdown(text: String) =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blocks =
+                text
+                    .takeIf(String::isNotBlank)
+                    ?.let {
+                        listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text(it))))
+                    }.orEmpty(),
+            blankLinesBefore = byteArrayOf(),
+        )
 
     private fun integrationAppState(
         accountRef: String,
