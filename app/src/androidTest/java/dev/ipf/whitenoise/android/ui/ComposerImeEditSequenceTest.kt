@@ -205,8 +205,10 @@ class ComposerImeEditSequenceTest {
         }
     }
 
-    private fun valueAtMarkedCaret(text: String): TextFieldValue =
-        TextFieldValue(text.replace("|", ""), selection = TextRange(text.indexOf('|')))
+    private fun valueAtMarkedCaret(text: String): TextFieldValue {
+        val caret = TextRange(text.indexOf('|'))
+        return TextFieldValue(text.replace("|", ""), selection = caret)
+    }
 
     private fun assertBeforeFrameHardwareDeletion(
         expected: TextFieldValue,
