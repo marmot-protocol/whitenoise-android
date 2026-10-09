@@ -1,5 +1,6 @@
 #!/system/bin/sh
 # Source these functions from an owned on-device fixture worker.
+# Android's mksh supports the intentional local and pipefail extensions below.
 
 # Resolve a fresh output's parent without creating or modifying its destination.
 background_perfetto_output_path() (
@@ -21,13 +22,15 @@ background_perfetto_start() {
   trace_path="$(background_perfetto_output_path "$trace")" || return 1
   log_path="$(background_perfetto_output_path "$log")" || return 1
   [ "$trace_path" != "$log_path" ] || return 1
+  # Reserve diagnostics atomically; a late-created log must remain untouched.
+  (set -C; : >"$log") 2>/dev/null || return 1
   # Perfetto's SELinux domain cannot read/write inherited shell-data file FDs.
   # Keep all three descriptors as pipes; shell-domain cat/tee own file access.
   (
     set -o pipefail
     cat "$config" |
       perfetto --txt -c - -o "$trace" --background-wait 2>&1 |
-      tee "$log" >/dev/null
+      tee -a "$log" >/dev/null
   ) || return 1
   awk '/^[1-9][0-9]*$/ { pid=$0; count++ } END { if (count != 1) exit 1; print pid }' "$log"
 }

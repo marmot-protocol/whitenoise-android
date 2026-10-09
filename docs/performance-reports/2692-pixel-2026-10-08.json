@@ -1,0 +1,438 @@
+{
+  "schema": 1,
+  "resource_campaign_passed": false,
+  "tracker_complete": false,
+  "source_sha": "b7261b3ebceb3b2537811fe09edc078ea2eebfd4",
+  "merged_tree_commit": "2ee08f351c1e13592d07e5d806053b5a3396edab",
+  "artifact_sha256": "c98cd8311e25398680b968d3ec347548b033701b204d9e427e67be65cc11566c",
+  "mdk_sha": "122bd90ffac60bb6311346e228d0f609a18521ee",
+  "device": {
+    "model": "Pixel 9 Pro XL",
+    "api": 37,
+    "build": "CP3A.260905.009",
+    "os": "stock Android 17"
+  },
+  "measurement": {
+    "method": "Direct platform Perfetto, installed hosted benchmark target; no compilation reset",
+    "configured_window_ms": 60000,
+    "rounds_per_scenario": 5,
+    "policy": "optimized",
+    "charging": false,
+    "energy_scope": "system_wide_hardware_rails",
+    "rail_categories": "CPU: cpu.*; network: AOC, modem, radio frontend, Wi-Fi/BT; memory: DDR and memory interface",
+    "gauge_resolution_uah": 2500,
+    "reported_trace_data_loss": 0.0,
+    "trace_visible_span_ms": [
+      59853.076608,
+      60096.542705
+    ],
+    "temperature_celsius": [
+      33.5,
+      33.9
+    ],
+    "fixture_pid_equal_at_capture_endpoints": true
+  },
+  "failures": [
+    "disabled_idle_energy_repeatability",
+    "push_burst_round_5_posting_deadline",
+    "push_burst_cpu_energy_repeatability"
+  ],
+  "scenarios": {
+    "disabled_idle": {
+      "samples": 5,
+      "metrics": {
+        "cpu_energy_uws": {
+          "median": 4456643.0,
+          "p95": 15145085.0,
+          "maximum": 15145085.0,
+          "range_over_median_percent": 244.0452376373876
+        },
+        "network_energy_uws": {
+          "median": 7017905.0,
+          "p95": 10187065.0,
+          "maximum": 10187065.0,
+          "range_over_median_percent": 48.548947299799586
+        },
+        "memory_energy_uws": {
+          "median": 3118084.0,
+          "p95": 5278402.0,
+          "maximum": 5278402.0,
+          "range_over_median_percent": 72.93280104063906
+        },
+        "all_rails_energy_uws": {
+          "median": 23058011.0,
+          "p95": 42855905.0,
+          "maximum": 42855905.0,
+          "range_over_median_percent": 88.30356182933558
+        },
+        "fixture_cpu_ms": {
+          "median": 277.836543,
+          "p95": 358.370768,
+          "maximum": 358.370768,
+          "range_over_median_percent": 52.02601480684274
+        }
+      },
+      "uid_service_snapshot_deltas_ms_and_starts": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "uid_total_and_background_partial_wakelock_deltas_ms": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "posting_bodies": null,
+      "completed_push_lock_spans_ms": [],
+      "scheduled_job_records_unchanged": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    "push_idle": {
+      "samples": 5,
+      "metrics": {
+        "cpu_energy_uws": {
+          "median": 4839017.0,
+          "p95": 5593925.0,
+          "maximum": 5593925.0,
+          "range_over_median_percent": 22.619924666518013
+        },
+        "network_energy_uws": {
+          "median": 7267722.0,
+          "p95": 7674722.0,
+          "maximum": 7674722.0,
+          "range_over_median_percent": 14.400454502800189
+        },
+        "memory_energy_uws": {
+          "median": 3234269.0,
+          "p95": 3308008.0,
+          "maximum": 3308008.0,
+          "range_over_median_percent": 7.914493197690112
+        },
+        "all_rails_energy_uws": {
+          "median": 23686443.0,
+          "p95": 25081983.0,
+          "maximum": 25081983.0,
+          "range_over_median_percent": 8.219233255073377
+        },
+        "fixture_cpu_ms": {
+          "median": 481.31014,
+          "p95": 559.771286,
+          "maximum": 559.771286,
+          "range_over_median_percent": 58.94729165689301
+        }
+      },
+      "uid_service_snapshot_deltas_ms_and_starts": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "uid_total_and_background_partial_wakelock_deltas_ms": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "posting_bodies": null,
+      "completed_push_lock_spans_ms": [],
+      "scheduled_job_records_unchanged": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    "local_idle": {
+      "samples": 5,
+      "metrics": {
+        "cpu_energy_uws": {
+          "median": 4645503.0,
+          "p95": 5142220.0,
+          "maximum": 5142220.0,
+          "range_over_median_percent": 16.914874449548304
+        },
+        "network_energy_uws": {
+          "median": 7056012.0,
+          "p95": 7309378.0,
+          "maximum": 7309378.0,
+          "range_over_median_percent": 6.13852414083196
+        },
+        "memory_energy_uws": {
+          "median": 3111966.0,
+          "p95": 3325491.0,
+          "maximum": 3325491.0,
+          "range_over_median_percent": 8.263040148896229
+        },
+        "all_rails_energy_uws": {
+          "median": 23234760.0,
+          "p95": 24161815.0,
+          "maximum": 24161815.0,
+          "range_over_median_percent": 5.696013214683517
+        },
+        "fixture_cpu_ms": {
+          "median": 369.460767,
+          "p95": 416.325843,
+          "maximum": 416.325843,
+          "range_over_median_percent": 68.22217093486412
+        }
+      },
+      "uid_service_snapshot_deltas_ms_and_starts": [
+        [
+          73543,
+          0
+        ],
+        [
+          72627,
+          0
+        ],
+        [
+          79349,
+          0
+        ],
+        [
+          77135,
+          0
+        ],
+        [
+          70849,
+          0
+        ]
+      ],
+      "uid_total_and_background_partial_wakelock_deltas_ms": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "posting_bodies": null,
+      "completed_push_lock_spans_ms": [],
+      "scheduled_job_records_unchanged": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    "push_burst": {
+      "samples": 5,
+      "metrics": {
+        "cpu_energy_uws": {
+          "median": 5259831.0,
+          "p95": 6425719.0,
+          "maximum": 6425719.0,
+          "range_over_median_percent": 41.196475704257416
+        },
+        "network_energy_uws": {
+          "median": 7288906.0,
+          "p95": 7802936.0,
+          "maximum": 7802936.0,
+          "range_over_median_percent": 8.93412536805935
+        },
+        "memory_energy_uws": {
+          "median": 3287800.0,
+          "p95": 3480243.0,
+          "maximum": 3480243.0,
+          "range_over_median_percent": 13.656700529229273
+        },
+        "all_rails_energy_uws": {
+          "median": 24534459.0,
+          "p95": 25998798.0,
+          "maximum": 25998798.0,
+          "range_over_median_percent": 10.388690453700242
+        },
+        "fixture_cpu_ms": {
+          "median": 3672.231551,
+          "p95": 3916.20145,
+          "maximum": 3916.20145,
+          "range_over_median_percent": 101.44786618876256
+        }
+      },
+      "uid_service_snapshot_deltas_ms_and_starts": [
+        [
+          3072,
+          1
+        ],
+        [
+          3689,
+          1
+        ],
+        [
+          2445,
+          1
+        ],
+        [
+          2958,
+          1
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "uid_total_and_background_partial_wakelock_deltas_ms": [
+        [
+          5112,
+          2046
+        ],
+        [
+          5891,
+          2202
+        ],
+        [
+          4719,
+          2279
+        ],
+        [
+          5010,
+          2064
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "posting_bodies": [
+        5,
+        5,
+        5,
+        5,
+        0
+      ],
+      "completed_push_lock_spans_ms": [
+        3028.717693,
+        3661.403851,
+        2418.482057,
+        2923.182944
+      ],
+      "scheduled_job_records_unchanged": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "remaining_gates": [
+    "reconnect_campaign",
+    "unrestricted_policy_matrix",
+    "GrapheneOS_matrix",
+    "reviewed_budget_provenance",
+    "before_after_attribution"
+  ],
+  "canonical_timeline_after_foreground_reopen": {
+    "expected_sent_distinct_bodies": 36,
+    "canonical_timeline_delivered_distinct_bodies": 36,
+    "canonical_timeline_missing_distinct_bodies": 0,
+    "canonical_timeline_duplicate_ids": 0,
+    "canonical_fifth_burst_counts": [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "history_start_reached": true,
+    "raw_database_count_available": false
+  },
+  "reconnect_attempt": {
+    "qualified": false,
+    "completed_captures": 0,
+    "queued_distinct_bodies": 5,
+    "failure": "worker stopped at collector invocation; no collector PID or usable trace, completion marker absent",
+    "cleanup_verified": {
+      "airplane_disabled": true,
+      "wifi_enabled": true,
+      "shell_partial_wakelock_held": false
+    }
+  }
+}
