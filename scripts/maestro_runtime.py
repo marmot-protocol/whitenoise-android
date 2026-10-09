@@ -325,7 +325,11 @@ def case_selection(suite, partition):
     if suite not in SUITES or not 1 <= partition <= partitions:
         raise ValueError('Unknown runtime suite partition')
     start = (partition - 1) * MAX_CASES_PER_SHARD
-    return selected[start:start + MAX_CASES_PER_SHARD]
+    cases = selected[start:start + MAX_CASES_PER_SHARD]
+    if (not 1 <= len(cases) <= MAX_CASES_PER_SHARD
+            or any(not re.fullmatch(r'[a-z][a-z0-9]*(?:-[a-z0-9]+)+', name) for name in cases)):
+        raise ValueError('Suite case budget or allowlist invalid')
+    return cases
 
 
 def main():
@@ -343,8 +347,6 @@ def main():
         selected = case_selection(args.suite, args.partition)
     except ValueError as error:
         parser.error(str(error))
-    if not 1 <= len(selected) <= MAX_CASES_PER_SHARD or any(not re.fullmatch(r'[a-z]+(?:-[a-z]+)+', name) for name in selected):
-        parser.error('Suite case budget or allowlist invalid')
     args.reports.mkdir(parents=True, exist_ok=False)
     results = []
     deadline = time.monotonic() + CAMPAIGN_SECONDS

@@ -3,9 +3,9 @@
 import json
 import sys
 try:
-    from scripts.maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD
+    from scripts.maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD, case_selection
 except ModuleNotFoundError:
-    from maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD
+    from maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD, case_selection
 
 
 def selection(value):
@@ -23,8 +23,10 @@ def matrix_selection(value):
     for suite in selection(value):
         count = sum(case['suite'] == suite for case in CASES.values())
         partitions = (count + MAX_CASES_PER_SHARD - 1) // MAX_CASES_PER_SHARD
-        result.extend({'slice': suite, 'partition': part, 'partitions': partitions}
-                      for part in range(1, partitions + 1))
+        for part in range(1, partitions + 1):
+            # The producer and executor must admit the same maintained, path-safe case names.
+            case_selection(suite, part)
+            result.append({'slice': suite, 'partition': part, 'partitions': partitions})
     return result
 
 

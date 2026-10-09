@@ -10,5 +10,4 @@ name: inbound-share-document-empty-caption-cancel
 - assertNotVisible:
     id: performance.share_picker
 - assertNotVisible: Some files could not be imported
-- assertVisible:
-    text: ^Maestro group$
+- runFlow: ../fixtures/runtime-ready.yaml

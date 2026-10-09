@@ -13,6 +13,11 @@ name: inbound-share-picker-rotation
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible:
     id: performance.share_picker
+- scrollUntilVisible:
+    element:
+      text: ^Maestro group$
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     text: ^Maestro group$
 - assertVisible:
@@ -32,5 +37,4 @@ name: inbound-share-picker-rotation
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:
     id: performance.share_picker
-- assertVisible:
-    text: ^Maestro group$
+- runFlow: ../fixtures/runtime-ready.yaml

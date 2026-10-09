@@ -9,4 +9,4 @@ name: inbound-share-owned-error-close
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:
     id: performance.share_picker
-- assertVisible: Maestro group
+- runFlow: ../fixtures/runtime-ready.yaml

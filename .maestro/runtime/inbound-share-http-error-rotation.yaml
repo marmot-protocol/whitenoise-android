@@ -26,5 +26,4 @@ name: inbound-share-http-error-rotation
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:
     id: performance.share_picker
-- assertVisible:
-    text: ^Maestro group$
+- runFlow: ../fixtures/runtime-ready.yaml

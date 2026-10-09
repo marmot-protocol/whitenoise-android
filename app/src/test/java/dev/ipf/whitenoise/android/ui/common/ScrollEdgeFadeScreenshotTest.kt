@@ -120,7 +120,7 @@ class ScrollEdgeFadeScreenshotTest {
         capture("list_end", top = true, bottom = false)
     }
 
-    /** A fitting grid has no fade band and remains fully opaque. */
+    /** A fitting grid has no fade band and needs no offscreen mask. */
     @Test
     fun fittingGrid() {
         rows.intValue = 4

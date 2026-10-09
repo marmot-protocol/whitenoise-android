@@ -31,5 +31,4 @@ name: inbound-share-deselect-cancel
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:
     id: performance.share_picker
-- assertVisible:
-    text: ^Maestro group$
+- runFlow: ../fixtures/runtime-ready.yaml

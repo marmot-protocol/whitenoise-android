@@ -17,4 +17,4 @@ name: inbound-share-partial-continue-back
 - assertNotVisible: Some files could not be imported
 - assertNotVisible:
     id: performance.share_picker
-- assertVisible: Maestro group
+- runFlow: ../fixtures/runtime-ready.yaml

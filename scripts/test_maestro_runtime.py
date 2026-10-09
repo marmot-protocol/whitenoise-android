@@ -1892,6 +1892,34 @@ class RuntimeEvidenceTest(unittest.TestCase):
             with self.subTest(partition=part), self.assertRaises(ValueError):
                 runtime.case_selection('navigation', part)
 
+    def test_maintained_numeric_relay_case_reaches_actual_runtime_cli_ledger(self):
+        """The secure443 case must pass the same admission before APK production and actual execution."""
+        selected = runtime.case_selection('relay-validation', 4)
+        self.assertIn('relay-add-secure-443-accept-cancel', selected)
+        self.assertIn({'slice': 'relay-validation', 'partition': 4, 'partitions': 4},
+                      matrix_selection('runtime-relay-validation'))
+        with tempfile.TemporaryDirectory() as temporary:
+            reports = Path(temporary) / 'report'
+            with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+                 patch('sys.argv', ['runtime', '--suite', 'relay-validation', '--partition', '4',
+                                    '--reports', str(reports)]), \
+                 patch.object(runtime, 'command', return_value='1'), \
+                 patch.object(runtime, 'run_case', side_effect=lambda name, _: {
+                     'case': name, 'passed': True, 'cleanup_safe': True}) as runner:
+                runtime.main()
+            self.assertEqual([call.args[0] for call in runner.call_args_list], selected)
+            self.assertTrue(json.loads((reports / 'results.json').read_text())['evidence_complete'])
+
+    def test_prebuild_and_runtime_reject_unsafe_configured_case_paths(self):
+        """Numeric support must not admit traversal, shell fragments, Unicode or empty path segments."""
+        for name in ('../escape', 'relay/escape', 'relay-443\n', 'relay-443;echo',
+                     'relay--443', 'relay-４４３', '443-relay', 'relay..443'):
+            with self.subTest(name=name), patch.dict(runtime.CASES, {name: {'suite': 'relay-validation'}}, clear=True):
+                with self.assertRaisesRegex(ValueError, 'allowlist'):
+                    runtime.case_selection('relay-validation', 1)
+                with self.assertRaisesRegex(ValueError, 'allowlist'):
+                    matrix_selection('runtime-relay-validation')
+
     def test_full_partition_admits_every_case_at_its_reserved_ceiling(self):
         """Worst-case reserved durations must leave enough time to admit the entire selected partition."""
         selected = runtime.case_selection('navigation', 1)
