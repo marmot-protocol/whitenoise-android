@@ -484,6 +484,48 @@ code. Resolve the competing install and take a new private backup before retryin
 The host also captures and verifies fixture notification permission, FCM receiver
 override and receipt-listener access, restoring them even if instrumentation dies.
 
+### Direct platform collector for disposable-profile diagnostics
+
+When secondary-profile Macrobenchmark file access fails, an explicitly guarded
+on-device worker can source `scripts/background_perfetto.sh` and call
+`background_perfetto_start <config> <fresh-trace-path> <private-launch-log>`.
+Push the helper/config to the worker's owned directory first. The function returns
+one positive collector PID after data-source startup. Source it with Android's
+`/system/bin/sh` (mksh), which supports its `local` and `pipefail` extensions;
+strict POSIX shells are not supported. Use an exclusively owned directory: the
+trace path is opened later by Perfetto, so path checks cannot prevent competing
+writers. The worker remains responsible for deadlines, process ownership,
+finalization, state restoration and
+trace validation. It neither changes app/profile/network settings nor qualifies
+a battery campaign by itself.
+
+Perfetto runs in a separate SELinux domain. A configuration redirected from a
+shell-data file can become unreadable even after the shell opened it. The helper
+pipes config through `cat` and both diagnostic descriptors through `tee`, so
+shell-domain processes perform file access. Pipeline failure, missing/ambiguous
+PID and a pre-existing trace path reject the start. Diagnostics are reserved with
+`noclobber` before launch and `tee` appends instead of truncating; a log created
+between the initial checks and reservation rejects the start. Rejected diagnostics
+remain private instead of disappearing into inaccessible file descriptors. See
+[Perfetto's Android tracing guide](https://perfetto.dev/docs/learning-more/android).
+
+On the stock Pixel, the original file-stdin launch rejected the config as empty
+with a SELinux read denial. Identical piped config and the checked-in helper each
+produce parseable five-second smoke traces; invalid config is rejected with
+nonempty retained diagnostics. These charging system-only probes establish the
+collector repair, not reconnect behavior, fixed-window energy or delivery.
+
+The [8–9 October Pixel report](performance-reports/2692-pixel-report-2026-10-09.md)
+retains anonymous measurements, rejected campaigns, delivery observations and
+restoration evidence. Its incomplete acceptance assessment must not be treated
+as tracker closure or battery savings.
+
+Keep an active, unsaturated bounded phase session for each diagnostic window.
+The local phase sink expires after 30 minutes and caps output at 256 events; a
+missing callback phase without a verified active session is not proof that FCM
+never reached the app. Renew sessions only in unmeasured fixture setup, retaining
+the previous export and recording the setup change.
+
 ### Resource campaign acceptance
 
 `scripts/background_delivery_report.py <campaign.json>` validates measured,
