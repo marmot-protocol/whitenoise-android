@@ -731,7 +731,8 @@ class ShareChatPickerLandscapeTest {
         assertTrue("Recipient title must fit inside the scroll viewport", bounds.top >= viewport.top)
         assertTrue("Recipient must remain above the footer", bounds.bottom <= viewport.bottom)
         recipient.performClick().assertIsSelected()
-        composeRule.onNodeWithText(app.resources.getQuantityString(R.plurals.share_to_chats_count, 1, 1))
+        composeRule
+            .onNodeWithText(app.resources.getQuantityString(R.plurals.share_to_chats_count, 1, 1))
             .assertIsDisplayed()
         destinations.performScrollToNode(hasSetTextAction())
         composeRule.onNode(hasSetTextAction()).performTextInput("Person 11")
