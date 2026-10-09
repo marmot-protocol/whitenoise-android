@@ -2288,4 +2288,8 @@
     <string name="pinned_shortcut_unavailable">Bu sohbet artık kullanılamıyor.</string>
     <string name="pinned_shortcut_failed">Ana ekran kısayolu istenemedi. Tekrar deneyin.</string>
     <string name="media_set_group_picture">Grup fotoğrafı olarak ayarla</string>
+    <plurals name="media_downloading_count">
+        <item quantity="one">%1$d ek indiriliyor</item>
+        <item quantity="other">%1$d ek indiriliyor</item>
+    </plurals>
 </resources>

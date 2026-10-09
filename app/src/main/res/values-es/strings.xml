@@ -2290,4 +2290,8 @@
     <string name="pinned_shortcut_unavailable">Esta conversación ya no está disponible.</string>
     <string name="pinned_shortcut_failed">No se pudo solicitar el acceso directo. Inténtalo de nuevo.</string>
     <string name="media_set_group_picture">Establecer como foto del grupo</string>
+    <plurals name="media_downloading_count">
+        <item quantity="one">Descargando %1$d archivo adjunto</item>
+        <item quantity="other">Descargando %1$d archivos adjuntos</item>
+    </plurals>
 </resources>

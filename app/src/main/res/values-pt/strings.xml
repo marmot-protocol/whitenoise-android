@@ -2290,4 +2290,8 @@
     <string name="pinned_shortcut_unavailable">Esta conversa já não está disponível.</string>
     <string name="pinned_shortcut_failed">Não foi possível solicitar um atalho. Tente novamente.</string>
     <string name="media_set_group_picture">Definir como foto do grupo</string>
+    <plurals name="media_downloading_count">
+        <item quantity="one">Baixando %1$d anexo</item>
+        <item quantity="other">Baixando %1$d anexos</item>
+    </plurals>
 </resources>

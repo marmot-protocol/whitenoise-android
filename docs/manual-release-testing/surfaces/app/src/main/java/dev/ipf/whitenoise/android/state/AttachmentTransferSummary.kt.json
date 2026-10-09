@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentTransferSummary.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "Download summary notification title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentTransferSummary.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "Download summary notification count of live transfers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentTransferSummary.kt",
+        "anchor": "R.plurals.media_downloading_count",
+        "test_ids": [
+          "MED-022"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Concurrent transfer cards collapse under one quiet count summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentTransferSummary.kt",
+        "anchor": "setGroupSummary(true)",
+        "test_ids": [
+          "MED-022"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

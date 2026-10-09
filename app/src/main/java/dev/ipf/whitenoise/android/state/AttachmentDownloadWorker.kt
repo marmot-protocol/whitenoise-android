@@ -249,26 +249,59 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 if (ordinary && !AttachmentDownloadWorkData.hasInterruptionBackoff(inputData)) {
                     adoptInterruptionBackoff(request)
                 }
-                if (attachmentExecutionClass(priority, userVisible = false, Build.VERSION.SDK_INT) ==
-                    AttachmentExecutionClass.ForegroundWork
-                ) {
-                    try {
-                        // Owner and attempt only: the identity stays out of the log, but a repeated card can
-                        // be matched to retry churn against a user-initiated job on the same attachment.
-                        Log.i(TAG, "attachment_work_foreground run_attempt=$runAttemptCount")
-                        setForeground(
-                            attachmentWorkForegroundInfo(applicationContext, request),
-                        )
-                    } catch (failure: IllegalStateException) {
-                        // A background retry may be denied foreground-service startup.
-                        // WorkManager can still run this durable request as ordinary work.
-                        Log.w(TAG, "attachment_foreground_unavailable type=${failure.javaClass.simpleName}")
-                    }
-                }
-                performDownload(application, request, priority, intentStore)
+                val foreground =
+                    attachmentExecutionClass(priority, userVisible = false, Build.VERSION.SDK_INT) ==
+                        AttachmentExecutionClass.ForegroundWork
+                runTransfer(application, request, priority, intentStore, foreground)
             }
         }
     }
+
+    /**
+     * Runs one transfer, counting it in the ledger while its card is live when it runs in the [foreground].
+     *
+     * The ledger entry always ends with this run's outcome, including when the scheduler cancels the run, and
+     * carries only the owner and the attempt, so a repeated card can be matched to retry churn against a
+     * user-initiated job on the same attachment without naming the attachment.
+     */
+    private suspend fun runTransfer(
+        application: WhiteNoiseApplication,
+        request: AttachmentTransferRequest,
+        priority: AttachmentDownloadPriority,
+        intentStore: AttachmentDownloadIntentStore,
+        foreground: Boolean,
+    ): Result {
+        val ledger = AttachmentTransfers.ledger
+        val token =
+            if (foreground) {
+                ledger.begin(attachmentJobId(request), AttachmentTransferOwner.WorkManager, runAttemptCount)
+            } else {
+                null
+            }
+        var outcome = AttachmentTransferOutcome.Stopped
+        try {
+            if (foreground) {
+                try {
+                    setForeground(attachmentWorkForegroundInfo(applicationContext, request))
+                } catch (failure: IllegalStateException) {
+                    // A background retry may be denied foreground-service startup.
+                    // WorkManager can still run this durable request as ordinary work.
+                    Log.w(TAG, "attachment_foreground_unavailable type=${failure.javaClass.simpleName}")
+                }
+            }
+            return performDownload(application, request, priority, intentStore).also { outcome = outcomeOf(it) }
+        } finally {
+            token?.let { ledger.end(it, outcome) }
+        }
+    }
+
+    /** Maps a worker result to how the run ended, so a retry is not reported as a failure. */
+    private fun outcomeOf(result: Result): AttachmentTransferOutcome =
+        when (result) {
+            Result.success() -> AttachmentTransferOutcome.Completed
+            Result.retry() -> AttachmentTransferOutcome.Retrying
+            else -> AttachmentTransferOutcome.Failed
+        }
 
     /** Keeps scheduler interruption distinct from terminal acquisition so only live completed runs retire intent. */
     private suspend fun performDownload(
