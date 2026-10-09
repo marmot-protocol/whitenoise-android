@@ -1,0 +1,87 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+  "legacy_sha256": "3dee16ee8ab0c498636f6b08a274aa04acb133501b220ed0d45c05b2eb8493c8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WaveHiButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "private fun WaveHiButton(",
+        "test_ids": [
+          "CON-019"
+        ]
+      },
+      {
+        "surface": "GroupSystemRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "fun GroupSystemRow(",
+        "test_ids": [
+          "CON-001",
+          "CON-026"
+        ]
+      },
+      {
+        "surface": "Affected member's name links to their profile in add/remove history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "internal fun groupSystemSummaryText(",
+        "test_ids": [
+          "CON-026"
+        ]
+      },
+      {
+        "surface": "Activity reaction action: message_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.message_actions",
+        "test_ids": [
+          "GRP-023"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Group-system show details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.group_system_show_details",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "Group-system hide details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.group_system_hide_details",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "Delete for me on a group-system row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.delete_for_me",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "Wave hi greets the added member from an authenticated group-system row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "R.string.wave_hi",
+        "test_ids": [
+          "CON-019"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: GroupSystemRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": ".scrollEdgeFade(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

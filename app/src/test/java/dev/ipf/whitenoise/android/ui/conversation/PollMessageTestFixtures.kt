@@ -209,11 +209,13 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
 
     protected fun recordedCalls(): List<Pair<String, List<Any?>>> = synchronized(nativeCalls) { nativeCalls.toList() }
 
+    /** Exercises the actual timeline dispatch, with an optional read-only membership gate. */
     @Composable
     @Suppress("FunctionNaming")
     protected fun RealPollMessage(
         item: TimelineMessage,
         menuOpen: Boolean,
+        readOnly: Boolean = false,
         onMenuChange: (Boolean) -> Unit,
     ) {
         TimelineRow(
@@ -249,7 +251,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             onActionMenuOpenChange = onMenuChange,
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
+            composerGate = if (readOnly) ComposerGate.NOTICE else ComposerGate.COMPOSER,
             onBack = {},
             collapseLongMessages = true,
             mentionCandidates = emptyList(),

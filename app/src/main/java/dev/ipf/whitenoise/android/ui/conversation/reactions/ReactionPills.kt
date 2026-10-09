@@ -7,6 +7,7 @@ import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -106,6 +107,24 @@ internal fun ReactionPillRow(
     }
 }
 
+/** Centered wrapping activity-row chips: tap toggles an emoji, long press opens its reactors. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ReactionPillFlow(
+    tallies: List<ReactionTally>,
+    onToggleReaction: ((String) -> Unit)?,
+    onOpenDetails: (String?) -> Unit,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(ReactionPillSpacing, Alignment.CenterHorizontally),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        reactionPills(tallies).forEachIndexed { index, pill ->
+            ReactionPillItem(pill, index, true, onOpenDetails, onToggleReaction)
+        }
+    }
+}
+
 /** One reaction pill in the row. */
 @Suppress("LongParameterList", "FunctionNaming")
 @Composable
@@ -114,6 +133,7 @@ private fun ReactionPillItem(
     index: Int,
     enabled: Boolean,
     onOpenDetails: (String?) -> Unit,
+    onToggleReaction: ((String) -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val emoji = pill.emoji
@@ -126,6 +146,9 @@ private fun ReactionPillItem(
     val selectedState =
         stringResource(if (pill.selected) R.string.selection_state_selected else R.string.selection_state_not_selected)
     val viewReactors = stringResource(R.string.view_reactors)
+    val toggleLabel =
+        stringResource(if (pill.selected) R.string.reaction_tap_to_remove else R.string.message_react)
+    val canToggle = emoji != null && onToggleReaction != null
     val single = emoji != null && pill.count == 1
     Box(
         modifier =
@@ -138,8 +161,14 @@ private fun ReactionPillItem(
                             interactionSource = interactionSource,
                             indication = null,
                             role = Role.Button,
-                            onClick = { onOpenDetails(null) },
-                            onClickLabel = viewReactors,
+                            onClick = {
+                                if (emoji != null && onToggleReaction != null) {
+                                    onToggleReaction(emoji)
+                                } else {
+                                    onOpenDetails(null)
+                                }
+                            },
+                            onClickLabel = if (canToggle) toggleLabel else viewReactors,
                             onLongClickLabel = viewReactors,
                             onLongClick = { onOpenDetails(null) },
                         )

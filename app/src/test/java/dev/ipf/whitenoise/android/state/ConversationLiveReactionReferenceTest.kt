@@ -52,6 +52,37 @@ class ConversationLiveReactionReferenceTest {
             }
         }
 
+    /** Activity rows accept the same live sidecar and rehydrate its counts on conversation reentry. */
+    @Test
+    fun activityReactionSurvivesLiveUpdateAndReentry() =
+        runBlocking {
+            val activityPage = page.copy(messages = page.messages.map { it.copy(kind = 1210uL, direction = "system") })
+            val first = InstalledWindowHandle(activityPage, frame(sequence = 1uL, reactions = null))
+            val firstController = controller(first)
+            try {
+                awaitConversationCondition { timelineMessageIds(firstController) == listOf(messageId) }
+                first.replace(frame(sequence = 2uL, reactions = thumbsUp()))
+                awaitLiveWindowApplied(first, calls = 2) { firstController.reactions[messageId] != null }
+                assertEquals(listOf(messageId), timelineMessageIds(firstController))
+                assertEquals(listOf(ReactionTally("👍", 1, mine = false)), firstController.reactions[messageId])
+            } finally {
+                firstController.onCleared()
+                awaitConversationCondition { first.closed }
+            }
+            val restored = InstalledWindowHandle(activityPage, frame(sequence = 3uL, reactions = thumbsUp()))
+            val restoredController = controller(restored)
+            try {
+                awaitConversationCondition { restoredController.reactions[messageId] != null }
+                assertEquals(listOf(messageId), timelineMessageIds(restoredController))
+                assertEquals(listOf(ReactionTally("👍", 1, mine = false)), restoredController.reactions[messageId])
+                restored.replace(frame(sequence = 4uL, reactions = null))
+                awaitLiveWindowApplied(restored, calls = 2) { restoredController.reactions[messageId] == null }
+            } finally {
+                restoredController.onCleared()
+                awaitConversationCondition { restored.closed }
+            }
+        }
+
     /** Only messages whose sidecar reactions differ from the installed frame are reported. */
     @Test
     fun reactionReferenceChangesNameOnlyTheMovedMessages() {
