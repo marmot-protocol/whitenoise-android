@@ -1,0 +1,168 @@
+{
+  "bounds": [
+    {
+      "trace_seconds": "19.861259"
+    }
+  ],
+  "cpu": [
+    {
+      "fixture_processes": "1",
+      "fixture_cpu_ms": "103.023266",
+      "fixture_cpu_megacycles": "84"
+    }
+  ],
+  "rails": [
+    {
+      "power_rail_name": "power.S12S_VDD_AUR_uws",
+      "samples": "21",
+      "measured_energy_uws": "145908.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.aoc.logic",
+      "samples": "21",
+      "measured_energy_uws": "173584.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.camera",
+      "samples": "6",
+      "measured_energy_uws": "435.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.cpu.big",
+      "samples": "21",
+      "measured_energy_uws": "125963.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.cpu.little",
+      "samples": "21",
+      "measured_energy_uws": "2222030.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.cpu.mid",
+      "samples": "21",
+      "measured_energy_uws": "409417.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.cpu.mid.mem",
+      "samples": "21",
+      "measured_energy_uws": "155569.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.ddr.a",
+      "samples": "21",
+      "measured_energy_uws": "92028.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.ddr.b",
+      "samples": "21",
+      "measured_energy_uws": "108534.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.ddr.c",
+      "samples": "21",
+      "measured_energy_uws": "677002.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.display",
+      "samples": "2",
+      "measured_energy_uws": "0.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.gpu",
+      "samples": "21",
+      "measured_energy_uws": "10620.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.ldo.main.a",
+      "samples": "21",
+      "measured_energy_uws": "986862.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.ldo.main.b",
+      "samples": "21",
+      "measured_energy_uws": "579189.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.ldo.sub",
+      "samples": "21",
+      "measured_energy_uws": "1258808.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.memory.interface",
+      "samples": "21",
+      "measured_energy_uws": "640574.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.modem",
+      "samples": "21",
+      "measured_energy_uws": "1655548.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.multimedia",
+      "samples": "21",
+      "measured_energy_uws": "68103.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.radio.frontend",
+      "samples": "13",
+      "measured_energy_uws": "1746.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.system.fabric",
+      "samples": "21",
+      "measured_energy_uws": "522519.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.tpu",
+      "samples": "2",
+      "measured_energy_uws": "0.000000",
+      "rail_observation_seconds": "19.837378"
+    },
+    {
+      "power_rail_name": "power.rails.udfps",
+      "samples": "21",
+      "measured_energy_uws": "16196.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.ufs",
+      "samples": "21",
+      "measured_energy_uws": "817370.000000",
+      "rail_observation_seconds": "19.842378"
+    },
+    {
+      "power_rail_name": "power.rails.wifi.bt",
+      "samples": "21",
+      "measured_energy_uws": "1494955.000000",
+      "rail_observation_seconds": "19.842378"
+    }
+  ],
+  "quality": [],
+  "screen_duration": [],
+  "source_sha": "202abaa5b1c20059cf24c2b3d08c340afab15fa8",
+  "mdk_sha": "7692e26649193bd0bfba5f6a425a80b7c2e8f502",
+  "proof_kind": "short_unplugged_collector_diagnostic",
+  "charging_flags_false_at_endpoints": true,
+  "continuous_screen_state_verified": false,
+  "tracker_complete": false
+}
