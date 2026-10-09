@@ -8664,12 +8664,7 @@ class ConversationController(
                     )
                 }
                 ?: return null
-        if (!canSendMessages || attachments.isEmpty()) return null
-        if (attachments.any { it.plaintextBytes.isEmpty() }) return null
-        if (albumExceedsRetainedCap(attachments)) {
-            appState.present(R.string.media_album_too_large)
-            return null
-        }
+        if (!canQueueAttachmentBytes(attachments)) return null
         val tempId = UUID.randomUUID().toString()
         val key = "msg:$tempId"
         val outboundVisibleAttempt =
@@ -8703,45 +8698,24 @@ class ConversationController(
                 throw throwable
             }
         // Markdown preparation can suspend: a reviewed take must still belong to its visible owner.
-        if (
-            !canQueue() || !shouldAcceptMediaUploadForAccount(
-                account,
-                mediaUploadSessionEpoch,
-                appState.activeAccountRef,
-                appState.mediaUploadSessionEpoch(),
-            )
-        ) {
+        if (!canQueueMediaForAccount(account, canQueue)) {
             outboundVisibleAttempt.cancel()
             return null
         }
         val replyRevision =
-            if (replyTarget != null) {
-                val revision =
-                    runCatchingCancellable {
-                        appState.marmotIo {
-                            stageMediaReply(account, group.groupIdHex, replyTarget, trimmedCaption, attachments)
-                        }
-                    }.getOrNull()
-                if (
-                    revision == null || !canQueue() || !canSendMessages ||
-                    !shouldAcceptMediaUploadForAccount(
-                        account,
-                        mediaUploadSessionEpoch,
-                        appState.activeAccountRef,
-                        appState.mediaUploadSessionEpoch(),
-                    )
-                ) {
-                    outboundVisibleAttempt.cancel()
-                    appState.present(R.string.media_reply_draft_conflict)
-                    return null
-                }
-                revision
-            } else {
-                null
-            }
+            replyTarget?.let { prepareQueuedMediaReply(account, it, trimmedCaption, attachments) }
+        val replyStagingFailed = replyTarget != null && replyRevision == null
+        if (replyStagingFailed || !canQueueMediaForAccount(account, canQueue)) {
+            outboundVisibleAttempt.cancel()
+            if (replyStagingFailed) appState.present(R.string.media_reply_draft_conflict)
+            return null
+        }
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, retentionSnapshot)
         val optimisticOrder = nextOptimisticTimelineOrder()
-        retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption, replyTarget, replyRevision, replyVersion))
+        retainedMediaUploads.put(
+            key,
+            RetainedMediaUpload(attachments, trimmedCaption, replyTarget, replyRevision, replyVersion),
+        )
         // Mark this slot as "still needed by a pending send" so the screen
         // dispose hook's `clearRetainedUploads` won't wipe bytes for slots
         // queued behind the one currently uploading.
@@ -8774,6 +8748,41 @@ class ConversationController(
         appState.pendingSendDiagnostics.startMediaSend(tempId)
         return QueuedAttachmentSend(account, key, tempId, optimisticOrder, optimistic)
     }
+
+    /** Rejects empty payloads before reserving a pending slot and reports the existing retained-byte limit. */
+    private fun canQueueAttachmentBytes(attachments: List<PendingAttachment>): Boolean {
+        if (!canSendMessages || attachments.isEmpty() || attachments.any { it.plaintextBytes.isEmpty() }) return false
+        return if (albumExceedsRetainedCap(attachments)) {
+            appState.present(R.string.media_album_too_large)
+            false
+        } else {
+            true
+        }
+    }
+
+    /** Rechecks presentation eligibility and account generation after asynchronous preparation. */
+    private fun canQueueMediaForAccount(
+        account: String,
+        canQueue: () -> Boolean,
+    ): Boolean =
+        canQueue() && canSendMessages &&
+            shouldAcceptMediaUploadForAccount(
+                account,
+                mediaUploadSessionEpoch,
+                appState.activeAccountRef,
+                appState.mediaUploadSessionEpoch(),
+            )
+
+    /** A refused native draft write leaves the caller's unsent media and reply selection available. */
+    private suspend fun prepareQueuedMediaReply(
+        account: String,
+        target: String,
+        caption: String?,
+        attachments: List<PendingAttachment>,
+    ): dev.ipf.marmotkit.MessageDraftRevisionFfi? =
+        runCatchingCancellable {
+            appState.marmotIo { stageMediaReply(account, group.groupIdHex, target, caption, attachments) }
+        }.getOrNull()
 
     /** Builds the optimistic pending record that carries staged attachments until the send confirms. */
     private suspend fun pendingAttachmentRecord(
@@ -9171,7 +9180,10 @@ class ConversationController(
                                 // sent), not the "📎 filename" optimistic placeholder, so
                                 // the bridge bubble is identical to the projected one.
                                 plaintext = retained.caption.orEmpty(),
-                                tags = imetaTags + optimistic.tags.filter { it.values.firstOrNull() != "_media_pending" },
+                                tags =
+                                    imetaTags + optimistic.tags.filter {
+                                        it.values.firstOrNull() != "_media_pending"
+                                    },
                                 sourceEpoch = references.firstOrNull()?.sourceEpoch,
                             )
                         messageById[confirmedId] = confirmedRecord

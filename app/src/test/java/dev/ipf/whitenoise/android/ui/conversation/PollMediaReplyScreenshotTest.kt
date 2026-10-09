@@ -60,7 +60,10 @@ class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
             listOf(MessageStatus.Pending, MessageStatus.Sent).mapIndexed { index, status ->
                 val source = fileTimelineMessage(80 + index, "Lunch-menu.pdf", mine = true, status = status)
                 source.copy(
-                    record = source.record.copy(tags = source.record.tags + MessageProjector.eventTag(poll.record.messageIdHex)),
+                    record =
+                        source.record.copy(
+                            tags = source.record.tags + MessageProjector.eventTag(poll.record.messageIdHex),
+                        ),
                     projected =
                         checkNotNull(source.projected).copy(
                             replyToMessageIdHex = poll.record.messageIdHex,
@@ -97,6 +100,8 @@ class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
             }
         }
         val name = if (largeRtl) "amoled_rtl_large" else "light"
-        composeRule.onNodeWithTag("poll-media-replies").captureRoboImage("src/test/snapshots/poll_media_replies_$name.png")
+        composeRule
+            .onNodeWithTag("poll-media-replies")
+            .captureRoboImage("src/test/snapshots/poll_media_replies_$name.png")
     }
 }

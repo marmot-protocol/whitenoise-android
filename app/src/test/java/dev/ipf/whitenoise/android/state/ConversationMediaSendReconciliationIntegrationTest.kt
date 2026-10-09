@@ -45,9 +45,12 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.ui.conversation.ConversationMediaSender
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
+import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
 import java.lang.reflect.Proxy
 import java.time.Duration
@@ -641,108 +644,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
     fun voiceReplyKeepsOriginalTargetWhenSelectionChangesDuringUpload() =
         assertDraftlessMediaUsesTokenBoundNativeAdmission("audio/mp4", "voice.m4a", replyTarget = "poll-original")
 
-    /** Exercises the default production path: no injected uploader or publisher test seam. */
-    @Suppress("LongMethod") // The native proxy and both cancellation/admission outcomes share one fixture.
-    private fun assertDraftlessMediaUsesTokenBoundNativeAdmission(
-        mediaType: String,
-        fileName: String,
-        cancelBeforeUpload: Boolean = false,
-        replyTarget: String? = null,
-    ) = runTest {
-        val calls = mutableListOf<String>()
-        var uploadedRequest: MediaUploadRequestFfi? = null
-        var stagedTarget: String? = null
-        lateinit var controller: ConversationController
-        val draftRevision = mediaReplyRevisionStub()
-        val reference = mediaReference().copy(fileName = fileName, mediaType = mediaType)
-        val marmot =
-            Proxy.newProxyInstance(
-                MarmotInterface::class.java.classLoader,
-                arrayOf(MarmotInterface::class.java),
-            ) { proxy, method, args ->
-                val name = method.name.substringBefore('-')
-                calls += name
-                when (name) {
-                    "toString" -> "draftless-media-boundary"
-                    "hashCode" -> System.identityHashCode(proxy)
-                    "equals" -> proxy === args?.firstOrNull()
-                    "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
-                    "localSendStatus" -> null
-                    "selectedMessageDraft" -> if (replyTarget == null) null else SelectedMessageDraftFfi(draftRevision, null)
-                    "saveMessageDraftIfRevision" -> {
-                        stagedTarget = args!![3] as String
-                        SelectedMessageDraftFfi(draftRevision, null)
-                    }
-                    "sendMessageDraftWithClientToken" -> {
-                        assertTrue(args!![1] === draftRevision)
-                        assertEquals(replyTarget, stagedTarget)
-                        LocalSendAcceptanceFfi(args[3] as String, CONFIRMED_MESSAGE_ID)
-                    }
-                    "uploadMediaWithClientToken" -> {
-                        val request = args!![2] as MediaUploadRequestFfi
-                        val token = args[3] as String
-                        uploadedRequest = request
-                        if (replyTarget != null) {
-                            controller.replyingTo = controller.timeline.single().record.copy(messageIdHex = "newer-poll")
-                        }
-                        MediaUploadSubmissionFfi(
-                            upload = MediaUploadResultFfi(listOf(MediaUploadAttachmentResultFfi(reference, 4uL)), null),
-                            acceptance = if (replyTarget == null) LocalSendAcceptanceFfi(token, CONFIRMED_MESSAGE_ID) else null,
-                        )
-                    }
-                    else -> error("Unexpected Marmot call: $name")
-                }
-            } as MarmotInterface
-        val appState =
-            mediaSendReconciliationAppState().also { state ->
-                WhiteNoiseAppState::class.java
-                    .getDeclaredField("marmotRuntime")
-                    .apply { isAccessible = true }
-                    .set(state, AppMarmotRuntime("test", marmot))
-            }
-        controller =
-            ConversationController(
-                appState = appState,
-                initialGroup = group(),
-                initialMemberSnapshot = memberSnapshot(),
-                groupRosterReader = { _, _ -> authoritativeRoster() },
-                mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
-                markdownParser = { emptyMarkdownDocument() },
-            )
 
-        controller.retryMembers()
-        assertEquals(true, controller.canSendMessages)
-        val seeded =
-            requireNotNull(
-                controller.queueAttachments(
-                    listOf(PendingAttachment(byteArrayOf(1, 2, 3, 4), mediaType, fileName)),
-                    caption = null,
-                    replyTarget = replyTarget,
-                ),
-            )
-        val pending = controller.timeline.single().record
-        assertEquals(replyTarget, MessageProjector.replyTargetMessageId(pending))
-
-        if (cancelBeforeUpload) {
-            assertTrue(controller.deleteMessage(pending, presentFailure = false))
-            controller.uploadQueued(seeded)
-            assertEquals(0, calls.count { it == "uploadMediaWithClientToken" })
-            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
-            return@runTest
-        }
-
-        controller.uploadQueued(seeded)
-
-        assertEquals(1, calls.count { it == "uploadMediaWithClientToken" })
-        assertFalse(calls.contains("sendMediaAttachments"))
-        assertEquals(replyTarget != null, calls.contains("sendMessageDraftWithClientToken"))
-        assertEquals(replyTarget == null, uploadedRequest?.send)
-        assertEquals(replyTarget, MessageProjector.replyTargetMessageId(controller.timeline.single().record))
-        if (replyTarget != null) assertEquals("newer-poll", controller.replyingTo?.messageIdHex)
-        assertEquals(mediaType, uploadedRequest?.attachments?.single()?.mediaType)
-        assertEquals(MessageStatus.Pending, controller.timeline.single().status)
-        assertFalse(controller.deleteMessage(pending, presentFailure = false))
-    }
 }
 
 /** Covers native echo ordering while host-only thumbnail decoding suspends. */
@@ -1112,6 +1014,199 @@ private val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115,
 private fun mediaReplyRevisionStub(): MessageDraftRevisionFfi {
     val unsafeClass = Class.forName("sun.misc.Unsafe")
     val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
-    return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, MessageDraftRevisionFfi::class.java)
+    return unsafeClass
+        .getMethod("allocateInstance", Class::class.java)
+        .invoke(unsafe, MessageDraftRevisionFfi::class.java)
         as MessageDraftRevisionFfi
 }
+
+/** Exercises the default production path: no injected uploader or publisher test seam. */
+@Suppress("LongMethod") // The native proxy and both cancellation/admission outcomes share one fixture.
+private fun assertDraftlessMediaUsesTokenBoundNativeAdmission(
+    mediaType: String,
+    fileName: String,
+    cancelBeforeUpload: Boolean = false,
+    replyTarget: String? = null,
+) = runTest {
+    val calls = mutableListOf<String>()
+    var uploadedRequest: MediaUploadRequestFfi? = null
+    lateinit var controller: ConversationController
+    val reference = mediaReference().copy(fileName = fileName, mediaType = mediaType)
+    val marmot =
+        mediaAdmissionBoundary(replyTarget, reference, calls) { request ->
+            uploadedRequest = request
+            if (replyTarget != null) {
+                controller.replyingTo = controller.timeline.single().record.copy(messageIdHex = "newer-poll")
+            }
+        }
+    val appState =
+        mediaSendReconciliationAppState().also { state ->
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("marmotRuntime")
+                .apply { isAccessible = true }
+                .set(state, AppMarmotRuntime("test", marmot))
+        }
+    controller =
+        ConversationController(
+            appState = appState,
+            initialGroup = group(),
+            initialMemberSnapshot = memberSnapshot(),
+            groupRosterReader = { _, _ -> authoritativeRoster() },
+            mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+            markdownParser = { emptyMarkdownDocument() },
+        )
+
+    controller.retryMembers()
+    assertEquals(true, controller.canSendMessages)
+    val seeded =
+        requireNotNull(
+            controller.queueAttachments(
+                listOf(PendingAttachment(byteArrayOf(1, 2, 3, 4), mediaType, fileName)),
+                caption = null,
+                replyTarget = replyTarget,
+            ),
+        )
+    val pending = controller.timeline.single().record
+    assertEquals(replyTarget, MessageProjector.replyTargetMessageId(pending))
+
+    if (cancelBeforeUpload) {
+        assertTrue(controller.deleteMessage(pending, presentFailure = false))
+        controller.uploadQueued(seeded)
+        assertEquals(0, calls.count { it == "uploadMediaWithClientToken" })
+        assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+        return@runTest
+    }
+
+    controller.uploadQueued(seeded)
+
+    assertEquals(1, calls.count { it == "uploadMediaWithClientToken" })
+    assertFalse(calls.contains("sendMediaAttachments"))
+    assertEquals(replyTarget != null, calls.contains("sendMessageDraftWithClientToken"))
+    assertEquals(replyTarget == null, uploadedRequest?.send)
+    assertEquals(replyTarget, MessageProjector.replyTargetMessageId(controller.timeline.single().record))
+    if (replyTarget != null) assertEquals("newer-poll", controller.replyingTo?.messageIdHex)
+    assertEquals(mediaType, uploadedRequest?.attachments?.single()?.mediaType)
+    assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+    assertFalse(controller.deleteMessage(pending, presentFailure = false))
+}
+
+/** Scripts native draft staging and token admission separately from the controller assertions. */
+private fun mediaAdmissionBoundary(
+    replyTarget: String?,
+    reference: MediaAttachmentReferenceFfi,
+    calls: MutableList<String>,
+    onUpload: (MediaUploadRequestFfi) -> Unit,
+): MarmotInterface {
+    var stagedTarget: String? = null
+    val draftRevision = mediaReplyRevisionStub()
+    return Proxy.newProxyInstance(
+        MarmotInterface::class.java.classLoader,
+        arrayOf(MarmotInterface::class.java),
+    ) { proxy, method, args ->
+        val name = method.name.substringBefore('-')
+        calls += name
+        when (name) {
+            "toString" -> "draftless-media-boundary"
+            "hashCode" -> System.identityHashCode(proxy)
+            "equals" -> proxy === args?.firstOrNull()
+            "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+            "localSendStatus" -> null
+            "selectedMessageDraft" ->
+                if (replyTarget == null) null else SelectedMessageDraftFfi(draftRevision, null)
+            "saveMessageDraftIfRevision" -> {
+                stagedTarget = args!![3] as String
+                SelectedMessageDraftFfi(draftRevision, null)
+            }
+            "sendMessageDraftWithClientToken" -> {
+                assertTrue(args!![1] === draftRevision)
+                assertEquals(replyTarget, stagedTarget)
+                LocalSendAcceptanceFfi(args[3] as String, CONFIRMED_MESSAGE_ID)
+            }
+            "uploadMediaWithClientToken" -> {
+                val request = args!![2] as MediaUploadRequestFfi
+                val token = args[3] as String
+                onUpload(request)
+                MediaUploadSubmissionFfi(
+                    upload = MediaUploadResultFfi(listOf(MediaUploadAttachmentResultFfi(reference, 4uL)), null),
+                    acceptance =
+                        if (replyTarget == null) LocalSendAcceptanceFfi(token, CONFIRMED_MESSAGE_ID) else null,
+                )
+            }
+            else -> error("Unexpected Marmot call: $name")
+        }
+    } as MarmotInterface
+}
+
+/** Exercises retry settlement through the shipping media sender and reviewed recording owner together. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ConversationVoiceReplyRetryTest {
+    /** A failed upload releases preparation, and bubble Retry consumes only the original reviewed take. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun failedVoiceReplySettlesReviewAfterBubbleRetry() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val calls = mutableListOf<String>()
+            val target = "e1".repeat(32)
+            val reference = mediaReference().copy(fileName = "voice-1000ms.m4a", mediaType = "audio/mp4")
+            var uploads = 0
+            val engine = mediaAdmissionBoundary(target, reference, calls) {
+                uploads++
+                if (uploads == 1) error("controlled upload failure")
+            }
+            WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }
+                .set(state, AppMarmotRuntime("test", engine))
+            val controller = voiceRetryController(state)
+            val sender = ConversationMediaSender(state, controller, ApplicationProvider.getApplicationContext()) {}
+            val rejected = CompletableDeferred<Unit>()
+            val review =
+                VoiceRecordingReview(
+                    this,
+                    { true },
+                    { file, duration, guard, complete ->
+                        sender.sendVoiceAttachment(file, duration, guard) { accepted ->
+                            complete(accepted)
+                            if (!accepted) rejected.complete(Unit)
+                        }
+                    },
+                )
+            val recording =
+                java.io.File.createTempFile("voice-reply", ".m4a").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            try {
+                controller.retryMembers()
+                controller.replyingTo =
+                    TimelineProjector.toAppMessageRecord(projectedMediaMessage(1uL, reference))
+                        .copy(messageIdHex = target)
+                review.offer(recording, 1_000L)
+                val clip = checkNotNull(review.clip)
+                review.send(clip)
+                rejected.await()
+                assertTrue(review.clip === clip)
+                assertTrue(recording.exists())
+                val failed = controller.timeline.single()
+                assertEquals(MessageStatus.Failed, failed.status)
+                controller.retryFailedSend(failed)
+                assertNull(review.clip)
+                assertFalse(recording.exists())
+                assertFalse(review.send(clip))
+                assertEquals(2, uploads)
+                assertEquals(1, calls.count { it == "sendMessageDraftWithClientToken" })
+            } finally {
+                review.release()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+}
+
+/** Supplies authoritative send permission and a non-blocking Markdown fixture for the real voice sender. */
+private fun voiceRetryController(state: WhiteNoiseAppState) =
+    ConversationController(
+        appState = state,
+        initialGroup = group(),
+        initialMemberSnapshot = memberSnapshot(),
+        groupRosterReader = { _, _ -> authoritativeRoster() },
+        markdownParser = { emptyMarkdownDocument() },
+    )

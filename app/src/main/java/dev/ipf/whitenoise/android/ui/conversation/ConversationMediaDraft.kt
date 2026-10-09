@@ -331,6 +331,21 @@ internal class ConversationMediaDraftState(
         return documents.mapValues { (_, document) -> document.pendingAttachment() }
     }
 
+    /**
+     * Captures the shelf and byte owners for a later durable send completion. A rejected attempt can
+     * release its UI claim; its eventual Retry completion must leave any replacement or edit intact.
+     */
+    fun captureSendSettlement(): () -> Boolean {
+        val revision = inputsRevision
+        val account = currentAccountRef
+        val photos = preparedAttachments()
+        val documents = preparedDocumentAttachments()
+        return {
+            revision == inputsRevision && account == currentAccountRef && account == appState.activeAccountRef &&
+                photos == preparedAttachments() && documents == preparedDocumentAttachments()
+        }
+    }
+
     /** Removes a document only after an explicit shelf action, never because the screen was disposed. */
     fun releasePreparedDocument(uri: Uri) {
         val uriString = uri.toString()
@@ -931,22 +946,25 @@ internal fun ConversationMediaDraftContent(
                     }
                 },
                 onSend = { caption, onResult ->
+                    val canSettle = state.captureSendSettlement()
                     mediaSender.sendStagedAttachments(
                         mediaSlots,
                         documentUris,
                         caption,
                         preparedImageAttachments = state.preparedAttachments(),
                         preparedDocumentAttachments = state.preparedDocumentAttachments(),
-                        onAccepted = {
-                            state.forgetAcceptedAttachments(
-                                mediaSlots.mapTo(linkedSetOf()) { it.id },
-                                documentUris.toSet(),
-                            )
-                            onMediaSlotsChange(emptyList())
-                            onDocumentUrisChange(emptyList())
-                            onCaptionAccepted(seededCaption)
-                            onResult(true)
+                        onSettled = {
+                            if (canSettle()) {
+                                state.forgetAcceptedAttachments(
+                                    mediaSlots.mapTo(linkedSetOf()) { it.id },
+                                    documentUris.toSet(),
+                                )
+                                onMediaSlotsChange(emptyList())
+                                onDocumentUrisChange(emptyList())
+                                onCaptionAccepted(seededCaption)
+                            }
                         },
+                        onAccepted = { onResult(true) },
                         onRejected = { onResult(false) },
                         onAfterSend = onAfterSend,
                     )

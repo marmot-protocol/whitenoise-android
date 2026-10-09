@@ -66,7 +66,8 @@ class MediaReplyDraftTest {
             nativeBoundary { method, _ ->
                 calls += method
                 when (method) {
-                    "selectedMessageDraft" -> SelectedMessageDraftFfi(revision(), content("", attachments = listOf(descriptor())))
+                    "selectedMessageDraft" ->
+                        SelectedMessageDraftFfi(revision(), content("", attachments = listOf(descriptor())))
                     "messageDraftAttachmentIfRevision" -> byteArrayOf(9)
                     else -> error(method)
                 }
@@ -83,7 +84,8 @@ class MediaReplyDraftTest {
         val engine =
             nativeBoundary { method, args ->
                 when (method) {
-                    "selectedMessageDraft" -> SelectedMessageDraftFfi(original, content("caption", attachments = listOf(descriptor())))
+                    "selectedMessageDraft" ->
+                        SelectedMessageDraftFfi(original, content("caption", attachments = listOf(descriptor())))
                     "messageDraftAttachmentIfRevision" -> {
                         assertSame(original, args[1])
                         assertEquals("id", args[2])
@@ -140,14 +142,17 @@ class MediaReplyDraftTest {
                     }
                 }
             assertTrue(
-                runCatching { engine.sendComposerMedia("account", "group", emptyList(), null, "token", revision()) }.isFailure,
+                runCatching {
+                    engine.sendComposerMedia("account", "group", emptyList(), null, "token", revision())
+                }.isFailure,
             )
             assertFalse(calls.contains("sendMediaAttachments"))
             assertFalse(calls.contains("selectedMessageDraft"))
         }
 
     /** A selected file fixture uses its opaque native attachment identity. */
-    private fun descriptor() = SelectedMessageDraftAttachmentFfi("id", "pick", "image/jpeg", 1uL, null, null, null, emptyList())
+    private fun descriptor() =
+        SelectedMessageDraftAttachmentFfi("id", "pick", "image/jpeg", 1uL, null, null, null, emptyList())
 
     /** Minimal staged plaintext whose identity is compared using the selected revision. */
     private fun attachment() = PendingAttachment(byteArrayOf(1), "image/jpeg", "pick")
@@ -163,7 +168,9 @@ class MediaReplyDraftTest {
     private fun revision(): MessageDraftRevisionFfi {
         val unsafeClass = Class.forName("sun.misc.Unsafe")
         val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
-        return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, MessageDraftRevisionFfi::class.java)
+        return unsafeClass
+            .getMethod("allocateInstance", Class::class.java)
+            .invoke(unsafe, MessageDraftRevisionFfi::class.java)
             as MessageDraftRevisionFfi
     }
 }

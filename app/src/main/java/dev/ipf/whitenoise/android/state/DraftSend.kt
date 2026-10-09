@@ -59,7 +59,8 @@ internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: Conve
  * Submits a captured reply revision unchanged, or a matching non-reply composer draft.
  * A captured reply conflict is terminal for that revision; it never falls back to an unrelated send.
  */
-@Suppress("ReturnCount", "LongParameterList") // Captured reply ownership, matching drafts, and legacy sends are distinct outcomes.
+// Captured reply ownership, matching drafts, and legacy sends are distinct outcomes.
+@Suppress("ReturnCount", "LongParameterList")
 internal suspend fun MarmotInterface.sendComposerMedia(
     accountRef: String,
     groupIdHex: String,
@@ -75,9 +76,9 @@ internal suspend fun MarmotInterface.sendComposerMedia(
             sendMessageDraftWithClientToken(accountRef, replyRevision, references, clientToken)
         }
     }
-    val selected = selectedDraftOrNull(accountRef, groupIdHex)
+    val selected = selectedDraftOrNull(accountRef, groupIdHex)?.takeIf { it.draft?.replyToMessageIdHex == null }
     val content = selected?.draft
-    if (selected != null && content != null && content.replyToMessageIdHex == null && draftDescribes(content, references)) {
+    if (selected != null && content != null && draftDescribes(content, references)) {
         val submitted =
             saveDraftForSend(accountRef, selected, caption.orEmpty(), content.replyToMessageIdHex)
                 ?.let { revision ->

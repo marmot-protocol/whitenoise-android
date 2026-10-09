@@ -3347,23 +3347,26 @@ internal fun ConversationScreen(
         ) { onAccepted, onRejected ->
             val sendingMedia = pendingMediaSlots
             val sendingDocuments = pendingDocumentUris
+            val canSettle = mediaDraftState.captureSendSettlement()
             mediaSender.sendStagedAttachments(
                 sendingMedia,
                 sendingDocuments,
                 caption,
                 preparedImageAttachments = mediaDraftState.preparedAttachments(),
                 preparedDocumentAttachments = mediaDraftState.preparedDocumentAttachments(),
-                onAccepted = {
-                    val acceptedIds = sendingMedia.map { it.id }.toSet()
-                    mediaDraftState.forgetAcceptedAttachments(
-                        acceptedIds,
-                        sendingDocuments.toSet(),
-                    )
-                    pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
-                    pendingDocumentUris =
-                        removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)
-                    onAccepted()
+                onSettled = {
+                    if (canSettle() && pendingMediaSlots == sendingMedia && pendingDocumentUris == sendingDocuments) {
+                        val acceptedIds = sendingMedia.map { it.id }.toSet()
+                        mediaDraftState.forgetAcceptedAttachments(
+                            acceptedIds,
+                            sendingDocuments.toSet(),
+                        )
+                        pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
+                        pendingDocumentUris =
+                            removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)
+                    }
                 },
+                onAccepted = onAccepted,
                 onRejected = onRejected,
                 onAfterSend = {
                     acceptedSendRevealedTranscript = true

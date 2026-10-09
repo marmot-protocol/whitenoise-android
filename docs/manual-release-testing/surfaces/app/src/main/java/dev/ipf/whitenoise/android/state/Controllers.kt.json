@@ -234,6 +234,16 @@
           "MED-008",
           "MED-009"
         ]
+      },
+      {
+        "surface": "Media queue retained-byte limit feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.media_album_too_large",
+        "test_ids": [
+          "MED-003",
+          "MED-009",
+          "MSG-021"
+        ]
       }
     ],
     "settings_controls": [

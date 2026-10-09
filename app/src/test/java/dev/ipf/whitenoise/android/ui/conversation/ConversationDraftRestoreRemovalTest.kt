@@ -47,6 +47,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -504,6 +505,39 @@ class ConversationDraftRestoreRemovalTest {
                 assertTrue(requireNotNull(restored).documentUris.isEmpty())
                 assertTrue(owner.preparedDocumentAttachments().isEmpty())
                 assertNull(gateway.current)
+            } finally {
+                closeFixtureJobs()
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A late bubble Retry clears an unchanged shelf, but never a new occurrence of the same document URI. */
+    @Test
+    fun delayedSendSettlementRejectsReplacedShelfIdentity() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            Dispatchers.setMain(dispatcher)
+            try {
+                val context = ApplicationProvider.getApplicationContext<Context>()
+                val group = conversationTimelineTestGroup()
+                val gateway = RestoreGateway(null)
+                val repository = MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher)
+                val app = appForRestore(context, repository)
+                val controller = ConversationController(appState = app, initialGroup = group)
+                val owner =
+                    ConversationMediaDraftState(
+                        app, controller, context, backgroundScope, PhotoEditorMessages("", "", "", ""),
+                    )
+                val uri = Uri.parse("content://picker/document/same-name")
+                owner.updateInputs(emptyList(), listOf(uri), "account")
+                val canSettle = owner.captureSendSettlement()
+                assertTrue(canSettle())
+                owner.updateInputs(emptyList(), emptyList(), "account")
+                owner.updateInputs(emptyList(), listOf(uri), "account")
+                assertFalse(canSettle())
+                val replacement = owner.captureSendSettlement()
+                owner.updateInputs(emptyList(), listOf(uri), "other-account")
+                assertFalse(replacement())
             } finally {
                 closeFixtureJobs()
                 Dispatchers.resetMain()

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
+import dev.ipf.marmotkit.SelectedMessageDraftFfi
 
 /**
  * Stages a reply only into an empty slot or the exact media already selected by this composer.
@@ -18,23 +19,20 @@ internal fun MarmotInterface.stageMediaReply(
 ): MessageDraftRevisionFfi? {
     val selected = selectedMessageDraft(account, group)
     val draft = selected.draft
-    val sameAttachments =
-        draft?.mediaAttachments?.let { descriptors ->
-            descriptors.size == attachments.size &&
-                descriptors.zip(attachments).all { (descriptor, attachment) ->
-                    descriptor.fileName == attachment.fileName && descriptor.mediaType == attachment.mediaType &&
-                        descriptor.dim == attachment.dim && descriptor.thumbhash == attachment.thumbhash &&
-                        messageDraftAttachmentIfRevision(account, selected.revision, descriptor.id)
-                            ?.contentEquals(attachment.plaintextBytes) == true
-                }
-        } == true
+    val sameAttachments = replyDraftMatchesBytes(account, selected, attachments)
     val emptySlot = draft == null || (draft.content.isBlank() && draft.mediaAttachments.isEmpty())
-    if (!emptySlot && (!sameAttachments || draft?.content != caption.orEmpty())) return null
-    if (draft?.replyToMessageIdHex != null && draft.replyToMessageIdHex != target) return null
+    val conflictingContent = !emptySlot && (!sameAttachments || draft?.content != caption.orEmpty())
+    val conflictingReply = draft?.replyToMessageIdHex != null && draft.replyToMessageIdHex != target
+    if (conflictingContent || conflictingReply) return null
     val staged =
         attachments.mapIndexed { index, attachment ->
             MessageDraftAttachmentFfi(
-                id = if (sameAttachments) draft!!.mediaAttachments[index].id else java.util.UUID.randomUUID().toString(),
+                id =
+                    if (sameAttachments) {
+                        checkNotNull(draft).mediaAttachments[index].id
+                    } else {
+                        java.util.UUID.randomUUID().toString()
+                    },
                 fileName = attachment.fileName,
                 mediaType = attachment.mediaType,
                 plaintext = attachment.plaintextBytes,
@@ -45,4 +43,23 @@ internal fun MarmotInterface.stageMediaReply(
             )
         }
     return saveMessageDraftIfRevision(account, selected.revision, caption.orEmpty(), target, staged).revision
+}
+
+/** Names alone cannot identify a selected file; every byte read is bound to the captured native revision. */
+private fun MarmotInterface.replyDraftMatchesBytes(
+    account: String,
+    selected: SelectedMessageDraftFfi,
+    attachments: List<PendingAttachment>,
+): Boolean {
+    val descriptors = selected.draft?.mediaAttachments ?: return false
+    return descriptors.size == attachments.size &&
+        descriptors.zip(attachments).all { (descriptor, attachment) ->
+            val sameMetadata =
+                descriptor.fileName == attachment.fileName && descriptor.mediaType == attachment.mediaType &&
+                    descriptor.dim == attachment.dim
+            val sameBytes =
+                messageDraftAttachmentIfRevision(account, selected.revision, descriptor.id)
+                    ?.contentEquals(attachment.plaintextBytes) == true
+            sameMetadata && descriptor.thumbhash == attachment.thumbhash && sameBytes
+        }
 }
