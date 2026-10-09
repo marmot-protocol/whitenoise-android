@@ -293,7 +293,10 @@ class PlaybackTransportOwnershipTest {
         var confirm: (() -> Unit)? = null
         val host = ShellPlaybackHost(appState) { opened++ }
         host.registerLeaveGuard(this) { confirm = it }
-        rule.waitUntil(timeoutMillis = 5_000) { timeline.nextWindowCallCount == 1 }
+        rule.waitUntil(timeoutMillis = 5_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            timeline.nextWindowCallCount == 1
+        }
         assertEquals("first", appState.currentPlaybackConversationDestination()?.messageIdHex)
         host.requestOpenSource()
         assertEquals(TtsNavigationOutcome.Moved, appState.ttsController.skipNextMessage())
