@@ -89,7 +89,7 @@ jobs:
         run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
 
       - name: Test Maestro artifact and manual-only execution contracts
-        run: python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py scripts/test_maestro_runtime.py scripts/test_maestro_environment.py
+        run: python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py scripts/test_maestro_runtime.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py
 
       - name: Validate manual release guide
         env:

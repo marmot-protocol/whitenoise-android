@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -21,11 +23,13 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +39,11 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class DropdownMenuAndroidTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
+
+    @Before
+    fun configureWindow() {
+        rule.runOnUiThread { rule.activity.enableEdgeToEdge() }
+    }
 
     @Test
     fun fittingAppMenuShowsItsItemsAndDismissesAfterSelection() = exerciseMenu(rows = 3, appMenu = true)
@@ -54,9 +63,11 @@ class DropdownMenuAndroidTest {
         render(rows, appMenu, expanded) { selected = it }
         rule.onNodeWithText("Open menu").performClick()
         rule.onNodeWithText("Choice 0").assertIsDisplayed()
-        val pixels = rule.onNodeWithTag(MENU).captureToImage().toPixelMap()
-        assertTrue("the first action must be painted, not an empty popup surface", pixels[8, 14].green > 0.95f)
-        assertTrue("the first action must retain its cyan background", pixels[8, 14].red < 0.05f)
+        val pixels = rule.onNodeWithTag("${ITEM_PREFIX}0").captureToImage().toPixelMap()
+        val inset = with(rule.density) { 8.dp.roundToPx() }
+        val painted = pixels[inset, pixels.height / 2]
+        assertTrue("first action must be painted cyan: $painted", painted.green > 0.95f && painted.blue > 0.95f)
+        assertTrue("first action must remain opaque cyan: $painted", painted.red < 0.05f)
         val last = rule.onNodeWithText("Choice ${rows - 1}")
         last.performScrollTo().assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(rows - 1, selected) }
@@ -71,7 +82,7 @@ class DropdownMenuAndroidTest {
     ) {
         rule.setContent {
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                     Button(onClick = { expanded.value = true }) { Text("Open menu") }
                     if (appMenu) {
                         WhiteNoiseDropdownMenu(
@@ -82,7 +93,7 @@ class DropdownMenuAndroidTest {
                                     WhiteNoiseMenuItem(
                                         label = "Choice $index",
                                         onClick = { onSelected(index) },
-                                        modifier = Modifier.background(Color.Cyan),
+                                        modifier = Modifier.background(Color.Cyan).testTag("$ITEM_PREFIX$index"),
                                     )
                                 },
                             modifier = Modifier.testTag(MENU),
@@ -100,7 +111,7 @@ class DropdownMenuAndroidTest {
                                         onSelected(index)
                                         expanded.value = false
                                     },
-                                    modifier = Modifier.background(Color.Cyan),
+                                    modifier = Modifier.background(Color.Cyan).testTag("$ITEM_PREFIX$index"),
                                 )
                             }
                         }
@@ -112,5 +123,6 @@ class DropdownMenuAndroidTest {
 
     private companion object {
         const val MENU = "dropdown.native.menu"
+        const val ITEM_PREFIX = "dropdown.native.item."
     }
 }

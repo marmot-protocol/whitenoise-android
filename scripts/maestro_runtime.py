@@ -261,7 +261,44 @@ def run_ui(name, directory):
                 return invoke_ui(name, private)
             finally:
                 private_ui_result(private / 'junit.xml', directory / 'junit.xml', name)
-    return invoke_ui(name, directory)
+    runner_memory_snapshot(directory, 'before')
+    try:
+        return invoke_ui(name, directory)
+    finally:
+        runner_memory_snapshot(directory, 'after')
+
+
+def runner_memory_snapshot(directory, phase):
+    """Keep numerical host diagnostics when emulator loss prevents Android log capture.
+
+    These optional counters contain no UI, process names, command lines or
+    credentials. Missing counters never replace the actual UI outcome.
+    """
+    if phase not in ('before', 'after'):
+        raise ValueError('Known UI boundary required')
+    sources = {
+        'memory_kib': ('/proc/meminfo', {'MemTotal', 'MemAvailable', 'SwapTotal', 'SwapFree'}),
+        'kernel': ('/proc/vmstat', {'oom_kill'}),
+        'cgroup': ('/sys/fs/cgroup/memory.events', {'low', 'high', 'max', 'oom', 'oom_kill', 'oom_group_kill'}),
+    }
+    record = {'schema': 1, 'phase': phase}
+    for kind, (source, allowed) in sources.items():
+        values = {}
+        try:
+            for line in Path(source).read_text(encoding='ascii').splitlines():
+                fields = line.split()
+                key = fields[0].removesuffix(':') if fields else ''
+                if (key in allowed and len(fields) >= 2 and len(fields[1]) <= 20
+                        and fields[1].isascii() and fields[1].isdigit()):
+                    values[key] = int(fields[1])
+            record[kind] = {'available': bool(values), 'values': values}
+        except (OSError, UnicodeError):
+            record[kind] = {'available': False, 'values': {}}
+    try:
+        (directory / f'runner-memory-{phase}.json').write_text(json.dumps(record, indent=2) + '\n')
+    except OSError:
+        # Optional host diagnostics must not turn a CLI failure/timeout into another result.
+        pass
 
 
 def invoke_ui(name, directory):
