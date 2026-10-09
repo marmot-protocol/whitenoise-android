@@ -136,11 +136,11 @@ class AccountKeysPresentationTest {
     fun regularSignOutCanBeCancelledWithoutStartingTeardown() {
         val appState = render(localSigning = false)
         composeRule.onNodeWithTag("profile_keys.sign_out").performClick()
-        composeRule.onNodeWithText(app.getString(R.string.sign_out_sheet_title)).assertIsDisplayed()
+        composeRule.onNodeWithTag("profile_keys.signout_invitation_keys").assertIsDisplayed()
         composeRule
             .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
             .performSemanticsAction(SemanticsActions.Dismiss)
-        composeRule.onNodeWithText(app.getString(R.string.sign_out_sheet_title)).assertDoesNotExist()
+        composeRule.onNodeWithTag("profile_keys.signout_invitation_keys").assertDoesNotExist()
         composeRule.onNodeWithTag("profile_keys.sign_out").assertIsDisplayed()
         assertEquals(ACCOUNT_REF, appState.activeAccountRef)
         assertFalse(appState.signOutInProgress)
