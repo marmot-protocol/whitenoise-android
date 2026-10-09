@@ -35,7 +35,9 @@ name: accounts-signout-warm-resume
     id: settings.switch_profile
 - tapOn:
     text: ^Maestro Bob$
-- assertVisible: Settings
+- assertVisible:
+    id: chats.scope.chats
+- runFlow: ../fixtures/open-settings.yaml
 - assertVisible: Maestro Bob
 - back
 - assertVisible: Maestro group

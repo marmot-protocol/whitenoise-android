@@ -693,6 +693,26 @@ class RuntimeEvidenceTest(unittest.TestCase):
             self.assertEqual(commands[tap + 1], {'assertVisible': {'focused': True}})
             self.assertEqual(commands[tap + 2], {'inputText': 'Maestro account action draft'})
             self.assertIn({'assertVisible': {'text': '^Message$'}}, commands)
+            selected = commands.index({'tapOn': {'text': '^Maestro Bob$'}})
+            self.assertEqual(commands[selected + 1], {'assertVisible': {'id': 'chats.scope.chats'}})
+            self.assertEqual(commands[selected + 2], {'runFlow': '../fixtures/open-settings.yaml'})
+            if path.name == 'accounts-wipe-confirmed-survivors.yaml':
+                wiped = commands.index({'tapOn': {'id': 'profile_keys.wipe_confirm'}})
+                close = commands.index({'tapOn': 'Close'})
+                settings = commands.index({'runFlow': '../fixtures/open-settings.yaml'})
+                self.assertLess(wiped, close)
+                self.assertLess(close, settings)
+                self.assertIn({'assertVisible': 'Local data wiped'}, commands[wiped:close])
+
+    def test_security_return_checks_the_actual_android_security_center_owner(self):
+        path = runtime.ROOT / '.maestro/runtime/app-lock-no-credential-security-return.yaml'
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        external = commands.index({'tapOn': 'Open Android security settings'})
+        self.assertEqual(commands[external + 1], {
+            'assertVisible': {'id': '^com.android.(settings|permissioncontroller):id/.*'}})
+        self.assertEqual(commands[external + 2], {
+            'assertNotVisible': {'id': 'privacy.device_protection.group'}})
+        self.assertEqual(runtime.CASES[path.stem]['postcondition'], 'app-lock-unavailable')
 
     def test_scanner_popup_uses_exported_recovery_controls_and_native_permission_proof(self):
         """Modal tags missing from the captured tree cannot qualify visible or absent scanner state."""

@@ -23,6 +23,14 @@ name: accounts-wipe-confirmed-survivors
 - tapOn:
     id: profile_keys.wipe_confirm
 - assertNotVisible: Stays on this device
+- assertVisible:
+    text: ^Wipe finished with [0-9]+ issues?$
+- assertVisible: Local data wiped
+- tapOn: Close
+- assertNotVisible:
+    text: ^Wipe finished with [0-9]+ issues?$
+- assertVisible:
+    id: chats.scope.chats
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible:
     text: ^Maestro (Bob|Carol)$
@@ -31,7 +39,9 @@ name: accounts-wipe-confirmed-survivors
     id: settings.switch_profile
 - tapOn:
     text: ^Maestro Bob$
-- assertVisible: Settings
+- assertVisible:
+    id: chats.scope.chats
+- runFlow: ../fixtures/open-settings.yaml
 - assertVisible: Maestro Bob
 - back
 - assertVisible: Maestro group

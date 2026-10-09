@@ -3073,7 +3073,7 @@
         "ACC-014",
         "ACC-015"
       ],
-      "assertions": "Type a disposable Alice draft, complete real wipe, then select Bob and require a clean Bob composer. Native proof requires Alice removal, unchanged surviving profiles, retained original member histories and untouched peer drafts; only MDK-authenticated new MLS system rows are allowed. The wiped owner draft is not retained or queried; no public-relay or forensic byte-erasure claim.",
+      "assertions": "Type a disposable Alice draft, complete real wipe, require Local data wiped and acknowledge the actual structured outcome, then select Bob and require a clean Bob composer. Loopback group-leave warnings are visible and do not qualify public-relay departure. Native proof requires Alice removal, unchanged surviving profiles, retained original member histories and untouched peer drafts; only MDK-authenticated new MLS system rows are allowed. The wiped owner draft is not retained or queried; no public-relay or forensic byte-erasure claim.",
       "postcondition": "account-action-wiped"
     },
     "app-lock-no-credential-back": {
@@ -3107,7 +3107,7 @@
       "manual_ids": [
         "SEC-001"
       ],
-      "assertions": "On a real emulator without an OS credential, require the disabled unchecked device-authentication switch, setup guidance, available Android security action and absent Auto-lock/lock cover. Open the real Android Settings activity and return without configuring a credential; require the unchanged unavailable state. Independent native proof checks real Keyguard/biometric unavailability before UI and at completion, unchanged lock preferences, three original identities, Alice session and both original messages. No PIN setup, lock/unlock success or full SEC-001 completion claim.",
+      "assertions": "On a real emulator without an OS credential, require the disabled unchecked device-authentication switch, setup guidance, available Android security action and absent Auto-lock/lock cover. Open the real Android security screen, hosted by Settings or Permission Controller, and return without configuring a credential; require the unchanged unavailable state. Independent native proof checks real Keyguard/biometric unavailability before UI and at completion, unchanged lock preferences, three original identities, Alice session and both original messages. No PIN setup, lock/unlock success or full SEC-001 completion claim.",
       "postcondition": "app-lock-unavailable"
     },
     "app-lock-credential-cancel-retry": {
