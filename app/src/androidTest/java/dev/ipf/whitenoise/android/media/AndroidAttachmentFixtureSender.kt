@@ -87,9 +87,10 @@ internal suspend fun sendAndroidFixtureMedia(
             awaitAndroidFixtureSenderReady(harness.controller)
         }
         withContext(Dispatchers.Main.immediate) {
-            val queued = checkNotNull(harness.controller.queueAttachments(attachments, caption = null)) {
-                "generated sender did not admit its media"
-            }
+            val queued =
+                checkNotNull(harness.controller.queueAttachments(attachments, caption = null)) {
+                    "generated sender did not admit its media"
+                }
             harness.controller.uploadQueued(queued)
         }
         val published = awaitAndroidFixtureReferences(marmot, sender.label, group, attachments.map { it.fileName })
