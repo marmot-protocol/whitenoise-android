@@ -27,7 +27,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageAction
 import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageActions
-import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
+import dev.ipf.whitenoise.android.ui.conversation.reactions.CompleteReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillFlow
 
 /** Transient overlay state scoped to one mounted activity row, never a second reaction store. */
@@ -94,7 +94,7 @@ internal fun GroupSystemTimelineRow(
     if (isActionMenuOpen && (actions.canReact || actions.canDelete)) {
         GroupSystemFocusedActions(actions, surface, quickReactionEmojis, onActionMenuOpenChange)
     }
-    GroupSystemReactionSheets(actions, surface, recentEmojis, onEmojiUsed)
+    GroupSystemReactionSheets(item, actions, surface, recentEmojis, onEmojiUsed)
 }
 
 /** Retires row-owned overlays on disposal or when native action admission disappears. */
@@ -172,6 +172,7 @@ private fun GroupSystemFocusedActions(
 /** Uses the shared picker and live reactor details, keeping read-only history inspectable. */
 @Composable
 private fun GroupSystemReactionSheets(
+    item: TimelineMessage,
     actions: GroupSystemRowActions,
     surface: GroupSystemActionSurface,
     recentEmojis: List<String>,
@@ -189,21 +190,12 @@ private fun GroupSystemReactionSheets(
         )
     }
     if (surface.detailsOpen && !actions.hidden) {
-        // The tally map invalidates optimistic changes before the native sidecar echoes them.
-        val participants =
-            if (actions.tallies.isEmpty()) {
-                emptyList()
-            } else {
-                actions.controller.reactionParticipantsFor(actions.owner.messageId)
-            }
-        LaunchedEffect(participants.isEmpty()) { if (participants.isEmpty()) surface.detailsOpen = false }
-        if (participants.isNotEmpty()) {
-            ReactionDetailsSheet(
-                participants = participants,
-                appState = actions.appState,
-                onRemoveOwnReaction = actions::react.takeIf { actions.canReact },
-                onDismissRequest = { surface.detailsOpen = false },
-            )
-        }
+        CompleteReactionDetailsSheet(
+            item = item,
+            controller = actions.controller,
+            appState = actions.appState,
+            onRemoveOwnReaction = actions::react.takeIf { actions.canReact },
+            onDismissRequest = { surface.detailsOpen = false },
+        )
     }
 }

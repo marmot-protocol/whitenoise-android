@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupCreationFlow.kt",
+  "legacy_sha256": "5906d801b27254c19159c3d9e1ec373e53c925e38824f29d4e40db6ddb8a6c28",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NewGroupAccountFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupCreationFlow.kt",
+        "anchor": "fun NewGroupAccountFlow(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "NewGroupCreationFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupCreationFlow.kt",
+        "anchor": "fun NewGroupCreationFlow(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Explicit failed-recipient removal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupCreationFlow.kt",
+        "anchor": "onRemoveMember =",
+        "test_ids": [
+          "NCH-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

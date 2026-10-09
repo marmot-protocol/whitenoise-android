@@ -83,6 +83,7 @@ internal class VoiceRecordingReview(
     var isSending: Boolean by mutableStateOf(false)
         private set
     private var pendingSend: Any? = null
+    private var latestCompletion: Any? = null
     private var released = false
     private var playbackJob: Job? = null
 
@@ -126,6 +127,7 @@ internal class VoiceRecordingReview(
         if (clip !== expected) return false
         stopPlayback(expected)
         pendingSend = null
+        latestCompletion = null
         isSending = false
         clip = null
         // Disposal deletes private audio but retains the non-sensitive recreation warning.
@@ -149,6 +151,7 @@ internal class VoiceRecordingReview(
         stopPlayback(expected)
         val token = Any()
         pendingSend = token
+        latestCompletion = token
         isSending = true
         try {
             send(
@@ -164,16 +167,21 @@ internal class VoiceRecordingReview(
         return true
     }
 
-    /** Ends only the matching attempt; accepted bytes now belong to the existing native upload/retry owner. */
+    /**
+     * Rejection releases preparation, but the same logical send may later settle through bubble Retry.
+     * Only the latest attempt for this exact clip can consume it; replacement clips and newer sends win.
+     */
     private fun finishSend(
         expected: VoiceReviewClip,
         token: Any,
         accepted: Boolean,
     ) {
-        if (pendingSend !== token || clip !== expected) return
+        if (latestCompletion !== token || clip !== expected) return
+        if (!accepted && pendingSend !== token) return
         pendingSend = null
         isSending = false
         if (accepted) {
+            latestCompletion = null
             clip = null
             onReviewPresenceChanged(false)
             deleteFile(expected.file)

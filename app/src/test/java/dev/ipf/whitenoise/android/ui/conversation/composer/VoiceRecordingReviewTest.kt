@@ -259,6 +259,46 @@ class VoiceRecordingReviewTest {
             assertEquals(1, failures)
         }
 
+    /** Bubble Retry can settle the original clip after its failed preparation attempt released the UI token. */
+    @Test
+    fun delayedDurableAcceptanceConsumesOnlyTheOriginalRetainedClip() =
+        runTest {
+            for (replaceClip in listOf(false, true)) {
+                lateinit var completion: (Boolean) -> Unit
+                lateinit var guard: () -> Boolean
+                val review =
+                    VoiceRecordingReview(
+                        this,
+                        { true },
+                        { _, _, canQueue, completed ->
+                            guard = canQueue
+                            completion = completed
+                        },
+                        playback = FakePlayback(),
+                    )
+                val original = take()
+                review.offer(original, 1_000L)
+                val clip = checkNotNull(review.clip)
+                review.send(clip)
+                completion(false)
+                assertFalse(guard())
+                assertTrue(review.clip === clip)
+                assertTrue(original.exists())
+                if (replaceClip) review.offer(take(), 2_000L)
+                val replacement = review.clip
+                completion(true)
+                if (replaceClip) {
+                    assertTrue(review.clip === replacement)
+                    assertTrue(checkNotNull(replacement).file.exists())
+                } else {
+                    assertNull(review.clip)
+                    assertFalse(original.exists())
+                    assertFalse(review.send(clip))
+                }
+                review.release()
+            }
+        }
+
     /** A synchronous dispatch failure is retryable; discard revokes an asynchronous pending queue attempt. */
     @Test
     fun dispatchFailureAndDiscardDuringPreparationNeverLoseOrSendTheWrongTake() =

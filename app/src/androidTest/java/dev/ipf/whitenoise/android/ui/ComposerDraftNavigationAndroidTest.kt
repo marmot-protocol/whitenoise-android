@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -114,10 +115,14 @@ class ComposerDraftNavigationAndroidTest {
 
     /** Allows queued frame startup, then proves movement with the finger released before testing cancellation. */
     private fun startReadingFling(field: SemanticsNodeInteraction) {
+        val touchSlop = ViewConfiguration.get(composeRule.activity).scaledTouchSlop
         field.performTouchInput {
-            down(Offset(center.x, height - 8f))
-            moveTo(Offset(center.x, height / 2f), delayMillis = 16)
-            moveTo(Offset(center.x, 4f), delayMillis = 16)
+            // A docked keyboard can leave a viewport shorter than touch slop.
+            // Start inside the field, then retain the gesture as it crosses its bounds.
+            val distance = maxOf(height - 12f, touchSlop * 4f)
+            down(center)
+            moveTo(Offset(center.x, center.y - distance / 2f), delayMillis = 16)
+            moveTo(Offset(center.x, center.y - distance), delayMillis = 16)
             up()
         }
         repeat(FLING_STARTUP_FRAMES) {

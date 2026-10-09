@@ -370,7 +370,10 @@ internal class ConversationMediaSender(
 ) {
     private val attachmentReader = ConversationAttachmentReader(appState, context)
 
+    /** Captures the reply before contact serialization can suspend. */
     fun sendSharedContact(contact: SharedContact) {
+        val replyTarget = controller.replyingTo?.messageIdHex
+        val replyVersion = controller.replySelectionVersion
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             val vcardBytes =
@@ -392,7 +395,10 @@ internal class ConversationMediaSender(
                 controller.queueAttachments(
                     attachments = listOf(attachment),
                     caption = caption,
+                    canQueue = { controller.replySelectionVersion == replyVersion },
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                    replyTarget = replyTarget,
+                    replyVersion = replyVersion,
                 ) ?: return@launchMutation
             onRevealSent()
             controller.uploadQueued(seeded)
@@ -406,6 +412,8 @@ internal class ConversationMediaSender(
         canSend: () -> Boolean,
         onQueued: (Boolean) -> Unit,
     ) {
+        val replyTarget = controller.replyingTo?.messageIdHex
+        val replyVersion = controller.replySelectionVersion
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             var accepted = false
@@ -427,24 +435,29 @@ internal class ConversationMediaSender(
                     controller.queueAttachments(
                         listOf(attachment),
                         null,
-                        canQueue = { canSend() && controller.canSendMessages },
+                        canQueue = {
+                            canSend() && controller.canSendMessages && controller.replySelectionVersion == replyVersion
+                        },
                         outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                        replyTarget = replyTarget,
+                        replyVersion = replyVersion,
                     ) ?: return@launchMutation
-                accepted = true
-                onQueued(true)
+                if (replyTarget == null) {
+                    accepted = true
+                    onQueued(true)
+                }
                 onRevealSent()
-                controller.uploadQueued(seeded)
+                controller.uploadQueued(seeded) {
+                    if (replyTarget != null) {
+                        accepted = true
+                        onQueued(true)
+                    }
+                }
             } finally {
                 if (!accepted) onQueued(false)
             }
         }
     }
-
-    private data class BudgetedAttachments(
-        val attachments: List<PendingAttachment>,
-        val totalBytes: Long,
-        val overflowed: Boolean,
-    )
 
     private data class PreparedStagedAttachments(
         val images: List<PendingAttachment>,
@@ -465,12 +478,16 @@ internal class ConversationMediaSender(
         preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment> = emptyMap(),
         onAccepted: () -> Unit = {},
         onRejected: () -> Unit = {},
+        onSettled: () -> Unit = {},
         onAfterSend: () -> Unit = {},
     ) {
+        val completion = StagedMediaSendCompletion(onAccepted, onRejected, onSettled)
         if (imageSlots.isEmpty() && documentUris.isEmpty()) {
-            onRejected()
+            completion.reject()
             return
         }
+        val replyTarget = controller.replyingTo?.messageIdHex
+        val replyVersion = controller.replySelectionVersion
         val pendingDraftClear =
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
@@ -492,38 +509,71 @@ internal class ConversationMediaSender(
                         preparedImageAttachments,
                         preparedDocumentAttachments,
                     )
-                if (!acceptPreparedAttachments(prepared, imageSlots.size)) {
-                    return@launchMutation
-                }
-                val readyDocuments =
-                    prepared.documents.copy(
-                        attachments = addMissingThumbhashes(prepared.documents.attachments),
-                    )
+                val ready =
+                    preparedForReplySend(prepared, imageSlots.size, documentUris.size, replyTarget != null)
+                        ?: return@launchMutation
                 val seeded =
                     seedPreparedAttachments(
-                        prepared.copy(documents = readyDocuments),
+                        ready,
                         trimmedCaption,
                         outboundVisibleStartedAtElapsedMs,
+                        replyTarget,
+                        replyVersion,
                     )
                 if (seeded.isEmpty()) {
                     return@launchMutation
                 }
                 val sourceReleases = retainStagedSources(appState, controller, sourceLease, seeded)
                 accepted = true
-                onAccepted()
+                if (replyTarget == null) completion.accept()
                 onAfterSend()
-                val clearDraftAfterDurableAcceptance: (() -> Unit)? =
-                    pendingDraftClear?.let { pendingClear ->
-                        { appState.clearDraftAfterSuccessfulSend(pendingClear) }
-                    }
-                uploadStagedAttachments(seeded, sourceReleases, clearDraftAfterDurableAcceptance)
+                settleStagedUpload(seeded, sourceReleases, pendingDraftClear, replyTarget != null, completion)
             } finally {
                 if (!accepted) {
                     withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { sourceLease?.release() }
-                    onRejected()
+                    completion.reject()
                 }
             }
         }
+    }
+
+    /** Replies cannot silently drop failed picks; all prepared items share one typed native draft. */
+    private suspend fun preparedForReplySend(
+        prepared: PreparedStagedAttachments,
+        imageCount: Int,
+        documentCount: Int,
+        isReply: Boolean,
+    ): PreparedStagedAttachments? {
+        val incomplete = prepared.images.size != imageCount || prepared.documents.attachments.size != documentCount
+        if (isReply && incomplete) {
+            appState.present(R.string.media_reply_draft_conflict)
+            return null
+        }
+        return if (acceptPreparedAttachments(prepared, imageCount)) {
+            val documents = prepared.documents.copy(attachments = addMissingThumbhashes(prepared.documents.attachments))
+            prepared.copy(documents = documents)
+        } else {
+            null
+        }
+    }
+
+    /** A rejected attempt releases its UI claim while retry retains separate exact-shelf settlement. */
+    private suspend fun settleStagedUpload(
+        seeded: List<ConversationController.QueuedAttachmentSend>,
+        releases: List<() -> Unit>?,
+        pendingClear: dev.ipf.whitenoise.android.state.DraftSendClearToken?,
+        isReply: Boolean,
+        completion: StagedMediaSendCompletion,
+    ) {
+        var replyAccepted = false
+        uploadStagedAttachments(seeded, releases) {
+            if (isReply) {
+                replyAccepted = true
+                completion.accept()
+            }
+            pendingClear?.let(appState::clearDraftAfterSuccessfulSend)
+        }
+        if (isReply && !replyAccepted) completion.reject()
     }
 
     /** Uploads seeded sends in order; durable acceptance releases each source owner and clears the draft only once. */
@@ -625,47 +675,6 @@ internal class ConversationMediaSender(
         return VisualReadOutcome(attachments, overflowed)
     }
 
-    private fun limitAttachmentsToBudget(
-        attachments: List<PendingAttachment>,
-        bytesBudget: Long,
-    ): BudgetedAttachments {
-        val accepted = mutableListOf<PendingAttachment>()
-        var totalBytes = 0L
-        var overflowed = false
-        attachments.forEach { attachment ->
-            val nextTotal = totalBytes + attachment.plaintextBytes.size
-            if (nextTotal > bytesBudget) {
-                overflowed = true
-            } else {
-                totalBytes = nextTotal
-                accepted += attachment
-            }
-        }
-        return BudgetedAttachments(accepted, totalBytes, overflowed)
-    }
-
-    private suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>): List<PendingAttachment> =
-        if (attachments.isEmpty()) {
-            emptyList()
-        } else {
-            withContext(Dispatchers.Default) {
-                attachments.map { attachment ->
-                    if (!attachment.mediaType.startsWith("image/", ignoreCase = true) || attachment.thumbhash != null) {
-                        attachment
-                    } else {
-                        val bitmap =
-                            MediaPipeline.decodeSampledBitmap(
-                                attachment.plaintextBytes,
-                                MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                            )
-                        val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
-                        bitmap?.recycle()
-                        attachment.copy(thumbhash = hash)
-                    }
-                }
-            }
-        }
-
     private fun acceptPreparedAttachments(
         prepared: PreparedStagedAttachments,
         imagePickCount: Int,
@@ -688,17 +697,33 @@ internal class ConversationMediaSender(
         return !prepared.isEmpty
     }
 
+    /** One reply owns one native draft/album; ordinary sends retain the existing document grouping. */
     private suspend fun seedPreparedAttachments(
         prepared: PreparedStagedAttachments,
         caption: String?,
         outboundVisibleStartedAtElapsedMs: Long,
+        replyTarget: String?,
+        replyVersion: Long,
     ): List<ConversationController.QueuedAttachmentSend> {
+        if (replyTarget != null) {
+            return listOfNotNull(
+                controller.queueAttachments(
+                    attachments = prepared.images + prepared.documents.attachments,
+                    caption = caption,
+                    canQueue = { controller.replySelectionVersion == replyVersion },
+                    outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                    replyTarget = replyTarget,
+                    replyVersion = replyVersion,
+                ),
+            )
+        }
         val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
         if (prepared.images.isNotEmpty()) {
             controller
                 .queueAttachments(
                     attachments = prepared.images,
                     caption = caption,
+                    replyTarget = null,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                 )?.let(seeded::add)
         }
@@ -715,12 +740,63 @@ internal class ConversationMediaSender(
                 .queueAttachments(
                     attachments = listOf(itemAttachment),
                     caption = itemCaption,
+                    replyTarget = null,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                 )?.let(seeded::add)
         }
         return seeded
     }
 }
+
+/** Attachment budget result independent of a conversation or its lifecycle. */
+private data class BudgetedAttachments(
+    val attachments: List<PendingAttachment>,
+    val totalBytes: Long,
+    val overflowed: Boolean,
+)
+
+/** Preserves pick order while rejecting attachments that exceed the remaining native album budget. */
+private fun limitAttachmentsToBudget(
+    attachments: List<PendingAttachment>,
+    bytesBudget: Long,
+): BudgetedAttachments {
+    val accepted = mutableListOf<PendingAttachment>()
+    var totalBytes = 0L
+    var overflowed = false
+    attachments.forEach { attachment ->
+        val nextTotal = totalBytes + attachment.plaintextBytes.size
+        if (nextTotal > bytesBudget) {
+            overflowed = true
+        } else {
+            totalBytes = nextTotal
+            accepted += attachment
+        }
+    }
+    return BudgetedAttachments(accepted, totalBytes, overflowed)
+}
+
+/** Completes missing image metadata off the UI thread without replacing existing thumbhashes. */
+private suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>): List<PendingAttachment> =
+    if (attachments.isEmpty()) {
+        emptyList()
+    } else {
+        withContext(Dispatchers.Default) {
+            attachments.map { attachment ->
+                if (!attachment.mediaType.startsWith("image/", ignoreCase = true) || attachment.thumbhash != null) {
+                    attachment
+                } else {
+                    val bitmap =
+                        MediaPipeline.decodeSampledBitmap(
+                            attachment.plaintextBytes,
+                            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                        )
+                    val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
+                    bitmap?.recycle()
+                    attachment.copy(thumbhash = hash)
+                }
+            }
+        }
+    }
 
 @Composable
 internal fun rememberConversationMediaSender(

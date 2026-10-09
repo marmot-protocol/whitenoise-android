@@ -88,6 +88,33 @@ class NewGroupScreenshotTest {
     /** Large RTL setup uses the same root font scale as dialogs and other destinations. */
     @Test fun setupLargeRtl() = setup("group_setup_large_rtl.png", largeRtl = true)
 
+    /** Recipient and actionable recovery remain readable beside the retained draft. */
+    @Test fun setupRecipientRecoveryLight() = setup("group_setup_recipient_recovery_light.png", recovery = true)
+
+    /** Dark recovery uses the same named error and deliberate actions. */
+    @Test fun setupRecipientRecoveryDark() =
+        setup(
+            "group_setup_recipient_recovery_dark.png",
+            recovery = true,
+            dark = true,
+        )
+
+    /** Long duplicate names and public-key disambiguation wrap without obscuring the actions. */
+    @Test fun setupRecipientRecoveryLargeRtl() =
+        setup(
+            "group_setup_recipient_recovery_large_rtl.png",
+            recovery = true,
+            largeRtl = true,
+        )
+
+    /** A keyboard-compressed visible viewport keeps recovery scrollable and Retry pinned. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h400dp-mdpi")
+    fun setupRecipientRecoveryShortViewport() = setup("group_setup_recipient_recovery_short.png", recovery = true)
+
+    /** Unknown identity offers manual editing without an invented recipient removal. */
+    @Test fun setupUnattributedRecovery() = setup("group_setup_unattributed_recovery.png", unknown = true)
+
     /** The real picker composable renders controlled display states, never a fake search provider. */
     private fun picker(
         file: String,
@@ -134,6 +161,8 @@ class NewGroupScreenshotTest {
         preparing: Boolean = false,
         reselect: Boolean = false,
         canonical: Boolean = false,
+        recovery: Boolean = false,
+        unknown: Boolean = false,
     ) {
         val draft =
             NewGroupDraft(
@@ -158,9 +187,17 @@ class NewGroupScreenshotTest {
                             !preparing && !reselect,
                             false,
                             null,
-                            if (canonical) "The local group view is unavailable. Try opening again." else null,
+                            when {
+                                canonical -> "The local group view is unavailable. Try opening again."
+                                recovery -> "This person has not published their messaging setup."
+                                unknown -> "Could not create the group. Please try again."
+                                else -> null
+                            },
                             "Off",
                             false,
+                            recoveryRecipient =
+                                if (recovery) "Alexandra Margaret Hamilton · npub1abcd…wxyz" else null,
+                            hasUnacceptedFailure = recovery || unknown,
                         ),
                         NewGroupSetupActions({}, {}, {}, {}, {}),
                     )
