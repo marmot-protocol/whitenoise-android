@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
 import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
+import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
@@ -101,7 +102,7 @@ private suspend fun createOrRecoverNewGroup(
     }
 
 /** Freeze the normalized recipients, text and prepared image at the original submission boundary. */
-private fun captureNewGroupSubmission(
+internal fun captureNewGroupSubmission(
     draft: NewGroupDraft,
     members: List<RecipientSearch.Candidate>,
     image: ImageUploadDraft?,
@@ -244,6 +245,7 @@ internal fun NewGroupSetupScreen(
     initialRetryGroupIdHex: String? = null,
     draft: NewGroupDraft? = null,
     prepareRemoteImage: suspend (String) -> ImageUploadDraft = GroupImageDraftProcessor::fromRemoteUrl,
+    onRemoveMember: (String) -> Unit = {},
 ) {
     if (appState.signOutInProgress || appState.wipeInProgress) return
     key(appState, appState.activeAccountRef, appState.runtimeGeneration) {
@@ -263,6 +265,7 @@ internal fun NewGroupSetupScreen(
                     },
             ),
             prepareRemoteImage,
+            onRemoveMember,
         )
     }
 }
@@ -278,6 +281,7 @@ private fun NewGroupSetupAccountScreen(
     onCreateSubmitted: () -> Long,
     draft: NewGroupDraft,
     prepareRemoteImage: suspend (String) -> ImageUploadDraft,
+    onRemoveMember: (String) -> Unit,
 ) {
     val accountRef = appState.activeAccountRef
     val runtime = remember { appState.runtimeGeneration }
@@ -314,6 +318,8 @@ private fun NewGroupSetupAccountScreen(
     var retryGroupIdHex by draft::retryGroupIdHex
     var createRequestToken by draft::createRequestToken
     var error by remember { mutableStateOf<String?>(null) }
+    var attempt by remember { mutableIntStateOf(0) }
+    var recovery by remember { mutableStateOf<GroupCreationRecovery?>(null) }
     val context = LocalContext.current
     val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
     val imagePreview = rememberImageUploadPreview(imageDraft)
@@ -359,7 +365,10 @@ private fun NewGroupSetupAccountScreen(
         val account = appState.activeAccountRef ?: return
         val isRetryLoad = retryLoadGroupIdHex != null
         val submittedRetention = retentionSecs
-        val submission = captureNewGroupSubmission(draft, members, imageDraft, submittedRetention)
+        val submittedMembers = members.toList()
+        val submission = captureNewGroupSubmission(draft, submittedMembers, imageDraft, submittedRetention)
+        val submittedAttempt = ++attempt
+        recovery = null
         busy = true
         createStage = null
         error = null
@@ -379,7 +388,14 @@ private fun NewGroupSetupAccountScreen(
                     createRequestToken = createRequestToken,
                     onStage = { if (owner.isCurrent()) createStage = it },
                     onRetryGroupId = { if (owner.isCurrent()) retryGroupIdHex = it },
-                    onCreateError = { if (owner.isCurrent()) error = createGroupErrorMessage(it) },
+                    onCreateError = { failure ->
+                        if (owner.isCurrent() && attempt == submittedAttempt) {
+                            val captured = groupCreationRecovery(failure, submittedAttempt, submittedMembers)
+                            recovery = captured
+                            error =
+                                groupCreateSelectionFailureDetail(failure, captured.recipient?.displayName).resolve(context)
+                        }
+                    },
                     onCreateCompletedOpen = { item, token ->
                         if (owner.isCurrent()) {
                             owner.dispose()
@@ -457,6 +473,7 @@ private fun NewGroupSetupAccountScreen(
                 pendingCropUri = uri
             }
         }
+    val displayedRecovery = recovery
     NewGroupSetupContent(
         draft = draft,
         state =
@@ -479,6 +496,8 @@ private fun NewGroupSetupAccountScreen(
                 error = error,
                 retentionLabel = disappearingMessagesLabel(retentionSecs),
                 emojiOpen = showEmojiPicker,
+                recoveryRecipient = recovery?.recipient?.let { "${it.displayName} · ${appState.shortNpub(it.accountIdHex)}" },
+                hasUnacceptedFailure = recovery != null && retryGroupIdHex == null,
             ),
         actions =
             NewGroupSetupActions(
@@ -498,6 +517,18 @@ private fun NewGroupSetupAccountScreen(
                 },
                 retention = { if (detailsEditableNow()) showRetentionPicker = true },
                 emoji = { if (detailsEditableNow()) showEmojiPicker = true },
+                removeFailedRecipient = {
+                    if (detailsEditableNow() && recovery === displayedRecovery) {
+                        displayedRecovery?.removableRecipient(attempt, members, owner, retryGroupIdHex)?.let { failed ->
+                            onRemoveMember(failed.accountIdHex)
+                            if (members.any { it.accountIdHex == failed.accountIdHex }) return@let
+                            recovery = null
+                            error = null
+                            // The visible roster has changed; an empty roster requires an explicit solo action.
+                            if (members.isNotEmpty()) create()
+                        }
+                    }
+                },
             ),
         photoMenu = {
             NewGroupPhotoMenu(

@@ -2455,4 +2455,7 @@
     </plurals>
     <string name="reaction_details_loading">Loading reactions…</string>
     <string name="reaction_details_load_failed">Couldn\'t load reactions.</string>
+    <string name="group_create_remove_and_continue">Remove this person and continue</string>
+    <string name="group_create_edit_members">Edit members</string>
+    <string name="group_create_unattributed_failure">We could not identify an affected person. Retry or edit your members.</string>
 </resources>

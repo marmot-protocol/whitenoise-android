@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import androidx.compose.foundation.text.input.TextFieldState
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -45,6 +48,45 @@ class NewGroupSubmissionTest {
                 }
             assertEquals("canonical", result)
             assertEquals(1, creates)
+        }
+
+    /** Two typed failures remove only the chosen people and recapture all authored options for each native attempt. */
+    @Test fun failedTenPersonSubmissionCanContinueWithNineThenEight() =
+        runTest {
+            val image = ImageUploadDraft(byteArrayOf(1, 2), "image/png", null, null, null)
+            val draft = NewGroupDraft(TextFieldState(" Team "), TextFieldState(" Plans "), retentionSecs = 300L)
+            draft.imageDraft = image
+            val selected = (1..10).map { RecipientSearch.Candidate("$it", "Same name", "npub$it") }.toMutableList()
+            val owner = GroupCreationSession { true }
+            val seenSizes = mutableListOf<Int>()
+            for (attempt in 1..3) {
+                val submitted = selected.toList()
+                val request = captureNewGroupSubmission(draft, selected, draft.imageDraft, draft.retentionSecs)
+                val result = runCatching {
+                    request.createWith { name, members, options ->
+                        seenSizes += members.size
+                        assertEquals("Team", name)
+                        assertEquals("Plans", options.description)
+                        assertEquals(300uL, options.disappearingMessageSecs)
+                        assertArrayEquals(byteArrayOf(1, 2), options.initialImage!!.plaintext)
+                        when (attempt) {
+                            1 -> throw MarmotKitException.MissingKeyPackage("3")
+                            2 -> throw MarmotKitException.MissingMemberInboxRoute("7")
+                            else -> "canonical"
+                        }
+                    }
+                }
+                result.exceptionOrNull()?.let { error ->
+                    val failure = groupCreationRecovery(error, attempt, submitted)
+                    assertEquals(submitted, selected)
+                    val removed = failure.removableRecipient(attempt, selected, owner, null)!!
+                    selected.removeAll { it.accountIdHex == removed.accountIdHex }
+                    assertNull(failure.removableRecipient(attempt, selected, owner, null))
+                }
+                if (attempt == 3) assertEquals("canonical", result.getOrThrow())
+            }
+            assertEquals(listOf(10, 9, 8), seenSizes)
+            assertEquals(listOf("1", "2", "4", "5", "6", "8", "9", "10"), selected.map { it.accountIdHex })
         }
 
     /** Empty membership stays a real solo group and a missing image remains absent at the native boundary. */

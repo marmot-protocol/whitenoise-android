@@ -78,6 +78,11 @@ private fun NewGroupAccountFlow(
             appState = appState,
             members = selected,
             draft = draft,
+            onRemoveMember = { accountId ->
+                if (current() && draft.retryGroupIdHex == null) {
+                    selected.removeAll { it.accountIdHex == accountId }
+                }
+            },
             onBack = {
                 if (current()) {
                     onCreateFlowSuperseded()

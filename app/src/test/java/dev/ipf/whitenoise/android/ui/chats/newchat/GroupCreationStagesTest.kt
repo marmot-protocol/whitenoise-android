@@ -138,6 +138,37 @@ class GroupCreationStagesTest {
             }
         }
 
+    /** Projection recovery retains the accepted ID and cannot call creation a second time. */
+    @Test fun acceptedCreateThenReadFailureRetriesCanonicalGroup() =
+        runTest {
+            val owner = GroupCreationSession { true }
+            var canonical: String? = null
+            var creates = 0
+            var opens = 0
+            repeat(2) { attempt ->
+                val result = runCatching {
+                    runGroupCreationStages(
+                        owner,
+                        createOrRetry = {
+                            canonical ?: run {
+                                creates++
+                                "accepted"
+                            }
+                        },
+                        openCurrentChat = {
+                            canonical = it
+                            opens++
+                            if (attempt == 0) error("Projection temporarily unavailable")
+                            assertEquals("accepted", it)
+                        },
+                    )
+                }
+                assertEquals(attempt == 1, result.isSuccess)
+            }
+            assertEquals(1, creates)
+            assertEquals(2, opens)
+        }
+
     /** Handled native failure has no canonical ID, so projection may not run. */
     @Test fun unacceptedFailureCannotEnterOpenStage() =
         runTest {
