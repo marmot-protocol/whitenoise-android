@@ -56,6 +56,8 @@ import kotlin.math.roundToInt
 
 internal const val TIMESTAMP_TAG = "markdown-timestamp"
 private const val TIMESTAMP_CLOCK_PREFIX = "markdown-timestamp-clock:"
+private const val TIMESTAMP_REFRESH_MILLIS = 1000L
+private const val TIMESTAMP_HOVER_OFFSET_PX = 24
 internal val markdownTimestampInlineContentTag =
     buildAnnotatedString { appendInlineContent("clock", "◷") }
         .getStringAnnotations(0, 1)
@@ -117,7 +119,7 @@ internal fun rememberTimestampRevision(
     LaunchedEffect(relative) {
         if (relative) {
             while (true) {
-                delay(1000)
+                delay(TIMESTAMP_REFRESH_MILLIS)
                 revision++
             }
         }
@@ -136,7 +138,12 @@ internal fun markdownInlinesHaveTimestamp(
                 is MarkdownInlineFfi.Timestamp -> !relativeOnly || inline.style == MarkdownTimestampStyleFfi.RELATIVE
                 is MarkdownInlineFfi.Emph -> markdownInlinesHaveTimestamp(inline.children, relativeOnly, depth + 1)
                 is MarkdownInlineFfi.Strong -> markdownInlinesHaveTimestamp(inline.children, relativeOnly, depth + 1)
-                is MarkdownInlineFfi.Strikethrough -> markdownInlinesHaveTimestamp(inline.children, relativeOnly, depth + 1)
+                is MarkdownInlineFfi.Strikethrough ->
+                    markdownInlinesHaveTimestamp(
+                        inline.children,
+                        relativeOnly,
+                        depth + 1,
+                    )
                 is MarkdownInlineFfi.Link -> markdownInlinesHaveTimestamp(inline.children, relativeOnly, depth + 1)
                 is MarkdownInlineFfi.Image -> markdownInlinesHaveTimestamp(inline.alt, relativeOnly, depth + 1)
                 else -> false
@@ -159,13 +166,22 @@ private fun markdownBlocksHaveTimestamp(
                 is MarkdownBlockFfi.Paragraph -> markdownInlinesHaveTimestamp(block.inlines, relativeOnly)
                 is MarkdownBlockFfi.Heading -> markdownInlinesHaveTimestamp(block.inlines, relativeOnly)
                 is MarkdownBlockFfi.BlockQuote -> markdownBlocksHaveTimestamp(block.blocks, relativeOnly, depth + 1)
-                is MarkdownBlockFfi.ListBlock -> markdownVisibleSiblings(block.items).any { markdownBlocksHaveTimestamp(it.blocks, relativeOnly, depth + 1) }
+                is MarkdownBlockFfi.ListBlock ->
+                    markdownVisibleSiblings(block.items).any {
+                        markdownBlocksHaveTimestamp(
+                            it.blocks,
+                            relativeOnly,
+                            depth + 1,
+                        )
+                    }
                 is MarkdownBlockFfi.Details ->
                     markdownInlinesHaveTimestamp(block.summary, relativeOnly) ||
                         markdownBlocksHaveTimestamp(block.body, relativeOnly, depth + 1)
                 is MarkdownBlockFfi.Table -> {
                     val table = markdownVisibleTable(block.header, block.rows)
-                    (listOf(table.header) + table.rows).any { row -> row.cells.any { markdownInlinesHaveTimestamp(it.inlines, relativeOnly) } }
+                    (listOf(table.header) + table.rows).any { row ->
+                        row.cells.any { markdownInlinesHaveTimestamp(it.inlines, relativeOnly) }
+                    }
                 }
                 else -> false
             }
@@ -178,6 +194,7 @@ private fun timestampDisclosure(token: String): String {
 }
 
 /** A single selectable Text: ranges retain styles, links, wrapping and UTF-16 selection offsets. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun MarkdownTimestampText(
     text: AnnotatedString,
@@ -187,120 +204,180 @@ internal fun MarkdownTimestampText(
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
     fontStyle: FontStyle? = null,
-    inlineContent: Map<String, InlineTextContent> = emptyMap(),
+    inlineContent: Map<String, InlineTextContent> = EmojiShortcodes.content(),
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     val ranges = remember(text) { text.getStringAnnotations(TIMESTAMP_TAG, 0, text.length) }
-    var layout by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
-    var hovered by remember(text) { mutableStateOf<String?>(null) }
-    var tapped by remember { mutableStateOf<String?>(null) }
-    var hoverPosition by remember(text) { mutableStateOf(Offset.Zero) }
+    val state = remember { TimestampTextState() }
+    LaunchedEffect(text) { state.hovered = null }
     LaunchedEffect(ranges) {
-        if (ranges.none { it.item == tapped }) {
-            tapped = null
+        if (ranges.none { it.item == state.tapped }) {
+            state.tapped = null
         }
     }
-    val clockContent =
-        remember(ranges) {
-            ranges.associate { range ->
-                TIMESTAMP_CLOCK_PREFIX + range.item to
-                    InlineTextContent(
-                        Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter),
-                    ) {
-                        Icon(
-                            Icons.Outlined.Schedule,
-                            contentDescription = timestampDisclosure(range.item),
-                            modifier = Modifier.fillMaxSize().clickable { tapped = range.item },
-                        )
-                    }
-            }
-        }
-
-    fun hit(position: Offset): AnnotatedString.Range<String>? {
-        val measured = layout ?: return null
-        val offset = measured.getOffsetForPosition(position)
-        // getOffsetForPosition clamps whitespace to a nearby glyph; do not show a false tooltip.
-        if (offset !in 0 until text.length || !measured.getBoundingBox(offset).contains(position)) return null
-        return ranges.firstOrNull { offset >= it.start && offset < it.end }
-    }
-    Box {
+    if (ranges.isEmpty()) {
         Text(
             text = text,
-            inlineContent = EmojiShortcodes.content() + inlineContent + clockContent,
-            modifier =
-                modifier.then(
-                    if (ranges.isEmpty()) {
-                        Modifier
-                    } else {
-                        Modifier.pointerInput(text) {
-                            awaitPointerEventScope {
-                                var down: Offset? = null
-                                var downAt = 0L
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    val change = event.changes.firstOrNull() ?: continue
-                                    when (event.type) {
-                                        PointerEventType.Exit -> hovered = null
-                                        PointerEventType.Move, PointerEventType.Enter -> {
-                                            if (!change.pressed) {
-                                                hovered = hit(change.position)?.item
-                                                hoverPosition = change.position
-                                            }
-                                        }
-                                        PointerEventType.Press -> {
-                                            down = change.position
-                                            downAt = change.uptimeMillis
-                                        }
-                                        PointerEventType.Release -> {
-                                            val origin = down
-                                            val range = hit(change.position)
-                                            if (origin != null &&
-                                                range != null &&
-                                                !change.isConsumed &&
-                                                (change.position - origin).getDistance() < viewConfiguration.touchSlop &&
-                                                change.uptimeMillis - downAt < viewConfiguration.longPressTimeoutMillis
-                                            ) {
-                                                val offset = layout?.getOffsetForPosition(change.position) ?: -1
-                                                // Linked labels navigate normally; their clock remains a separate disclosure target.
-                                                if (text.getLinkAnnotations(offset, offset + 1).isEmpty()) {
-                                                    tapped = range.item
-                                                    change.consume()
-                                                }
-                                            }
-                                            down = null
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                ),
+            modifier = modifier,
+            inlineContent = inlineContent,
             style = style,
             textAlign = textAlign,
             maxLines = maxLines,
             overflow = overflow,
             fontStyle = fontStyle,
-            onTextLayout = {
-                layout = it
-                onTextLayout?.invoke(it)
-            },
+            onTextLayout = { onTextLayout?.invoke(it) },
         )
-        hovered?.let { token ->
-            Popup(alignment = Alignment.TopStart, offset = IntOffset(hoverPosition.x.roundToInt(), hoverPosition.y.roundToInt() + 24)) {
-                Surface(shape = MaterialTheme.shapes.small, tonalElevation = 4.dp) {
-                    Text(timestampDisclosure(token), modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.bodySmall)
+    } else {
+        val clocks = rememberTimestampClocks(ranges, state)
+        Box(modifier, propagateMinConstraints = true) {
+            Text(
+                text = text,
+                modifier = Modifier.timestampPointers(text, ranges, state),
+                inlineContent = inlineContent + clocks,
+                style = style,
+                textAlign = textAlign,
+                maxLines = maxLines,
+                overflow = overflow,
+                fontStyle = fontStyle,
+                onTextLayout = {
+                    state.layout = it
+                    onTextLayout?.invoke(it)
+                },
+            )
+            TimestampOverlays(state)
+        }
+    }
+}
+
+private class TimestampTextState {
+    var layout: TextLayoutResult? = null
+    var hovered by mutableStateOf<String?>(null)
+    var tapped by mutableStateOf<String?>(null)
+    var hoverPosition by mutableStateOf(Offset.Zero)
+
+    fun hit(
+        position: Offset,
+        ranges: List<AnnotatedString.Range<String>>,
+    ): AnnotatedString.Range<String>? {
+        val measured = layout ?: return null
+        val offset = measured.getOffsetForPosition(position)
+        // Ignore whitespace clamped to a nearby glyph by getOffsetForPosition.
+        return if (offset in 0 until measured.layoutInput.text.length &&
+            measured.getBoundingBox(offset).contains(position)
+        ) {
+            ranges.firstOrNull { offset >= it.start && offset < it.end }
+        } else {
+            null
+        }
+    }
+}
+
+@Composable
+private fun rememberTimestampClocks(
+    ranges: List<AnnotatedString.Range<String>>,
+    state: TimestampTextState,
+): Map<String, InlineTextContent> =
+    remember(ranges) {
+        ranges.associate { range ->
+            TIMESTAMP_CLOCK_PREFIX + range.item to
+                InlineTextContent(Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)) {
+                    Icon(
+                        Icons.Outlined.Schedule,
+                        contentDescription = timestampDisclosure(range.item),
+                        modifier = Modifier.fillMaxSize().clickable { state.tapped = range.item },
+                    )
+                }
+        }
+    }
+
+private fun Modifier.timestampPointers(
+    text: AnnotatedString,
+    ranges: List<AnnotatedString.Range<String>>,
+    state: TimestampTextState,
+): Modifier =
+    pointerInput(text) {
+        awaitPointerEventScope {
+            var down: Offset? = null
+            var downAt = 0L
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val change = event.changes.firstOrNull() ?: continue
+                when (event.type) {
+                    PointerEventType.Exit -> state.hovered = null
+                    PointerEventType.Move, PointerEventType.Enter -> {
+                        if (!change.pressed) {
+                            state.hovered = state.hit(change.position, ranges)?.item
+                            state.hoverPosition = change.position
+                        }
+                    }
+                    PointerEventType.Press -> {
+                        down = change.position
+                        downAt = change.uptimeMillis
+                    }
+                    PointerEventType.Release -> {
+                        timestampTap(change, down, downAt, ranges, state)
+                        down = null
+                    }
                 }
             }
         }
     }
-    tapped?.let { token ->
+
+private fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.timestampTap(
+    change: androidx.compose.ui.input.pointer.PointerInputChange,
+    origin: Offset?,
+    downAt: Long,
+    ranges: List<AnnotatedString.Range<String>>,
+    state: TimestampTextState,
+) {
+    if (origin == null || change.isConsumed) {
+        return
+    }
+    val range = state.hit(change.position, ranges) ?: return
+    val moved = (change.position - origin).getDistance() >= viewConfiguration.touchSlop
+    val held = change.uptimeMillis - downAt >= viewConfiguration.longPressTimeoutMillis
+    if (!moved && !held) {
+        val offset = state.layout?.getOffsetForPosition(change.position) ?: -1
+        // Linked labels navigate normally; the clock has its own disclosure target.
+        val links =
+            state.layout
+                ?.layoutInput
+                ?.text
+                ?.getLinkAnnotations(offset, offset + 1)
+        if (links?.isEmpty() == true) {
+            state.tapped = range.item
+            change.consume()
+        }
+    }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun TimestampOverlays(state: TimestampTextState) {
+    state.hovered?.let { token ->
+        Popup(
+            alignment = Alignment.TopStart,
+            offset =
+                IntOffset(
+                    state.hoverPosition.x.roundToInt(),
+                    state.hoverPosition.y.roundToInt() + TIMESTAMP_HOVER_OFFSET_PX,
+                ),
+        ) {
+            Surface(shape = MaterialTheme.shapes.small, tonalElevation = 4.dp) {
+                Text(
+                    timestampDisclosure(token),
+                    modifier = Modifier.padding(8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+    state.tapped?.let { token ->
         AlertDialog(
-            onDismissRequest = { tapped = null },
+            onDismissRequest = { state.tapped = null },
             text = { Text(timestampDisclosure(token)) },
             confirmButton = {
-                TextButton(
-                    onClick = { tapped = null },
-                ) {
+                TextButton(onClick = { state.tapped = null }) {
                     Text(
                         androidx.compose.ui.res
                             .stringResource(dev.ipf.whitenoise.android.R.string.dismiss),

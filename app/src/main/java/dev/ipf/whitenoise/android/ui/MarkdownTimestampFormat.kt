@@ -32,8 +32,14 @@ internal fun timestampRelativeAmount(
     val future = at > current
     val distance = if (future) at - current else current - at
     var index = 0
-    while (index < timestampRelativeScales.lastIndex && distance < timestampRelativeScales[index].toULong()) index++
-    return TimestampRelativeAmount((distance / timestampRelativeScales[index].toULong()).toLong(), TIMESTAMP_RELATIVE_UNITS[index], future)
+    while (index < timestampRelativeScales.lastIndex && distance < timestampRelativeScales[index].toULong()) {
+        index++
+    }
+    return TimestampRelativeAmount(
+        (distance / timestampRelativeScales[index].toULong()).toLong(),
+        TIMESTAMP_RELATIVE_UNITS[index],
+        future,
+    )
 }
 
 internal fun markdownTimestampAbsolute(

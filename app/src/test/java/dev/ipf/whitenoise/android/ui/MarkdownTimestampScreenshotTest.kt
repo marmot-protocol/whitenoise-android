@@ -67,16 +67,18 @@ class MarkdownTimestampScreenshotTest {
                 CompositionLocalProvider(LocalLayoutDirection provides direction) {
                     Surface(Modifier.width(360.dp).testTag("timestamps")) {
                         Column(Modifier.padding(16.dp)) {
-                            MarkdownTimestampStyleFfi.entries.filter { it != MarkdownTimestampStyleFfi.RELATIVE }.forEach { style ->
-                                MarkdownTimestampText(
-                                    markdownInlinesToAnnotatedString(
-                                        listOf(MarkdownInlineFfi.Timestamp(-1, style)),
-                                        SpanStyle(),
-                                        SpanStyle(),
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
+                            MarkdownTimestampStyleFfi.entries
+                                .filter { it != MarkdownTimestampStyleFfi.RELATIVE }
+                                .forEach { style ->
+                                    MarkdownTimestampText(
+                                        markdownInlinesToAnnotatedString(
+                                            listOf(MarkdownInlineFfi.Timestamp(-1, style)),
+                                            SpanStyle(),
+                                            SpanStyle(),
+                                        ),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                }
                             MarkdownTimestampText(
                                 buildAnnotatedString {
                                     val token = "<t:0:R>"
