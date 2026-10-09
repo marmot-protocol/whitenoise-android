@@ -13,13 +13,7 @@ name: inbound-share-picker-rotation
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible:
     id: performance.share_picker
-- scrollUntilVisible:
-    element:
-      text: ^Maestro group$
-    direction: DOWN
-    timeout: 15000
-- assertVisible:
-    text: ^Maestro group$
+- runFlow: ../fixtures/share-recipient-visible.yaml
 - assertVisible:
     enabled: false
     containsChild:

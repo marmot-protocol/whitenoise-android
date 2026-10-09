@@ -893,6 +893,39 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertEqual(commands[index + 1], proof)
             self.assertEqual(commands[-1], {'assertVisible': 'Settings'})
 
+    def test_share_no_match_recovery_clears_the_whole_query_before_recipient_assertion(self):
+        """The hosted capture retained Destination after deletion at a mid-string caret."""
+        path = runtime.ROOT / '.maestro/runtime/inbound-share-search-no-match-clear.yaml'
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        clear = commands.index({'tapOn': 'Clear'})
+        self.assertEqual(commands[clear + 1], {'assertVisible': 'Search chats'})
+        self.assertEqual(commands[clear + 2], {'assertNotVisible': {'text': '^ZZZMaestroNoDestination$'}})
+        self.assertEqual(commands[clear + 3], {'assertNotVisible': {'text': '^No chats match your search.$'}})
+        self.assertIn({'assertVisible': {'text': '^Maestro group$'}}, commands[clear + 4:])
+        self.assertFalse(any(isinstance(c, dict) and 'eraseText' in c for c in commands))
+        self.assertEqual(runtime.CASES['inbound-share-search-no-match-clear']['postcondition'],
+                         'share-request-cancelled')
+
+    def test_share_rotation_searches_inside_actual_destination_fragment(self):
+        """A static landscape search/filter bar must never receive the recipient-list gesture."""
+        root = runtime.ROOT / '.maestro'
+        helper = list(yaml.safe_load_all((root / 'fixtures/share-recipient-visible.yaml').read_text()))[1]
+        self.assertEqual(helper[0], {'assertVisible': {'id': 'share.destinations'}})
+        repeat = helper[1]['repeat']
+        self.assertLessEqual(repeat['times'], 6)
+        search = repeat['commands'][0]['runFlow']
+        self.assertEqual(search['when'], {'notVisible': {'text': '^Maestro group$'}})
+        self.assertEqual(search['commands'], [{'swipe': {
+            'from': {'id': 'share.destinations'}, 'direction': 'UP'}}])
+        self.assertEqual(helper[-1], {'assertVisible': {'text': '^Maestro group$'}})
+        for name in ('inbound-share-picker-rotation', 'inbound-share-selected-rotation'):
+            commands = list(yaml.safe_load_all((root / 'runtime' / f'{name}.yaml').read_text()))[1]
+            rotation = commands.index({'setOrientation': 'LANDSCAPE_LEFT'})
+            self.assertEqual(commands[rotation + 2], {'runFlow': '../fixtures/share-recipient-visible.yaml'})
+            self.assertNotIn('scrollUntilVisible', {key for command in commands for key in command})
+            self.assertIn({'setOrientation': 'PORTRAIT'}, commands[rotation + 3:])
+            self.assertIn('share-request-', runtime.CASES[name]['postcondition'])
+
     def test_rotation_commands_use_supported_pinned_cli_orientations(self):
         """Reject flow parse failures before requesting an emulator; include every offline and runtime flow."""
         # https://docs.maestro.dev/reference/commands-available/setorientation
