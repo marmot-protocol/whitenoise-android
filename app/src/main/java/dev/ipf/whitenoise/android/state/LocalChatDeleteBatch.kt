@@ -7,6 +7,7 @@ internal class LocalChatDeleteObserver(
     val onFailure: (Throwable) -> Unit = {},
     val onCleanupDeferred: () -> Unit = {},
     val readinessBudget: LocalGroupDeleteReadinessBudget = LocalGroupDeleteReadinessBudget(),
+    val onNativeCommitted: () -> Unit = {},
 )
 
 internal data class LocalChatDeleteBatchResult(

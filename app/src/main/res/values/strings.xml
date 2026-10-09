@@ -2453,4 +2453,18 @@
         <item quantity="one">%1$d attachment downloading</item>
         <item quantity="other">%1$d attachments downloading</item>
     </plurals>
+    <string name="account_keys_local_signing">Local signing</string>
+    <string name="account_keys_external_signing">External signer</string>
+    <string name="account_keys_session_running">Account session running</string>
+    <string name="account_keys_session_stopped">Account session stopped</string>
+    <string name="account_keys_session">Account session</string>
+    <string name="chat_departure_confirm">Review %1$d selected chats. Joined groups will be left and deleted from this device; direct chats are deleted locally. Other members keep their copies. Required administrator handovers will be confirmed before deletion starts.</string>
+    <string name="chat_departure_result">%1$d completed · %2$d unfinished · %3$d skipped. Retry rechecks membership and continues only unfinished work.</string>
+    <string name="chat_departure_admin_granted">Admin transfer succeeded. Leaving the group is unfinished.</string>
+    <string name="reaction_details_loading">Loading reactions…</string>
+    <string name="reaction_details_load_failed">Couldn\'t load reactions.</string>
+    <string name="group_create_remove_and_continue">Remove this person and continue</string>
+    <string name="group_create_edit_members">Edit members</string>
+    <string name="group_create_unattributed_failure">We could not identify an affected person. Retry or edit your members.</string>
+    <string name="media_reply_draft_conflict">Your draft changed. Keep this reply and try again, or cancel the reply before sending.</string>
 </resources>

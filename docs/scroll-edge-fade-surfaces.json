@@ -84,6 +84,21 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "chats",
+      "policy": "Scroll partial per-chat departure results while retaining dialog actions; accepted operations reconcile native state before retry.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "CHL-026"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -944,6 +959,21 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPrivateDetailsFrame.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "profile",
+      "policy": "Scroll the private-details body within the safe keyboard viewport; Save and Cancel remain outside the scroll container.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "PRO-009"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
       "calls": {
         "WhiteNoiseLazyColumn": 1
@@ -1016,7 +1046,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
       "calls": {
-        "fadingVerticalScroll": 3,
+        "fadingVerticalScroll": 2,
         "WhiteNoiseLazyColumn": 2
       },
       "family": "profile",

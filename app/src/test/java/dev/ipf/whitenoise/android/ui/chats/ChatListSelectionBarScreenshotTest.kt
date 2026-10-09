@@ -6,8 +6,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
@@ -51,6 +53,52 @@ class ChatListSelectionBarScreenshotTest {
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
     fun rtlLarge() = capture("selection_actions_rtl_large", single = true, rtl = true, large = true)
 
+    @Test
+    fun groupDepartureLight() =
+        capture(
+            "selection_actions_departure_light",
+            departureLabel = R.string.leave_and_delete,
+        )
+
+    @Test
+    fun groupDepartureDark() =
+        capture(
+            "selection_actions_departure_dark",
+            dark = true,
+            departureLabel = R.string.leave_and_delete,
+        )
+
+    @Test
+    fun groupDepartureAmoled() =
+        capture(
+            "selection_actions_departure_amoled",
+            dark = true,
+            amoled = true,
+            departureLabel = R.string.leave_and_delete,
+        )
+
+    @Test
+    @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
+    fun groupDepartureLargeRtl() =
+        capture(
+            "selection_actions_departure_large_rtl",
+            rtl = true,
+            large = true,
+            departureLabel = R.string.leave_and_delete,
+        )
+
+    @Test
+    fun directLocalDelete() = capture("selection_actions_direct_delete", departureLabel = R.string.delete_from_device)
+
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w280dp-h700dp-mdpi")
+    fun groupDepartureNarrow() =
+        capture(
+            "selection_actions_departure_narrow",
+            single = true,
+            departureLabel = R.string.leave_and_delete,
+        )
+
     /** Captures the actual controls with deterministic eligibility and no account content. */
     @Suppress("LongParameterList")
     private fun capture(
@@ -60,6 +108,7 @@ class ChatListSelectionBarScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         large: Boolean = false,
+        departureLabel: Int? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (large) 2f else 1f) {
@@ -69,6 +118,7 @@ class ChatListSelectionBarScreenshotTest {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                         ChatListSelectionControls(
                             count = if (single) 1 else 4,
+                            deleteLabel = stringResource(departureLabel ?: R.string.delete),
                             archiveAction = ChatListBulkArchiveAction.Archive,
                             actionsEnabled = true,
                             allVisibleSelected = false,
@@ -98,6 +148,7 @@ class ChatListSelectionBarScreenshotTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val selectAllLabel = context.getString(R.string.chat_list_select_all)
         composeRule.onNodeWithText(selectAllLabel, useUnmergedTree = true).assertIsDisplayed()
+        departureLabel?.let { composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed() }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 }

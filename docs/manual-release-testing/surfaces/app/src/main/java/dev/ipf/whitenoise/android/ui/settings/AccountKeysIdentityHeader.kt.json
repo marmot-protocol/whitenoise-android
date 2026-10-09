@@ -1,0 +1,83 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AccountKeysIdentityHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "fun AccountKeysIdentityHeader(",
+        "test_ids": [
+          "ACC-020"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.account_keys_external_signing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "R.string.account_keys_external_signing",
+        "test_ids": [
+          "ACC-020"
+        ]
+      },
+      {
+        "surface": "R.string.account_keys_local_signing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "R.string.account_keys_local_signing",
+        "test_ids": [
+          "ACC-020"
+        ]
+      },
+      {
+        "surface": "R.string.account_keys_session_running",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "R.string.account_keys_session_running",
+        "test_ids": [
+          "ACC-020"
+        ]
+      },
+      {
+        "surface": "R.string.account_keys_session_stopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "R.string.account_keys_session_stopped",
+        "test_ids": [
+          "ACC-020"
+        ]
+      },
+      {
+        "surface": "R.string.connecting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "R.string.connecting",
+        "test_ids": [
+          "ACC-020"
+        ]
+      },
+      {
+        "surface": "R.string.connected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "R.string.connected",
+        "test_ids": [
+          "ACC-020"
+        ]
+      },
+      {
+        "surface": "R.string.connectivity_offline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "R.string.connectivity_offline",
+        "test_ids": [
+          "ACC-020"
+        ]
+      },
+      {
+        "surface": "R.string.disconnected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysIdentityHeader.kt",
+        "anchor": "R.string.disconnected",
+        "test_ids": [
+          "ACC-020"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

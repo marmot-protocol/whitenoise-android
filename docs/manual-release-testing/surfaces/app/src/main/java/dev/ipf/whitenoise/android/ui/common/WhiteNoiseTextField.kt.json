@@ -9,7 +9,8 @@
         "anchor": "fun WhiteNoiseSecureTextField(",
         "test_ids": [
           "ACC-009",
-          "ACC-011"
+          "ACC-011",
+          "SET-001"
         ]
       },
       {
@@ -32,7 +33,8 @@
           "SYS-002"
         ]
       }
-    ]
+    ],
+    "settings_controls": []
   },
   "discovery_exceptions": []
 }

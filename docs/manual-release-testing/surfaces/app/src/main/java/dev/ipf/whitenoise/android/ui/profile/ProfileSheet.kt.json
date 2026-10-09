@@ -370,14 +370,6 @@
         ]
       },
       {
-        "surface": "R.string.profile_nickname_and_notes",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "R.string.profile_nickname_and_notes",
-        "test_ids": [
-          "ACC-007"
-        ]
-      },
-      {
         "surface": "R.string.save",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "R.string.save",

@@ -826,6 +826,22 @@
         "test_ids": [
           "SET-001"
         ]
+      },
+      {
+        "surface": "R.string.account_keys_session",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.account_keys_session",
+        "test_ids": [
+          "ACC-020"
+        ]
+      },
+      {
+        "surface": "R.string.no_active_account_period",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.no_active_account_period",
+        "test_ids": [
+          "ACC-020"
+        ]
       }
     ],
     "source_coverage": [

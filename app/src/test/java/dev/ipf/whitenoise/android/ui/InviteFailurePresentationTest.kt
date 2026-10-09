@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
+import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
@@ -15,6 +16,31 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InviteFailurePresentationTest {
+    /** Unmatched typed identities keep the precise reason without blaming a selected person. */
+    @Test fun foundingFailureRequiresCapturedRecipientForNamedCopy() {
+        val missing = MarmotKitException.MissingKeyPackage("outside-selection")
+        assertEquals(
+            AppText.Resource(R.string.error_missing_key_package),
+            groupCreateSelectionFailureDetail(missing, null),
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_missing_key_package_for, listOf("Ada")),
+            groupCreateSelectionFailureDetail(missing, "Ada"),
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_missing_member_inbox),
+            groupCreateSelectionFailureDetail(MarmotKitException.MissingMemberInboxRoute("outside"), null),
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_invalid_key_package),
+            groupCreateSelectionFailureDetail(MarmotKitException.InvalidKeyPackageEvent("private details"), null),
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_group_create_failed_retry),
+            groupCreateSelectionFailureDetail(MarmotKitException.Publish("offline"), null),
+        )
+    }
+
     @Test
     fun startProfileChatFailureMapsMissingSetupToHumanCopy() {
         val missing = MarmotKitException.MissingKeyPackage("deadbeef")

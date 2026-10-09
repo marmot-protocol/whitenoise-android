@@ -2261,4 +2261,18 @@
     <plurals name="media_downloading_count">
         <item quantity="other">正在下載 %1$d 個附件</item>
     </plurals>
+    <string name="account_keys_local_signing">本機簽署</string>
+    <string name="account_keys_external_signing">外部簽署器</string>
+    <string name="account_keys_session_running">帳戶工作階段執行中</string>
+    <string name="account_keys_session_stopped">帳戶工作階段已停止</string>
+    <string name="account_keys_session">帳戶工作階段</string>
+    <string name="chat_departure_confirm">檢查所選的 %1$d 個聊天。將退出已加入的群組並從此裝置刪除；私聊僅在本機刪除。其他成員保留其副本。刪除前會確認所需的管理員移交。</string>
+    <string name="chat_departure_result">%1$d 個已完成 · %2$d 個未完成 · %3$d 個已略過。重試會檢查成員身分，僅繼續未完成的操作。</string>
+    <string name="chat_departure_admin_granted">管理員權限已轉移。退出群組尚未完成。</string>
+    <string name="reaction_details_loading">正在載入回應…</string>
+    <string name="reaction_details_load_failed">無法載入回應。</string>
+    <string name="group_create_remove_and_continue">移除此人並繼續</string>
+    <string name="group_create_edit_members">編輯成員</string>
+    <string name="group_create_unattributed_failure">無法確定受影響的成員。請重試或編輯成員清單。</string>
+    <string name="media_reply_draft_conflict">草稿已變更。請保留此回覆並重試，或在傳送前取消回覆。</string>
 </resources>

@@ -88,13 +88,6 @@ internal fun ChatContextMenu(
                     ) { onArchiveToggle() },
                 )
             }
-            if (actions?.canDeleteLocal != false) {
-                add(
-                    chatMenuItem(R.string.delete_from_device, R.drawable.ic_delete, "Delete", destructive = true) {
-                        onDelete()
-                    },
-                )
-            }
             if (onLeaveAndDelete != null && actions?.canStartLeave == true && actions.canDeleteLocal) {
                 add(
                     chatMenuItem(
@@ -104,6 +97,13 @@ internal fun ChatContextMenu(
                         destructive = true,
                     ) {
                         onLeaveAndDelete()
+                    },
+                )
+            }
+            if (actions?.canDeleteLocal != false) {
+                add(
+                    chatMenuItem(R.string.delete_from_device, R.drawable.ic_delete, "Delete", destructive = true) {
+                        onDelete()
                     },
                 )
             }

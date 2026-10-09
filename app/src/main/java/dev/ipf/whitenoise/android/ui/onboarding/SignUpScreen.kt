@@ -261,6 +261,7 @@ internal fun SignUpContent(
                 ) {
                     WhiteNoiseTextField(
                         name,
+                        emojiAction = true,
                         modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_up.name"),
                         enabled = editable,
                         label = { Text(stringResource(R.string.name)) },
@@ -280,6 +281,7 @@ internal fun SignUpContent(
                     )
                     WhiteNoiseTextField(
                         about,
+                        emojiAction = true,
                         modifier = Modifier.fillMaxWidth().testTag("onboarding.sign_up.about"),
                         enabled = editable,
                         label = { Text(stringResource(R.string.about)) },

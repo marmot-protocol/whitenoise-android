@@ -65,6 +65,8 @@ internal data class NewGroupSetupPresentation(
     val error: String?,
     val retentionLabel: String,
     val emojiOpen: Boolean,
+    val recoveryRecipient: String? = null,
+    val hasUnacceptedFailure: Boolean = false,
 )
 
 /** Existing owner callbacks for editing and submitting the native group draft. */
@@ -74,6 +76,7 @@ internal data class NewGroupSetupActions(
     val photo: () -> Unit,
     val retention: () -> Unit,
     val emoji: () -> Unit,
+    val removeFailedRecipient: () -> Unit = {},
 )
 
 /** Target centered avatar, two authored fields, timer/members and pinned full-width creation action. */
@@ -93,10 +96,11 @@ internal fun NewGroupSetupContent(
             GroupCreationBottomAction(
                 label =
                     stringResource(
-                        if (draft.retryGroupIdHex == null) {
-                            R.string.group_create_action
-                        } else {
-                            R.string.new_message_open_chat
+                        when {
+                            draft.retryGroupIdHex != null -> R.string.new_message_open_chat
+                            state.hasUnacceptedFailure -> R.string.retry
+                            state.members.isEmpty() -> R.string.group_create_solo
+                            else -> R.string.group_create_action
                         },
                     ),
                 enabled = state.submitEnabled,
@@ -118,6 +122,9 @@ internal fun NewGroupSetupContent(
         ) {
             // Explain an accepted create or retry failure before the locked form, including on short screens.
             item { GroupSetupStatus(draft.retryGroupIdHex, state.stage, state.error, state.busy) }
+            if (state.hasUnacceptedFailure && draft.retryGroupIdHex == null) {
+                item { GroupSetupRecovery(state, actions) }
+            }
             item {
                 GroupSetupPhoto(draft, state, actions.photo, photoMenu)
             }
@@ -139,6 +146,7 @@ internal fun NewGroupSetupContent(
                     )
                     WhiteNoiseTextField(
                         state = draft.description,
+                        emojiAction = true,
                         enabled = state.detailsEditable,
                         modifier = Modifier.fillMaxWidth().testTag("group_setup.description"),
                         label = { Text(stringResource(R.string.description)) },
@@ -315,6 +323,37 @@ internal fun GroupCreationBottomAction(
                 Spacer(Modifier.size(8.dp))
             }
             Text(label)
+        }
+    }
+}
+
+/** Pre-creation recovery never offers founding-member edits once a canonical group exists. */
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupSetupRecovery(
+    state: NewGroupSetupPresentation,
+    actions: NewGroupSetupActions,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            state.recoveryRecipient ?: stringResource(R.string.group_create_unattributed_failure),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (state.recoveryRecipient != null) {
+            WhiteNoiseFilledTonalButton(
+                onClick = actions.removeFailedRecipient,
+                enabled = state.detailsEditable,
+                modifier = Modifier.fillMaxWidth().testTag("group_setup.removeFailedRecipient"),
+            ) {
+                Text(stringResource(R.string.group_create_remove_and_continue))
+            }
+        }
+        WhiteNoiseFilledTonalButton(
+            onClick = actions.back,
+            enabled = state.detailsEditable,
+            modifier = Modifier.fillMaxWidth().testTag("group_setup.editMembers"),
+        ) {
+            Text(stringResource(R.string.group_create_edit_members))
         }
     }
 }

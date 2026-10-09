@@ -2294,4 +2294,18 @@
         <item quantity="one">Descargando %1$d archivo adjunto</item>
         <item quantity="other">Descargando %1$d archivos adjuntos</item>
     </plurals>
+    <string name="account_keys_local_signing">Firma local</string>
+    <string name="account_keys_external_signing">Firmante externo</string>
+    <string name="account_keys_session_running">Sesión de cuenta activa</string>
+    <string name="account_keys_session_stopped">Sesión de cuenta detenida</string>
+    <string name="account_keys_session">Sesión de cuenta</string>
+    <string name="chat_departure_confirm">Revisa %1$d chats seleccionados. Se abandonarán los grupos y se eliminarán de este dispositivo; los chats directos se eliminan localmente. Los demás miembros conservan sus copias. Los traspasos de administración se confirmarán antes de eliminar.</string>
+    <string name="chat_departure_result">%1$d completados · %2$d sin terminar · %3$d omitidos. Reintentar comprueba la pertenencia y continúa solo el trabajo pendiente.</string>
+    <string name="chat_departure_admin_granted">La transferencia de administrador se completó. La salida del grupo sigue pendiente.</string>
+    <string name="reaction_details_loading">Cargando reacciones…</string>
+    <string name="reaction_details_load_failed">No se pudieron cargar las reacciones.</string>
+    <string name="group_create_remove_and_continue">Quitar a esta persona y continuar</string>
+    <string name="group_create_edit_members">Editar miembros</string>
+    <string name="group_create_unattributed_failure">No pudimos identificar a la persona afectada. Vuelve a intentarlo o edita los miembros.</string>
+    <string name="media_reply_draft_conflict">Tu borrador ha cambiado. Conserva esta respuesta y vuelve a intentarlo, o cancela la respuesta antes de enviar.</string>
 </resources>

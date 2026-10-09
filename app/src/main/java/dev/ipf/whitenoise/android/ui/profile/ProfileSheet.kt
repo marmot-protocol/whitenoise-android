@@ -13,7 +13,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -135,7 +133,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
-import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.delay
@@ -1266,77 +1263,61 @@ internal fun ContactPrivateDetailsDialog(
                 .TextFieldState(initialNotes)
         }
     val scheme = MaterialTheme.colorScheme
-    val outline =
-        dev.ipf.whitenoise.android.ui.theme
-            .amoledOutlineBorder()
     androidx.compose.runtime.CompositionLocalProvider(
         LocalWhiteNoiseTextFieldContainerColor provides scheme.surfaceContainerLowest,
     ) {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            modifier =
-                (if (outline != null) Modifier.border(outline, MaterialTheme.shapes.extraLarge) else Modifier)
-                    .exposePerformanceTestTags(),
-            properties = DialogProperties(securePolicy = securePolicy),
-            containerColor = scheme.surfaceContainerLow,
-            textContentColor = scheme.onSurfaceVariant,
-            title = { Text(stringResource(R.string.profile_nickname_and_notes)) },
-            text = {
-                Column(
-                    Modifier.heightIn(max = 360.dp).fadingVerticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    EmojiLabel(stringResource(R.string.profile_name_from_profile, profileName))
-                    pictureState?.let { state ->
-                        ContactPictureControls(
-                            state,
-                            pictureSource,
-                            profileName,
-                            pictureSeed ?: profileName,
-                            onPickPicture,
-                            onRepositionPicture,
-                            onClearPicture,
-                        )
-                    }
-                    dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
-                        state = nickname,
-                        enabled = pictureState?.busy != true,
-                        label = { Text(stringResource(R.string.profile_contact_name_hint)) },
-                        lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.SingleLine,
-                        modifier = Modifier.fillMaxWidth().testTag("person_profile.nickname"),
-                    )
-                    dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
-                        state = notes,
-                        enabled = pictureState?.busy != true,
-                        label = { Text(stringResource(R.string.profile_contact_notes_hint)) },
-                        lineLimits =
-                            androidx.compose.foundation.text.input.TextFieldLineLimits.MultiLine(
-                                minHeightInLines = 3,
-                                maxHeightInLines = 8,
-                            ),
-                        modifier = Modifier.fillMaxWidth().testTag("person_profile.notes"),
-                    )
-                    Text(
-                        stringResource(R.string.profile_contact_editor_private_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            },
-            confirmButton = {
+        ContactPrivateDetailsFrame(
+            securePolicy = securePolicy,
+            onDismiss = onDismiss,
+            actions = {
+                TextButton(
+                    onDismiss,
+                    Modifier.testTag("person_profile.private_cancel"),
+                    enabled = pictureState?.busy != true,
+                ) { Text(stringResource(R.string.cancel)) }
                 TextButton(
                     enabled = pictureState?.busy != true,
                     onClick = { onSave(nickname.text.toString(), notes.text.toString()) },
                     modifier = Modifier.testTag("person_profile.private_save"),
                 ) { Text(stringResource(R.string.save)) }
             },
-            dismissButton = {
-                TextButton(
-                    onDismiss,
-                    Modifier.testTag("person_profile.private_cancel"),
-                    enabled = pictureState?.busy != true,
-                ) {
-                    Text(stringResource(R.string.cancel))
+            form = {
+                EmojiLabel(stringResource(R.string.profile_name_from_profile, profileName))
+                pictureState?.let { state ->
+                    ContactPictureControls(
+                        state,
+                        pictureSource,
+                        profileName,
+                        pictureSeed ?: profileName,
+                        onPickPicture,
+                        onRepositionPicture,
+                        onClearPicture,
+                    )
                 }
+                dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
+                    state = nickname,
+                    emojiAction = true,
+                    enabled = pictureState?.busy != true,
+                    label = { Text(stringResource(R.string.profile_contact_name_hint)) },
+                    lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.SingleLine,
+                    modifier = Modifier.fillMaxWidth().testTag("person_profile.nickname"),
+                )
+                dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
+                    state = notes,
+                    emojiAction = true,
+                    enabled = pictureState?.busy != true,
+                    label = { Text(stringResource(R.string.profile_contact_notes_hint)) },
+                    lineLimits =
+                        androidx.compose.foundation.text.input.TextFieldLineLimits.MultiLine(
+                            minHeightInLines = 3,
+                            maxHeightInLines = 8,
+                        ),
+                    modifier = Modifier.fillMaxWidth().testTag("person_profile.notes"),
+                )
+                Text(
+                    stringResource(R.string.profile_contact_editor_private_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             },
         )
     }

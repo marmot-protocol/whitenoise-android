@@ -158,8 +158,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.saveMessageMediaAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.shareMessageExternally
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldExpandCaptionedPortrait
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
+import dev.ipf.whitenoise.android.ui.conversation.reactions.CompleteReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
-import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
@@ -3274,31 +3274,13 @@ internal fun MessageBubble(
                     },
                 )
                 if (reactionSheetOpen && !deleted) {
-                    val participants =
-                        remember(record.messageIdHex, item.projected?.reactions, tallies) {
-                            controller.reactionParticipantsFor(record.messageIdHex)
-                        }
-                    // Close when the participant list drains, without re-firing for every list update.
-                    LaunchedEffect(participants.isEmpty()) {
-                        if (participants.isEmpty()) {
-                            reactionSheetOpen = false
-                        }
-                    }
-                    if (participants.isNotEmpty()) {
-                        ReactionDetailsSheet(
-                            participants = participants,
-                            appState = appState,
-                            onRemoveOwnReaction =
-                                if (actionsReadOnly || deleted) {
-                                    null
-                                } else {
-                                    ::reactWithEmoji
-                                },
-                            onDismissRequest = {
-                                reactionSheetOpen = false
-                            },
-                        )
-                    }
+                    CompleteReactionDetailsSheet(
+                        item = item,
+                        controller = controller,
+                        appState = appState,
+                        onRemoveOwnReaction = if (actionsReadOnly || deleted) null else ::reactWithEmoji,
+                        onDismissRequest = { reactionSheetOpen = false },
+                    )
                 }
             }
         }
