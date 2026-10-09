@@ -139,7 +139,7 @@ def run_fixture(name, directory, generation):
             # Preserve readiness diagnostics even when Maestro never started.
             diagnostics = [
                 ('setup.json', adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/setup.json']),
-                ('emulator-errors.txt', adb + ['logcat', '-d', '-v', 'brief', 'AndroidRuntime:E', 'TestRunner:V',
+                ('emulator-errors.txt', adb + ['logcat', '-d', '-v', 'brief', 'AndroidRuntime:E', 'TestRunner:V', 'MaestroShareProof:W',
                                               'UiAutomation:V', 'UiAutomationConnection:V', 'AccessibilityManagerService:V',
                                               'ActivityManager:I', 'Maestro:V', '*:S']),
             ]

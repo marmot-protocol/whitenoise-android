@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerInputConnection.kt",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Accepted composer text queries after keyboard Backspace",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerInputConnection.kt",
+        "anchor": "internal class ComposerInputConnection(",
+        "test_ids": [
+          "CON-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8"
+}

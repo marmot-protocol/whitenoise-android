@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -17,6 +19,38 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
+
+/** Observe intent without consuming native word-selection and handle gestures. */
+internal suspend fun PointerInputScope.composerNativeSelectionTouchGestures(
+    onPress: () -> Unit,
+    onFinished: () -> Unit,
+    onTap: () -> Unit,
+) {
+    val touchSlop = viewConfiguration.touchSlop
+    val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        if (down.type != PointerType.Touch) return@awaitEachGesture
+        var moved = false
+        var last = down
+        onPress()
+        try {
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                last = event.changes.firstOrNull { it.id == down.id } ?: break
+                val displaced = (last.position - down.position).getDistance() > touchSlop
+                moved = moved || last.isConsumed || displaced || event.changes.size > 1
+            } while (last.pressed)
+            val shortTap = last.uptimeMillis - down.uptimeMillis < longPressTimeoutMillis
+            val releasedNormally = !last.pressed && !moved
+            if (releasedNormally && shortTap) {
+                onTap()
+            }
+        } finally {
+            onFinished()
+        }
+    }
+}
 
 /**
  * Let a short finger tap enter the unfocused editor and a stationary hold open Paste, while

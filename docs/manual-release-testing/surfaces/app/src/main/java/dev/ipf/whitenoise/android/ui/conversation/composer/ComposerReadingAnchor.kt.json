@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerReadingAnchor.kt",
+  "legacy_sha256": "f002472c2decab0454135e2d9c686b7d15489b48c4b75462795eb6bcd815e168",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerUnfocusedTouchFocusGestures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerReadingAnchor.kt",
+        "anchor": "fun PointerInputScope.composerUnfocusedTouchFocusGestures(",
+        "test_ids": [
+          "CON-013",
+          "CON-021"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Composer reading boundary reversal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerReadingAnchor.kt",
+        "anchor": "fun PointerInputScope.composerEditorReadingScrollGestures(",
+        "test_ids": [
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "Native touch-selection intent observer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerReadingAnchor.kt",
+        "anchor": "fun PointerInputScope.composerNativeSelectionTouchGestures(",
+        "test_ids": [
+          "CON-013",
+          "CON-021"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

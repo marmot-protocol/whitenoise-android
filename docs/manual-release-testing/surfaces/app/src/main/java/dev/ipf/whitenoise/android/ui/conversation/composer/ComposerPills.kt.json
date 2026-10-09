@@ -47,6 +47,15 @@
           "CON-013",
           "CON-017"
         ]
+      },
+      {
+        "surface": "Native selection with keyboard hidden",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "InterceptPlatformTextInput(",
+        "test_ids": [
+          "CON-013",
+          "CON-021"
+        ]
       }
     ],
     "source_coverage": [

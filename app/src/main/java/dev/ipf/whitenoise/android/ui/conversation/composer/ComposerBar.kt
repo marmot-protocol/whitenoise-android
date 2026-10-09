@@ -1350,6 +1350,7 @@ internal fun ComposerBar(
                                 }
                             },
                         textFieldValue = textFieldValue,
+                        readAcceptedValue = { textState.valueState.value },
                         composerFocus = composerFocus,
                         emojiPickerOpen = composerEmojiPickerRequested,
                         actionColors = actionColors,
