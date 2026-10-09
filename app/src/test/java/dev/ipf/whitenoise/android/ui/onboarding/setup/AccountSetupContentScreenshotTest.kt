@@ -69,7 +69,23 @@ class AccountSetupContentScreenshotTest {
     /** A manual-review outcome cannot be confused with an approved publication still pending. */
     @Test fun relayRepairManualReview() {
         val snapshot = relayDiffSnapshot()
-        snapshot.proposal!!.relayRepair!!.mode = dev.ipf.marmotkit.OnboardingRelayRepairModeFfi.MANUAL_REVIEW
+        snapshot.proposal!!.relayRepair!!.apply {
+            mode = OnboardingRelayRepairModeFfi.MANUAL_REVIEW
+            afterTags = beforeTags
+            proposedContent = originalContent
+            changes =
+                beforeTags.mapIndexed { index, tag ->
+                    OnboardingRelayTagChangeFfi(
+                        OnboardingRelayTagDispositionFfi.RETAINED,
+                        index.toULong(),
+                        index.toULong(),
+                        tag.fields,
+                        tag.endpoint,
+                        tag.role,
+                        OnboardingRelayCapabilityFfi.NONE,
+                    )
+                }
+        }
         snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.actions =
             listOf(OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.CANCEL_REPAIR)
         capture("relay_repair_manual", AccountSetupState(snapshot = snapshot))
