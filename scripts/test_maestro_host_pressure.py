@@ -71,6 +71,8 @@ class FixtureDiagnosticTimingTest(unittest.TestCase):
             (directory / 'instrumentation.txt').write_text('OK (1 test)')
         process.wait.side_effect = wait
         def command(arguments, **kwargs):
+            if 'disable-user' in arguments:
+                return 'Component new state: disabled-user'
             if arguments[-3:] == ['pm', 'clear', runtime.PACKAGE]:
                 return 'Success'
             if 'logcat' in arguments:

@@ -4,19 +4,7 @@ name: qr-permission-permanent-close
 - runFlow: ../fixtures/runtime-qr-denied-ready.yaml
 - tapOn:
     text: ^(Allow Camera|Open settings)$
-- assertVisible:
-    id: com.android.permissioncontroller:id/permission_deny_button
-- tapOn:
-    id: com.android.permissioncontroller:id/permission_deny_button
-- assertVisible:
-    text: ^Scan QR Code$
-- assertVisible:
-    text: ^Camera Access Needed$
-- assertVisible:
-    id: qr_scanner.recovery
-    enabled: true
-    containsChild:
-      text: ^(Allow Camera|Open settings)$
+- runFlow: ../fixtures/qr-deny-again.yaml
 - assertVisible:
     text: ^Open settings$
 - tapOn:

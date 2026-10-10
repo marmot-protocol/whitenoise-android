@@ -1,12 +1,15 @@
 package dev.ipf.whitenoise.android.maestro
 
 import android.app.Application
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.test.runner.AndroidJUnitRunner
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 /** Selected only by maestro-runtime.init.gradle; ordinary instrumentation is unchanged. */
@@ -34,6 +37,11 @@ class MaestroFixtureApplication : WhiteNoiseApplication() {
 
     // Intentionally omit WhiteNoiseApplication.onCreate: it schedules production work.
     override fun onCreate() {
+        check(
+            packageManager.getComponentEnabledSetting(
+                ComponentName(this, BackgroundConnectionBootReceiver::class.java),
+            ) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
+        ) { "Production boot receiver must be disabled for the isolated native fixture" }
         DictationDiagnostics.attach(this)
         PerformanceDiagnostics.bind(this)
         VoicePlaybackController.attach(this)

@@ -88,6 +88,11 @@ def run_fixture(name, directory, generation):
     def read(flag):
         """Read only the current generated fixture receipt from the isolated package."""
         return command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{flag}.json'])
+    # A fresh AVD can deliver BOOT_COMPLETED while the native fixture is still being prepared.
+    # Suppress only this disposable package's production boot entry point, before clearing or launching it.
+    boot = f'{PACKAGE}/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'
+    if not command(adb + ['shell', 'pm', 'disable-user', '--user', '0', boot]).strip().endswith('new state: disabled-user'):
+        raise ValueError('Isolated fixture boot receiver was not disabled')
     if command(adb + ['shell', 'pm', 'clear', PACKAGE]).strip() != 'Success':
         raise ValueError('Isolated fixture data reset failed before instrumentation')
     # Restore Android's fresh-install permission state after a preceding grant or denial.

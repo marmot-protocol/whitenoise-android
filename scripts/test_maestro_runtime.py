@@ -1475,6 +1475,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
                         return process
 
                     def command(arguments):
+                        if 'disable-user' in arguments:
+                            return 'Component new state: disabled-user'
                         if arguments[-2:] == ['clear', runtime.PACKAGE]:
                             return 'Success'
                         path = arguments[-1]
@@ -1591,7 +1593,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
     def test_failed_fixture_data_reset_never_launches_a_host(self):
         """Prevent a fresh-generation claim when Android did not clear isolated global stores."""
         with tempfile.TemporaryDirectory() as temporary:
-            with patch.object(runtime, 'command', return_value='Failed'), \
+            with patch.object(runtime, 'command', side_effect=['Component new state: disabled-user', 'Failed']), \
                  patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(ValueError):
                 runtime.run_case('navigation-settings-back', Path(temporary))
             start.assert_not_called()
@@ -1600,12 +1602,24 @@ class RuntimeEvidenceTest(unittest.TestCase):
         """A preceding permission decision must not silently leak into the next generation."""
         for reset_step in (1, 2):
             with self.subTest(reset_step=reset_step), tempfile.TemporaryDirectory() as temporary:
-                results = ['Success'] + [''] * (reset_step - 1)
+                results = ['Component new state: disabled-user', 'Success'] + [''] * (reset_step - 1)
                 results.append(subprocess.CalledProcessError(1, 'permission reset'))
                 with patch.object(runtime, 'command', side_effect=results), \
                      patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(subprocess.CalledProcessError):
                     runtime.run_case('navigation-settings-back', Path(temporary))
                 start.assert_not_called()
+
+    def test_unqualified_boot_component_never_launches_a_fixture(self):
+        """A boot receiver must not race the uninitialized fixture Application or disable a user package."""
+        for result in ('', 'new state: enabled', 'new state: disabled'):
+            with self.subTest(result=result), tempfile.TemporaryDirectory() as temporary:
+                with patch.object(runtime, 'command', return_value=result) as commands, \
+                     patch.object(runtime.subprocess, 'Popen') as start, self.assertRaisesRegex(ValueError, 'boot receiver'):
+                    runtime.run_case('navigation-settings-back', Path(temporary))
+                start.assert_not_called()
+                self.assertEqual(commands.call_args.args[0], ['adb', '-s', 'emulator-5554', 'shell', 'pm',
+                    'disable-user', '--user', '0',
+                    runtime.PACKAGE + '/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'])
 
     def test_runtime_cases_never_kill_or_replace_the_instrumentation_host(self):
         """Keep UI flows inside their native host lifetime and permanent acceptance scope."""
@@ -1909,6 +1923,19 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn('- tapOn: "Settings"', helper)
         for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
             self.assertNotIn('Open settings.*', path.read_text(), path.name)
+
+    def test_camera_second_denial_uses_the_observed_permanent_denial_control(self):
+        """The real API-34 second dialog exposes a different ID despite the same Don't allow label."""
+        control = 'com.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button'
+        for name in ('deny-reopen', 'permanent-close', 'permanent-back', 'permanent-reopen'):
+            commands = expanded_flow_commands(runtime.ROOT / f'.maestro/runtime/qr-permission-{name}.yaml')
+            denies = [item['tapOn']['id'] for item in commands
+                      if isinstance(item, dict) and isinstance(item.get('tapOn'), dict)
+                      and 'permission_deny' in item['tapOn'].get('id', '')]
+            self.assertEqual(denies, ['com.android.permissioncontroller:id/permission_deny_button', control])
+            self.assertIn({'assertVisible': {'id': 'qr_scanner.recovery', 'enabled': True,
+                                           'containsChild': {'text': '^Open settings$'}}}, commands)
+            self.assertFalse(any('optional' in str(item) for item in commands))
 
     def test_emulator_interruption_guard_is_limited_to_the_external_launcher(self):
         """Never hide a tested-app crash behind the disposable launcher's known boot interruption."""
