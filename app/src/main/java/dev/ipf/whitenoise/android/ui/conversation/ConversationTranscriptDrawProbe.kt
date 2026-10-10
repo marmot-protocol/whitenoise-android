@@ -14,13 +14,22 @@ internal object ConversationTranscriptDrawProbe {
             field = value
             lastPainted = null
             rootFrame = null
-            if (value == null) compositionRowsOverride = null
+            if (value == null) {
+                compositionRowsOverride = null
+                foregroundGateObserver = null
+            }
         }
 
     /** Freezes production composition for negative controls without changing the controller. */
     var compositionRowsOverride: ((ConversationController, List<TimelineMessage>) -> List<TimelineMessage>)? = null
+    var foregroundGateObserver: ((Boolean, Long) -> Unit)? = null
     private var lastPainted: ConversationTranscriptDraw? = null
     private var rootFrame: RootFrame? = null
+
+    /** Measures real blocked and released pre-draw attempts only while a fixture owns the probe. */
+    fun foregroundGateObserved(blocked: Boolean) {
+        if (isObserving()) foregroundGateObserver?.invoke(blocked, SystemClock.uptimeMillis())
+    }
 
     /** A hidden or disposed route has no reusable visible transcript layer in subsequent root traversals. */
     fun retire(controller: ConversationController) {

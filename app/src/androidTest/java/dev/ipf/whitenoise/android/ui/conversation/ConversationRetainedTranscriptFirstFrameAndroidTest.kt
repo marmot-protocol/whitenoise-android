@@ -197,9 +197,14 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 assertTrue("known local preparation must still hold the first draw", fixture.draws.isEmpty())
                 if (supersedeForeground) {
                     composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+                    val nextPreDrawCheckpoint = fixture.preDraws.get()
                     composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+                    composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+                        fixture.preDraws.get() > nextPreDrawCheckpoint
+                    }
                     assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
                 }
+                assertTrue("queued preparation produced a blocked pre-draw", fixture.firstBlockedAt != null)
                 fixture.dispatcher.release()
             }
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
@@ -254,9 +259,16 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         assertTrue(fixture.applicationTimes.last() <= fixture.firstDrawAt)
         assertTrue(fixture.lastResumeAt >= resumedAt)
         assertTrue(fixture.firstDrawAt >= fixture.lastResumeAt)
+        val gateHeldMs =
+            fixture.firstBlockedAt?.let { blockedAt ->
+                val releasedAt = checkNotNull(fixture.gateReleasedAt)
+                assertTrue(releasedAt >= blockedAt && releasedAt <= fixture.firstDrawAt)
+                releasedAt - blockedAt
+            }
         Log.i(
             "WNFirstFrameTest",
-            "ime_denied=$denyIme on_resume_to_draw_ms=${fixture.firstDrawAt - fixture.lastResumeAt}",
+            "ime_denied=$denyIme on_resume_to_draw_ms=${fixture.firstDrawAt - fixture.lastResumeAt} " +
+                "gate_held_ms=${gateHeldMs ?: "not_observed"}",
         )
     }
 
@@ -273,6 +285,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             fixture.controller.hasPublishedAuthoritativeTimeline && fixture.controller.timeline.isNotEmpty()
         }
         ConversationTranscriptDrawProbe.observer = fixture::observe
+        ConversationTranscriptDrawProbe.foregroundGateObserver = fixture::observeGate
         ConversationTranscriptDrawProbe.compositionRowsOverride = { controller, rows ->
             if (controller === fixture.controller && fixture.paintStaleControl) fixture.staleRows else rows
         }
@@ -284,6 +297,8 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 val lifecycleObserver = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME && fixture.recording.get()) {
                         fixture.lastResumeAt = SystemClock.uptimeMillis()
+                        fixture.firstBlockedAt = null
+                        fixture.gateReleasedAt = null
                     }
                 }
                 lifecycle.addObserver(lifecycleObserver)
@@ -401,9 +416,18 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         val draws = CopyOnWriteArrayList<ConversationTranscriptDraw>()
         var firstDrawAt = 0L
         var lastResumeAt = 0L
+        var firstBlockedAt: Long? = null
+        var gateReleasedAt: Long? = null
         var lastDraw: ConversationTranscriptDraw? = null
         val hasB: Boolean
             get() = controller.timeline.any { it.record.messageIdHex == ConversationTimelineTestIds.MESSAGE_B }
+
+        /** Times actual production pre-draw decisions, separate from lifecycle and first-content draw. */
+        fun observeGate(blocked: Boolean, atUptimeMs: Long) {
+            if (!recording.get()) return
+            if (blocked && firstBlockedAt == null) firstBlockedAt = atUptimeMs
+            if (!blocked && firstBlockedAt != null && gateReleasedAt == null) gateReleasedAt = atUptimeMs
+        }
 
         /** Records bounded in-memory evidence, without emitting message text or identifiers to a log. */
         fun observe(frame: ConversationTranscriptDraw) {

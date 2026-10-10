@@ -86,7 +86,9 @@ internal class ConversationForegroundDrawGate(
     /** Signals each frame attempt and exposes it only after the live gate opens. */
     override fun onPreDraw(): Boolean {
         onPreDrawSignal()
-        return !isBlocked()
+        val blocked = isBlocked()
+        ConversationTranscriptDrawProbe.foregroundGateObserved(blocked)
+        return !blocked
     }
 }
 

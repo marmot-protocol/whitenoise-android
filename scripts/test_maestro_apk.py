@@ -277,12 +277,12 @@ class MaestroWorkflowTest(unittest.TestCase):
         text = self.workflow.split(f'\n  {name}:\n', 1)[1]
         return re.split(r'\n  [a-z][a-z-]*:\n', text, maxsplit=1)[0]
 
-    def enabled(self, name, event, selected):
+    def enabled(self, name, event, selected, responsiveness=False):
         """Evaluate the trusted job condition with restricted event/input fixtures."""
         expression = re.search(r'^    if: (.+)$', self.job(name), re.MULTILINE).group(1)
         expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding'),
+                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness),
                      'startsWith': lambda value, prefix: value.startswith(prefix)})
 
     def test_pilot_and_normal_jobs_are_exclusive_for_every_event(self):
@@ -295,13 +295,25 @@ class MaestroWorkflowTest(unittest.TestCase):
                     for normal in ['instrumented', 'attachment-fixture']:
                         self.assertEqual(self.enabled(normal, event, selected), not pilot_enabled)
 
+    def test_responsiveness_selection_runs_acceptance_and_excludes_pilot(self):
+        """Keep focused acceptance admitted even when incompatible pilot inputs need rejection."""
+        for selected in [False, True]:
+            with self.subTest(maestro_pilot=selected):
+                self.assertTrue(self.enabled('instrumented', 'workflow_dispatch', selected, True))
+                self.assertFalse(self.enabled('attachment-fixture', 'workflow_dispatch', selected, True))
+                self.assertFalse(self.enabled('maestro-pilot', 'workflow_dispatch', selected, True))
+        instrumented = self.job('instrumented')
+        self.assertIn('inputs.responsiveness_only && inputs.maestro_pilot', instrumented)
+        self.assertIn('exit 2', instrumented)
+        self.assertIn("inputs.responsiveness_only && 'responsiveness' || 'standard'", self.workflow)
+
     def test_no_pilot_build_secrets_or_cancellation_of_normal_runs(self):
         """Check that the optional pilot cannot build, use secrets or cancel normal CI."""
         job = self.job('maestro-pilot')
         self.assertNotIn('gradlew', job)
         self.assertNotIn('secrets.', job)
         self.assertIn('actions: read', job)
-        self.assertIn("&& 'android-maestro-pilot' || format('android-instrumented-{0}-{1}'", self.workflow)
+        self.assertIn("&& 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}'", self.workflow)
         self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}", self.workflow)
         self.assertIn('if: always()', job)
         self.assertIn('retention-days: 7', job)
