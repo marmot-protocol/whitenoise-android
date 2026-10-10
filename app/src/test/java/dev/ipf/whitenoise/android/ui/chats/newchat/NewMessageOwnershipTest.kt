@@ -82,6 +82,25 @@ class NewMessageOwnershipTest {
         }
     }
 
+    /** Self recognition is immediate and never waits for the profile refresh or recipient preparation. */
+    @Test fun ownNpubOffersNotesWithoutProfileRefresh() {
+        val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
+        val hex = requireNotNull(TestNip19.npubToHex(npub))
+        var refreshes = 0
+        val state =
+            emptyAppState(
+                accounts = listOf(testAccount("self", hex)),
+                activeAccountRef = "self",
+                profileRefresh = { refreshes++ },
+                accountIdHex = { TestNip19.npubToHex(it) },
+            )
+        composeRule.setContent { WhiteNoiseTheme { NewMessageScreen(state, {}, {}, { _, _ -> }) } }
+        composeRule.onNodeWithTag("new_message.searchField").performTextReplacement(npub)
+        composeRule.onNodeWithTag("new_message.self_result").assertIsDisplayed().assertHasClickAction()
+        assertEquals(0, refreshes)
+        composeRule.onNodeWithTag("creation.person.$hex").assertDoesNotExist()
+    }
+
     /** A new account cannot inherit the previous recipient's identifier query or resolved result. */
     @Test fun accountChangeResetsRecipientQuery() {
         val state = state()

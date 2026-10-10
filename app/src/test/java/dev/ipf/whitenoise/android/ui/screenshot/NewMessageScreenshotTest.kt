@@ -175,6 +175,32 @@ class NewMessageScreenshotTest {
             search = RecipientUserSearchState(failed = true),
         )
 
+    /** The own-key result and both entry points stay legible in supported themes and large RTL. */
+    @Test fun selfLight() = capture("new_message_self_light.png", people = emptyList(), self = true)
+
+    @Test fun selfDark() = capture("new_message_self_dark.png", dark = true, people = emptyList(), self = true)
+
+    @Test fun selfAmoled() {
+        capture(
+            "new_message_self_amoled.png",
+            dark = true,
+            amoled = true,
+            people = emptyList(),
+            self = true,
+        )
+    }
+
+    @Test fun selfLargeRtl() {
+        capture(
+            "new_message_self_large_rtl.png",
+            largeRtl = true,
+            people = emptyList(),
+            self = true,
+        )
+    }
+
+    @Test fun selfFailure() = capture("new_message_self_failed.png", people = emptyList(), notesFailed = true)
+
     /** Renders caller-projected display state through the production destination and shared theme. */
     private fun capture(
         file: String,
@@ -188,6 +214,8 @@ class NewMessageScreenshotTest {
         identifier: Boolean = false,
         resolving: Boolean = false,
         lookupFailed: Boolean = false,
+        self: Boolean = false,
+        notesFailed: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -195,7 +223,7 @@ class NewMessageScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                     NewMessageContent(
-                        TextFieldState(query),
+                        TextFieldState(if (self) "nostr:npub1self" else query),
                         people,
                         search,
                         identifier,
@@ -206,6 +234,8 @@ class NewMessageScreenshotTest {
                         NewMessageActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
                         isValidNpub = { true },
                         identifierLookupFailed = lookupFailed,
+                        noteToSelfIdentifier = self,
+                        noteToSelfFailed = notesFailed,
                         addressFallback = identifier,
                     )
                 }

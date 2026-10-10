@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
+import dev.ipf.whitenoise.android.state.NoteToSelfOpening
 import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientPreviewState
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
@@ -34,6 +35,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NewChatFlowTest {
+    @Test
+    fun replacedSelfChatOwnerCannotStartCreation() =
+        runTest {
+            val opening = NoteToSelfOpening()
+            var writes = 0
+            try {
+                opening.open<String>(
+                    "old-account:1",
+                    { throw kotlinx.coroutines.CancellationException("replaced") },
+                    { null },
+                    { _, _ ->
+                        writes++
+                        "group" to "row"
+                    },
+                    { it },
+                )
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                // Captured account ownership is checked before the native mutation.
+            }
+            assertEquals(0, writes)
+        }
+
     @Test
     fun newGroupSetupAfterCanonicalCreateFailureShowsRetryOpenSurface() {
         val retryState =

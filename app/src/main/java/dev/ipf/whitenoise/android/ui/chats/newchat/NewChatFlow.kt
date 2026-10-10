@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.inviteFailureDetail
+import dev.ipf.whitenoise.android.state.openNoteToSelf
 import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -357,6 +358,7 @@ private fun NewMessageAccountScreen(
     var creatingHex by remember { mutableStateOf<String?>(null) }
     var inviteShareInProgress by remember { mutableStateOf(false) }
     var startChatError by remember { mutableStateOf<StartChatErrorUiState?>(null) }
+    var noteToSelfFailed by remember(session) { mutableStateOf(false) }
     DisposableEffect(session) {
         onDispose {
             preparationCoordinator.clear()
@@ -368,7 +370,10 @@ private fun NewMessageAccountScreen(
     LaunchedEffect(creatingHex, appState.signOutInProgress, appState.wipeInProgress) {
         if (creatingHex != null || !session.isCurrent()) scannerSession = null
     }
-    LaunchedEffect(query) { startChatError = null }
+    LaunchedEffect(query) {
+        startChatError = null
+        noteToSelfFailed = false
+    }
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
@@ -431,8 +436,9 @@ private fun NewMessageAccountScreen(
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
     val addressQuery = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05
+    val ownIdentifier = isNoteToSelfIdentifier(query, activeHex, appState::accountIdHexForMention)
     val resolution =
-        rememberRecipientResolution(query, appState, retryKey = searchRetry) { stage ->
+        rememberRecipientResolution(if (ownIdentifier) "" else query, appState, retryKey = searchRetry) { stage ->
             when (stage) {
                 RecipientResolutionStage.Cleared ->
                     appState.abandonChatCreateOpenTiming(ChatCreateOpenTiming.STAGE_RECIPIENT_REPLACED)
@@ -451,7 +457,7 @@ private fun NewMessageAccountScreen(
                     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_PROFILE_REFRESH_RETURN)
             }
         }
-    val directoryQuery = query.takeIf { resolution.resolvedHex == null }.orEmpty()
+    val directoryQuery = query.takeIf { !ownIdentifier && resolution.resolvedHex == null }.orEmpty()
     val userSearch by key(query, searchRetry, appState.relationshipRevision) {
         rememberRecipientUserSearchState(directoryQuery, appState, retryKey = searchRetry)
     }
@@ -471,6 +477,7 @@ private fun NewMessageAccountScreen(
         }
     SideEffect { contactsLoadAttempt.success() }
 
+    val noteToSelfIdentifier = ownIdentifier || resolution.resolvedHex?.equals(activeHex, ignoreCase = true) == true
     val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
     val identifierDiagnostic = remember(accountRef, runtimeGeneration, resolvedHex) { DmCreationInteraction() }
     var tappedDiagnostic by remember(accountRef, runtimeGeneration, resolvedHex) {
@@ -639,6 +646,36 @@ private fun NewMessageAccountScreen(
         }
     }
 
+    /** Both self entry points share native lookup and the process-owned canonical retry identity. */
+    fun openNotes() {
+        val account = accountRef
+        val hex = activeHex
+        val available = session.isCurrent() && creatingHex == null && scannerSession == null
+        if (account == null || hex == null || !available) return
+        creatingHex = hex
+        startChatError = null
+        noteToSelfFailed = false
+        appState.launchMutation {
+            try {
+                val result =
+                    runCatchingCancellable {
+                        appState.openNoteToSelf(account, hex, runtimeGeneration, session::isCurrent)
+                    }
+                if (session.isCurrent()) {
+                    result.fold(
+                        onSuccess = { item ->
+                            session.dispose()
+                            onOpenConversation(item, false)
+                        },
+                        onFailure = { noteToSelfFailed = true },
+                    )
+                }
+            } finally {
+                if (session.isCurrent()) creatingHex = null
+            }
+        }
+    }
+
     /** Starts or opens the direct chat with a search candidate. */
     fun startOrOpenConversation(candidate: RecipientSearch.Candidate) {
         openOrCreateChat(
@@ -650,7 +687,9 @@ private fun NewMessageAccountScreen(
     }
 
     val displayedCandidates =
-        if (identifierQuery && resolution.resolvedHex != null) {
+        if (noteToSelfIdentifier) {
+            emptyList()
+        } else if (identifierQuery && resolution.resolvedHex != null) {
             resolvedHex
                 ?.let {
                     listOf(RecipientSearch.Candidate(it, appState.displayName(it), appState.npub(it)))
@@ -721,6 +760,8 @@ private fun NewMessageAccountScreen(
             connectQrEnabled = myQrContent != null,
             creatingHex = creatingHex,
             error = startChatError,
+            noteToSelfIdentifier = noteToSelfIdentifier,
+            noteToSelfFailed = noteToSelfFailed,
             retryableIdentifier = addressQuery,
             identifierLookupFailed = recipientAddressLookupFailed(query, resolution.state),
             addressFallback = addressQuery && resolution.resolvedHex == null,
@@ -755,6 +796,7 @@ private fun NewMessageAccountScreen(
                     },
                     profile = ::presentPerson,
                     copyError = { if (canInteract()) clipboard.setText(AnnotatedString(it)) },
+                    noteToSelf = ::openNotes,
                 ),
         )
     }

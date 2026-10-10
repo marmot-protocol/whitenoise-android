@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="note_to_self">Nota para mim</string>
+    <string name="note_to_self_open_failed">Não foi possível abrir suas notas. Tente novamente para encontrar a conversa existente.</string>
+</resources>

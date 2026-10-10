@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.CircularProgressIndicator
@@ -80,6 +81,7 @@ internal data class NewMessageActions(
     val person: (RecipientSearch.Candidate) -> Unit,
     val profile: (RecipientSearch.Candidate) -> Unit,
     val copyError: (String) -> Unit,
+    val noteToSelf: () -> Unit = {},
 )
 
 /** Prototype discovery hierarchy driven exclusively by the caller's current native result state. */
@@ -99,6 +101,8 @@ internal fun NewMessageContent(
     retryableIdentifier: Boolean = false,
     identifierLookupFailed: Boolean = false,
     addressFallback: Boolean = false,
+    noteToSelfIdentifier: Boolean = false,
+    noteToSelfFailed: Boolean = false,
 ) {
     val query = queryState.text.toString()
     val busy = creatingHex != null
@@ -123,19 +127,23 @@ internal fun NewMessageContent(
                 )
             }
             item { NewMessageActionGroup(actions, connectQrEnabled, busy) }
+            if (busy && people.isEmpty()) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            noteToSelfItems(noteToSelfIdentifier, noteToSelfFailed, busy, actions.noteToSelf)
             error?.let { item { StartChatErrorCard(it, actions.retryChat, actions.invite, actions.copyError) } }
             item {
-                NewMessageSearchFeedback(
-                    searching = resolvingIdentifier || search.isSearching,
-                    failed = search.failed,
-                    incomplete = search.isIncomplete,
-                    empty = query.isNotBlank() && people.isEmpty(),
-                    busy = busy,
-                    onRetry = actions.retrySearch,
-                    onInvite = actions.invite,
-                    retryableIdentifier = retryableIdentifier,
-                    lookupFailed = identifierLookupFailed,
-                )
+                if (!noteToSelfIdentifier) {
+                    NewMessageSearchFeedback(
+                        searching = resolvingIdentifier || search.isSearching,
+                        failed = search.failed,
+                        incomplete = search.isIncomplete,
+                        empty = query.isNotBlank() && people.isEmpty(),
+                        busy = busy,
+                        onRetry = actions.retrySearch,
+                        onInvite = actions.invite,
+                        retryableIdentifier = retryableIdentifier,
+                        lookupFailed = identifierLookupFailed,
+                    )
+                }
             }
             val groups =
                 if (query.isBlank() || (identifierQuery && !addressFallback)) {
@@ -170,6 +178,16 @@ private fun NewMessageActionGroup(
     busy: Boolean,
 ) {
     SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Related)) {
+        row("note_to_self") { context ->
+            SettingsLink(
+                context,
+                stringResource(R.string.note_to_self),
+                actions.noteToSelf,
+                enabled = !busy,
+                modifier = Modifier.testTag("new_message.self_action"),
+                leading = { Icon(painterResource(R.drawable.ic_edit), null, Modifier.size(24.dp)) },
+            )
+        }
         row("new_group") { context ->
             SettingsLink(
                 context,
@@ -303,6 +321,40 @@ internal fun NewMessageSearchFeedback(
                 TextButton(onClick = onInvite, enabled = !busy) {
                     Text(stringResource(R.string.new_message_invite_friend))
                 }
+            }
+        }
+    }
+}
+
+/** Keep the search result and failure in their own lazy items, preserving existing list layout. */
+private fun LazyListScope.noteToSelfItems(
+    identifier: Boolean,
+    failed: Boolean,
+    busy: Boolean,
+    onOpen: () -> Unit,
+) {
+    if (identifier) {
+        item {
+            SettingsSection(stringResource(R.string.new_message_people))
+            SettingsGroup {
+                row("own_notes") { context ->
+                    SettingsLink(
+                        context,
+                        stringResource(R.string.note_to_self),
+                        onOpen,
+                        enabled = !busy,
+                        modifier = Modifier.testTag("new_message.self_result"),
+                        leading = { Icon(painterResource(R.drawable.ic_edit), null, Modifier.size(24.dp)) },
+                    )
+                }
+            }
+        }
+    }
+    if (failed) {
+        item {
+            Column(Modifier.padding(horizontal = 16.dp).semantics { liveRegion = LiveRegionMode.Polite }) {
+                Text(stringResource(R.string.note_to_self_open_failed))
+                TextButton(onClick = onOpen, enabled = !busy) { Text(stringResource(R.string.retry)) }
             }
         }
     }

@@ -1192,6 +1192,7 @@ class WhiteNoiseAppState private constructor(
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
     internal val localGroupDeleteCleanupMutex = Mutex()
+    internal val noteToSelfOpening = NoteToSelfOpening()
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val swipePreferences = SwipePreferences(preferences)

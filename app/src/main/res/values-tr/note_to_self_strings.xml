@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="note_to_self">Kendime not</string>
+    <string name="note_to_self_open_failed">Notlarınız açılamadı. Mevcut sohbeti bulmak için yeniden deneyin.</string>
+</resources>

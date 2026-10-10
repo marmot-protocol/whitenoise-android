@@ -8,6 +8,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -41,6 +42,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
+import dev.ipf.whitenoise.android.state.NOTE_TO_SELF_GROUP_NAME
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -130,6 +132,25 @@ class GroupEditNameEmojiPickerTest {
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
     }
 
+    /** A private notes group retains its discovery name while description editing stays available. */
+    @Test
+    fun notesNameIsLockedButDescriptionRemainsEditable() {
+        val state = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupEditScreen(state, controller(state, admin = true, name = NOTE_TO_SELF_GROUP_NAME), {})
+            }
+        }
+        composeRule.onNodeWithText(NOTE_TO_SELF_GROUP_NAME).assertIsNotEnabled()
+        composeRule.onNode(nameEmojiActionMatcher()).assertIsNotEnabled().performClick()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
+        composeRule
+            .onNode(hasSetTextAction() and hasText("Group description"))
+            .performTextReplacement("My private notes")
+        composeRule.onNode(hasSetTextAction() and hasText("My private notes")).assertExists()
+        composeRule.onNodeWithText(string(R.string.save_group)).assertIsEnabled()
+    }
+
     @Test
     fun savingAndMutationGatesDisableTheEmojiInput() {
         assertTrue(groupNameEmojiEditable(canEdit = true, saving = false, mutationInFlight = false))
@@ -209,9 +230,10 @@ class GroupEditNameEmojiPickerTest {
     private fun controller(
         appState: WhiteNoiseAppState,
         admin: Boolean,
+        name: String = "Marmot team",
     ) = ConversationController(
         appState = appState,
-        initialGroup = group(admin),
+        initialGroup = group(admin).copy(name = name),
         initialMemberSnapshot =
             GroupMemberSnapshot(
                 listOf(
