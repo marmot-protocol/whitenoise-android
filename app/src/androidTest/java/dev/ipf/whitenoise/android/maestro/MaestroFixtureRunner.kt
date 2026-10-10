@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.maestro
 import android.app.Application
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import androidx.test.runner.AndroidJUnitRunner
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
@@ -37,6 +38,9 @@ class MaestroFixtureApplication : WhiteNoiseApplication() {
 
     // Intentionally omit WhiteNoiseApplication.onCreate: it schedules production work.
     override fun onCreate() {
+        check(applicationInfo.flags and ApplicationInfo.FLAG_TEST_ONLY != 0) {
+            "The isolated native fixture must be built as a test-only APK"
+        }
         check(
             packageManager.getComponentEnabledSetting(
                 ComponentName(this, BackgroundConnectionBootReceiver::class.java),

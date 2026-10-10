@@ -1621,6 +1621,44 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     'disable', '--user', '0',
                     runtime.PACKAGE + '/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'])
 
+    def test_credential_baseline_never_precedes_boot_suppression(self):
+        """Read-only credential probes instantiate the same Application and need its boot guard first."""
+        names = [name for name, case in runtime.CASES.items()
+                 if case['postcondition'].startswith('app-lock-credential-')]
+        self.assertEqual(len(names), 4)
+        for name in names:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                observed = []
+                def disable(arguments):
+                    observed.append('boot-disabled')
+                    self.assertIn('disable', arguments)
+                    return 'Component new state: disabled'
+                def fixture(*_):
+                    observed.append('fixture')
+                    return {'case': name, 'passed': True, 'cleanup_safe': True}
+                with patch.object(runtime, 'command', side_effect=disable), \
+                     patch.object(runtime, 'DisposableCredential') as credential, \
+                     patch.object(runtime, 'run_fixture', side_effect=fixture):
+                    credential.return_value.install.side_effect = lambda: observed.append('baseline-and-install')
+                    credential.return_value.restore.side_effect = lambda: observed.append('restored')
+                    result = runtime.run_case(name, Path(temporary))
+                self.assertEqual(observed, ['boot-disabled', 'baseline-and-install', 'fixture', 'restored'])
+                self.assertTrue(result['passed'])
+
+    def test_unqualified_boot_never_starts_a_credential_probe_or_pin_write(self):
+        """A refused component change stops before credential ownership or installation can begin."""
+        name = next(name for name, case in runtime.CASES.items()
+                    if case['postcondition'].startswith('app-lock-credential-'))
+        for failure in ('new state: enabled', subprocess.CalledProcessError(255, 'component denied')):
+            with self.subTest(failure=type(failure).__name__), tempfile.TemporaryDirectory() as temporary:
+                with patch.object(runtime, 'command', side_effect=[failure]), \
+                     patch.object(runtime, 'DisposableCredential') as credential, \
+                     patch.object(runtime, 'run_fixture') as fixture:
+                    with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                        runtime.run_case(name, Path(temporary))
+                credential.assert_not_called()
+                fixture.assert_not_called()
+
     def test_runtime_cases_never_kill_or_replace_the_instrumentation_host(self):
         """Keep UI flows inside their native host lifetime and permanent acceptance scope."""
         ids = definitions(load_guide(runtime.ROOT))
@@ -2078,6 +2116,14 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(emulator['with']['emulator-boot-timeout'], 300)
         fixture_build = (runtime.ROOT / 'scripts/maestro-runtime.init.gradle').read_text()
         self.assertIn("'ENABLE_PERFORMANCE_TEST_SELECTORS', 'true'", fixture_build)
+        # API34 permits shell receiver suppression only for a FLAG_TEST_ONLY target APK.
+        test_only = '-Pandroid.injected.testOnly=true'
+        self.assertIn(test_only, json.dumps(jobs['maestro-runtime-build']))
+        for job_name, job in jobs.items():
+            if job_name != 'maestro-runtime-build':
+                self.assertNotIn(test_only, json.dumps(job))
+        application = (runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro/MaestroFixtureRunner.kt').read_text()
+        self.assertIn('applicationInfo.flags and ApplicationInfo.FLAG_TEST_ONLY != 0', application)
         for path in (runtime.ROOT / 'app/src/main').rglob('*MaestroFixture*'):
             self.fail(f'Fixture must remain outside app APK: {path}')
 
@@ -2241,6 +2287,7 @@ class CredentialControlTest(unittest.TestCase):
                         **runtime.CASES['navigation-settings-back'], 'postcondition': 'app-lock-credential-retry'}}), \
                         patch.object(runtime.uuid, 'uuid4', return_value=Mock(hex=self.generation)), \
                         patch.object(runtime, 'DisposableCredential', return_value=owner), \
+                        patch.object(runtime, 'command', return_value='Component new state: disabled'), \
                         patch.object(runtime, 'run_fixture', side_effect=ValueError('Early setup failure')
                                      if early_failure else None, return_value=returned):
                     result = runtime.run_case('navigation-settings-back', Path(temporary))

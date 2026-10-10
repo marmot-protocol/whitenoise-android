@@ -63,6 +63,9 @@ def run_case(name, reports):
     directory.mkdir()
     if not CASES[name]['postcondition'].startswith('app-lock-credential-'):
         return run_fixture(name, directory, generation)
+    # Baseline and restoration probes instantiate the same guarded Application as the UI host.
+    # Suppress boot before the first read-only probe, not only after installing its owned PIN.
+    disable_fixture_boot_receiver()
     credential = DisposableCredential(generation, directory)
     result = {'case': name, 'generation': generation, **CASES[name], 'passed': False, 'cleanup_safe': False}
     try:
@@ -81,6 +84,15 @@ def run_case(name, reports):
     return result
 
 
+def disable_fixture_boot_receiver():
+    """Require the isolated test-only APK's receiver disabled before any fixture/probe Application."""
+    # A fresh AVD can deliver BOOT_COMPLETED while the native fixture is still being prepared.
+    # Suppress only this disposable package's production boot entry point, before clearing or launching it.
+    boot = f'{PACKAGE}/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'
+    if not command(['adb', '-s', 'emulator-5554', 'shell', 'pm', 'disable', '--user', '0', boot]).strip().endswith('new state: disabled'):
+        raise ValueError('Isolated fixture boot receiver was not disabled')
+
+
 def run_fixture(name, directory, generation):
     """Native fixture lifetime; outer credential ownership covers early setup and launch failures."""
     relative = f'files/maestro-{generation}'
@@ -88,11 +100,7 @@ def run_fixture(name, directory, generation):
     def read(flag):
         """Read only the current generated fixture receipt from the isolated package."""
         return command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{flag}.json'])
-    # A fresh AVD can deliver BOOT_COMPLETED while the native fixture is still being prepared.
-    # Suppress only this disposable package's production boot entry point, before clearing or launching it.
-    boot = f'{PACKAGE}/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'
-    if not command(adb + ['shell', 'pm', 'disable', '--user', '0', boot]).strip().endswith('new state: disabled'):
-        raise ValueError('Isolated fixture boot receiver was not disabled')
+    disable_fixture_boot_receiver()
     if command(adb + ['shell', 'pm', 'clear', PACKAGE]).strip() != 'Success':
         raise ValueError('Isolated fixture data reset failed before instrumentation')
     # Restore Android's fresh-install permission state after a preceding grant or denial.

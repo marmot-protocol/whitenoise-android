@@ -424,7 +424,7 @@ jobs:
       - name: Build app and test APK once for this source revision
         id: fixture
         run: |
-          ./gradlew --init-script scripts/maestro-runtime.init.gradle :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon
+          ./gradlew --init-script scripts/maestro-runtime.init.gradle -Pandroid.injected.testOnly=true :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon
           mkdir -p build/maestro-runtime-pair
           app_apks=(app/build/outputs/apk/devZapstore/debug/*-universal-debug.apk)
           test_apks=(app/build/outputs/apk/androidTest/devZapstore/debug/*.apk)
