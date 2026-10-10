@@ -68,6 +68,33 @@ class ConversationDictationControllerTest {
             assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
 
+    /** Another chat's removal cannot mark a kept recording's still-available origin as removed. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun keptAudioRetryDoesNotInheritAnotherChatsRemoval() =
+        runTest {
+            val f = fixture(draft = TextFieldValue(""), targetValidationScope = this)
+            f.platform.allowAudioParking = true
+            failRecognizedTail(f, send = false)
+            val kept = f.controller.composerAccess(ACCOUNT, GROUP)
+            assertTrue(f.controller.keepComposerAudioForLater(kept))
+            val other = ACCOUNT to "removed-group"
+            f.drafts[other] = TextFieldValue("")
+            assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
+            f.scheduler.runDelay(500L)
+            f.controller.onTargetRemoved(ACCOUNT, other.second)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
+            assertTrue(f.controller.canRetryComposerAudio(kept))
+            f.controller.retryComposerAudio(kept)
+            f.scheduler.runDelay(500L)
+            f.platform.pendingCallerAudio = false
+            f.platform.listener.onResult("recovered tail")
+            advanceUntilIdle()
+            assertEquals("first recovered tail", f.drafts.getValue(key()).text)
+            assertEquals("", f.drafts.getValue(other).text)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
+        }
+
     /** A panel from another chat may keep the recording, but cannot retry or discard its PCM. */
     @Test
     fun anotherChatCannotRetryOrDiscardTheOriginRecording() {

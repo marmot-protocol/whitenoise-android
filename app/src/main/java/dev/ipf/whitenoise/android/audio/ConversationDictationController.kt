@@ -887,7 +887,7 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Immediate recovery preserves its completion choice; parked recordings resume draft-only. */
+    /** Composer audio recovery is draft-only, including recordings explicitly kept for later. */
     internal fun retryComposerAudio(access: ConversationDictationComposerAccess) {
         if (restoreParkedRecovery(access)) {
             if (canRetryRetainedAudio) retry()
@@ -955,6 +955,7 @@ internal class ConversationDictationController internal constructor(
             runCatching { targetAvailable(parked.failure.target) && parked.audio.restore() }.getOrDefault(false)
         if (!restored) return false
         parkedRecoveries.remove(entry.key)
+        draftTargetRemoved = false
         captureClosureGeneration += 1L
         notificationActionGeneration += 1L
         draftRecovery = parked.draft
