@@ -222,6 +222,7 @@ class ConversationMentionNavigationUiTest {
                             )
                         }
                     state.activeCoordinator = coordinator
+
                     fun anchor(): ConversationScrollAnchor {
                         val index = listState.firstVisibleItemIndex
                         val id = "message-${index - state.incomingCount}"
@@ -260,9 +261,10 @@ class ConversationMentionNavigationUiTest {
                             captureLayout = {
                                 ConversationInitialAnchorLayout(
                                     viewportHeight,
-                                    listState.layoutInfo.visibleItemsInfo.firstOrNull {
-                                        it.index == restore.firstVisibleItemIndex
-                                    }?.size,
+                                    listState.layoutInfo.visibleItemsInfo
+                                        .firstOrNull {
+                                            it.index == restore.firstVisibleItemIndex
+                                        }?.size,
                                 )
                             },
                         )
@@ -341,11 +343,12 @@ class ConversationMentionNavigationUiTest {
                                 unreadIncomingCount = 0,
                                 onClick = {
                                     scope.launch {
-                                        state.tailReturned = coordinator.programmaticJump(
-                                            targetMessageId = null,
-                                            reason = ConversationScrollReason.JumpToNewest,
-                                            resultingMode = ConversationScrollMode.FollowingTail,
-                                        ) { scrollToTail(0) }
+                                        state.tailReturned =
+                                            coordinator.programmaticJump(
+                                                targetMessageId = null,
+                                                reason = ConversationScrollReason.JumpToNewest,
+                                                resultingMode = ConversationScrollMode.FollowingTail,
+                                            ) { scrollToTail(0) }
                                     }
                                 },
                                 modifier = Modifier.offset(y = 48.dp).testTag("mention-tail"),
