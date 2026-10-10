@@ -221,12 +221,14 @@ jobs:
             printf 'WHITENOISE_STAGING_KEY_PASSWORD=android\n'
           } >> "$GITHUB_ENV"
 
+      # Restored metadata can cache missing artifacts that are available again.
+      # Recheck repositories before validating the optimized staging runtime.
       - name: Build optimized staging APKs
         run: >-
           ./gradlew :app:assembleStagingZapstoreRelease
           -Pandroid.injected.testOnly=false
           ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && '-x :app:lintVitalStagingZapstoreRelease' || '' }}
-          --build-cache --no-daemon --stacktrace
+          --refresh-dependencies --build-cache --no-daemon --stacktrace
 
       - name: Locate ARM64 and x86_64 staging APKs
         id: apks
