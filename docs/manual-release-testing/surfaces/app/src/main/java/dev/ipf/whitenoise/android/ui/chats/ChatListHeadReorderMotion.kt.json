@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListHeadReorderMotion.kt",
+  "legacy_sha256": "35142c5ecfb78b8bb7af1caf3f527a2ee20e0b15ea8844c6ae33a0cc77e853f3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListActiveHeadScrollEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListHeadReorderMotion.kt",
+        "anchor": "fun ChatListActiveHeadScrollEffect(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListHeadReorderMotion.kt",
+        "surface": "Latest-owned visible head correction",
+        "anchor": "internal fun ChatListActiveHeadScrollEffect(",
+        "test_ids": [
+          "CHL-029"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

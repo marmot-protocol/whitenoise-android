@@ -55,6 +55,32 @@ class ConversationMentionNavigationTest {
             assertEquals(listOf(Write(true, 5, 0), Write(false, 6, 300)), writer.writes)
         }
 
+    /** A distant approach must use geometry measured after its bounded preposition, without a stale bounce. */
+    @Test
+    fun distantMentionUsesFreshViewportAndHeightBeforeTheFinalAnimation() =
+        runTest {
+            val writer = RecordingWriter()
+            var viewport = 500
+            var height = 80
+            writer.afterSnap = {
+                viewport = 280
+                height = 700
+            }
+            val reached =
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "mention-at-end-of-unread-window",
+                    resolveTargetIndex = { 60 },
+                    readLayout = { ConversationMentionJumpLayout(viewport, height) },
+                    awaitLayout = {},
+                )
+            assertTrue(reached)
+            assertEquals(
+                "one bounded preposition and a final animation; no stale-offset correction",
+                listOf(Write(false, 50, 0), Write(true, 60, 420)),
+                writer.writes,
+            )
+        }
+
     @Test
     fun cachedEstimateCannotReportSuccessWithoutLiveMeasurement() =
         runTest {

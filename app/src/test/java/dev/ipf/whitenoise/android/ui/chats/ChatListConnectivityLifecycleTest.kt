@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -53,6 +54,9 @@ class ChatListConnectivityLifecycleTest {
                 ),
             )
         var revalidationCount = 0
+        var foregroundCount = 0
+        var relayCount = 0
+        val renderedStates = mutableListOf<ConnectivityBannerState>()
 
         composeRule.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
@@ -65,6 +69,15 @@ class ChatListConnectivityLifecycleTest {
                     relaysConnected = false,
                     foregroundEpoch = foregroundEpoch,
                     revalidateConnectionReadiness = {
+                        error("explicit foreground and relay sources must be used")
+                    },
+                    revalidateOnForeground = {
+                        foregroundCount += 1
+                        revalidationCount += 1
+                        connectionState.value = connectionState.value.beginReadinessRefresh(presentAttempt = false)
+                    },
+                    revalidateOnRelaySample = {
+                        relayCount += 1
                         revalidationCount += 1
                         connectionState.value = connectionState.value.beginReadinessRefresh(presentAttempt = false)
                     },
@@ -76,13 +89,17 @@ class ChatListConnectivityLifecycleTest {
                         runtimeGeneration = RUNTIME_GENERATION,
                         connectionState = connectionState.value,
                     )
+                val displayed = initialConnectivityBannerState(target).displayed
+                SideEffect { renderedStates.add(displayed) }
                 WhiteNoiseTheme {
-                    ChatListInlineConnectivityIndicator(initialConnectivityBannerState(target).displayed)
+                    ChatListInlineConnectivityIndicator(displayed)
                 }
             }
         }
         composeRule.waitForIdle()
         val revalidationsBeforeResume = revalidationCount
+        val foregroundBeforeResume = foregroundCount
+        val relayBeforeResume = relayCount
 
         composeRule.runOnUiThread {
             lifecycleOwner.handle(Lifecycle.Event.ON_PAUSE)
@@ -93,6 +110,13 @@ class ChatListConnectivityLifecycleTest {
         composeRule.waitForIdle()
 
         assertEquals(revalidationsBeforeResume + 1, revalidationCount)
+        assertEquals(foregroundBeforeResume + 1, foregroundCount)
+        assertEquals("resume must not manufacture a relay edge", relayBeforeResume, relayCount)
+        assertTrue(renderedStates.isNotEmpty())
+        assertTrue(
+            "no committed warm-resume state is Connecting or JustConnected",
+            renderedStates.all { it == ConnectivityBannerState.Hidden },
+        )
         assertEquals(ChatListConnectionPhase.Validating, connectionState.value.phase)
         composeRule.onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG).assertIsNotDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.connectivity_connecting)).assertDoesNotExist()

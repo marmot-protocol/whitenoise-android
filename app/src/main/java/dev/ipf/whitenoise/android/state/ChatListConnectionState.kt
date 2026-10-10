@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -175,11 +176,13 @@ private fun ChatListConnectionState.sessionIdentityOrNull(): ChatListConnectionS
     accountRef?.let { ChatListConnectionSessionIdentity(it, runtimeGeneration, bindEpoch, sessionAttemptId) }
 
 /** Owns the controller's observable readiness state and stale-result fences. */
+@Suppress("TooManyFunctions") // Readiness transitions and their diagnostics share one fenced owner.
 internal class ChatListConnectionOwner(
     private val runtimeGeneration: () -> Int,
     private val hasValidatedInternet: () -> Boolean,
     private val launchCatchUpRequest: () -> Deferred<AccountCatchUpResult>,
     private val hasCurrentSubscriptions: () -> Boolean,
+    private val diagnostics: ChatListConnectionDiagnostics? = null,
 ) {
     constructor(
         appState: WhiteNoiseAppState,
@@ -189,6 +192,7 @@ internal class ChatListConnectionOwner(
         hasValidatedInternet = { appState.connectivitySignals.value.hasValidatedInternet },
         launchCatchUpRequest = appState::launchCatchUpAccounts,
         hasCurrentSubscriptions = hasCurrentSubscriptions,
+        diagnostics = ChatListConnectionDiagnostics(appState::chatListConnectionDiagnosticConfiguration),
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -204,6 +208,7 @@ internal class ChatListConnectionOwner(
         bindEpoch: Long,
     ) {
         readinessJob?.cancel()
+        diagnostics?.clear()
         state =
             ChatListConnectionState(
                 accountRef = accountRef,
@@ -219,6 +224,7 @@ internal class ChatListConnectionOwner(
     ): ChatListConnectionState {
         readinessJob?.cancel()
         state = state.beginSessionAttempt(accountRef, runtimeGeneration(), bindEpoch)
+        diagnostics?.begin(PerformancePhase.CONNECTION_SESSION_ATTEMPT, state)
         return state
     }
 
@@ -229,6 +235,7 @@ internal class ChatListConnectionOwner(
     ): ChatListConnectionState {
         readinessJob?.cancel()
         state = state.beginSubscriptionValidation(accountRef, runtimeGeneration(), bindEpoch)
+        diagnostics?.begin(PerformancePhase.CONNECTION_SESSION_VALIDATION, state)
         return state
     }
 
@@ -239,24 +246,45 @@ internal class ChatListConnectionOwner(
         readinessJob?.cancel()
         readinessJob =
             scope.launch {
-                val result =
-                    awaitCatchUpAfterSupersession(
-                        initial = catchUp.await(),
-                        launchReplacement = {
-                            if (!state.matches(token) || !state.phase.canAcceptReadiness) {
-                                AccountCatchUpResult(AccountCatchUpOutcome.Failed)
-                            } else {
-                                launchCatchUpRequest().await()
-                            }
-                        },
-                    )
+                val result = awaitReadinessCatchUp(catchUp, token)
+                val ownsResult = state.matches(token)
                 state = state.applyCatchUpResult(token, result)
+                if (ownsResult) {
+                    diagnostics?.event(
+                        when (result.outcome) {
+                            AccountCatchUpOutcome.Succeeded -> PerformancePhase.CONNECTION_CATCH_UP_SUCCEEDED
+                            AccountCatchUpOutcome.Failed -> PerformancePhase.CONNECTION_CATCH_UP_FAILED
+                            AccountCatchUpOutcome.Superseded -> PerformancePhase.CONNECTION_CATCH_UP_SUPERSEDED
+                        },
+                        state,
+                    )
+                }
             }
     }
+
+    /** A failed native request settles readiness; cancellation still unwinds the owning observer. */
+    private suspend fun awaitReadinessCatchUp(
+        catchUp: Deferred<AccountCatchUpResult>,
+        token: ChatListConnectionEvidenceToken,
+    ): AccountCatchUpResult =
+        runCatchingCancellable {
+            awaitCatchUpAfterSupersession(
+                initial = catchUp.await(),
+                launchReplacement = {
+                    if (!state.matches(token) || !state.phase.canAcceptReadiness) {
+                        AccountCatchUpResult(AccountCatchUpOutcome.Failed)
+                    } else {
+                        diagnostics?.event(PerformancePhase.CONNECTION_CATCH_UP_SUPERSEDED, state)
+                        launchCatchUpRequest().await()
+                    }
+                },
+            )
+        }.getOrElse { AccountCatchUpResult(AccountCatchUpOutcome.Failed) }
 
     /** Publishes live-update readiness only when the captured attempt remains current. */
     fun noteLiveUpdate(attempt: ChatListConnectionState) {
         val account = attempt.accountRef ?: return
+        val previousPhase = state.phase
         state =
             state.readyFromLiveUpdate(
                 accountRef = account,
@@ -265,6 +293,28 @@ internal class ChatListConnectionOwner(
                 sessionAttemptId = attempt.sessionAttemptId,
                 hasValidatedInternet = hasValidatedInternet(),
             )
+        if (state.phase != previousPhase && state.phase == ChatListConnectionPhase.Ready) {
+            diagnostics?.event(PerformancePhase.CONNECTION_READY, state)
+        }
+    }
+
+    /** Attributes only boundaries belonging to the current account/runtime/subscription attempt. */
+    fun noteSubscriptionBoundary(
+        attempt: ChatListConnectionState,
+        phase: PerformancePhase,
+        durationMs: Long = 0L,
+    ) {
+        if (state.sessionIdentityOrNull() == attempt.sessionIdentityOrNull()) {
+            diagnostics?.event(phase, state, durationMs)
+        }
+    }
+
+    /** Records a rendered status boundary without granting readiness or changing transport policy. */
+    fun notePresentation(
+        phase: PerformancePhase,
+        durationMs: Long = 0L,
+    ) {
+        diagnostics?.event(phase, state, durationMs)
     }
 
     /** Completes the captured attempt without allowing stale work to replace newer state. */
@@ -280,18 +330,29 @@ internal class ChatListConnectionOwner(
         if (finished != state) {
             readinessJob?.cancel()
             state = finished
+            diagnostics?.event(PerformancePhase.CONNECTION_SESSION_ENDED, state)
         }
     }
 
     /** Re-evaluates readiness after connectivity, lifecycle, or subscription evidence changes. */
-    fun refresh(presentAttempt: Boolean) {
+    fun refresh(
+        presentAttempt: Boolean,
+        source: PerformancePhase = PerformancePhase.CONNECTION_SESSION_VALIDATION,
+    ) {
         if (!cleared) {
             when {
-                !hasValidatedInternet() -> invalidate()
+                !hasValidatedInternet() -> {
+                    invalidate(PerformancePhase.CONNECTION_NETWORK_LOST)
+                }
                 hasCurrentSubscriptions() && shouldRefresh(presentAttempt) -> {
                     state = state.beginReadinessRefresh(presentAttempt)
+                    diagnostics?.begin(
+                        if (presentAttempt) PerformancePhase.CONNECTION_NETWORK_RECOVERY else source,
+                        state,
+                    )
                     observe(launchCatchUp())
                 }
+                else -> diagnostics?.event(source, state)
             }
         }
     }
@@ -309,9 +370,11 @@ internal class ChatListConnectionOwner(
     fun launchCatchUp(): Deferred<AccountCatchUpResult> = launchCatchUpRequest()
 
     /** Invalidates current readiness and cancels any result awaiting publication. */
-    fun invalidate() {
+    fun invalidate(source: PerformancePhase = PerformancePhase.CONNECTION_INVALIDATED) {
         readinessJob?.cancel()
+        if (source != PerformancePhase.CONNECTION_INVALIDATED) diagnostics?.begin(source, state)
         if (state.phase != ChatListConnectionPhase.Idle) state = state.invalidateReadiness()
+        diagnostics?.event(PerformancePhase.CONNECTION_INVALIDATED, state)
     }
 
     /** Permanently releases this owner and its pending readiness observation. */
@@ -319,6 +382,7 @@ internal class ChatListConnectionOwner(
         cleared = true
         readinessJob?.cancel()
         scope.cancel()
+        diagnostics?.clear()
         state = ChatListConnectionState()
     }
 }

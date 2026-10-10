@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerState.kt",
+  "legacy_sha256": "13326c39f80938743a01b84fd3e738a25693ebc86559cceefa5d5e2d6d40aa8a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListInlineConnectivityIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerState.kt",
+        "anchor": "fun ChatListInlineConnectivityIndicator(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerState.kt",
+        "surface": "Effective notification readiness presentation",
+        "anchor": "internal fun rememberChatListConnectivityState(",
+        "test_ids": [
+          "CHL-030"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

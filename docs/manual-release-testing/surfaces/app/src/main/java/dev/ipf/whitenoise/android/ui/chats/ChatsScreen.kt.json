@@ -234,6 +234,14 @@
         "test_ids": [
           "CHL-017"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "surface": "User gesture authority during head correction",
+        "anchor": "userGestureGeneration = userGestureGeneration",
+        "test_ids": [
+          "CHL-029"
+        ]
       }
     ]
   },

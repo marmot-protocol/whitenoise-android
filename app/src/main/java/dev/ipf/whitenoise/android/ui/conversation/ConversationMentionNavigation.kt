@@ -32,6 +32,8 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
         programmaticJump(targetMessageId, ConversationScrollReason.Mention) {
             val initialIndex = resolveTargetIndex() ?: return@programmaticJump
             val initialOffset = readLayout(initialIndex).readingStartOffset
+            var placedIndex = initialIndex
+            var placedOffset = initialOffset
             val approached =
                 tracedPagingSection(ConversationMentionJumpTrace.APPROACH) {
                     animateScrollToItem(
@@ -39,18 +41,21 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
                         initialOffset,
                         traceMentionJump = true,
                         resolveIndex = resolveTargetIndex,
+                        resolveScrollOffset = { index ->
+                            placedIndex = index
+                            placedOffset = readLayout(index).readingStartOffset
+                            placedOffset
+                        },
                     )
                 }
             if (!approached) return@programmaticJump
 
             tracedPagingSection(ConversationMentionJumpTrace.LAYOUT) { awaitLayout() }
-            var placedIndex = initialIndex
-            var placedOffset = initialOffset
             var measuredIndex = resolveTargetIndex() ?: return@programmaticJump
             var measuredLayout = readLayout(measuredIndex)
             // An expanded-row estimate can overshoot a now-collapsed row entirely.
             // Reach its newest edge once without the estimate, then measure afresh.
-            if (!measuredLayout.isMeasured && measuredLayout.viewportEndOffsetPx > 0 && initialOffset != 0) {
+            if (!measuredLayout.isMeasured && measuredLayout.viewportEndOffsetPx > 0 && placedOffset != 0) {
                 tracedPagingSection(ConversationMentionJumpTrace.CORRECTION) {
                     scrollToItem(measuredIndex, 0)
                 }

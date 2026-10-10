@@ -745,6 +745,7 @@ internal fun ChatListHeadReorderMotionHarness(
     onHeadScrollCorrectionStarted: () -> Unit = {},
     onOpen: (String) -> Unit = {},
     onRowsComposed: (List<String>, Boolean) -> Unit = { _, _ -> },
+    rowContent: (@Composable (String, Modifier, Boolean) -> Unit)? = null,
 ) {
     var scrollCorrectionInProgress by remember { mutableStateOf(false) }
     val viewportGeneration = rememberChatListUserGestureGeneration(listState)
@@ -816,15 +817,23 @@ internal fun ChatListHeadReorderMotionHarness(
             }
             item(key = id) {
                 Box(modifier = chatListRowMotion(targetIndex, rowPlacementDurationMillis)) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(rowHeights[id] ?: rowHeight)
-                                .clickable(enabled = interactionsEnabled) { onOpen(id) }
-                                .testTag(chatListHeadReorderRowTag(id)),
-                    ) {
-                        Text("$id-$contentRevision")
+                    if (rowContent != null) {
+                        rowContent(
+                            id,
+                            Modifier.fillMaxWidth().testTag(chatListHeadReorderRowTag(id)),
+                            interactionsEnabled,
+                        )
+                    } else {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(rowHeights[id] ?: rowHeight)
+                                    .clickable(enabled = interactionsEnabled) { onOpen(id) }
+                                    .testTag(chatListHeadReorderRowTag(id)),
+                        ) {
+                            Text("$id-$contentRevision")
+                        }
                     }
                 }
             }

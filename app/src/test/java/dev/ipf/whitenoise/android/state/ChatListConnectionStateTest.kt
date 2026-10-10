@@ -478,6 +478,34 @@ class ChatListConnectionStateTest {
             }
         }
 
+    /** Exceptional catch-up completion must not strand a visible Connecting attempt. */
+    @Test
+    fun failedCatchUpDeferredSettlesTheCurrentReadinessAttempt() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val failed = CompletableDeferred<AccountCatchUpResult>()
+            val owner =
+                ChatListConnectionOwner(
+                    runtimeGeneration = { 4 },
+                    hasValidatedInternet = { true },
+                    launchCatchUpRequest = { failed },
+                    hasCurrentSubscriptions = { true },
+                )
+            try {
+                owner.beginSessionAttempt(accountRef = "personal", bindEpoch = 7)
+                owner.observe(failed)
+                runCurrent()
+                assertEquals(ChatListConnectionPhase.Attempting, owner.state.phase)
+
+                failed.completeExceptionally(IllegalStateException("fixture catch-up failure"))
+                runCurrent()
+                assertEquals(ChatListConnectionPhase.Idle, owner.state.phase)
+            } finally {
+                owner.clear()
+                Dispatchers.resetMain()
+            }
+        }
+
     @Test
     fun liveUpdateRequiresCurrentSessionAndValidatedInternet() {
         val attempting =

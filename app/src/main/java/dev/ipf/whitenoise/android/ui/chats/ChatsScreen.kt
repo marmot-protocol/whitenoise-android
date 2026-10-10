@@ -1148,6 +1148,7 @@ internal fun ChatsScreen(
         userHeadDemotionSettled = pendingHeadDemotionSettled,
         userHeadDemotionTargetIndex = pendingHeadDemotionTargetIndex,
         viewportGeneration = viewportGeneration,
+        userGestureGeneration = userGestureGeneration,
         onUserHeadDemotionConsumed = { consumed ->
             if (pendingHeadDemotion == consumed) pendingHeadDemotion = null
         },
