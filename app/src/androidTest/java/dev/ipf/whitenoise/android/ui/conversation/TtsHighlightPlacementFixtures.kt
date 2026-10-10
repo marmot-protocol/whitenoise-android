@@ -262,7 +262,6 @@ internal object TtsHighlightPlacementFixtures {
         }
     }
 
-
     const val SENDER_NAME = "Alice"
     const val PREFIX = "$SENDER_NAME: "
     const val ACCOUNT_REF = "personal"
