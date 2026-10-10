@@ -92,7 +92,9 @@ private enum class StartupBoundary {
 }
 
 /** Owns a synthetic account and holds exactly one selected native boundary until released. */
-private class InitialRecoveryFixture(private val boundary: StartupBoundary) : AutoCloseable {
+private class InitialRecoveryFixture(
+    private val boundary: StartupBoundary,
+) : AutoCloseable {
     val entered = CountDownLatch(1)
     val release = CountDownLatch(1)
     val windowOpens = AtomicInteger()
@@ -191,7 +193,10 @@ private class InitialRecoveryWindow(
     ) = frame
 
     /** Unused anchor commands preserve the complete empty replacement. */
-    override suspend fun setVisibleAnchor(sequence: ULong, groupIdHex: String) = frame
+    override suspend fun setVisibleAnchor(
+        sequence: ULong,
+        groupIdHex: String,
+    ) = frame
 
     /** Unused top commands preserve the complete empty replacement. */
     override suspend fun returnToTop(sequence: ULong) = frame
