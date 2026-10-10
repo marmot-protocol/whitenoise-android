@@ -7,6 +7,17 @@ test_package="dev.ipf.whitenoise.android.benchmark"
 runner="$test_package/androidx.test.runner.AndroidJUnitRunner"
 allow_network_toggle="${ALLOW_NETWORK_TOGGLE:-false}"
 network_recovery_benchmark_class="dev.ipf.whitenoise.android.benchmark.NetworkRecoveryBenchmark"
+startup_local_frame_budget_ms="${STARTUP_LOCAL_FRAME_BUDGET_MS:-}"
+if [[ -n "$startup_local_frame_budget_ms" && ! "$startup_local_frame_budget_ms" =~ ^[1-9][0-9]{0,8}$ ]]; then
+  echo "STARTUP_LOCAL_FRAME_BUDGET_MS must be a positive reviewed budget (at most 9 digits)." >&2
+  exit 2
+fi
+if [[ -z "${BENCHMARK_CLASS_FILTER:-}" || "${BENCHMARK_CLASS_FILTER:-}" == *"StartupBenchmark"* ]]; then
+  if [[ -z "$startup_local_frame_budget_ms" ]]; then
+    echo "Startup qualification requires a reviewed STARTUP_LOCAL_FRAME_BUDGET_MS before device changes." >&2
+    exit 2
+  fi
+fi
 
 if [[ "${BENCHMARK_CLASS_FILTER:-}" == *"$network_recovery_benchmark_class"* &&
   "$allow_network_toggle" != true ]]; then
@@ -646,13 +657,16 @@ if [[ "$startup_markers_ready" != true ]]; then
     echo "Captured log: $startup_log" >&2
     exit 1
   fi
-else
+elif [[ -n "$startup_local_frame_budget_ms" ]]; then
   bash scripts/package-replacement-startup-report.sh \
     "$local_output/package-replacement-launch.txt" \
     "$startup_log" \
     "$local_output/package-replacement-device.txt" \
     "$(sha256_file "$app_apk")" \
-    "$local_output/package-replacement-startup.json"
+    "$local_output/package-replacement-startup.json" \
+    "$startup_local_frame_budget_ms"
+else
+  echo "No reviewed local-frame budget supplied; this non-startup journey does not qualify startup." >&2
 fi
 
 preflight_dump="$device_output/preflight.xml"

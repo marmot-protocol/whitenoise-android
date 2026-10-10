@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if (($# != 5)); then
-  echo "usage: $0 <launch-output> <startup-log> <device-state> <apk-sha256> <report-json>" >&2
+if (($# != 6)); then
+  echo "usage: $0 <launch-output> <startup-log> <device-state> <apk-sha256> <report-json> <local-frame-budget-ms>" >&2
   exit 2
 fi
 
@@ -11,6 +11,11 @@ startup_log="$2"
 device_state="$3"
 apk_sha256="$4"
 report_json="$5"
+local_frame_budget_ms="$6"
+if [[ ! "$local_frame_budget_ms" =~ ^[1-9][0-9]{0,8}$ ]]; then
+  echo "A positive, reviewed local-frame budget in milliseconds is required (at most 9 digits)." >&2
+  exit 2
+fi
 
 for required_file in "$launch_output" "$startup_log" "$device_state"; do
   if [[ ! -f "$required_file" ]]; then
@@ -80,7 +85,7 @@ if [[ "$activity" != \
   echo "Package-replacement launch reported the wrong Activity: ${activity:-missing}" >&2
   exit 1
 fi
-if [[ ! "$total_time_ms" =~ ^[0-9]+$ ]]; then
+if [[ ! "$total_time_ms" =~ ^(0|[1-9][0-9]{0,8})$ ]]; then
   echo "Package-replacement launch is missing a numeric TotalTime." >&2
   exit 1
 fi
@@ -97,6 +102,12 @@ if ! ready_ms="$(read_phase_value first_local_frame elapsed_ms)"; then
   echo "Expected exactly one first-local-frame startup marker." >&2
   exit 1
 fi
+for duration_ms in "$splash_handoff_ms" "$ready_ms"; do
+  if [[ ! "$duration_ms" =~ ^(0|[1-9][0-9]{0,8})$ ]]; then
+    echo "Startup marker duration is malformed or outside the supported numeric range." >&2
+    exit 1
+  fi
+done
 # Activity TotalTime includes launch work before Application/AppState exists,
 # while WNPerf elapsed time begins with AppState. Use the conservative later
 # value so pre-AppState work cannot be hidden from the splash bound.
@@ -107,6 +118,13 @@ else
 fi
 if ((first_compose_ui_ms >= 2000)); then
   echo "App-owned Compose UI missed the 2 second handoff bound: ${first_compose_ui_ms}ms" >&2
+  exit 1
+fi
+# Sum both clocks conservatively: this includes launch work before AppState
+# exists, although the overlapping Activity/trace work is counted twice.
+ready_upper_bound_ms=$((total_time_ms + ready_ms))
+if ((ready_upper_bound_ms > local_frame_budget_ms)); then
+  echo "First local chat frame exceeded its reviewed budget: ${ready_upper_bound_ms}ms > ${local_frame_budget_ms}ms" >&2
   exit 1
 fi
 
@@ -149,12 +167,15 @@ jq -n \
   --argjson systemSplashHandoffMs "$splash_handoff_ms" \
   --argjson timeToFirstComposeUiMs "$first_compose_ui_ms" \
   --argjson timeToReadyMs "$ready_ms" \
+  --argjson timeToReadyUpperBoundMs "$ready_upper_bound_ms" \
+  --argjson localFrameBudgetMs "$local_frame_budget_ms" \
   '{
-    schemaVersion: 1,
+    schemaVersion: 2,
     journey: "in-place-package-replacement-cold-start",
     capturedAtUtc: $capturedAtUtc,
     packageName: $packageName,
     releaseLikeApkSha256: $apkSha256,
+    acceptance: {localFrameBudgetMs: $localFrameBudgetMs},
     device: {
       serial: $serial,
       model: $model,
@@ -166,15 +187,17 @@ jq -n \
       activityTotalTimeMs: $activityTotalTimeMs,
       systemSplashHandoffMs: $systemSplashHandoffMs,
       timeToFirstComposeUiMs: $timeToFirstComposeUiMs,
-      timeToReadyMs: $timeToReadyMs
+      timeToReadyMs: $timeToReadyMs,
+      timeToReadyUpperBoundMs: $timeToReadyUpperBoundMs
     }
   }' >"$report_json"
 
 jq -e '
-  .schemaVersion == 1 and
+  .schemaVersion == 2 and
   .journey == "in-place-package-replacement-cold-start" and
   .measurements.timeToFirstComposeUiMs < 2000 and
-  .measurements.timeToReadyMs >= 0
+  .measurements.timeToReadyMs >= 0 and
+  .measurements.timeToReadyUpperBoundMs <= .acceptance.localFrameBudgetMs
 ' "$report_json" >/dev/null
 
 echo "Package-replacement startup report: $report_json"

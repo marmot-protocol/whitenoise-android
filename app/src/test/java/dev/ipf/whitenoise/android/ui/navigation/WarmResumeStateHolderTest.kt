@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
 import android.os.Bundle
+import android.os.Looper
 import android.os.Parcel
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.SavedStateHandle
@@ -15,6 +16,7 @@ import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.AppPhase
+import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -24,9 +26,15 @@ import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -34,11 +42,52 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class WarmResumeStateHolderTest {
+    /** Recovery keeps one unfinished controller while account/runtime fences and protected-shell gates hold. */
+    @Test
+    fun initialLoadFailureIsRecoverableWithoutGrantingASnapshotOrDroppingTheSavedRoute() {
+        val state = appState()
+        state.liveSubscriptionOverrides.chatList =
+            ChatListLiveSubscriptions(
+                openChatListWindow = { _, _ -> throw IllegalStateException("synthetic initial read failure") },
+                openChats = { _, _ -> error("Window failure must precede the paired stream") },
+            )
+        val savedState =
+            SavedStateHandle(
+                mapOf(
+                    "main_shell_selected_account_ref" to ACCOUNT_REF,
+                    "main_shell_selected_group_id" to GROUP_ID,
+                ),
+            )
+        val holder = MainShellStateHolder(state, savedState)
+        val controller = holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        scope.launch { controller.bind(ACCOUNT_REF) }
+        repeat(100) {
+            if (controller.error == null) shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+        }
+        assertNotNull(controller.error)
+        holder.restoreConversationIfReady(controller, ACCOUNT_REF)
+
+        assertSame(controller, holder.startupRecoveryController(ACCOUNT_REF, runtimeGeneration = 4))
+        assertFalse(holder.localProjectionAvailable(ACCOUNT_REF, runtimeGeneration = 4))
+        assertFalse(holder.firstUsefulFrameReady(AppPhase.Ready, ACCOUNT_REF, 4, appLockScreenVisible = false))
+        assertNull(holder.startupRecoveryController("another-account", runtimeGeneration = 4))
+        assertNull(holder.startupRecoveryController(ACCOUNT_REF, runtimeGeneration = 5))
+        assertTrue(holder.hasSavedConversationRoute)
+        assertNull(holder.selectedChat.value)
+        assertEquals(GROUP_ID, savedState.get<String>("main_shell_selected_group_id"))
+        assertSame(controller, holder.chatsController(ACCOUNT_REF, runtimeGeneration = 4))
+        holder.release()
+        scope.cancel()
+    }
+
     /** Verifies that account replacement cannot replay the cold-process indicator. */
     @Test
     fun onlyTheFirstAccountControllerInAProcessPresentsItsInitialConnectionAttempt() {

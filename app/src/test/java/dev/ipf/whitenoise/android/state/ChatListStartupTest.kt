@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,6 +63,19 @@ class ChatListStartupTest {
         runBlocking { controller.watchSlowChatListStartup(controller.bindEpoch - 1L, delayMillis = 0L) }
 
         assertFalse(controller.startupTakingLonger)
+    }
+
+    /** A stale or cleared startup timer cannot create recovery for a different owner. */
+    @Test
+    fun staleOrClearedDeadlineCannotPublishRecovery() {
+        val controller = controller()
+        runBlocking { controller.watchActionableChatListStartup(controller.bindEpoch - 1L, delayMillis = 0L) }
+        assertNull(controller.error)
+        val epoch = controller.bindEpoch
+        controller.onCleared()
+        runBlocking { controller.watchActionableChatListStartup(epoch, delayMillis = 0L) }
+        assertNull(controller.error)
+        assertFalse(controller.hasLoadedLocalSnapshot)
     }
 
     private fun controller(): ChatsController {

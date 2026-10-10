@@ -38,14 +38,17 @@ bash "$reporter" \
   "$fixture_dir/startup.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/report.json"
+  "$fixture_dir/report.json" 4000
 
 jq -e '
   .device.model == "Pixel 9 Pro XL" and
   .measurements.activityTotalTimeMs == 1634 and
   .measurements.systemSplashHandoffMs == 1498 and
   .measurements.timeToFirstComposeUiMs == 1634 and
-  .measurements.timeToReadyMs == 2288
+  .measurements.timeToReadyMs == 2288 and
+  .measurements.timeToReadyUpperBoundMs == 3922 and
+  .acceptance.localFrameBudgetMs == 4000 and
+  .schemaVersion == 2
 ' "$fixture_dir/report.json" >/dev/null
 
 cp "$fixture_dir/startup.log" "$fixture_dir/missing-marker.log"
@@ -55,7 +58,7 @@ if bash "$reporter" \
   "$fixture_dir/missing-marker.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/missing.json" >/dev/null 2>&1; then
+  "$fixture_dir/missing.json" 4000 >/dev/null 2>&1; then
   echo "Reporter accepted evidence without a Ready marker." >&2
   exit 1
 fi
@@ -67,7 +70,7 @@ if bash "$reporter" \
   "$fixture_dir/lookalike-marker.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/lookalike.json" >/dev/null 2>&1; then
+  "$fixture_dir/lookalike.json" 4000 >/dev/null 2>&1; then
   echo "Reporter accepted a look-alike Ready marker." >&2
   exit 1
 fi
@@ -79,7 +82,7 @@ if bash "$reporter" \
   "$fixture_dir/duplicate-marker.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/duplicate.json" >/dev/null 2>&1; then
+  "$fixture_dir/duplicate.json" 4000 >/dev/null 2>&1; then
   echo "Reporter accepted duplicate Ready markers." >&2
   exit 1
 fi
@@ -90,7 +93,7 @@ if bash "$reporter" \
   "$fixture_dir/startup.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/warm.json" >/dev/null 2>&1; then
+  "$fixture_dir/warm.json" 4000 >/dev/null 2>&1; then
   echo "Reporter accepted a non-cold package-replacement launch." >&2
   exit 1
 fi
@@ -102,7 +105,7 @@ if bash "$reporter" \
   "$fixture_dir/late-handoff.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/late.json" >/dev/null 2>&1; then
+  "$fixture_dir/late.json" 4000 >/dev/null 2>&1; then
   echo "Reporter accepted a Compose handoff outside the 2 second bound." >&2
   exit 1
 fi
@@ -113,7 +116,7 @@ if bash "$reporter" \
   "$fixture_dir/startup.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/late-activity.json" >/dev/null 2>&1; then
+  "$fixture_dir/late-activity.json" 4000 >/dev/null 2>&1; then
   echo "Reporter hid launch work before the startup trace began." >&2
   exit 1
 fi
@@ -125,7 +128,7 @@ if bash "$reporter" \
   "$fixture_dir/startup.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/wrong-activity.json" >/dev/null 2>&1; then
+  "$fixture_dir/wrong-activity.json" 4000 >/dev/null 2>&1; then
   echo "Reporter accepted evidence from the wrong Activity." >&2
   exit 1
 fi
@@ -137,9 +140,37 @@ if bash "$reporter" \
   "$fixture_dir/wrong-operation.log" \
   "$fixture_dir/device.txt" \
   0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
-  "$fixture_dir/wrong-operation.json" >/dev/null 2>&1; then
+  "$fixture_dir/wrong-operation.json" 4000 >/dev/null 2>&1; then
   echo "Reporter accepted a startup marker from another operation." >&2
   exit 1
 fi
+
+# A fast splash cannot hide a local projection arriving minutes later.
+sed 's/elapsed_ms=2288/elapsed_ms=180000/' "$fixture_dir/startup.log" >"$fixture_dir/late-local.log"
+if bash "$reporter" "$fixture_dir/launch.txt" "$fixture_dir/late-local.log" \
+  "$fixture_dir/device.txt" 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+  "$fixture_dir/late-local.json" 4000 >/dev/null 2>&1; then
+  echo "Reporter accepted a late local frame despite its budget." >&2
+  exit 1
+fi
+
+# The bound includes launch work before AppState; exact equality is accepted.
+bash "$reporter" "$fixture_dir/launch.txt" "$fixture_dir/startup.log" \
+  "$fixture_dir/device.txt" 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+  "$fixture_dir/boundary.json" 3922 >/dev/null
+if bash "$reporter" "$fixture_dir/launch.txt" "$fixture_dir/startup.log" \
+  "$fixture_dir/device.txt" 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+  "$fixture_dir/over-budget.json" 3921 >/dev/null 2>&1; then
+  echo "Reporter hid pre-AppState launch work from the local-frame bound." >&2
+  exit 1
+fi
+for invalid_budget in 0 -1 04 abc 4000ms 1000000000 ''; do
+  if bash "$reporter" "$fixture_dir/launch.txt" "$fixture_dir/startup.log" \
+    "$fixture_dir/device.txt" 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+    "$fixture_dir/invalid-budget.json" "$invalid_budget" >/dev/null 2>&1; then
+    echo "Reporter accepted invalid local-frame budget: $invalid_budget" >&2
+    exit 1
+  fi
+done
 
 echo "Package-replacement startup reporter tests passed."

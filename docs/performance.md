@@ -306,6 +306,7 @@ remove the authenticated target package:
 
 ```bash
 ANDROID_SERIAL=<device-serial> \
+  STARTUP_LOCAL_FRAME_BUDGET_MS=<reviewed-device-budget-ms> \
   scripts/run-performance-benchmarks.sh "$GROUP_NAME"
 ```
 
@@ -321,8 +322,14 @@ first cold launch after that in-place replacement. The explicitly selected
 release-like benchmark build emits privacy-safe `WNPerf` startup milestones for
 the system-splash handoff and the first authoritative local chat-list frame. The
 host runner requires a cold Activity
-launch, requires both milestones, and rejects a Compose handoff at or beyond two
-seconds. It writes the exact APK SHA-256, named device/API/build fingerprint,
+launch, requires both milestones, rejects a Compose handoff at or beyond two
+seconds, and rejects the first local frame when its conservative upper bound exceeds
+`STARTUP_LOCAL_FRAME_BUDGET_MS`. Choose and review that budget from repeated
+release-like measurements on the named device **before** the acceptance run; do
+not pick a larger value after seeing a failing measurement. There is no default
+budget. The startup/default suite rejects a missing budget before changing the
+device; a filtered non-startup journey without one does not produce a qualified
+startup report. It writes the exact APK SHA-256, named device/API/build fingerprint,
 Activity launch timing, splash handoff timing, time to first app-owned Compose
 UI, and time to local Ready state to:
 
@@ -753,8 +760,14 @@ account, group, or message identifier.
 launch time and the monotonic system-splash handoff; this prevents Application
 startup before the app trace exists from disappearing from the result.
 `timeToReadyMs` is the first locally authoritative chat-list frame measured by
-the process-local `app_start` trace; pre-AppState launch work remains represented
-by the separate Activity timing. Do not
+the process-local `app_start` trace. Schema 2 also records
+`timeToReadyUpperBoundMs`, the sum of that trace duration and Activity launch
+time. This deliberately counts their overlapping work twice so pre-AppState
+launch work cannot escape the local-frame budget. The measured trace duration
+and conservative upper bound are separate fields; compare like for like when
+calibrating `acceptance.localFrameBudgetMs`. A recovery screen never qualifies
+as a successful local frame. The UI's 15-second recovery deadline is a
+presentation limit, not a performance acceptance budget. Do not
 substitute emulator output for the named physical-device evidence required by
 the startup issue.
 

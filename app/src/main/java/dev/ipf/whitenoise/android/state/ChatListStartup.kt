@@ -8,6 +8,9 @@ import kotlinx.coroutines.delay
 /** How long the chat list may sit on a bare spinner before it says the update is still finishing. */
 internal const val CHAT_LIST_SLOW_START_MILLIS = 4_000L
 
+/** Presentation deadline, matching bootstrap recovery; this does not time out native work. */
+internal const val CHAT_LIST_ACTIONABLE_START_MILLIS = 15_000L
+
 /**
  * Whether a member snapshot failure can never succeed on retry. MarmotKit answers `UnknownGroup` for a
  * chat row whose group its member API no longer knows; retrying only repeats the refusal on the backoff
@@ -31,6 +34,15 @@ internal suspend fun ChatsController.watchSlowChatListStartup(
     if (!isLoading || !isActiveBindEpoch(epoch)) return
     slowStartupEpoch = epoch
     Log.i("DMChats", "chat_list_first_window_slow ms=$delayMillis")
+}
+
+/** Exposes recovery for an unfinished first projection without cancelling or duplicating its read. */
+internal suspend fun ChatsController.watchActionableChatListStartup(
+    epoch: Long,
+    delayMillis: Long = CHAT_LIST_ACTIONABLE_START_MILLIS,
+) {
+    delay(delayMillis)
+    publishInitialLoadTimeout(epoch)
 }
 
 /** Debug-only so operational INFO logs don't ship in release logcat. See #39. */
