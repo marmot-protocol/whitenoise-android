@@ -184,6 +184,35 @@ may uninstall the target during teardown and erase the local identity and messag
 history. After profile collection, restore the normal dev APK in place without
 uninstalling or clearing data.
 
+## Populated process-death startup regression
+
+`PopulatedProcessDeathStartupBenchmark#populatedLocalRowsRemainInteractiveBeforeNetworkRelease`
+uses the separate benchmark process and the ordinary target Application. Prepare an
+owned authenticated fixture with persisted chats and a known `groupName` through
+normal app/MDK operations before the run. The test does not reset accounts or
+create an Android protocol-data cache.
+
+The host must capture and restore the original connectivity state, make every
+internet-capable transport unavailable, and pass `requireOfflineStartup=true`.
+When using the state-preserving runner, set `REQUIRE_OFFLINE_STARTUP=true` and
+select this class with `BENCHMARK_CLASS_FILTER`; supply the reviewed
+`STARTUP_LOCAL_FRAME_BUDGET_MS` as for other startup qualification. This test does
+not toggle radios itself and refuses online or switched-user fixtures.
+
+Each of three iterations verifies the populated local list, presses Home, calls
+`am kill` for only the fixture user, requires the old process to disappear, and
+reopens the retained task. It rejects a retained PID, loading/recovery in place of
+the populated local checkpoint, missing rows, or a row action that cannot open
+the local transcript before network release. Every restored launch enforces the
+reviewed `localFrameBudgetMs` against the launch-to-populated-checkpoint elapsed
+time, including UI-automation observation overhead. The runner passes the same
+reviewed budget to both this test and its package-replacement reporter. A foreground service that prevents
+`am kill` is a failed qualification, not a skipped test. Macrobenchmark's
+`killProcess()` uses force-stop and cannot substitute for this ordinary
+process-death scenario. Retain the startup traces and instrumentation result
+alongside exact APK/source/MDK provenance. Emulator runs qualify behavior only;
+physical release-like timings and a reviewed device budget remain separate gates.
+
 ## Run Macrobenchmarks
 
 ### Isolated media component probe
@@ -306,6 +335,7 @@ remove the authenticated target package:
 
 ```bash
 ANDROID_SERIAL=<device-serial> \
+  STARTUP_LOCAL_FRAME_BUDGET_MS=<reviewed-device-budget-ms> \
   scripts/run-performance-benchmarks.sh "$GROUP_NAME"
 ```
 
@@ -321,8 +351,14 @@ first cold launch after that in-place replacement. The explicitly selected
 release-like benchmark build emits privacy-safe `WNPerf` startup milestones for
 the system-splash handoff and the first authoritative local chat-list frame. The
 host runner requires a cold Activity
-launch, requires both milestones, and rejects a Compose handoff at or beyond two
-seconds. It writes the exact APK SHA-256, named device/API/build fingerprint,
+launch, requires both milestones, rejects a Compose handoff at or beyond two
+seconds, and rejects the first local frame when its conservative upper bound exceeds
+`STARTUP_LOCAL_FRAME_BUDGET_MS`. Choose and review that budget from repeated
+release-like measurements on the named device **before** the acceptance run; do
+not pick a larger value after seeing a failing measurement. There is no default
+budget. The startup/default suite rejects a missing budget before changing the
+device; a filtered non-startup journey without one does not produce a qualified
+startup report. It writes the exact APK SHA-256, named device/API/build fingerprint,
 Activity launch timing, splash handoff timing, time to first app-owned Compose
 UI, and time to local Ready state to:
 
@@ -753,8 +789,14 @@ account, group, or message identifier.
 launch time and the monotonic system-splash handoff; this prevents Application
 startup before the app trace exists from disappearing from the result.
 `timeToReadyMs` is the first locally authoritative chat-list frame measured by
-the process-local `app_start` trace; pre-AppState launch work remains represented
-by the separate Activity timing. Do not
+the process-local `app_start` trace. Schema 2 also records
+`timeToReadyUpperBoundMs`, the sum of that trace duration and Activity launch
+time. This deliberately counts their overlapping work twice so pre-AppState
+launch work cannot escape the local-frame budget. The measured trace duration
+and conservative upper bound are separate fields; compare like for like when
+calibrating `acceptance.localFrameBudgetMs`. A recovery screen never qualifies
+as a successful local frame. The UI's 15-second recovery deadline is a
+presentation limit, not a performance acceptance budget. Do not
 substitute emulator output for the named physical-device evidence required by
 the startup issue.
 

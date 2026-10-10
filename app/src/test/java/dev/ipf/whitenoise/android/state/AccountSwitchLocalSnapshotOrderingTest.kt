@@ -39,6 +39,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertEquals(MAX_TOP_BAR_OTHER_ACCOUNTS + 1, seeds.size)
     }
 
+    /** Local rows, membership and the rendered frame retain their order under one captured bind epoch. */
     @Test
     fun bindPublishesLocalSnapshotsAndAFrameBeforeCatchUp() {
         val body = controllersSource().readText().kotlinFunctionBody("bind")
@@ -56,7 +57,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val firstSnapshot = body.indexOf("liveSubscriptions.openFolderSource(")
         val localRowsReady = body.indexOf("recordAccountSwitchLocalRowsReady", startIndex = firstSnapshot)
         val secondSnapshot = body.indexOf("chatStream.snapshot()")
-        val memberProjection = body.indexOf("seedInitialMemberIdProjection(accountRef, bindEpoch)")
+        val memberProjection = body.indexOf("seedInitialMemberIdProjection(accountRef, epoch)")
         val publishReady = body.indexOf("isLoading = false", startIndex = secondSnapshot)
         val renderFrame = body.indexOf("awaitRenderedChatListFrame()", startIndex = publishReady)
         val catchUp = body.indexOf("connectionOwner.launchCatchUp()", startIndex = renderFrame)
@@ -76,6 +77,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("chat-list snapshot must be read", firstSnapshot >= 0)
         assertTrue("cached-row timing must follow its local snapshot", localRowsReady > firstSnapshot)
         assertTrue("chats snapshot must follow the chat-list snapshot", secondSnapshot > firstSnapshot)
+        assertCapturedBindEpochFences(body, firstSnapshot, secondSnapshot, memberProjection)
         assertTrue("the local member projection must follow both row snapshots", memberProjection > secondSnapshot)
         assertTrue("member-derived UI must be ready before the first visible frame", publishReady > memberProjection)
         assertTrue("the local snapshot must get a rendered frame before catch-up", renderFrame > publishReady)
@@ -95,6 +97,22 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         assertTrue("the first UI projection bind must validate without presenting a retry", initialValidation >= 0)
         assertTrue("only a later subscription iteration may present Connecting", retryAttempt > initialValidation)
+    }
+
+    /** A single captured epoch guards both native snapshots before membership publication. */
+    private fun assertCapturedBindEpochFences(
+        body: String,
+        firstSnapshot: Int,
+        secondSnapshot: Int,
+        memberProjection: Int,
+    ) {
+        val capturedEpoch = body.indexOf("val epoch = bindEpoch")
+        val groupSnapshotFence = body.indexOf("if (!isActiveBindEpoch(epoch)) break", startIndex = secondSnapshot)
+        assertTrue("the bind epoch must be captured before the first native read", capturedEpoch in 0..<firstSnapshot)
+        assertTrue(
+            "a late group snapshot must be fenced before membership hydration",
+            groupSnapshotFence in (secondSnapshot + 1)..<memberProjection,
+        )
     }
 
     /** The final activation fence must precede cache clearing and publication of the target account. */
@@ -274,10 +292,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertTrue("the publisher must replace the cache only after validation", publisherReplacesCache)
     }
 
+    /** Member-derived readiness is emitted only after the captured epoch's local membership has loaded. */
     @Test
     fun memberDerivedReadinessIsRecordedBeforeTheFirstVisibleFrame() {
         val body = controllersSource().readText().kotlinFunctionBody("bind")
-        val seed = body.indexOf("seedInitialMemberIdProjection(accountRef, bindEpoch)")
+        val seed = body.indexOf("seedInitialMemberIdProjection(accountRef, epoch)")
         val readiness = body.indexOf("recordMemberDerivedLocalReadyIfComplete()", startIndex = seed)
         val publishReady = body.indexOf("isLoading = false", startIndex = readiness)
 

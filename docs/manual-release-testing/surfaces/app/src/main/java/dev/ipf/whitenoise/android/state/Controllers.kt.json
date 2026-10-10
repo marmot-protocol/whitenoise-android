@@ -703,6 +703,22 @@
         "test_ids": [
           "GRP-003"
         ]
+      },
+      {
+        "surface": "Single-owner initial chat-list Retry and timeout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "publishInitialLoadTimeout(",
+        "test_ids": [
+          "INT-012"
+        ]
+      },
+      {
+        "surface": "R.string.startup_taking_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.startup_taking_too_long",
+        "test_ids": [
+          "INT-012"
+        ]
       }
     ]
   },

@@ -173,6 +173,25 @@ internal class WhiteNoiseJourneys {
         waitForVisibleTag(PerformanceTags.OPEN_GROUP_DETAILS)
     }
 
+    /** Requires a known persisted row on the useful list, excluding loading, recovery and false-empty checkpoints. */
+    fun requirePopulatedLocalList(groupName: String) {
+        waitForUsefulSurface(BenchmarkUsefulSurface.ChatList)
+        checkNotNull(
+            device.onElementOrNull(timeoutMs = STARTUP_TIMEOUT_MS) {
+                textAsString() == groupName && isVisibleOnDisplay()
+            },
+        ) { "The populated local fixture row is absent after startup." }
+        listOf("startup-loading", "full-screen-loading", "startup-failure").forEach { tag ->
+            check(findVisibleTag(tag) == null) { "An unusable surface replaced the populated local checkpoint." }
+        }
+    }
+
+    /** A successful row action must expose the retained transcript before the host releases network blocking. */
+    fun openLocalTranscript(groupName: String) {
+        openGroup(groupName)
+        waitForVisibleTag(PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE, STARTUP_TIMEOUT_MS)
+    }
+
     fun openMembers(groupName: String) {
         openGroup(groupName)
         waitForTag(PerformanceTags.OPEN_GROUP_DETAILS).click()

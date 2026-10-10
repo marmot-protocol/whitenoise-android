@@ -102,6 +102,19 @@ internal const val STARTUP_FAILURE_TEST_TAG = "startup-failure"
 internal const val STARTUP_RETRY_TEST_TAG = "startup-retry"
 internal const val STARTUP_COPY_TEST_TAG = "startup-copy-report"
 
+/** Keeps no-snapshot recovery in the preparation branch so Retry cannot remount the shell's bind. */
+@Composable
+internal fun StartupLocalProjectionScreen(
+    error: ErrorPresentation?,
+    onRetry: () -> Unit,
+) {
+    if (error == null) {
+        StartupLoadingScreen()
+    } else {
+        StartupFailureScreen(stringResource(R.string.white_noise_couldnt_start), error, onRetry)
+    }
+}
+
 /** Pinned AccessUi.StartupScreen: safe scaffold, adaptive pane, 520 dp column, 24 dp inset and 16 dp gaps. */
 @Composable
 private fun StartupStatusPage(

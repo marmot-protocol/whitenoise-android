@@ -76,6 +76,37 @@ class RunnerContractTest(unittest.TestCase):
                 sleep.assert_called_once_with(0.01)
                 self.assertEqual(ledger.snapshot()[start:], events)
 
+    def test_unknown_length_wait_requires_both_correlated_terminals(self):
+        """A probe disconnect and file completion are both required, while other modes still reject two GETs."""
+        for missing in (None, "disconnect", "complete", "upload_complete", "acquisition_unavailable"):
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as root:
+                ledger = Ledger(root)
+                upload = ledger.event(None, "generated", "upload")
+                ledger.event(upload, "generated", "upload_bytes", 4 * 1024 * 1024 + 16)
+                if missing != "upload_complete":
+                    ledger.event(upload, "generated", "upload_complete")
+                ledger.event(None, "control", "hold_unknown_acquisition")
+                probe = ledger.event(None, "generated", "get")
+                for kind, value in (("range_offset", 0), ("unknown_content_length", 0), ("status", 200)):
+                    ledger.event(probe, "generated", kind, value)
+                ledger.event(probe, "generated", "body_bytes", 16384)
+                if missing != "disconnect":
+                    ledger.event(probe, "generated", "disconnect")
+                transfer = ledger.event(None, "generated", "get")
+                for kind, value in (("range_offset", 0), ("unknown_content_length", 0), ("status", 200),
+                                    ("body_bytes", 2 * 1024 * 1024), ("held", 2 * 1024 * 1024)):
+                    ledger.event(transfer, "generated", kind, value)
+                ledger.event(None, "control", "release_acquisition")
+                ledger.event(transfer, "generated", "body_bytes", 2 * 1024 * 1024 + 16)
+                if missing != "complete":
+                    ledger.event(transfer, "generated", "complete")
+                if missing != "acquisition_unavailable":
+                    ledger.event(None, "control", "acquisition_unavailable")
+                events, finalized = device_runner.wait_for_unknown_length_completion(ledger, 0, timeout=0)
+                self.assertEqual(missing is None, finalized)
+                self.assertEqual(ledger.snapshot(), events)
+                self.assertFalse(device_runner.wait_for_ledger_completion(ledger, 0, timeout=0)[1])
+
     def test_timeout_and_cleanup_failure_preserve_failed_report(self):
         """An adb failure cannot discard the host evidence or become qualification."""
         def adb(_, serial, *args):
