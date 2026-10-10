@@ -488,10 +488,13 @@ jobs:
                                        ': ' + repr([str(apk.relative_to(root)) for apk in matches]))
                   verification = subprocess.check_output(
                       [str(signers[-1]), 'verify', '--verbose', '--print-certs', str(matches[0])], text=True)
-                  certificates = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-f]{64})$',
-                                            verification, re.MULTILINE)
-                  if len(certificates) != 1:
-                      raise SystemExit('expected one fixture signer')
+                  signer_label = r'(?:#\d+|\(minSdkVersion=\d+(?: \(dev release=true\))?, maxSdkVersion=\d+\))'
+                  certificates = sorted(set(re.findall(
+                      r'^Signer ' + signer_label + r' certificate SHA-256 digest: ([0-9a-f]{64})$',
+                      verification, re.MULTILINE)))
+                  if len(certificates) != 1 or not re.search(r'^Number of signers: 1$', verification, re.MULTILINE):
+                      print(verification)
+                      raise SystemExit('expected one fixture signer for ' + role + '/' + variant)
                   certificate = certificates[0]
                   if campaign_certificate is None:
                       campaign_certificate = certificate

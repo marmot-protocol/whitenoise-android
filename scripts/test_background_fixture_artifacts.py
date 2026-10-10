@@ -170,5 +170,30 @@ class ResponsivenessApkSelectionTest(unittest.TestCase):
                 exec(selection, scope)
 
 
+class ResponsivenessSignerOutputTest(unittest.TestCase):
+    """Keep SDK-range certificate labels compatible without accepting multiple signing identities."""
+
+    def test_numbered_and_sdk_range_certificates_require_one_identity(self):
+        """Accept repeated SDK-range output for one key and reject distinct rotation or multiple signers."""
+        import re
+        import textwrap
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/android-staging-apk.yml').read_text()
+        body = workflow.split('                  signer_label = ', 1)[1].split('                  certificate =', 1)[0]
+        first, rest = body.split('\n', 1)
+        parser = 'signer_label = ' + first + '\n' + textwrap.dedent(rest)
+        fingerprint = 'a' * 64
+        numbered = f'Signer #1 certificate SHA-256 digest: {fingerprint}\n'
+        ranged = f'Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: {fingerprint}\n'
+        for output in (numbered, ranged, ranged + numbered):
+            scope = {'verification': 'Number of signers: 1\n' + output, 're': re, 'role': 'before', 'variant': 'debug'}
+            exec(parser, scope)
+            self.assertEqual([fingerprint], scope['certificates'])
+        for output in ('Number of signers: 2\n' + numbered,
+                       'Number of signers: 1\n' + numbered + ranged.replace(fingerprint, 'b' * 64),
+                       'Number of signers: 1\nSource Stamp Signer certificate SHA-256 digest: ' + fingerprint):
+            with self.assertRaisesRegex(SystemExit, 'expected one fixture signer'):
+                exec(parser, {'verification': output, 're': re, 'role': 'after', 'variant': 'debug'})
+
+
 if __name__ == "__main__":
     unittest.main()
