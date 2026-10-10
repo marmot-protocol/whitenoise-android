@@ -144,7 +144,9 @@ class GroupEditNameEmojiPickerTest {
         composeRule.onNodeWithText(NOTE_TO_SELF_GROUP_NAME).assertIsNotEnabled()
         composeRule.onNode(nameEmojiActionMatcher()).assertIsNotEnabled().performClick()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
-        composeRule.onNode(hasSetTextAction() and hasText("Group description")).performTextReplacement("My private notes")
+        composeRule
+            .onNode(hasSetTextAction() and hasText("Group description"))
+            .performTextReplacement("My private notes")
         composeRule.onNode(hasSetTextAction() and hasText("My private notes")).assertExists()
         composeRule.onNodeWithText(string(R.string.save_group)).assertIsEnabled()
     }

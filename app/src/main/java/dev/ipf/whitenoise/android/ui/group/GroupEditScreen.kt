@@ -133,7 +133,10 @@ internal fun GroupEditScreen(
             controller.group.name == NOTE_TO_SELF_GROUP_NAME &&
                 (
                     controller.members.isEmpty() ||
-                        isNoteToSelfRoster(controller.members.map { it.memberIdHex }, controller.boundAccountIdHex.orEmpty())
+                        isNoteToSelfRoster(
+                            controller.members.map { it.memberIdHex },
+                            controller.boundAccountIdHex.orEmpty(),
+                        )
                 )
         val nameEditable =
             groupNameEmojiEditable(
