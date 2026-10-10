@@ -15,7 +15,7 @@ from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
 from phases_checker import check_phases
 from resume_checker import check_resume
-from unknown_length_checker import check_unknown_length
+from unknown_length_checker import check_unknown_length, check_unknown_length_requests
 from background_checker import check_background
 from automatic_resume_checker import check_automatic_resume
 
@@ -75,6 +75,19 @@ def wait_for_ledger_completion(ledger, start, timeout=LEDGER_COMPLETION_TIMEOUT_
         uploads = {e["seq"] for e in events if e["kind"] == "upload"}
         uploaded = {e["request"] for e in events if e["kind"] == "upload_complete"}
         if len(requests) == 1 and len(uploads) == 1 and requests <= completed and uploads <= uploaded:
+            return events, True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return events, False
+        time.sleep(min(0.01, remaining))
+
+
+def wait_for_unknown_length_completion(ledger, start, timeout=LEDGER_COMPLETION_TIMEOUT_SECONDS):
+    """Wait for the bounded probe, completed file GET and retained-read boundary without dropping failures."""
+    deadline = time.monotonic() + timeout
+    while True:
+        events = ledger.snapshot()[start:]
+        if not check_unknown_length_requests(events):
             return events, True
         remaining = deadline - time.monotonic()
         if remaining <= 0:
@@ -230,6 +243,8 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         # Retain failure/timeout evidence before cleanup; never discard failed attempts.
         if native_phases:
             events, report["ledger_finalized"] = wait_for_phase_completion(server.ledger, len(before))
+        elif unknown_length:
+            events, report["ledger_finalized"] = wait_for_unknown_length_completion(server.ledger, len(before))
         elif held_cancellation or transport_resume or automatic_resume:
             events, report["ledger_finalized"] = wait_for_cancellation_completion(server.ledger, len(before))
         else:
