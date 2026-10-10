@@ -645,23 +645,28 @@ private fun NewMessageAccountScreen(
 
     /** Both self entry points share native lookup and the process-owned canonical retry identity. */
     fun openNotes() {
-        val account = accountRef ?: return
-        val hex = activeHex ?: return
-        if (!session.isCurrent() || creatingHex != null || scannerSession != null) return
+        val account = accountRef
+        val hex = activeHex
+        val available = session.isCurrent() && creatingHex == null && scannerSession == null
+        if (account == null || hex == null || !available) return
         creatingHex = hex
         startChatError = null
         noteToSelfFailed = false
         appState.launchMutation {
             try {
-                val item = appState.openNoteToSelf(account, hex, runtimeGeneration, session::isCurrent)
+                val result =
+                    runCatchingCancellable {
+                        appState.openNoteToSelf(account, hex, runtimeGeneration, session::isCurrent)
+                    }
                 if (session.isCurrent()) {
-                    session.dispose()
-                    onOpenConversation(item, false)
+                    result.fold(
+                        onSuccess = { item ->
+                            session.dispose()
+                            onOpenConversation(item, false)
+                        },
+                        onFailure = { noteToSelfFailed = true },
+                    )
                 }
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                if (session.isCurrent()) noteToSelfFailed = true
             } finally {
                 if (session.isCurrent()) creatingHex = null
             }

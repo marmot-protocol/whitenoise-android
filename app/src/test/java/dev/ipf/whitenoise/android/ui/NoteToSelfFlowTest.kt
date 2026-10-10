@@ -45,6 +45,21 @@ class NoteToSelfFlowTest {
             assertEquals("first-id", flow.open("first:1", {}, { null }, { _, _ -> error("duplicate") }, { it }))
         }
 
+    @Test fun canonicalCallbackSurvivesCancelledIoReturn() =
+        runTest {
+            val flow = NoteToSelfOpening()
+            try {
+                flow.open<String>("first:1", {}, { null }, { started, created ->
+                    started()
+                    created("canonical")
+                    throw CancellationException("response discarded after commit")
+                }, { it })
+            } catch (_: CancellationException) {
+                // Native response identity was retained before switching back to the cancelled UI job.
+            }
+            assertEquals("canonical", flow.open("first:1", {}, { null }, { _, _ -> error("duplicate") }, { it }))
+        }
+
     @Test fun cancellationBeforeWriteDoesNotPoisonRetry() =
         runTest {
             val flow = NoteToSelfOpening()

@@ -131,17 +131,19 @@ internal fun NewMessageContent(
             noteToSelfItems(noteToSelfIdentifier, noteToSelfFailed, busy, actions.noteToSelf)
             error?.let { item { StartChatErrorCard(it, actions.retryChat, actions.invite, actions.copyError) } }
             item {
-                NewMessageSearchFeedback(
-                    searching = !noteToSelfIdentifier && (resolvingIdentifier || search.isSearching),
-                    failed = !noteToSelfIdentifier && search.failed,
-                    incomplete = !noteToSelfIdentifier && search.isIncomplete,
-                    empty = !noteToSelfIdentifier && query.isNotBlank() && people.isEmpty(),
-                    busy = busy,
-                    onRetry = actions.retrySearch,
-                    onInvite = actions.invite,
-                    retryableIdentifier = retryableIdentifier,
-                    lookupFailed = !noteToSelfIdentifier && identifierLookupFailed,
-                )
+                if (!noteToSelfIdentifier) {
+                    NewMessageSearchFeedback(
+                        searching = resolvingIdentifier || search.isSearching,
+                        failed = search.failed,
+                        incomplete = search.isIncomplete,
+                        empty = query.isNotBlank() && people.isEmpty(),
+                        busy = busy,
+                        onRetry = actions.retrySearch,
+                        onInvite = actions.invite,
+                        retryableIdentifier = retryableIdentifier,
+                        lookupFailed = identifierLookupFailed,
+                    )
+                }
             }
             val groups =
                 if (query.isBlank() || (identifierQuery && !addressFallback)) {
