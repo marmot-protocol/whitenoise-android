@@ -3,11 +3,13 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingSubscription
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -66,7 +68,7 @@ class MarmotAccountSetupClientTest {
                     override fun snapshot() = setupSnapshot()
 
                     /** Records the dispatcher used to enter native next. */
-                    override suspend fun next(): dev.ipf.marmotkit.OnboardingSnapshotFfi? {
+                    override suspend fun next(): OnboardingSnapshotFfi? {
                         nextOffCaller.set(Thread.currentThread() !== caller)
                         nextStarted.complete(Unit)
                         return null
@@ -90,7 +92,7 @@ class MarmotAccountSetupClientTest {
                 launch {
                     try {
                         stream.next()
-                        kotlinx.coroutines.awaitCancellation()
+                        awaitCancellation()
                     } finally {
                         stream.close()
                     }
@@ -179,6 +181,31 @@ class MarmotAccountSetupClientTest {
             val client = MarmotAccountSetupClient(nativeBoundary { name, _ -> calls += name }, SETUP_TEST_ACCOUNT) {}
             client.execute(SetupRequest(3uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.CANCEL_REPAIR))
             assertEquals(listOf("cancelOnboardingRepair"), calls)
+        }
+
+    /** Minimal repair uses the typed native preview; no approval or signing call is made. */
+    @Test fun minimalRepairUsesLosslessNativeProposal() =
+        runTest {
+            val calls = mutableListOf<String>()
+            val client = MarmotAccountSetupClient(nativeBoundary { name, _ -> calls += name }, SETUP_TEST_ACCOUNT) {}
+            client.execute(SetupRequest(3uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.USE_RECOMMENDED_RELAYS))
+            assertEquals(listOf("proposeOnboardingRelayRepair"), calls)
+        }
+
+    /** Explicit reset reaches the full replacement path, never masquerading as minimal repair. */
+    @Test fun fullResetUsesAnExplicitReplacementProposal() =
+        runTest {
+            val calls = mutableListOf<String>()
+            val client = MarmotAccountSetupClient(nativeBoundary { name, _ -> calls += name }, SETUP_TEST_ACCOUNT) {}
+            client.execute(
+                SetupRequest(
+                    3uL,
+                    OnboardingStepFfi.INBOX_RELAYS,
+                    OnboardingActionFfi.USE_RECOMMENDED_RELAYS,
+                    resetRelays = true,
+                ),
+            )
+            assertEquals(listOf("proposeOnboardingRelays"), calls)
         }
 
     /** Builds a strict proxy that records the native method and arguments under test. */

@@ -6519,6 +6519,7 @@ class ConversationController(
         lastMutationError = null
     }
 
+    /** Retains the original conversation error without showing it on a replacement account or runtime. */
     internal fun recordMutationFailure(
         @StringRes title: Int,
         operationCode: String,
@@ -6526,7 +6527,11 @@ class ConversationController(
         detail: AppText = AppText.Resource(R.string.error_try_again),
     ) {
         lastMutationError = privacySafeErrorPresentation(operationCode, throwable, detail)
-        appState.presentFailure(title, operationCode, throwable, detail)
+        if (appState.activeAccountRef == conversationAccountRef &&
+            appState.runtimeGeneration == conversationRuntimeGeneration
+        ) {
+            appState.presentFailure(title, operationCode, throwable, detail)
+        }
     }
 
     private fun Throwable.rethrowIfCancellation() {
@@ -6547,6 +6552,7 @@ class ConversationController(
     }
 
     private val conversationAccountRef = accountRefOverride ?: appState.activeAccountRef
+    private val conversationRuntimeGeneration = appState.runtimeGeneration
     internal val boundAccountRef: String?
         get() = conversationAccountRef
 

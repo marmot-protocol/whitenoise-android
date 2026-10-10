@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+  "legacy_sha256": "942c9ca98729902761e657852d0708d797cb564823fd4e05720326bf3fa8e833",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SetupActionButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+        "anchor": "fun SetupActionButton(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-016",
+          "ONB-021"
+        ]
+      },
+      {
+        "surface": "SetupActionButtons",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+        "anchor": "fun SetupActionButtons(",
+        "test_ids": [
+          "ONB-016",
+          "ONB-017",
+          "ONB-019"
+        ]
+      },
+      {
+        "surface": "R.string.setup_reset_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupButtons.kt",
+        "anchor": "R.string.setup_reset_relays",
+        "test_ids": [
+          "ONB-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -244,6 +244,14 @@
           "MED-009",
           "MSG-021"
         ]
+      },
+      {
+        "surface": "Account-scoped group mutation failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal fun recordMutationFailure(",
+        "test_ids": [
+          "GRP-005"
+        ]
       }
     ],
     "settings_controls": [
