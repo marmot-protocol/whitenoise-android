@@ -1264,5 +1264,5 @@ listOf("staging", "production").forEach { environment ->
 
 // Audited upstream vector data for the exact used icon set; no extended icon runtime.
 android.sourceSets.named("main") {
-    java.srcDir("src/main/generated/material-icons")
+    kotlin.srcDir("src/main/generated/material-icons")
 }

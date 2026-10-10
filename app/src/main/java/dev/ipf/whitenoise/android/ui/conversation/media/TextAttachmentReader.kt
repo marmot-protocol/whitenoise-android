@@ -71,10 +71,10 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
 import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHitFromRenderedHit
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Info
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 private const val READER_ACTIONS_MAXIMUM_HEIGHT_FRACTION = 0.55f
 

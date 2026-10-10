@@ -68,7 +68,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
-import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -79,6 +78,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 private val videoMaterializations = SingleFlight<String, java.io.File>()
 

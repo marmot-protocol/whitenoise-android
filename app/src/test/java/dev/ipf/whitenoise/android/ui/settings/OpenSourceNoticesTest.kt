@@ -1,9 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import java.nio.charset.CharacterCodingException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.nio.charset.CharacterCodingException
 
 class OpenSourceNoticesTest {
     @Test

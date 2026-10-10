@@ -82,7 +82,6 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
-import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -90,6 +89,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 private val voiceMaterializations = SingleFlight<VoiceMaterializationFlightKey, java.io.File>()
 

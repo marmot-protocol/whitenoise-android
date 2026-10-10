@@ -63,12 +63,12 @@ import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 internal enum class DiagnosticsSection {
     Actions,

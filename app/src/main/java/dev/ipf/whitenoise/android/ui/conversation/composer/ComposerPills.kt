@@ -143,13 +143,13 @@ import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOr
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
-import kotlin.math.ceil
-import kotlin.math.floor
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 internal const val COMPOSER_RESIZE_HANDLE_TAG = "composer-resize-handle"
 internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"

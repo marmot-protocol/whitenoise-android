@@ -56,8 +56,6 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
-import java.util.Locale
-import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -67,6 +65,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.util.Locale
+import kotlin.coroutines.resume
 
 private const val GIPHY_MAX_BODY_BYTES = 5 * 1024 * 1024
 private const val GIPHY_MEMORY_CACHE_MAX_BYTES = 20L * 1024 * 1024

@@ -249,7 +249,6 @@ import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -258,6 +257,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 private data class ConversationSearchScrollAnchor(
     val bookmark: ConversationScrollBookmark,

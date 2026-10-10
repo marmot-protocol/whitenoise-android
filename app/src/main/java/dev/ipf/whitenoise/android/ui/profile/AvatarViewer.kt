@@ -87,10 +87,10 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Edit
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
-import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 private const val AVATAR_VIEWER_MAX_BYTES = 8 * 1024 * 1024
 

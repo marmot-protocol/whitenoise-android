@@ -3,12 +3,12 @@ package dev.ipf.whitenoise.android.ui.qr
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
-import java.nio.ByteBuffer
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.nio.ByteBuffer
 
 class QrFrameDecoderTest {
     @Test

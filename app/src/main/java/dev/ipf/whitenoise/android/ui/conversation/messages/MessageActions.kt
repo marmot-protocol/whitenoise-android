@@ -72,10 +72,10 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.icons.filled.Schedule
 import dev.ipf.whitenoise.android.ui.theme.Dimens
-import java.util.Locale
-import java.util.UUID
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import java.util.Locale
+import java.util.UUID
 
 /** Focused long-press presentation; all capabilities and dispatch remain native to the owning message. */
 @Composable
