@@ -6671,6 +6671,102 @@
         "delete-handoff"
       ],
       "layer": "production-presentation-ui"
+    },
+    "presentation-setup-profile-edit-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-profile-edit-cancel",
+      "presentation_actions": [
+        "profile-loaded",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-profile-edit-unchanged": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-profile-edit-unchanged",
+      "presentation_actions": [
+        "profile-loaded",
+        "profile-review-requested"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-profile-edit-suggest": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-profile-edit-suggest",
+      "presentation_actions": [
+        "profile-loaded",
+        "profile-review-requested"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-profile-edit-failure": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-profile-edit-failure",
+      "presentation_actions": [
+        "profile-loaded",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-inbox-edit-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-inbox-edit-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-inbox-edit-review": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-inbox-edit-review",
+      "presentation_actions": [
+        "discovery-check-requested"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-inbox-edit-failure": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-inbox-edit-failure",
+      "presentation_actions": [
+        "discovery-request-refused",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
     }
   }
 }

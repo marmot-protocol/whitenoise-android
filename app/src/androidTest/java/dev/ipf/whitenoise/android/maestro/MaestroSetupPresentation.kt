@@ -9,7 +9,6 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
-import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupClient
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupScreen
@@ -90,6 +89,7 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
     }
 
     override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi {
+        if (maestroSetupEditorRequest(fixture, request)) return current
         if (request.action == OnboardingActionFfi.CANCEL_REPAIR) {
             check(request.revision == 4uL && request.step == step)
             fixture.record("preview-cancelled")
@@ -116,6 +116,5 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
         return current
     }
 
-    override suspend fun profile() =
-        UserProfileMetadataFfi("Maestro", "Maestro setup", "Setup detail", null, null, null, null)
+    override suspend fun profile() = maestroSetupProfile(fixture)
 }

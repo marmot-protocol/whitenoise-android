@@ -897,7 +897,7 @@
         {
           "case": "presentation-dictation-closing",
           "selector": {
-            "text": "Finishing microphone\u2026"
+            "text": "Finishing microphone…"
           },
           "scope": "Actual recovery panel closing-microphone state; native capture and disposal remain separate."
         }
@@ -1492,7 +1492,7 @@
         {
           "case": "presentation-nostr-image-failure",
           "selector": {
-            "text": "Couldn\u2019t load this image. Try again."
+            "text": "Couldn’t load this image. Try again."
           },
           "scope": "Actual image-pane failure and retry against bounded null image loader."
         }
@@ -1534,7 +1534,7 @@
         {
           "case": "presentation-nostr-video-failure",
           "selector": {
-            "text": "Couldn\u2019t play this video\\."
+            "text": "Couldn’t play this video\\."
           },
           "scope": "Actual ExoPlayer local missing-file failure and Close; no successful playback claim."
         }
@@ -1548,7 +1548,7 @@
         {
           "case": "reactions-details-back",
           "selector": {
-            "text": "All \u00b7 2"
+            "text": "All · 2"
           },
           "scope": "Actual complete-reaction host resolves both native reactors and opens the All filter."
         }
@@ -1653,7 +1653,7 @@
         {
           "case": "reactions-details-back",
           "selector": {
-            "text": "All \u00b7 2"
+            "text": "All · 2"
           },
           "scope": "Actual non-focus-stealing reaction popup retains its production Back interception."
         }
@@ -2189,6 +2189,55 @@
             "text": "Account setup"
           },
           "scope": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification."
+        },
+        {
+          "case": "presentation-setup-profile-edit-cancel",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion."
+        },
+        {
+          "case": "presentation-setup-profile-edit-unchanged",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion."
+        },
+        {
+          "case": "presentation-setup-profile-edit-suggest",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion."
+        },
+        {
+          "case": "presentation-setup-profile-edit-failure",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion."
+        },
+        {
+          "case": "presentation-setup-inbox-edit-cancel",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion."
+        },
+        {
+          "case": "presentation-setup-inbox-edit-review",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion."
+        },
+        {
+          "case": "presentation-setup-inbox-edit-failure",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Actual production setup editor checks profile metadata prefill/preservation and suggestion or discovery draft dispatch, cancellation and load/check failure. Root Open chats remains disabled before readiness. Bounded native port; no profile/relay publication or account setup completion."
         }
       ],
       "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
@@ -2630,7 +2679,7 @@
         {
           "case": "presentation-extra-wait-wipe",
           "selector": {
-            "text": "Signing out & wiping\u2026"
+            "text": "Signing out & wiping…"
           },
           "scope": "Actual non-cancellable wipe progress sheet ignores Back and remains visible; observation-only receipt requires zero callbacks. No wipe runs."
         }
@@ -2700,7 +2749,7 @@
         {
           "case": "nested-blocked-empty",
           "selector": {
-            "text": "You haven\u2019t blocked anyone."
+            "text": "You haven’t blocked anyone."
           },
           "scope": "Actual empty blocked list of disposable account and Back."
         }
@@ -3082,14 +3131,14 @@
         {
           "case": "presentation-extra-help-cancel",
           "selector": {
-            "text": "Couldn\u2019t open GitHub"
+            "text": "Couldn’t open GitHub"
           },
           "scope": "Actual bug-report parent receives a refused browser handoff, opens its recovery dialog, and verifies Cancel/Retry without any external browser launch."
         },
         {
           "case": "presentation-extra-help-retry",
           "selector": {
-            "text": "Couldn\u2019t open GitHub"
+            "text": "Couldn’t open GitHub"
           },
           "scope": "Actual bug-report parent receives a refused browser handoff, opens its recovery dialog, and verifies Cancel/Retry without any external browser launch."
         }

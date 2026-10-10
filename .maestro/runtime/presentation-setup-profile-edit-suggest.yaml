@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-profile-edit-suggest
+---
+- assertVisible: Account setup
+- assertVisible:
+    id: setup-open-chats
+    enabled: false
+- tapOn:
+    id: setup-open-chats
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-PROFILE
+- tapOn:
+    id: setup-action-EDIT_PROFILE
+- assertVisible: Maestro setup
+- assertVisible: Setup detail
+- tapOn:
+    id: setup.profile.suggest_name
+- assertVisible: Maestro setup name
+- tapOn:
+    id: setup-editor-save
+- assertVisible:
+    id: presentation.complete
