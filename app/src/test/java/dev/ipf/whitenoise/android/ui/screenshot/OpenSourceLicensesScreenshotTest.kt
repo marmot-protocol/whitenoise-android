@@ -52,7 +52,12 @@ class OpenSourceLicensesScreenshotTest {
             "Example library",
             "Copyright Example\n\nFull licence notice text.",
         )
-        val result: Result<List<OpenSourceNotice>> = if (failed) Result.failure(IllegalArgumentException()) else Result.success(listOf(notice))
+        val result: Result<List<OpenSourceNotice>> =
+            if (failed) {
+                Result.failure(IllegalArgumentException())
+            } else {
+                Result.success(listOf(notice))
+            }
         composeRule.setContent {
             val density = LocalDensity.current
             val title = LocalContext.current.getString(R.string.open_source_licenses)
