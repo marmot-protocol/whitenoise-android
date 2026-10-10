@@ -24,6 +24,14 @@
           "SEC-004",
           "ACC-004"
         ]
+      },
+      {
+        "surface": "No-snapshot recovery account and runtime ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt",
+        "anchor": "startupRecoveryController(",
+        "test_ids": [
+          "INT-012"
+        ]
       }
     ]
   },

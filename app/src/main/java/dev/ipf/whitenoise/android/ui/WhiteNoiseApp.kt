@@ -66,6 +66,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.StartupFailureScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
+import dev.ipf.whitenoise.android.ui.common.StartupLocalProjectionScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
@@ -603,23 +604,35 @@ internal fun WhiteNoiseApp(
                                             firstUsefulFrameRecorded = true
                                         }
                                     }
-                                    if (inboundProfilePayload != null) {
+                                    if (
+                                        inboundProfilePayload != null ||
+                                        !shouldComposeProtectedMainShell(firstUsefulSurface)
+                                    ) {
                                         PrepareMainShellFirstFrame(appState, mainShellStateHolder)
+                                        val startupController =
+                                            mainShellStateHolder.startupRecoveryController(
+                                                appState.activeAccountRef,
+                                                appState.runtimeGeneration,
+                                            )
+                                        val startupError = startupController?.error
                                         WarmResumeFrameSurface(
                                             activityToken = warmResumeTraceToken,
                                             foregroundEpoch = warmResumeEpoch,
-                                            surface = WarmResumeRenderedSurface.FullScreenLoading,
+                                            surface =
+                                                when {
+                                                    startupError != null -> WarmResumeRenderedSurface.Error
+                                                    inboundProfilePayload != null ->
+                                                        WarmResumeRenderedSurface.FullScreenLoading
+                                                    else -> WarmResumeRenderedSurface.StartupLoading
+                                                },
                                         ) {
-                                            LoadingScreen()
-                                        }
-                                    } else if (!shouldComposeProtectedMainShell(firstUsefulSurface)) {
-                                        PrepareMainShellFirstFrame(appState, mainShellStateHolder)
-                                        WarmResumeFrameSurface(
-                                            activityToken = warmResumeTraceToken,
-                                            foregroundEpoch = warmResumeEpoch,
-                                            surface = WarmResumeRenderedSurface.StartupLoading,
-                                        ) {
-                                            StartupLoadingScreen()
+                                            if (startupError == null && inboundProfilePayload != null) {
+                                                LoadingScreen()
+                                            } else {
+                                                StartupLocalProjectionScreen(startupError) {
+                                                    startupController?.retryLoad()
+                                                }
+                                            }
                                         }
                                     } else {
                                         val renderedSurface =
