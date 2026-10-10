@@ -1294,7 +1294,10 @@ class ConversationFileBackedMediaSendTest {
             }
         }
 
-    /** A failed transfer keeps the pick's private snapshot, and Retry uploads the very same file. */
+    /**
+     * A failed transfer keeps the pick's private snapshot, and Retry uploads the very same file. The failed
+     * attempt's bytes are forgotten, and a Retry starts its own count rather than resuming a stale one.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun failedTransferKeepsItsSnapshotAndRetryReusesTheSamePath() =
@@ -1304,9 +1307,16 @@ class ConversationFileBackedMediaSendTest {
             val video = stagedVideo(state)
             val videoFile = checkNotNull(video.sourceFile).file
             val paths = mutableListOf<String>()
-            val controller =
+            val progressAtAttemptStart = mutableListOf<FileUploadProgress?>()
+            lateinit var controller: ConversationController
+            val retained = {
+                checkNotNull(state.retainedMediaUploads(ACCOUNT_REF, GROUP_ID).get(controller.timeline.single().id))
+            }
+            controller =
                 fileBackedController(state) { request, _ ->
                     paths += request.attachments.single().sourcePath
+                    progressAtAttemptStart += retained().uploadProgress.value
+                    retained().reportTransferProgress(STAGED_VIDEO_BYTES)
                     if (paths.size == 1) error("endpoint unavailable") else oneAttachmentUpload()
                 }
             try {
@@ -1316,9 +1326,13 @@ class ConversationFileBackedMediaSendTest {
                 val failed = controller.timeline.single()
                 assertEquals(MessageStatus.Failed, failed.status)
                 assertTrue("a failed send keeps its snapshot for Retry", videoFile.exists())
+                val failedProgress = controller.pendingUploadProgress(failed.record.messageIdHex)?.value
+                assertNull("a failed send shows no bytes", failedProgress)
+                retained().reportTransferProgress(3 * (STAGED_VIDEO_BYTES + 16L))
 
                 controller.retryFailedSend(failed)
 
+                assertEquals("each attempt starts without bytes", listOf(null, null), progressAtAttemptStart)
                 assertEquals(listOf(videoFile.absolutePath, videoFile.absolutePath), paths)
                 assertEquals(
                     CONFIRMED_MESSAGE_ID,
@@ -1797,103 +1811,103 @@ class ConversationFileBackedMediaSendTest {
                 Dispatchers.resetMain()
             }
         }
+}
 
-    /** A 20 MiB in-memory document; two of them overflow the 32 MiB retained heap. */
-    private fun inMemoryDocument(name: String): PendingAttachment {
-        val bytes = ByteArray(IN_MEMORY_DOCUMENT_BYTES)
-        return PendingAttachment(bytes, "application/pdf", name)
-    }
+/** A 20 MiB in-memory document; two of them overflow the 32 MiB retained heap. */
+private fun inMemoryDocument(name: String): PendingAttachment {
+    val bytes = ByteArray(IN_MEMORY_DOCUMENT_BYTES)
+    return PendingAttachment(bytes, "application/pdf", name)
+}
 
-    /** The composer's media sender with native limits supplied, so no MarmotKit library is loaded. */
-    private fun composerSender(
-        state: WhiteNoiseAppState,
-        controller: ConversationController,
-    ) = ConversationMediaSender(state, controller, state.appContext, fileBackedLimits = ::senderLimits) {}
+/** The composer's media sender with native limits supplied, so no MarmotKit library is loaded. */
+private fun composerSender(
+    state: WhiteNoiseAppState,
+    controller: ConversationController,
+) = ConversationMediaSender(state, controller, state.appContext, fileBackedLimits = ::senderLimits) {}
 
-    /** Native limits for the composer's reader, without loading MarmotKit. */
-    private fun senderLimits() = FileBackedSendLimits(FILE_BACKED_ATTACHMENT_MAX_BYTES, FILE_BATCH_CIPHERTEXT_BYTES)
+/** Native limits for the composer's reader, without loading MarmotKit. */
+private fun senderLimits() = FileBackedSendLimits(FILE_BACKED_ATTACHMENT_MAX_BYTES, FILE_BATCH_CIPHERTEXT_BYTES)
 
-    /** Publishes a 4 KiB document whose provider declares 40 MiB, larger than the in-memory cap. */
-    private fun scriptedDocument(state: WhiteNoiseAppState): android.net.Uri {
-        Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
-        val file =
-            java.io.File(state.appContext.cacheDir, "sender-pick-${System.nanoTime()}.pdf").apply {
-                writeBytes(ByteArray(SCRIPTED_DOCUMENT_BYTES) { 3 })
-            }
-        ScriptedPickProvider.picks["report.pdf"] = ScriptedPick(file, "application/pdf", SCRIPTED_DECLARED_BYTES)
-        return android.net.Uri.parse("content://$SENDER_PICKS_AUTHORITY/report.pdf")
-    }
+/** Publishes a 4 KiB document whose provider declares 40 MiB, larger than the in-memory cap. */
+private fun scriptedDocument(state: WhiteNoiseAppState): android.net.Uri {
+    Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
+    val file =
+        java.io.File(state.appContext.cacheDir, "sender-pick-${System.nanoTime()}.pdf").apply {
+            writeBytes(ByteArray(SCRIPTED_DOCUMENT_BYTES) { 3 })
+        }
+    ScriptedPickProvider.picks["report.pdf"] = ScriptedPick(file, "application/pdf", SCRIPTED_DECLARED_BYTES)
+    return android.net.Uri.parse("content://$SENDER_PICKS_AUTHORITY/report.pdf")
+}
 
-    /**
-     * A controller whose file uploads run [upload] with the cancel registration the native control would
-     * receive; the in-memory uploader must never be reached, and every publish reports relay acceptance.
-     */
-    private fun fileBackedController(
-        state: WhiteNoiseAppState,
-        publish: () -> Unit = {},
-        publishSummary: () -> SendSummaryFfi = { requireNotNull(uploadResult(mediaReference()).sent) },
-        upload: suspend (MediaFileUploadRequestFfi, ((() -> Unit)?) -> Unit) -> MediaUploadResultFfi,
-    ) = ConversationController(
-        appState = state,
-        initialGroup = group(),
-        initialMemberSnapshot = memberSnapshot(),
-        groupRosterReader = { _, _ -> authoritativeRoster() },
-        mediaUploader = { _, _, _ -> error("the in-memory upload path must not run") },
-        mediaFileUploader = { _, _, request, register -> upload(request, register) },
-        fileBatchCiphertextBytes = { FILE_BATCH_CIPHERTEXT_BYTES },
-        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
-        mediaPublisher = { _, _, _, _ ->
-            publish()
-            publishSummary()
-        },
-        markdownParser = { emptyMarkdownDocument() },
+/**
+ * A controller whose file uploads run [upload] with the cancel registration the native control would
+ * receive; the in-memory uploader must never be reached, and every publish reports relay acceptance.
+ */
+private fun fileBackedController(
+    state: WhiteNoiseAppState,
+    publish: () -> Unit = {},
+    publishSummary: () -> SendSummaryFfi = { requireNotNull(uploadResult(mediaReference()).sent) },
+    upload: suspend (MediaFileUploadRequestFfi, ((() -> Unit)?) -> Unit) -> MediaUploadResultFfi,
+) = ConversationController(
+    appState = state,
+    initialGroup = group(),
+    initialMemberSnapshot = memberSnapshot(),
+    groupRosterReader = { _, _ -> authoritativeRoster() },
+    mediaUploader = { _, _, _ -> error("the in-memory upload path must not run") },
+    mediaFileUploader = { _, _, request, register -> upload(request, register) },
+    fileBatchCiphertextBytes = { FILE_BATCH_CIPHERTEXT_BYTES },
+    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+    mediaPublisher = { _, _, _, _ ->
+        publish()
+        publishSummary()
+    },
+    markdownParser = { emptyMarkdownDocument() },
+)
+
+/** A video pick already staged to a private snapshot under the app's upload directory. */
+private fun stagedVideo(state: WhiteNoiseAppState): PendingAttachment {
+    val directory = uploadSourcesDirectory(state.appContext.cacheDir)
+    val read =
+        dev.ipf.whitenoise.android.ui.conversation.media.readStagedDocument(directory, STAGED_VIDEO_BYTES) {
+            java.io.ByteArrayInputStream(ByteArray(STAGED_VIDEO_BYTES.toInt()))
+        }
+    val source = (read as dev.ipf.whitenoise.android.ui.conversation.media.StagedDocumentRead.Success).source
+    return PendingAttachment(ByteArray(0), VIDEO_MEDIA_TYPE, "clip.mp4", "1280x720", sourceFile = source)
+}
+
+/** One accepted upload result per attachment of a two-item album. */
+private fun twoAttachmentUpload() =
+    MediaUploadResultFfi(
+        attachments =
+            listOf(
+                MediaUploadAttachmentResultFfi(mediaReference(), 4uL),
+                MediaUploadAttachmentResultFfi(videoReference(), 4uL),
+            ),
+        sent = null,
     )
 
-    /** A video pick already staged to a private snapshot under the app's upload directory. */
-    private fun stagedVideo(state: WhiteNoiseAppState): PendingAttachment {
-        val directory = uploadSourcesDirectory(state.appContext.cacheDir)
-        val read =
-            dev.ipf.whitenoise.android.ui.conversation.media.readStagedDocument(directory, STAGED_VIDEO_BYTES) {
-                java.io.ByteArrayInputStream(ByteArray(STAGED_VIDEO_BYTES.toInt()))
-            }
-        val source = (read as dev.ipf.whitenoise.android.ui.conversation.media.StagedDocumentRead.Success).source
-        return PendingAttachment(ByteArray(0), VIDEO_MEDIA_TYPE, "clip.mp4", "1280x720", sourceFile = source)
+/** The accepted reference of the staged video. */
+private fun videoReference() = mediaReference().copy(fileName = "clip.mp4", mediaType = VIDEO_MEDIA_TYPE)
+
+/** One accepted upload result for a single file-backed item. */
+private fun oneAttachmentUpload() =
+    MediaUploadResultFfi(
+        attachments = listOf(MediaUploadAttachmentResultFfi(mediaReference().copy(fileName = "clip.mp4"), 4uL)),
+        sent = null,
+    )
+
+/** Waits for the off-Main deletion that follows a retained upload's release, running [drive] between checks. */
+private fun awaitDeleted(
+    file: java.io.File,
+    drive: () -> Unit = {},
+) {
+    repeat(DELETE_POLL_ATTEMPTS) {
+        drive()
+        shadowOf(Looper.getMainLooper()).idle()
+        if (!file.exists()) return
+        Thread.sleep(DELETE_POLL_INTERVAL_MS)
     }
-
-    /** One accepted upload result per attachment of a two-item album. */
-    private fun twoAttachmentUpload() =
-        MediaUploadResultFfi(
-            attachments =
-                listOf(
-                    MediaUploadAttachmentResultFfi(mediaReference(), 4uL),
-                    MediaUploadAttachmentResultFfi(videoReference(), 4uL),
-                ),
-            sent = null,
-        )
-
-    /** The accepted reference of the staged video. */
-    private fun videoReference() = mediaReference().copy(fileName = "clip.mp4", mediaType = VIDEO_MEDIA_TYPE)
-
-    /** One accepted upload result for a single file-backed item. */
-    private fun oneAttachmentUpload() =
-        MediaUploadResultFfi(
-            attachments = listOf(MediaUploadAttachmentResultFfi(mediaReference().copy(fileName = "clip.mp4"), 4uL)),
-            sent = null,
-        )
-
-    /** Waits for the off-Main deletion that follows a retained upload's release, running [drive] between checks. */
-    private fun awaitDeleted(
-        file: java.io.File,
-        drive: () -> Unit = {},
-    ) {
-        repeat(DELETE_POLL_ATTEMPTS) {
-            drive()
-            shadowOf(Looper.getMainLooper()).idle()
-            if (!file.exists()) return
-            Thread.sleep(DELETE_POLL_INTERVAL_MS)
-        }
-        throw AssertionError("the private snapshot was not deleted")
-    }
+    throw AssertionError("the private snapshot was not deleted")
 }
 
 private const val STAGED_VIDEO_BYTES = 2L * 1024L * 1024L

@@ -1414,6 +1414,12 @@
     <string name="media_download_queued">Queued for download</string>
     <string name="media_download_body_known">%1$s of %2$s</string>
     <string name="media_download_body_unknown">%1$s received</string>
+    <string name="media_upload_preparing_body">Preparing %1$s of %2$s</string>
+    <string name="media_upload_encrypting_body">Encrypting %1$s of %2$s</string>
+    <string name="media_upload_body_known">Uploading %1$s of %2$s</string>
+    <string name="media_upload_preparing">Preparing</string>
+    <string name="media_upload_encrypting">Encrypting</string>
+    <string name="media_upload_bytes">%1$s of %2$s</string>
     <string name="media_verifying_download">Verifying download</string>
     <string name="media_decrypting_download">Decrypting download</string>
     <string name="media_download_retry_scheduled">Waiting to retry</string>

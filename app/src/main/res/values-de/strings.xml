@@ -1038,6 +1038,12 @@
     <string name="media_download_queued">In der Warteschlange für den Download</string>
     <string name="media_download_body_known">%1$s von %2$s</string>
     <string name="media_download_body_unknown">%1$s empfangen</string>
+    <string name="media_upload_preparing_body">Wird vorbereitet: %1$s von %2$s</string>
+    <string name="media_upload_encrypting_body">Wird verschlüsselt: %1$s von %2$s</string>
+    <string name="media_upload_body_known">Wird hochgeladen: %1$s von %2$s</string>
+    <string name="media_upload_preparing">Wird vorbereitet</string>
+    <string name="media_upload_encrypting">Wird verschlüsselt</string>
+    <string name="media_upload_bytes">%1$s von %2$s</string>
     <string name="media_verifying_download">Download wird geprüft</string>
     <string name="media_decrypting_download">Download wird entschlüsselt</string>
     <string name="media_download_retry_scheduled">Warten auf Wiederholung</string>

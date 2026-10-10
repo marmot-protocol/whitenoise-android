@@ -8482,7 +8482,10 @@ class ConversationController(
                     .withGroupCommitLock(account, group.groupIdHex) {
                         requireOptimisticSendNotCancelled(key)
                         val outcome =
-                            withNativeTransferControl(retained::attachTransferCancel) { control ->
+                            withNativeTransferControl(
+                                retained::attachTransferCancel,
+                                onProgress = retained::reportTransferProgress,
+                            ) { control ->
                                 appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
                                     uploadOrAdmitComposerMediaFilesWithToken(
                                         account,
@@ -9086,6 +9089,8 @@ class ConversationController(
                     return
                 }
             discardedDuringRetry.remove(key)
+            // Every attempt reports its own transfer from the start, so a Retry never shows the last one's bytes.
+            retained.clearTransferProgress()
             try {
                 // Reuse the references if a prior attempt already uploaded the
                 // blobs (publish-only failure) — re-uploading would orphan
@@ -9463,6 +9468,8 @@ class ConversationController(
                     if (BuildConfig.DEBUG) Log.w("DMConversation", "post-acceptance media settlement failed", throwable)
                     return
                 }
+                // A failed bubble offers Retry, not the bytes of the attempt that failed.
+                retained.clearTransferProgress()
                 optimisticMessages[key] =
                     TimelineMessage(
                         key,
@@ -10695,6 +10702,15 @@ class ConversationController(
             .get("msg:$messageIdHex")
             ?.attachments
             .orEmpty()
+
+    /**
+     * Byte progress of the single-file send still pending as [messageIdHex], or null when it has none to
+     * show: an album, a send held in memory, or a message that is no longer pending here.
+     */
+    internal fun pendingUploadProgress(messageIdHex: String): StateFlow<FileUploadProgress?>? {
+        val retained = retainedMediaUploads.get("msg:$messageIdHex") ?: return null
+        return retained.uploadProgress
+    }
 
     /**
      * Drop all retained outgoing JPEG bytes. Called when leaving the

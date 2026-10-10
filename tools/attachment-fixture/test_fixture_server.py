@@ -10,7 +10,7 @@ import time
 import unittest
 from unittest import mock
 
-from fixture_server import Control, FixtureServer, Handler, Ledger
+from fixture_server import MAX_BYTES, UPLOAD_MAX_BYTES, Control, FixtureServer, Handler, Ledger
 
 
 class FixtureContractTest(unittest.TestCase):
@@ -407,6 +407,17 @@ class FixtureContractTest(unittest.TestCase):
         self.assertEqual(404, self.get("/../ledger.sqlite3")[0])
         self.assertEqual(413, self.get("/upload", method="PUT", headers={"Content-Length": "999999999"})[0])
         self.assertEqual(0o600, Path(self.server.ledger.path).stat().st_mode & 0o777)
+
+    def test_upload_admission_allows_one_whole_file_backed_send_and_no_more(self):
+        """An upload above the generated-body cap is admitted up to 512 MiB of ciphertext, and one byte more is refused."""
+        self.assertGreater(UPLOAD_MAX_BYTES, MAX_BYTES)
+        self.assertEqual(413, self.get("/upload", method="PUT", headers={"Content-Length": str(UPLOAD_MAX_BYTES + 1)})[0])
+        admitted = MAX_BYTES + 1
+        with socket.create_connection(("127.0.0.1", self.server.server_port), timeout=5) as client:
+            client.sendall(f"PUT /upload HTTP/1.1\r\nHost: x\r\nContent-Length: {admitted}\r\n\r\nabc".encode())
+        # The body is cut short on purpose: an admitted upload is recorded and then counted as a disconnect.
+        events = self.await_event("upload_disconnect")
+        self.assertIn(admitted, [event["value"] for event in events if event["kind"] == "upload"])
 
     def test_binary_suffix_is_the_same_generated_blob_without_changing_default_uploads(self):
         """Match MDK's canonical group fallback only when that explicit fixture mode requests it."""

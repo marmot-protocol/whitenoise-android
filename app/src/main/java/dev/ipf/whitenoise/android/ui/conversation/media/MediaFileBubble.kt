@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.state.AttachmentOpenPhase
 import dev.ipf.whitenoise.android.state.AttachmentOpenTrace
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -563,7 +564,10 @@ private fun formatFileSize(bytes: Long): String {
     return String.format(java.util.Locale.US, "%.1f GB", gb)
 }
 
-/** Pill for a file still being sent. */
+/**
+ * Pill for a file still being sent. While [uploadProgress] is known, the ring fills with the whole send's
+ * progress, the size line shows the step's short label and TalkBack reads the step with its bytes.
+ */
 @Composable
 internal fun PendingFilePill(
     fileName: String,
@@ -575,8 +579,12 @@ internal fun PendingFilePill(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Pending,
+    uploadProgress: FileUploadProgress? = null,
 ) {
     val presentation = remember(mediaType, fileName) { resolveAttachmentPresentation(mediaType, fileName) }
+    val progress = uploadProgress?.takeIf { !failed }
+    val progressText = progress?.let { uploadProgressLabel(it) }
+    val progressDescription = progress?.let { uploadProgressDescription(it) }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = ConversationRichContentShape,
@@ -600,13 +608,21 @@ internal fun PendingFilePill(
                 } else {
                     AttachmentTransferState.Downloading
                 },
-            metadataText = if (failed && timestampText != null) statusLabel else formatFileSize(sizeBytes),
+            metadataText =
+                when {
+                    failed && timestampText != null -> statusLabel
+                    progressText != null -> progressText
+                    else -> formatFileSize(sizeBytes)
+                },
             metadataIsError = failed && timestampText != null,
-            trailingMetadataText = timestampText ?: statusLabel,
+            // The size line already names the upload step while bytes are known, so it is not repeated here.
+            trailingMetadataText = timestampText ?: statusLabel.takeIf { progressText == null },
             trailingMetadataIsError = failed && timestampText == null,
             trailingStatus = status.takeIf { showStatus },
             loadingDescription = statusLabel,
             transferDirection = FileTransferDirection.Upload,
+            progressDescription = progressDescription,
+            progressFraction = progress?.ringFraction,
         )
     }
 }

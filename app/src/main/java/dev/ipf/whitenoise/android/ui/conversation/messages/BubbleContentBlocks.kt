@@ -78,6 +78,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaVoiceBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.RejectedAttachmentPlaceholder
 import dev.ipf.whitenoise.android.ui.conversation.media.RemoteGiphyMediaBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachmentKey
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberPendingUploadProgress
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberVoicePresentationOwner
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCards
@@ -413,6 +414,8 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 focusedPreview = focusedPreview,
             ) {
                 if (MediaReferenceSupport.isVideoMedia(entry.value)) {
+                    val uploadProgress =
+                        rememberPendingUploadProgress(controller, record.messageIdHex, active = !uploadFailed)
                     MediaVideoBubble(
                         item = item,
                         attachmentIndex = entry.index,
@@ -431,6 +434,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                         uploading = !uploadFailed,
                         uploadFailed = uploadFailed,
                         onRetryUpload = if (uploadFailed) retryUpload else null,
+                        uploadProgress = uploadProgress,
                     )
                 } else {
                     MediaImageBubble(
@@ -481,9 +485,16 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 visualOwnsFooter = footerOnPendingVisual,
                 hasCaption = hasCaption,
             )
+        val uploadProgress =
+            rememberPendingUploadProgress(
+                controller,
+                record.messageIdHex,
+                active = item.status != MessageStatus.Failed,
+            )
         MediaPendingPlaceholder(
             pendingAttachments = controller.pendingAttachmentsList(record.messageIdHex),
             failed = item.status == MessageStatus.Failed,
+            uploadProgress = uploadProgress,
             timestampText = rememberedMessageBubbleTime(record.recordedAt).takeIf { pendingFileOwnsFooter },
             showStatus = pendingFileOwnsFooter && showStatus,
             status = item.status,

@@ -54,6 +54,15 @@
           "MED-007",
           "MED-017"
         ]
+      },
+      {
+        "surface": "VideoUploadIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "fun VideoUploadIndicator(",
+        "test_ids": [
+          "MED-001",
+          "MED-030"
+        ]
       }
     ],
     "settings_controls": [

@@ -5,6 +5,10 @@ import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Compressed bytes + metadata retained for an in-flight/failed media send.
@@ -28,6 +32,32 @@ internal class RetainedMediaUpload(
     private var sourceRelease: (() -> Unit)? = null
     private var transferCancel: (() -> Unit)? = null
     private var transferCancelRequested = false
+    private val transferProgress = MutableStateFlow<FileUploadProgress?>(null)
+
+    // MDK's transfer counter describes a send of one file only, so an album or an in-memory send shows none.
+    private val singleFileBytes: Long? =
+        attachments
+            .singleOrNull()
+            ?.takeIf { it.sourceFile != null }
+            ?.byteCount
+            ?.takeIf { it > 0L }
+
+    /** The running single-file transfer's progress, or null while none is known or after it failed. */
+    val uploadProgress: StateFlow<FileUploadProgress?> = transferProgress.asStateFlow()
+
+    /** Publishes MDK's transfer counter for this send, keeping the last value once every byte is sent. */
+    fun reportTransferProgress(processed: Long) {
+        val fileBytes = singleFileBytes ?: return
+        val next = fileUploadProgress(processed, fileBytes) ?: return
+        transferProgress.update { current ->
+            if (current != null && current.fraction > next.fraction) current else next
+        }
+    }
+
+    /** Forgets the progress of an attempt that ended without a send, so a failed bubble shows no stale bytes. */
+    fun clearTransferProgress() {
+        transferProgress.value = null
+    }
 
     /**
      * Registers how to stop the file-backed transfer now running for this send; null once it has returned.
