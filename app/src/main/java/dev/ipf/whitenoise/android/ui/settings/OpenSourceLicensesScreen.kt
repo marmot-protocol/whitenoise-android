@@ -43,7 +43,7 @@ internal fun OpenSourceLicensesScreen(onBack: () -> Unit) {
         produceState<Result<List<OpenSourceNotice>>?>(null, retry, context.resources) {
             value =
                 withContext(Dispatchers.IO) {
-                    runCatchingCancellable { readOpenSourceNotices(context.resources, context.packageName) }
+                    runCatchingCancellable { readOpenSourceNotices(context.resources) }
                 }
         }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }

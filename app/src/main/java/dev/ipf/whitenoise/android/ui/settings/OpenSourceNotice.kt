@@ -12,15 +12,10 @@ internal data class OpenSourceNotice(
     val text: String,
 )
 
-internal fun readOpenSourceNotices(
-    resources: Resources,
-    packageName: String,
-): List<OpenSourceNotice> {
-    val metadata = resources.getIdentifier("third_party_license_metadata", "raw", packageName)
-    val texts = resources.getIdentifier("third_party_licenses", "raw", packageName)
-    require(metadata != 0 && texts != 0) { "Missing generated open source notices" }
-    val index = resources.openRawResource(metadata).use { stream -> stream.readBytes() }
-    val data = resources.openRawResource(texts).use { stream -> stream.readBytes() }
+internal fun readOpenSourceNotices(resources: Resources): List<OpenSourceNotice> {
+    // Static references keep the generator's files reachable in optimized release APKs.
+    val index = resources.openRawResource(R.raw.third_party_license_metadata).use { stream -> stream.readBytes() }
+    val data = resources.openRawResource(R.raw.third_party_licenses).use { stream -> stream.readBytes() }
     val generated = parseOpenSourceNotices(index, data)
     val local = resources.openRawResource(R.raw.material_icons_notice).use { stream -> strictUtf8(stream.readBytes()) }
     return (generated + OpenSourceNotice("local-material-icons", "AndroidX Material icon definitions", local))

@@ -33,6 +33,9 @@ if [[ -z "$application_id" ]]; then
   exit 1
 fi
 
+# Inspect the APK already built by this job; no extra compile or emulator matrix.
+python3 "$(dirname "$0")/verify_notice_resources.py" --apk "$apk_path"
+
 mkdir -p "$report_dir"
 adb wait-for-device
 if [[ "$(adb shell getprop ro.kernel.qemu | tr -d '\r')" != "1" ]]; then
