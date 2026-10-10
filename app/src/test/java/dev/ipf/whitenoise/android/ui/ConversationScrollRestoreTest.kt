@@ -67,6 +67,15 @@ class ConversationScrollRestoreTest {
         )
     }
 
+    /** Native offset zero still owns a history snapshot when a newest mention needs reading room. */
+    @Test
+    fun newestMentionOnLeavePersistsItsReadingRoomWithTheLogicalAnchor() {
+        assertEquals(
+            ConversationScrollSnapshot(0, 0, "msg:mention", "mention", 80),
+            conversationScrollSnapshotOnLeave(0, 0, false, "msg:mention", "mention", 80),
+        )
+    }
+
     @Test
     fun ordinaryReopenRestoresSavedHistoryPosition() {
         assertTrue(

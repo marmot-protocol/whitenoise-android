@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationLogic.kt",
+  "legacy_sha256": "0aadb0f72d95778a063616211fa632df5b4172da07d593037ee906618cec6521",
+  "categories": {
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationLogic.kt",
+        "surface": "Newest mention reading intent, visible return control and route snapshot room",
+        "anchor": "mentionReadingRowHeightPx: Int? = null",
+        "test_ids": [
+          "CON-032"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
