@@ -17,7 +17,7 @@ internal object ConversationTranscriptDrawProbe {
             if (value == null) compositionRowsOverride = null
         }
 
-    /** Instrumented negative controls can freeze the actual production composition without altering controller state. */
+    /** Freezes production composition for negative controls without changing the controller. */
     var compositionRowsOverride: ((ConversationController, List<TimelineMessage>) -> List<TimelineMessage>)? = null
     private var lastPainted: ConversationTranscriptDraw? = null
     private var rootFrame: RootFrame? = null
@@ -32,13 +32,13 @@ internal object ConversationTranscriptDrawProbe {
     fun rowsForComposition(controller: ConversationController, rows: List<TimelineMessage>): List<TimelineMessage> =
         if (isObserving()) compositionRowsOverride?.invoke(controller, rows) ?: rows else rows
 
-    /** Freezes painted rows during composition so newer controller publications cannot alter recorded-layer evidence. */
+    /** Freezes composed rows so newer controller publications cannot alter painted-layer evidence. */
     fun composedRows(rows: List<TimelineMessage>): List<TimelineMessage> = if (isObserving()) rows.toList() else rows
 
     /** Starts one real OnDraw traversal, retaining cached layer evidence if the transcript is not re-recorded. */
     fun beginRootDraw(): (() -> Unit)? {
-        if (!isObserving()) return null
-        val callback = observer ?: return null
+        val callback = observer
+        if (!isObserving() || callback == null) return null
         val frame = RootFrame(lastPainted, SystemClock.uptimeMillis())
         rootFrame = frame
         return {
