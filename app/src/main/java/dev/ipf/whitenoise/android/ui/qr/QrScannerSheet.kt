@@ -15,6 +15,7 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.WindowInsets
@@ -305,7 +306,7 @@ private fun bindQrScannerCamera(
 }
 
 /** One serial analysis owner closes every frame and delivers at most one live result on the main executor. */
-private fun createQrAnalysis(
+internal fun createQrAnalysis(
     analyzerExecutor: Executor,
     resultExecutor: Executor,
     disposedRef: AtomicBoolean,
@@ -316,7 +317,13 @@ private fun createQrAnalysis(
     val analysis =
         ImageAnalysis
             .Builder()
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setResolutionSelector(
+                ResolutionSelector
+                    .Builder()
+                    .setResolutionFilter { sizes, _ ->
+                        sizes.filter { size -> size.width.toLong() * size.height <= QrFrameDecoder.MAX_PIXELS }
+                    }.build(),
+            ).setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
 
     analysis.setAnalyzer(analyzerExecutor) { imageProxy ->
