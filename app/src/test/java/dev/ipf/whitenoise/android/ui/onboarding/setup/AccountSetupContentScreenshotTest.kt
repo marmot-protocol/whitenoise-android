@@ -12,6 +12,12 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
+import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
+import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
+import dev.ipf.marmotkit.OnboardingRelayTagChangeFfi
+import dev.ipf.marmotkit.OnboardingRelayTagDispositionFfi
+import dev.ipf.marmotkit.OnboardingRelayTagFfi
+import dev.ipf.marmotkit.OnboardingRelayTagRoleFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
@@ -29,6 +35,88 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36], qualifiers = "en-w360dp-h1000dp-mdpi")
 class AccountSetupContentScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
+
+    /** Both explicit choices are visible without opening diagnostic details. */
+    @Test fun relayRepairChoices() = capture("relay_repair_choices", relayChoicesState())
+
+    /** The repair choices retain contrast against the AMOLED black background. */
+    @Test fun relayRepairChoicesAmoled() =
+        capture(
+            "relay_repair_choices_amoled",
+            relayChoicesState(),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
+    /** Narrow screens keep the two explicit relay choices reachable at double text size. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h640dp-mdpi")
+    fun relayChoicesNarrowLarge() = capture("relay_choices_narrow_large", relayChoicesState(), fontScale = 2f)
+
+    /** A failed editor operation preserves its fields and exposes the retryable error in a short AMOLED viewport. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h640dp-mdpi")
+    fun relayEditorFailureNarrowAmoled() =
+        capture(
+            "relay_editor_failure_narrow_amoled",
+            mixedRelayEditorState().copy(error = true),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
+    /** Supplies the same native repair decision to each theme baseline. */
+    private fun relayChoicesState() =
+        AccountSetupState(
+            snapshot =
+                relayDecision().apply {
+                    steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+                        listOf(OnboardingFindingFfi(OnboardingIssueFfi.RETIRED_RELAY, null))
+                },
+        )
+
+    /** Records the exact declaration and native change labels before consent. */
+    @Test fun relayRepairPreview() = capture("relay_repair_preview", AccountSetupState(snapshot = relayDiffSnapshot()))
+
+    /** Exact native declarations and content remain readable in the AMOLED palette. */
+    @Test fun relayRepairPreviewAmoled() =
+        capture(
+            "relay_repair_preview_amoled",
+            AccountSetupState(snapshot = relayDiffSnapshot()),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
+    /** Long exact source strings remain inspectable in a large-text mirrored viewport. */
+    @Test fun relayRepairPreviewDarkRtlLarge() =
+        capture(
+            "relay_repair_preview_dark_rtl_large",
+            AccountSetupState(snapshot = relayDiffSnapshot()),
+            theme = SetupScreenshotTheme.DARK,
+            rtl = true,
+            fontScale = 2f,
+        )
+
+    /** A manual-review outcome cannot be confused with an approved publication still pending. */
+    @Test fun relayRepairManualReview() {
+        val snapshot = relayDiffSnapshot()
+        snapshot.proposal!!.relayRepair!!.apply {
+            mode = OnboardingRelayRepairModeFfi.MANUAL_REVIEW
+            afterTags = beforeTags
+            proposedContent = originalContent
+            changes =
+                beforeTags.mapIndexed { index, tag ->
+                    OnboardingRelayTagChangeFfi(
+                        OnboardingRelayTagDispositionFfi.RETAINED,
+                        index.toULong(),
+                        index.toULong(),
+                        tag.fields,
+                        tag.endpoint,
+                        tag.role,
+                        OnboardingRelayCapabilityFfi.NONE,
+                    )
+                }
+        }
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.actions =
+            listOf(OnboardingActionFfi.EDIT_RELAYS, OnboardingActionFfi.CANCEL_REPAIR)
+        capture("relay_repair_manual", AccountSetupState(snapshot = snapshot))
+    }
 
     /** Captures the busy preflight state with the current decision and checklist visible. */
     @Test fun progress() = capture("progress", AccountSetupState(snapshot = setupSnapshot(), busy = true))
@@ -105,10 +193,42 @@ class AccountSetupContentScreenshotTest {
                         3uL,
                         OnboardingStepFfi.INBOX_RELAYS,
                         OnboardingActionFfi.EDIT_RELAYS,
-                        reads = "wss://inbox.example",
-                    ),
+                    ).withRelayDeclaration(relayRepairFixture().copy(beforeTags = emptyList()))
+                        .copy(reads = "wss://inbox.example"),
             ),
         )
+
+    /** Mixed native read/write declarations are editable without rebuilding their raw tags in Android. */
+    @Test fun mixedRelayEditor() = capture("relay_repair_editor", mixedRelayEditorState())
+
+    /** The lossless relay fields and review action retain visible boundaries in AMOLED. */
+    @Test fun mixedRelayEditorAmoled() =
+        capture(
+            "relay_repair_editor_amoled",
+            mixedRelayEditorState(),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
+    /** The enabled mixed-role editor remains usable with mirrored layout and double-sized dark text. */
+    @Test fun mixedRelayEditorDarkRtlLarge() =
+        capture(
+            "relay_repair_editor_dark_rtl_large",
+            mixedRelayEditorState(),
+            theme = SetupScreenshotTheme.DARK,
+            rtl = true,
+            fontScale = 2f,
+        )
+
+    /** Keeps the editor tied to the proposal that supplied its source declaration. */
+    private fun mixedRelayEditorState(): AccountSetupState {
+        val snapshot = relayDiffSnapshot()
+        return AccountSetupState(
+            snapshot = snapshot,
+            editor =
+                SetupEditor(snapshot.revision, OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS)
+                    .withRelayDeclaration(requireNotNull(snapshot.proposal?.relayRepair)),
+        )
+    }
 
     /** Checks the bounded content width on a tablet-sized surface. */
     @Test
@@ -123,7 +243,12 @@ class AccountSetupContentScreenshotTest {
     /** Relay approval explains preservation and replacement without assuming a proposal mode. */
     @Test fun relayProposal() = capture("relay_proposal", relayProposalState())
 
-    @Test fun relayProposalDark() = capture("relay_proposal_dark", relayProposalState(), dark = true)
+    @Test fun relayProposalDark() =
+        capture(
+            "relay_proposal_dark",
+            relayProposalState(),
+            theme = SetupScreenshotTheme.DARK,
+        )
 
     @Test
     fun relayProposalRtlLarge() {
@@ -164,7 +289,7 @@ class AccountSetupContentScreenshotTest {
                         listOf(OnboardingActionFfi.RECONNECT_SIGNER, OnboardingActionFfi.RETRY),
                     ),
             ),
-            dark = true,
+            theme = SetupScreenshotTheme.DARK,
         )
 
     /** Expanded device diagnostics explain an inconclusive result without asserting another device is absent. */
@@ -230,7 +355,7 @@ class AccountSetupContentScreenshotTest {
         capture(
             "large_rtl",
             AccountSetupState(snapshot = deviceSnapshot()),
-            dark = true,
+            theme = SetupScreenshotTheme.DARK,
             rtl = true,
             fontScale = 2f,
         )
@@ -275,11 +400,70 @@ class AccountSetupContentScreenshotTest {
         capture("device_retry", AccountSetupState(snapshot = snapshot))
     }
 
+    /** Includes real occurrence changes so the visual fixture exercises every native disposition. */
+    private fun relayDiffSnapshot() =
+        relayPreviewSnapshot().apply {
+            val read =
+                OnboardingRelayTagFfi(
+                    listOf("r", "wss://read.example", "read"),
+                    "wss://read.example",
+                    OnboardingRelayTagRoleFfi.READ,
+                )
+            val old =
+                OnboardingRelayTagFfi(
+                    listOf("r", "wss://old.example", "write"),
+                    "wss://old.example",
+                    OnboardingRelayTagRoleFfi.WRITE,
+                )
+            val added =
+                OnboardingRelayTagFfi(
+                    listOf("r", "wss://new.example", "write"),
+                    "wss://new.example",
+                    OnboardingRelayTagRoleFfi.WRITE,
+                )
+            proposal!!.relayRepair =
+                relayRepairFixture().copy(
+                    mode = OnboardingRelayRepairModeFfi.REMOVAL_AND_ADDITIVE,
+                    beforeTags = listOf(read, old),
+                    afterTags = listOf(read, added),
+                    changes =
+                        listOf(
+                            OnboardingRelayTagChangeFfi(
+                                OnboardingRelayTagDispositionFfi.RETAINED,
+                                0uL,
+                                0uL,
+                                read.fields,
+                                read.endpoint,
+                                read.role,
+                                OnboardingRelayCapabilityFfi.NONE,
+                            ),
+                            OnboardingRelayTagChangeFfi(
+                                OnboardingRelayTagDispositionFfi.REMOVED,
+                                1uL,
+                                null,
+                                old.fields,
+                                old.endpoint,
+                                old.role,
+                                OnboardingRelayCapabilityFfi.NONE,
+                            ),
+                            OnboardingRelayTagChangeFfi(
+                                OnboardingRelayTagDispositionFfi.ADDED,
+                                null,
+                                1uL,
+                                added.fields,
+                                added.endpoint,
+                                added.role,
+                                OnboardingRelayCapabilityFfi.WRITE,
+                            ),
+                        ),
+                )
+        }
+
     /** Freezes animation time and records the supplied state with explicit theme, direction, and density. */
     private fun capture(
         name: String,
         state: AccountSetupState,
-        dark: Boolean = false,
+        theme: SetupScreenshotTheme = SetupScreenshotTheme.LIGHT,
         rtl: Boolean = false,
         fontScale: Float = 1f,
     ) {
@@ -288,7 +472,11 @@ class AccountSetupContentScreenshotTest {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
+                WhiteNoiseTheme(
+                    darkTheme = theme != SetupScreenshotTheme.LIGHT,
+                    amoled = theme == SetupScreenshotTheme.AMOLED,
+                    fontScale = fontScale,
+                ) {
                     AccountSetupContent(state, {}, { _, _, _ -> }, {}, {}, {}, {}, {}, {}, { "Quiet Otter" })
                 }
             }
@@ -306,4 +494,11 @@ class AccountSetupContentScreenshotTest {
             composeRule.onRoot().captureRoboImage("src/test/snapshots/account_setup_large_rtl_actions.png")
         }
     }
+}
+
+/** Selects the app palette independently of viewport direction and font scale. */
+private enum class SetupScreenshotTheme {
+    LIGHT,
+    DARK,
+    AMOLED,
 }

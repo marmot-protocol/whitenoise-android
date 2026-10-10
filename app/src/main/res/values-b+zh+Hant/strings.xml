@@ -1873,8 +1873,8 @@
     <string name="setup_status_skipped">已略過</string>
     <string name="setup_action_retry">重試</string>
     <string name="setup_action_continue_without">暫時略過</string>
-    <string name="setup_action_use_recommended_relays">使用推薦中繼</string>
-    <string name="setup_action_edit_relays">選擇中繼站</string>
+    <string name="setup_action_use_recommended_relays">修復中繼站設定</string>
+    <string name="setup_action_edit_relays">檢查中繼站</string>
     <string name="setup_action_edit_profile">編輯個人檔案</string>
     <string name="setup_action_edit_follows">編輯追蹤清單</string>
     <string name="setup_action_approve_repair">儲存變更</string>

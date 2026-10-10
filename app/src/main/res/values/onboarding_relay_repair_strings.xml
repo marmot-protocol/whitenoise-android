@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">Reset to recommended relays</string>
+    <string name="setup_repair_preview">Review this relay repair before publishing. Your other Nostr apps will see the same change.</string>
+    <string name="setup_repair_manual">These relay details need manual review. No automatic repair will be published.</string>
+    <string name="setup_repair_before">Current declaration</string>
+    <string name="setup_repair_after">Proposed declaration</string>
+    <string name="setup_repair_retained">Keep</string>
+    <string name="setup_repair_removed">Remove</string>
+    <string name="setup_repair_added">Add</string>
+    <string name="setup_repair_read">Read</string>
+    <string name="setup_repair_write">Publish</string>
+    <string name="setup_repair_both">Read and publish</string>
+    <string name="setup_repair_inbox">Receive invitations</string>
+    <string name="setup_repair_other">Other metadata</string>
+    <string name="setup_repair_content">Event content</string>
+    <string name="setup_repair_edit_unavailable">This declaration has details the manual editor cannot preserve. Use the exact repair preview or review it in a client that supports these details.</string>
+    <string name="setup_repair_edit_unchanged">Change a relay before reviewing a replacement. Nothing is published until you approve.</string>
+</resources>

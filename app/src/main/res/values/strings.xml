@@ -2081,8 +2081,8 @@
     <string name="setup_status_skipped">Skipped</string>
     <string name="setup_action_retry">Retry</string>
     <string name="setup_action_continue_without">Not now</string>
-    <string name="setup_action_use_recommended_relays">Use recommended relays</string>
-    <string name="setup_action_edit_relays">Choose relays</string>
+    <string name="setup_action_use_recommended_relays">Fix relay setup</string>
+    <string name="setup_action_edit_relays">Review relays</string>
     <string name="setup_action_edit_profile">Edit profile</string>
     <string name="setup_action_edit_follows">Edit follows</string>
     <string name="setup_action_approve_repair">Save changes</string>

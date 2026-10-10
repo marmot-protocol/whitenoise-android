@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">Repor os relés recomendados</string>
+    <string name="setup_repair_preview">Reveja esta correção dos relés antes de publicar. As suas outras aplicações Nostr verão a mesma alteração.</string>
+    <string name="setup_repair_manual">Estes detalhes dos relés precisam de revisão manual. Não será publicada nenhuma correção automática.</string>
+    <string name="setup_repair_before">Declaração atual</string>
+    <string name="setup_repair_after">Declaração proposta</string>
+    <string name="setup_repair_retained">Manter</string>
+    <string name="setup_repair_removed">Remover</string>
+    <string name="setup_repair_added">Adicionar</string>
+    <string name="setup_repair_read">Ler</string>
+    <string name="setup_repair_write">Publicar</string>
+    <string name="setup_repair_both">Ler e publicar</string>
+    <string name="setup_repair_inbox">Receber convites</string>
+    <string name="setup_repair_other">Outros metadados</string>
+    <string name="setup_repair_content">Conteúdo do evento</string>
+    <string name="setup_repair_edit_unavailable">Esta declaração contém detalhes que o editor manual não consegue preservar. Use a pré-visualização exata da correção ou reveja-a num cliente que suporte estes detalhes.</string>
+    <string name="setup_repair_edit_unchanged">Altere um relé antes de rever uma substituição. Nada será publicado sem a sua aprovação.</string>
+</resources>

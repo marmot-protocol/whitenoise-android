@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">重設為建議的中繼站</string>
+    <string name="setup_repair_preview">發佈前請檢查此中繼站修復。你的其他 Nostr 應用程式也會看到相同變更。</string>
+    <string name="setup_repair_manual">這些中繼站詳細資料需要手動檢查。不會發佈自動修復。</string>
+    <string name="setup_repair_before">目前宣告</string>
+    <string name="setup_repair_after">擬議宣告</string>
+    <string name="setup_repair_retained">保留</string>
+    <string name="setup_repair_removed">移除</string>
+    <string name="setup_repair_added">新增</string>
+    <string name="setup_repair_read">讀取</string>
+    <string name="setup_repair_write">發佈</string>
+    <string name="setup_repair_both">讀取及發佈</string>
+    <string name="setup_repair_inbox">接收邀請</string>
+    <string name="setup_repair_other">其他中繼資料</string>
+    <string name="setup_repair_content">事件內容</string>
+    <string name="setup_repair_edit_unavailable">此宣告包含手動編輯器無法保留的詳細資料。請使用精確的修復預覽，或在支援這些詳細資料的用戶端中檢查。</string>
+    <string name="setup_repair_edit_unchanged">請先修改中繼站，再檢查替換內容。未經你的核准，不會發佈任何內容。</string>
+</resources>

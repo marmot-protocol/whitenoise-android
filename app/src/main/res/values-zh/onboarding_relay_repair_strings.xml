@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">重置为推荐中继</string>
+    <string name="setup_repair_preview">发布前请检查此中继修复。你的其他 Nostr 应用也会看到相同更改。</string>
+    <string name="setup_repair_manual">这些中继详情需要手动检查。不会发布自动修复。</string>
+    <string name="setup_repair_before">当前声明</string>
+    <string name="setup_repair_after">拟议声明</string>
+    <string name="setup_repair_retained">保留</string>
+    <string name="setup_repair_removed">移除</string>
+    <string name="setup_repair_added">添加</string>
+    <string name="setup_repair_read">读取</string>
+    <string name="setup_repair_write">发布</string>
+    <string name="setup_repair_both">读取和发布</string>
+    <string name="setup_repair_inbox">接收邀请</string>
+    <string name="setup_repair_other">其他元数据</string>
+    <string name="setup_repair_content">事件内容</string>
+    <string name="setup_repair_edit_unavailable">此声明包含手动编辑器无法保留的详情。请使用精确的修复预览，或在支持这些详情的客户端中检查。</string>
+    <string name="setup_repair_edit_unchanged">请先修改中继，再检查替换内容。未经你的批准，不会发布任何内容。</string>
+</resources>
