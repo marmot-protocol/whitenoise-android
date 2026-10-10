@@ -56,29 +56,36 @@ internal class TtsPlaybackMediaSessionCallback(
             controller.state.value.sessionId == sessionId &&
             TtsPlaybackSessionModel.from(controller.state.value).isActive
 
+    /** Validate and operate under the controller's queue-replacement lock. */
+    private inline fun withOwnedSession(action: () -> Unit) {
+        synchronized(controller) {
+            if (ownsSession()) action()
+        }
+    }
+
     /** Resumes the paused controller without rebuilding its queue. */
     override fun onPlay() {
-        if (ownsSession()) controller.resume()
+        withOwnedSession { controller.resume() }
     }
 
     /** Pauses the shared controller while retaining its sentence cursor. */
     override fun onPause() {
-        if (ownsSession()) controller.pause()
+        withOwnedSession { controller.pause() }
     }
 
     /** Ends both platform playback and the app-owned history session. */
     override fun onStop() {
-        if (ownsSession()) host.stopSession()
+        withOwnedSession { host.stopSession() }
     }
 
     /** Advances one logical sentence, paging history at a message edge when needed. */
     override fun onSkipToNext() {
-        if (ownsSession()) host.nextSentence()
+        withOwnedSession { host.nextSentence() }
     }
 
     /** Moves back one logical sentence, paging history at a message edge when needed. */
     override fun onSkipToPrevious() {
-        if (ownsSession()) host.previousSentence()
+        withOwnedSession { host.previousSentence() }
     }
 }
 
@@ -163,11 +170,15 @@ class TtsPlaybackForegroundService : Service() {
         observeJob?.cancel()
         serviceScope.cancel()
         playbackOwner
-            ?.takeIf {
-                it.controller.state.value.sessionId == playbackSessionId &&
-                    TtsPlaybackSessionModel.from(it.controller.state.value).isActive
+            ?.let { owner ->
+                synchronized(owner.controller) {
+                    if (owner.controller.state.value.sessionId == playbackSessionId &&
+                        TtsPlaybackSessionModel.from(owner.controller.state.value).isActive
+                    ) {
+                        owner.stopSession()
+                    }
+                }
             }
-            ?.stopSession()
         playbackOwner = null
         playbackSessionId = null
         observedController = null
