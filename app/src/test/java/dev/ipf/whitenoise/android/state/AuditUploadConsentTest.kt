@@ -92,6 +92,25 @@ class AuditUploadConsentTest {
             assertFalse(AuditUploadConsent(preferences).granted)
         }
 
+    /** Recreating startup preserves the disclosure receipt; it is not an app-version receipt. */
+    @Test
+    fun repeatedStartupKeepsTheSameAcknowledgementWithoutRenewal() =
+        runTest {
+            preferences.edit().clear().commit()
+            AuditUploadConsent(preferences).choose(true)
+            val receipt = preferences.all.toMap()
+            repeat(3) {
+                val native = Native(enabled = true)
+                val reopened = AuditUploadConsent(preferences)
+                reopened.prepare(native.runtime)
+                assertTrue(reopened.granted)
+                assertFalse(reopened.requiresChoice)
+                assertTrue(native.enabled)
+                assertEquals(receipt, preferences.all)
+                assertFalse(native.mutations.contains("disable"))
+            }
+        }
+
     /** Native rejection leaves a consented recorder local and cannot assert upload readiness. */
     @Test
     fun rejectedV5UploadDoesNotBlockStartupOrStopLocalRecording() =

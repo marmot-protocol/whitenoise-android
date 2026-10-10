@@ -23,6 +23,23 @@ import java.util.concurrent.TimeUnit
 
 /** Behavioral receipt projection tests; the fake controls persistence failure and exporter capability. */
 class UsageDiagnosticsControllerTest {
+    /** A replacement Android projection reads the native decision without creating another grant. */
+    @Test
+    fun replacementControllerPreservesGrantedAndDeclinedNativeDecisions() =
+        runBlocking {
+            for (enabled in listOf(true, false)) {
+                val native = NativeReceipt()
+                assertTrue(UsageDiagnosticsController().choose(native.engine, enabled))
+                repeat(3) {
+                    val reopened = UsageDiagnosticsController()
+                    reopened.refresh(native.engine)
+                    assertFalse(reopened.requiresChoice)
+                    assertEquals(enabled, reopened.granted)
+                    assertEquals(1, native.writes)
+                }
+            }
+        }
+
     /** Slow grants and revocations keep the last receipt visible while admitting no host observations. */
     @Test
     fun pendingSaveKeepsPresentationStableWithoutGrantingCollection() =
@@ -228,6 +245,7 @@ class UsageDiagnosticsControllerTest {
 
     /** Tiny native boundary with independently controllable settings and delivery capability. */
     private class NativeReceipt {
+        var writes = 0
         var fail = false
         var configured = true
         var beforeWrite: () -> Unit = {}
@@ -242,6 +260,7 @@ class UsageDiagnosticsControllerTest {
                 when (method.name) {
                     "setUsageDiagnosticsConsent" -> {
                         beforeWrite()
+                        writes++
                         decision =
                             if (args!![0] == true) {
                                 UsageDiagnosticsDecisionFfi.GRANTED

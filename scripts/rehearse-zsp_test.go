@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -101,8 +103,139 @@ func TestOfflineSignerRejectsPublicAndForeignEvents(t *testing.T) {
 	}
 }
 
+// TestOfflineSignerSubscriptionLifecycle uses protocol barriers, not timing sleeps.
+func TestOfflineSignerSubscriptionLifecycle(t *testing.T) {
+	ctx, conn, relay, signerPub, clientKey := offlineRelayFixture(t)
+	matching := nostr.Filter{Kinds: []int{24133}, Tags: nostr.TagMap{"p": []string{relay.clientPub}}}
+	writeOfflineFrame(t, ctx, conn, "REQ", "first", matching)
+	readOfflineFrame(t, ctx, conn, "EOSE")
+	// A stale CLOSE cannot remove the current subscription.
+	writeOfflineFrame(t, ctx, conn, "CLOSE", "old")
+	writeOfflineFrame(t, ctx, conn, "EVENT", offlineConnectRequestID(t, signerPub, clientKey, "first"))
+	readOfflineFrame(t, ctx, conn, "OK")
+	assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EVENT"), "first")
+	// Replacing the socket's subscription must replace its filter as well as ID.
+	writeOfflineFrame(t, ctx, conn, "REQ", "unmatched", nostr.Filter{Kinds: []int{0}})
+	assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EOSE"), "unmatched")
+	writeOfflineFrame(t, ctx, conn, "EVENT", offlineConnectRequestID(t, signerPub, clientKey, "second"))
+	readOfflineFrame(t, ctx, conn, "OK")
+	writeOfflineFrame(t, ctx, conn, "REQ", "reply", matching)
+	for range 2 {
+		assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EVENT"), "reply")
+	}
+	assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EOSE"), "reply")
+	writeOfflineFrame(t, ctx, conn, "CLOSE", "reply")
+	writeOfflineFrame(t, ctx, conn, "EVENT", offlineConnectRequestID(t, signerPub, clientKey, "third"))
+	// The ACK follows CLOSE processing; any stale delivery would precede the next EOSE.
+	readOfflineFrame(t, ctx, conn, "OK")
+	relay.mu.Lock()
+	peerCount := len(relay.peers)
+	relay.mu.Unlock()
+	if peerCount != 0 {
+		t.Fatal("CLOSE retained a reply subscription")
+	}
+	writeOfflineFrame(t, ctx, conn, "REQ", "barrier", nostr.Filter{Kinds: []int{0}})
+	assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EOSE"), "barrier")
+	writeOfflineFrame(t, ctx, conn, "REQ", "reopened", matching)
+	for range 3 {
+		assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EVENT"), "reopened")
+	}
+	assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EOSE"), "reopened")
+}
+
+func TestOfflineSignerReplayHasFixedBound(t *testing.T) {
+	ctx, conn, relay, signerPub, clientKey := offlineRelayFixture(t)
+	for index := range offlineSignerResponseLimit + 3 {
+		writeOfflineFrame(t, ctx, conn, "EVENT", offlineConnectRequestID(t, signerPub, clientKey, string(rune('a'+index))))
+		readOfflineFrame(t, ctx, conn, "OK")
+	}
+	relay.mu.Lock()
+	if len(relay.responses) != offlineSignerResponseLimit {
+		relay.mu.Unlock()
+		t.Fatal("reply retention exceeded its fixed bound")
+	}
+	relay.mu.Unlock()
+	key, err := nip44.GenerateConversationKey(signerPub, clientKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeOfflineFrame(t, ctx, conn, "REQ", "bounded", nostr.Filter{Kinds: []int{24133}})
+	for index := range offlineSignerResponseLimit {
+		frame := readOfflineFrame(t, ctx, conn, "EVENT")
+		assertOfflineSubscriptionID(t, frame, "bounded")
+		var response nostr.Event
+		if len(frame) != 3 || json.Unmarshal(frame[2], &response) != nil {
+			t.Fatal("invalid retained response")
+		}
+		plain, err := nip44.Decrypt(response.Content, key)
+		var reply nip46.Response
+		if err != nil || json.Unmarshal([]byte(plain), &reply) != nil || reply.ID != string(rune('a'+index+3)) {
+			t.Fatal("replay changed the bounded response order")
+		}
+	}
+	assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EOSE"), "bounded")
+}
+
+func TestOfflineSignerFiltersRecipientsAndKeepsSubscriptionAfterMalformedREQ(t *testing.T) {
+	ctx, conn, relay, signerPub, clientKey := offlineRelayFixture(t)
+	wrongRecipient := nostr.Filter{Kinds: []int{24133}, Tags: nostr.TagMap{"p": []string{signerPub}}}
+	writeOfflineFrame(t, ctx, conn, "REQ", "wrong-recipient", wrongRecipient)
+	readOfflineFrame(t, ctx, conn, "EOSE")
+	writeOfflineFrame(t, ctx, conn, "EVENT", offlineConnectRequest(t, signerPub, clientKey))
+	readOfflineFrame(t, ctx, conn, "OK")
+	// EOSE is an ordered barrier: no live or retained reply may match the wrong recipient.
+	writeOfflineFrame(t, ctx, conn, "REQ", "wrong-recipient", wrongRecipient)
+	assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EOSE"), "wrong-recipient")
+	writeOfflineFrame(t, ctx, conn, "REQ", "current", nostr.Filter{
+		Kinds: []int{24133}, Tags: nostr.TagMap{"p": []string{relay.clientPub}},
+	})
+	assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EVENT"), "current")
+	readOfflineFrame(t, ctx, conn, "EOSE")
+	for _, malformed := range [][]any{
+		{"REQ", "missing-filter"},
+		{"REQ", "null-filter", nil},
+		{"REQ", "bad-filter", "not an object"},
+		{"REQ", "", nostr.Filter{}},
+	} {
+		writeOfflineFrame(t, ctx, conn, malformed...)
+		writeOfflineFrame(t, ctx, conn, "EVENT", offlineConnectRequestID(t, signerPub, clientKey, "barrier"))
+		readOfflineFrame(t, ctx, conn, "OK")
+		assertOfflineSubscriptionID(t, readOfflineFrame(t, ctx, conn, "EVENT"), "current")
+	}
+}
+
+func TestOfflineSignerDisconnectRemovesSubscription(t *testing.T) {
+	ctx, conn, relay, _, _, ended := offlineRelayFixtureWithDone(t)
+	writeOfflineFrame(t, ctx, conn, "REQ", "reply", nostr.Filter{Kinds: []int{24133}})
+	readOfflineFrame(t, ctx, conn, "EOSE")
+	conn.CloseNow()
+	select {
+	case <-ended:
+	case <-ctx.Done():
+		t.Fatal("disconnected relay handler did not finish")
+	}
+	relay.mu.Lock()
+	defer relay.mu.Unlock()
+	if len(relay.peers) != 0 {
+		t.Fatal("disconnected socket retained a subscription")
+	}
+}
+
+func assertOfflineSubscriptionID(t *testing.T, frame []json.RawMessage, expected string) {
+	t.Helper()
+	var actual string
+	if len(frame) < 2 || json.Unmarshal(frame[1], &actual) != nil || actual != expected {
+		t.Fatal("response used a replaced or unexpected subscription ID")
+	}
+}
+
 // offlineRelayFixture uses the real rehearsal handler with disposable identities and loopback transport.
 func offlineRelayFixture(t *testing.T) (context.Context, *websocket.Conn, *offlineSignerRelay, string, string) {
+	ctx, conn, relay, signerPub, clientKey, _ := offlineRelayFixtureWithDone(t)
+	return ctx, conn, relay, signerPub, clientKey
+}
+
+func offlineRelayFixtureWithDone(t *testing.T) (context.Context, *websocket.Conn, *offlineSignerRelay, string, string, <-chan struct{}) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	t.Cleanup(cancel)
@@ -112,24 +245,33 @@ func offlineRelayFixture(t *testing.T) (context.Context, *websocket.Conn, *offli
 	signer := nip46.NewStaticKeySigner(signerKey)
 	signer.AuthorizeRequest = func(_ bool, from, _ string) bool { return from == clientPub }
 	relay := newOfflineSignerRelay(ctx, &signer, clientPub)
-	server := httptest.NewServer(relay)
+	ended := make(chan struct{})
+	var endOnce sync.Once
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer endOnce.Do(func() { close(ended) })
+		relay.ServeHTTP(w, r)
+	}))
 	t.Cleanup(server.Close)
 	conn, _, err := websocket.Dial(ctx, strings.Replace(server.URL, "http://", "ws://", 1), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { conn.CloseNow() })
-	return ctx, conn, relay, signerPub, clientKey
+	return ctx, conn, relay, signerPub, clientKey, ended
 }
 
 // offlineConnectRequest matches the pinned client's encrypted and signed NIP-46 request.
 func offlineConnectRequest(t *testing.T, signerPub, clientKey string) nostr.Event {
+	return offlineConnectRequestID(t, signerPub, clientKey, "connect-fixture")
+}
+
+func offlineConnectRequestID(t *testing.T, signerPub, clientKey, id string) nostr.Event {
 	t.Helper()
 	key, err := nip44.GenerateConversationKey(signerPub, clientKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	payload, err := json.Marshal(nip46.Request{ID: "connect-fixture", Method: "connect", Params: []string{signerPub}})
+	payload, err := json.Marshal(nip46.Request{ID: id, Method: "connect", Params: []string{signerPub}})
 	if err != nil {
 		t.Fatal(err)
 	}

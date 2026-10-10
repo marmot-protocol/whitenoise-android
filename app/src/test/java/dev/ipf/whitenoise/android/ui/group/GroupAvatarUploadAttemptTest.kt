@@ -132,6 +132,30 @@ class GroupAvatarUploadAttemptTest {
             }
         }
 
+    /** Cancellation at preparation or native publication cannot be converted to an upload error. */
+    @Test
+    fun cancellationAtPreparationAndPublicationPreservesTheOriginalException() =
+        runTest {
+            for (duringPreparation in listOf(true, false)) {
+                val cancelled = CancellationException("editor closed")
+                var uploads = 0
+                try {
+                    GroupAvatarUploadAttempt({ true }, { 0 }).run(
+                        { if (duringPreparation) throw cancelled else draft },
+                        {
+                            uploads++
+                            url
+                        },
+                        { throw cancelled },
+                    )
+                    error("expected cancellation")
+                } catch (actual: CancellationException) {
+                    assertSame(cancelled, actual)
+                    assertEquals(if (duringPreparation) 0 else 1, uploads)
+                }
+            }
+        }
+
     @Test
     fun diagnosticReportContainsOnlyPhaseTimingAndFixedCategories() =
         runTest {
