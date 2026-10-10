@@ -74,6 +74,7 @@ class AccountSetupChecklistScreenshotTest {
                         listOf("wss://write.example"),
                         null,
                         null,
+                        relayRepair = null,
                     ),
             )
         capture("no_action_approved", state = AccountSetupState(snapshot))
