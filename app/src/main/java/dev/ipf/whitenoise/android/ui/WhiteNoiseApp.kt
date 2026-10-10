@@ -606,7 +606,7 @@ internal fun WhiteNoiseApp(
                                     }
                                     if (
                                         inboundProfilePayload != null ||
-                                            !shouldComposeProtectedMainShell(firstUsefulSurface)
+                                        !shouldComposeProtectedMainShell(firstUsefulSurface)
                                     ) {
                                         PrepareMainShellFirstFrame(appState, mainShellStateHolder)
                                         val startupController =
