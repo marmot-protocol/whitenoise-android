@@ -950,6 +950,9 @@ internal fun sweepStaleSharedMedia(
         }
         AttachmentPlaintextCache.trimKnownDirectories(context.cacheDir)
     }
+    // Large-send snapshots belong to one process's retry state; an earlier process's are orphans at any age.
+    // Run on its own so a failure above cannot leave hundreds of MiB of plaintext behind.
+    runCatching { sweepOrphanedUploadSources(context.cacheDir) }
 }
 
 /** Files in `shared_media` older than this are considered safe to delete —

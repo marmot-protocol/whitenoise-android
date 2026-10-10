@@ -30,6 +30,7 @@ class MessageOutboundShareTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** Text, captions and attachments each make a message shareable; an incomplete attachment set does not. */
     @Test
     fun payloadDecisionCoversTextFileCaptionAndAttachmentOnly() {
         assertTrue(messageHasShareablePayload("hello", emptyList(), emptyList()))
@@ -44,6 +45,27 @@ class MessageOutboundShareTest {
                 protocolAttachmentCount = 2,
             ),
         )
+    }
+
+    /** A pending file-backed item has no in-memory copy, so its message is shareable only once confirmed. */
+    @Test
+    fun pendingFileBackedItemIsShareableOnlyAfterConfirmation() {
+        val directory = File(context.cacheDir, "share-gate-${System.nanoTime()}")
+        val read = readStagedDocument(directory, 4) { java.io.ByteArrayInputStream(byteArrayOf(1, 2, 3, 4)) }
+        val source = (read as StagedDocumentRead.Success).source
+        try {
+            val fileBacked = PendingAttachment(ByteArray(0), "application/pdf", "large.pdf", sourceFile = source)
+            assertFalse(messageHasShareablePayload("caption", emptyList(), listOf(fileBacked)))
+            assertFalse(
+                messageHasShareablePayload(null, emptyList(), listOf(pending("a.jpg", "image/jpeg"), fileBacked)),
+            )
+            assertTrue(
+                messageHasShareablePayload(null, listOf(reference("large.pdf", "application/pdf")), listOf(fileBacked)),
+            )
+        } finally {
+            source.close()
+            directory.deleteRecursively()
+        }
     }
 
     @Test
