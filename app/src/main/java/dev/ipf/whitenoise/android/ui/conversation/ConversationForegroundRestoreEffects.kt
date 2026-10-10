@@ -159,6 +159,7 @@ internal fun ConversationForegroundRestoreEffects(
                     geometry = currentForegroundGeometryProvider(),
                     imeTargetBottomPx = imeAnimationTargetInsets.getBottom(density),
                     bottomChromeMeasured = bottomChromeHeightObserver.hasMeasurement,
+                    timelineMeasured = timelineViewport?.hasMeasuredTimeline(controller.timeline) ?: true,
                 )
             },
         )

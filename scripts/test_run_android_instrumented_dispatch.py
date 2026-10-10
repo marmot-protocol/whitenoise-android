@@ -107,6 +107,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
         """Focused device acceptance excludes native benchmarks but cannot omit required cases."""
         output = self.run_dispatch("workflow_dispatch", "false", "false", "true")
         self.assertIn("ResponsivenessDeviceAcceptance", output)
+        self.assertIn("timeout_msec=120000", output)
         self.assertIn("required-cases", output)
         self.assertNotIn(":cryptoBenchmark:", output)
         with self.assertRaises(subprocess.CalledProcessError):

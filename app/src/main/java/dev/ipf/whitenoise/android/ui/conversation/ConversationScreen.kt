@@ -871,11 +871,12 @@ internal fun ConversationScreen(
         }
     // Edits mutate their original message and must not occupy a lazy-list slot.
     // Keep every reveal and scroll decision on the same filtered projection.
+    val timelinePublication = controller.timeline
     val renderedTimeline =
         ConversationTranscriptDrawProbe.rowsForComposition(
             controller,
-            remember(controller.timeline) {
-                controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            remember(timelinePublication) {
+                timelinePublication.filterNot { MessageProjector.isEdit(it.record) }
             },
         )
     DisposableEffect(controller) {
@@ -4171,6 +4172,7 @@ internal fun ConversationScreen(
                                             CONVERSATION_TIMELINE_TAIL_GAP +
                                                 snackbarContentInset.value + mentionReadingReserve,
                                             overlayPadding,
+                                            timelinePublication,
                                         ).trackWhiteNoiseHeader(listState)
                                         .padding(horizontal = 12.dp)
                                         // Paint, TalkBack exposure, and first-useful-frame

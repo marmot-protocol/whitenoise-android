@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
 import android.view.WindowManager
@@ -63,6 +64,8 @@ import kotlin.coroutines.EmptyCoroutineContext
 class ConversationRetainedTranscriptFirstFrameAndroidTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    private lateinit var retainedActivity: ComponentActivity
 
     /** Already consumed background content must be in the first live draw with roster enrichment still held. */
     @Test
@@ -132,9 +135,9 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 fixture.staleRows = paintedA
                 fixture.paintStaleControl = true
             }
-            composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            stopRetainedActivity()
             fixture.recording.set(true)
-            composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            resumeRetainedActivity()
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
             assertTrue(fixture.hasB)
             assertTrue(fixture.draws.first().visibleItemKeys.isNotEmpty())
@@ -156,7 +159,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         supersedeForeground: Boolean = false,
     ) {
         val fixture = mountFixture(replacement = boundary == UpdateBoundary.Replacement, olderReader = olderReader)
-        val original = composeRule.activity
+        val original = retainedActivity
         try {
             if (focusComposer) establishFocusedComposer(fixture)
             val olderAnchor =
@@ -168,7 +171,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 } else {
                     null
                 }
-            composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            stopRetainedActivity()
             assertEquals(Lifecycle.State.CREATED, original.lifecycle.currentState)
             if (denyIme) {
                 composeRule.runOnUiThread { original.window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM) }
@@ -189,21 +192,13 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             fixture.recording.set(true)
             val resumedAt = SystemClock.uptimeMillis()
             val preDrawCheckpoint = fixture.preDraws.get()
-            composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            resumeRetainedActivity()
             if (boundary == UpdateBoundary.Queued) {
                 composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
                     fixture.preDraws.get() > preDrawCheckpoint
                 }
                 assertTrue("known local preparation must still hold the first draw", fixture.draws.isEmpty())
-                if (supersedeForeground) {
-                    composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
-                    val nextPreDrawCheckpoint = fixture.preDraws.get()
-                    composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
-                    composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
-                        fixture.preDraws.get() > nextPreDrawCheckpoint
-                    }
-                    assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
-                }
+                if (supersedeForeground) assertSupersedingResumeStillHeld(fixture)
                 assertTrue("queued preparation produced a blocked pre-draw", fixture.firstBlockedAt != null)
                 fixture.dispatcher.release()
             }
@@ -215,6 +210,37 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             composeRule.runOnUiThread { original.window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM) }
             fixture.close()
         }
+    }
+
+    /** Backgrounds the real task without ActivityScenario's idle wait while a pre-draw is deliberately held. */
+    private fun stopRetainedActivity() {
+        val original = retainedActivity
+        composeRule.runOnUiThread { assertTrue(original.moveTaskToBack(true)) }
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+            original.lifecycle.currentState == Lifecycle.State.CREATED
+        }
+    }
+
+    /** Reorders the existing task Activity to the front and keeps the retained-instance assertion explicit. */
+    private fun resumeRetainedActivity() {
+        val original = retainedActivity
+        composeRule.runOnUiThread {
+            original.startActivity(Intent(original, original.javaClass).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        }
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+            original.lifecycle.currentState == Lifecycle.State.RESUMED
+        }
+    }
+
+    /** Attempts a second foreground frame before releasing the same locally queued update. */
+    private fun assertSupersedingResumeStillHeld(fixture: RetainedFixture) {
+        stopRetainedActivity()
+        val nextPreDrawCheckpoint = fixture.preDraws.get()
+        resumeRetainedActivity()
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+            fixture.preDraws.get() > nextPreDrawCheckpoint
+        }
+        assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
     }
 
     /** Establishes actual focused IME geometry before capturing the retained foreground state. */
@@ -277,6 +303,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         replacement: Boolean = false,
         olderReader: Boolean = false,
     ): RetainedFixture {
+        retainedActivity = composeRule.activity
         lateinit var fixture: RetainedFixture
         composeRule.runOnUiThread { fixture = RetainedFixture(replacement, olderReader) }
         // This suite starts from a retained, authoritative transcript, not a cold route whose
@@ -293,7 +320,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             val view = LocalView.current
             fixture.keyboard = LocalSoftwareKeyboardController.current
             DisposableEffect(view) {
-                val lifecycle = composeRule.activity.lifecycle
+                val lifecycle = retainedActivity.lifecycle
                 val lifecycleObserver = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME && fixture.recording.get()) {
                         fixture.lastResumeAt = SystemClock.uptimeMillis()
@@ -309,7 +336,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 }
                 val drawListener = android.view.ViewTreeObserver.OnDrawListener {
                     val completed = ConversationTranscriptDrawProbe.beginRootDraw()
-                    val live = composeRule.activity.lifecycle.currentState == Lifecycle.State.RESUMED
+                    val live = retainedActivity.lifecycle.currentState == Lifecycle.State.RESUMED
                     view.post { if (live) completed?.invoke() }
                 }
                 observer.addOnPreDrawListener(listener)

@@ -173,8 +173,12 @@ class ConversationScrollIndicatorTest {
                             Modifier
                                 .fillMaxWidth()
                                 .height(240.dp)
-                                .measureConversationTimelinePadding(viewport, CONVERSATION_TIMELINE_TAIL_GAP, 0.dp)
-                                .onGloballyPositioned(viewport::onPaintViewportMeasured),
+                                .measureConversationTimelinePadding(
+                                    viewport,
+                                    CONVERSATION_TIMELINE_TAIL_GAP,
+                                    0.dp,
+                                    timelinePublication = emptyList(),
+                                ).onGloballyPositioned(viewport::onPaintViewportMeasured),
                     ) {
                         if (bottomError) item(key = "conversation-load-error-bottom") { Box(Modifier.height(40.dp)) }
                         itemsIndexed(keys.value, key = { _, key -> key }) { index, key ->

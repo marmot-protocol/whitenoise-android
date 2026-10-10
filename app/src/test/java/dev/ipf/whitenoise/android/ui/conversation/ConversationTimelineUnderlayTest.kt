@@ -416,8 +416,12 @@ class ConversationTimelineUnderlayTest {
                                     Modifier
                                         .fillMaxSize()
                                         .padding(horizontal = 12.dp)
-                                        .measureConversationTimelinePadding(viewport, 8.dp + notice.dp, overlap)
-                                        .onGloballyPositioned(viewport::onPaintViewportMeasured),
+                                        .measureConversationTimelinePadding(
+                                            viewport,
+                                            8.dp + notice.dp,
+                                            overlap,
+                                            timelinePublication = emptyList(),
+                                        ).onGloballyPositioned(viewport::onPaintViewportMeasured),
                                 reverseLayout = true,
                                 contentPadding = conversationTimelineContentPadding(notice.dp, overlap),
                             ) {

@@ -469,7 +469,7 @@ jobs:
               outputs = []
               for module, variant, package in expected:
                   matches = []
-                  for metadata in (root / module / 'build').rglob('output-metadata.json'):
+                  for metadata in (root / module / 'build/outputs/apk').rglob('output-metadata.json'):
                       data = json.loads(metadata.read_text())
                       if data.get('applicationId') != package or data.get('variantName') != variant:
                           continue
@@ -477,8 +477,10 @@ jobs:
                           abis = [f['value'] for f in element.get('filters', []) if f['filterType'] == 'ABI']
                           apk = metadata.parent / element['outputFile']
                           if (not abis or abis == ['arm64-v8a']) and apk.is_file():
-                              matches.append(apk.resolve())
-                  matches = list(dict.fromkeys(matches))
+                              matches.append((apk.resolve(), bool(abis)))
+                  # Split builds also emit a universal APK; prefer the exact ABI.
+                  preferred = [apk for apk, split in matches if split]
+                  matches = list(dict.fromkeys(preferred or [apk for apk, _ in matches]))
                   if len(matches) != 1:
                       raise SystemExit('expected one APK for ' + role + '/' + module + '/' + variant)
                   verification = subprocess.check_output(
