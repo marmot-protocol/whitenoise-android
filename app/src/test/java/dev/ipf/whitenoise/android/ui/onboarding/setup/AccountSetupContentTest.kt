@@ -86,6 +86,7 @@ class AccountSetupContentTest {
                 emptyList(),
                 null,
                 null,
+                relayRepair = null,
             )
         show(AccountSetupState(snapshot = snapshot, detailsExpanded = true))
         OnboardingActionFfi.entries.filter { it != OnboardingActionFfi.EDIT_FOLLOWS }.forEach { action ->
@@ -130,6 +131,7 @@ class AccountSetupContentTest {
                 emptyList(),
                 null,
                 null,
+                relayRepair = null,
             )
         show(AccountSetupState(snapshot = snapshot))
         composeRule.onNodeWithText("Add a name so people recognize you.", substring = true).assertExists()
@@ -151,6 +153,7 @@ class AccountSetupContentTest {
                 emptyList(),
                 null,
                 null,
+                relayRepair = null,
             )
         show(AccountSetupState(snapshot = snapshot))
         composeRule.onNodeWithTag("setup-action-APPROVE_REPAIR").assertIsNotEnabled()
@@ -254,6 +257,7 @@ class AccountSetupContentTest {
                 listOf("wss://write.example"),
                 null,
                 null,
+                relayRepair = null,
             )
         show(AccountSetupState(snapshot = snapshot))
         composeRule.onNodeWithText("wss://read.example").performScrollTo().assertExists()
@@ -308,6 +312,7 @@ class AccountSetupContentTest {
                 listOf("wss://write.example"),
                 null,
                 null,
+                relayRepair = null,
             )
         show(AccountSetupState(snapshot = snapshot))
         composeRule.onNodeWithText("Your saved change needs to finish.", substring = true).assertExists()
