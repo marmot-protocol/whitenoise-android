@@ -17,7 +17,7 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
         "surface": "Fresh geometry after mention preposition",
-        "anchor": "resolveScrollOffset = { readLayout(it).readingStartOffset }",
+        "anchor": "placedOffset = readLayout(index).readingStartOffset",
         "test_ids": [
           "CON-032"
         ]

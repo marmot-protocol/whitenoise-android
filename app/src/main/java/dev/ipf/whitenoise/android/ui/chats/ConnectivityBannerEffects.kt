@@ -152,10 +152,10 @@ internal fun ValidatedInternetRefreshEffect(
                 when {
                     firstSignal -> {
                         firstSignal = false
-                        if (!hasValidatedInternet) controller.invalidateConnectionReadiness()
+                        if (!hasValidatedInternet) controller.invalidateConnectionReadinessOnNetworkLoss()
                     }
                     hasValidatedInternet -> controller.refreshConnectionReadiness()
-                    else -> controller.invalidateConnectionReadiness()
+                    else -> controller.invalidateConnectionReadinessOnNetworkLoss()
                 }
             }
     }

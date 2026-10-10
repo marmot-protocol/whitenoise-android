@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 import dev.ipf.whitenoise.android.ui.conversation.media.isPendingVideo
 import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -2690,7 +2691,12 @@ class ChatsController private constructor(
     /** Records a closed rendered banner state in the active opt-in readiness episode. */
     internal fun noteConnectionPresentation(phase: PerformancePhase) = connectionOwner.notePresentation(phase)
 
-    fun invalidateConnectionReadiness() = connectionOwner.invalidate(PerformancePhase.CONNECTION_NETWORK_LOST)
+    /** Invalidates an account-owned attempt without attributing teardown to transport failure. */
+    fun invalidateConnectionReadiness() = connectionOwner.invalidate()
+
+    /** Records network loss only at a confirmed validated-internet boundary. */
+    internal fun invalidateConnectionReadinessOnNetworkLoss() =
+        connectionOwner.invalidate(PerformancePhase.CONNECTION_NETWORK_LOST)
 
     /** Ends account-owned streams and invalidates roster results before closing their handles. */
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
@@ -2807,7 +2813,10 @@ class ChatsController private constructor(
                     val chatListStream =
                         liveSubscriptions.openFolderSource(accountRef, completeChatList)
                     chatListSubscription = chatListStream
-                    connectionOwner.noteSubscriptionBoundary(connectionAttempt, PerformancePhase.CONNECTION_CHAT_LIST_OPEN)
+                    connectionOwner.noteSubscriptionBoundary(
+                        connectionAttempt,
+                        PerformancePhase.CONNECTION_CHAT_LIST_OPEN,
+                    )
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
                     connectionOwner.noteSubscriptionBoundary(connectionAttempt, PerformancePhase.CONNECTION_CHATS_OPEN)
@@ -7398,6 +7407,7 @@ class ConversationController(
             // sessions retain accurate unread counts on the chat list.
 
             var connected = false
+            val initialMetadataReady = CompletableDeferred<Unit>()
 
             coroutineScope {
                 runUntilFirstLiveSubscriptionEndsWithAttemptJobs(
@@ -7414,6 +7424,9 @@ class ConversationController(
                     },
                     first = {
                         runTimelineSubscriptionPipeline(account, timelineStream)
+                        // Normal EOF must not cancel the initial roster before it can settle
+                        // loading/disclosure. Failures still unwind the paired attempt immediately.
+                        initialMetadataReady.await()
                     },
                     second = {
                         // The authoritative timeline is already installed. Keep consuming its
@@ -7443,6 +7456,7 @@ class ConversationController(
                         isLoading = false
                         subscriptionError = null
                         connected = true
+                        initialMetadataReady.complete(Unit)
                         runGroupStateSubscriptionLoop(groupStream)
                     },
                 )
