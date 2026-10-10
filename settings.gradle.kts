@@ -27,3 +27,6 @@ include(":app")
 include(":benchmark")
 include(":cryptoBenchmark")
 include(":fuzz")
+
+// Install before project evaluation so plugin and tool classpaths receive the same floors.
+apply(from = "gradle/dependency-security.settings.gradle")

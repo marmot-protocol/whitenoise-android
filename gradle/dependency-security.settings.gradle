@@ -1,0 +1,125 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import org.gradle.api.GradleException
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
+import org.gradle.api.artifacts.result.UnresolvedDependencyResult
+
+// No dependencies are added here. Only existing requests for affected modules
+// are raised, before metadata is downloaded (including project plugin classpaths).
+class SecurityVersions {
+    static boolean exactRequest(String version) {
+        return version == null || version.isEmpty() || version ==~ /\d+(?:\.\d+)*(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?/
+    }
+
+    static boolean unsafePrerelease(String version, String fixed) {
+        if (fixed == null || version == null) return false
+        def boundary = fixed =~ /^(\d+(?:\.\d+)*)-alpha(\d+)$/
+        if (!boundary.matches()) throw new GradleException('Unsupported prerelease policy')
+        def actual = version =~ /^(\d+(?:\.\d+)*)-alpha(\d*)([.+-].*)?$/
+        if (!actual.matches() || actual[0][1] != boundary[0][1]) return false
+        def alpha = actual[0][2].isEmpty() ? 0 : actual[0][2].toInteger()
+        def boundaryAlpha = boundary[0][2].toInteger()
+        return alpha < boundaryAlpha || (alpha == boundaryAlpha && actual[0][3] != null)
+    }
+
+    static boolean below(String version, String minimum) {
+        if (version == null || version.isEmpty()) return true
+        def match = version =~ /^(\d+(?:\.\d+)*)(.*)$/
+        if (!match.matches()) {
+            throw new GradleException("Unsupported version selector for security floor: ${version}")
+        }
+        def actual = match[0][1].tokenize('.').collect { it.toInteger() }
+        def floor = minimum.tokenize('.').collect { it.toInteger() }
+        for (int index = 0; index < Math.max(actual.size(), floor.size()); index++) {
+            int left = index < actual.size() ? actual[index] : 0
+            int right = index < floor.size() ? floor[index] : 0
+            if (left != right) return left < right
+        }
+        // A prerelease of the fixed version is not proof of the stable fix.
+        return !match[0][2].isEmpty()
+    }
+}
+
+def policyFile = new File(settingsDir, 'gradle/dependency-security.json')
+def policy = new JsonSlurper().parse(policyFile)
+if (policy.schema != 1 || !(policy.minimum_versions instanceof Map)) {
+    throw new GradleException('Invalid dependency security policy')
+}
+def minimums = policy.minimum_versions
+def prereleases = policy.fixed_prerelease_versions ?: [:]
+// Source identity is evidence metadata, not a prerequisite for security enforcement.
+def sourceSha = providers.gradleProperty('dependencySecurity.sourceSha')
+    .orElse(providers.environmentVariable('GITHUB_SHA')).orNull ?: 'unknown'
+try {
+    def gitSource = providers.exec {
+        commandLine('git', '-C', settingsDir.absolutePath, 'rev-parse', 'HEAD')
+        ignoreExitValue = true
+    }.standardOutput.asText.get().trim()
+    if (gitSource ==~ /[a-f0-9]{40}/) sourceSha = gitSource
+} catch (Exception ignored) {
+    // ZIP/source archives and machines without git retain the floor policy.
+}
+
+gradle.beforeProject { project ->
+    def install = { configuration, scope ->
+        configuration.resolutionStrategy.eachDependency { details ->
+            def coordinate = "${details.requested.group}:${details.requested.name}".toString()
+            def minimum = minimums[coordinate]
+            if (minimum != null && SecurityVersions.exactRequest(details.requested.version)) {
+                if (SecurityVersions.unsafePrerelease(details.requested.version, prereleases[coordinate])) {
+                    details.useVersion(prereleases[coordinate])
+                    details.because('first patched release on the requested prerelease line')
+                } else if (SecurityVersions.below(details.requested.version, minimum)) {
+                    details.useVersion(minimum)
+                    details.because('minimum release containing the dependency security fixes')
+                }
+            }
+        }
+        // Candidate filtering retains dynamic/range selectors while refusing affected versions.
+        configuration.resolutionStrategy.componentSelection {
+            all { selection ->
+                def coordinate = "${selection.candidate.group}:${selection.candidate.module}".toString()
+                def minimum = minimums[coordinate]
+                if (minimum != null && (SecurityVersions.below(selection.candidate.version, minimum) ||
+                        SecurityVersions.unsafePrerelease(selection.candidate.version, prereleases[coordinate]))) {
+                    selection.reject('affected dependency version rejected by security policy')
+                }
+            }
+        }
+        configuration.incoming.afterResolve { dependencies ->
+            def components = dependencies.resolutionResult.allComponents
+                .findAll { it.id instanceof ModuleComponentIdentifier }
+                .collect { component ->
+                    [group: component.id.group, name: component.id.module,
+                     version: component.id.version,
+                     reasons: component.selectionReason.descriptions.collect { it.description }.sort()]
+                }.sort { a, b -> "${a.group}:${a.name}:${a.version}" <=> "${b.group}:${b.name}:${b.version}" }
+            def edges = dependencies.resolutionResult.allDependencies
+                .findAll { it instanceof ResolvedDependencyResult }
+                .collect { edge -> [from: edge.from.id.displayName, to: edge.selected.id.displayName] }
+                .sort { a, b -> "${a.from}:${a.to}" <=> "${b.from}:${b.to}" }
+            def unresolved = dependencies.resolutionResult.allDependencies
+                .findAll { it instanceof UnresolvedDependencyResult }
+                .collect { it.requested.displayName }.sort()
+            def violations = components.findAll { component ->
+                def minimum = minimums["${component.group}:${component.name}".toString()]
+                def coordinate = "${component.group}:${component.name}".toString()
+                minimum != null && (SecurityVersions.below(component.version, minimum) ||
+                    SecurityVersions.unsafePrerelease(component.version, prereleases[coordinate]))
+            }
+            def reportDir = new File(project.rootDir, 'build/reports/dependency-security')
+            reportDir.mkdirs()
+            def name = "${project.path}-${scope}-${configuration.name}".replaceAll('[^A-Za-z0-9_.-]', '_')
+            new File(reportDir, "${name}.json").text = JsonOutput.prettyPrint(JsonOutput.toJson(
+                [schema: 1, source_sha: sourceSha, project: project.path, scope: scope,
+                 configuration: configuration.name, components: components,
+                 edges: edges, unresolved: unresolved, violations: violations])) + '\n'
+            if (!violations.isEmpty()) {
+                throw new GradleException("Vulnerable dependency selected in ${project.path}:${configuration.name}")
+            }
+        }
+    }
+    project.buildscript.configurations.configureEach { install(it, 'plugin') }
+    project.configurations.configureEach { install(it, 'project') }
+}
