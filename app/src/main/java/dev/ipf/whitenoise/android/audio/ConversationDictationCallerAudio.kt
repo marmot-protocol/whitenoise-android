@@ -263,6 +263,9 @@ internal class ConversationDictationCallerAudio internal constructor(
     /** Includes partial, queued, and in-flight audio until acknowledged or discarded. */
     fun hasPending(): Boolean = buffer.hasPending
 
+    /** Parking requires both sealed samples and acknowledged native recorder release. */
+    val closed: Boolean get() = captureClosed.get()
+
     /** Measures quiet capture time only after actual PCM speech, independently of provider callbacks. */
     fun silenceMillis(): Long? =
         lastSpeechAt

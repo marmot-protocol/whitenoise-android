@@ -110,6 +110,14 @@
           "MSG-021",
           "MED-009"
         ]
+      },
+      {
+        "surface": "Kept dictation audio remains visible in its origin composer after active ownership is released",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "val parkedDictationAudio =",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

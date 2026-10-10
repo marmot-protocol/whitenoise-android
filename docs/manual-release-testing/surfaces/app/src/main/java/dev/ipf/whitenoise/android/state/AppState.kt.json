@@ -299,6 +299,22 @@
         "test_ids": [
           "TTS-001"
         ]
+      },
+      {
+        "surface": "Explicit dictation Send failure remains visible as Not sent while composer recovery completes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "onSendBlocked =",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_send_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.dictation_send_blocked",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

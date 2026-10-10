@@ -245,6 +245,22 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Keep closed audio in its origin chat and release active dictation ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal fun keepComposerAudioForLater(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Resume only the current displayed parked audio receipt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal fun canRetryComposerAudio(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

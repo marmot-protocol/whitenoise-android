@@ -44,6 +44,15 @@ class ConversationDictationRecoveryScreenshotTest {
     }
 
     @Test
+    fun remainingAudioPanelKeepForLaterLight() {
+        var kept = 0
+        render(ConversationDictationComposerPhase.RemainingAudio, onKeepForLater = { kept++ })
+        composeRule.onNodeWithText("Keep for later").performClick()
+        assertEquals(1, kept)
+        capture("dictation_remaining_audio_keep_later_light")
+    }
+
+    @Test
     fun remainingAudioPanelDark() {
         render(ConversationDictationComposerPhase.RemainingAudio, theme = "dark")
         capture("dictation_remaining_audio_dark")
@@ -98,6 +107,7 @@ class ConversationDictationRecoveryScreenshotTest {
         theme: String = "light",
         rtl: Boolean = false,
         onDiscard: () -> Unit = {},
+        onKeepForLater: () -> Unit = {},
     ) {
         val access = ConversationDictationComposerAccess(1L, 1L, phase, ConversationDictationFailure.NoMatch)
         composeRule.setContent {
@@ -112,7 +122,7 @@ class ConversationDictationRecoveryScreenshotTest {
                     Surface(Modifier.width(360.dp)) {
                         Column(Modifier.testTag("recovery-status-frame")) {
                             ConversationDictationRecoveryStatus(access)
-                            ConversationDictationRecoveryPanel(access, true, {}, onDiscard, {})
+                            ConversationDictationRecoveryPanel(access, true, {}, onDiscard, {}, onKeepForLater)
                         }
                     }
                 }

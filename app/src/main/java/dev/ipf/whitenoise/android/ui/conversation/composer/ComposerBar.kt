@@ -1284,9 +1284,17 @@ internal fun ComposerBar(
                         },
                     )
                 }
-                if (dictationOwnedByComposer && dictationController?.recoveryHandedToComposer == true) {
+                val parkedDictationAudio =
+                    dictationController != null &&
+                        dictationAccountRef != null &&
+                        dictationGroupIdHex != null &&
+                        dictationController.hasParkedComposerAudio(dictationAccountRef, dictationGroupIdHex)
+                val showDictationRecovery =
+                    (dictationOwnedByComposer && dictationController?.recoveryHandedToComposer == true) ||
+                        parkedDictationAudio
+                if (showDictationRecovery) {
                     ConversationDictationRecoveryStatus(
-                        dictationController.composerAccess(
+                        checkNotNull(dictationController).composerAccess(
                             checkNotNull(dictationAccountRef),
                             checkNotNull(dictationGroupIdHex),
                         ),
