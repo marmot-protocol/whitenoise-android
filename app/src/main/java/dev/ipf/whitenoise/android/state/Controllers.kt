@@ -2997,13 +2997,16 @@ class ChatsController private constructor(
             // don't log normal lifecycle events as bind failures.
             throw cancel
         } catch (throwable: Throwable) {
-            if (!isActiveBindEpoch(epoch)) return
-            chatListLoad.failure()
-            archivedChatListLoad.failure()
-            chatsDebug(throwable) { "bind failed account=${accountRef.take(8)}: ${throwable.message ?: throwable.javaClass.simpleName}" }
-            isLoading = false
-            error = privacySafeErrorPresentation("CHAT_LIST_LOAD", throwable)
-            terminalLoadFailure = true
+            if (isActiveBindEpoch(epoch)) {
+                chatListLoad.failure()
+                archivedChatListLoad.failure()
+                chatsDebug(throwable) {
+                    "bind failed account=${accountRef.take(8)}: ${throwable.message ?: throwable.javaClass.simpleName}"
+                }
+                isLoading = false
+                error = privacySafeErrorPresentation("CHAT_LIST_LOAD", throwable)
+                terminalLoadFailure = true
+            }
         } finally {
             if (isActiveBindEpoch(epoch)) initialLoadWatchdog?.cancel()
             chatListLoad.unavailable()

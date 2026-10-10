@@ -604,7 +604,10 @@ internal fun WhiteNoiseApp(
                                             firstUsefulFrameRecorded = true
                                         }
                                     }
-                                    if (inboundProfilePayload != null || !shouldComposeProtectedMainShell(firstUsefulSurface)) {
+                                    if (
+                                        inboundProfilePayload != null ||
+                                            !shouldComposeProtectedMainShell(firstUsefulSurface)
+                                    ) {
                                         PrepareMainShellFirstFrame(appState, mainShellStateHolder)
                                         val startupController =
                                             mainShellStateHolder.startupRecoveryController(
@@ -618,14 +621,17 @@ internal fun WhiteNoiseApp(
                                             surface =
                                                 when {
                                                     startupError != null -> WarmResumeRenderedSurface.Error
-                                                    inboundProfilePayload != null -> WarmResumeRenderedSurface.FullScreenLoading
+                                                    inboundProfilePayload != null ->
+                                                        WarmResumeRenderedSurface.FullScreenLoading
                                                     else -> WarmResumeRenderedSurface.StartupLoading
                                                 },
                                         ) {
                                             if (startupError == null && inboundProfilePayload != null) {
                                                 LoadingScreen()
                                             } else {
-                                                StartupLocalProjectionScreen(startupError) { startupController?.retryLoad() }
+                                                StartupLocalProjectionScreen(startupError) {
+                                                    startupController?.retryLoad()
+                                                }
                                             }
                                         }
                                     } else {

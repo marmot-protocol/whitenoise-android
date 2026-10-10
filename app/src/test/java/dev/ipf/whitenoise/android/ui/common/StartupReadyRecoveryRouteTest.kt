@@ -122,7 +122,10 @@ class StartupReadyRecoveryRouteTest {
                 .apply { isAccessible = true }
                 .invoke(state, AppPhase.Ready)
             listOf("bootstrapCompleted", "networkNotificationRecoverySuppressed").forEach { name ->
-                WhiteNoiseAppState::class.java.getDeclaredField(name).apply { isAccessible = true }.setBoolean(state, true)
+                WhiteNoiseAppState::class.java
+                    .getDeclaredField(name)
+                    .apply { isAccessible = true }
+                    .setBoolean(state, true)
             }
             state.markDefaultNotificationsEnableAttempted()
         }
