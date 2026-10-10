@@ -130,7 +130,11 @@ class ChatListProductionReorderTest {
     /** Reads current physical bounds rather than a target index or a synthetic animation value. */
     private fun top(id: String): Float {
         val node = composeRule.onNodeWithTag(chatListHeadReorderRowTag(id), useUnmergedTree = true).fetchSemanticsNode()
-        return node.layoutInfo.coordinates.boundsInRoot().top
+        return node
+            .layoutInfo
+            .coordinates
+            .boundsInRoot()
+            .top
     }
 }
 
