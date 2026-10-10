@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: navigation-folder-presets-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.presets
+    direction: DOWN
+- tapOn:
+    id: folder.presets
+- assertVisible:
+    text: All read
+- assertVisible:
+    text: Unread mentions
+- back
+- assertVisible:
+    id: folder.presets

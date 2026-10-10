@@ -23,6 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
+OBSERVATION_SCENARIOS = frozenset({"extra-wait-signout", "extra-wait-wipe"})
+
 SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'account-actions', 'app-lock', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation', 'inbound-share', 'presentation')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 660
@@ -136,13 +138,17 @@ def disable_fixture_boot_receiver():
 
 
 def presentation_arguments(case):
-    """Only maintained presentation cases may replace content in the isolated test Activity."""
+    """Only maintained production fixtures may replace content in the isolated test Activity."""
     scenario = case.get('presentation')
     if scenario is None:
-        if case.get('postcondition') == 'presentation-checked':
+        if case.get('postcondition') in {'presentation-checked', 'presentation-observed'}:
             raise ValueError('Missing production presentation fixture')
         return []
     actions = case.get('presentation_actions', [])
+    if case.get('postcondition') == 'presentation-observed':
+        if scenario not in OBSERVATION_SCENARIOS or actions != []:
+            raise ValueError('Invalid non-cancellable presentation observation')
+        return ['-e', 'presentationScenario', scenario, '-e', 'presentationActions', 'none']
     if (case.get('postcondition') != 'presentation-checked' or not isinstance(scenario, str)
             or not re.fullmatch('[a-z][a-z0-9-]+', scenario)
             or not isinstance(actions, list) or not actions
@@ -152,13 +158,17 @@ def presentation_arguments(case):
 
 
 def qualify_presentation(case, verified):
-    """A UI pass cannot replace the actual production callback/payload sequence."""
-    if case['postcondition'] != 'presentation-checked':
+    """Dispatch proof and explicit non-cancellable observation retain different acceptance boundaries."""
+    if case['postcondition'] not in {'presentation-checked', 'presentation-observed'}:
         return
+    presentation_arguments(case)
     observed = verified.get('presentation')
+    observing = case['postcondition'] == 'presentation-observed'
     if (not isinstance(observed, dict) or observed.get('verified') is not True
             or observed.get('scenario') != case.get('presentation')
-            or observed.get('callbacks') != case.get('presentation_actions')):
+            or observed.get('callbacks') != case.get('presentation_actions')
+            or (observing and observed.get('observationOnly') is not True)
+            or (not observing and observed.get('observationOnly') is True)):
         raise ValueError('Production presentation dispatch was not verified')
 
 

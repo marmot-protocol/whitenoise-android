@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-search-entity-selected
+---
+- assertVisible:
+    text: Chats
+- assertVisible:
+    text: Fixture chat
+- tapOn: Fixture chat
+- assertVisible:
+    text: Fixture chat
+- back
+- assertVisible:
+    id: presentation.complete

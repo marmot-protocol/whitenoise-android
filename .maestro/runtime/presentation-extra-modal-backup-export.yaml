@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-backup-export
+---
+- assertVisible:
+    text: Your encrypted backup
+- assertVisible:
+    text: Copy
+- assertVisible:
+    text: Export
+- tapOn: Export
+- assertVisible:
+    id: presentation.complete

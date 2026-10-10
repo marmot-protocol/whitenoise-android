@@ -5591,6 +5591,982 @@
         "dismiss"
       ],
       "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-backup-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-010",
+        "ACC-011",
+        "ACC-013",
+        "ACC-014",
+        "ACC-020",
+        "ONB-009",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-001"
+      ],
+      "assertions": "Actual encrypted-result dialog renders synthetic preview text and verifies copy/export/dismiss dispatch. It does not generate or decode a native encrypted backup or certify clipboard/file export.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-backup-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-backup-copy": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-010",
+        "ACC-011",
+        "ACC-013",
+        "ACC-014",
+        "ACC-020",
+        "ONB-009",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-001"
+      ],
+      "assertions": "Actual encrypted-result dialog renders synthetic preview text and verifies copy/export/dismiss dispatch. It does not generate or decode a native encrypted backup or certify clipboard/file export.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-backup-copy",
+      "presentation_actions": [
+        "copy-handoff",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-backup-export": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-010",
+        "ACC-011",
+        "ACC-013",
+        "ACC-014",
+        "ACC-020",
+        "ONB-009",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-001"
+      ],
+      "assertions": "Actual encrypted-result dialog renders synthetic preview text and verifies copy/export/dismiss dispatch. It does not generate or decode a native encrypted backup or certify clipboard/file export.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-backup-export",
+      "presentation_actions": [
+        "export-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-emoji-empty": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-034",
+        "SET-030"
+      ],
+      "assertions": "Actual emoji name dialog guards empty names and validates exact accepted code at its UI port; no artwork is persisted.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-emoji-empty",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-emoji-valid": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-034",
+        "SET-030"
+      ],
+      "assertions": "Actual emoji name dialog guards empty names and validates exact accepted code at its UI port; no artwork is persisted.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-emoji-valid",
+      "presentation_actions": [
+        "save-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-scanner-close": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-003",
+        "ONB-005",
+        "ONB-006",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual scanner binding-error dialog supports Close/Retry with a bounded port, without opening a camera or changing permission.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-scanner-close",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-scanner-retry": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-003",
+        "ONB-005",
+        "ONB-006",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual scanner binding-error dialog supports Close/Retry with a bounded port, without opening a camera or changing permission.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-scanner-retry",
+      "presentation_actions": [
+        "retry-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-audit-consent-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SEC-007",
+        "SEC-008",
+        "SEC-009",
+        "SEC-010",
+        "SEC-011",
+        "SEC-012",
+        "SEC-013"
+      ],
+      "assertions": "Actual diagnostic export disclosure verifies Cancel/acknowledgement; no archive, upload or retained user log is created.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-audit-consent-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-audit-consent-confirm": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SEC-007",
+        "SEC-008",
+        "SEC-009",
+        "SEC-010",
+        "SEC-011",
+        "SEC-012",
+        "SEC-013"
+      ],
+      "assertions": "Actual diagnostic export disclosure verifies Cancel/acknowledgement; no archive, upload or retained user log is created.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-audit-consent-confirm",
+      "presentation_actions": [
+        "consent-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-audit-destination-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SEC-007",
+        "SEC-008",
+        "SEC-009",
+        "SEC-010",
+        "SEC-011",
+        "SEC-012",
+        "SEC-013"
+      ],
+      "assertions": "Actual archive destination dialog verifies dismissal/save/share handoff without creating an archive or launching an external activity.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-audit-destination-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-audit-destination-save": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SEC-007",
+        "SEC-008",
+        "SEC-009",
+        "SEC-010",
+        "SEC-011",
+        "SEC-012",
+        "SEC-013"
+      ],
+      "assertions": "Actual archive destination dialog verifies dismissal/save/share handoff without creating an archive or launching an external activity.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-audit-destination-save",
+      "presentation_actions": [
+        "save-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-audit-destination-share": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SEC-007",
+        "SEC-008",
+        "SEC-009",
+        "SEC-010",
+        "SEC-011",
+        "SEC-012",
+        "SEC-013"
+      ],
+      "assertions": "Actual archive destination dialog verifies dismissal/save/share handoff without creating an archive or launching an external activity.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-audit-destination-share",
+      "presentation_actions": [
+        "share-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-share-empty": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Actual empty/partial inbound-import error dialog verifies recovery dispatch using a bounded failure payload; real provider-grant and intake proof remain in native campaigns.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-share-empty",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-modal-share-partial": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Actual empty/partial inbound-import error dialog verifies recovery dispatch using a bounded failure payload; real provider-grant and intake proof remain in native campaigns.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-modal-share-partial",
+      "presentation_actions": [
+        "continue-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-search-folder-empty": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-017",
+        "FIND-008",
+        "FIND-012",
+        "FIND-013",
+        "NCH-002",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual search picker renders empty or populated options, checks the selected stable identity and dismisses without a native search or persisted preference.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-search-folder-empty",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-search-folder-selected": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-017",
+        "FIND-008",
+        "FIND-012",
+        "FIND-013",
+        "NCH-002",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual search picker renders empty or populated options, checks the selected stable identity and dismisses without a native search or persisted preference.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-search-folder-selected",
+      "presentation_actions": [
+        "filter-selected",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-search-entity-empty": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-017",
+        "FIND-008",
+        "FIND-012",
+        "FIND-013",
+        "NCH-002",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual search picker renders empty or populated options, checks the selected stable identity and dismisses without a native search or persisted preference.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-search-entity-empty",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-search-entity-selected": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-017",
+        "FIND-008",
+        "FIND-012",
+        "FIND-013",
+        "NCH-002",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual search picker renders empty or populated options, checks the selected stable identity and dismisses without a native search or persisted preference.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-search-entity-selected",
+      "presentation_actions": [
+        "filter-selected",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-search-menu-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008",
+        "FIND-012",
+        "FIND-013",
+        "FLD-001"
+      ],
+      "assertions": "Actual global filter menu renders its category/clear controls and verifies the exact dispatch; no search query is executed.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-search-menu-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-search-menu-category": {
+      "suite": "presentation",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008",
+        "FIND-012",
+        "FIND-013",
+        "FLD-001"
+      ],
+      "assertions": "Actual global filter menu renders its category/clear controls and verifies the exact dispatch; no search query is executed.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-search-menu-category",
+      "presentation_actions": [
+        "category-selected"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-search-menu-clear": {
+      "suite": "presentation",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008",
+        "FIND-012",
+        "FIND-013",
+        "FLD-001"
+      ],
+      "assertions": "Actual global filter menu renders its category/clear controls and verifies the exact dispatch; no search query is executed.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-search-menu-clear",
+      "presentation_actions": [
+        "clear-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-history-populated": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-001",
+        "MSG-007",
+        "MSG-015",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual edit history dialog renders empty or ordered synthetic revisions and original text; native authoritative edit history stays separately qualified.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-history-populated",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-history-empty": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-001",
+        "MSG-007",
+        "MSG-015",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual edit history dialog renders empty or ordered synthetic revisions and original text; native authoritative edit history stays separately qualified.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-history-empty",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-summary-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "CON-001",
+        "CON-019",
+        "CON-026",
+        "GRP-023",
+        "GRP-028",
+        "MSG-008",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-020"
+      ],
+      "assertions": "Actual system-summary overflow menu verifies dismissal and delete dispatch without deleting a native event.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-summary-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-summary-select": {
+      "suite": "presentation",
+      "manual_ids": [
+        "CON-001",
+        "CON-019",
+        "CON-026",
+        "GRP-023",
+        "GRP-028",
+        "MSG-008",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-020"
+      ],
+      "assertions": "Actual system-summary overflow menu verifies dismissal and delete dispatch without deleting a native event.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-summary-select",
+      "presentation_actions": [
+        "dismiss",
+        "delete-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-mention-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "CON-001",
+        "MSG-037"
+      ],
+      "assertions": "Actual mention candidate uses the generated native peer identity and verifies selection, without sending or editing a persisted message.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-mention-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-mention-select": {
+      "suite": "presentation",
+      "manual_ids": [
+        "CON-001",
+        "MSG-037"
+      ],
+      "assertions": "Actual mention candidate uses the generated native peer identity and verifies selection, without sending or editing a persisted message.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-mention-select",
+      "presentation_actions": [
+        "mention-selected"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-pending-loading": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001",
+        "MED-007"
+      ],
+      "assertions": "Actual pending-media overlay renders loading/failure and retry dispatch from deterministic UI state; no attachment upload occurs.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-pending-loading",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-pending-failed": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001",
+        "MED-007"
+      ],
+      "assertions": "Actual pending-media overlay renders loading/failure and retry dispatch from deterministic UI state; no attachment upload occurs.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-pending-failed",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-pending-retry": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001",
+        "MED-007"
+      ],
+      "assertions": "Actual pending-media overlay renders loading/failure and retry dispatch from deterministic UI state; no attachment upload occurs.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-pending-retry",
+      "presentation_actions": [
+        "retry-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-footer": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-003",
+        "MED-007",
+        "MSG-001"
+      ],
+      "assertions": "Actual media footer overlays the provided timestamp and outgoing status in its production Box layout.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-footer",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-seed-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "CON-003",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-020"
+      ],
+      "assertions": "Actual developer seeding dialog mounts the generated native account chat targets and guards Start before selecting a target; Close sends no fixture messages.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-seed-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-wipe-outcome-close": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-010",
+        "ACC-011",
+        "ACC-013",
+        "ACC-014",
+        "ACC-020",
+        "ONB-009",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-001"
+      ],
+      "assertions": "Actual wipe partial-failure result displays all reported stages and a failure snapshot; no sign-out, key deletion or account wipe runs.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-wipe-outcome-close",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-notification-scope-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001",
+        "NTF-026",
+        "NTF-031"
+      ],
+      "assertions": "Actual notification-category parent opens its scope dialog, verifies default/custom controls and exact selected category. No Android notification channel is modified.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-notification-scope-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-notification-scope-select": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001",
+        "NTF-026",
+        "NTF-031"
+      ],
+      "assertions": "Actual notification-category parent opens its scope dialog, verifies default/custom controls and exact selected category. No Android notification channel is modified.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-notification-scope-select",
+      "presentation_actions": [
+        "scope-selected"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-help-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SET-001",
+        "SET-018",
+        "SET-019",
+        "SET-020"
+      ],
+      "assertions": "Actual bug-report parent receives a refused browser handoff, opens its recovery dialog, and verifies Cancel/Retry without any external browser launch.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-help-cancel",
+      "presentation_actions": [
+        "open-refused",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-help-retry": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SET-001",
+        "SET-018",
+        "SET-019",
+        "SET-020"
+      ],
+      "assertions": "Actual bug-report parent receives a refused browser handoff, opens its recovery dialog, and verifies Cancel/Retry without any external browser launch.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-help-retry",
+      "presentation_actions": [
+        "open-refused",
+        "open-refused",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-wait-signout": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-010",
+        "ACC-011",
+        "ACC-013",
+        "ACC-014",
+        "ACC-020",
+        "ONB-009",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-001"
+      ],
+      "assertions": "Actual non-cancellable sign-out progress window ignores Back and remains visible; observation-only receipt requires zero callbacks. No teardown runs.",
+      "postcondition": "presentation-observed",
+      "presentation": "extra-wait-signout",
+      "presentation_actions": [],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-wait-wipe": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-010",
+        "ACC-011",
+        "ACC-013",
+        "ACC-014",
+        "ACC-020",
+        "ONB-009",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-001"
+      ],
+      "assertions": "Actual non-cancellable wipe progress sheet ignores Back and remains visible; observation-only receipt requires zero callbacks. No wipe runs.",
+      "postcondition": "presentation-observed",
+      "presentation": "extra-wait-wipe",
+      "presentation_actions": [],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-forward-close": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-010",
+        "MSG-011",
+        "MSG-037"
+      ],
+      "assertions": "Actual forwarding status parent opens the details sheet for a failed/running snapshot and verifies Close/Retry/Cancel dispatch without performing forwarding.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-forward-close",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-forward-retry": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-010",
+        "MSG-011",
+        "MSG-037"
+      ],
+      "assertions": "Actual forwarding status parent opens the details sheet for a failed/running snapshot and verifies Close/Retry/Cancel dispatch without performing forwarding.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-forward-retry",
+      "presentation_actions": [
+        "retry-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-forward-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-010",
+        "MSG-011",
+        "MSG-037"
+      ],
+      "assertions": "Actual forwarding status parent opens the details sheet for a failed/running snapshot and verifies Close/Retry/Cancel dispatch without performing forwarding.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-forward-cancel",
+      "presentation_actions": [
+        "cancel-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-relay-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-037",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SYS-001",
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Actual relay details displays synthetic address/roles and verifies cancellation or the exact role callback. No native relay list is published.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-relay-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-relay-role": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-037",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SYS-001",
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Actual relay details displays synthetic address/roles and verifies cancellation or the exact role callback. No native relay list is published.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-relay-role",
+      "presentation_actions": [
+        "role-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-relay-remove-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MSG-037",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SYS-001",
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Actual relay details displays synthetic address/roles and verifies cancellation or the exact role callback. No native relay list is published.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-relay-remove-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-native-agent-delete-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "CON-001",
+        "MSG-037"
+      ],
+      "assertions": "Actual agent delete confirmation uses the generated native message/controller and cancels without deleting anything; it does not qualify agent-event parsing.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-native-agent-delete-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-native-location-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "CON-001"
+      ],
+      "assertions": "Actual location map renders offline with location permission absent and cancels without handoff. GPS, network tiles and actual location sending remain separate hardware/native checks.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-native-location-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-native-viewer-ready": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-003",
+        "MED-001",
+        "MED-007",
+        "MED-015",
+        "MED-016",
+        "MED-017"
+      ],
+      "assertions": "Actual conversation/full-screen viewer decodes generated PNG bytes or displays a malformed decode failure, verifies selected page requests and dismissal using the generated native message identity. No encryption, native attachment retrieval, export or forwarding is certified.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-native-viewer-ready",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-native-viewer-gallery": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-003",
+        "MED-001",
+        "MED-007",
+        "MED-015",
+        "MED-016",
+        "MED-017"
+      ],
+      "assertions": "Actual conversation/full-screen viewer decodes generated PNG bytes or displays a malformed decode failure, verifies selected page requests and dismissal using the generated native message identity. No encryption, native attachment retrieval, export or forwarding is certified.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-native-viewer-gallery",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-native-viewer-malformed": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-003",
+        "MED-001",
+        "MED-007",
+        "MED-015",
+        "MED-016",
+        "MED-017"
+      ],
+      "assertions": "Actual conversation/full-screen viewer decodes generated PNG bytes or displays a malformed decode failure, verifies selected page requests and dismissal using the generated native message identity. No encryption, native attachment retrieval, export or forwarding is certified.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-native-viewer-malformed",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "navigation-kept-cancel": {
+      "suite": "navigation",
+      "manual_ids": [
+        "MSG-001",
+        "MSG-037",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Real generated-account conversation keeps its native message on screen, opens the production kept-message menu, and verifies popup cancellation or clearing the local overlay without deleting a native message.",
+      "postcondition": "none"
+    },
+    "navigation-kept-clear": {
+      "suite": "navigation",
+      "manual_ids": [
+        "MSG-001",
+        "MSG-037",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Real generated-account conversation keeps its native message on screen, opens the production kept-message menu, and verifies popup cancellation or clearing the local overlay without deleting a native message.",
+      "postcondition": "none"
+    },
+    "navigation-folder-presets-cancel": {
+      "suite": "navigation",
+      "manual_ids": [
+        "FLD-003",
+        "FLD-004",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "assertions": "Actual unsaved smart-folder editor opens its preset popup and cancels without persisting the draft.",
+      "postcondition": "none"
+    },
+    "navigation-group-developer-info": {
+      "suite": "navigation",
+      "manual_ids": [
+        "ACC-008",
+        "GRP-001",
+        "GRP-004",
+        "GRP-005",
+        "GRP-006",
+        "GRP-007",
+        "GRP-008",
+        "GRP-009",
+        "GRP-010",
+        "GRP-015",
+        "GRP-017",
+        "GRP-027",
+        "MSG-037",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SYS-007"
+      ],
+      "assertions": "Actual unlocked developer group details mounts its MLS technical information panel for the generated native group; Back returns to the conversation. No protocol mutation is performed.",
+      "postcondition": "none"
     }
   }
 }

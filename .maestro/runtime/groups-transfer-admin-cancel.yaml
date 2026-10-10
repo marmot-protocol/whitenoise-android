@@ -16,7 +16,7 @@ name: groups-transfer-admin-cancel
 - tapOn:
     id: chat_info.transfer_admin
 - assertVisible:
-    text: Transfer admin
+    text: Transfer administration
 - assertVisible:
     text: Maestro Bob
 - back

@@ -870,7 +870,7 @@ private fun ExportPasswordDialog(
 /** Temporary account-owned encrypted result; copying and file export are separate deliberate actions. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
-private fun EncryptedBackupResultDialog(
+internal fun EncryptedBackupResultDialog(
     backup: String,
     copied: Boolean,
     onCopy: () -> Unit,
@@ -1159,7 +1159,10 @@ internal fun SignOutProgressDialog() {
                 usePlatformDefaultWidth = false,
             ),
     ) {
-        Box(Modifier.fillMaxSize().testTag("settings.sign_out_progress"), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxSize().testTag("settings.sign_out_progress").exposePerformanceTestTags(),
+            contentAlignment = Alignment.Center,
+        ) {
             // The full-window dim layer can cover either theme; white stays visible against that scrim.
             LoadingIndicator(color = Color.White)
         }

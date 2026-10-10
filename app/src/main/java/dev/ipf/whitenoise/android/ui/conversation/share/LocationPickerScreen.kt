@@ -79,6 +79,7 @@ internal fun LocationPickerScreen(
     hasFineGrant: Boolean,
     onDismiss: () -> Unit,
     onPick: (SharedLocation) -> Unit,
+    useDataConnection: Boolean = true,
 ) {
     PlaybackDialog(
         onDismissRequest = onDismiss,
@@ -98,6 +99,7 @@ internal fun LocationPickerScreen(
                 configureOsmdroid(context)
                 MapView(context).apply {
                     setTileSource(TileSourceFactory.MAPNIK)
+                    setUseDataConnection(useDataConnection)
                     setMultiTouchControls(true)
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     controller.setZoom(PICKER_ZOOM)

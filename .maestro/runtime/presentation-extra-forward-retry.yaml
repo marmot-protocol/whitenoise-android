@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-forward-retry
+---
+- assertVisible:
+    id: forward-operation-status
+- tapOn:
+    id: forward-operation-status
+- assertVisible:
+    text: Fixture forwarding target
+- tapOn: Retry
+- assertVisible:
+    id: presentation.complete

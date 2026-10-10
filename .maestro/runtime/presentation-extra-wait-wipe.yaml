@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-wait-wipe
+---
+- assertVisible:
+    text: Signing out & wiping…
+- assertVisible:
+    text: Leaving groups…
+- back
+- assertVisible:
+    text: Signing out & wiping…

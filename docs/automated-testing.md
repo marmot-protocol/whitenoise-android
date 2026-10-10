@@ -17,13 +17,15 @@ Keep the original checklist and its subcases available during a release campaign
 
 The generated guide lists permanent requirements, prerequisites, named subcases and discovered surfaces. [Requirement-layer plans](../config/test-requirement-layers.json) classify every family. Companion tests aid discovery without proving child coverage. Normal CI retains the assembled checklist, source identity and JSON/Markdown reports without extra emulators.
 
+Normal CI requires a direct maintained Maestro assertion for every discovered named UI surface. The current audit maps all 220 surfaces; this checks planned assertions, and successful execution still needs the source-bound campaign results. Presentation fixtures mount production controls inside a safe system-inset viewport and verify actual callback sequences. The gallery uses generated image bytes at its decode boundary, the location map disables tile traffic, and destructive progress screens verify that Back remains blocked without running teardown.
+
 The generated matrix plans fifteen unexecuted edges per surface: recreation/process death, input bounds, identity changes, interruption, permissions, accessibility and keyboard behavior. Leave evidence empty and boxes unchecked until source-bound execution or justified N/A; parent success cannot qualify children.
 
 ## Whole-suite execution order
 
 Preserve source SHA, current base and SDK pin. Run normal CI once; retain both-distribution unit/golden, connected, media, packaging and guide reports. Diagnose failed jobs before retrying; one distribution cannot qualify another.
 
-Run manual campaigns serially: `offline-signin` (9), `offline-signup` (7), `offline-edge` (6), then `runtime-all` (535), which executes all 145 partitions. Offline records retained dev-APK source separately from flow source; runtime requires one exact-source checksummed isolated pair. Never dispatch over a running/pending manual run. The written UI inventory is 557 journeys; it does not qualify full release acceptance. Pair builds use only successful branch-scoped caches with [strict matching](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/docs/setup-gradle.md#strict-cache-matching); misses retain original budgets and wrapper/compilation/checksum checks.
+Run manual campaigns serially: `offline-signin` (9), `offline-signup` (7), `offline-edge` (6), then `runtime-all` (589), which executes all 159 partitions. Offline records retained dev-APK source separately from flow source; runtime requires one exact-source checksummed isolated pair. Never dispatch over a running/pending manual run. The written UI inventory is 611 journeys; it does not qualify full release acceptance. Pair builds use only successful branch-scoped caches with [strict matching](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/docs/setup-gradle.md#strict-cache-matching); misses retain original budgets and wrapper/compilation/checksum checks.
 
 Inspect individual UI, native and cleanup results plus final reconciliation. Missing/failed cases stay unexecuted/failed; diagnose hierarchy/postcondition/teardown, fix the owner source and rerun the affected corrected-source campaign. Retain failures and never merge different manifests into a pass count. App behavior changes also need affected normal CI/release layers.
 

@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-seed-cancel
+---
+- assertVisible:
+    text: Seed conversation fixture
+- assertVisible:
+    text: Start
+    enabled: false
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

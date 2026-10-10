@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-message-footer
+---
+- assertVisible:
+    text: '12:34'
+- back
+- assertVisible:
+    id: presentation.complete

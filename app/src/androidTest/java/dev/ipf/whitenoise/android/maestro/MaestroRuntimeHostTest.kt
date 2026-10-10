@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
@@ -16,7 +17,9 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -31,6 +34,7 @@ private val MAESTRO_POSTCONDITIONS =
     setOf(
         "none",
         "presentation-checked",
+        "presentation-observed",
         "send",
         "message-reply",
         "message-edit",
@@ -145,19 +149,7 @@ class MaestroRuntimeHostTest {
                 withTimeout(90_000L) {
                     native.start()
                     val fixture = InstrumentationRegistry.getArguments().getString("fixtureScenario", "basic")
-                    val profileNames =
-                        if (fixture == "large-roster") {
-                            listOf(
-                                "Maestro Alice",
-                                "Maestro Bob",
-                                "Maestro Carol",
-                                "Maestro Erin",
-                                "Maestro Frank",
-                                "Maestro Grace",
-                            )
-                        } else {
-                            listOf("Maestro Alice", "Maestro Bob", "Maestro Carol")
-                        }
+                    val profileNames = maestroProfileNames(fixture)
                     val accounts =
                         profileNames.map { name ->
                             native.createIdentity(relays, relays).also {
@@ -183,9 +175,7 @@ class MaestroRuntimeHostTest {
                     val invited = if (fixture == "large-roster") accounts.drop(1) else listOf(accounts[1])
                     val members = invited.map { it.accountIdHex } + listOfNotNull(externalContact?.accountIdHex)
                     val group = native.createGroup(owner.label, "Maestro group", members, null)
-                    for (member in invited) {
-                        while (runCatching { native.acceptGroupInvite(member.label, group) }.isFailure) delay(100L)
-                    }
+                    for (member in invited) acceptMaestroInvite(native, member.label, group)
                     externalContact?.acceptGroup(group)
                     seedMaestroFixtureMessages(native, owner.label, accounts[1].label, group, fixture)
                     if (fixture == "departed") prepareMaestroDepartedGroup(native, owner, accounts[1], group)
@@ -261,13 +251,9 @@ class MaestroRuntimeHostTest {
                     checkNotNull(activity).onActivity { originalActivity = it }
                     inboundShareBaseline =
                         captureMaestroInboundShare(native, app, checkNotNull(activity), group, fixture)
-                    val presentationScenario = InstrumentationRegistry.getArguments().getString("presentationScenario")
-                    if (presentationScenario != null) {
-                        check(postcondition == "presentation-checked")
-                        val expected =
-                            checkNotNull(InstrumentationRegistry.getArguments().getString("presentationActions"))
-                        presentation = MaestroPresentationFixture(presentationScenario, expected.split(","))
-                        checkNotNull(activity).onActivity { checkNotNull(presentation).install(it) }
+                    presentation = loadMaestroPresentation(app, group, nativeRow.row.lastMessage)
+                    presentation?.let { fixturePresentation ->
+                        checkNotNull(activity).onActivity { fixturePresentation.install(it) }
                     }
                     // Maestro alone owns Android accessibility; this receipt certifies native handoff only.
                     File(directory, "ready.json").writeText(
@@ -334,7 +320,7 @@ class MaestroRuntimeHostTest {
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
-                        .put("presentation", presentation?.verify() ?: JSONObject.NULL)
+                        .put("presentation", withContext(Dispatchers.Main) { presentation?.verify() ?: JSONObject.NULL })
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
@@ -400,7 +386,8 @@ class MaestroRuntimeHostTest {
                 )
             } finally {
                 val activityClosed = runCatching { activity?.close() }
-                presentation?.close()
+                val presentationClosed =
+                    runCatching { withContext(NonCancellable + Dispatchers.Main) { presentation?.close() } }
                 val listenerStopped =
                     runCatching { withTimeout(10_000L) { state?.stopNotificationListenerForAccountTeardown() } }
                 state?.mutationsScope?.cancel()
@@ -420,6 +407,7 @@ class MaestroRuntimeHostTest {
                 val preferencesRemoved = runCatching { context.deleteSharedPreferences(directory.name) }
                 val rootRemoved = nativeClosed.isSuccess && root.deleteRecursively()
                 check(activityClosed.isSuccess) { "Fixture Activity teardown failed" }
+                check(presentationClosed.isSuccess) { "Fixture presentation teardown failed" }
                 check(listenerStopped.isSuccess) { "Fixture notification listener teardown failed" }
                 check(nativeClosed.isSuccess) { "Fixture native runtime teardown failed" }
                 check(shareStorageCleared.isSuccess) { "Fixture Android share storage cleanup failed" }
@@ -467,4 +455,58 @@ class MaestroRuntimeHostTest {
                 verifyMaestroComposer(checkNotNull(state), group, postcondition)
         }
     }
+}
+
+private fun maestroProfileNames(fixture: String): List<String> =
+    if (fixture == "large-roster") {
+        listOf("Maestro Alice", "Maestro Bob", "Maestro Carol", "Maestro Erin", "Maestro Frank", "Maestro Grace")
+    } else {
+        listOf("Maestro Alice", "Maestro Bob", "Maestro Carol")
+    }
+
+private suspend fun loadMaestroPresentation(
+    app: WhiteNoiseAppState,
+    group: String,
+    lastMessage: AppMessageRecordFfi?,
+): MaestroPresentationFixture? {
+    val arguments = InstrumentationRegistry.getArguments()
+    val scenario = arguments.getString("presentationScenario") ?: return null
+    val postcondition = arguments.getString("postcondition", "none")
+    check(postcondition in setOf("presentation-checked", "presentation-observed"))
+    val expected = checkNotNull(arguments.getString("presentationActions"))
+    val actions =
+        if (postcondition == "presentation-observed") {
+            check(expected == "none")
+            emptyList()
+        } else {
+            expected.split(",")
+        }
+    val nativeChat =
+        if (scenario.startsWith("extra-native-")) {
+            app.loadCreatedChatListItem(group).copy(latest = checkNotNull(lastMessage))
+        } else {
+            null
+        }
+    return MaestroPresentationFixture(scenario, actions, nativeChat)
+}
+
+/** The outer setup deadline remains authoritative; each member also has a bounded diagnostic retry. */
+private suspend fun acceptMaestroInvite(
+    native: Marmot,
+    member: String,
+    group: String,
+) {
+    var lastFailure: Exception? = null
+    repeat(100) { attempt ->
+        try {
+            native.acceptGroupInvite(member, group)
+            return
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            lastFailure = failure
+        }
+        if (attempt < 99) delay(100L)
+    }
+    throw IllegalStateException("Fixture invite acceptance failed for $member", lastFailure)
 }

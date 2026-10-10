@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-viewer-ready
+---
+- assertVisible:
+    text: Fixture viewer 0.png
+- back
+- assertVisible:
+    id: presentation.complete

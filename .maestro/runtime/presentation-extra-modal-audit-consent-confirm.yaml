@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-audit-consent-confirm
+---
+- assertVisible:
+    text: Export diagnostic logs\?
+- assertVisible:
+    text: Diagnostic logs contain technical identifiers.*
+- tapOn: Continue
+- assertVisible:
+    id: presentation.complete

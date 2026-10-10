@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,6 +21,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import java.io.File
@@ -30,6 +33,7 @@ import org.json.JSONObject
 internal class MaestroPresentationFixture(
     val scenario: String,
     private val expected: List<String>,
+    val nativeChat: ChatListItem? = null,
 ) : AutoCloseable {
     private val calls = mutableListOf<String>()
     private var complete by mutableStateOf(false)
@@ -41,6 +45,9 @@ internal class MaestroPresentationFixture(
         private set
     private var imageFile: File? = null
     private lateinit var clipboard: android.content.ClipboardManager
+    var nativeController: ConversationController? = null
+        private set
+    val imagePagesLoaded = mutableSetOf<Int>()
 
     fun finish(action: String) {
         calls.add(action)
@@ -54,6 +61,16 @@ internal class MaestroPresentationFixture(
     fun install(activity: MainActivity) {
         appState = (activity.application as MaestroFixtureApplication).fixtureState
         clipboard = activity.getSystemService(android.content.ClipboardManager::class.java)
+        nativeChat?.let { chat ->
+            nativeController =
+                ConversationController(
+                    appState,
+                    chat.group,
+                    initialMemberSnapshot = chat.memberSnapshot,
+                    initialChatListRow = chat.projection,
+                    startOnConstruction = false,
+                )
+        }
         if (scenario == "surface-onboarding-signup") appState.beginProfileSignUp()
         if (scenario == "surface-animated-avatar") installAnimatedAvatar()
         if (scenario.startsWith("preview-")) {
@@ -64,7 +81,7 @@ internal class MaestroPresentationFixture(
         }
         activity.setContent {
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+                Box(Modifier.fillMaxSize().systemBarsPadding().semantics { testTagsAsResourceId = true }) {
                     if (complete) {
                         Text(
                             "Presentation action completed",
@@ -107,13 +124,19 @@ internal class MaestroPresentationFixture(
             scenario.startsWith("preview-") -> MaestroPreviewPresentation(this)
             scenario.startsWith("group-ui-") -> MaestroGroupPresentation(this)
             scenario.startsWith("surface-") -> MaestroSurfacePresentation(this)
+            scenario.startsWith("extra-") -> MaestroExtraPresentation(this)
             else -> MaestroBoundaryPresentation(this)
         }
     }
 
     /** Actual callback sequence, never a UI label or controller-supplied success bit. */
     fun verify(): JSONObject {
-        check(complete && calls == expected) { "Production presentation callback mismatch: $scenario $calls" }
+        val observing = scenario in setOf("extra-wait-signout", "extra-wait-wipe")
+        if (observing) {
+            check(!complete && calls.isEmpty() && expected.isEmpty()) { "Non-cancellable overlay dispatched an action" }
+        } else {
+            check(complete && calls == expected) { "Production presentation callback mismatch: $scenario $calls" }
+        }
         if (scenario.startsWith("feedback-") && scenario.endsWith("copyable")) {
             check(clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "Synthetic diagnostic report") {
                 "Production report Copy did not write the expected synthetic payload"
@@ -131,10 +154,20 @@ internal class MaestroPresentationFixture(
                 clipboard.primaryClip?.getItemAt(0)?.text?.toString() == appState.npubForDisplay(account.accountIdHex),
             )
         }
-        return JSONObject().put("scenario", scenario).put("callbacks", JSONArray(calls)).put("verified", true)
+        if (scenario.startsWith("extra-native-viewer-")) {
+            val expectedPages = if (scenario.endsWith("gallery")) setOf(0, 1) else setOf(0)
+            check(imagePagesLoaded == expectedPages) { "Viewer did not request the selected image pages" }
+        }
+        return JSONObject()
+            .put("scenario", scenario)
+            .put("callbacks", JSONArray(calls))
+            .put("observationOnly", observing)
+            .put("imagePagesLoaded", JSONArray(imagePagesLoaded.sorted()))
+            .put("verified", true)
     }
 
     override fun close() {
+        nativeController?.onCleared()
         if (scenario == "surface-animated-avatar") AvatarImageLoader.clear()
         bitmap.recycle()
         imageFile?.let { check(!it.exists() || it.delete()) { "Generated preview file cleanup failed" } }

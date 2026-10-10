@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-emoji-valid
+---
+- assertVisible:
+    text: Name this emoji
+- assertVisible:
+    text: Save
+    enabled: true
+- tapOn: Save
+- assertVisible:
+    id: presentation.complete

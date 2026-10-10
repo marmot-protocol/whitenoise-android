@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-audit-destination-save
+---
+- assertVisible:
+    text: Export as one archive
+- assertVisible:
+    text: Save to device
+- assertVisible:
+    text: Share
+- tapOn: Save to device
+- assertVisible:
+    id: presentation.complete

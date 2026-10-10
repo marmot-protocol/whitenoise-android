@@ -163,7 +163,7 @@ private fun ScannerPermissionArea(content: @Composable (Dp) -> Unit) {
 
 /** Keep native error ownership in the scanner while using the prototype's retry/close dialog chrome. */
 @Composable
-private fun ScannerErrorDialog(
+internal fun ScannerErrorDialog(
     detail: String,
     onDismiss: () -> Unit,
     onRetry: () -> Unit,

@@ -89,6 +89,23 @@ class ScreenProofTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 qualify_presentation(case, {'presentation': invalid})
 
+    def test_only_non_cancellable_overlays_admit_observation_without_dispatch(self):
+        case = {'postcondition': 'presentation-observed', 'presentation': 'extra-wait-signout',
+                'presentation_actions': []}
+        self.assertEqual(presentation_arguments(case)[-1], 'none')
+        proof = {'scenario': 'extra-wait-signout', 'callbacks': [], 'observationOnly': True, 'verified': True}
+        qualify_presentation(case, {'presentation': proof})
+        for changed in [{**case, 'presentation': 'update-confirm'},
+                        {**case, 'presentation_actions': ['dismiss']},
+                        {**case, 'postcondition': 'presentation-checked'}]:
+            with self.assertRaises(ValueError):
+                presentation_arguments(changed)
+        for changed in [{**proof, 'observationOnly': False}, {**proof, 'callbacks': ['dismiss']},
+                        {**proof, 'scenario': 'extra-wait-wipe'}, {**proof, 'verified': False}]:
+            with self.assertRaises(ValueError):
+                qualify_presentation(case, {'presentation': changed})
+
+
 
 if __name__ == '__main__':
     unittest.main()

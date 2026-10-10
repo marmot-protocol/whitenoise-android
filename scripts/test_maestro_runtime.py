@@ -87,13 +87,18 @@ class CampaignSummaryTest(unittest.TestCase):
                                  'maestro-runtime-pair/pair.json', 'maestro-runtime-environment.json'])
         self.assertNotIn('build/', '\n'.join(paths))
 
+    @staticmethod
+    def case_count():
+        return sum(case['suite'] == 'navigation' for case in runtime.CASES.values())
+
     def prepare(self, root):
-        """Create six independently identified synthetic success leaves for reconciler boundary tests."""
+        """Create every selected navigation leaf independently for reconciler boundary tests."""
         identity = {'schema': 1, 'source_sha': 'a' * 40, 'run_id': '123', 'run_attempt': '1',
                     'distribution': 'Zapstore', 'package': runtime.PACKAGE,
                     'apk_sha256': 'b' * 64, 'test_apk_sha256': 'c' * 64}
         leaves, pairs = [], []
-        for partition in (1, 2):
+        for shard in matrix_selection('runtime-navigation'):
+            partition = shard['partition']
             artifact = root / f'maestro-runtime-results-navigation-{partition}-123-1'
             pair_path = artifact / 'maestro-runtime-pair/pair.json'
             pair_path.parent.mkdir(parents=True)
@@ -133,14 +138,14 @@ class CampaignSummaryTest(unittest.TestCase):
         """Reconcile the same source/run selection after a controlled evidence mutation."""
         return campaign(root, 'runtime-navigation', 'a' * 40, '123', '1')
 
-    def test_complete_campaign_requires_six_leaves_and_keeps_release_gap(self):
+    def test_complete_campaign_requires_all_selected_leaves_and_keeps_release_gap(self):
         """All requested UI leaves can pass without becoming complete release certification."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self.prepare(root)
             result = self.result(root)
             self.assertTrue(result['evidence_complete'])
-            self.assertEqual(result['passed_count'], 6)
+            self.assertEqual(result['passed_count'], self.case_count())
             self.assertFalse(result['full_release_coverage'])
 
     def test_expanded_roster_requires_all_six_native_account_receipts(self):
@@ -171,7 +176,7 @@ class CampaignSummaryTest(unittest.TestCase):
             self.prepare(root)
             result = campaign(root, 'runtime-navigation', 'a' * 40, '123', '2')
             self.assertTrue(result['evidence_complete'])
-            self.assertEqual(result['passed_count'], 6)
+            self.assertEqual(result['passed_count'], self.case_count())
 
     def test_new_failed_leaf_overrides_older_pass(self):
         """A rerun failure cannot be hidden by selecting an earlier green artifact."""
@@ -189,7 +194,7 @@ class CampaignSummaryTest(unittest.TestCase):
             (leaf / 'junit.xml').unlink()
             result = campaign(root, 'runtime-navigation', 'a' * 40, '123', '2')
             self.assertFalse(result['evidence_complete'])
-            self.assertEqual(result['passed_count'], 5)
+            self.assertEqual(result['passed_count'], self.case_count() - 1)
 
     def test_missing_or_mixed_platform_cannot_qualify_complete_ui_results(self):
         """Matching APKs and UI/native success still require one observed OS/navigation environment."""
@@ -219,7 +224,7 @@ class CampaignSummaryTest(unittest.TestCase):
             with patch.dict(runtime.CASES, {name: replacement}):
                 result = self.result(root)
                 self.assertFalse(result['evidence_complete'])
-                self.assertEqual(result['passed_count'], 5)
+                self.assertEqual(result['passed_count'], self.case_count() - 1)
                 self.assertIn('recreation', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
                 record = json.loads(path.read_text())
@@ -236,7 +241,7 @@ class CampaignSummaryTest(unittest.TestCase):
             replacement = {**runtime.CASES[name], 'postcondition': 'contact-private-saved'}
             with patch.dict(runtime.CASES, {name: replacement}):
                 result = self.result(root)
-                self.assertEqual(result['passed_count'], 5)
+                self.assertEqual(result['passed_count'], self.case_count() - 1)
                 self.assertFalse(result['evidence_complete'])
                 self.assertIn('contact privacy', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
@@ -254,7 +259,7 @@ class CampaignSummaryTest(unittest.TestCase):
             replacement = {**runtime.CASES[name], 'postcondition': 'speech-rate-custom'}
             with patch.dict(runtime.CASES, {name: replacement}):
                 result = self.result(root)
-                self.assertEqual(result['passed_count'], 5)
+                self.assertEqual(result['passed_count'], self.case_count() - 1)
                 self.assertFalse(result['evidence_complete'])
                 self.assertIn('speech rate', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
@@ -276,7 +281,7 @@ class CampaignSummaryTest(unittest.TestCase):
             with patch.dict(runtime.CASES, {name: replacement}):
                 result = self.result(root)
                 self.assertFalse(result['evidence_complete'])
-                self.assertEqual(result['passed_count'], 5)
+                self.assertEqual(result['passed_count'], self.case_count() - 1)
                 self.assertIn('public profile', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
                 record = json.loads(path.read_text())
@@ -296,7 +301,7 @@ class CampaignSummaryTest(unittest.TestCase):
             with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'smart-rule-read'}}):
                 result = self.result(root)
                 self.assertFalse(result['evidence_complete'])
-                self.assertEqual(result['passed_count'], 5)
+                self.assertEqual(result['passed_count'], self.case_count() - 1)
                 self.assertIn('smart-folder', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
                 record = json.loads(path.read_text())
@@ -316,7 +321,7 @@ class CampaignSummaryTest(unittest.TestCase):
             with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'relay-lists-unchanged'}}):
                 result = self.result(root)
                 self.assertFalse(result['evidence_complete'])
-                self.assertEqual(result['passed_count'], 5)
+                self.assertEqual(result['passed_count'], self.case_count() - 1)
                 self.assertIn('native relay lists', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
                 record = json.loads(path.read_text())
@@ -439,7 +444,7 @@ class CampaignSummaryTest(unittest.TestCase):
             with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'share-request-staged'}}):
                 result = self.result(root)
                 self.assertFalse(result['evidence_complete'])
-                self.assertEqual(result['passed_count'], 5)
+                self.assertEqual(result['passed_count'], self.case_count() - 1)
                 self.assertIn('inbound share', result['results'][0]['failure'])
                 path = leaves[0] / 'verified.json'
                 record = json.loads(path.read_text())
@@ -463,7 +468,7 @@ class CampaignSummaryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             result = self.result(Path(temporary))
             self.assertFalse(result['evidence_complete'])
-            self.assertEqual(result['expected_count'], 6)
+            self.assertEqual(result['expected_count'], self.case_count())
             self.assertTrue(all(row['not_run'] for row in result['results']))
 
     def test_native_success_without_junit_never_certifies_ui(self):
@@ -474,7 +479,7 @@ class CampaignSummaryTest(unittest.TestCase):
             (leaves[0] / 'junit.xml').unlink()
             result = self.result(root)
             self.assertFalse(result['evidence_complete'])
-            self.assertEqual(result['passed_count'], 5)
+            self.assertEqual(result['passed_count'], self.case_count() - 1)
 
     def test_cleanup_receipt_cannot_belong_to_another_generation(self):
         """A stale teardown cannot certify a fresh fixture even if its UI passed."""
@@ -494,7 +499,7 @@ class CampaignSummaryTest(unittest.TestCase):
             pairs[0].write_text(json.dumps(data))
             result = self.result(root)
             self.assertFalse(result['evidence_complete'])
-            self.assertEqual(result['expected_count'], 6)
+            self.assertEqual(result['expected_count'], self.case_count())
 
     def test_different_apk_pairs_cannot_share_one_campaign(self):
         """Source equality alone cannot reconcile different test APK bytes across shards."""
@@ -522,8 +527,8 @@ class CampaignSummaryTest(unittest.TestCase):
             leaves, _ = self.prepare(root)
             (leaves[0] / 'junit.xml').write_text('<broken')
             result = self.result(root)
-            self.assertEqual(result['expected_count'], 6)
-            self.assertEqual(result['passed_count'], 5)
+            self.assertEqual(result['expected_count'], self.case_count())
+            self.assertEqual(result['passed_count'], self.case_count() - 1)
             self.assertFalse(result['evidence_complete'])
 
     def test_unexpected_shard_artifact_invalidates_the_campaign(self):
@@ -547,7 +552,7 @@ class CampaignSummaryTest(unittest.TestCase):
             path.write_text(json.dumps(data))
             result = self.result(root)
             self.assertFalse(result['evidence_complete'])
-            self.assertEqual(result['expected_count'], 6)
+            self.assertEqual(result['expected_count'], self.case_count())
 
 
 class RuntimeEvidenceTest(unittest.TestCase):

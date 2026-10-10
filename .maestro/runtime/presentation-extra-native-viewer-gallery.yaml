@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-viewer-gallery
+---
+- assertVisible:
+    text: Fixture viewer 0.png
+- assertVisible:
+    text: Media 1 of 2
+- swipe:
+    start: 85%, 50%
+    end: 15%, 50%
+    duration: 600
+- assertVisible:
+    text: Fixture viewer 1.png
+- assertVisible:
+    text: Media 2 of 2
+- back
+- assertVisible:
+    id: presentation.complete

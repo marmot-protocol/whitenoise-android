@@ -320,7 +320,7 @@ private fun GroupSystemSummaryAndWave(
 
 @Composable
 @Suppress("FunctionNaming")
-private fun GroupSystemSummaryMenu(
+internal fun GroupSystemSummaryMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     onDelete: (() -> Unit)?,

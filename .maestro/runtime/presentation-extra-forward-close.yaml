@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-forward-close
+---
+- assertVisible:
+    id: forward-operation-status
+- tapOn:
+    id: forward-operation-status
+- assertVisible:
+    text: Fixture forwarding target
+- tapOn: Close
+- assertVisible:
+    id: forward-operation-status
+- back
+- assertVisible:
+    id: presentation.complete
