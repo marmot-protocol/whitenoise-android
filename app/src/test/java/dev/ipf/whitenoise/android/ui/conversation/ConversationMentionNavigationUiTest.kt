@@ -138,7 +138,15 @@ class ConversationMentionNavigationUiTest {
 
     @Test
     fun tallMentionWithExpandedComposerAndRtlShowsTheBeginning() {
-        assertMentionTop(MentionFixture(target = Target(720), viewportHeight = 420, padding = 144, overlap = 120, rtl = true))
+        assertMentionTop(
+            MentionFixture(
+                target = Target(720),
+                viewportHeight = 420,
+                padding = 144,
+                overlap = 120,
+                rtl = true,
+            ),
+        )
     }
 
     @Test
@@ -148,7 +156,15 @@ class ConversationMentionNavigationUiTest {
 
     @Test
     fun endMentionAcrossMoreThanFiftyMixedRowsStillStartsAtThePhysicalTop() {
-        assertMentionTop(MentionFixture(target = Target(720), viewportHeight = 420, padding = 12, initialIndex = 90, mixedRows = true))
+        assertMentionTop(
+            MentionFixture(
+                target = Target(720),
+                viewportHeight = 420,
+                padding = 12,
+                initialIndex = 90,
+                mixedRows = true,
+            ),
+        )
     }
 
     @Test
@@ -204,7 +220,10 @@ class ConversationMentionNavigationUiTest {
                                 writer = LazyListConversationScrollWriter(listState),
                                 initialMode =
                                     savedSnapshot?.let {
-                                        ConversationScrollMode.ReadingHistory(it.anchorMessageIdHex, it.firstVisibleItemScrollOffset)
+                                        ConversationScrollMode.ReadingHistory(
+                                            it.anchorMessageIdHex,
+                                            it.firstVisibleItemScrollOffset,
+                                        )
                                     } ?: ConversationScrollMode.FollowingTail,
                                 initialMentionReadingRowHeightPx = savedSnapshot?.mentionReadingRowHeightPx,
                             )
@@ -311,9 +330,12 @@ class ConversationMentionNavigationUiTest {
                                                     estimatedItemHeightPx = target.height,
                                                     isNewest = index == 0,
                                                     itemOffsetPx =
-                                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset,
+                                                        layout.visibleItemsInfo
+                                                            .firstOrNull { it.index == index }
+                                                            ?.offset,
                                                 )
                                             },
+                                            onCompleted = { coordinator.settleReadingAt(anchor()) },
                                         )
                                 }
                             },
@@ -369,11 +391,15 @@ class ConversationMentionNavigationUiTest {
                 .getUnclippedBoundsInRoot()
                 .top.value
         assertEquals(listTop, messageTop, 1f)
-        composeRule.runOnIdle { assertTrue(completed) }
+        composeRule.runOnIdle {
+            assertTrue(completed)
+            assertTrue(activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
+        }
         if (incomingAfterLanding) {
             composeRule.runOnIdle { incomingCount++ }
             composeRule.waitForIdle()
-            val afterIncoming = composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
+            val afterIncoming =
+                composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
             assertEquals(listTop, afterIncoming, 1f)
         }
         if (gestureAfterLanding) {
@@ -384,7 +410,8 @@ class ConversationMentionNavigationUiTest {
         if (reopenAfterLanding) {
             composeRule.onNodeWithTag("mention-reopen").performClick()
             composeRule.waitForIdle()
-            val reopenedTop = composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
+            val reopenedTop =
+                composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
             assertEquals(listTop, reopenedTop, 1f)
             composeRule.runOnIdle { assertEquals(target.height, savedSnapshot?.mentionReadingRowHeightPx) }
         }

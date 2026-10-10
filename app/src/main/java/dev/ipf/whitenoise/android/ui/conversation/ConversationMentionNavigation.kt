@@ -42,14 +42,8 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
     val completed =
         programmaticJump(targetMessageId, ConversationScrollReason.Mention) {
             var initialIndex = resolveTargetIndex() ?: return@programmaticJump
-            val initialLayout = readLayout(initialIndex)
-            if (initialLayout.isNewest) {
-                reserveMentionReadingStart(
-                    initialLayout.itemHeightPx ?: initialLayout.estimatedItemHeightPx ?: 1,
-                    awaitLayout,
-                )
-                initialIndex = resolveTargetIndex() ?: return@programmaticJump
-            }
+            reserveNewestMentionReadingSpace(initialIndex, readLayout, awaitLayout)
+            initialIndex = resolveTargetIndex() ?: return@programmaticJump
             val initialOffset = readLayout(initialIndex).readingStartOffset
             var placedIndex = initialIndex
             var placedOffset = initialOffset
@@ -111,15 +105,8 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     var attempt = 0
     var reached = false
     while (attempt <= MAX_MENTION_LAYOUT_CORRECTIONS && !reached) {
-        var index = resolveTargetIndex() ?: break
-        var layout = readLayout(index)
-        if (!layout.isMeasured) break
-        if (layout.isNewest) {
-            reserveMentionReadingStart(requireNotNull(layout.itemHeightPx), awaitLayout)
-            index = resolveTargetIndex() ?: break
-            layout = readLayout(index)
-            if (!layout.isMeasured) break
-        }
+        val measured = readMentionLayoutAfterReserve(resolveTargetIndex, readLayout, awaitLayout) ?: break
+        val (index, layout) = measured
         if (index == placedIndex && layout.readingStartOffset == placedOffset && layout.isAtReadingStart) {
             reached = true
         } else if (attempt < MAX_MENTION_LAYOUT_CORRECTIONS) {
@@ -134,3 +121,40 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     }
     return reached
 }
+
+/** Uses the current row estimate to provide native room before the first newest-row approach. */
+private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.reserveNewestMentionReadingSpace(
+    index: Int,
+    readLayout: (Int) -> ConversationMentionJumpLayout,
+    awaitLayout: suspend () -> Unit,
+) {
+    val layout = readLayout(index)
+    if (layout.isNewest) {
+        reserveMentionReadingStart(layout.itemHeightPx ?: layout.estimatedItemHeightPx ?: 1, awaitLayout)
+    }
+}
+
+/** Re-resolves the logical target after a reserved-padding layout pass before validating its coordinate. */
+private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.readMentionLayoutAfterReserve(
+    resolveTargetIndex: () -> Int?,
+    readLayout: (Int) -> ConversationMentionJumpLayout,
+    awaitLayout: suspend () -> Unit,
+): Pair<Int, ConversationMentionJumpLayout>? {
+    val measured = resolveMeasuredMentionLayout(resolveTargetIndex, readLayout) ?: return null
+    val layout = measured.second
+    return if (layout.isNewest) {
+        reserveMentionReadingStart(requireNotNull(layout.itemHeightPx), awaitLayout)
+        resolveMeasuredMentionLayout(resolveTargetIndex, readLayout)
+    } else {
+        measured
+    }
+}
+
+/** Pairs the current logical index with measured geometry, rejecting targets absent from the viewport. */
+private fun resolveMeasuredMentionLayout(
+    resolveTargetIndex: () -> Int?,
+    readLayout: (Int) -> ConversationMentionJumpLayout,
+): Pair<Int, ConversationMentionJumpLayout>? =
+    resolveTargetIndex()?.let { index ->
+        readLayout(index).takeIf { it.isMeasured }?.let { index to it }
+    }
