@@ -181,9 +181,10 @@ def main(argv):
                 f"{r['frames']:5d} {ms(r['f_p50'], 4)}/{ms(r['f_p90'], 4)}/{ms(r['f_p99'], 5)}/{ms(r['f_max'], 5)} {r['jank32']:4d} {r['main_running_ms']:8.0f} {r['gpu_samples']:5d}"
             )
             if r["test"] == "jumpToUnreadMentionFromHistory":
-                print("  mention phases (ms; dash means unmeasured): " + ", ".join(
+                print("  mention phases (ms; total includes highlight; dash means unmeasured): " + ", ".join(
                     f"{phase}={ms(r.get(f'mention_{phase}_ms'), 0)}"
-                    for phase in ("total", "availability", "position", "animation", "layout", "correction")
+                    for phase in ("tap_to_landing", "total", "availability", "approach", "position",
+                                  "animation", "layout", "correction", "highlight")
                 ) + f"; corrections={r.get('mention_correction_n', 0)}")
         print()
         for test in order:

@@ -4,19 +4,14 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.core.view.ViewCompat
@@ -123,9 +118,13 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             composeRule.runOnUiThread {
                 fixture.staleRows = paintedA
                 fixture.paintStaleControl = true
-                fixture.recording.set(true)
             }
+            composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            fixture.recording.set(true)
+            composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
+            assertTrue(fixture.hasB)
+            assertTrue(fixture.draws.first().visibleItemKeys.isNotEmpty())
             assertFalse(
                 "new controller content cannot make stale painted A pass",
                 ConversationTimelineTestIds.MESSAGE_B in fixture.draws.first().messageIds,
@@ -148,7 +147,10 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             if (focusComposer) establishFocusedComposer(fixture)
             val olderAnchor =
                 if (olderReader) {
-                    fixture.lastDraw?.visibleItemOffsets?.entries?.firstOrNull { it.key.toString().startsWith("msg:") }
+                    val key = checkNotNull(fixture.readingSnapshot?.anchorItemId)
+                    checkNotNull(fixture.lastDraw?.visibleItemOffsets?.entries?.firstOrNull { it.key == key }) {
+                        "the intended older anchor must be painted before STOP"
+                    }
                 } else {
                     null
                 }
@@ -241,8 +243,9 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     ): RetainedFixture {
         lateinit var fixture: RetainedFixture
         composeRule.runOnUiThread { fixture = RetainedFixture(replacement, olderReader) }
-        ConversationTranscriptDrawProbe.observer = { frame ->
-            if (composeRule.activity.lifecycle.currentState == Lifecycle.State.RESUMED) fixture.observe(frame)
+        ConversationTranscriptDrawProbe.observer = fixture::observe
+        ConversationTranscriptDrawProbe.compositionRowsOverride = { controller, rows ->
+            if (controller === fixture.controller && fixture.paintStaleControl) fixture.staleRows else rows
         }
         composeRule.setContent {
             val view = LocalView.current
@@ -253,21 +256,21 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                     fixture.preDraws.incrementAndGet()
                     true
                 }
+                val drawListener = android.view.ViewTreeObserver.OnDrawListener {
+                    val completed = ConversationTranscriptDrawProbe.beginRootDraw()
+                    val live = composeRule.activity.lifecycle.currentState == Lifecycle.State.RESUMED
+                    view.post { if (live) completed?.invoke() }
+                }
                 observer.addOnPreDrawListener(listener)
-                onDispose { if (observer.isAlive) observer.removeOnPreDrawListener(listener) }
+                observer.addOnDrawListener(drawListener)
+                onDispose {
+                    if (observer.isAlive) {
+                        observer.removeOnPreDrawListener(listener)
+                        observer.removeOnDrawListener(drawListener)
+                    }
+                }
             }
-            if (fixture.paintStaleControl) {
-                Box(
-                    Modifier.drawWithContent {
-                        drawContent()
-                        ConversationTranscriptDrawProbe.drawn(
-                            fixture.controller,
-                            fixture.staleRows,
-                            androidx.compose.foundation.lazy.LazyListState().layoutInfo,
-                        )
-                    },
-                ) { Text("fixture A") }
-            } else if (fixture.mounted) {
+            if (fixture.mounted) {
                 WhiteNoiseTheme {
                     ConversationScreen(
                         appState = fixture.appState,
@@ -359,7 +362,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             if (!recording.get()) lastDraw = frame
             initialDrawObserved.set(true)
             if (recording.get() && draws.isEmpty()) {
-                firstDrawAt = SystemClock.uptimeMillis()
+                firstDrawAt = frame.rootDrawAtUptimeMs
                 draws.add(frame)
             }
         }

@@ -62,12 +62,14 @@ receiver or network wait. A projection that has not returned from `nextWindow`
 is a separate native boundary and is not covered by this local receipt barrier.
 
 `ConversationRetainedTranscriptFirstFrameAndroidTest` mounts the production
-conversation screen. It checks the first actual painted composition with
+conversation screen. It records each actual Android root draw using painted-layer metadata, including cached display-list reuse. It checks the first live transcript with
 consumed, queued and replacement-only windows, held roster enrichment, open
 and denied IME visibility, an older reading anchor and disposal. Its stale A
-negative control must reject painted content even when the controller has B.
+negative control uses that same production composition and must reject painted
+content even when the controller has B. Superseded or retired receipts do not
+count as commits; they retain the existing bounded fallback.
 `ChatListConnectionResumeDeviceTest` samples actual banner draws through a
-retained Activity edge, detects an injected visible attempt, and exercises the
+retained and recreated Activity edges, detects an injected visible attempt, and exercises the
 production recovery flash. Paired controller tests advance the real automatic
 retry deadline for EOF and failure of either or both inputs. These controlled
 cases do not classify an uncaptured real five-second recurrence.
