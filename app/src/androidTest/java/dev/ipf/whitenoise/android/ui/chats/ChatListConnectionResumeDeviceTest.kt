@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+import dev.ipf.whitenoise.android.ResponsivenessDeviceAcceptance
 import dev.ipf.whitenoise.android.state.ChatListConnectionPhase
 import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import dev.ipf.whitenoise.android.state.beginReadinessRefresh
@@ -30,6 +31,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /** Actual drawn frames of the retained production banner state machine, rather than committed SideEffects. */
 @PullRequestDeviceSmoke
+@ResponsivenessDeviceAcceptance
 @RunWith(AndroidJUnit4::class)
 class ChatListConnectionResumeDeviceTest {
     @get:Rule

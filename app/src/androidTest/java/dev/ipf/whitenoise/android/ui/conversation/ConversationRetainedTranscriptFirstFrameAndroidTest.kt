@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -25,6 +26,7 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+import dev.ipf.whitenoise.android.ResponsivenessDeviceAcceptance
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
@@ -56,6 +58,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 /** Checks content at the production transcript draw, before any post-resume UI polling can hide stale frames. */
 @PullRequestDeviceSmoke
+@ResponsivenessDeviceAcceptance
 @RunWith(AndroidJUnit4::class)
 class ConversationRetainedTranscriptFirstFrameAndroidTest {
     @get:Rule
@@ -70,6 +73,11 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     @Test
     fun queuedLocalPreparationCommitsBeforeFirstLiveTranscriptDraw() =
         assertFirstDraw(UpdateBoundary.Queued)
+
+    /** A second foreground epoch cannot inherit the first epoch's permission to reveal held content. */
+    @Test
+    fun supersededForegroundEpochStillWaitsForCurrentLocalWindow() =
+        assertFirstDraw(UpdateBoundary.Queued, supersedeForeground = true)
 
     /** Reconnect's replacement snapshot is sufficient even when no later live update arrives. */
     @Test
@@ -145,6 +153,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         focusComposer: Boolean = false,
         denyIme: Boolean = false,
         olderReader: Boolean = false,
+        supersedeForeground: Boolean = false,
     ) {
         val fixture = mountFixture(replacement = boundary == UpdateBoundary.Replacement, olderReader = olderReader)
         val original = composeRule.activity
@@ -186,6 +195,11 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                     fixture.preDraws.get() > preDrawCheckpoint
                 }
                 assertTrue("known local preparation must still hold the first draw", fixture.draws.isEmpty())
+                if (supersedeForeground) {
+                    composeRule.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+                    composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+                    assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
+                }
                 fixture.dispatcher.release()
             }
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
@@ -238,7 +252,12 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         assertEquals(fixture.expectedOpenCount, fixture.scripts.timelineSubscriptionOpenCount)
         assertTrue(fixture.firstDrawAt >= resumedAt)
         assertTrue(fixture.applicationTimes.last() <= fixture.firstDrawAt)
-        Log.i("WNFirstFrameTest", "ime_denied=$denyIme resume_to_draw_ms=${fixture.firstDrawAt - resumedAt}")
+        assertTrue(fixture.lastResumeAt >= resumedAt)
+        assertTrue(fixture.firstDrawAt >= fixture.lastResumeAt)
+        Log.i(
+            "WNFirstFrameTest",
+            "ime_denied=$denyIme on_resume_to_draw_ms=${fixture.firstDrawAt - fixture.lastResumeAt}",
+        )
     }
 
     /** Installs the real conversation screen with a bounded local subscription and independently delayed roster. */
@@ -250,7 +269,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         composeRule.runOnUiThread { fixture = RetainedFixture(replacement, olderReader) }
         // This suite starts from a retained, authoritative transcript, not a cold route whose
         // unread boundary still depends on the native read-state initialization fixture.
-        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+        awaitFixtureSetup(fixture) {
             fixture.controller.hasPublishedAuthoritativeTimeline && fixture.controller.timeline.isNotEmpty()
         }
         ConversationTranscriptDrawProbe.observer = fixture::observe
@@ -261,6 +280,13 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             val view = LocalView.current
             fixture.keyboard = LocalSoftwareKeyboardController.current
             DisposableEffect(view) {
+                val lifecycle = composeRule.activity.lifecycle
+                val lifecycleObserver = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME && fixture.recording.get()) {
+                        fixture.lastResumeAt = SystemClock.uptimeMillis()
+                    }
+                }
+                lifecycle.addObserver(lifecycleObserver)
                 val observer = view.viewTreeObserver
                 val listener = android.view.ViewTreeObserver.OnPreDrawListener {
                     fixture.preDraws.incrementAndGet()
@@ -274,6 +300,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 observer.addOnPreDrawListener(listener)
                 observer.addOnDrawListener(drawListener)
                 onDispose {
+                    lifecycle.removeObserver(lifecycleObserver)
                     if (observer.isAlive) {
                         observer.removeOnPreDrawListener(listener)
                         observer.removeOnDrawListener(drawListener)
@@ -292,13 +319,18 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 }
             }
         }
+        awaitFixtureSetup(fixture) { fixture.initialDrawObserved.get() }
+        return fixture
+    }
+
+    /** A setup timeout must release the controller before a caller can take ownership of the fixture. */
+    private fun awaitFixtureSetup(fixture: RetainedFixture, condition: () -> Boolean) {
         try {
-            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.initialDrawObserved.get() }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS, condition = condition)
         } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
             fixture.close()
             throw failure
         }
-        return fixture
     }
 
     /** Complete-window replacements are the only data source; no test edits controller timeline state. */
@@ -368,6 +400,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         val initialDrawObserved = AtomicBoolean()
         val draws = CopyOnWriteArrayList<ConversationTranscriptDraw>()
         var firstDrawAt = 0L
+        var lastResumeAt = 0L
         var lastDraw: ConversationTranscriptDraw? = null
         val hasB: Boolean
             get() = controller.timeline.any { it.record.messageIdHex == ConversationTimelineTestIds.MESSAGE_B }

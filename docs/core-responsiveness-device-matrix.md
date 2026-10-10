@@ -84,3 +84,7 @@ workflow supports fresh owned-emulator fixtures with an identical native pin.
 It cannot be installed on a personal Dev app. Hosted tests and the paired
 measurement campaign must pass before these additional harnesses qualify the
 remaining issues; Max's separate GrapheneOS acceptance is deferred.
+
+### Focused hosted responsiveness validation
+
+Dispatch `android-instrumented.yml` with `responsiveness_only=true` on the exact candidate ref to run the production transcript and connectivity Activity/draw tests. This uses a separate concurrency group, skips unrelated attachment and native verifier jobs, and fails if any declared case in those two classes is missing, skipped or failing. The default full instrumented suite remains required before readiness. The focused result does not establish physical-device or GrapheneOS acceptance.
