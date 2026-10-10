@@ -259,6 +259,7 @@ internal class ConversationScrollIntentToken internal constructor(
 internal class ConversationScrollCoordinator(
     private val writer: ConversationScrollWriter,
     initialMode: ConversationScrollMode = ConversationScrollMode.FollowingTail,
+    initialMentionReadingRowHeightPx: Int? = null,
     private val onExplicitNavigation: () -> Unit = {},
 ) {
     private var settledMode = initialMode.requireSettled()
@@ -274,7 +275,7 @@ internal class ConversationScrollCoordinator(
         private set
 
     /** Measured layout room retained while a newest mention owns the reading position. */
-    var mentionReadingRowHeightPx by mutableStateOf<Int?>(null)
+    var mentionReadingRowHeightPx by mutableStateOf(initialMentionReadingRowHeightPx)
         private set
 
     var foregroundRestoreInProgress by mutableStateOf(false)
@@ -743,7 +744,10 @@ internal class ConversationScrollCoordinator(
         suspend fun prepareReadingSpace(reason: ConversationScrollReason?) {
             ensureCurrent()
             if (
-                reason == null || reason == ConversationScrollReason.Mention || mentionReadingRowHeightPx == null
+                reason == null ||
+                    reason == ConversationScrollReason.Mention ||
+                    reason == ConversationScrollReason.SavedRestore ||
+                    mentionReadingRowHeightPx == null
             ) return
             mentionReadingRowHeightPx = null
             withFrameNanos { }

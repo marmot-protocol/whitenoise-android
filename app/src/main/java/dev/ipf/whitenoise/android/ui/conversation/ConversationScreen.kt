@@ -793,6 +793,7 @@ internal fun ConversationScreen(
                     } else {
                         ConversationScrollMode.FollowingTail
                     },
+                initialMentionReadingRowHeightPx = scrollRestore?.mentionReadingRowHeightPx,
                 onExplicitNavigation = {
                     unreadJumpState = unreadJumpState.suppressCurrentStack()
                 },
@@ -1461,6 +1462,7 @@ internal fun ConversationScreen(
             timelineViewport = timelineViewport,
             renderedTimelineSize = renderedSize,
             trailingRowCount = trailingRowCount,
+            mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
         )
 
     /** Resolves a saved logical anchor after current header and error rows. */
@@ -1511,6 +1513,7 @@ internal fun ConversationScreen(
                         timelineViewport = timelineViewport,
                         timelineSize = liveRenderedSize,
                         trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
+                        mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
                     ),
                 )
             },
@@ -1550,6 +1553,7 @@ internal fun ConversationScreen(
                     nearBottom = scrollCoordinator.isFollowingTail,
                     anchorItemId = anchor?.id,
                     anchorMessageIdHex = anchor?.record?.messageIdHex,
+                    mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
                 ),
             )
         }

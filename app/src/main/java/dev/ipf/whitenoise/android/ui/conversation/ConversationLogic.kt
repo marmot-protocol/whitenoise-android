@@ -54,6 +54,7 @@ internal data class ConversationScrollSnapshot(
     val firstVisibleItemScrollOffset: Int,
     val anchorItemId: String? = null,
     val anchorMessageIdHex: String? = null,
+    val mentionReadingRowHeightPx: Int? = null,
 )
 
 /** Whether saved history may own this open instead of the first-unread anchor. */
@@ -78,12 +79,14 @@ internal fun conversationScrollKey(
  * Snapshot to persist when leaving a conversation. Returns null when the reader
  * was at/near the bottom so the normal unread/newest anchor runs on re-entry.
  */
+@Suppress("LongParameterList") // One route snapshot retains the complete logical anchor and its required native room.
 internal fun conversationScrollSnapshotOnLeave(
     firstVisibleItemIndex: Int,
     firstVisibleItemScrollOffset: Int,
     nearBottom: Boolean,
     anchorItemId: String? = null,
     anchorMessageIdHex: String? = null,
+    mentionReadingRowHeightPx: Int? = null,
 ): ConversationScrollSnapshot? =
     if (nearBottom) {
         null
@@ -93,6 +96,7 @@ internal fun conversationScrollSnapshotOnLeave(
             firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
             anchorItemId = anchorItemId,
             anchorMessageIdHex = anchorMessageIdHex,
+            mentionReadingRowHeightPx = mentionReadingRowHeightPx,
         )
     }
 
@@ -168,7 +172,11 @@ internal fun isNearBottom(
     timelineSize: Int,
     trailingRowCount: Int = 0,
     timelineViewport: ConversationTimelineViewport? = null,
+    mentionReadingRowHeightPx: Int? = null,
 ): Boolean {
+    // Reserved room belongs to a reading anchor, even at the native padded tail origin.
+    // Keep the return-to-newest action available and gestures in history intent until it is released.
+    if (mentionReadingRowHeightPx != null) return false
     // The transcript is reversed, so history lies toward higher indices and the
     // newest edge is exhausted when the list can no longer scroll backward.
     if (!listState.canScrollBackward) return true
@@ -227,16 +235,19 @@ internal fun rememberConversationNearBottom(
     renderedTimelineSize: Int,
     trailingRowCount: Int = 0,
     timelineViewport: ConversationTimelineViewport? = null,
+    mentionReadingRowHeightPx: Int? = null,
 ): Boolean {
-    val nearBottom by remember(listState, renderedTimelineSize, trailingRowCount, timelineViewport) {
-        derivedStateOf {
-            isNearBottom(
-                listState,
-                renderedTimelineSize,
-                trailingRowCount,
-                timelineViewport,
-            )
+    val nearBottom by
+        remember(listState, renderedTimelineSize, trailingRowCount, timelineViewport, mentionReadingRowHeightPx) {
+            derivedStateOf {
+                isNearBottom(
+                    listState,
+                    renderedTimelineSize,
+                    trailingRowCount,
+                    timelineViewport,
+                    mentionReadingRowHeightPx,
+                )
+            }
         }
-    }
     return nearBottom
 }
