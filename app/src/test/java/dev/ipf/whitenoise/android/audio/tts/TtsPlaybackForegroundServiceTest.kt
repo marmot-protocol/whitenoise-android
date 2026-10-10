@@ -455,6 +455,101 @@ class TtsPlaybackForegroundServiceTest {
         assertTrue(harness.controller.state.value is TtsState.Idle)
     }
 
+    /** A delayed teardown must not stop a new queue waiting for its own service start. */
+    @Test
+    fun retiredServiceDestructionPreservesReplacementPlayback() {
+        val harness = installHost()
+        harness.speak()
+        val lifecycle = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(Intent(RuntimeEnvironment.getApplication(), service::class.java), 0, 1)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        harness.controller.stop()
+        shadowOf(Looper.getMainLooper()).idle()
+        harness.speak("Replacement private sentence.")
+        val replacement = harness.controller.state.value
+
+        lifecycle.destroy()
+
+        assertEquals(replacement, harness.controller.state.value)
+        assertEquals(0, harness.stops)
+        harness.controller.stop()
+    }
+
+    /** Resolving a different app host during teardown cannot grant ownership of its speech. */
+    @Test
+    fun serviceDestructionStopsOnlyItsOriginalHost() {
+        val original = installHost()
+        original.speak()
+        val lifecycle = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(Intent(RuntimeEnvironment.getApplication(), service::class.java), 0, 1)
+        shadowOf(Looper.getMainLooper()).idle()
+        val replacement = installHost()
+        replacement.speak("Other account private sentence.")
+        val replacementState = replacement.controller.state.value
+
+        lifecycle.destroy()
+
+        assertTrue(original.controller.state.value is TtsState.Idle)
+        assertEquals(1, original.stops)
+        assertEquals(replacementState, replacement.controller.state.value)
+        assertEquals(0, replacement.stops)
+        replacement.controller.stop()
+    }
+
+    /** A retained platform callback belongs to the old session even when the controller is reused. */
+    @Test
+    fun retiredMediaCallbackCannotControlReplacementPlayback() {
+        val harness = installHost()
+        harness.speak()
+        val retired = TtsPlaybackMediaSessionCallback(harness.host)
+        harness.controller.stop()
+        harness.speak("Replacement first sentence. Replacement second sentence.")
+        val replacement = harness.controller.state.value
+
+        retired.onPause()
+        retired.onPlay()
+        retired.onSkipToNext()
+        retired.onSkipToPrevious()
+        retired.onStop()
+
+        assertEquals(replacement, harness.controller.state.value)
+        assertEquals(0, harness.nextSentences)
+        assertEquals(0, harness.previousSentences)
+        assertEquals(0, harness.stops)
+        val current = TtsPlaybackMediaSessionCallback(harness.host)
+        current.onPause()
+        assertTrue(harness.controller.state.value is TtsState.Paused)
+        current.onPlay()
+        assertTrue(harness.controller.state.value is TtsState.Speaking)
+        current.onStop()
+        assertEquals(1, harness.stops)
+    }
+
+    /** A valid service restart binds teardown to the new queue rather than abandoning it. */
+    @Test
+    fun newServiceStartOwnsReplacementPlayback() {
+        val harness = installHost()
+        harness.speak()
+        val lifecycle = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
+        val service = lifecycle.get()
+        val context = RuntimeEnvironment.getApplication()
+        service.onStartCommand(Intent(context, service::class.java), 0, 1)
+        shadowOf(Looper.getMainLooper()).idle()
+        harness.controller.stop()
+        shadowOf(Looper.getMainLooper()).idle()
+        harness.speak("Replacement private sentence.")
+        service.onStartCommand(Intent(context, service::class.java), 0, 2)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        lifecycle.destroy()
+
+        assertTrue(harness.controller.state.value is TtsState.Idle)
+        assertEquals(1, harness.stops)
+    }
+
     @Test
     fun notificationDismissalStopsTheSession() {
         val harness = installHost()

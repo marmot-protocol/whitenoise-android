@@ -1,0 +1,46 @@
+{
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "TTS playback stop notification action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackForegroundService.kt",
+        "anchor": "R.string.tts_playback_action_stop",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TTS playback notification text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackForegroundService.kt",
+        "anchor": "R.string.tts_playback_notification_text",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TTS playback notification title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackForegroundService.kt",
+        "anchor": "R.string.tts_playback_notification_title",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Session-bound platform read-aloud callbacks",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackForegroundService.kt",
+        "anchor": "private fun ownsSession(): Boolean",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackForegroundService.kt",
+  "legacy_sha256": "7d06d048eec4596e6ac0bdb66d02f65661a066adac4b9960598e898877a44d95"
+}

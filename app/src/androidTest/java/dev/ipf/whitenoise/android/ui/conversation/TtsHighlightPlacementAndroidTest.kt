@@ -60,8 +60,10 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.highlightBoundingBoxe
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsHighlightTextRange
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -96,6 +98,71 @@ class TtsHighlightPlacementAndroidTest {
         appState = appState()
         controller = ConversationController(appState = appState, initialGroup = group())
         appState.ttsController.attachEngine(engine)
+    }
+
+    @After
+    fun stopPlayback() {
+        appState.ttsController.stop()
+        appState.ttsController.detachEngine()
+    }
+
+    /** The production row keeps a sentence band when an engine reports no native ranges. */
+    @Test
+    fun rangeSilentPlaybackKeepsTheSentenceAndMapsEstimatedWords() {
+        startSpeaking(TWO_SENTENCES)
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+        engine.start(0)
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            appState.ttsController.state.value.passage
+                ?.visibleWord
+                .orEmpty()
+                .isNotEmpty()
+        }
+        composeRule.waitForIdle()
+        val leaf = checkNotNull(leafCarryingHighlight())
+        val word = checkNotNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
+        assertTrue(word.first >= 0 && word.last < FIRST_SENTENCE.length)
+        assertTrue(leaf.text().substring(word.first, word.last + 1).isNotBlank())
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+    }
+
+    /** Stopping revokes the active passage even when native callbacks arrive afterwards. */
+    @Test
+    fun stopClearsTheRenderedPassageAndRejectsLateEngineCallbacks() {
+        startSpeaking(TWO_SENTENCES)
+        rangeWithin(chunkIndex = 0, word = "first")
+        assertNotNull(leafCarryingHighlight())
+        appState.ttsController.stop()
+        engine.range(0, PREFIX.length, PREFIX.length + 4)
+        engine.start(0)
+        engine.done(0)
+        composeRule.waitForIdle()
+
+        assertNull(appState.ttsController.state.value.passage)
+        assertNull(leafCarryingHighlight())
+    }
+
+    /** Pause retains sentence context; resumed playback refuses the superseded utterance's ranges. */
+    @Test
+    fun resumedPlaybackRetainsTheSentenceAndIgnoresOldWordRanges() {
+        startSpeaking(TWO_SENTENCES)
+        rangeWithin(chunkIndex = 0, word = "first")
+        val session = appState.ttsController.state.value.sessionId
+        appState.ttsController.pause()
+        composeRule.waitForIdle()
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+        val resumedIndex = engine.submitted.size
+        appState.ttsController.resume()
+        rangeWithin(chunkIndex = resumedIndex, word = "sentence")
+        val currentPassage = appState.ttsController.state.value.passage
+
+        engine.range(0, PREFIX.length, PREFIX.length + 4)
+        engine.done(0)
+        composeRule.waitForIdle()
+
+        assertEquals(session, appState.ttsController.state.value.sessionId)
+        assertEquals(currentPassage, appState.ttsController.state.value.passage)
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
     }
 
     @Test
@@ -824,6 +891,14 @@ class TtsHighlightPlacementAndroidTest {
         }
 
         override fun stop() = Unit
+
+        fun start(chunkIndex: Int) {
+            startCallback?.invoke(spoken[chunkIndex])
+        }
+
+        fun done(chunkIndex: Int) {
+            doneCallback?.invoke(spoken[chunkIndex])
+        }
 
         /**
          * The queue submits every chunk up front, so the utterance being spoken
