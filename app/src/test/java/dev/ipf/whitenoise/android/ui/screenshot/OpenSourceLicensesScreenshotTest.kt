@@ -1,9 +1,9 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
@@ -60,7 +60,7 @@ class OpenSourceLicensesScreenshotTest {
             }
         composeRule.setContent {
             val density = LocalDensity.current
-            val title = LocalContext.current.getString(R.string.open_source_licenses)
+            val title = stringResource(R.string.open_source_licenses)
             CompositionLocalProvider(
                 LocalDensity provides Density(density.density, if (largeRtl) 2f else 1f),
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
