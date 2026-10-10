@@ -20,13 +20,13 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportRatePicker
 import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import java.util.Locale
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Locale
 
 /** Actual popup pixels complement the device first-open/reopen regression. */
 @RunWith(RobolectricTestRunner::class)
