@@ -2711,8 +2711,9 @@ class ChatsController private constructor(
     fun revalidateConnectionReadiness() = connectionOwner.refresh(presentAttempt = false)
 
     /** Revalidates retained subscriptions silently and attributes the foreground source. */
-    internal fun revalidateConnectionReadinessOnForeground() =
+    internal fun revalidateConnectionReadinessOnForeground() {
         connectionOwner.refresh(presentAttempt = false, source = PerformancePhase.CONNECTION_FOREGROUND)
+    }
 
     /** Keeps a disconnected aggregate relay sample distinct from a foreground lifecycle edge. */
     internal fun revalidateConnectionReadinessOnRelaySample() =
@@ -2725,8 +2726,9 @@ class ChatsController private constructor(
     fun invalidateConnectionReadiness() = connectionOwner.invalidate()
 
     /** Records network loss only at a confirmed validated-internet boundary. */
-    internal fun invalidateConnectionReadinessOnNetworkLoss() =
+    internal fun invalidateConnectionReadinessOnNetworkLoss() {
         connectionOwner.invalidate(PerformancePhase.CONNECTION_NETWORK_LOST)
+    }
 
     /** Ends account-owned streams and invalidates roster results before closing their handles. */
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {

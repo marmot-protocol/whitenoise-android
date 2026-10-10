@@ -248,8 +248,8 @@ internal fun rememberChatListHeadReorderGate(
 /**
  * Active on-list head promotion: pairs [chatListRowMotion] with
  * animated scroll correction when [shouldSnapChatListForHeadReorder] fires.
+ * Dataset, gesture and demotion fences belong to this single viewport owner.
  */
-// Dataset, gesture and demotion fences belong to this single viewport owner.
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun ChatListActiveHeadScrollEffect(

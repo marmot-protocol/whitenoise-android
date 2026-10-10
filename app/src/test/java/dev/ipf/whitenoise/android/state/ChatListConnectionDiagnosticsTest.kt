@@ -5,12 +5,19 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticEmitter
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Readiness attribution reuses the opt-in, bounded emitter without exposing owner keys. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChatListConnectionDiagnosticsTest {
     /** Delivery settings are not read at all when the local collector has not been enabled. */
     @Test
@@ -123,46 +130,49 @@ class ChatListConnectionDiagnosticsTest {
 
     /** A retired subscription cannot attribute completion or failure to a replacement account. */
     @Test
-    fun staleSubscriptionBoundariesCannotEnterTheReplacementEpisode() {
-        val output = mutableListOf<String>()
-        val emitter =
-            PerformanceDiagnosticEmitter(
-                available = true,
-                appRevision = "candidate",
-                mdkRevision = "7692e266",
-                nowMs = { 0L },
-                sink = output::add,
-            )
-        emitter.start()
-        val owner =
-            ChatListConnectionOwner(
-                runtimeGeneration = { 7 },
-                hasValidatedInternet = { true },
-                launchCatchUpRequest = { error("no transport call is needed for attribution") },
-                hasCurrentSubscriptions = { true },
-                diagnostics = diagnostics(emitter) { 0L },
-            )
-        try {
-            val retired = owner.beginSessionAttempt("retired-private-account", 1L)
-            val current = owner.beginSubscriptionValidation("replacement-private-account", 2L)
-            val count = output.size
-            owner.noteSubscriptionBoundary(retired, PerformancePhase.CONNECTION_SUBSCRIPTION_FAILED)
-            owner.noteSubscriptionBoundary(retired, PerformancePhase.CONNECTION_CHATS_COMPLETED)
-            assertEquals(count, output.size)
-            owner.noteSubscriptionBoundary(current, PerformancePhase.CONNECTION_CHATS_OPEN)
-            assertTrue(output.any { "phase=connection_chats_open" in it })
-            assertEquals(ChatListConnectionPhase.Validating, owner.state.phase)
-            owner.invalidate()
-            assertTrue(output.any { "phase=connection_invalidated" in it })
-            assertFalse(
-                "healthy account teardown is not a network-loss event",
-                output.any { "phase=connection_network_lost" in it },
-            )
-            assertFalse(output.any { "private-account" in it })
-        } finally {
-            owner.clear()
+    fun staleSubscriptionBoundariesCannotEnterTheReplacementEpisode() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val output = mutableListOf<String>()
+            val emitter =
+                PerformanceDiagnosticEmitter(
+                    available = true,
+                    appRevision = "candidate",
+                    mdkRevision = "7692e266",
+                    nowMs = { 0L },
+                    sink = output::add,
+                )
+            emitter.start()
+            val owner =
+                ChatListConnectionOwner(
+                    runtimeGeneration = { 7 },
+                    hasValidatedInternet = { true },
+                    launchCatchUpRequest = { error("no transport call is needed for attribution") },
+                    hasCurrentSubscriptions = { true },
+                    diagnostics = diagnostics(emitter) { 0L },
+                )
+            try {
+                val retired = owner.beginSessionAttempt("retired-private-account", 1L)
+                val current = owner.beginSubscriptionValidation("replacement-private-account", 2L)
+                val count = output.size
+                owner.noteSubscriptionBoundary(retired, PerformancePhase.CONNECTION_SUBSCRIPTION_FAILED)
+                owner.noteSubscriptionBoundary(retired, PerformancePhase.CONNECTION_CHATS_COMPLETED)
+                assertEquals(count, output.size)
+                owner.noteSubscriptionBoundary(current, PerformancePhase.CONNECTION_CHATS_OPEN)
+                assertTrue(output.any { "phase=connection_chats_open" in it })
+                assertEquals(ChatListConnectionPhase.Validating, owner.state.phase)
+                owner.invalidate()
+                assertTrue(output.any { "phase=connection_invalidated" in it })
+                assertFalse(
+                    "healthy account teardown is not a network-loss event",
+                    output.any { "phase=connection_network_lost" in it },
+                )
+                assertFalse(output.any { "private-account" in it })
+            } finally {
+                owner.clear()
+                Dispatchers.resetMain()
+            }
         }
-    }
 
     /** Unchanged fast polls cannot consume the session budget needed for later recovery boundaries. */
     @Test
