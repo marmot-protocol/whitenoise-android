@@ -86,9 +86,9 @@ internal class ConversationAttachmentReader(
      * The file-backed budget of one outgoing message, staging under the private upload directory,
      * or null when native limits are unavailable and every pick must fit in memory.
      */
-    fun fileBackedBudget(): FileBackedPickBudget? =
+    fun fileBackedBudget(onStaged: (StagedUploadSource) -> Unit = {}): FileBackedPickBudget? =
         fileBackedLimits()?.let { limits ->
-            FileBackedPickBudget(uploadSourcesDirectory(context.cacheDir), limits)
+            FileBackedPickBudget(uploadSourcesDirectory(context.cacheDir), limits, onStaged = onStaged)
         }
 
     fun readImageAttachment(
@@ -225,6 +225,7 @@ internal class ConversationAttachmentReader(
         var albumOverflowed: Boolean = false,
         var totalBytes: Long = 0L,
         val checkCancellation: () -> Unit = {},
+        val onStaged: (StagedUploadSource) -> Unit = {},
     ) {
         /** Freezes this pass into the result callers blend with the image decode. */
         fun outcome(): DocumentReadOutcome = DocumentReadOutcome(attachments, failures, albumOverflowed, totalBytes)
@@ -234,15 +235,16 @@ internal class ConversationAttachmentReader(
      * Reads document picks against the in-memory [bytesBudget]. With [allowFileBacked], a non-image
      * document that does not fit in memory is staged to a private file instead; each document is sent
      * as its own message, so each gets its own file-backed budget. [DocumentReadOutcome.totalBytes]
-     * counts in-memory bytes only.
+     * counts in-memory bytes only, and [onStaged] receives every snapshot as soon as it is created.
      */
     suspend fun readPickedDocuments(
         uris: List<android.net.Uri>,
         bytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
         allowFileBacked: Boolean = false,
+        onStaged: (StagedUploadSource) -> Unit = {},
     ): DocumentReadOutcome =
         withContext(Dispatchers.IO) {
-            val state = DocumentReadAccumulator(checkCancellation = { ensureActive() })
+            val state = DocumentReadAccumulator(checkCancellation = { ensureActive() }, onStaged = onStaged)
             for (uri in uris) {
                 if (!allowFileBacked && state.totalBytes >= bytesBudget) {
                     state.albumOverflowed = true
@@ -344,7 +346,7 @@ internal class ConversationAttachmentReader(
         declaredSize: Long,
         state: DocumentReadAccumulator,
     ) {
-        val budget = fileBackedBudget()
+        val budget = fileBackedBudget(state.onStaged)
         val pick = budget?.stage(declaredSize, state.checkCancellation) { context.contentResolver.openInputStream(uri) }
         val source = pick?.source
         if (source == null) {
@@ -624,10 +626,6 @@ internal class ConversationMediaSender(
     ) {
         val isEmpty: Boolean
             get() = images.isEmpty() && documents.attachments.isEmpty()
-
-        /** Private snapshots this preparation created; each is closed unless a queued send adopts it. */
-        val stagedSources: List<StagedUploadSource>
-            get() = (images + documents.attachments).mapNotNull(PendingAttachment::sourceFile)
     }
 
     /** Sends the staged images and documents with the caption as one message. */
@@ -657,7 +655,7 @@ internal class ConversationMediaSender(
         appState.launchMutation {
             var accepted = false
             var sourceLease: PrivateShareSendLease? = null
-            var stagedSources = emptyList<StagedUploadSource>()
+            val stagedSources = java.util.concurrent.ConcurrentLinkedQueue<StagedUploadSource>()
             var adoptedSources = emptySet<StagedUploadSource>()
             try {
                 sourceLease =
@@ -672,8 +670,8 @@ internal class ConversationMediaSender(
                         preparedImageAttachments,
                         preparedDocumentAttachments,
                         allowFileBacked = replyTarget == null,
+                        onStaged = { stagedSources += it },
                     )
-                stagedSources = prepared.stagedSources
                 val ready =
                     preparedForReplySend(prepared, imageSlots.size, documentUris.size, replyTarget != null)
                         ?: return@launchMutation
@@ -693,7 +691,7 @@ internal class ConversationMediaSender(
                 onAfterSend()
                 settleStagedUpload(seeded, sourceReleases, pendingDraftClear, replyTarget != null, completion)
             } finally {
-                releaseUnadoptedStagedSources(stagedSources, adoptedSources)
+                releaseUnadoptedStagedSources(stagedSources.toList(), adoptedSources)
                 if (!accepted) {
                     withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { sourceLease?.release() }
                     completion.reject()
@@ -764,6 +762,8 @@ internal class ConversationMediaSender(
      * Reads the shelf's visual album and documents for one send. [allowFileBacked] lets picks that do
      * not fit the in-memory budget be staged to private files; the album shares one file-backed budget.
      * Replies pass false: native reply drafts carry attachment bytes, so every reply pick stays in memory.
+     * [onStaged] receives every snapshot as soon as it exists, so a preparation that fails part-way can
+     * still be cleaned up by its caller.
      */
     private suspend fun prepareStagedAttachments(
         imageSlots: List<PendingMediaSlot>,
@@ -771,11 +771,12 @@ internal class ConversationMediaSender(
         preparedImageAttachments: Map<String, PendingAttachment>,
         preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment>,
         allowFileBacked: Boolean,
+        onStaged: (StagedUploadSource) -> Unit,
     ): PreparedStagedAttachments {
         // Reading the native limit is a binding call, so it stays off Main.
         val albumFileBudget =
             if (allowFileBacked) {
-                withContext(Dispatchers.IO) { attachmentReader.fileBackedBudget() }
+                withContext(Dispatchers.IO) { attachmentReader.fileBackedBudget(onStaged) }
             } else {
                 null
             }
@@ -786,7 +787,13 @@ internal class ConversationMediaSender(
             if (documentUris.isEmpty()) {
                 DocumentReadOutcome(emptyList(), emptySet(), albumOverflowed = false, totalBytes = 0L)
             } else {
-                readStagedDocuments(documentUris, preparedDocumentAttachments, documentBudget, allowFileBacked)
+                readStagedDocuments(
+                    documentUris,
+                    preparedDocumentAttachments,
+                    documentBudget,
+                    allowFileBacked,
+                    onStaged,
+                )
             }
         val pickHasVideo =
             imageSlots.any {
@@ -805,13 +812,14 @@ internal class ConversationMediaSender(
     /**
      * Reuses native-draft bytes and reads only picks that have not finished staging. With
      * [allowFileBacked], a draft document that no longer fits the in-memory budget is copied to a
-     * private file, and an unstaged pick may be read straight into one.
+     * private file, and an unstaged pick may be read straight into one; [onStaged] hears about each copy.
      */
     private suspend fun readStagedDocuments(
         documentUris: List<android.net.Uri>,
         preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment>,
         bytesBudget: Long,
         allowFileBacked: Boolean,
+        onStaged: (StagedUploadSource) -> Unit,
     ): DocumentReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
         var totalBytes = 0L
@@ -832,13 +840,13 @@ internal class ConversationMediaSender(
             } else if (staged != null) {
                 val copied =
                     withContext(Dispatchers.IO) {
-                        val budget = attachmentReader.fileBackedBudget()
+                        val budget = attachmentReader.fileBackedBudget(onStaged)
                         stageDraftDocumentToFile(staged, budget)
                     }
                 attachments += copied.attachments
                 failures += copied.failures
             } else {
-                val read = attachmentReader.readPickedDocuments(listOf(uri), remaining, allowFileBacked)
+                val read = attachmentReader.readPickedDocuments(listOf(uri), remaining, allowFileBacked, onStaged)
                 attachments += read.attachments
                 totalBytes += read.totalBytes
                 failures += read.failures

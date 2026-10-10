@@ -92,7 +92,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
-import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentFile
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaLaunchFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.presentMediaSaveOutcome
@@ -981,17 +981,20 @@ private fun FileLibraryRow(
     // in the library. Prefer retained bytes for own in-flight sends, mirroring
     // the conversation file bubble.
 
-    /** Loads the row's file bytes from the retained or downloaded attachment. */
+    /** The sender's in-memory retry bytes for this row, or null so the attachment is read from MDK. */
+    fun retainedBytes(): ByteArray? =
+        if (row.mine) {
+            controller
+                .pendingAttachmentsList(row.messageIdHex)
+                .getOrNull(row.attachmentIndex)
+                ?.inMemoryBytes
+        } else {
+            null
+        }
+
+    /** Loads the row's file bytes for Share from the retained or downloaded attachment, within the preview budget. */
     suspend fun fetchBytes(): ByteArray {
-        val retained =
-            if (row.mine) {
-                controller
-                    .pendingAttachmentsList(row.messageIdHex)
-                    .getOrNull(row.attachmentIndex)
-                    ?.inMemoryBytes
-            } else {
-                null
-            }
+        val retained = retainedBytes()
         return controller
             .requestAttachmentTransfer(
                 messageIdHex = row.messageIdHex,
@@ -1001,14 +1004,15 @@ private fun FileLibraryRow(
             ).await()
     }
 
-    /** Materializes the row's document for opening or saving. */
+    /** Materializes the row's document for opening or saving by streaming it, whatever its size. */
     suspend fun fetchFile() =
-        materializeDocumentAttachment(
+        materializeDocumentFile(
             context = context,
+            controller = controller,
             messageIdHex = row.messageIdHex,
             attachmentIndex = row.attachmentIndex,
             reference = row.reference,
-            resolveBytes = { fetchBytes() },
+            retained = retainedBytes(),
         )
 
     Row(

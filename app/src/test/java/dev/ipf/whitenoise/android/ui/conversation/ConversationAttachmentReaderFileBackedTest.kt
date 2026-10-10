@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -58,10 +59,12 @@ class ConversationAttachmentReaderFileBackedTest {
             val bytes = ByteArray(4096) { (it % 251).toByte() }
             val uri = pick("report.pdf", "application/pdf", bytes, declaredSize = 40L * MIB)
 
-            val outcome = reader().readPickedDocuments(listOf(uri), allowFileBacked = true)
+            val reported = mutableListOf<StagedUploadSource>()
+            val outcome = reader().readPickedDocuments(listOf(uri), allowFileBacked = true, onStaged = reported::add)
 
             val attachment = outcome.attachments.single()
             val source = checkNotNull(attachment.sourceFile)
+            assertEquals("the caller hears about the snapshot before it is handed back", listOf(source), reported)
             assertTrue(outcome.failures.isEmpty())
             assertEquals(0L, outcome.totalBytes)
             assertNull(attachment.inMemoryBytes)

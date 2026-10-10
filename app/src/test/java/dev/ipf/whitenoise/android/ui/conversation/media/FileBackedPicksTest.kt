@@ -142,4 +142,30 @@ class FileBackedPicksTest {
             .listFiles()
             ?.toList()
             .orEmpty()
+
+    /** Every snapshot a budget keeps is reported as it is created; one refused after the copy is not. */
+    @Test
+    fun keptSnapshotsAreReportedAndRefusedOnesAreNot() {
+        val reported = mutableListOf<StagedUploadSource>()
+        val budget =
+            FileBackedPickBudget(
+                directory = File(temporary.root, "upload_sources"),
+                limits = FileBackedSendLimits(perFileBytes = 1_000, batchCiphertextBytes = 10_000),
+                usableBytes = { Long.MAX_VALUE / 4 },
+                onStaged = reported::add,
+            )
+        val tight =
+            FileBackedPickBudget(
+                directory = File(temporary.root, "tight"),
+                limits = FileBackedSendLimits(perFileBytes = 1_000, batchCiphertextBytes = 10_000),
+                usableBytes = { 64L * 1024L * 1024L + 15 },
+                onStaged = reported::add,
+            )
+
+        val kept = checkNotNull(budget.stage(3) { ByteArrayInputStream(ByteArray(3)) }.source)
+        assertEquals(FileBackedPickFailure.STORAGE, tight.stage(-1) { ByteArrayInputStream(ByteArray(10)) }.failure)
+
+        assertEquals(listOf(kept), reported)
+        kept.close()
+    }
 }

@@ -96,11 +96,14 @@ internal data class FileBackedPick(
 /**
  * The file-backed budget of one outgoing message. Each staged item, and each in-memory item that the
  * upload converts to a file, costs its bytes plus one AEAD tag against the native per-send ciphertext bound.
+ * [onStaged] hears about every snapshot as soon as it exists, so a caller can release it if a later
+ * step of the same preparation fails.
  */
 internal class FileBackedPickBudget(
     val directory: File,
     private val limits: FileBackedSendLimits,
     private val usableBytes: () -> Long = { usableSpaceFor(directory) },
+    private val onStaged: (StagedUploadSource) -> Unit = {},
 ) {
     private var remainingCiphertextBytes = limits.batchCiphertextBytes
 
@@ -142,6 +145,7 @@ internal class FileBackedPickBudget(
         when (val read = readStagedDocument(directory, maxBytes, checkCancellation, open)) {
             is StagedDocumentRead.Success ->
                 if (hasStorageFor(read.source.byteCount, FILE_BACKED_DISK_COPIES - 1)) {
+                    onStaged(read.source)
                     FileBackedPick(read.source, null)
                 } else {
                     read.source.closeQuietly()

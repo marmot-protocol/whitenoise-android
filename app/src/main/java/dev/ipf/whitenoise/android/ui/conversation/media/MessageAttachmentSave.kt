@@ -139,7 +139,10 @@ private suspend fun saveMessageImageAttachment(
     }
 }
 
-/** Saves one document to Downloads from a materialized file, preferring the sender's in-memory retry bytes. */
+/**
+ * Saves one document to Downloads from a materialized file, preferring the sender's in-memory retry bytes
+ * and otherwise streaming the native source, so a document larger than the preview budget still saves.
+ */
 private suspend fun saveMessageDocumentAttachment(
     context: MessageAttachmentSaveContext,
     attachmentIndex: Int,
@@ -155,20 +158,13 @@ private suspend fun saveMessageDocumentAttachment(
             null
         }
     val file =
-        materializeDocumentAttachment(
+        materializeDocumentFile(
             context = context.androidContext,
+            controller = context.controller,
             messageIdHex = context.messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
-            resolveBytes = {
-                context.controller
-                    .requestAttachmentTransfer(
-                        messageIdHex = context.messageIdHex,
-                        attachmentIndex = attachmentIndex,
-                        reference = reference,
-                        retainedPlaintext = retained,
-                    ).await()
-            },
+            retained = retained,
         )
     return saveDocumentWithFallback(
         context = context.androidContext,

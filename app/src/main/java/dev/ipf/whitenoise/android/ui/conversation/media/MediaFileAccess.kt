@@ -25,36 +25,51 @@ internal suspend fun materializeMediaFile(
 ): File? {
     val retained = retainedMediaFileBytes(controller, messageIdHex, attachmentIndex, mine)
     return runCatchingCancellable {
-        materializeDocumentAttachmentSource(
-            context = context,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            reference = reference,
-            resolveSource = {
-                if (retained != null) {
-                    AttachmentPlaintext.Bytes(
-                        controller
-                            .requestAttachmentTransfer(
-                                messageIdHex = messageIdHex,
-                                attachmentIndex = attachmentIndex,
-                                reference = reference,
-                                retainedPlaintext = retained,
-                            ).await(),
-                    )
-                } else {
-                    controller.downloadAttachmentSource(
-                        messageIdHex,
-                        attachmentIndex,
-                        reference,
-                        AttachmentDownloadPriority.Interactive,
-                    )
-                }
-            },
-        )
+        materializeDocumentFile(context, controller, messageIdHex, attachmentIndex, reference, retained)
     }.onFailure {
         logMediaFileDownloadFailure()
     }.getOrNull()
 }
+
+/**
+ * Builds a document's reusable file from the sender's in-memory retry bytes when there are some, and
+ * otherwise streams it from the native source, so a file of any size is never read into one array.
+ * Open and Save share this path; failures propagate to the caller.
+ */
+internal suspend fun materializeDocumentFile(
+    context: Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    retained: ByteArray?,
+): File =
+    materializeDocumentAttachmentSource(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+        resolveSource = {
+            if (retained != null) {
+                AttachmentPlaintext.Bytes(
+                    controller
+                        .requestAttachmentTransfer(
+                            messageIdHex = messageIdHex,
+                            attachmentIndex = attachmentIndex,
+                            reference = reference,
+                            retainedPlaintext = retained,
+                        ).await(),
+                )
+            } else {
+                controller.downloadAttachmentSource(
+                    messageIdHex,
+                    attachmentIndex,
+                    reference,
+                    AttachmentDownloadPriority.Interactive,
+                )
+            }
+        },
+    )
 
 /**
  * Keeps a persisted viewer intent alive when the foreground attempt fails but
