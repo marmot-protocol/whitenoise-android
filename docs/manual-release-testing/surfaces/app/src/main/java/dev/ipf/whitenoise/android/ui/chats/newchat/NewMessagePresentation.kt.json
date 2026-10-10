@@ -1,0 +1,293 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+  "legacy_sha256": "40b0b9394558c4f10a1e661ef0bd0d757ab2aa08acb3161bda3a7337c39be75d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: NewMessagePresentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "NewMessageActionGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "fun NewMessageActionGroup(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017",
+          "NCH-004",
+          "NCH-005"
+        ]
+      },
+      {
+        "surface": "NewMessageContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "fun NewMessageContent(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017",
+          "NCH-004",
+          "NCH-005"
+        ]
+      },
+      {
+        "surface": "NewMessagePersonRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "fun NewMessagePersonRow(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "NewMessageSearchFeedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "fun NewMessageSearchFeedback(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:user_search_address_unverified",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.user_search_address_unverified",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:new_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_group",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_connect_qr",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_connect_qr",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_invite_friend",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_invite_friend",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_name_or_npub",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_name_or_npub",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_no_results_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_no_results_detail",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_people",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_source_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_source_chats",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_source_following",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_source_following",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_source_local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_source_local",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_source_network",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_source_network",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:user_search_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.user_search_failed",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:user_search_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.user_search_incomplete",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:user_search_searching",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.user_search_searching",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:user_search_you_follow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.user_search_you_follow",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-003",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:note_to_self",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.note_to_self",
+        "test_ids": [
+          "NCH-004",
+          "NCH-005"
+        ]
+      },
+      {
+        "surface": "setting:note_to_self_open_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.note_to_self_open_failed",
+        "test_ids": [
+          "NCH-004",
+          "NCH-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: NewMessagePresentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

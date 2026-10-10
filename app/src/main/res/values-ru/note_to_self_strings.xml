@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="note_to_self">Заметки для себя</string>
+    <string name="note_to_self_open_failed">Не удалось открыть заметки. Повторите попытку, чтобы найти существующий чат.</string>
+</resources>

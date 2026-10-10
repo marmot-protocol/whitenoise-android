@@ -47,6 +47,23 @@ class NewMessagePresentationTest {
         assertEquals(listOf("group", "scan", "invite"), calls)
     }
 
+    /** Own-key search is actionable without profile/KeyPackage discovery or an empty result. */
+    @Test fun selfSearchAndQuickActionUseTheSameOwner() {
+        show(people = emptyList(), query = "nostr:npub1self", self = true)
+        composeRule.onNodeWithTag("new_message.self_action").performClick()
+        composeRule.onNodeWithTag("new_message.self_result").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.no_matches)).assertDoesNotExist()
+        assertEquals(listOf("notes", "notes"), calls)
+    }
+
+    /** A failed self opening offers the same safe retry, while in-flight actions stay disabled. */
+    @Test fun failedSelfOpeningRetriesNotes() {
+        show(people = emptyList(), notesFailed = true)
+        composeRule.onNodeWithText(context.getString(R.string.note_to_self_open_failed)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        assertEquals(listOf("notes"), calls)
+    }
+
     /** Material long-press opens the profile and does not also activate the chat tap callback. */
     @Test fun nativeLongPressAndTapAreIndependent() {
         show()
@@ -73,6 +90,7 @@ class NewMessagePresentationTest {
     /** A current create prevents new navigation or a second person activation. */
     @Test fun creatingDisablesActionsAndPeople() {
         show(creating = person.accountIdHex)
+        composeRule.onNodeWithTag("new_message.self_action").assertIsNotEnabled()
         composeRule.onNodeWithText(context.getString(R.string.new_group)).assertIsNotEnabled()
         composeRule.onNodeWithText(context.getString(R.string.new_message_connect_qr)).assertIsNotEnabled()
         composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertIsNotEnabled()
@@ -222,6 +240,8 @@ class NewMessagePresentationTest {
         resolving: Boolean = false,
         query: String = "Ada",
         lookupFailed: Boolean = false,
+        self: Boolean = false,
+        notesFailed: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -245,9 +265,12 @@ class NewMessagePresentationTest {
                         { calls += "person" },
                         { calls += "profile" },
                         {},
+                        { calls += "notes" },
                     ),
                     isValidNpub = { true },
                     identifierLookupFailed = lookupFailed,
+                    noteToSelfIdentifier = self,
+                    noteToSelfFailed = notesFailed,
                     addressFallback = identifier && query.contains('@'),
                 )
             }

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="note_to_self">给自己的笔记</string>
+    <string name="note_to_self_open_failed">无法打开笔记。请重试以查找已有的聊天。</string>
+</resources>

@@ -46,7 +46,9 @@
           "NCH-002",
           "ACC-003",
           "ACC-017",
-          "ACC-019"
+          "ACC-019",
+          "NCH-004",
+          "NCH-005"
         ]
       },
       {
@@ -206,6 +208,15 @@
         "anchor": "val identifierDiagnostic =",
         "test_ids": [
           "SEC-009"
+        ]
+      },
+      {
+        "surface": "Note to self opening owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "fun openNotes(",
+        "test_ids": [
+          "NCH-004",
+          "NCH-005"
         ]
       }
     ]

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="note_to_self">Notas para mí</string>
+    <string name="note_to_self_open_failed">No se pudieron abrir tus notas. Reintenta para buscar el chat existente.</string>
+</resources>
