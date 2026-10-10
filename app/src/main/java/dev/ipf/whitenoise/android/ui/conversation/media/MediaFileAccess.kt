@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
+import dev.ipf.whitenoise.android.state.enqueueInteractiveAttachmentDownload
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -43,8 +44,11 @@ internal suspend fun materializeDocumentFile(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
     retained: ByteArray?,
-): File =
-    materializeDocumentAttachmentSource(
+): File {
+    // Durable work backs the foreground stream, so a persisted Open or Save can still complete; enqueued
+    // from the caller's thread, as the byte-transfer path does, and coalesced with any earlier request.
+    if (retained == null) controller.enqueueInteractiveAttachmentDownload(messageIdHex, attachmentIndex, reference)
+    return materializeDocumentAttachmentSource(
         context = context,
         messageIdHex = messageIdHex,
         attachmentIndex = attachmentIndex,
@@ -70,6 +74,7 @@ internal suspend fun materializeDocumentFile(
             }
         },
     )
+}
 
 /**
  * Keeps a persisted viewer intent alive when the foreground attempt fails but

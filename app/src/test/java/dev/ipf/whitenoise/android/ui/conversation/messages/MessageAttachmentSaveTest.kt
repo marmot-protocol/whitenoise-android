@@ -79,8 +79,9 @@ class MessageAttachmentSaveTest {
                 "documentSaveFallback" in saveBody,
         )
         assertTrue(
-            "the shared materializer must stream the native source and join only retained retry bytes",
+            "the shared materializer must back its stream with durable work and join only retained retry bytes",
             "downloadAttachmentSource(" in materializer &&
+                "enqueueInteractiveAttachmentDownload(" in materializer &&
                 "requestAttachmentTransfer(" in materializer,
         )
     }
