@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListStartup.kt",
+  "legacy_sha256": "c90974aed6d28814408badae17a4f2f4350a432ecd308f1ab27f09c61d66da7a",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Slow first chat-list window switches the spinner copy and logs a marker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListStartup.kt",
+        "anchor": "suspend fun ChatsController.watchSlowChatListStartup(",
+        "test_ids": [
+          "CHL-015"
+        ]
+      },
+      {
+        "surface": "Initial local projection presentation deadline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListStartup.kt",
+        "anchor": "watchActionableChatListStartup(",
+        "test_ids": [
+          "INT-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

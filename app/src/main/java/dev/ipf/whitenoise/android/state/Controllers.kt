@@ -2019,6 +2019,7 @@ class ChatsController private constructor(
         private set
 
     private val retryLoadSignal = Channel<Unit>(Channel.CONFLATED)
+    private var initialLoadWatchdog: Job? = null
 
     // staleness-exempt: observable retry trigger consumed by the chat-list UI.
     var retryGeneration by mutableLongStateOf(0L)
@@ -2030,13 +2031,37 @@ class ChatsController private constructor(
         private set
     private val pendingRecoveryProjectionGeneration = RecoveryProjectionGenerationHandoff()
 
+    /** Re-awaits an outstanding initial read; only a finished terminal attempt creates a new bind. */
     fun retryLoad() {
         if (terminalLoadFailure) {
             terminalLoadFailure = false
             retryGeneration += 1L
         } else {
+            if (!hasLoadedLocalSnapshot && error != null) {
+                error = null
+                isLoading = true
+                watchInitialLoad(bindEpoch)
+            }
             retryLoadSignal.trySend(Unit)
         }
+    }
+
+    /** Owns a presentation timer independently of a potentially blocked native snapshot. */
+    private fun watchInitialLoad(epoch: Long) {
+        initialLoadWatchdog?.cancel()
+        initialLoadWatchdog = recomputeScope.launch { watchActionableChatListStartup(epoch) }
+    }
+
+    /** A deadline is recoverable presentation state, never an authoritative empty local snapshot. */
+    internal fun publishInitialLoadTimeout(epoch: Long) {
+        if (!isActiveBindEpoch(epoch) || hasLoadedLocalSnapshot || error != null) return
+        isLoading = false
+        error =
+            privacySafeErrorPresentation(
+                operationCode = "CHAT_LIST_LOAD_TIMEOUT",
+                throwable = IllegalStateException("initial local projection exceeded presentation deadline"),
+                message = AppText.Resource(R.string.startup_taking_too_long),
+            )
     }
 
     /** Publishes the terminal no-snapshot failure used by first-frame screen coverage. */
@@ -2733,8 +2758,13 @@ class ChatsController private constructor(
             resetBackingState()
         }
         bindLifetime.advance()
-        if (isLoading) recomputeScope.launch { watchSlowChatListStartup(bindEpoch) }
-        connectionOwner.reset(accountRef, bindEpoch)
+        val epoch = bindEpoch
+        initialLoadWatchdog?.cancel()
+        if (isLoading) {
+            recomputeScope.launch { watchSlowChatListStartup(epoch) }
+            watchInitialLoad(epoch)
+        }
+        connectionOwner.reset(accountRef, epoch)
         recompute(scheduleBackgroundEnrichment = seededLocalSnapshot == null)
         error = null
         terminalLoadFailure = false
@@ -2749,8 +2779,8 @@ class ChatsController private constructor(
         }
         val chatListLoad = appState.beginHostPerformance(HostPerformanceOperationFfi.CHAT_LIST_LOAD)
         val archivedChatListLoad = appState.beginHostPerformance(HostPerformanceOperationFfi.ARCHIVED_CHAT_LIST_LOAD)
-        appState.refreshDraftSummaries(accountRef)
         try {
+            appState.refreshDraftSummaries(accountRef)
             val catchUpGate = ChatListCatchUpGate()
             var retryDelayMs = LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
             var lastFailureNotReady = false
@@ -2760,7 +2790,7 @@ class ChatsController private constructor(
             if (seededLocalSnapshot != null) {
                 // Render the preinstalled one-shot seed before live or background enrichment.
                 awaitRenderedChatListFrame()
-                if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
+                if (isActiveBindEpoch(epoch) && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                     appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
                     localFramePresented = true
                     if (catchUpGate.claimInitial()) {
@@ -2774,7 +2804,7 @@ class ChatsController private constructor(
                     recompute(scheduleBackgroundEnrichment = false)
                 }
             }
-            while (coroutineContext.isActive && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
+            while (coroutineContext.isActive && isActiveBindEpoch(epoch)) {
                 var chatListSubscription: ChatListWindowSet? = null
                 lastFailureNotReady = false
                 var chatsSubscription: ChatsSubscriptionHandle? = null
@@ -2785,22 +2815,23 @@ class ChatsController private constructor(
                     if (initialSubscriptionProjection) {
                         initialSubscriptionProjection = false
                         if (claimInitialConnectionPresentation()) {
-                            connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
+                            connectionOwner.beginSessionAttempt(accountRef, epoch)
                         } else {
-                            connectionOwner.beginSubscriptionValidation(accountRef, bindEpoch)
+                            connectionOwner.beginSubscriptionValidation(accountRef, epoch)
                         }
                     } else {
-                        connectionOwner.beginSessionAttempt(accountRef, bindEpoch)
+                        connectionOwner.beginSessionAttempt(accountRef, epoch)
                     }
                 try {
                     val chatListStream =
                         liveSubscriptions.openFolderSource(accountRef, completeChatList)
                     chatListSubscription = chatListStream
+                    if (!isActiveBindEpoch(epoch) || !coroutineContext.isActive) break
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
-                    if (!shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
+                    if (!isActiveBindEpoch(epoch) || !coroutineContext.isActive) break
                     synchronized(liveSubscriptionLock) {
-                        if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
+                        if (isActiveBindEpoch(epoch)) {
                             chatListWindows = chatListStream
                             activeChatsSubscription = chatStream
                         }
@@ -2811,15 +2842,19 @@ class ChatsController private constructor(
                             !chatListStream.closed &&
                             chatListWindows === chatListStream,
                     )
+                    if (!isActiveBindEpoch(epoch)) break
                     chatListStream.publishIfCurrent(initialFrame, ::replacePresentedChatRows)
                     appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
-                    groupRecordsById =
+                    val initialGroups =
                         withContext(Dispatchers.IO) {
                             chatStream.snapshot()
                         }.associateBy { it.groupIdHex }
+                    if (!isActiveBindEpoch(epoch)) break
+                    groupRecordsById = initialGroups
                     groupRecordsById.values.forEach(::requestGroupProfiles)
-                    seedInitialMemberIdProjection(accountRef, bindEpoch)
+                    seedInitialMemberIdProjection(accountRef, epoch)
+                    if (!isActiveBindEpoch(epoch)) break
                     recordMemberDerivedLocalReadyIfComplete()
                     chatsDebug {
                         "snapshot account=${accountRef.take(8)} rows=${chatRows.size} groups=${groupRecordsById.size} " +
@@ -2828,6 +2863,7 @@ class ChatsController private constructor(
                     hasLoadedLocalSnapshot = true
                     isLoading = false
                     error = null
+                    initialLoadWatchdog?.cancel()
                     recompute()
                     chatListLoad.success()
                     archivedChatListLoad.success()
@@ -2888,6 +2924,7 @@ class ChatsController private constructor(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (throwable: Throwable) {
+                    if (!isActiveBindEpoch(epoch)) break
                     chatListLoad.failure()
                     archivedChatListLoad.failure()
                     chatsDebug(throwable) {
@@ -2927,7 +2964,7 @@ class ChatsController private constructor(
                         runCatching { chatsSubscription?.close() }
                     }
                 }
-                if (!coroutineContext.isActive || !shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
+                if (!coroutineContext.isActive || !isActiveBindEpoch(epoch)) break
                 if (folderSourceChanged || folderSource.complete.value != completeChatList) {
                     initialSubscriptionProjection = true
                     continue
@@ -2960,13 +2997,18 @@ class ChatsController private constructor(
             // don't log normal lifecycle events as bind failures.
             throw cancel
         } catch (throwable: Throwable) {
-            chatListLoad.failure()
-            archivedChatListLoad.failure()
-            chatsDebug(throwable) { "bind failed account=${accountRef.take(8)}: ${throwable.message ?: throwable.javaClass.simpleName}" }
-            isLoading = false
-            error = privacySafeErrorPresentation("CHAT_LIST_LOAD", throwable)
-            terminalLoadFailure = true
+            if (isActiveBindEpoch(epoch)) {
+                chatListLoad.failure()
+                archivedChatListLoad.failure()
+                chatsDebug(throwable) {
+                    "bind failed account=${accountRef.take(8)}: ${throwable.message ?: throwable.javaClass.simpleName}"
+                }
+                isLoading = false
+                error = privacySafeErrorPresentation("CHAT_LIST_LOAD", throwable)
+                terminalLoadFailure = true
+            }
         } finally {
+            if (isActiveBindEpoch(epoch)) initialLoadWatchdog?.cancel()
             chatListLoad.unavailable()
             archivedChatListLoad.unavailable()
             synchronized(liveSubscriptionLock) {

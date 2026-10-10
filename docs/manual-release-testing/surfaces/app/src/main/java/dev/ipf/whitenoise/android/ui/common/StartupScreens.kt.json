@@ -1,0 +1,92 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+  "legacy_sha256": "e2f4056dbb82a68fa1ae507048f08a65fec1675ad273d83826c45097e9667f62",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StartupFailureScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "fun StartupFailureScreen(",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "StartupProgressContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "fun StartupProgressContent(",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "StartupStatusPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "fun StartupStatusPage(",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "StartupLocalProjectionScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "fun StartupLocalProjectionScreen(",
+        "test_ids": [
+          "INT-012"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "R.string.startup_loading_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.startup_loading_message",
+        "test_ids": [
+          "INT-003",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: StartupScreens",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": ".whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.white_noise_couldnt_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.white_noise_couldnt_start",
+        "test_ids": [
+          "INT-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
