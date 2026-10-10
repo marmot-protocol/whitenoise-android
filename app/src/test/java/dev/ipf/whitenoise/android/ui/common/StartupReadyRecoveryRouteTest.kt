@@ -4,9 +4,11 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.notifications.setAppLockScreenVisibleForTest
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -27,10 +29,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Exercises the actual Ready/no-snapshot app gate, with the native subscription held open. */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class StartupReadyRecoveryRouteTest {
     @get:Rule val composeRule = createComposeRule()
@@ -55,6 +59,9 @@ class StartupReadyRecoveryRouteTest {
                 composeRule.runOnIdle { controller.publishInitialLoadTimeout(controller.bindEpoch) }
                 composeRule.onNodeWithTag(STARTUP_FAILURE_TEST_TAG).assertExists()
                 composeRule.onNodeWithTag(WARM_RESUME_USEFUL_SURFACE_TEST_TAG).assertDoesNotExist()
+                if (it == 0) {
+                    composeRule.onRoot().captureRoboImage("src/test/snapshots/startup_local_projection_recovery.png")
+                }
                 composeRule.onNodeWithTag(STARTUP_RETRY_TEST_TAG).performClick()
                 composeRule.onNodeWithTag(STARTUP_LOADING_TEST_TAG).assertExists()
                 assertEquals(1, opens.get())
