@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.res.Resources
+import dev.ipf.whitenoise.android.R
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 
@@ -17,7 +18,10 @@ internal fun readOpenSourceNotices(resources: Resources, packageName: String): L
     require(metadata != 0 && texts != 0) { "Missing generated open source notices" }
     val index = resources.openRawResource(metadata).use { stream -> stream.readBytes() }
     val data = resources.openRawResource(texts).use { stream -> stream.readBytes() }
-    return parseOpenSourceNotices(index, data)
+    val generated = parseOpenSourceNotices(index, data)
+    val local = resources.openRawResource(R.raw.material_icons_notice).use { stream -> strictUtf8(stream.readBytes()) }
+    return (generated + OpenSourceNotice("local-material-icons", "AndroidX Material icon definitions", local))
+        .sortedBy { it.name.lowercase(java.util.Locale.ROOT) }
 }
 
 /** Offsets are bytes, not UTF-16 characters; malformed/truncated notices fail visibly instead of disappearing. */
