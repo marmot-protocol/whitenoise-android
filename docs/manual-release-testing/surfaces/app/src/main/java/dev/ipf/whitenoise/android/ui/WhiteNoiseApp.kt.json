@@ -133,6 +133,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Prepared local projection recovery preserves protected shell gate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "StartupLocalProjectionScreen(startupError)",
+        "test_ids": [
+          "INT-012"
+        ]
       }
     ]
   },

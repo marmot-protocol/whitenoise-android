@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -25,6 +26,31 @@ class StartupRecoveryPresentationTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private var retries = 0
+
+    /** The no-snapshot destination exposes its failure immediately and keeps recovery outside shell content. */
+    @Test
+    fun initialProjectionFailureAndRetryStayInTheStartupDestination() {
+        val failure = ErrorPresentation(AppText.Plain("Local chat read failed"), "operation=CHAT_LIST_LOAD")
+        val error = mutableStateOf<ErrorPresentation?>(failure)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                StartupLocalProjectionScreen(error.value) {
+                    retries++
+                    error.value = null
+                }
+            }
+        }
+        composeRule.onNodeWithText("Local chat read failed").assertExists()
+        composeRule.onNodeWithTag(STARTUP_FAILURE_TEST_TAG).assertExists()
+        composeRule.onNodeWithTag(WARM_RESUME_USEFUL_SURFACE_TEST_TAG).assertDoesNotExist()
+        assertEquals(0, retries)
+        composeRule.onNodeWithTag(STARTUP_RETRY_TEST_TAG).performClick()
+        composeRule.onNodeWithTag(STARTUP_LOADING_TEST_TAG).assertExists()
+        assertEquals(1, retries)
+        composeRule.runOnIdle { error.value = failure }
+        composeRule.onNodeWithTag(STARTUP_RETRY_TEST_TAG).assertExists()
+        assertEquals(1, retries)
+    }
 
     /** No timer or composition effect may retry; the visible button delivers the user action once. */
     @Test fun failureWaitsForExplicitRetry() {
