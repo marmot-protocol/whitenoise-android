@@ -357,14 +357,15 @@ class ConversationMentionNavigationUiTest {
                         if (reopenAfterLanding) {
                             TextButton(
                                 onClick = {
-                                    state.savedSnapshot = conversationScrollSnapshotOnLeave(
-                                        listState.firstVisibleItemIndex,
-                                        listState.firstVisibleItemScrollOffset,
-                                        coordinator.isFollowingTail,
-                                        "message-$targetIndex",
-                                        "message-$targetIndex",
-                                        coordinator.mentionReadingRowHeightPx,
-                                    )
+                                    state.savedSnapshot =
+                                        conversationScrollSnapshotOnLeave(
+                                            listState.firstVisibleItemIndex,
+                                            listState.firstVisibleItemScrollOffset,
+                                            coordinator.isFollowingTail,
+                                            "message-$targetIndex",
+                                            "message-$targetIndex",
+                                            coordinator.mentionReadingRowHeightPx,
+                                        )
                                     state.routeGeneration++
                                 },
                                 modifier = Modifier.offset(y = 96.dp).testTag("mention-reopen"),
@@ -406,7 +407,10 @@ class ConversationMentionNavigationUiTest {
             composeRule.runOnIdle { state.incomingCount++ }
             composeRule.waitForIdle()
             val afterIncoming =
-                composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
+                composeRule
+                    .onNodeWithTag("message-$targetIndex")
+                    .getUnclippedBoundsInRoot()
+                    .top.value
             assertEquals(listTop, afterIncoming, 1f)
         }
         if (fixture.gestureAfterLanding) {
@@ -418,14 +422,21 @@ class ConversationMentionNavigationUiTest {
             composeRule.onNodeWithTag("mention-reopen").performClick()
             composeRule.waitForIdle()
             val reopenedTop =
-                composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
+                composeRule
+                    .onNodeWithTag("message-$targetIndex")
+                    .getUnclippedBoundsInRoot()
+                    .top.value
             assertEquals(listTop, reopenedTop, 1f)
             composeRule.runOnIdle { assertEquals(target.height, state.savedSnapshot?.mentionReadingRowHeightPx) }
         }
         if (fixture.restoreTail) {
             composeRule.onNodeWithTag("mention-tail").assertIsDisplayed().performClick()
             composeRule.waitForIdle()
-            val restingTop = composeRule.onNodeWithTag("message-0").getUnclippedBoundsInRoot().top.value
+            val restingTop =
+                composeRule
+                    .onNodeWithTag("message-0")
+                    .getUnclippedBoundsInRoot()
+                    .top.value
             assertEquals(listTop + fixture.viewportHeight - fixture.padding - target.height, restingTop, 1f)
             composeRule.runOnIdle { assertTrue(state.tailReturned) }
             composeRule.onNodeWithTag("mention-tail").assertDoesNotExist()
