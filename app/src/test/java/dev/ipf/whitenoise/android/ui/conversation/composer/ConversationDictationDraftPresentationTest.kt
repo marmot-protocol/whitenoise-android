@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationParkedAudio
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
@@ -133,6 +134,7 @@ class ConversationDictationDraftPresentationTest {
             f.result("recognized")
             f.runRestart()
             f.failTail()
+            f.controller.sendRecognizedText()
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
@@ -185,7 +187,8 @@ class ConversationDictationDraftPresentationTest {
             composeRule.onNode(hasSetTextAction()).performImeAction()
             composeRule.runOnIdle {
                 assertEquals(listOf("Edited message", "Next message"), f.sent)
-                assertTrue(f.pendingAudio)
+                assertFalse(f.pendingAudio)
+                assertTrue(f.keptAudio)
                 assertFalse(f.controller.completionControlsRequired)
             }
         } finally {
@@ -214,6 +217,7 @@ class ConversationDictationDraftPresentationTest {
             f.result("recognized")
             f.runRestart()
             f.failTail()
+            f.controller.sendRecognizedText()
             f.controller.onAppForegrounded()
             f.controller.onAppForegrounded()
         }
@@ -272,7 +276,7 @@ class ConversationDictationDraftPresentationTest {
             assertTrue(f.controller.state is ConversationDictationState.Failed)
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.dictation_original_conversation)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.dictation_retry_remaining)).assertIsDisplayed()
     }
 
     private class Fixture(
@@ -293,6 +297,7 @@ class ConversationDictationDraftPresentationTest {
         private lateinit var listener: RecognitionListener
         private var recognitionCreated = false
         var pendingAudio = false
+        var keptAudio = false
         val dictationSends = mutableListOf<String>()
         private val restarts = mutableListOf<() -> Unit>()
         val controller =
@@ -304,6 +309,24 @@ class ConversationDictationDraftPresentationTest {
                         override fun recognitionAvailable(): Boolean = true
 
                         override fun callerAudioHasPending(): Boolean = pendingAudio
+
+                        override fun parkCallerAudio(): ConversationDictationParkedAudio? {
+                            if (!pendingAudio) return null
+                            pendingAudio = false
+                            keptAudio = true
+                            return object : ConversationDictationParkedAudio {
+                                override fun restore(): Boolean {
+                                    if (pendingAudio || !keptAudio) return false
+                                    keptAudio = false
+                                    pendingAudio = true
+                                    return true
+                                }
+
+                                override fun discard() {
+                                    keptAudio = false
+                                }
+                            }
+                        }
 
                         override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
                             val retained = pendingAudio && recognitionCreated

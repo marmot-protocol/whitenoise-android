@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerAccess
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /** Dictate remains useful while the single capture owner holds unresolved audio or native closure. */
@@ -61,7 +62,10 @@ internal fun rememberComposerDictationAction(
             },
             onDiscard = { if (binding.active) controller.discardComposerAudio(access) },
             onKeepForLater = {
-                if (binding.active && controller.keepComposerAudioForLater(access)) panelOwner = null
+                val kept =
+                    controller.state !is ConversationDictationState.Failed ||
+                        (binding.active && controller.keepComposerAudioForLater(access))
+                if (binding.active && kept) panelOwner = null
             },
             onDismiss = { panelOwner = null },
         )
@@ -85,7 +89,7 @@ internal fun ConversationDictationRecoveryStatus(access: ConversationDictationCo
     )
 }
 
-/** Closing this panel keeps the existing recovery owner; no dismissal automatically starts recording. */
+/** Keep for later can release closed audio; ordinary dismissal never starts a replacement recording. */
 @Composable
 internal fun ConversationDictationRecoveryPanel(
     access: ConversationDictationComposerAccess,

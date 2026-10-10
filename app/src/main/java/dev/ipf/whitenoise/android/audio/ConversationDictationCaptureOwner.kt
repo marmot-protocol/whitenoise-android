@@ -25,8 +25,7 @@ internal class ConversationDictationCaptureOwner(
 
     /** Transfers only fully closed captures; the caller owns the returned bounded PCM lease. */
     fun park(): ConversationDictationParkedAudio? {
-        val capture = current ?: return null
-        if (!capture.closed || !capture.hasPending()) return null
+        val capture = current?.takeIf { it.closed && it.hasPending() } ?: return null
         current = null
         return object : ConversationDictationParkedAudio {
             private var owned = true

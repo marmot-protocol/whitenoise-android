@@ -39,11 +39,17 @@ class ConversationDictationRecoveryScreenshotTest {
 
     @Test
     fun remainingAudioPanelLight() {
+        render(ConversationDictationComposerPhase.RemainingAudio)
+        capture("dictation_remaining_audio_light")
+    }
+
+    @Test
+    fun remainingAudioPanelKeepForLaterLight() {
         var kept = 0
         render(ConversationDictationComposerPhase.RemainingAudio, onKeepForLater = { kept++ })
         composeRule.onNodeWithText("Keep for later").performClick()
         assertEquals(1, kept)
-        capture("dictation_remaining_audio_light")
+        capture("dictation_remaining_audio_keep_later_light")
     }
 
     @Test

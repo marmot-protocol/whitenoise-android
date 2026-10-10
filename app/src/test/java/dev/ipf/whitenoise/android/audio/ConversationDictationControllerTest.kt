@@ -46,6 +46,7 @@ class ConversationDictationControllerTest {
             val other = ACCOUNT to "other-group"
             f.drafts[other] = TextFieldValue("")
             assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
+            f.scheduler.runDelay(500L)
             val active = f.controller.state.sessionId
             assertFalse(f.controller.keepComposerAudioForLater(access))
             f.controller.retryComposerAudio(access)
@@ -82,25 +83,27 @@ class ConversationDictationControllerTest {
     /** A concurrent editor change prevents sending and stays a visible Send failure, never a Paste success. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun explicitSendWithAChangedDraftRemainsAnExplicitFailure() =
+    fun explicitSendWithAChangedDraftReportsFailureAndKeepsNormalComposer() =
         runTest {
             var sends = 0
+            var notices = 0
             val f = fixture(
                 draft = TextFieldValue("Draft"),
                 targetValidationScope = this,
-                sendTranscriptIfOriginUnchanged = { sends++; true },
+                onSendBlocked = { notices++ },
+                sendTranscriptIfOriginUnchanged = {
+                    sends++
+                    true
+                },
             )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.controller.send()
             f.edit(key(), TextFieldValue("New draft"))
             f.platform.listener.onResult("recognized words")
             advanceUntilIdle()
-            val failed = f.controller.state as ConversationDictationState.Failed
-            assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
-            assertEquals(0, sends)
-            assertEquals("New draft recognized words", f.drafts.getValue(key()).text)
-            assertTrue(f.controller.keepComposerAudioForLater(f.controller.composerAccess(ACCOUNT, GROUP)))
+            assertEquals(1, notices)
             assertTrue(f.controller.state is ConversationDictationState.Idle)
+            assertEquals(0, sends)
             assertEquals("New draft recognized words", f.drafts.getValue(key()).text)
         }
 
@@ -3995,8 +3998,8 @@ class ConversationDictationControllerTest {
         sent: List<String>,
         stops: Int,
     ) {
-        assertEquals(listOf("body"), sent)
-        assertEquals("tail", fixture.drafts.getValue(key()).text)
+        assertTrue(sent.isEmpty())
+        assertEquals("body tail", fixture.drafts.getValue(key()).text)
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         assertEquals(1, stops)
     }
@@ -4258,12 +4261,13 @@ class ConversationDictationControllerTest {
             fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
             advanceUntilIdle()
 
-            assertEquals(listOf("first"), sent)
-            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertTrue(sent.isEmpty())
+            assertEquals("first", fixture.drafts.getValue(key()).text)
             assertTrue(fixture.controller.hasDurableSession)
             val failed = fixture.controller.state as ConversationDictationState.Failed
             assertEquals("first", failed.retainedTranscript)
-            assertEquals(ConversationDictationFailure.NoSpeech, failed.reason)
+            assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+            assertEquals(ConversationDictationFailure.NoSpeech, failed.cause)
             assertTrue(failed.recognitionIncomplete)
             assertTrue(fixture.controller.canRetryRetainedAudio)
 
@@ -4273,8 +4277,8 @@ class ConversationDictationControllerTest {
             fixture.platform.listener.onResult("recovered tail")
             advanceUntilIdle()
 
-            assertEquals(listOf("first"), sent)
-            assertEquals("recovered tail", fixture.drafts.getValue(key()).text)
+            assertTrue(sent.isEmpty())
+            assertEquals("first recovered tail", fixture.drafts.getValue(key()).text)
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
             assertFalse(fixture.controller.hasDurableSession)
         }
@@ -4298,6 +4302,7 @@ class ConversationDictationControllerTest {
                     },
                 )
             failRecognizedTail(f, send = true)
+            f.controller.sendRecognizedText()
             runCurrent()
             assertEquals(listOf("first"), sent)
             assertTrue(f.controller.canRetryRetainedAudio)
@@ -4544,9 +4549,9 @@ class ConversationDictationControllerTest {
                 f.platform.pendingCallerAudio = false
                 f.platform.listener.onResult("recovered tail")
                 advanceUntilIdle()
-                assertEquals(if (mode == "explicit") listOf("first recovered tail") else emptyList<String>(), sent)
+                assertTrue(sent.isEmpty())
                 assertEquals(
-                    if (mode == "explicit") "" else "first recovered tail",
+                    "first recovered tail",
                     f.drafts.getValue(key()).text,
                 )
                 assertTrue(f.controller.state is ConversationDictationState.Idle)
@@ -4872,7 +4877,7 @@ class ConversationDictationControllerTest {
             failedGeneration.callerAudioFeedComplete = false
             f.platform.listener.onCallerAudioFailure(ConversationDictationCallerAudioFailure.CaptureFailed) { true }
             advanceUntilIdle()
-            assertEquals(listOf("first"), sent)
+            assertTrue(sent.isEmpty())
             assertEquals(0, failedGeneration.acknowledgedCallerAudio)
             assertTrue(f.platform.pendingCallerAudio)
             assertTrue(f.controller.canRetryRetainedAudio)
@@ -7424,7 +7429,7 @@ class ConversationDictationControllerTest {
     /** A rejected Send stores recognized text without a Paste gesture and keeps a single retry payload. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun rejectedExplicitSendKeepsItsFailureUntilAnExplicitRetry() =
+    fun automaticDraftRecoveryEndsRejectedSendAtTheComposer() =
         runTest {
             var accept = false
             var sends = 0
@@ -7448,16 +7453,16 @@ class ConversationDictationControllerTest {
             f.platform.listener.onResult("recognized")
             advanceUntilIdle()
             assertEquals("Draft recognized", f.drafts.getValue(key()).text)
-            assertTrue(f.controller.state is ConversationDictationState.Failed)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
             assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
             assertFalse(f.controller.hasDurableSession)
             accept = true
             f.controller.retry()
             advanceUntilIdle()
             f.controller.retry()
-            assertEquals(2, sends)
-            assertEquals(listOf("Draft recognized"), payloads)
-            assertEquals("", f.drafts.getValue(key()).text)
+            assertEquals(1, sends)
+            assertTrue(payloads.isEmpty())
+            assertEquals("Draft recognized", f.drafts.getValue(key()).text)
             assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
 
@@ -7510,6 +7515,7 @@ class ConversationDictationControllerTest {
                     },
                 )
             failRecognizedTail(f, send = true)
+            f.controller.sendRecognizedText()
             advanceUntilIdle()
             assertEquals("", f.drafts.getValue(key()).text)
             f.edit(key(), TextFieldValue("Draft first edited"))
@@ -7704,6 +7710,7 @@ class ConversationDictationControllerTest {
         sendTranscriptIfOriginUnchanged: suspend (ConversationDictationSendRequest) -> Boolean = { false },
         onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
         onRecoveryExpired: () -> Unit = {},
+        onSendBlocked: () -> Unit = {},
         onDraftRead: () -> Unit = {},
         allowDraftWrite: () -> Boolean = { true },
     ): Fixture {
@@ -7753,6 +7760,7 @@ class ConversationDictationControllerTest {
                 sendTranscriptIfOriginUnchanged = sendTranscriptIfOriginUnchanged,
                 onReadinessEvent = onReadinessEvent,
                 onRecoveryExpired = onRecoveryExpired,
+                onSendBlocked = onSendBlocked,
             )
         return Fixture(controller, platform, scheduler, drafts, revisions) { writes }
     }

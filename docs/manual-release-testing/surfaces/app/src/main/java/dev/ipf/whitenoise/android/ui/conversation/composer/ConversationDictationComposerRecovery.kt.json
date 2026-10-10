@@ -155,6 +155,16 @@
           "DIC-002"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Keep for later requests retention separately from ordinary dialog dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
+        "anchor": "onKeepForLater =",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
     ]
   }
 }
