@@ -81,7 +81,11 @@ class StagedDocumentReadTest {
             object : InputStream() {
                 override fun read(): Int = error("positive-length block reads must suffice")
 
-                override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                override fun read(
+                    buffer: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ): Int {
                     assertTrue(length in 1..64 * 1024)
                     if (remaining == 0L) return -1
                     val count = minOf(length.toLong(), remaining).toInt()
