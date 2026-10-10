@@ -67,7 +67,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -94,16 +93,28 @@ import java.time.Duration
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationMediaSendReconciliationIntegrationTest {
-    /** A timed-out test still drains asynchronous mutation cleanup before releasing the Main dispatcher. */
+    /** A cancelled fixture waits for controller and mutation cleanup before releasing Main. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun cancelledFixtureOwnerWaitsForMutationCleanup() =
+    fun cancelledFixtureOwnerWaitsForControllerAndMutationCleanup() =
         runTest {
             Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
             val controller = ConversationController(state, group(), initialMemberSnapshot = memberSnapshot())
             var mutationFinished = false
             var ownerObservedCompletion = false
+            val cleanupStarted = CompletableDeferred<Unit>()
+            val releaseCleanup = CompletableDeferred<Unit>()
+            fixtureScopes(controller).first().launch(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+                try {
+                    awaitCancellation()
+                } finally {
+                    withContext(NonCancellable + Dispatchers.Main) {
+                        cleanupStarted.complete(Unit)
+                        releaseCleanup.await()
+                    }
+                }
+            }
             state.mutationsScope.launch {
                 try {
                     awaitCancellation()
@@ -124,10 +135,16 @@ class ConversationMediaSendReconciliationIntegrationTest {
                     }
                 }
             try {
-                owner.cancelAndJoin()
+                owner.cancel()
+                cleanupStarted.await()
+                runCurrent()
+                assertFalse("fixture owner must wait for controller IO cleanup", owner.isCompleted)
+                releaseCleanup.complete(Unit)
+                owner.join()
                 assertTrue(ownerObservedCompletion)
                 assertTrue(state.mutationsScope.coroutineContext.job.isCompleted)
             } finally {
+                releaseCleanup.complete(Unit)
                 try {
                     finishMediaFixture(controller, state)
                 } finally {
@@ -714,15 +731,29 @@ class ConversationMediaSendReconciliationThumbnailTest {
         }
 }
 
-/** Drains cancelled cache IO even after a test timeout, before its process-global Main dispatcher is reset. */
+/** Joins every fixture-owned IO handoff before resetting the process-global Main dispatcher, including after timeout. */
 private suspend fun finishMediaFixture(
     controller: ConversationController,
     state: WhiteNoiseAppState,
 ) = withContext(NonCancellable) {
+    val chats =
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("chatsController")
+            .apply { isAccessible = true }
+            .get(state) as ChatsController?
+    val scopes = fixtureScopes(controller) + fixtureScopes(state) + (chats?.let(::fixtureScopes) ?: emptyList())
     controller.onCleared()
-    state.mutationsScope.coroutineContext.job
-        .cancelAndJoin()
+    chats?.onCleared()
+    val jobs = scopes.map { it.coroutineContext.job }.distinct()
+    jobs.forEach { it.cancel() }
+    jobs.forEach { it.join() }
 }
+
+/** The fixture owns these standalone scopes; production disposal deliberately remains synchronous. */
+private fun fixtureScopes(owner: Any): List<CoroutineScope> =
+    owner.javaClass.declaredFields
+        .filter { CoroutineScope::class.java.isAssignableFrom(it.type) }
+        .mapNotNull { field -> field.apply { isAccessible = true }.get(owner) as CoroutineScope? }
 
 /** Mounts the existing chat-list bridge so accepted media preview replacement remains observable. */
 private fun attachedChatsController(appState: WhiteNoiseAppState): ChatsController =
