@@ -1,0 +1,74 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-action-color-invalid-reset
+---
+- runFlow: ../fixtures/open-action-color.yaml
+- assertVisible:
+    id: color.hex
+    text: ^#171717$
+- tapOn:
+    id: color.hex
+    text: ^#171717$
+- eraseText: 100
+- inputText: '#XYZ'
+- assertVisible:
+    id: color.hex
+    text: ^#XYZ$
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: 'Enter six hexadecimal digits, such as #1D4ED8.'
+    direction: DOWN
+- assertVisible: 'Enter six hexadecimal digits, such as #1D4ED8.'
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: action_color.reset
+    direction: DOWN
+- tapOn:
+    id: action_color.reset
+- scrollUntilVisible:
+    element:
+      id: color.hex
+    direction: UP
+- assertVisible:
+    id: color.hex
+    text: ^#171717$
+- assertNotVisible: 'Enter six hexadecimal digits, such as #1D4ED8.'
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- tapOn:
+    id: color.hex
+    text: ^#171717$
+- eraseText: 100
+- inputText: '#12AB34'
+- assertVisible:
+    id: color.hex
+    text: ^#12AB34$
+- hideKeyboard
+- assertVisible:
+    id: action_color.save
+    enabled: true
+- back
+- assertVisible:
+    id: appearance.theme.group
+- scrollUntilVisible:
+    element:
+      text: Action color
+    direction: DOWN
+- tapOn: Action color
+- scrollUntilVisible:
+    element:
+      id: color.hex
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#171717$
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- back
+- assertVisible:
+    id: appearance.theme.group

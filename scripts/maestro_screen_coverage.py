@@ -45,8 +45,9 @@ def flow_assertions(path, root, active=None):
                 selector = {'text': selector}
             if isinstance(selector, dict) and (selector.get('optional') or has_substitution(selector)):
                 continue
-            if (not isinstance(selector, dict) or not selector
-                    or not set(selector) <= {'text', 'id', 'enabled', 'selected', 'checked', 'index', 'focused', 'containsChild', 'containsDescendants'}):
+            allowed = {'text', 'id', 'enabled', 'selected', 'checked', 'index', 'focused',
+                       'containsChild', 'containsDescendants', 'childOf'}
+            if not isinstance(selector, dict) or not selector or not set(selector) <= allowed:
                 raise ValueError('Screen assertion requires an unconditional selector')
             assertions.append(selector)
         if 'runFlow' in command:

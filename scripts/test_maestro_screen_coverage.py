@@ -9,6 +9,22 @@ from scripts.maestro_runtime import presentation_arguments, qualify_presentation
 
 
 class ScreenProofTest(unittest.TestCase):
+    def test_literal_parent_scope_keeps_child_identity_without_optional_credit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / '.maestro').mkdir()
+            flow = root / '.maestro/main.yaml'
+            flow.write_text(
+                'appId: test\n---\n'
+                '- assertVisible:\n    text: "Color #15803D"\n    childOf:\n      id: other.picker\n'
+                '- assertVisible:\n    text: "Color #15803D"\n    childOf:\n      id: ${PARENT}\n'
+                '- assertVisible:\n    text: "Color #15803D"\n    optional: true\n'
+                '- runFlow:\n    when:\n      visible: Other\n    commands:\n'
+                '      - assertVisible:\n          text: Optional child\n')
+            selectors, hashes = flow_assertions(flow, root)
+            self.assertEqual(selectors, [{'text': 'Color #15803D', 'childOf': {'id': 'other.picker'}}])
+            self.assertEqual(set(hashes), {'.maestro/main.yaml'})
+
     def test_substituted_selectors_grant_no_literal_screen_credit(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

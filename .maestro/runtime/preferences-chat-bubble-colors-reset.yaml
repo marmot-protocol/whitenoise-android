@@ -1,0 +1,108 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-chat-bubble-colors-reset
+---
+- runFlow: ../fixtures/open-chat-bubble-colors.yaml
+- scrollUntilVisible:
+    element:
+      text: 'Color #B91C1C'
+      childOf:
+        id: bubble_colors.mine.picker
+    direction: DOWN
+- assertVisible:
+    text: 'Color #B91C1C'
+    childOf:
+      id: bubble_colors.mine.picker
+- tapOn:
+    text: 'Color #B91C1C'
+    childOf:
+      id: bubble_colors.mine.picker
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#B91C1C$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#B91C1C$
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#B91C1C$
+- assertVisible:
+    id: bubble_colors.save
+    enabled: true
+- tapOn:
+    id: bubble_colors.save
+- runFlow: ../fixtures/reopen-chat-bubble-colors.yaml
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#B91C1C$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#B91C1C$
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#B91C1C$
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- tapOn:
+    id: bubble_colors.menu
+- assertVisible: Reset to global colors
+- tapOn: Reset to global colors
+- assertVisible:
+    id: bubble_colors.save
+    enabled: true
+- tapOn:
+    id: bubble_colors.save
+- runFlow: ../fixtures/reopen-chat-bubble-colors.yaml
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#E5E5E5$
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- scrollUntilVisible:
+    element:
+      id: bubble_colors.other.picker
+      containsDescendants:
+      - id: color.hex
+        text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- back
+- assertVisible:
+    id: chat_info.list
+- back
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- back
+- assertVisible: Maestro group

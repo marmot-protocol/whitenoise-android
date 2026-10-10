@@ -1,0 +1,111 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-bubble-colors-invalid-reset
+---
+- runFlow: ../fixtures/open-bubble-colors.yaml
+- runFlow: ../fixtures/draft-bubble-color-pair.yaml
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#B91C1C$
+    direction: UP
+- tapOn:
+    id: color.hex
+    text: ^#B91C1C$
+- eraseText: 100
+- inputText: '#MINEINVALID'
+- assertVisible:
+    id: color.hex
+    text: ^#MINEINVALID$
+- hideKeyboard
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#MINEINVALID$
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#15803D$
+    direction: DOWN
+- tapOn:
+    id: color.hex
+    text: ^#15803D$
+- eraseText: 100
+- inputText: '#OTHERINVALID'
+- assertVisible:
+    id: color.hex
+    text: ^#OTHERINVALID$
+- hideKeyboard
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#OTHERINVALID$
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- tapOn:
+    id: bubble_colors.menu
+- assertVisible: Reset to default
+- tapOn: Reset to default
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: bubble_colors.other.picker
+      containsDescendants:
+      - id: color.hex
+        text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- scrollUntilVisible:
+    element:
+      text: 'Color #B91C1C'
+      childOf:
+        id: bubble_colors.mine.picker
+    direction: UP
+- tapOn:
+    text: 'Color #B91C1C'
+    childOf:
+      id: bubble_colors.mine.picker
+- assertVisible:
+    id: bubble_colors.save
+    enabled: true
+- back
+- runFlow: ../fixtures/reopen-bubble-colors.yaml
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- scrollUntilVisible:
+    element:
+      id: bubble_colors.other.picker
+      containsDescendants:
+      - id: color.hex
+        text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- back
+- assertVisible:
+    id: appearance.theme.group
