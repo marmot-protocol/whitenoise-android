@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">Rétablir les relais recommandés</string>
+    <string name="setup_repair_preview">Vérifiez cette correction des relais avant de la publier. Vos autres applications Nostr verront la même modification.</string>
+    <string name="setup_repair_manual">Ces détails des relais nécessitent une vérification manuelle. Aucune correction automatique ne sera publiée.</string>
+    <string name="setup_repair_before">Déclaration actuelle</string>
+    <string name="setup_repair_after">Déclaration proposée</string>
+    <string name="setup_repair_retained">Conserver</string>
+    <string name="setup_repair_removed">Supprimer</string>
+    <string name="setup_repair_added">Ajouter</string>
+    <string name="setup_repair_read">Lecture</string>
+    <string name="setup_repair_write">Publication</string>
+    <string name="setup_repair_both">Lecture et publication</string>
+    <string name="setup_repair_inbox">Réception des invitations</string>
+    <string name="setup_repair_other">Autres métadonnées</string>
+    <string name="setup_repair_content">Contenu de l’événement</string>
+    <string name="setup_repair_edit_unavailable">Cette déclaration contient des détails que l’éditeur manuel ne peut pas préserver. Utilisez l’aperçu exact de la correction ou vérifiez-la dans un client qui prend en charge ces détails.</string>
+    <string name="setup_repair_edit_unchanged">Modifiez un relais avant de vérifier un remplacement. Rien ne sera publié sans votre approbation.</string>
+</resources>

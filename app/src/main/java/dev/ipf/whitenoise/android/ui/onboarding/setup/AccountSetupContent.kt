@@ -20,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
+import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
@@ -96,6 +97,9 @@ internal fun AccountSetupContent(
                     SetupEditorActions(
                         state.editor,
                         state.busy,
+                        canSave =
+                            state.editor.action != OnboardingActionFfi.EDIT_RELAYS ||
+                                checkNotNull(editorFields).current(state.editor).canReviewRelayEdit,
                         onSave = {
                             onEditorChange(checkNotNull(editorFields).current(state.editor))
                             onSaveEditor()
@@ -203,7 +207,10 @@ private fun SetupOperationNotice(
 ) {
     if (snapshot.cancellationPending) {
         SetupNotice(stringResource(R.string.setup_cancel_pending))
-    } else if (snapshot.proposal?.step == step.step && OnboardingActionFfi.APPROVE_REPAIR !in step.actions) {
+    } else if (snapshot.proposal?.step == step.step &&
+        snapshot.proposal?.relayRepair?.mode != OnboardingRelayRepairModeFfi.MANUAL_REVIEW &&
+        OnboardingActionFfi.APPROVE_REPAIR !in step.actions
+    ) {
         SetupNotice(stringResource(R.string.setup_approved_repair_pending))
     }
 }
@@ -227,6 +234,8 @@ private fun SetupProposalContent(proposal: OnboardingRepairProposalFfi) {
             EmojiLabel(profile.displayName.orEmpty())
             EmojiLabel(profile.about.orEmpty())
         }
+    } else if (proposal.relayRepair != null) {
+        SetupRelayRepairContent(checkNotNull(proposal.relayRepair))
     } else {
         if (proposal.previousEventId != null) SetupNotice(stringResource(R.string.setup_replacement_warning))
         val listTitle =
@@ -249,12 +258,13 @@ private fun SetupProposalContent(proposal: OnboardingRepairProposalFfi) {
 private fun SetupEditorActions(
     editor: SetupEditor,
     busy: Boolean,
+    canSave: Boolean,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     WhiteNoiseButton(
         onClick = onSave,
-        enabled = !busy,
+        enabled = !busy && canSave,
         modifier = Modifier.fillMaxWidth().testTag("setup-editor-save"),
     ) {
         val label =

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">Auf empfohlene Relays zurücksetzen</string>
+    <string name="setup_repair_preview">Prüfe diese Relay-Korrektur vor der Veröffentlichung. Deine anderen Nostr-Apps sehen dieselbe Änderung.</string>
+    <string name="setup_repair_manual">Diese Relay-Angaben müssen manuell geprüft werden. Es wird keine automatische Korrektur veröffentlicht.</string>
+    <string name="setup_repair_before">Aktuelle Deklaration</string>
+    <string name="setup_repair_after">Vorgeschlagene Deklaration</string>
+    <string name="setup_repair_retained">Beibehalten</string>
+    <string name="setup_repair_removed">Entfernen</string>
+    <string name="setup_repair_added">Hinzufügen</string>
+    <string name="setup_repair_read">Lesen</string>
+    <string name="setup_repair_write">Veröffentlichen</string>
+    <string name="setup_repair_both">Lesen und veröffentlichen</string>
+    <string name="setup_repair_inbox">Einladungen empfangen</string>
+    <string name="setup_repair_other">Weitere Metadaten</string>
+    <string name="setup_repair_content">Ereignisinhalt</string>
+    <string name="setup_repair_edit_unavailable">Diese Deklaration enthält Angaben, die der manuelle Editor nicht erhalten kann. Nutze die genaue Korrekturvorschau oder prüfe sie in einem Client, der diese Angaben unterstützt.</string>
+    <string name="setup_repair_edit_unchanged">Ändere ein Relay, bevor du einen Ersatz prüfst. Erst nach deiner Zustimmung wird etwas veröffentlicht.</string>
+</resources>
