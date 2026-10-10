@@ -121,6 +121,7 @@ internal data class ConversationScrollBookmark(
     val anchor: ConversationScrollAnchor,
     val settledMode: ConversationScrollMode,
     internal val intentRevision: Long,
+    internal val mentionReadingRowHeightPx: Int? = null,
 )
 
 /** Stable layout inputs that determine the transcript's visible viewport. */
@@ -272,6 +273,10 @@ internal class ConversationScrollCoordinator(
     var mode by mutableStateOf(settledMode)
         private set
 
+    /** Measured layout room retained while a newest mention owns the reading position. */
+    var mentionReadingRowHeightPx by mutableStateOf<Int?>(null)
+        private set
+
     var foregroundRestoreInProgress by mutableStateOf(false)
         private set
 
@@ -294,6 +299,7 @@ internal class ConversationScrollCoordinator(
             anchor = stableAnchor,
             settledMode = settledMode,
             intentRevision = intentLifetime.capture(),
+            mentionReadingRowHeightPx = mentionReadingRowHeightPx,
         )
     }
 
@@ -494,6 +500,7 @@ internal class ConversationScrollCoordinator(
     ): Boolean {
         if (!intentLifetime.isCurrent(expectedIntent.revision)) return false
         val anchor = bookmark.anchor
+        mentionReadingRowHeightPx = bookmark.mentionReadingRowHeightPx
         readingAnchor = anchor.takeIf { bookmark.settledMode is ConversationScrollMode.ReadingHistory }
         return runCommand(
             transientMode = ConversationScrollMode.Restoring(anchor.messageId, anchor.pixelOffset),
@@ -677,7 +684,11 @@ internal class ConversationScrollCoordinator(
             val serial = commandLifetime.advance()
             val command =
                 async(start = CoroutineStart.LAZY) {
-                    ConversationScrollCommandScope(serial).operation()
+                    val commandScope = ConversationScrollCommandScope(serial)
+                    commandScope.prepareReadingSpace(
+                        (transientMode as? ConversationScrollMode.ProgrammaticJump)?.reason,
+                    )
+                    commandScope.operation()
                 }
             previous?.cancel()
             activeCommand = command
@@ -728,6 +739,30 @@ internal class ConversationScrollCoordinator(
     internal inner class ConversationScrollCommandScope internal constructor(
         private val serial: Long,
     ) {
+        /** Restores resting padding before an explicit command supersedes the mention's reading intent. */
+        suspend fun prepareReadingSpace(reason: ConversationScrollReason?) {
+            ensureCurrent()
+            if (
+                reason == null || reason == ConversationScrollReason.Mention || mentionReadingRowHeightPx == null
+            ) return
+            mentionReadingRowHeightPx = null
+            withFrameNanos { }
+            ensureCurrent()
+        }
+
+        /** Reserves native trailing padding before positioning a short newest-row mention. */
+        suspend fun reserveMentionReadingStart(
+            rowHeightPx: Int,
+            awaitLayout: suspend () -> Unit,
+        ) {
+            ensureCurrent()
+            val height = rowHeightPx.coerceAtLeast(1)
+            if (mentionReadingRowHeightPx == height) return
+            mentionReadingRowHeightPx = height
+            awaitLayout()
+            ensureCurrent()
+        }
+
         suspend fun scrollToItem(
             index: Int,
             scrollOffset: Int = 0,

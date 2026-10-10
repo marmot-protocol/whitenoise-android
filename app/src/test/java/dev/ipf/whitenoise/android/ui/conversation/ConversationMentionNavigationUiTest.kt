@@ -5,12 +5,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -38,6 +42,36 @@ import org.robolectric.annotation.Config
 class ConversationMentionNavigationUiTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** A genuine end mention has no newer rows supplying scroll room below it. */
+    @Test
+    fun shortNewestMentionWithNoNewerRowsStartsAtThePhysicalTop() {
+        assertMentionTop(
+            target = Target(80, 0),
+            viewportHeight = 420,
+            padding = 12,
+            initialIndex = 90,
+            restoreTail = true,
+        )
+    }
+
+    /** The keyboard viewport retains the same physical destination for the true final row. */
+    @Test
+    fun shortNewestMentionWithKeyboardStartsAtThePhysicalTop() {
+        assertMentionTop(target = Target(80, 0), viewportHeight = 260, padding = 32, initialIndex = 90)
+    }
+
+    /** Stable row keys retain the visited reading top when a new tail message arrives. */
+    @Test
+    fun incomingAfterNewestMentionDoesNotPullTheReaderToTheTail() {
+        assertMentionTop(
+            target = Target(80, 0),
+            viewportHeight = 420,
+            padding = 12,
+            initialIndex = 90,
+            incomingAfterLanding = true,
+        )
+    }
 
     @Test
     fun shortMentionStartsAtThePhysicalTop() {
@@ -95,9 +129,13 @@ class ConversationMentionNavigationUiTest {
         rtl: Boolean = false,
         initialIndex: Int = 0,
         mixedRows: Boolean = false,
+        restoreTail: Boolean = false,
+        incomingAfterLanding: Boolean = false,
     ) {
         var completed = false
         val targetIndex = target.index
+        var tailReturned = false
+        var incomingCount by mutableIntStateOf(0)
         composeRule.setContent {
             WhiteNoiseTheme {
                 CompositionLocalProvider(
@@ -109,15 +147,21 @@ class ConversationMentionNavigationUiTest {
                         remember(listState) {
                             ConversationScrollCoordinator(LazyListConversationScrollWriter(listState))
                         }
+                    val readingReserve =
+                        conversationMentionReadingReservePx(
+                            viewportHeight - overlap,
+                            padding - overlap,
+                            coordinator.mentionReadingRowHeightPx,
+                        )
                     Box(modifier = Modifier.fillMaxWidth().height(viewportHeight.dp)) {
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize().testTag("mention-list"),
                             reverseLayout = true,
-                            contentPadding = PaddingValues(bottom = padding.dp),
+                            contentPadding = PaddingValues(bottom = (padding + readingReserve).dp),
                         ) {
                             items(
-                                (0..maxOf(targetIndex, initialIndex) + 12).toList(),
+                                (-incomingCount..maxOf(targetIndex, initialIndex) + 12).toList(),
                                 key = { "message-$it" },
                             ) { index ->
                                 val height =
@@ -150,6 +194,10 @@ class ConversationMentionNavigationUiTest {
                                                     viewportEndOffsetPx = layout.viewportEndOffset,
                                                     itemHeightPx =
                                                         layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+                                                    estimatedItemHeightPx = target.height,
+                                                    isNewest = index == 0,
+                                                    itemOffsetPx =
+                                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset,
                                                 )
                                             },
                                         )
@@ -158,6 +206,20 @@ class ConversationMentionNavigationUiTest {
                             modifier = Modifier.testTag("mention-jump"),
                         ) {
                             Text("@")
+                        }
+                        if (restoreTail) {
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        tailReturned = coordinator.programmaticJump(
+                                            targetMessageId = null,
+                                            reason = ConversationScrollReason.JumpToNewest,
+                                            resultingMode = ConversationScrollMode.FollowingTail,
+                                        ) { scrollToTail(0) }
+                                    }
+                                },
+                                modifier = Modifier.offset(y = 48.dp).testTag("mention-tail"),
+                            ) { Text("Newest") }
                         }
                     }
                 }
@@ -177,6 +239,19 @@ class ConversationMentionNavigationUiTest {
                 .top.value
         assertEquals(listTop, messageTop, 1f)
         composeRule.runOnIdle { assertTrue(completed) }
+        if (incomingAfterLanding) {
+            composeRule.runOnIdle { incomingCount++ }
+            composeRule.waitForIdle()
+            val afterIncoming = composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
+            assertEquals(listTop, afterIncoming, 1f)
+        }
+        if (restoreTail) {
+            composeRule.onNodeWithTag("mention-tail").performClick()
+            composeRule.waitForIdle()
+            val restingTop = composeRule.onNodeWithTag("message-0").getUnclippedBoundsInRoot().top.value
+            assertEquals(listTop + viewportHeight - padding - target.height, restingTop, 1f)
+            composeRule.runOnIdle { assertTrue(tailReturned) }
+        }
     }
 
     private data class Target(

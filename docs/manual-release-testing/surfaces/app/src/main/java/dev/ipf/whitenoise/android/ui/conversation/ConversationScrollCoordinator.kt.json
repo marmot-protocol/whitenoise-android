@@ -26,6 +26,14 @@
         "test_ids": [
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "surface": "Latest-owned temporary room and explicit navigation cleanup",
+        "anchor": "suspend fun reserveMentionReadingStart(",
+        "test_ids": [
+          "CON-032"
+        ]
       }
     ]
   },
