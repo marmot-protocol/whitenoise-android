@@ -488,9 +488,12 @@ jobs:
                                        ': ' + repr([str(apk.relative_to(root)) for apk in matches]))
                   verification = subprocess.check_output(
                       [str(signers[-1]), 'verify', '--verbose', '--print-certs', str(matches[0])], text=True)
-                  signer_label = r'(?:#\d+|\(minSdkVersion=\d+(?: \(dev release=true\))?, maxSdkVersion=\d+\))'
+                  signer_label = (
+                      r'(?:(?:V2|V3(?:\.[12])?|V4) Signer:|Signer '
+                      r'(?:#\d+|\(minSdkVersion=\d+(?: \(dev release=true\))?, maxSdkVersion=\d+\)))'
+                  )
                   certificates = sorted(set(re.findall(
-                      r'^Signer ' + signer_label + r' certificate SHA-256 digest: ([0-9a-f]{64})$',
+                      r'^' + signer_label + r' certificate SHA-256 digest: ([0-9a-f]{64})$',
                       verification, re.MULTILINE)))
                   if len(certificates) != 1 or not re.search(r'^Number of signers: 1$', verification, re.MULTILINE):
                       print(verification)

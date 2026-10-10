@@ -171,10 +171,10 @@ class ResponsivenessApkSelectionTest(unittest.TestCase):
 
 
 class ResponsivenessSignerOutputTest(unittest.TestCase):
-    """Keep SDK-range certificate labels compatible without accepting multiple signing identities."""
+    """Accept verified SDK signer labels without accepting multiple signing identities."""
 
-    def test_numbered_and_sdk_range_certificates_require_one_identity(self):
-        """Accept repeated SDK-range output for one key and reject distinct rotation or multiple signers."""
+    def test_numbered_range_and_scheme_certificates_require_one_identity(self):
+        """Cover the actual V2 staging failure, repeated scheme output and different signing keys."""
         import re
         import textwrap
         workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/android-staging-apk.yml').read_text()
@@ -184,12 +184,17 @@ class ResponsivenessSignerOutputTest(unittest.TestCase):
         fingerprint = 'a' * 64
         numbered = f'Signer #1 certificate SHA-256 digest: {fingerprint}\n'
         ranged = f'Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: {fingerprint}\n'
-        for output in (numbered, ranged, ranged + numbered):
+        schemes = [f'{scheme} Signer: certificate SHA-256 digest: {fingerprint}\n'
+                   for scheme in ('V2', 'V3', 'V3.1', 'V3.2', 'V4')]
+        for output in (numbered, ranged, ranged + numbered, *schemes, ''.join(schemes)):
             scope = {'verification': 'Number of signers: 1\n' + output, 're': re, 'role': 'before', 'variant': 'debug'}
             exec(parser, scope)
             self.assertEqual([fingerprint], scope['certificates'])
         for output in ('Number of signers: 2\n' + numbered,
                        'Number of signers: 1\n' + numbered + ranged.replace(fingerprint, 'b' * 64),
+                       'Number of signers: 1\n' + schemes[0] + schemes[1].replace(fingerprint, 'b' * 64),
+                       'Number of signers: 2\n' + schemes[0],
+                       'Number of signers: 1\nV2 Signer: public key SHA-256 digest: ' + fingerprint,
                        'Number of signers: 1\nSource Stamp Signer certificate SHA-256 digest: ' + fingerprint):
             with self.assertRaisesRegex(SystemExit, 'expected one fixture signer'):
                 exec(parser, {'verification': output, 're': re, 'role': 'after', 'variant': 'debug'})
