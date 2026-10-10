@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "minimum_versions": {
+    "org.freemarker:freemarker": "2.3.35",
+    "org.bouncycastle:bcprov-jdk18on": "1.86",
+    "org.bouncycastle:bcpkix-jdk18on": "1.86",
+    "org.bouncycastle:bcutil-jdk18on": "1.86",
+    "com.squareup.wire:wire-runtime": "6.4.5",
+    "com.squareup.wire:wire-runtime-jvm": "6.4.5",
+    "ch.qos.logback:logback-core": "1.5.34",
+    "ch.qos.logback:logback-classic": "1.5.34",
+    "org.bitbucket.b_c:jose4j": "0.9.6",
+    "org.jdom:jdom2": "2.0.6.1",
+    "org.apache.commons:commons-lang3": "3.18.0",
+    "org.apache.httpcomponents:httpclient": "4.5.14"
+  }
+}

@@ -68,6 +68,9 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
+      - name: Test selected dependency evidence validator
+        run: python3 -m unittest scripts/test_verify_dependency_security.py
+
       - name: Test manual release guide and viewport coverage validators
         run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py scripts/test_check_scroll_edge_fades.py scripts/test_check_viewport_restoration_coverage.py scripts/test_paging_trace_report.py
 
@@ -354,6 +357,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # Read existing resolutions only; retain proof without a second build.
+      - name: Verify selected dependency security floors
+        if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Retain selected dependency security evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-security-${{ github.job }}-${{ strategy.job-index || 0 }}
+          path: build/reports/dependency-security
+          if-no-files-found: ignore
+          retention-days: 14
   compose-compiler:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.supplemental_campaigns != 'false'
@@ -432,6 +448,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # Read existing resolutions only; retain proof without a second build.
+      - name: Verify selected dependency security floors
+        if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Retain selected dependency security evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-security-${{ github.job }}-${{ strategy.job-index || 0 }}
+          path: build/reports/dependency-security
+          if-no-files-found: ignore
+          retention-days: 14
   static-analysis:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
@@ -508,6 +537,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # Read existing resolutions only; retain proof without a second build.
+      - name: Verify selected dependency security floors
+        if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Retain selected dependency security evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-security-${{ github.job }}-${{ strategy.job-index || 0 }}
+          path: build/reports/dependency-security
+          if-no-files-found: ignore
+          retention-days: 14
   tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
@@ -665,6 +707,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # Read existing resolutions only; retain proof without a second build.
+      - name: Verify selected dependency security floors
+        if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Retain selected dependency security evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-security-${{ github.job }}-${{ strategy.job-index || 0 }}
+          path: build/reports/dependency-security
+          if-no-files-found: ignore
+          retention-days: 14
   # Preserve the existing check name for branch protection and consumers.
   # A successful docs-only classifier permits only the named Android skips.
   # Missing outputs, unexpected skips, failures and cancellations remain red.

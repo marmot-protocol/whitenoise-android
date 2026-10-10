@@ -35,3 +35,17 @@ jobs:
         with:
           dependency-graph: generate-and-submit
           additional-arguments: --no-configuration-cache --stacktrace
+
+      # Export only configurations already resolved by this job; no new compile or matrix.
+      - name: Verify selected dependency security floors
+        if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Retain selected dependency security evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-security-${{ github.job }}
+          path: build/reports/dependency-security
+          if-no-files-found: ignore
+          retention-days: 14
