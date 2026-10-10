@@ -23,6 +23,36 @@ import java.util.concurrent.atomic.AtomicLong
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ConversationDictationCallerAudioTest {
+    /** A parked recording releases the active slot without losing or duplicating its sealed sample bytes. */
+    @Test
+    fun parkedCaptureRequiresNativeClosureAndRestoresItsExactBuffer() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 17L, chunkBytes = 4, maxBufferedBytes = 8)
+        val capture = callerAudio(FakeCaptureDevice(listOf(shortArrayOf(1, 2))), buffer)
+        val replacement = callerAudio()
+        var creates = 0
+        val owner = ConversationDictationCaptureOwner { if (creates++ == 0) capture else replacement }
+        assertTrue(owner.acquire() === capture)
+        assertNull(owner.park())
+        assertTrue(capture.start())
+        await { capture.closed }
+        val kept = checkNotNull(owner.park())
+        assertFalse(owner.hasPending())
+        assertTrue(buffer.hasPending)
+        assertTrue(owner.acquire() === replacement)
+        assertFalse(kept.restore())
+        owner.discard {}
+        await { replacement.closed }
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(kept.restore())
+        assertTrue(owner.acquire() === capture)
+        assertFalse(kept.restore())
+        val chunk = checkNotNull(buffer.poll())
+        assertTrue(chunk.pcm.contentEquals(byteArrayOf(1, 0, 2, 0)))
+        assertTrue(buffer.retry(chunk.chunkId))
+        owner.discard {}
+        assertFalse(buffer.hasPending)
+    }
+
     /** Production discard/finish/forced closure adapters queue recorder-thread callbacks to main. */
     @Test
     fun nativeCaptureClosureIsDeliveredOnlyOnMain() {

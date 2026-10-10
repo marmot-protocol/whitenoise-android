@@ -52,7 +52,7 @@ internal fun rememberComposerDictationAction(
         ConversationDictationRecoveryPanel(
             access =
                 if (access.phase == ConversationDictationComposerPhase.Ready) checkNotNull(panelOwner) else access,
-            retryEnabled = controller.canRetryRetainedAudio,
+            retryEnabled = controller.canRetryComposerAudio(access),
             onRetry = {
                 if (binding.active) {
                     controller.retryComposerAudio(access)
@@ -60,6 +60,9 @@ internal fun rememberComposerDictationAction(
                 }
             },
             onDiscard = { if (binding.active) controller.discardComposerAudio(access) },
+            onKeepForLater = {
+                if (binding.active && controller.keepComposerAudioForLater(access)) panelOwner = null
+            },
             onDismiss = { panelOwner = null },
         )
     }
@@ -90,6 +93,7 @@ internal fun ConversationDictationRecoveryPanel(
     onRetry: () -> Unit,
     onDiscard: () -> Unit,
     onDismiss: () -> Unit,
+    onKeepForLater: () -> Unit = onDismiss,
 ) {
     var confirmDiscard by remember(access) { mutableStateOf(false) }
     val remainingAudio = access.phase == ConversationDictationComposerPhase.RemainingAudio
@@ -124,7 +128,7 @@ internal fun ConversationDictationRecoveryPanel(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.dictation_keep_later)) }
+                TextButton(onClick = onKeepForLater) { Text(stringResource(R.string.dictation_keep_later)) }
             },
         )
     }
