@@ -182,6 +182,7 @@ class ByteSizeLruCacheTest {
         assertEquals(emptyList<String>(), removed)
     }
 
+    /** An entry larger than the per-entry cap is refused and still replaces the key's previous value. */
     @Test
     fun oversizedEntryIsNotCachedAndRemovesPreviousValue() {
         val removed = mutableListOf<String>()
@@ -199,5 +200,32 @@ class ByteSizeLruCacheTest {
         assertNull(cache.get("k"))
         assertEquals(0L, cache.residentBytes())
         assertEquals(listOf("small"), removed)
+    }
+
+    /**
+     * An entry that opted out of eviction is skipped and charged nothing, so an evictable entry filling
+     * the cap exactly keeps itself, and only older evictable entries make room.
+     */
+    @Test
+    fun nonEvictableEntriesAreSkippedAndChargedNothing() {
+        val cache =
+            ByteSizeLruCache<String, ByteArray>(
+                maxBytes = 100,
+                sizeOf = { it.size },
+                isEvictable = { it.isNotEmpty() },
+            )
+        cache.put("file-backed", ByteArray(0))
+        cache.put("full", ByteArray(100))
+        assertNotNull("an exact fit is not evicted on its own insert", cache.get("full"))
+        assertEquals(100L, cache.residentBytes())
+
+        cache.put("newer", ByteArray(60))
+
+        assertNotNull(cache.get("file-backed"))
+        assertNull(cache.get("full"))
+        assertNotNull(cache.get("newer"))
+        assertEquals(60L, cache.residentBytes())
+        cache.remove("file-backed")
+        assertEquals(60L, cache.residentBytes())
     }
 }

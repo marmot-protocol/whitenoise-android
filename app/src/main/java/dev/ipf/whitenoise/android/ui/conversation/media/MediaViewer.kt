@@ -144,8 +144,7 @@ internal suspend fun attachmentBytes(
         controller
             .pendingAttachmentsList(messageIdHex)
             .getOrNull(attachmentIndex)
-            ?.plaintextBytes
-            ?.takeIf { it.isNotEmpty() }
+            ?.inMemoryBytes
             ?.let { return it }
     }
     val resolvedReference =

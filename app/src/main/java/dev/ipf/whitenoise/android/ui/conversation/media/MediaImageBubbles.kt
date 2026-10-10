@@ -201,7 +201,7 @@ internal fun MediaImageBubble(
         rememberImageAttachmentCacheAvailability(controller, key, attachmentIndex, epoch, presentation != null)
     var cachedPlaintextOnEntry by cacheAvailability.cached
     val retainedPlaintextOnEntry =
-        mine && controller.pendingAttachmentsList(key).getOrNull(attachmentIndex) != null
+        mine && controller.pendingAttachmentsList(key).getOrNull(attachmentIndex)?.inMemoryBytes != null
     // Auto-download gating (#10): retained/cached own bytes always render;
     // idle network fallback obeys policy. Once accepted, materialization stays
     // latched across policy recomposition so an active UI waiter is not lost.
@@ -676,7 +676,7 @@ internal fun MediaImageGridTile(
         )
     var cachedPlaintextOnEntry by cacheAvailability.cached
     val retainedPlaintextOnEntry =
-        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.inMemoryBytes != null
     // Mirror the single-image bubble's auto-download gate (#10) so the
     // policy applies to album tiles too. Retained/cached outgoing bytes still
     // materialize during a pause, but a cache-missing network fallback waits

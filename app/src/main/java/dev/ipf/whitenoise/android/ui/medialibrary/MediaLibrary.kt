@@ -988,7 +988,7 @@ private fun FileLibraryRow(
                 controller
                     .pendingAttachmentsList(row.messageIdHex)
                     .getOrNull(row.attachmentIndex)
-                    ?.plaintextBytes
+                    ?.inMemoryBytes
             } else {
                 null
             }

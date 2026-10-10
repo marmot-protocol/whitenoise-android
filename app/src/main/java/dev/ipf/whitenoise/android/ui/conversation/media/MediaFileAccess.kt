@@ -142,6 +142,7 @@ internal suspend fun loadMediaFileBytes(
     }.getOrNull()
 }
 
+/** The sender's own in-memory retry bytes for a pending file, or null so the caller reads MDK's copy instead. */
 private fun retainedMediaFileBytes(
     controller: ConversationController,
     messageIdHex: String,
@@ -152,7 +153,7 @@ private fun retainedMediaFileBytes(
         controller
             .pendingAttachmentsList(messageIdHex)
             .getOrNull(attachmentIndex)
-            ?.plaintextBytes
+            ?.inMemoryBytes
     } else {
         null
     }

@@ -168,6 +168,8 @@ import dev.ipf.whitenoise.android.share.shareResolveMime
 import dev.ipf.whitenoise.android.state.GroupInviteNotificationIdentityRefreshStore.RefreshCandidate
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
+import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
@@ -3174,10 +3176,17 @@ class WhiteNoiseAppState private constructor(
                 dev.ipf.whitenoise.android.media.ByteSizeLruCache(
                     maxBytes = ConversationController.MEDIA_RETAINED_MAX_BYTES,
                     sizeOf = { upload -> upload.attachments.sumOf { it.plaintextBytes.size } },
-                    onEntryRemoved = RetainedMediaUpload::releaseSource,
+                    onEntryRemoved = { upload -> upload.releaseSource(::closeStagedUploadSourceOffMain) },
+                    // Evicting a send whose items all live in private files frees no heap, only its retry.
+                    isEvictable = { upload -> upload.attachments.any { it.inMemoryBytes != null } },
                 )
             }
         }
+
+    /** Deletes a released private upload snapshot on the IO pool; unlinking a large file must not block Main. */
+    internal fun closeStagedUploadSourceOffMain(source: StagedUploadSource) {
+        launchMutation { withContext(Dispatchers.IO) { source.closeQuietly() } }
+    }
 
     internal fun activeUploadKeys(
         accountRef: String?,

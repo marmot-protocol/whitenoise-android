@@ -14,6 +14,9 @@ object MediaCacheDirs {
     const val SHARED = "shared_media"
     const val NATIVE_ATTACHMENT_LEASES = "native_attachment_leases"
     const val COMPOSER_PASTE = "composer_paste"
+
+    /** Private snapshots of large picks that the native runtime uploads from a path. */
+    const val UPLOAD_SOURCES = "upload_sources"
 }
 
 /** Deletes session-owned plaintext directories while keeping shared-reader leases alive. */
@@ -26,6 +29,7 @@ internal fun wipeSessionAttachmentPlaintext(
         MediaCacheDirs.VIDEO,
         MediaCacheDirs.COMPOSER_PASTE,
         MediaCacheDirs.NATIVE_ATTACHMENT_LEASES,
+        MediaCacheDirs.UPLOAD_SOURCES,
     ).forEach { name ->
         runCatching {
             check(java.io.File(cacheRoot, name).deleteRecursively()) {

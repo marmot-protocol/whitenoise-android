@@ -88,6 +88,7 @@ private suspend fun saveMessageMediaAttachment(
     }
 }
 
+/** Saves one video to the gallery from a materialized file, never a whole-array read. */
 private suspend fun saveMessageVideoAttachment(
     context: MessageAttachmentSaveContext,
     attachmentIndex: Int,
@@ -112,6 +113,7 @@ private suspend fun saveMessageVideoAttachment(
     }
 }
 
+/** Saves one image's whole verified bytes to the gallery; explicit saves are not bound by the preview budget. */
 private suspend fun saveMessageImageAttachment(
     context: MessageAttachmentSaveContext,
     attachmentIndex: Int,
@@ -137,6 +139,7 @@ private suspend fun saveMessageImageAttachment(
     }
 }
 
+/** Saves one document to Downloads from a materialized file, preferring the sender's in-memory retry bytes. */
 private suspend fun saveMessageDocumentAttachment(
     context: MessageAttachmentSaveContext,
     attachmentIndex: Int,
@@ -147,7 +150,7 @@ private suspend fun saveMessageDocumentAttachment(
             context.controller
                 .pendingAttachmentsList(context.messageIdHex)
                 .getOrNull(attachmentIndex)
-                ?.plaintextBytes
+                ?.inMemoryBytes
         } else {
             null
         }
