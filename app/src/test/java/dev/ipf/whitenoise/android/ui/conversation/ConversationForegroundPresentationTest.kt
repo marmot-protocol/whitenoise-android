@@ -17,6 +17,47 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationForegroundPresentationTest {
+    /** A consumed local publication still waits for its actual layout, even without an outstanding receipt. */
+    @Test
+    fun consumedTimelineWaitsForMatchingMeasuredPublication() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            var state = ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true, false)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(signals, { state }, false, 1_500)
+                }
+            signals.trySend(Unit)
+            runCurrent()
+            assertFalse(result.isCompleted)
+            state = state.copy(timelineMeasured = true)
+            signals.trySend(Unit)
+            runCurrent()
+            assertEquals(state, result.await())
+        }
+
+    /** Missing layout acknowledgement shares the original bounded liveness fallback. */
+    @Test
+    fun unmeasuredTimelineDoesNotExtendPresentationDeadline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val state = ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true, false)
+            var released = false
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(signals, { state }, false, 1_500, { released = true })
+                }
+            signals.trySend(Unit)
+            advanceTimeBy(1_499)
+            runCurrent()
+            assertFalse(released)
+            assertFalse(result.isCompleted)
+            advanceTimeBy(1)
+            runCurrent()
+            assertTrue(released)
+            assertEquals(state, result.await())
+        }
+
     /** Superseded preparation remains blocked until the same deadline instead of treating false as readiness. */
     @Test
     fun nonCommittedReceiptCannotReleasePresentationBeforeItsDeadline() =

@@ -27,12 +27,23 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.state.TimelineMessage
 
 /** Separates the one native list's paint area from the measured foreground composer's reading occlusion. */
 @Stable
 internal class ConversationTimelineViewport(
     private val listState: LazyListState,
 ) {
+    private var measuredTimelinePublication: List<TimelineMessage>? = null
+
+    /** A committed controller page is presentable only after its matching composition has measured. */
+    fun hasMeasuredTimeline(publication: List<TimelineMessage>): Boolean = measuredTimelinePublication === publication
+
+    /** Acknowledges the immutable publication captured by the completed native list measure. */
+    fun onTimelineMeasured(publication: List<TimelineMessage>) {
+        measuredTimelinePublication = publication
+    }
+
     var enabled by mutableStateOf(false)
     private var measuredPadding by mutableStateOf(0 to 0)
     var foregroundHeightPx by mutableIntStateOf(0)
@@ -152,15 +163,17 @@ internal fun LazyListLayoutInfo.newestReadRow(timelineListIndices: IntRange): La
         it.index in timelineListIndices && (it.offset >= viewportStartOffset || it.size >= viewportSize.height)
     }
 
-/** Records the exact padding passed through this native list measure, including unchanged-total transitions. */
+/** Records the publication and padding consumed by this native list measure, including unchanged-total transitions. */
 internal fun Modifier.measureConversationTimelinePadding(
     viewport: ConversationTimelineViewport,
     basePadding: Dp,
     foregroundOverlap: Dp,
+    timelinePublication: List<TimelineMessage>,
 ): Modifier =
     layout { measurable, constraints ->
         val placeable = measurable.measure(constraints)
         viewport.onPaddingMeasured(basePadding.roundToPx(), foregroundOverlap.roundToPx())
+        viewport.onTimelineMeasured(timelinePublication)
         layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
     }
 

@@ -23,6 +23,7 @@ internal data class ConversationForegroundSettleState(
     val geometry: ConversationForegroundGeometry,
     val imeTargetBottomPx: Int,
     val bottomChromeMeasured: Boolean,
+    val timelineMeasured: Boolean = true,
 ) {
     /** Whether every measured surface agrees on one coherent viewport geometry. */
     fun isGeometrySettled(): Boolean =
@@ -30,9 +31,9 @@ internal data class ConversationForegroundSettleState(
             bottomChromeMeasured &&
             geometry.imeBottomPx == imeTargetBottomPx
 
-    /** Whether coherent geometry also matches the IME visibility requested at resume. */
+    /** Whether measured current content and coherent geometry match the IME visibility requested at resume. */
     fun isSettled(expectedImeVisible: Boolean): Boolean =
-        isGeometrySettled() &&
+        isGeometrySettled() && timelineMeasured &&
             (geometry.imeBottomPx > 0) == expectedImeVisible
 }
 

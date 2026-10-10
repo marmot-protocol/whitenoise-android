@@ -20,6 +20,7 @@ if [[ "$event_name" == "workflow_dispatch" && "$responsiveness_only" == "true" ]
   fi
   ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
     -Pandroid.testInstrumentationRunnerArguments.annotation=dev.ipf.whitenoise.android.ResponsivenessDeviceAcceptance \
+    -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000 \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
   required_file="$(mktemp)"
