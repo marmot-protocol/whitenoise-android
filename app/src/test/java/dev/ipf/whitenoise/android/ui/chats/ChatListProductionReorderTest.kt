@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Surface
@@ -106,14 +108,17 @@ class ChatListProductionReorderTest {
                         listState = currentListState,
                         rowHeight = 48.dp,
                         rowContent = { id, modifier, enabled ->
-                            ChatRow(
-                                item = rows.getValue(id),
-                                appState = appState,
-                                onClick = {},
-                                onOpenProfile = {},
-                                interactionsEnabled = enabled,
-                                modifier = modifier,
-                            )
+                            // Measure the whole lazy item, outside Material's internal content padding.
+                            Box(modifier) {
+                                ChatRow(
+                                    item = rows.getValue(id),
+                                    appState = appState,
+                                    onClick = {},
+                                    onOpenProfile = {},
+                                    interactionsEnabled = enabled,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         },
                     )
                 }

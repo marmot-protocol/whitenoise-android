@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.Looper
 import dev.ipf.marmotkit.GroupRosterFfi
+import java.time.Duration
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -9,6 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** Locally projected replacements cannot wait behind independent roster enrichment. */
@@ -47,7 +50,7 @@ class ConversationLiveWindowHandoffTest {
                 }
                 timeline.emitWindow(timelinePage(messageA, messageB))
 
-                awaitConversationCondition {
+                awaitAdvancingTimelineClock {
                     ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller)
                 }
                 assertFalse("the live replacement must not release the roster read", rosterReply.isCompleted)
@@ -91,7 +94,7 @@ class ConversationLiveWindowHandoffTest {
             try {
                 awaitConversationCondition { timeline.nextWindowCallCount > 0 }
                 timeline.emitWindow(timelinePage(messageA, messageB))
-                awaitConversationCondition {
+                awaitAdvancingTimelineClock {
                     ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller)
                 }
                 assertFalse(controller.membersVerified)
@@ -163,4 +166,12 @@ class ConversationLiveWindowHandoffTest {
                 awaitOpenedTimelineSubscriptionsClosed(scripts)
             }
         }
+
+    /** Runs the production batch-drain timeout on Robolectric's paused main clock while IO remains live. */
+    private fun awaitAdvancingTimelineClock(condition: () -> Boolean) {
+        awaitConversationCondition {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+            condition()
+        }
+    }
 }
