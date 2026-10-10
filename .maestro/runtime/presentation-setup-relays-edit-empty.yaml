@@ -1,0 +1,34 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-relays-edit-empty
+---
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-RELAYS
+- assertVisible: Read and write relays
+- tapOn:
+    id: setup-action-EDIT_RELAYS
+- assertVisible: Change a relay before reviewing a replacement.*
+- assertVisible: wss://Custom.example.invalid/path/
+- assertVisible:
+    id: setup-editor-save
+    enabled: false
+- tapOn:
+    text: wss://Custom.example.invalid/path/
+    index: 1
+- eraseText: 100
+- tapOn: wss://Custom.example.invalid/path/
+- eraseText: 100
+- hideKeyboard
+- assertVisible:
+    id: setup-editor-save
+    enabled: false
+- tapOn:
+    id: setup-editor-save
+- assertVisible: Change a relay before reviewing a replacement.*
+- tapOn: Cancel
+- assertVisible: Read and write relays
+- back
+- assertVisible: Account setup
+- back
+- assertVisible:
+    id: presentation.complete

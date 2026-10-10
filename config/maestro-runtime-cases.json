@@ -6567,6 +6567,79 @@
       ],
       "assertions": "Actual unlocked developer group details mounts its MLS technical information panel for the generated native group; Back returns to the conversation. No protocol mutation is performed.",
       "postcondition": "none"
+    },
+    "presentation-setup-relays-edit-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-relays-edit-cancel",
+      "presentation_actions": [
+        "preview-loaded",
+        "preview-cancelled",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-relays-edit-unchanged": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-relays-edit-unchanged",
+      "presentation_actions": [
+        "preview-loaded",
+        "preview-cancelled",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-relays-edit-empty": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-relays-edit-empty",
+      "presentation_actions": [
+        "preview-loaded",
+        "preview-cancelled",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-relays-edit-review": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-relays-edit-review",
+      "presentation_actions": [
+        "preview-loaded",
+        "relay-review-requested"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-relays-edit-failure": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-relays-edit-failure",
+      "presentation_actions": [
+        "preview-loaded",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
     }
   }
 }

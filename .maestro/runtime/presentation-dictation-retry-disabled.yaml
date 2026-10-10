@@ -8,6 +8,8 @@ name: presentation-dictation-retry-disabled
     enabled: false
     containsChild:
       text: Retry remaining audio
+- tapOn: Retry remaining audio
+- assertVisible: Remaining dictation audio
 - tapOn: Keep for later
 - assertVisible:
     id: presentation.complete

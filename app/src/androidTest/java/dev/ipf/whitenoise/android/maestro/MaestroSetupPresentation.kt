@@ -41,7 +41,7 @@ internal fun MaestroSetupPresentation(fixture: MaestroPresentationFixture) {
 private class PresentationSetupClient(private val fixture: MaestroPresentationFixture) : AccountSetupClient {
     val account = "ab".repeat(32)
     private val step =
-        when (fixture.scenario) {
+        when (fixture.scenario.substringBefore("-edit")) {
             "setup-relays" -> OnboardingStepFfi.RELAYS
             "setup-discovery" -> OnboardingStepFfi.RELAYS
             "setup-follows" -> OnboardingStepFfi.FOLLOWS
@@ -56,7 +56,7 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
             OnboardingStepFfi.INBOX_RELAYS -> OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
             else -> OnboardingActionFfi.CONTINUE_WITHOUT
         }
-    private val current =
+    private var current =
         OnboardingSnapshotFfi(
             account, null, 3uL, false,
             OnboardingStepFfi.entries.map { item ->
@@ -90,8 +90,29 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
     }
 
     override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi {
+        if (request.action == OnboardingActionFfi.CANCEL_REPAIR) {
+            check(request.revision == 4uL && request.step == step)
+            fixture.record("preview-cancelled")
+            current = current.copy(revision = 5uL, proposal = null)
+            return current
+        }
+        if (request.action == OnboardingActionFfi.EDIT_RELAYS) {
+            check(request.revision == 4uL && request.step == step)
+            check(request.readRelays == listOf(MAESTRO_SETUP_RELAY))
+            check(request.writeRelays == listOf("wss://changed.example.invalid/"))
+            fixture.finish("relay-review-requested")
+            return current
+        }
         check(request.revision == 3uL && request.step == step && request.action == OnboardingActionFfi.CONTINUE_WITHOUT)
         fixture.finish("continue-without")
+        return current
+    }
+
+    override suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi {
+        check(step == this.step && current.revision == 3uL)
+        fixture.record("preview-loaded")
+        if (fixture.scenario == "setup-relays-edit-failure") error("Synthetic relay preview failure")
+        current = maestroSetupRelayPreview(current)
         return current
     }
 

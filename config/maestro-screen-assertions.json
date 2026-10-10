@@ -2147,6 +2147,41 @@
             "text": "Profile"
           },
           "scope": "Actual setup screen/controller profile decision against bounded native-port fixture; no real onboarding qualification."
+        },
+        {
+          "case": "presentation-setup-relays-edit-cancel",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification."
+        },
+        {
+          "case": "presentation-setup-relays-edit-unchanged",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification."
+        },
+        {
+          "case": "presentation-setup-relays-edit-empty",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification."
+        },
+        {
+          "case": "presentation-setup-relays-edit-review",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification."
+        },
+        {
+          "case": "presentation-setup-relays-edit-failure",
+          "selector": {
+            "text": "Account setup"
+          },
+          "scope": "Production setup controller loads a typed revision-bound relay preview, preserves its exact endpoint, guards unchanged or empty review, cancels its preview, validates an edited request or retains load-error state. Presentation-only native port: no relay publication or MDK onboarding qualification."
         }
       ],
       "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
