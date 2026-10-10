@@ -9,6 +9,8 @@
 
 *ScreenshotTest
 
+*.StartupReadyRecoveryRouteTest.rootRendersRecoveryWithoutRemountingTheBindOrRestoringProtectedContent
+
 *.AutoDownloadBacklogControlTest
 *.BubbleCollapsibleFooterLayoutTest.overflowingBodyIsClippedBeforeFooterRow
 *.ChatActionSheetTest.actionSheetDarkScreenshot
