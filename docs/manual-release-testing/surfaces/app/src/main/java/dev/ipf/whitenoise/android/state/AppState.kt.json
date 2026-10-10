@@ -291,6 +291,14 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "surface": "Account replacement revokes retained speech",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private fun clearCrossAccountCaches()",
+        "test_ids": [
+          "TTS-001"
+        ]
       }
     ]
   },

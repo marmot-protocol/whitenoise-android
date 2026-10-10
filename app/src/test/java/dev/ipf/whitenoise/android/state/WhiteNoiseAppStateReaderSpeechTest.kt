@@ -45,7 +45,38 @@ class WhiteNoiseAppStateReaderSpeechTest {
         assertTrue(appState.ownsCurrentAccountSpeech())
         runBlocking { appState.setActiveAccount("account-b") }
         assertFalse(appState.ownsCurrentAccountSpeech())
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+        assertTrue(appState.ttsController.queuedMessagesSnapshot().isEmpty())
     }
+
+    /** Platform Resume and stale callbacks cannot revive speech after an account round trip. */
+    @Test
+    fun pausedSpeechIsDiscardedBeforeAccountActivation() =
+        runBlocking {
+            val appState = testAppState(twoAccounts = true)
+            val engine = FakeSessionEngine()
+            appState.ttsController.attachEngine(engine)
+            assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("s", "Sender", "Old private speech.")), Locale.US))
+            appState.ttsController.pause()
+            assertTrue(appState.ttsController.state.value is TtsState.Paused)
+            val spoken = engine.spoken.size
+
+            assertTrue(appState.setActiveAccount("account-b"))
+            assertTrue(appState.setActiveAccount("account-a"))
+            appState.ttsController.resume()
+            engine.complete(0)
+            assertTrue(appState.ttsController.state.value is TtsState.Idle)
+            assertTrue(appState.ttsController.queuedMessagesSnapshot().isEmpty())
+            assertFalse(appState.ownsCurrentAccountSpeech())
+            assertEquals(spoken, engine.spoken.size)
+
+            assertTrue(
+                appState.speakAloud(listOf(TtsSpeakableEntry("s", "Sender", "Fresh private speech.")), Locale.US),
+            )
+            assertEquals(spoken + 1, engine.spoken.size)
+            assertTrue(appState.ownsCurrentAccountSpeech())
+            appState.stopSpeaking()
+        }
 
     /** A reader revoked before preparation leaves an existing manual queue and its ownership untouched. */
     @Test

@@ -1,0 +1,443 @@
+package dev.ipf.whitenoise.android.state
+
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.audio.tts.TtsController
+import dev.ipf.whitenoise.android.audio.tts.TtsQueuedMessage
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.core.TimelineProjector
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.withContext
+import java.util.Locale
+
+/** Transient tail identity for a single playback session, never a second message store. */
+internal class TtsAutoReadTail(
+    initial: String?,
+) {
+    var messageId: String? = initial
+        private set
+
+    fun following(page: TimelinePageFfi): List<TimelineMessageRecordFfi>? {
+        val anchor = messageId ?: return emptyList()
+        val index = page.messages.indexOfFirst { it.messageIdHex == anchor }
+        return if (index < 0) null else page.messages.drop(index + 1)
+    }
+
+    fun accepted(messageId: String) {
+        this.messageId = messageId
+    }
+}
+
+/** Native and playback boundaries supplied by the current process owner. */
+internal interface TtsAutoReadContinuationHost {
+    val controller: TtsController
+
+    fun owns(
+        account: String,
+        group: String,
+        session: Long,
+    ): Boolean
+
+    val appendDeferred: Boolean
+
+    suspend fun awaitAppendReadiness()
+
+    suspend fun awaitTailAttachment()
+
+    fun allowsAppend(): Boolean
+
+    suspend fun open(
+        account: String,
+        group: String,
+    ): ConversationTimelineSubscriptionHandle
+
+    suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry?
+}
+
+/** Reuses the native projection and subscription seams; plaintext remains only in the speech queue. */
+internal fun createTtsAutoReadContinuation(appState: WhiteNoiseAppState): TtsAutoReadContinuation =
+    TtsAutoReadContinuation(
+        object : TtsAutoReadContinuationHost {
+            override val controller = appState.ttsController
+
+            override fun owns(
+                account: String,
+                group: String,
+                session: Long,
+            ): Boolean =
+                appState.activeAccountRef == account &&
+                    appState.ownsTtsAutoReadSession(group) &&
+                    controller.state.value.sessionId == session
+
+            override val appendDeferred: Boolean
+                get() = appState.ttsHistorySession.liveAppendDeferred
+
+            override suspend fun awaitAppendReadiness() {
+                appState.ttsHistorySession.edgeState.first { !appendDeferred }
+            }
+
+            override suspend fun awaitTailAttachment() {
+                appState.ttsHistorySession.edgeState.first { !appendDeferred && allowsAppend() }
+            }
+
+            override fun allowsAppend(): Boolean =
+                appState.ttsHistorySession.allowsLiveAppend(
+                    reconciledNativeWindow = true,
+                )
+
+            override suspend fun open(
+                account: String,
+                group: String,
+            ): ConversationTimelineSubscriptionHandle =
+                appState.conversationLiveSubscriptions().openTimeline(
+                    account,
+                    group,
+                    CONVERSATION_WINDOW_MAX_ROWS,
+                )
+
+            override suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry? =
+                projectTtsSpeakableEntry(
+                    message = TimelineProjector.toAppMessageRecord(record),
+                    editedText = null,
+                    senderDisplayName = appState.displayName(record.sender),
+                    parseMarkdown = { appState.parseMarkdownOrEmpty(it) },
+                    mentionDisplayName = appState::mentionSpeechName,
+                )
+        },
+    )
+
+private data class TtsAutoReadRun(
+    val account: String,
+    val group: String,
+    val session: Long,
+    val tail: TtsAutoReadTail,
+    val locale: Locale,
+    var detached: Boolean = false,
+)
+
+private data class TtsAutoReadUpdate(
+    val page: TimelinePageFfi?,
+    val nativeWindowConsumed: Boolean,
+)
+
+private enum class TtsLiveAppendResult {
+    Accepted,
+    Deferred,
+    Detached,
+    Stopped,
+}
+
+/** One native subscription owned by speech, independent of the visible conversation's lifecycle. */
+internal class TtsAutoReadContinuation(
+    private val host: TtsAutoReadContinuationHost,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val maxRetainedMessages: Int = CONVERSATION_WINDOW_MAX_ROWS.toInt(),
+    private val maxRetainedTextChars: Int = 1_048_576,
+) {
+    private var job: Job? = null
+
+    fun start(
+        account: String,
+        groupId: String,
+        locale: Locale,
+    ) {
+        job?.cancel()
+        val session = host.controller.state.value.sessionId
+        val queued = host.controller.queuedMessagesSnapshot()
+        if (queued.size > maxRetainedMessages || retainedTextChars(queued) > maxRetainedTextChars) {
+            host.controller.stop()
+            return
+        }
+        // The initial projection may exceed the controller's bounded queue.
+        // Anchor to what was accepted, never to a row that has not been queued.
+        val anchor =
+            queued
+                .lastOrNull()
+                ?.messageIdHex
+                ?.takeIf(String::isNotEmpty) ?: return
+        val run = TtsAutoReadRun(account, groupId, session, TtsAutoReadTail(anchor), locale)
+        job =
+            scope.launch {
+                coroutineScope {
+                    val consumer =
+                        launch {
+                            consume(run)
+                        }
+                    host.controller.state.first { !owns(run, it) }
+                    consumer.cancelAndJoin()
+                }
+            }
+    }
+
+    private fun owns(
+        run: TtsAutoReadRun,
+        state: TtsState,
+    ): Boolean =
+        host.owns(run.account, run.group, run.session) &&
+            state.sessionId == run.session &&
+            (state is TtsState.Speaking || state is TtsState.Paused)
+
+    @Suppress("TooGenericExceptionCaught") // Native authority loss must revoke captured speech.
+    private suspend fun consume(run: TtsAutoReadRun) {
+        var subscription: ConversationTimelineSubscriptionHandle? = null
+        try {
+            // Native open has its own finite deadline. Adopt its handle even when
+            // the caller cancels during IO, then close it instead of leaking it.
+            val active = withContext(NonCancellable) { host.open(run.account, run.group) }
+            subscription = active
+            currentCoroutineContext().ensureActive()
+            val initial = withContext(io) { active.snapshot() }
+            var reading = initial == null || appendPage(active, initial, run)
+            coroutineScope {
+                var nextWindow = async(io) { active.nextWindow() }
+                try {
+                    while (reading && owns(run, host.controller.state.value)) {
+                        val update = awaitTtsAutoReadUpdate(host, io, active, nextWindow, run.detached)
+                        reading = update.page?.let { appendPage(active, it, run) } == true
+                        if (reading && update.nativeWindowConsumed) nextWindow = async(io) { active.nextWindow() }
+                    }
+                } finally {
+                    nextWindow.cancelAndJoin()
+                }
+            }
+            // No disconnected retained text may reach the engine through Resume.
+            if (owns(run, host.controller.state.value)) host.controller.stop()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            if (owns(run, host.controller.state.value)) host.controller.stop()
+        } finally {
+            withContext(NonCancellable + io) {
+                try {
+                    try {
+                        subscription?.cancel()
+                    } finally {
+                        subscription?.close()
+                    }
+                } catch (_: Exception) {
+                    withContext(scope.coroutineContext + NonCancellable) {
+                        if (owns(run, host.controller.state.value)) host.controller.stop()
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun appendPage(
+        subscription: ConversationTimelineSubscriptionHandle,
+        initial: TimelinePageFfi,
+        run: TtsAutoReadRun,
+    ): Boolean {
+        var page = reconcileAnchor(subscription, initial, run) ?: return stopForGap(run)
+        var complete = false
+        var healthy = true
+        while (healthy && !complete && owns(run, host.controller.state.value)) {
+            if (invalidatesQueuedSpeech(page)) {
+                host.controller.stop()
+                healthy = false
+            } else {
+                when (appendFollowing(page, run)) {
+                    TtsLiveAppendResult.Deferred -> {
+                        val fresh = retryDeferredPage(subscription, run)
+                        healthy = fresh != null
+                        page = fresh ?: page
+                    }
+                    TtsLiveAppendResult.Detached -> {
+                        run.detached = true
+                        complete = true
+                    }
+                    TtsLiveAppendResult.Stopped -> healthy = false
+                    TtsLiveAppendResult.Accepted ->
+                        if (page.hasMoreAfter) {
+                            val advanced = advanceNativePage(subscription, run)
+                            healthy = advanced != null
+                            page = advanced ?: page
+                        } else {
+                            complete = true
+                        }
+                }
+            }
+        }
+        return complete
+    }
+
+    private suspend fun reconcileAnchor(
+        subscription: ConversationTimelineSubscriptionHandle,
+        initial: TimelinePageFfi,
+        run: TtsAutoReadRun,
+    ): TimelinePageFfi? =
+        when {
+            !reattachAutoReadTail(host, run) -> null
+            run.tail.following(initial) != null -> initial
+            else -> {
+                val jump = withContext(io) { subscription.jumpToMessage(requireNotNull(run.tail.messageId)) }
+                val outcome = (jump as? ConversationJumpOutcome.Window)?.outcome as? TimelinePageOutcome.Advanced
+                outcome?.page
+            }
+        }
+
+    private suspend fun appendFollowing(
+        page: TimelinePageFfi,
+        run: TtsAutoReadRun,
+    ): TtsLiveAppendResult {
+        val following = run.tail.following(page) ?: return TtsLiveAppendResult.Stopped
+        val records = following.iterator()
+        var result = TtsLiveAppendResult.Accepted
+        while (records.hasNext() && result == TtsLiveAppendResult.Accepted && owns(run, host.controller.state.value)) {
+            currentCoroutineContext().ensureActive()
+            val record = records.next()
+            result = appendRecord(record, run)
+            if (result == TtsLiveAppendResult.Accepted) run.tail.accepted(record.messageIdHex)
+        }
+        return if (owns(run, host.controller.state.value)) result else TtsLiveAppendResult.Stopped
+    }
+
+    private suspend fun appendRecord(
+        record: TimelineMessageRecordFfi,
+        run: TtsAutoReadRun,
+    ): TtsLiveAppendResult {
+        if (host.appendDeferred) return TtsLiveAppendResult.Deferred
+        return when {
+            !host.allowsAppend() -> TtsLiveAppendResult.Detached
+            record.deleted || record.invalidationStatus != null -> TtsLiveAppendResult.Accepted
+            record.plaintext.length > maxRetainedTextChars -> {
+                stopForGap(run)
+                TtsLiveAppendResult.Stopped
+            }
+            else -> {
+                val entry = withContext(io) { host.project(record) }
+                when {
+                    host.appendDeferred -> TtsLiveAppendResult.Deferred
+                    !host.allowsAppend() -> TtsLiveAppendResult.Detached
+                    entry == null || !owns(run, host.controller.state.value) -> TtsLiveAppendResult.Accepted
+                    !canRetainSpeech(host.controller, entry, maxRetainedMessages, maxRetainedTextChars) -> {
+                        stopForGap(run)
+                        TtsLiveAppendResult.Stopped
+                    }
+                    else -> {
+                        host.controller.appendSpeech(entry, run.locale)
+                        TtsLiveAppendResult.Accepted
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * MDK supplies the accepted edited body in plaintext (and parses its content tokens).
+     * Compare that effective body, not a raw event or a visible controller's optimistic overlay.
+     * A subsequent native edit, deletion or invalidation revokes captured speech without a screen.
+     */
+    private fun invalidatesQueuedSpeech(page: TimelinePageFfi): Boolean {
+        val queued = host.controller.queuedMessagesSnapshot().associateBy { it.messageIdHex }
+        return page.messages.any { record ->
+            val message = queued[record.messageIdHex]
+            message != null &&
+                (
+                    record.deleted ||
+                        record.invalidationStatus != null ||
+                        message.presentationEntry?.sourceText?.let { it != record.plaintext } == true
+                )
+        }
+    }
+
+    private suspend fun retryDeferredPage(
+        subscription: ConversationTimelineSubscriptionHandle,
+        run: TtsAutoReadRun,
+    ): TimelinePageFfi? {
+        host.awaitAppendReadiness()
+        // Revalidate native edits/deletions rather than retrying captured rows.
+        val fresh = withContext(io) { subscription.snapshot() }
+        val reconciled = fresh?.let { reconcileAnchor(subscription, it, run) }
+        if (reconciled == null) stopForGap(run)
+        return reconciled
+    }
+
+    private suspend fun advanceNativePage(
+        subscription: ConversationTimelineSubscriptionHandle,
+        run: TtsAutoReadRun,
+    ): TimelinePageFfi? {
+        val next = withContext(io) { subscription.paginateForwards(CONVERSATION_WINDOW_MAX_ROWS) }
+        val advanced = (next as? TimelinePageOutcome.Advanced)?.page
+        val valid = advanced?.takeIf { run.tail.following(it)?.isEmpty() == false }
+        if (valid == null) stopForGap(run)
+        return valid
+    }
+
+    private fun stopForGap(run: TtsAutoReadRun): Boolean {
+        if (owns(run, host.controller.state.value)) host.controller.stop()
+        return false
+    }
+}
+
+/** Keep native revocation live while history owns a detached speech window. */
+private suspend fun awaitTtsAutoReadUpdate(
+    host: TtsAutoReadContinuationHost,
+    io: CoroutineDispatcher,
+    subscription: ConversationTimelineSubscriptionHandle,
+    nextWindow: Deferred<TimelinePageFfi?>,
+    detached: Boolean,
+): TtsAutoReadUpdate =
+    coroutineScope {
+        if (!detached) return@coroutineScope TtsAutoReadUpdate(nextWindow.await(), true)
+        val readiness = async { host.awaitTailAttachment() }
+        try {
+            select {
+                nextWindow.onAwait { TtsAutoReadUpdate(it, true) }
+                readiness.onAwait {
+                    TtsAutoReadUpdate(withContext(io) { subscription.snapshot() }, false)
+                }
+            }
+        } finally {
+            readiness.cancelAndJoin()
+        }
+    }
+
+private fun retainedTextChars(queued: List<TtsQueuedMessage>): Long =
+    queued.sumOf { message ->
+        message.presentationEntry?.let { maxOf(it.text.length, it.sourceText?.length ?: 0).toLong() }
+            ?: message.chunks.sumOf { it.text.length.toLong() }
+    }
+
+private fun reattachAutoReadTail(
+    host: TtsAutoReadContinuationHost,
+    run: TtsAutoReadRun,
+): Boolean {
+    if (run.detached && host.allowsAppend()) {
+        val tail = host.controller.queuedMessageIds().lastOrNull() ?: return false
+        run.tail.accepted(tail)
+        run.detached = false
+    }
+    return true
+}
+
+/** Bound transient speech retention while an unattended session is paused. */
+private fun canRetainSpeech(
+    controller: TtsController,
+    entry: TtsSpeakableEntry,
+    maxRetainedMessages: Int,
+    maxRetainedTextChars: Int,
+): Boolean {
+    val queued = controller.queuedMessagesSnapshot()
+    if (queued.any { it.messageIdHex == entry.messageIdHex }) return true
+    val incomingChars = maxOf(entry.text.length, entry.sourceText?.length ?: 0)
+    return queued.size < maxRetainedMessages && retainedTextChars(queued) + incomingChars <= maxRetainedTextChars
+}
