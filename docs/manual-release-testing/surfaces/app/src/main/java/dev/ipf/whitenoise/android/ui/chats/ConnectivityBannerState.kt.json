@@ -10,6 +10,14 @@
         "test_ids": [
           "CHL-001"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerState.kt",
+        "surface": "Retained production connection banner and flash ownership",
+        "anchor": "internal fun rememberConnectivityBannerPresentation(",
+        "test_ids": [
+          "CHL-030"
+        ]
       }
     ],
     "source_coverage": [

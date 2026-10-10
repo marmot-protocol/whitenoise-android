@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -16,6 +17,60 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationForegroundPresentationTest {
+    /** Coherent geometry cannot expose a locally received replacement before it has committed. */
+    @Test
+    fun coherentPreDrawStillWaitsForTheCapturedLocalTimeline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val commit = CompletableDeferred<Unit>()
+            val settled =
+                ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = signals,
+                        currentState = { settled },
+                        expectedImeVisible = false,
+                        expectedVisibilityTimeoutMillis = 1_500,
+                        awaitLocalTimeline = { commit.await() },
+                    )
+                }
+            runCurrent()
+            signals.trySend(Unit)
+            runCurrent()
+            assertFalse(result.isCompleted)
+            commit.complete(Unit)
+            runCurrent()
+            assertEquals(settled, result.await())
+        }
+
+    /** Local handoff failure cannot widen the existing IME/presentation liveness window. */
+    @Test
+    fun stalledLocalTimelineSharesTheExistingPresentationDeadline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val neverCommitted = CompletableDeferred<Unit>()
+            var released = false
+            val settled =
+                ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = signals,
+                        currentState = { settled },
+                        expectedImeVisible = false,
+                        expectedVisibilityTimeoutMillis = 1_500,
+                        onSettleDeadlineExpired = { released = true },
+                        awaitLocalTimeline = { neverCommitted.await() },
+                    )
+                }
+            advanceTimeBy(1_501)
+            runCurrent()
+            assertTrue(released)
+            assertEquals(settled, result.await())
+            assertFalse(neverCommitted.isCancelled)
+        }
+
     @Test
     fun drawGateBlocksOnlyWhileTheForegroundTransactionOwnsPresentation() {
         var blocked = false

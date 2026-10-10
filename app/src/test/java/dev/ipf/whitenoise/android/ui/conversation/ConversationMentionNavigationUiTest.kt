@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -33,10 +34,12 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -180,6 +183,41 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
+    /** A media-like target height changes after native reading room has suspended the real list command. */
+    @Test
+    fun targetMeasurementChangeDuringSuspensionUsesFreshPhysicalBounds() {
+        assertMentionTop(suspendedFixture(SuspendedMentionAction.Height))
+    }
+
+    /** New tail rows and a structural header shift the target index while layout is suspended. */
+    @Test
+    fun windowAndHeaderChangeDuringSuspensionUsesTheCurrentTargetKey() {
+        assertMentionTop(suspendedFixture(SuspendedMentionAction.Window))
+    }
+
+    /** Repeated @ owns one completion; an obsolete suspended command cannot mark the target visited. */
+    @Test
+    fun repeatedTapSupersedesTheSuspendedMentionVisit() {
+        assertMentionTop(suspendedFixture(SuspendedMentionAction.RepeatedTap))
+    }
+
+    /** A real drag supersedes the waiting command before any stale landing/read completion can occur. */
+    @Test
+    fun dragDuringSuspendedMentionPreventsOldLandingAndCompletion() {
+        assertMentionTop(suspendedFixture(SuspendedMentionAction.Drag))
+    }
+
+    /** More than fifty mixed rows separate the original reader from the true final mention. */
+    private fun suspendedFixture(action: SuspendedMentionAction) =
+        MentionFixture(
+            target = Target(80, 0),
+            viewportHeight = 420,
+            padding = 12,
+            initialIndex = 90,
+            mixedRows = true,
+            suspendedAction = action,
+        )
+
     @Suppress("LongMethod") // One real-list fixture shares measurement and the production command.
     private fun assertMentionTop(fixture: MentionFixture) {
         val target = fixture.target
@@ -190,7 +228,7 @@ class ConversationMentionNavigationUiTest {
         val mixedRows = fixture.mixedRows
         val restoreTail = fixture.restoreTail
         val reopenAfterLanding = fixture.reopenAfterLanding
-        val state = MentionHarnessState()
+        val state = MentionHarnessState(target.height)
         val targetIndex = target.index
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -225,7 +263,7 @@ class ConversationMentionNavigationUiTest {
 
                     fun anchor(): ConversationScrollAnchor {
                         val index = listState.firstVisibleItemIndex
-                        val id = "message-${index - state.incomingCount}"
+                        val id = "message-${index - state.incomingCount - state.headerCount}"
                         return ConversationScrollAnchor(index, listState.firstVisibleItemScrollOffset, id, id)
                     }
                     LaunchedEffect(listState, coordinator) {
@@ -288,13 +326,16 @@ class ConversationMentionNavigationUiTest {
                             reverseLayout = true,
                             contentPadding = PaddingValues(bottom = (padding + readingReserve).dp),
                         ) {
+                            if (state.headerCount > 0) {
+                                item(key = "structural-header") { Text("Local header", Modifier.height(32.dp)) }
+                            }
                             items(
                                 (-state.incomingCount..maxOf(targetIndex, initialIndex) + 12).toList(),
                                 key = { "message-$it" },
                             ) { index ->
                                 val height =
                                     when {
-                                        index == targetIndex -> target.height
+                                        index == targetIndex -> state.targetHeight
                                         mixedRows && index % 9 == 0 -> 480
                                         else -> 72
                                     }
@@ -314,7 +355,9 @@ class ConversationMentionNavigationUiTest {
                                     state.completed =
                                         coordinator.jumpToMentionReadingStart(
                                             targetMessageId = "message-$targetIndex",
-                                            resolveTargetIndex = { targetIndex },
+                                            resolveTargetIndex = {
+                                                targetIndex + state.incomingCount + state.headerCount
+                                            },
                                             readLayout = { index ->
                                                 val layout =
                                                     conversationReadingLayoutInfo(listState.layoutInfo, overlap)
@@ -322,15 +365,26 @@ class ConversationMentionNavigationUiTest {
                                                     viewportEndOffsetPx = layout.viewportEndOffset,
                                                     itemHeightPx =
                                                         layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-                                                    estimatedItemHeightPx = target.height,
-                                                    isNewest = index == 0,
+                                                    estimatedItemHeightPx = state.targetHeight,
+                                                    isNewest = index == state.incomingCount + state.headerCount,
                                                     itemOffsetPx =
                                                         layout.visibleItemsInfo
                                                             .firstOrNull { it.index == index }
                                                             ?.offset,
                                                 )
                                             },
-                                            onCompleted = { coordinator.settleReadingAt(anchor()) },
+                                            awaitLayout = {
+                                                withFrameNanos { }
+                                                if (fixture.suspendedAction != null && !state.suspensionUsed) {
+                                                    state.suspensionUsed = true
+                                                    state.awaitingLayout = true
+                                                    state.layoutRelease.await()
+                                                }
+                                            },
+                                            onCompleted = {
+                                                state.completionCount++
+                                                coordinator.settleReadingAt(anchor())
+                                            },
                                         )
                                 }
                             },
@@ -376,7 +430,14 @@ class ConversationMentionNavigationUiTest {
             }
         }
         composeRule.onNodeWithTag("mention-jump").performClick()
+        applySuspendedMentionAction(fixture, state)
         composeRule.waitForIdle()
+        if (fixture.suspendedAction == SuspendedMentionAction.Drag) {
+            assertFalse(state.completed)
+            assertEquals(0, state.completionCount)
+            composeRule.onNodeWithTag("message-$targetIndex").assertDoesNotExist()
+            return
+        }
         val listTop =
             composeRule
                 .onNodeWithTag("mention-list")
@@ -390,9 +451,30 @@ class ConversationMentionNavigationUiTest {
         assertEquals(listTop, messageTop, 1f)
         composeRule.runOnIdle {
             assertTrue(state.completed)
+            assertEquals(1, state.completionCount)
             assertTrue(state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
         }
         assertMentionFollowUps(fixture, state, listTop)
+    }
+
+    /** Mutates the actual list while the command awaits a controlled layout continuation. */
+    private fun applySuspendedMentionAction(
+        fixture: MentionFixture,
+        state: MentionHarnessState,
+    ) {
+        val action = fixture.suspendedAction ?: return
+        composeRule.waitUntil { state.awaitingLayout }
+        when (action) {
+            SuspendedMentionAction.Height -> composeRule.runOnIdle { state.targetHeight = 720 }
+            SuspendedMentionAction.Window -> composeRule.runOnIdle {
+                state.incomingCount++
+                state.headerCount++
+            }
+            SuspendedMentionAction.RepeatedTap -> composeRule.onNodeWithTag("mention-jump").performClick()
+            SuspendedMentionAction.Drag -> composeRule.onNodeWithTag("mention-list").performTouchInput { swipeUp() }
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { state.layoutRelease.complete(Unit) }
     }
 
     /** Exercises reading-intent lifetime through incoming rows, gestures, route recreation and explicit return. */
@@ -456,13 +538,20 @@ class ConversationMentionNavigationUiTest {
         val incomingAfterLanding: Boolean = false,
         val gestureAfterLanding: Boolean = false,
         val reopenAfterLanding: Boolean = false,
+        val suspendedAction: SuspendedMentionAction? = null,
     ) {
         val layoutDirection: LayoutDirection
             get() = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
     }
 
     /** Mutable controls belong to this one test's composition and never escape to the app. */
-    private class MentionHarnessState {
+    private class MentionHarnessState(initialHeight: Int) {
+        var targetHeight by mutableIntStateOf(initialHeight)
+        var headerCount by mutableIntStateOf(0)
+        var awaitingLayout = false
+        var suspensionUsed = false
+        var completionCount = 0
+        val layoutRelease = CompletableDeferred<Unit>()
         var completed = false
         var tailReturned = false
         var incomingCount by mutableIntStateOf(0)
@@ -470,6 +559,8 @@ class ConversationMentionNavigationUiTest {
         var savedSnapshot: ConversationScrollSnapshot? = null
         var activeCoordinator: ConversationScrollCoordinator? = null
     }
+
+    private enum class SuspendedMentionAction { Height, Window, RepeatedTap, Drag }
 
     private data class Target(
         val height: Int,

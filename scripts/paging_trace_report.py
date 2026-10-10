@@ -47,15 +47,30 @@ def pct(values, p):
 
 
 def mention_phase_metrics(query, window):
-    """Missing trace labels stay unmeasured, rather than becoming false zero-duration phases."""
+    """Scope async phases to the receiver; separate reached landing from the later highlight hold."""
     phases = {}
-    for phase in ("total", "availability", "approach", "position", "animation", "layout", "correction"):
+    scoped_window = re.sub(r"\bts\b", "s.ts", window)
+    for phase in ("total", "availability", "approach", "position", "animation", "layout", "correction", "landed", "highlight"):
         rows = query(
-            f"select count(*) n, sum(dur)/1e6 ms from slice "
-            f"where name='WhiteNoise.conversation.mention.{phase}' and dur>=0 and {window}"
+            f"select count(*) n, sum(s.dur)/1e6 ms from process_slice s "
+            f"where s.process_name='{PKG}' and s.name='WhiteNoise.conversation.mention.{phase}' "
+            f"and s.dur>=0 and {scoped_window}"
         )
         phases[f"mention_{phase}_n"] = rows[0].n if rows else 0
         phases[f"mention_{phase}_ms"] = rows[0].ms if rows else None
+    starts = query(
+        f"select s.ts, s.upid from process_slice s where s.process_name='{PKG}' "
+        f"and s.name='WhiteNoise.conversation.mention.total' and {scoped_window}"
+    )
+    landings = query(
+        f"select s.ts, s.upid from process_slice s where s.process_name='{PKG}' "
+        f"and s.name='WhiteNoise.conversation.mention.landed' and s.dur>=0 and {scoped_window}"
+    )
+    phases['mention_tap_to_landing_ms'] = None
+    if len(starts) == len(landings) == 1 and starts[0].upid == landings[0].upid:
+        delta = landings[0].ts - starts[0].ts
+        if delta >= 0:
+            phases['mention_tap_to_landing_ms'] = delta / 1e6
     return phases
 
 
@@ -117,7 +132,11 @@ def analyse(path):
         runway_kept=int(sec("runwayKept", "count(*)")),
         edge_reached=int(sec("edgeReached", "count(*)")),
     )
-    mention = mention_phase_metrics(q, win) if test == "jumpToUnreadMentionFromHistory" else {}
+    if test == "jumpToUnreadMentionFromHistory":
+        q("INCLUDE PERFETTO MODULE slices.with_context;")
+        mention = mention_phase_metrics(q, win)
+    else:
+        mention = {}
     tp.close()
     return dict(
         test=test,

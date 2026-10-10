@@ -218,6 +218,8 @@ internal fun mentionJumpMetrics(): List<Metric> =
             pagingSection("WhiteNoise.conversation.mention.layout", TraceSectionMetric.Mode.Sum, "mentionLayoutMs"),
             pagingSection("WhiteNoise.conversation.mention.correction", TraceSectionMetric.Mode.Sum, "mentionCorrectionMs"),
             pagingSection("WhiteNoise.conversation.mention.correction", TraceSectionMetric.Mode.Count, "mentionCorrectionCount"),
+            pagingSection("WhiteNoise.conversation.mention.highlight", TraceSectionMetric.Mode.Sum, "mentionHighlightHoldMs"),
+            pagingSection("WhiteNoise.conversation.mention.landed", TraceSectionMetric.Mode.Count, "mentionLandingCount"),
         )
 
 /** One paging slice aggregated over the measured block, restricted to the app's own process. */

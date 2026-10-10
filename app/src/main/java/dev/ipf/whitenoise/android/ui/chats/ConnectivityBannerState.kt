@@ -245,16 +245,14 @@ internal fun rememberChatListConnectivityState(
             runtimeGeneration = runtimeGeneration,
             connectionState = controller.connectionState,
         )
-    var presentation by
-        remember(controller, activeAccountRef, runtimeGeneration) {
-            mutableStateOf(initialConnectivityBannerState(target))
-        }
-    val renderedPresentation =
-        if (presentation.target == target) presentation else connectivityBannerNext(presentation, target)
-    SideEffect {
-        if (presentation != renderedPresentation) presentation = renderedPresentation
-    }
     val foregroundEpoch = rememberConnectivityForegroundEpoch()
+    val renderedPresentation =
+        rememberConnectivityBannerPresentation(
+            owner = controller,
+            accountRef = activeAccountRef,
+            runtimeGeneration = runtimeGeneration,
+            target = target,
+        )
     LaunchedEffect(controller, target, renderedPresentation.displayed, foregroundEpoch) {
         controller.noteConnectionPresentation(renderedPresentation.displayed.diagnosticPhase())
     }
@@ -282,7 +280,27 @@ internal fun rememberChatListConnectivityState(
         revalidateOnForeground = controller::revalidateConnectionReadinessOnForeground,
         revalidateOnRelaySample = controller::revalidateConnectionReadinessOnRelaySample,
     )
-    LaunchedEffect(controller, activeAccountRef, runtimeGeneration, renderedPresentation) {
+    return renderedPresentation.displayed
+}
+
+/** Retains the production banner transition and success-flash owner across ordinary foreground edges. */
+@Composable
+internal fun rememberConnectivityBannerPresentation(
+    owner: Any,
+    accountRef: String?,
+    runtimeGeneration: Int,
+    target: ConnectivityBannerTarget,
+): ConnectivityBannerPresentation {
+    var presentation by
+        remember(owner, accountRef, runtimeGeneration) {
+            mutableStateOf(initialConnectivityBannerState(target))
+        }
+    val renderedPresentation =
+        if (presentation.target == target) presentation else connectivityBannerNext(presentation, target)
+    SideEffect {
+        if (presentation != renderedPresentation) presentation = renderedPresentation
+    }
+    LaunchedEffect(owner, accountRef, runtimeGeneration, renderedPresentation) {
         if (renderedPresentation.displayed == ConnectivityBannerState.JustConnected) {
             delay(CONNECTIVITY_BANNER_FLASH_MILLIS)
             if (presentation == renderedPresentation) {
@@ -290,7 +308,7 @@ internal fun rememberChatListConnectivityState(
             }
         }
     }
-    return renderedPresentation.displayed
+    return renderedPresentation
 }
 
 /**

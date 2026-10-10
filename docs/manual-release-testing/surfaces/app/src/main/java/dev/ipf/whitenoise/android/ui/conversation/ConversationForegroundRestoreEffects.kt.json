@@ -1,0 +1,44 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+  "legacy_sha256": "5497b785041e286b82f8ac52e649dc3ff74a0c026ac93425ee4919f26fdc7eb4",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationForegroundRestoreEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "anchor": "fun ConversationForegroundRestoreEffects(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "ConversationImeReanchorEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "anchor": "fun ConversationImeReanchorEffect(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Foreground invitation authority retry without consent mutation replay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "anchor": "scope.launch { controller.retryInviteAcceptanceAuthority() }",
+        "test_ids": [
+          "GRP-011",
+          "GRP-014"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "surface": "Already received local transcript handoff before foreground presentation",
+        "anchor": "controller.pendingTimelineAtForeground()",
+        "test_ids": [
+          "CON-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
