@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Surface
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -42,11 +43,23 @@ class ChatFolderEditContentTest {
     @Test fun membershipAndPreviewPrecedeDisplayPreferences() {
         render(state = editState(name = "Work"))
         composeRule.onNodeWithTag("folder.name").assertExists()
-        val included = composeRule.onNodeWithTag("folder.includedChats").fetchSemanticsNode().boundsInRoot
-        val preview = composeRule.onNodeWithTag("folder.preview").fetchSemanticsNode().boundsInRoot
-        val visibility = composeRule.onNodeWithTag("folder.showWhenEmpty").fetchSemanticsNode().boundsInRoot
-        assertTrue(included.top < preview.top)
-        assertTrue(preview.top < visibility.top)
+        val content = composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+        val positions =
+            listOf("folder.includedChats", "folder.preview", "folder.showWhenEmpty").map { tag ->
+                content.performScrollToNode(hasTestTag(tag))
+                val scroll = content.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+                val top =
+                    composeRule
+                        .onNodeWithTag(tag)
+                        .fetchSemanticsNode()
+                        .boundsInRoot.top
+                scroll to top
+            }
+        assertTrue(
+            positions.zipWithNext().all { (earlier, later) ->
+                earlier.first < later.first || (earlier.first == later.first && earlier.second < later.second)
+            },
+        )
     }
 
     /** Every sort mode is reachable and the default Chats all-active rule remains editable. */

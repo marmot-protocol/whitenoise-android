@@ -127,6 +127,9 @@ class ChatFolderEditScreenTest {
         renderEditor(appState, {}, folderId = null)
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Personal")
         composeRule.onNodeWithTag("folder.description").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+            .performScrollToNode(hasTestTag("folder.addDescription"))
         composeRule.onNodeWithTag("folder.addDescription").performClick()
         composeRule.onNodeWithTag("folder.description").performTextReplacement("My notes")
         composeRule.onNodeWithTag("folder.save").performClick()
