@@ -3,9 +3,16 @@ name: presentation-group-ui-entity-disabled
 ---
 - assertVisible:
     text: Fixture entities
+- assertVisible: Fixture member
 - assertVisible:
-    text: Fixture member
     enabled: false
+    containsChild:
+      text: Fixture member
+- tapOn:
+    enabled: false
+    containsChild:
+      text: Fixture member
+- assertVisible: Fixture entities
 - back
 - assertVisible:
     id: presentation.complete

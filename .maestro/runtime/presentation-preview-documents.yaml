@@ -7,6 +7,11 @@ name: presentation-preview-documents
 - tapOn: Add more
 - assertVisible: Photo library
 - assertVisible: Document
+- back
+- assertVisible: Preview
+- tapOn: Add more
+- assertVisible: Photo library
+- assertVisible: Document
 - tapOn: Document
 - assertVisible:
     id: presentation.complete

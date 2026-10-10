@@ -4,6 +4,10 @@ name: presentation-selection-transport-rate
 - assertVisible: Speech rate, current .*
 - tapOn: Speech rate, current .*
 - assertVisible: System \(follow device setting\)
+- back
+- assertVisible: Speech rate, current .*
+- tapOn: Speech rate, current .*
+- assertVisible: System \(follow device setting\)
 - tapOn: System \(follow device setting\)
 - assertVisible:
     id: presentation.complete

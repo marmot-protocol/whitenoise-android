@@ -9,9 +9,16 @@ name: presentation-group-ui-emoji-empty
     element:
       text: Use emoji image
     direction: DOWN
+- assertVisible: Use emoji image
 - assertVisible:
-    text: Use emoji image
     enabled: false
+    containsChild:
+      text: Use emoji image
+- tapOn:
+    enabled: false
+    containsChild:
+      text: Use emoji image
+- assertVisible: No emoji selected
 - back
 - assertVisible:
     id: presentation.complete

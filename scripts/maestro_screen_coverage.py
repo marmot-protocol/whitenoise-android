@@ -6,6 +6,17 @@ from pathlib import Path
 import yaml
 
 
+def has_substitution(value):
+    """Runtime-expanded selectors cannot establish a maintained literal screen assertion."""
+    if isinstance(value, str):
+        return '${' in value
+    if isinstance(value, dict):
+        return any(has_substitution(item) for item in value.values())
+    if isinstance(value, list):
+        return any(has_substitution(item) for item in value)
+    return False
+
+
 def flow_assertions(path, root, active=None):
     """Collect unconditional assertions; optional, conditional and substituted paths grant no credit."""
     if any(part.is_symlink() for part in [path, *path.parents]):
@@ -32,7 +43,7 @@ def flow_assertions(path, root, active=None):
             selector = command['assertVisible']
             if isinstance(selector, str):
                 selector = {'text': selector}
-            if isinstance(selector, dict) and selector.get('optional'):
+            if isinstance(selector, dict) and (selector.get('optional') or has_substitution(selector)):
                 continue
             if (not isinstance(selector, dict) or not selector
                     or not set(selector) <= {'text', 'id', 'enabled', 'selected', 'checked', 'index', 'focused', 'containsChild', 'containsDescendants'}):

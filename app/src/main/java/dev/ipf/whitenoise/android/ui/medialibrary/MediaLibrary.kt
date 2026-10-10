@@ -1116,7 +1116,7 @@ private fun FileLibraryRow(
                 val menuScrollState = rememberScrollState()
                 DropdownMenu(
                     scrollState = menuScrollState,
-                    modifier = Modifier.scrollEdgeFade(menuScrollState),
+                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                     shape = MenuDefaults.shape,

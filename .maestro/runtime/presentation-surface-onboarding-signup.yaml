@@ -7,6 +7,10 @@ name: presentation-surface-onboarding-signup
     id: onboarding.sign_up.action
 - tapOn:
     id: onboarding.sign_up.action
+- scrollUntilVisible:
+    element:
+      text: No internet connection.*
+    direction: DOWN
 - assertVisible:
     text: No internet connection.*
 - tapOn: Back

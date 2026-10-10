@@ -420,7 +420,7 @@ internal fun AvatarViewerFrame(
                 val menuScrollState = rememberScrollState()
                 DropdownMenu(
                     scrollState = menuScrollState,
-                    modifier = Modifier.scrollEdgeFade(menuScrollState),
+                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
                 ) {

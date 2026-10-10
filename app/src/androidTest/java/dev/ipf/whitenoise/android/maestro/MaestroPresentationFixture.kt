@@ -33,6 +33,7 @@ import org.json.JSONObject
 internal class MaestroPresentationFixture(
     val scenario: String,
     private val expected: List<String>,
+    val peerAccountIdHex: String,
     val nativeChat: ChatListItem? = null,
 ) : AutoCloseable {
     private val calls = mutableListOf<String>()
@@ -115,17 +116,26 @@ internal class MaestroPresentationFixture(
             scenario.startsWith("update-") -> MaestroUpdatePresentation(this)
             scenario.startsWith("startup-") -> MaestroStartupPresentation(this)
             scenario.startsWith("text-") -> MaestroTextPresentation(this)
-            scenario.startsWith("image-") -> MaestroImagePresentation(this)
-            scenario.startsWith("nostr-") -> MaestroNostrPresentation(this)
+            scenario.substringBefore('-') in setOf("image", "nostr", "preview") -> MediaContent()
             scenario.startsWith("dictation-") -> MaestroDictationPresentation(this)
             scenario.startsWith("feedback-") -> MaestroFeedbackPresentation(this)
             scenario.startsWith("setup-") -> MaestroSetupPresentation(this)
             scenario.startsWith("selection-") -> MaestroSelectionPresentation(this)
-            scenario.startsWith("preview-") -> MaestroPreviewPresentation(this)
             scenario.startsWith("group-ui-") -> MaestroGroupPresentation(this)
             scenario.startsWith("surface-") -> MaestroSurfacePresentation(this)
             scenario.startsWith("extra-") -> MaestroExtraPresentation(this)
             else -> MaestroBoundaryPresentation(this)
+        }
+    }
+
+    @Composable
+    @Suppress("FunctionNaming")
+    private fun MediaContent() {
+        when (scenario.substringBefore('-')) {
+            "image" -> MaestroImagePresentation(this)
+            "nostr" -> MaestroNostrPresentation(this)
+            "preview" -> MaestroPreviewPresentation(this)
+            else -> error("Unknown media presentation")
         }
     }
 

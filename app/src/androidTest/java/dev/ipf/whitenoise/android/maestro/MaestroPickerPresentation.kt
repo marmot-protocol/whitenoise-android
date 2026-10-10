@@ -21,7 +21,8 @@ import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
 @Composable
 @Suppress("FunctionNaming")
 internal fun MaestroPickerPresentation(fixture: MaestroPresentationFixture) {
-    val account = fixture.appState.accounts[1]
+    // Native summaries are ordered independently of fixture creation order.
+    val account = fixture.appState.accounts.single { it.accountIdHex == fixture.peerAccountIdHex }
     val candidate =
         RecipientSearch.Candidate(
             account.accountIdHex,

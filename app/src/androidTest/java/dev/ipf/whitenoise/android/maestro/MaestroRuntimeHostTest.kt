@@ -5,6 +5,7 @@ import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
@@ -232,13 +233,15 @@ class MaestroRuntimeHostTest {
                     }
                     editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
                     accountActionBaseline = captureMaestroAccountAction(native, app, group, postcondition)
-                    if (requiresMaestroMessageBaseline(postcondition)) {
-                        expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
-                        val original = checkNotNull(nativeRow.row.lastMessage)
-                        check(original.plaintext == "Generated fixture message")
-                        messageBaseline =
-                            MaestroMessageBaseline(owner.label, original.messageIdHex, group, accounts[1].label)
-                    }
+                    expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
+                    messageBaseline =
+                        captureMaestroMessageBaseline(
+                            nativeRow.row.lastMessage,
+                            postcondition,
+                            owner.label,
+                            group,
+                            accounts[1].label,
+                        )
                     File(directory, "setup.json").writeText(
                         JSONObject()
                             .put("generation", generation)
@@ -252,7 +255,13 @@ class MaestroRuntimeHostTest {
                     checkNotNull(activity).onActivity { originalActivity = it }
                     inboundShareBaseline =
                         captureMaestroInboundShare(native, app, checkNotNull(activity), group, fixture)
-                    presentation = loadMaestroPresentation(app, group, chatListItemFromProjection(nativeRow.row).latest)
+                    presentation =
+                        loadMaestroPresentation(
+                            app,
+                            group,
+                            chatListItemFromProjection(nativeRow.row).latest,
+                            accounts[1].accountIdHex,
+                        )
                     presentation?.let { fixturePresentation ->
                         checkNotNull(activity).onActivity { fixturePresentation.install(it) }
                     }
@@ -468,10 +477,24 @@ private fun maestroProfileNames(fixture: String): List<String> =
         listOf("Maestro Alice", "Maestro Bob", "Maestro Carol")
     }
 
+private fun captureMaestroMessageBaseline(
+    message: ChatListMessagePreviewFfi?,
+    postcondition: String,
+    owner: String,
+    group: String,
+    peer: String,
+): MaestroMessageBaseline? {
+    if (!requiresMaestroMessageBaseline(postcondition)) return null
+    val original = checkNotNull(message)
+    check(original.plaintext == "Generated fixture message")
+    return MaestroMessageBaseline(owner, original.messageIdHex, group, peer)
+}
+
 private suspend fun loadMaestroPresentation(
     app: WhiteNoiseAppState,
     group: String,
     lastMessage: AppMessageRecordFfi?,
+    peerAccountIdHex: String,
 ): MaestroPresentationFixture? {
     val arguments = InstrumentationRegistry.getArguments()
     val scenario = arguments.getString("presentationScenario") ?: return null
@@ -491,7 +514,7 @@ private suspend fun loadMaestroPresentation(
         } else {
             null
         }
-    return MaestroPresentationFixture(scenario, actions, nativeChat)
+    return MaestroPresentationFixture(scenario, actions, peerAccountIdHex, nativeChat)
 }
 
 /** The outer setup deadline remains authoritative; each member also has a bounded diagnostic retry. */

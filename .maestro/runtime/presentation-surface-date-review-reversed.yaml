@@ -3,9 +3,16 @@ name: presentation-surface-date-review-reversed
 ---
 - assertVisible:
     text: Custom Range
+- assertVisible: OK
 - assertVisible:
-    text: OK
     enabled: false
+    containsChild:
+      text: OK
+- tapOn:
+    enabled: false
+    containsChild:
+      text: OK
+- assertVisible: Custom Range
 - assertVisible:
     text: End date must be on or after the start date.
 - tapOn: Cancel

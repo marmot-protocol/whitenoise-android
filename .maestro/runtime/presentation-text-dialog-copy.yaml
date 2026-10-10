@@ -5,7 +5,7 @@ name: presentation-text-dialog-copy
     text: Fixture decoded.txt
 - assertVisible:
     text: Fixture decoded first line.*
-- tapOn: Copy
+- tapOn: Copy text
 - tapOn: Back
 - assertVisible:
     id: presentation.complete

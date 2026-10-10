@@ -3,6 +3,10 @@ name: presentation-group-ui-disappearing-custom
 ---
 - assertVisible:
     text: Disappearing messages
+- scrollUntilVisible:
+    element:
+      text: Custom time
+    direction: DOWN
 - tapOn: Custom time
 - assertVisible:
     text: Set

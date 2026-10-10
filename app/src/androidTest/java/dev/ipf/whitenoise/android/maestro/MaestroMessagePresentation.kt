@@ -63,7 +63,7 @@ private fun HistoryPresentation(fixture: MaestroPresentationFixture) {
 @Composable
 @Suppress("FunctionNaming")
 private fun MentionPresentation(fixture: MaestroPresentationFixture) {
-    val account = fixture.appState.accounts[1]
+    val account = fixture.appState.accounts.single { it.accountIdHex == fixture.peerAccountIdHex }
     val candidate =
         MentionComposer.Candidate(
             accountIdHex = account.accountIdHex,

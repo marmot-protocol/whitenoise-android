@@ -1083,7 +1083,8 @@ internal fun ViewerPage(
         viewerTooLarge = false
         try {
             val data =
-                latestImageBytes?.invoke() ?: attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
+                latestImageBytes?.invoke()
+                    ?: attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,

@@ -6,10 +6,16 @@ name: presentation-surface-addprofile-signin
 - assertVisible:
     text: Sign Up
 - tapOn: Sign In
+- assertVisible: Sign In
 - assertVisible:
-    text: Sign In
-    index: 1
     enabled: false
+    containsChild:
+      text: Sign In
+- tapOn:
+    enabled: false
+    containsChild:
+      text: Sign In
+- assertVisible: Sign In
 - tapOn: Back
 - assertVisible:
     text: Sign Up
