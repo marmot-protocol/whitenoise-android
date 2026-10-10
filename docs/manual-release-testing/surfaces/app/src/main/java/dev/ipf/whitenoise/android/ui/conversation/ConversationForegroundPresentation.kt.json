@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+  "legacy_sha256": "03a08872ae11a4fd5d932b9cb73174f2809253c06e2c1bb59237a33a34bace3f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationForegroundDrawGateEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+        "anchor": "fun ConversationForegroundDrawGateEffect(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+        "surface": "Local content and IME geometry share the existing presentation deadline",
+        "anchor": "awaitLocalTimeline()",
+        "test_ids": [
+          "CON-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -6,12 +6,14 @@ import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.marmotkit.ProductEventFfi
 import dev.ipf.marmotkit.ProductEventPropertyFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import kotlinx.coroutines.CompletableDeferred
 
 internal data class RecoveryStampedTimelineWindow(
     val page: TimelinePageFfi,
     val recoveryGeneration: Long?,
     val receivedAtElapsedMs: Long,
     val productObservationTicket: Long?,
+    val foregroundHandoff: CompletableDeferred<Boolean>,
 )
 
 /** Binds presentation observations to the app's consent-gated product recorder. */

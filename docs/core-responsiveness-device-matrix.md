@@ -52,3 +52,33 @@ unbounded history, polling loop or unconditional foreground catch-up/reopen.
 
 Use `Refs` for this candidate while physical criteria remain outstanding. A
 merged PR or green CI does not close these issues or their parent outcomes.
+
+## Additional acceptance harnesses
+
+The retained transcript now captures the already received subscription tail
+before resume and awaits its actual commit within the existing presentation
+deadline. It introduces no message cache, native snapshot replay, second
+receiver or network wait. A projection that has not returned from `nextWindow`
+is a separate native boundary and is not covered by this local receipt barrier.
+
+`ConversationRetainedTranscriptFirstFrameAndroidTest` mounts the production
+conversation screen. It checks the first actual painted composition with
+consumed, queued and replacement-only windows, held roster enrichment, open
+and denied IME visibility, an older reading anchor and disposal. Its stale A
+negative control must reject painted content even when the controller has B.
+`ChatListConnectionResumeDeviceTest` samples actual banner draws through a
+retained Activity edge, detects an injected visible attempt, and exercises the
+production recovery flash. Paired controller tests advance the real automatic
+retry deadline for EOF and failure of either or both inputs. These controlled
+cases do not classify an uncaptured real five-second recurrence.
+
+The real mention list regressions add suspended height, window/header, repeated
+tap and drag cases. The trace report reads receiver-scoped asynchronous process
+tracks, counts measured correction phases and separates tap-to-reached-landing
+from the intentional highlight dwell. Historical d19 and dff traces contain
+these async phases, but their fixtures differ; they remain unpaired evidence.
+A manual credential-free before/after artifact mode on the existing staging
+workflow supports fresh owned-emulator fixtures with an identical native pin.
+It cannot be installed on a personal Dev app. Hosted tests and the paired
+measurement campaign must pass before these additional harnesses qualify the
+remaining issues; Max's separate GrapheneOS acceptance is deferred.

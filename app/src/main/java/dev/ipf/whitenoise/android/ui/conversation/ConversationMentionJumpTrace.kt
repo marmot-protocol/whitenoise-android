@@ -9,4 +9,6 @@ internal object ConversationMentionJumpTrace {
     const val ANIMATION = "WhiteNoise.conversation.mention.animation"
     const val LAYOUT = "WhiteNoise.conversation.mention.layout"
     const val CORRECTION = "WhiteNoise.conversation.mention.correction"
+    const val LANDED = "WhiteNoise.conversation.mention.landed"
+    const val HIGHLIGHT = "WhiteNoise.conversation.mention.highlight"
 }

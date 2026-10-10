@@ -36,12 +36,14 @@ internal data class ConversationForegroundSettleState(
  * otherwise the captured snapshot remains armed until later settled geometry
  * arrives to apply the one deferred correction without blocking presentation.
  */
+@Suppress("LongParameterList") // Independent local handoff, geometry and IME inputs share one liveness deadline.
 internal suspend fun awaitConversationForegroundPresentation(
     preDrawSignals: ReceiveChannel<Unit>,
     currentState: () -> ConversationForegroundSettleState,
     expectedImeVisible: Boolean,
     expectedVisibilityTimeoutMillis: Long,
     onSettleDeadlineExpired: () -> Unit = {},
+    awaitLocalTimeline: suspend () -> Unit = {},
 ): ConversationForegroundSettleState {
     /** Returns the first pre-draw state accepted by [predicate]. */
     suspend fun awaitState(predicate: ForegroundSettlePredicate): ConversationForegroundSettleState {
@@ -54,6 +56,7 @@ internal suspend fun awaitConversationForegroundPresentation(
 
     val requestedPresentation =
         withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
+            awaitLocalTimeline()
             awaitState { it.isSettled(expectedImeVisible) }
         }
     if (requestedPresentation != null) return requestedPresentation

@@ -2462,12 +2462,16 @@ internal fun ConversationScreen(
                             },
                         )
                     if (!reached || !navigationRequest.isCurrent()) return@launch
+                    // Keep the landing point on the same process-track family as the async approach.
+                    tracedPagingSection(ConversationMentionJumpTrace.LANDED) { Unit }
                     // Mark read up to the visited mention so the count — and the
                     // chat-list @-badge — decrement in step; advance the local read
                     // anchor so the chip's derived count updates immediately.
                     readAnchorMessageId = targetMessageId
                     controller.markReadUpTo(targetMessageId)
-                    showTransientMessageHighlight(targetMessageId)
+                    tracedPagingSection(ConversationMentionJumpTrace.HIGHLIGHT) {
+                        showTransientMessageHighlight(targetMessageId)
+                    }
                 }
             }
     }
@@ -4144,6 +4148,7 @@ internal fun ConversationScreen(
                                                 openActionMenuId == null,
                                     ),
                         ) {
+                            val composedTranscriptRows = ConversationTranscriptDrawProbe.composedRows(renderedTimeline)
                             LazyColumn(
                                 state = listState,
                                 modifier =
@@ -4161,7 +4166,14 @@ internal fun ConversationScreen(
                                         // final row or unknown notification roster therefore
                                         // cannot become observable before both owners commit.
                                         .drawWithContent {
-                                            if (transcriptReadyToReveal) drawContent()
+                                            if (transcriptReadyToReveal) {
+                                                drawContent()
+                                                ConversationTranscriptDrawProbe.drawn(
+                                                    controller,
+                                                    composedTranscriptRows,
+                                                    listState.layoutInfo,
+                                                )
+                                            }
                                         }.graphicsLayer {
                                             alpha = if (transcriptReadyToReveal) 1f else 0f
                                         }.semantics {

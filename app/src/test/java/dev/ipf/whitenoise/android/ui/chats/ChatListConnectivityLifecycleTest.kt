@@ -293,7 +293,13 @@ class ChatListConnectivityLifecycleTest {
                         runtimeGeneration = RUNTIME_GENERATION,
                         connectionState = connectionState.value,
                     )
-                val displayed = initialConnectivityBannerState(target).displayed
+                val displayed =
+                    rememberConnectivityBannerPresentation(
+                        owner = connectionState,
+                        accountRef = ACCOUNT,
+                        runtimeGeneration = RUNTIME_GENERATION,
+                        target = target,
+                    ).displayed
                 SideEffect { renderedStates.add(displayed) }
                 WhiteNoiseTheme { ChatListInlineConnectivityIndicator(displayed) }
             }
