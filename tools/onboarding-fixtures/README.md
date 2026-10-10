@@ -118,3 +118,44 @@ usable declarations imported through MainActivity, or `-e relayChangedSource tru
 to introduce the declarations after a missing-source preview. Both bind port
 44202 and must run sequentially. These switches are distinct from the process
 restart phase and must not be combined with it.
+
+
+## Account switch during live invitation discovery
+
+`InvitationAccountSwitchDeviceTest` mounts MainActivity with disposable native
+accounts in the isolated test-only package. Its two modes submit through Create
+and Add member controls, hold the recipient's real kind-30443 discovery response,
+and switch through the production account-selection API. Authentication-required
+discovery must leave both accounts and the original roster unchanged and publish
+no Welcome. Switching back and explicitly resubmitting must deliver an invitation
+that the independently running recipient accepts. Account switching alone does
+not revoke an already submitted native mutation; the rejection is imposed by the
+relay, not inferred from a switch.
+
+```sh
+adb -s <fixture-device> shell am instrument -w -r -e invitationSwitchE2e true \
+  -e invitationMode <create-or-add> \
+  -e class dev.ipf.whitenoise.android.maestro.InvitationAccountSwitchDeviceTest \
+  dev.ipf.whitenoise.android.maestrolab.test/dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner
+```
+
+Run each mode in a fresh instrumentation process; the real app has process-owned
+controllers and callbacks beyond an Activity lifetime. Do not mount a second
+independent AppState over those owners in the same process.
+
+## Genuine late signer callback after native runtime replacement
+
+On an owned emulator with official Amber and the public scalar-one test key
+configured as above, `LateSignerRuntimeDeviceTest` holds Amber's genuine signed
+response at the native callback boundary. It closes the old setup controller and
+native runtime, reopens the same durable store with a new app state, and begins
+another account's setup. Releasing the old signature must not change that account's
+checkpoint or publish. The new account's explicit approval is a positive control
+and must publish exactly once under its own key. This is runtime replacement in
+one process, not an Android process-death claim.
+
+```sh
+adb -s <owned-emulator> shell am instrument -w -r -e lateSignerE2e true \
+  -e class dev.ipf.whitenoise.android.maestro.LateSignerRuntimeDeviceTest \
+  dev.ipf.whitenoise.android.maestrolab.test/dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner
+```

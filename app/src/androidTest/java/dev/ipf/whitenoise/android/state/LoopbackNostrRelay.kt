@@ -13,6 +13,8 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
@@ -45,6 +47,28 @@ internal class LoopbackNostrRelay(
 
     /** Hides only the selected author's declarations while keeping other fixture accounts healthy. */
     @Volatile var hiddenAuthorsByKind: Map<Int, Set<String>> = emptyMap()
+
+    /** Pauses a specific recipient's real package reads until the device test changes account ownership. */
+    @Volatile var packageReadHold: PackageReadHold? = null
+
+    /** Bounded network barrier; closing the fixture always releases blocked clients. */
+    class PackageReadHold(
+        val author: String,
+    ) : Closeable {
+        val observed = CountDownLatch(1)
+        private val released = CountDownLatch(1)
+
+        /** Marks an actual matching request before holding its response. */
+        fun awaitRelease() {
+            observed.countDown()
+            check(released.await(30, TimeUnit.SECONDS)) { "Package fixture was not released" }
+        }
+
+        /** Allows held relay responses to complete after the ownership boundary has changed. */
+        override fun close() {
+            released.countDown()
+        }
+    }
 
     /** Records every publication attempt, including repeated sends with the same event ID. */
     fun publicationAttempts(kind: Int): List<JSONObject> =
@@ -90,6 +114,7 @@ internal class LoopbackNostrRelay(
 
     /** Stops accepting and drops every open connection. */
     override fun close() {
+        packageReadHold?.close()
         runCatching { server.close() }
         clients.forEach(Client::close)
         clients.clear()
@@ -188,6 +213,7 @@ internal class LoopbackNostrRelay(
                     val id = message.getString(1)
                     val filters = (2 until message.length()).map(message::getJSONObject)
                     synchronized(lock) { requests += filters.map { JSONObject(it.toString()) } }
+                    holdPackageRead(filters)
                     if (filters.any { filter ->
                             val kinds = filter.optJSONArray("kinds")
                             kinds != null && (0 until kinds.length()).any { kinds.getInt(it) in authRequiredKinds }
@@ -217,6 +243,19 @@ internal class LoopbackNostrRelay(
                 }
                 "CLOSE" -> subscriptions.remove(message.getString(1))
             }
+        }
+
+        /** Holds only the intended author and kind, leaving other accounts and relay operations responsive. */
+        private fun holdPackageRead(filters: List<JSONObject>) {
+            val hold = packageReadHold ?: return
+            val matches =
+                filters.any { filter ->
+                    val kinds = filter.optJSONArray("kinds") ?: JSONArray()
+                    val authors = filter.optJSONArray("authors") ?: JSONArray()
+                    (0 until kinds.length()).any { kinds.getInt(it) == 30443 } &&
+                        (0 until authors.length()).any { authors.getString(it) == hold.author }
+                }
+            if (matches) hold.awaitRelease()
         }
 
         /** Stored events matching any filter, newest first and within each filter's limit. */
