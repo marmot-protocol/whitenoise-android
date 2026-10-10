@@ -20,9 +20,11 @@ internal data class NotificationRouteSample(
     val durationMs: Long,
     val transcriptVisible: Boolean,
     val expectedConversationVisible: Boolean,
+    /** Loading or chat-list surfaces the root drew before the conversation, from its own frame markers. */
+    val intermediateSurfaces: List<String> = emptyList(),
 ) {
     val succeeded: Boolean
-        get() = transcriptVisible && expectedConversationVisible
+        get() = transcriptVisible && expectedConversationVisible && intermediateSurfaces.isEmpty()
 }
 
 internal data class ConversationSettingsLaunchSample(
@@ -447,6 +449,7 @@ internal class WhiteNoiseJourneys {
     ): NotificationRouteSample {
         device.openNotification()
         val notification = waitForText(notificationText)
+        clearRenderedSurfaceLog()
         val intentDeliveryApproximationMs = SystemClock.elapsedRealtime()
         notification.click()
         val diagnosticDeadlineMs = intentDeliveryApproximationMs + NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS
@@ -470,7 +473,62 @@ internal class WhiteNoiseJourneys {
             durationMs = durationMs,
             transcriptVisible = transcript != null,
             expectedConversationVisible = expectedConversation != null,
+            intermediateSurfaces = RenderedSurfaceLog.intermediateBeforeConversation(readRenderedSurfaceLog()),
         )
+    }
+
+    /** Empties the app's frame markers so the sample reads only the surfaces this tap caused. */
+    fun clearRenderedSurfaceLog() {
+        device.executeShellCommand("logcat -c")
+    }
+
+    /** The app's rendered-surface markers since [clearRenderedSurfaceLog], as the root recorded them. */
+    fun readRenderedSurfaceLog(): String = device.executeShellCommand("logcat -d -s WNWarmResume:I")
+
+    /** Restores the non-target account and leaves the device home, as the warm journey does before each sample. */
+    fun prepareSourceAccountAtHome() {
+        val sourceAccountRef =
+            BenchmarkConfig.requireFixture(BenchmarkConfig.notificationSourceAccountRef, "notificationSourceAccountRef")
+        returnToChatList()
+        activateNotificationSourceAccount(sourceAccountRef)
+        device.pressHome()
+        device.waitForIdle()
+    }
+
+    /** Kills the app process and leaves the device home, so the next tap starts a new process. */
+    fun killAppAndGoHome() {
+        device.executeShellCommand("am force-stop ${BenchmarkConfig.TARGET_PACKAGE}")
+        check(device.pressHome()) { "Failed to return home before a cold-process notification tap." }
+        device.waitForIdle()
+    }
+
+    /** Taps a fresh notification and reports when the app lock surface, not any content, first appears. */
+    fun openNotificationToAppLock(notificationText: String): Long {
+        device.openNotification()
+        val notification = waitForText(notificationText)
+        val tapMs = SystemClock.elapsedRealtime()
+        notification.click()
+        device.onElementOrNull(timeoutMs = NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS) {
+            textAsString() == APP_LOCKED_TITLE
+        } ?: error("The app lock surface never appeared after the notification tap.")
+        return SystemClock.elapsedRealtime() - tapMs
+    }
+
+    /** Runs the host-provided unlock, then reports when the first readable conversation frame appears. */
+    fun unlockToConversation(
+        unlockCommand: String,
+        expectedConversationTitle: String,
+    ): Long {
+        val unlockMs = SystemClock.elapsedRealtime()
+        device.executeShellCommand(unlockCommand)
+        val transcript = findVisibleTag(PerformanceTags.CONVERSATION_TRANSCRIPT_VISIBLE, NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS)
+        checkNotNull(transcript) { "No readable transcript appeared after unlock." }
+        val title =
+            device.onElementOrNull(timeoutMs = NAVIGATION_SETTLE_TIMEOUT_MS) {
+                textAsString() == expectedConversationTitle && isVisibleOnDisplay()
+            }
+        checkNotNull(title) { "The unlocked route opened the wrong conversation." }
+        return SystemClock.elapsedRealtime() - unlockMs
     }
 
     /** Unwinds only White Noise routes until the authenticated chat list is visible. */
@@ -865,6 +923,7 @@ internal class WhiteNoiseJourneys {
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
         const val NOTIFICATION_ROUTE_TIMEOUT_MS = 10_000L
         const val NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS = 15_000L
+        const val APP_LOCKED_TITLE = "White Noise is locked"
         const val SETTINGS_SCROLL_STEPS = 12
         const val MAX_CHAT_LIST_UNWIND_STEPS = 6
         const val NAVIGATION_SETTLE_TIMEOUT_MS = 2_000L

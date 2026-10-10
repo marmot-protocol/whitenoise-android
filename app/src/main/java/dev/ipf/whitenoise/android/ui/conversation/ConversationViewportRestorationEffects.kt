@@ -9,6 +9,7 @@ import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -21,12 +22,15 @@ internal data class ConversationViewportRestorationInputs(
     val entryProjectionAvailable: Boolean,
     val notificationOpenRequestId: Long,
     val seedTailAwaitingAuthoritative: Boolean,
+    // The tapped card's message, already verified against this controller's account and group.
+    val notificationTargetMessageId: String? = null,
 )
 
 internal data class ConversationViewportRestorationCallbacks(
     val navigation: ConversationViewportNavigation,
     val onAnchored: (latestItemId: String?) -> Unit,
     val retireUnreadDivider: () -> Unit,
+    val notification: ConversationNotificationLandingCallbacks = ConversationNotificationLandingCallbacks(),
 )
 
 /** Initial/unread/saved positioning and post-initial geometry, not IME or lifecycle ownership. */
@@ -45,6 +49,13 @@ internal fun ConversationViewportRestorationEffects(
         snapshotFlow { viewport.readingLayoutInfo().viewportSize.height }.collect { height ->
             owner.onViewportHeight(height, currentInputs.presentation, currentCallbacks.navigation)
         }
+    }
+    // A notified message's row can grow after it lands, so late media measurement reruns its settle.
+    LaunchedEffect(viewport, owner) {
+        snapshotFlow { owner.readingStartGeometry().takeUnless { currentInputs.presentation.imeIsOpen } }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { owner.onReadingStartGeometry() }
     }
     ConversationSavedViewportEffect(controller, viewport, owner, inputs, callbacks.onAnchored)
     ConversationEntryViewportEffect(controller, viewport, owner, inputs, callbacks)
@@ -147,6 +158,7 @@ private fun ConversationController.savedViewportCompletion(
     )
 }
 
+/** Positions the transcript once its entry inputs are ready, deferring to [ConversationEntryPositioning]. */
 @Suppress("FunctionNaming") // Compose functions use UpperCamelCase.
 @Composable
 private fun ConversationEntryViewportEffect(
@@ -176,35 +188,12 @@ private fun ConversationEntryViewportEffect(
         ) {
             return@LaunchedEffect
         }
-        val unreadId =
-            resolveConversationEntryUnreadMessageId(
-                snapshot = inputs.entryUnread,
-                timeline = { controller.timeline },
-                loadUntilMessageAvailable = controller::loadConversationEntryUnreadMessageAvailable,
-            )
-        if (!owner.isActive) return@LaunchedEffect
-        val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val structure = controller.conversationTimelineStructure()
-        val position =
-            conversationViewportEntryPosition(
-                rendered.map { it.id to it.record.messageIdHex },
-                unreadId,
-                controller.conversationTrailingRowCount(rendered.size),
-            ) ?: return@LaunchedEffect
-        if (hasSentMessageAfterUnreadBoundary(rendered, unreadId)) callbacks.retireUnreadDivider()
-        while (!owner.commitInitialPosition(position, { viewport.initialAnchorLayout(position.index) })) {
-            if (!owner.isActive) return@LaunchedEffect
-            withFrameNanos { }
-        }
-        val committedStructure =
-            structure.copy(groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0)
-        if (owner.completeInitialPosition(position, committedStructure, viewport.height())) {
-            callbacks.onAnchored(rendered.lastOrNull()?.id)
-        }
+        ConversationEntryPositioning(controller, viewport, owner, inputs, callbacks).run()
     }
 }
 
-private fun ConversationTimelineViewport.initialAnchorLayout(index: Int): ConversationInitialAnchorLayout {
+/** Reads the clear viewport height and the measured size of the row at [index], for the hidden anchor settle. */
+internal fun ConversationTimelineViewport.initialAnchorLayout(index: Int): ConversationInitialAnchorLayout {
     val layout = readingLayoutInfo()
     return ConversationInitialAnchorLayout(
         viewportHeight = layout.viewportSize.height,
@@ -212,4 +201,5 @@ private fun ConversationTimelineViewport.initialAnchorLayout(index: Int): Conver
     )
 }
 
-private fun ConversationTimelineViewport.height(): Int = readingLayoutInfo().viewportSize.height
+/** The measured clear viewport height, which the post-initial reanchor gate baselines. */
+internal fun ConversationTimelineViewport.height(): Int = readingLayoutInfo().viewportSize.height

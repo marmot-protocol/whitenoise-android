@@ -19,12 +19,17 @@ import org.junit.runner.RunWith
  * the non-target source account ref. Each sample restores that source account.
  * Keep the device cool and network-independent; relay readiness is intentionally
  * outside the measured route.
+ *
+ * Each sample also reads the app's own rendered-surface markers, so a loading or chat-list surface drawn
+ * between the tap and the conversation fails the run even when the total stays inside its budget. The
+ * cold-process, runtime-not-ready and app-lock journeys live in [NotificationRouteLifecycleBenchmark].
  */
 @RunWith(AndroidJUnit4::class)
 class SecondaryAccountNotificationNavigationMacrobenchmark {
     @get:Rule
     val benchmarkRule = MacrobenchmarkRule()
 
+    /** Measures the warm-task journey and fails on its budget, identity or any intermediate surface. */
     @Test
     fun warmProcessFirstConversationFrameWithinOneSecond() {
         val notificationTexts = BenchmarkConfig.notificationTexts
@@ -73,29 +78,20 @@ class SecondaryAccountNotificationNavigationMacrobenchmark {
         check(samples.size == notificationTexts.size) {
             "Expected ${notificationTexts.size} samples, recorded ${samples.size}."
         }
-        val sorted = samples.map(NotificationRouteSample::durationMs).sorted()
-        val median = percentile(sorted, 0.50)
-        val p95 = percentile(sorted, 0.95)
-        val maximum = sorted.last()
-        val identityFailures = samples.count { !it.succeeded }
+        val stats = routeLatencyStats(samples.map(NotificationRouteSample::durationMs))
+        val identityFailures = samples.count { !it.expectedConversationVisible || !it.transcriptVisible }
+        val intermediateFailures = samples.count { it.intermediateSurfaces.isNotEmpty() }
         val budgetFailures = samples.count { it.durationMs > WARM_ROUTE_BUDGET_MS }
         val report =
-            "samples=${samples.size} median=${median}ms p95=${p95}ms max=${maximum}ms " +
-                "identityFailures=$identityFailures budgetFailures=$budgetFailures"
+            "journey=${NotificationRouteJourney.WARM_TASK.label} ${stats.report()} " +
+                "identityFailures=$identityFailures intermediateSurfaceFailures=$intermediateFailures " +
+                "budgetFailures=$budgetFailures"
         Log.i(BENCHMARK_LOG_TAG, report)
-        check(identityFailures == 0 && budgetFailures == 0) {
+        check(identityFailures == 0 && intermediateFailures == 0 && budgetFailures == 0) {
             "Secondary-account notification route failed: $report. " +
                 "Inspect accountActivation, targetProjection, targetTimeline, initialAnchor, " +
-                "controllerBind, and firstConversationFrame slices."
+                "controllerBind, firstConversationFrame and startupSwap slices."
         }
-    }
-
-    private fun percentile(
-        sorted: List<Long>,
-        percentile: Double,
-    ): Long {
-        val rank = kotlin.math.ceil(percentile * sorted.size).toInt()
-        return sorted[rank.coerceIn(1, sorted.size) - 1]
     }
 
     private companion object {

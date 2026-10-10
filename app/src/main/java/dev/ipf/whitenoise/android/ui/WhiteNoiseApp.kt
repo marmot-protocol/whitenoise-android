@@ -75,6 +75,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
+import dev.ipf.whitenoise.android.ui.navigation.NotificationFirstFrameWatchdog
+import dev.ipf.whitenoise.android.ui.navigation.NotificationRouteAppLockTrace
+import dev.ipf.whitenoise.android.ui.navigation.NotificationRouteStartupSwapTrace
 import dev.ipf.whitenoise.android.ui.navigation.PrepareMainShellFirstFrame
 import dev.ipf.whitenoise.android.ui.navigation.WarmResumeFirstUsefulSurface
 import dev.ipf.whitenoise.android.ui.navigation.shouldComposeProtectedMainShell
@@ -304,6 +307,21 @@ internal fun WhiteNoiseApp(
         mainShellStateHolder.localProjectionAvailable(
             activeAccountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
+        )
+    // A consumed notification tap leaves its conversation selected before the target account's chat list has
+    // loaded. The shell is the only thing that can build that conversation, so it stays composed instead of
+    // handing the screen to a loading surface that waits on the bind (#586). Never under app lock.
+    NotificationFirstFrameWatchdog(mainShellStateHolder.notificationFirstFrame)
+    NotificationRouteAppLockTrace(
+        requestId = inboundNotificationRequestId,
+        routePending = inboundNotificationTarget != null,
+        locked = appState.appLockScreenVisible,
+    )
+    val notificationRouteOwnsShell =
+        mainShellStateHolder.notificationRouteOwnsShell(
+            activeAccountRef = appState.activeAccountRef,
+            runtimeGeneration = appState.runtimeGeneration,
+            appLockScreenVisible = appState.appLockScreenVisible,
         )
     val lockDecision =
         when {
@@ -581,14 +599,15 @@ internal fun WhiteNoiseApp(
                                     val firstUsefulSurface =
                                         warmResumeFirstUsefulSurface(
                                             appLockScreenVisible = false,
-                                            inboundRoutePending = inboundRoutePending,
+                                            inboundRoutePending = inboundRoutePending || notificationRouteOwnsShell,
                                             shellReady = firstUsefulFrameReady,
                                         )
                                     LaunchedEffect(firstUsefulSurface, warmResumeTraceToken, warmResumeEpoch) {
                                         val foregroundCanRecord =
                                             !firstUsefulFrameRecorded && warmResumeEpoch > 0
                                         val inboundFrameCanRecord =
-                                            !inboundRoutePending || visibleShareRequest != null
+                                            !(inboundRoutePending || notificationRouteOwnsShell) ||
+                                                visibleShareRequest != null
                                         if (
                                             foregroundCanRecord &&
                                             inboundFrameCanRecord &&
@@ -608,6 +627,10 @@ internal fun WhiteNoiseApp(
                                         inboundProfilePayload != null ||
                                         !shouldComposeProtectedMainShell(firstUsefulSurface)
                                     ) {
+                                        NotificationRouteStartupSwapTrace(
+                                            mainShellStateHolder.selectedChatOpenContext.value
+                                                .notificationRouteTraceRequestId ?: inboundNotificationRequestId,
+                                        )
                                         PrepareMainShellFirstFrame(appState, mainShellStateHolder)
                                         val startupController =
                                             mainShellStateHolder.startupRecoveryController(

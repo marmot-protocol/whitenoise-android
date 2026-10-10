@@ -95,11 +95,13 @@ import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSurfaceState
+import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
+import dev.ipf.whitenoise.android.ui.conversation.toLandingTarget
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
@@ -123,6 +125,10 @@ internal data class ConversationOpenContext(
     // freezes its pre-read unread projection. Back commits it immediately when
     // the user leaves before that boundary becomes available (#1016/#2191).
     val notificationReadThroughMessageId: String? = null,
+    // The tapped card's captured message with the account and group it was issued for. It is separate
+    // from focusMessageId, which belongs to search hits, and the screen verifies the pairing against its
+    // controller before it lands on the message's beginning (#3147).
+    val notificationTarget: NotificationLandingTarget? = null,
     // Non-null only when a notification-routed conversation opened before its
     // account switch landed (#586). The conversation controller and scroll key
     // bind to this account — never the still-switching active account — so the
@@ -312,16 +318,19 @@ internal fun ProfileGroupForegroundCoordinator(
     }
 }
 
+/** Builds the next notification open context, with a fresh request id and the card's captured target. */
 internal fun nextNotificationConversationOpenContext(
     current: ConversationOpenContext,
     notificationRouteTraceRequestId: Long? = null,
     pinnedAccountRef: String? = null,
     notificationReadThroughMessageId: String? = null,
+    notificationTarget: NotificationLandingTarget? = null,
 ): ConversationOpenContext =
     ConversationOpenContext(
         notificationOpenRequestId = current.notificationOpenRequestId + 1L,
         notificationRouteTraceRequestId = notificationRouteTraceRequestId,
         notificationReadThroughMessageId = notificationReadThroughMessageId,
+        notificationTarget = notificationTarget,
         pinnedAccountRef = pinnedAccountRef,
     )
 
@@ -605,23 +614,15 @@ internal fun MainShell(
     var notificationEarlyOpenRequestId by remember(appState.runtimeGeneration) {
         mutableLongStateOf(0L)
     }
-    var notificationFirstFrameGate by remember(appState.runtimeGeneration) {
-        mutableStateOf<NotificationRouteFirstFrameGate?>(null)
-    }
+    // Process-owned, so unmounting the shell for a frame cannot release the route's priority window (#586).
+    val notificationFirstFrameGate = shellStateHolder.notificationFirstFrame.gate
     var notificationActiveRetryRequestId by remember(appState.runtimeGeneration) {
         mutableStateOf<Long?>(null)
     }
 
+    /** Releases the process-owned priority window, only for [requestId] when one is given. */
     fun releaseNotificationFirstFrameGate(requestId: Long? = null) {
-        val gate = notificationFirstFrameGate ?: return
-        if (requestId != null && gate.requestId != requestId) return
-        gate.release()
-        notificationFirstFrameGate = null
-    }
-
-    DisposableEffect(appState.runtimeGeneration, notificationFirstFrameGate) {
-        val ownedGate = notificationFirstFrameGate
-        onDispose { ownedGate?.release() }
+        shellStateHolder.notificationFirstFrame.release(requestId)
     }
     var previousPendingProfileNpub by remember { mutableStateOf<String?>(null) }
     val supersedePendingGroupCreateOpen: () -> Unit = {
@@ -956,7 +957,9 @@ internal fun MainShell(
             appState.notificationReplyDraftHandoff.stage(target)
             // Await cancellation before publishing any route state. A superseded
             // effect must not partially commit while its platform call is pending.
-            appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
+            NotificationRouteTrace.tracePhase(routingRequestId, NotificationRouteTraceSection.COMMIT_DISMISS) {
+                appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
+            }
             if (rejectUnavailablePin()) return
             sectionName = MainSection.Chats.name
             settingsDetailName = null
@@ -988,6 +991,7 @@ internal fun MainShell(
                     notificationRouteTraceRequestId = routingRequestId,
                     pinnedAccountRef = pinnedAccountRef,
                     notificationReadThroughMessageId = target.messageIdHex,
+                    notificationTarget = target.toLandingTarget(),
                 )
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
@@ -1070,7 +1074,7 @@ internal fun MainShell(
                         NotificationRouteFirstFrameGate(
                             requestId = routingRequestId,
                             accountRef = step.accountRef,
-                        ).also { notificationFirstFrameGate = it }
+                        ).also(shellStateHolder.notificationFirstFrame::begin)
                     } else {
                         null
                     }
@@ -2473,6 +2477,7 @@ internal fun MainShell(
                             ttsFocusSessionId = content.openContext.ttsFocusSessionId,
                             notificationOpenRequestId = content.openContext.notificationOpenRequestId,
                             notificationReadThroughMessageId = content.openContext.notificationReadThroughMessageId,
+                            notificationLandingTarget = content.openContext.notificationTarget,
                             onNotificationUnreadBoundaryCaptured = {
                                 notificationReadThroughCommitter.commit(commitNotificationReadThrough)
                             },

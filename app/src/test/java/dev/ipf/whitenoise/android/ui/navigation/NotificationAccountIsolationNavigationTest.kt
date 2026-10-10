@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,33 +12,13 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AppBlobEndpointFfi
-import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
-import dev.ipf.marmotkit.AppGroupMlsStateFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
-import dev.ipf.marmotkit.AppProtocolProfileFfi
-import dev.ipf.marmotkit.ChatConversationKindFfi
-import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
-import dev.ipf.marmotkit.GroupDetailsFfi
-import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotInterface
-import dev.ipf.marmotkit.ProductRecordResultFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
-import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.NotificationMessageDirectLoadOutcome
-import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationReplyDraft
+import dev.ipf.whitenoise.android.notifications.NotificationScenario
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
-import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.loadNotificationMessageDirectly
-import dev.ipf.whitenoise.android.notifications.routeInboundIntent
-import dev.ipf.whitenoise.android.state.AppMarmotRuntime
-import dev.ipf.whitenoise.android.state.DraftPersistence
-import dev.ipf.whitenoise.android.state.DraftStore
-import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineDispatcher
@@ -58,7 +37,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
-import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -96,9 +74,10 @@ class NotificationAccountIsolationNavigationTest {
         verifyInactiveAccountTapIsolation(preloadFinishesFirst = true)
     }
 
+    /** A failed draft read still opens and consumes the route, and later navigation is not hijacked. */
     @Test
     fun failedNotificationDraftStillOpensAndConsumesItsRouteWithoutLaterNavigationHijack() {
-        val gate = RouteOrderGate(preloadFinishesFirst = true)
+        val gate = AccountRouteOrderGate(preloadFinishesFirst = true)
         gate.releaseActivation.countDown()
         val state = appState(fakeMarmot(gate))
         state.setAppInForeground(true)
@@ -147,9 +126,10 @@ class NotificationAccountIsolationNavigationTest {
         verifyInactiveAccountTapIsolation(preloadFinishesFirst = false)
     }
 
+    /** The exact preload reads the target's production projection while the source account stays active. */
     @Test
     fun inactiveAccountPreload_readsExactProductionProjectionWhileSourceAccountIsActive() {
-        val gate = RouteOrderGate(preloadFinishesFirst = true)
+        val gate = AccountRouteOrderGate(preloadFinishesFirst = true)
         val appState = appState(fakeMarmot(gate))
 
         val item =
@@ -159,14 +139,15 @@ class NotificationAccountIsolationNavigationTest {
 
         assertEquals(SOURCE_ACCOUNT, appState.activeAccountRef)
         assertEquals(3uL, item.projection?.unreadCount)
-        assertEquals(MESSAGE_ID, item.projection?.firstUnreadMessageIdHex)
+        assertEquals(OLDEST_UNREAD_ID, item.projection?.firstUnreadMessageIdHex)
         assertEquals(1, gate.projectionReadCount.get())
     }
 
+    /** The preload opens from its projection when roster enrichment is unavailable. */
     @Test
     fun inactiveAccountPreloadOpensFromProjectionWhenRosterEnrichmentIsUnavailable() {
         val gate =
-            RouteOrderGate(
+            AccountRouteOrderGate(
                 preloadFinishesFirst = true,
                 rosterReadFails = true,
             )
@@ -182,10 +163,11 @@ class NotificationAccountIsolationNavigationTest {
         assertEquals(0, gate.rosterReadCount.get())
     }
 
+    /** A missing projection is inconclusive and waits for the broad chat list. */
     @Test
     fun inactiveAccountPreload_missingProjectionWaitsForBroadList() {
         val gate =
-            RouteOrderGate(
+            AccountRouteOrderGate(
                 preloadFinishesFirst = true,
                 projectionAvailable = false,
             )
@@ -203,9 +185,10 @@ class NotificationAccountIsolationNavigationTest {
         assertEquals(1, gate.projectionReadCount.get())
     }
 
+    /** A foreground resume does not dismiss the retained source conversation's cards. */
     @Test
     fun notificationForegroundResumeDoesNotDismissRetainedSourceConversationCards() {
-        val gate = RouteOrderGate(preloadFinishesFirst = true)
+        val gate = AccountRouteOrderGate(preloadFinishesFirst = true)
         val appState = appState(fakeMarmot(gate))
         appState.setAppInForeground(true)
         runBlocking { appState.setActiveConversation(SOURCE_ACCOUNT, SHARED_GROUP) }
@@ -332,10 +315,11 @@ class NotificationAccountIsolationNavigationTest {
         assertFalse(observedOwnership.contains(SOURCE_ACCOUNT to SHARED_GROUP))
     }
 
+    /** An ordinary account switch dismisses source cards and keeps the destination's. */
     @Test
     fun mainShell_ordinaryConversationAccountSwitchPreservesDestinationCards() {
         val gate =
-            RouteOrderGate(
+            AccountRouteOrderGate(
                 preloadFinishesFirst = true,
                 holdSourceBroadList = true,
             )
@@ -387,6 +371,7 @@ class NotificationAccountIsolationNavigationTest {
         }
     }
 
+    /** Cancelling cards for a visible conversation never waits on the listener dispatcher. */
     @Test
     fun visibleConversationCancellationDoesNotWaitForNotificationListenerDispatcher() {
         val listenerExecutor = Executors.newSingleThreadExecutor()
@@ -406,7 +391,7 @@ class NotificationAccountIsolationNavigationTest {
             val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
             val appState =
                 appState(
-                    marmot = fakeMarmot(RouteOrderGate(preloadFinishesFirst = true)),
+                    marmot = fakeMarmot(AccountRouteOrderGate(preloadFinishesFirst = true)),
                     notificationDispatcher = listenerDispatcher,
                 )
 
@@ -424,7 +409,7 @@ class NotificationAccountIsolationNavigationTest {
 
     /** Routes a tap for the inactive account and checks only its cards are dismissed in either activation order. */
     private fun verifyInactiveAccountTapIsolation(preloadFinishesFirst: Boolean) {
-        val gate = RouteOrderGate(preloadFinishesFirst)
+        val gate = AccountRouteOrderGate(preloadFinishesFirst)
         val appState = appState(fakeMarmot(gate))
         val sourceKeys = postConversationCards(SOURCE_ACCOUNT, "source-invite")
         val targetKeys = postConversationCards(TARGET_ACCOUNT, "target-invite")
@@ -500,9 +485,10 @@ class NotificationAccountIsolationNavigationTest {
             }.map { it.tag to it.id }
             .toSet()
 
+    /** Asserts the route preloaded, was handled, activated the target and dismissed only the destination cards. */
     private fun verifyRouteCompletion(
         appState: WhiteNoiseAppState,
-        gate: RouteOrderGate,
+        gate: AccountRouteOrderGate,
         handled: AtomicBoolean,
         expectedNotificationKeys: Set<Pair<String?, Int>>,
     ) {
@@ -524,28 +510,8 @@ class NotificationAccountIsolationNavigationTest {
         assertEquals(TARGET_ACCOUNT, appState.activeAccountRef)
     }
 
-    private fun routedTarget(accountRef: String): InboundIntentRouting {
-        val target =
-            NotificationTarget(
-                accountRef = accountRef,
-                groupIdHex = SHARED_GROUP,
-                messageIdHex = MESSAGE_ID,
-                kind = NotificationTargetKind.MESSAGE,
-            )
-        val intent = Intent()
-        val notificationKey = "$accountRef-card"
-        NotificationNavigation.applyToIntent(intent, target, notificationKey, TAP_TOKEN)
-        val parsed =
-            NotificationNavigation.parse(intent) { parsedNotificationKey, tapToken ->
-                parsedNotificationKey == notificationKey && tapToken == TAP_TOKEN
-            }
-        return routeInboundIntent(
-            parsedTarget = parsed,
-            shareRequest = null,
-            dataString = null,
-            current = InboundIntentRouting(notificationTarget = null, profilePayload = null),
-        )
-    }
+    /** One parsed tap for [accountRef], built by the shared route harness. */
+    private fun routedTarget(accountRef: String) = NotificationRouteHarness.routedTarget(accountRef)
 
     private fun setActiveAccountRefForTest(
         appState: WhiteNoiseAppState,
@@ -557,88 +523,14 @@ class NotificationAccountIsolationNavigationTest {
             .invoke(appState, accountRef)
     }
 
+    /** The two-account app state around [marmot], built by the shared route harness. */
     private fun appState(
         marmot: MarmotInterface,
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    ): WhiteNoiseAppState =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(NoopDraftPersistence),
-            accountIdHexResolver = { null },
-            accounts = listOf(account(SOURCE_ACCOUNT, SOURCE_ID), account(TARGET_ACCOUNT, TARGET_ID)),
-            activeAccountRef = SOURCE_ACCOUNT,
-            notificationDispatcher = notificationDispatcher,
-        ).also { state ->
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("marmotRuntime")
-                .apply { isAccessible = true }
-                .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
-        }
+    ): WhiteNoiseAppState = NotificationRouteHarness.appState(context, marmot, notificationDispatcher)
 
-    /** Models the account-isolated native reads used while activating a notification route. */
-    @Suppress("CyclomaticComplexMethod")
-    private fun fakeMarmot(gate: RouteOrderGate): MarmotInterface =
-        Proxy.newProxyInstance(
-            MarmotInterface::class.java.classLoader,
-            arrayOf(MarmotInterface::class.java),
-        ) { proxy, method, arguments ->
-            when (method.name.substringBefore('-')) {
-                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
-                // These existing signed-in accounts have no interactive setup checkpoint.
-                "onboardingRecoveryRequired" -> false
-                "onboardingSnapshot" -> null
-                "groupDetails" -> {
-                    gate.rosterReadCount.incrementAndGet()
-                    check(!gate.rosterReadFails) { "roster enrichment is unavailable" }
-                    groupDetails()
-                }
-                "chatListRow" -> {
-                    val accountRef = arguments?.firstOrNull() as? String
-                    val groupIdHex = arguments?.getOrNull(1) as? String
-                    check(accountRef in listOf(SOURCE_ACCOUNT, TARGET_ACCOUNT)) {
-                        "projection read used an unknown account"
-                    }
-                    check(groupIdHex == SHARED_GROUP) { "projection read used the wrong group" }
-                    if (accountRef == TARGET_ACCOUNT) {
-                        gate.preloadStarted.countDown()
-                        check(gate.releasePreload.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                            "preload gate timed out"
-                        }
-                        gate.projectionReadCount.incrementAndGet()
-                        if (!gate.projectionAvailable) {
-                            throw NoSuchElementException("notification chat-list projection unavailable")
-                        }
-                        gate.preloadCompleted.countDown()
-                    }
-                    chatListRow(requireNotNull(groupIdHex))
-                }
-                "openChatListWindow" -> {
-                    val accountRef = arguments?.firstOrNull() as? String
-                    if (accountRef == SOURCE_ACCOUNT) {
-                        check(gate.releaseSourceBroadList.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                            "source broad-list gate timed out"
-                        }
-                    }
-                    if (accountRef == TARGET_ACCOUNT) {
-                        gate.broadBindStarted.countDown()
-                        check(gate.releaseActivation.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                            "activation gate timed out"
-                        }
-                    }
-                    error("Skip broad-list startup in the focused route test")
-                }
-                "subscribeAccountAttention" -> MarmotWindowTestFakes.accountAttention()
-                "subscribeBlockedUsers" -> MarmotWindowTestFakes.blockList()
-                "messageDraft" -> {
-                    gate.draftReadCount.incrementAndGet()
-                    error("Forced draft storage failure")
-                }
-                "toString" -> "NotificationAccountIsolationMarmotFake"
-                "hashCode" -> System.identityHashCode(proxy)
-                "equals" -> proxy === arguments?.firstOrNull()
-                else -> error("Unexpected Marmot call: ${method.name}")
-            }
-        } as MarmotInterface
+    /** The account-isolated engine fake, with the focused-route broad-bind shortcut this suite relies on. */
+    private fun fakeMarmot(gate: AccountRouteOrderGate): MarmotInterface = NotificationRouteHarness.fakeMarmot(gate)
 
     private fun postConversationCards(
         accountRef: String,
@@ -689,157 +581,13 @@ class NotificationAccountIsolationNavigationTest {
         )
     }
 
-    private fun groupDetails() =
-        GroupDetailsFfi(
-            group = group(),
-            members = emptyList(),
-            mlsState =
-                AppGroupMlsStateFfi(
-                    groupIdHex = SHARED_GROUP,
-                    protocolProfile = AppProtocolProfileFfi.CURRENT,
-                    lifecycleState = GroupLifecycleStateFfi.STABLE,
-                    epoch = 0uL,
-                    memberCount = 0u,
-                    unrecoverable = false,
-                    requiredAppComponents = emptyList(),
-                    disbandingEnabled = false,
-                    disbanding = false,
-                    disbandingBlockers = emptyList(),
-                    disbandRequest = null,
-                ),
-        )
-
-    private fun group() =
-        AppGroupRecordFfi(
-            groupIdHex = SHARED_GROUP,
-            protocolProfile = AppProtocolProfileFfi.CURRENT,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Shared group",
-            description = "",
-            admins = emptyList(),
-            relays = listOf("wss://relay.example"),
-            nostrGroupIdHex = "e4".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
-                        ),
-                ),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
-
-    private fun chatListRow(groupIdHex: String) =
-        ChatListRowFfi(
-            selfMembership = SelfMembershipFfi.MEMBER,
-            unreadMentionCount = 0uL,
-            unreadMention = false,
-            groupIdHex = groupIdHex,
-            archived = false,
-            pendingConfirmation = false,
-            title = "Shared group",
-            groupName = "Shared group",
-            avatarUrl = null,
-            avatar = null,
-            lastMessage = null,
-            unreadCount = 3uL,
-            hasUnread = true,
-            firstUnreadMessageIdHex = MESSAGE_ID,
-            lastReadMessageIdHex = null,
-            lastReadTimelineAt = null,
-            conversationCreatedAt = 0uL,
-            activitySortAt = 0uL,
-            updatedAt = 0uL,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            manuallyMarkedUnread = false,
-            conversationKind = ChatConversationKindFfi.GROUP,
-            muted = false,
-            mutedUntilMs = null,
-            pinned = false,
-            pinnedPosition = null,
-            lifecycleState = GroupLifecycleStateFfi.STABLE,
-            disbanding = false,
-            disbandRequest = null,
-        )
-
-    private fun account(
-        ref: String,
-        id: String,
-    ) = AccountSummaryFfi(
-        label = ref,
-        accountIdHex = id,
-        localSigning = true,
-        externalSigning = false,
-        signedOut = false,
-        running = true,
-    )
-
-    private class RouteOrderGate(
-        preloadFinishesFirst: Boolean,
-        val projectionAvailable: Boolean = true,
-        holdSourceBroadList: Boolean = false,
-        val rosterReadFails: Boolean = false,
-    ) {
-        val preloadStarted = CountDownLatch(1)
-        val preloadCompleted = CountDownLatch(1)
-        val broadBindStarted = CountDownLatch(1)
-        val releasePreload = CountDownLatch(if (preloadFinishesFirst) 0 else 1)
-        val releaseActivation = CountDownLatch(if (preloadFinishesFirst) 1 else 0)
-        val releaseSourceBroadList = CountDownLatch(if (holdSourceBroadList) 1 else 0)
-        val projectionReadCount = AtomicInteger()
-        val rosterReadCount = AtomicInteger()
-        val draftReadCount = AtomicInteger()
-    }
-
-    private object NoopDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
-
     private companion object {
-        const val SOURCE_ACCOUNT = "account-a"
-        const val TARGET_ACCOUNT = "account-b"
-        val SOURCE_ID = "a1".repeat(32)
-        val TARGET_ID = "b2".repeat(32)
-        val SHARED_GROUP = "c3".repeat(32)
-        val MESSAGE_ID = "d4".repeat(32)
-        const val TAP_TOKEN = "trusted-test-token"
+        const val SOURCE_ACCOUNT = NotificationRouteHarness.SOURCE_ACCOUNT
+        const val TARGET_ACCOUNT = NotificationRouteHarness.TARGET_ACCOUNT
+        val SHARED_GROUP = NotificationRouteHarness.SHARED_GROUP
+        val OLDEST_UNREAD_ID = NotificationScenario.OLDEST_UNREAD_ID
         const val TEST_CHANNEL = "notification-account-isolation-test"
-
-        // CI runs the entire Robolectric/Compose corpus in the same worker;
-        // individual route cases have reached eight seconds under contention.
-        // Keep a bounded margin without slowing successful polling paths.
-        const val ROUTE_TIMEOUT_MILLIS = 30_000L
+        const val ROUTE_TIMEOUT_MILLIS = NotificationRouteHarness.ROUTE_TIMEOUT_MILLIS
         const val POLL_INTERVAL_MILLIS = 20L
     }
 }

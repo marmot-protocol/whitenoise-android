@@ -58,6 +58,7 @@ internal enum class ConversationScrollReason {
     BottomInput,
     Reply,
     Mention,
+    NotificationTarget,
     Search,
     FocusMessage,
     ReadAloudFollow,
@@ -947,6 +948,7 @@ private val ConversationScrollReason.supersedesUnreadJump: Boolean
             ConversationScrollReason.Send,
             -> true
             ConversationScrollReason.InitialAnchor,
+            ConversationScrollReason.NotificationTarget,
             ConversationScrollReason.SavedRestore,
             ConversationScrollReason.LifecycleResume,
             ConversationScrollReason.ImeTransition,
@@ -1030,6 +1032,26 @@ internal suspend fun ConversationScrollCoordinator.commitInitialAnchor(
         }
     return commandCompleted && layoutStabilized
 }
+
+/**
+ * Positions a notified message's reading start while the transcript is hidden: one non-animated
+ * write, one layout frame, then the shared measured settle, so the first reveal is already on
+ * target and no visible corrective snap follows. Returns the placement the reveal may rely on, or
+ * null when the command was superseded or the geometry never became measurable.
+ */
+internal suspend fun ConversationScrollCoordinator.commitInitialReadingStartAnchor(
+    targetMessageId: String,
+    resultingMode: ConversationScrollMode,
+    probe: ConversationReadingStartProbe,
+    reason: ConversationScrollReason = ConversationScrollReason.NotificationTarget,
+): ConversationReadingStartPlacement? =
+    settleReadingStart(
+        targetMessageId = targetMessageId,
+        reason = reason,
+        probe = probe,
+        approach = ConversationReadingStartApproach.Instant,
+        resultingMode = resultingMode,
+    ).takeIf { it.reached }?.placement
 
 /**
  * Tail opens do not need the history path's two equal layout samples. Commit
