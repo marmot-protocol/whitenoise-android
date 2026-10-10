@@ -1,14 +1,14 @@
 package dev.ipf.whitenoise.android.ui.group
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.newchat.SettingsActionRow
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Description
+import dev.ipf.whitenoise.android.ui.icons.filled.Download
 
 /** Presents the real Share and SAF Save actions with their independent native progress and shared admission. */
 @Suppress("FunctionNaming")

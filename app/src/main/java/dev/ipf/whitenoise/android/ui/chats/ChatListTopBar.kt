@@ -10,11 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +56,11 @@ import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSearchScanStatus
 import dev.ipf.whitenoise.android.ui.conversation.allowsSearchSteps
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
+import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
+import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
+import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton

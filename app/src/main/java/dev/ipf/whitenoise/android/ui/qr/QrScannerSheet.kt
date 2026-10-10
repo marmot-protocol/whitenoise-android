@@ -13,9 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.WindowInsets
@@ -47,11 +47,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.google.mlkit.vision.barcode.BarcodeScanner
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import java.util.concurrent.Executor
@@ -59,7 +54,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-/** Near-full prototype scanner chrome around the production CameraX/ML Kit owner. */
+/** Near-full prototype scanner chrome around the production CameraX/ZXing owner. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod") // One CameraX/lifecycle owner with declarative Compose content.
 @Composable
@@ -189,11 +184,11 @@ private fun CameraQrScanner(
         return
     }
 
-    // Track the CameraX provider and ML Kit scanner so we can release them when
+    // Track the CameraX provider and analysis use case so we can release them when
     // the QR sheet is dismissed. CameraX binds use cases to the host activity's
     // lifecycle, so without an explicit unbind the camera keeps streaming
     // (and the OS in-use indicator stays lit) until the activity stops. The
-    // BarcodeScanner is Closeable and leaks native resources otherwise.
+    // Clearing analysis closes the frame stream before the executor is shut down.
     //
     // `disposedRef` is a separate teardown signal so a late
     // ProcessCameraProvider.getInstance() callback (fired after the sheet
@@ -202,9 +197,9 @@ private fun CameraQrScanner(
     // would let `compareAndSet(null, …)` succeed after onDispose, leaking the
     // camera again.
     val providerRef = remember { AtomicReference<ProcessCameraProvider?>(null) }
-    val scannerRef = remember { AtomicReference<BarcodeScanner?>(null) }
+    val analysisRef = remember { AtomicReference<ImageAnalysis?>(null) }
     val disposedRef = remember { AtomicBoolean(false) }
-    // Per-frame ML Kit analysis runs here, off the main thread, for as long as
+    // Per-frame ZXing analysis runs here, off the main thread, for as long as
     // the scanner is open; shut down on dispose. The provider/bind callbacks
     // still use the main executor (they touch the lifecycle and preview view).
     val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
@@ -213,7 +208,7 @@ private fun CameraQrScanner(
             disposedRef.set(true)
             onCameraBound(null)
             runCatching { providerRef.getAndSet(null)?.unbindAll() }
-            runCatching { scannerRef.getAndSet(null)?.close() }
+            runCatching { analysisRef.getAndSet(null)?.clearAnalyzer() }
             runCatching { analyzerExecutor.shutdown() }
         }
     }
@@ -230,7 +225,7 @@ private fun CameraQrScanner(
                     previewView,
                     cameraUnavailable,
                     providerRef,
-                    scannerRef,
+                    analysisRef,
                     disposedRef,
                     analyzerExecutor,
                     onScan,
@@ -244,14 +239,13 @@ private fun CameraQrScanner(
 }
 
 /** Bind the production latest-frame QR analyzer; rotation, one-result and late-disposal guards stay authoritative. */
-@androidx.annotation.OptIn(ExperimentalGetImage::class)
 private fun bindQrScannerCamera(
     context: Context,
     lifecycleOwner: LifecycleOwner,
     previewView: PreviewView,
     cameraUnavailable: String,
     providerRef: AtomicReference<ProcessCameraProvider?>,
-    scannerRef: AtomicReference<BarcodeScanner?>,
+    analysisRef: AtomicReference<ImageAnalysis?>,
     disposedRef: AtomicBoolean,
     analyzerExecutor: Executor,
     onScan: (String) -> Unit,
@@ -279,54 +273,12 @@ private fun bindQrScannerCamera(
                 Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
-            val scanner =
-                BarcodeScanning.getClient(
-                    BarcodeScannerOptions
-                        .Builder()
-                        .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                        .build(),
-                )
-            if (disposedRef.get() || !scannerRef.compareAndSet(null, scanner)) {
-                runCatching { scanner.close() }
+            val analysis = createQrAnalysis(analyzerExecutor, executor, disposedRef, onScan)
+            if (disposedRef.get() || !analysisRef.compareAndSet(null, analysis)) {
+                runCatching { analysis.clearAnalyzer() }
                 runCatching { provider.unbindAll() }
                 providerRef.set(null)
                 return@addListener
-            }
-            val didScan = AtomicBoolean(false)
-            val analyzerBusy = AtomicBoolean(false)
-            val analysis =
-                ImageAnalysis
-                    .Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-
-            analysis.setAnalyzer(analyzerExecutor) { imageProxy ->
-                if (!analyzerBusy.compareAndSet(false, true)) {
-                    imageProxy.close()
-                    return@setAnalyzer
-                }
-                val mediaImage = imageProxy.image
-                if (mediaImage == null) {
-                    analyzerBusy.set(false)
-                    imageProxy.close()
-                    return@setAnalyzer
-                }
-                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                scanner
-                    .process(image)
-                    .addOnSuccessListener { codes ->
-                        // process() can resolve after the sheet is dismissed; don't
-                        // call back into torn-down UI state.
-                        if (disposedRef.get()) return@addOnSuccessListener
-                        val raw = codes.firstOrNull { it.rawValue != null }?.rawValue
-                        if (raw != null && didScan.compareAndSet(false, true)) onScan(raw)
-                    }.addOnFailureListener {
-                        if (disposedRef.get()) return@addOnFailureListener
-                        onError(cameraUnavailable)
-                    }.addOnCompleteListener {
-                        analyzerBusy.set(false)
-                        imageProxy.close()
-                    }
             }
 
             runCatching {
@@ -342,13 +294,67 @@ private fun bindQrScannerCamera(
             }.onFailure {
                 // Failed before lifecycle binding could take over — the
                 // composable's onDispose has nothing to unbind, so release
-                // provider + scanner here instead of leaking them until the
+                // provider + analysis here instead of leaking them until the
                 // sheet dismisses.
-                runCatching { scannerRef.getAndSet(null)?.close() }
+                runCatching { analysisRef.getAndSet(null)?.clearAnalyzer() }
                 runCatching { providerRef.getAndSet(null)?.unbindAll() }
                 onError(cameraUnavailable)
             }
         },
         executor,
     )
+}
+
+/** One serial analysis owner closes every frame and delivers at most one live result on the main executor. */
+internal fun createQrAnalysis(
+    analyzerExecutor: Executor,
+    resultExecutor: Executor,
+    disposedRef: AtomicBoolean,
+    onScan: (String) -> Unit,
+): ImageAnalysis {
+    val decoder = QrFrameDecoder()
+    val didScan = AtomicBoolean(false)
+    val analysis =
+        ImageAnalysis
+            .Builder()
+            .setResolutionSelector(
+                ResolutionSelector
+                    .Builder()
+                    .setResolutionFilter { sizes, _ ->
+                        sizes.filter { size -> size.width.toLong() * size.height <= QrFrameDecoder.MAX_PIXELS }
+                    }.build(),
+            ).setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+
+    analysis.setAnalyzer(analyzerExecutor) { imageProxy ->
+        try {
+            if (disposedRef.get() || didScan.get()) return@setAnalyzer
+            val plane = imageProxy.planes.firstOrNull() ?: return@setAnalyzer
+            val crop = imageProxy.cropRect
+            val pixels =
+                copyQrLuminance(
+                    plane.buffer,
+                    plane.rowStride,
+                    plane.pixelStride,
+                    QrLuminanceCrop(crop.left, crop.top, crop.width(), crop.height()),
+                )
+            val raw =
+                decoder.decode(
+                    pixels,
+                    crop.width(),
+                    crop.height(),
+                    imageProxy.imageInfo.rotationDegrees,
+                )
+            if (raw != null) {
+                resultExecutor.execute {
+                    if (!disposedRef.get() && didScan.compareAndSet(false, true)) onScan(raw)
+                }
+            }
+        } catch (_: IllegalArgumentException) {
+            // An invalid/truncated camera frame does not make the camera unavailable.
+        } finally {
+            imageProxy.close()
+        }
+    }
+    return analysis
 }

@@ -984,6 +984,8 @@ kover {
                 // generated BuildConfig class.
                 classes(
                     "dev.ipf.marmotkit.*",
+                    // Exact upstream-generated vector data retains its own provenance.
+                    "dev.ipf.whitenoise.android.ui.icons.*",
                     "io.crates.keyring.*",
                     "*.BuildConfig",
                 )
@@ -1035,6 +1037,7 @@ detekt {
     source.setFrom(
         fileTree("src") {
             include("**/*.kt")
+            exclude("main/generated/material-icons/**")
         },
     )
     // Start from detekt's defaults and keep project-specific changes in one
@@ -1057,6 +1060,8 @@ ktlint {
         // immutable artifact bytes with their matching native libraries.
         // Normalize separators so the matches also hold on Windows paths.
         fun normalized(path: String) = path.replace('\\', '/')
+        // Pinned upstream vector data retains exact geometry and original source formatting.
+        exclude { normalized(it.file.path).contains("/generated/material-icons/") }
         exclude { normalized(it.file.path).contains("/marmotkit/") }
         exclude { normalized(it.file.path).contains("marmot_uniffi.kt") }
         exclude { normalized(it.file.path).contains("/io/crates/") }
@@ -1098,7 +1103,6 @@ dependencies {
     implementation(libs.osmdroid.android)
     implementation(libs.androidsvg)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
@@ -1115,12 +1119,10 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.datasource.okhttp)
     implementation(libs.androidx.media3.ui)
-    implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     implementation(libs.play.services.base)
-    implementation(libs.play.services.oss.licenses)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.work.runtime)
@@ -1137,6 +1139,8 @@ dependencies {
             configuration = "devZapstoreReleaseBaselineProfile",
         ),
     )
+    // EXIF privacy fixtures retain this test-only dependency after ML Kit runtime removal.
+    testImplementation("androidx.exifinterface:exifinterface:1.4.2")
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp)
@@ -1258,4 +1262,9 @@ listOf("staging", "production").forEach { environment ->
                 .asFile.absolutePath,
         )
     }
+}
+
+// Audited upstream vector data for the exact used icon set; no extended icon runtime.
+android.sourceSets.named("main") {
+    kotlin.srcDir("src/main/generated/material-icons")
 }

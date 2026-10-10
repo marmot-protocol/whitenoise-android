@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -50,6 +48,8 @@ import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import java.util.Locale
 

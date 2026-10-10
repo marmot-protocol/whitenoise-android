@@ -48,8 +48,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.contextmenu.data.TextContextMenuKeys
 import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMenuComponents
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -143,6 +141,8 @@ import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
+import dev.ipf.whitenoise.android.ui.icons.filled.Key
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first

@@ -3,13 +3,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -31,6 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.VolumeOff
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.VolumeUp
+import dev.ipf.whitenoise.android.ui.icons.filled.Forward10
+import dev.ipf.whitenoise.android.ui.icons.filled.Pause
+import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
+import dev.ipf.whitenoise.android.ui.icons.filled.Replay10
 
 private val TRANSPORT_ICON = 32.dp
 

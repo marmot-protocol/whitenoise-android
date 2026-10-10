@@ -1,7 +1,5 @@
 package dev.ipf.whitenoise.android.ui.group
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +9,8 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.outlined.RestartAlt
 
 /**
  * MDK 0.10.0 local reset for a stuck group: erases this device's copy and waits for a Welcome created

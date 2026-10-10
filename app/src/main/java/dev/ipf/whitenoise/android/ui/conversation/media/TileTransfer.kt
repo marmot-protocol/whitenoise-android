@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +47,10 @@ import dev.ipf.whitenoise.android.state.attachmentFilePresentationState
 import dev.ipf.whitenoise.android.state.attachmentNativeProgress
 import dev.ipf.whitenoise.android.state.cancelAttachmentTransfer
 import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
+import dev.ipf.whitenoise.android.ui.icons.filled.Close
+import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.flow.emptyFlow
 

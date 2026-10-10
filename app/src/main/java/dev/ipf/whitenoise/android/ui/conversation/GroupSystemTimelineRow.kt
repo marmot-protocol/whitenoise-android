@@ -3,8 +3,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,6 +27,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageAction
 import dev.ipf.whitenoise.android.ui.conversation.messages.FocusedMessageActions
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CompleteReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillFlow
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 
 /** Transient overlay state scoped to one mounted activity row, never a second reaction store. */
 private class GroupSystemActionSurface {

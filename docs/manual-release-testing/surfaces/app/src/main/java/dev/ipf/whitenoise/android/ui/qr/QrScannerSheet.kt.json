@@ -1,0 +1,71 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+  "legacy_sha256": "b1e9fa2975a615322d2534664a6bf91bb78b9393d15259ffecc8a29329b8e700",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "CameraQrScanner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "fun CameraQrScanner(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "QrScannerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "fun QrScannerSheet(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:camera_access_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "R.string.camera_access_required",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:camera_lifecycle_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "R.string.camera_lifecycle_unavailable",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:camera_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "R.string.camera_unavailable",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "bounded-zxing-camera-frames",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+        "anchor": "val decoder = QrFrameDecoder()",
+        "test_ids": [
+          "ACC-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

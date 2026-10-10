@@ -22,12 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -87,6 +81,12 @@ import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Close
+import dev.ipf.whitenoise.android.ui.icons.filled.Download
+import dev.ipf.whitenoise.android.ui.icons.filled.Edit
+import dev.ipf.whitenoise.android.ui.icons.filled.Image
+import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

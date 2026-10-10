@@ -8,13 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Forward
-import androidx.compose.material.icons.automirrored.filled.Reply
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +34,13 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardBlockedReasonLabel
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Reply
+import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
+import dev.ipf.whitenoise.android.ui.icons.filled.Delete
+import dev.ipf.whitenoise.android.ui.icons.filled.Download
+import dev.ipf.whitenoise.android.ui.icons.filled.Info
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class)

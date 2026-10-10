@@ -24,11 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -104,6 +99,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Language
+import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
+import dev.ipf.whitenoise.android.ui.icons.filled.Pause
+import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers

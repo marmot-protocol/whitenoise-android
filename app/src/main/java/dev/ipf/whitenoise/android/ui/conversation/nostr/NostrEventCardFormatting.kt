@@ -1,18 +1,18 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Article
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Fullscreen
-import androidx.compose.material.icons.outlined.NewReleases
-import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.Article
+import dev.ipf.whitenoise.android.ui.icons.outlined.ChatBubbleOutline
+import dev.ipf.whitenoise.android.ui.icons.outlined.Description
+import dev.ipf.whitenoise.android.ui.icons.outlined.Fullscreen
+import dev.ipf.whitenoise.android.ui.icons.outlined.NewReleases
+import dev.ipf.whitenoise.android.ui.icons.outlined.PlayCircleOutline
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

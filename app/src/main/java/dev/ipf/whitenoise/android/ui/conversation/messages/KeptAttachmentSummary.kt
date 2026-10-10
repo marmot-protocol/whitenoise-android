@@ -9,11 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +22,11 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.conversation.KeptAttachmentKind
 import dev.ipf.whitenoise.android.ui.conversation.KeptAttachmentPresentation
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.InsertDriveFile
+import dev.ipf.whitenoise.android.ui.icons.filled.Audiotrack
+import dev.ipf.whitenoise.android.ui.icons.filled.Image
+import dev.ipf.whitenoise.android.ui.icons.filled.Videocam
 
 /** Bounded collapsed metadata, with every attachment available in the expanded scrolling card. */
 @Composable

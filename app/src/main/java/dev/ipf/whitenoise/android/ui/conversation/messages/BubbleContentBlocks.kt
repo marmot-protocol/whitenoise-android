@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -89,6 +86,9 @@ import dev.ipf.whitenoise.android.ui.conversation.share.SharedUser
 import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.formatCoordinate
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Close
+import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
 import kotlin.math.ceil

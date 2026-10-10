@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -100,6 +99,7 @@ import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardOperationStatusHost
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
+import dev.ipf.whitenoise.android.ui.icons.filled.Settings
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
