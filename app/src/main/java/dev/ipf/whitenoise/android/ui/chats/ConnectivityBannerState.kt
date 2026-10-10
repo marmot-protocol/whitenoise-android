@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.state.ChatListConnectionPhase
 import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -245,6 +246,16 @@ internal fun rememberChatListConnectivityState(
         if (presentation != renderedPresentation) presentation = renderedPresentation
     }
     val foregroundEpoch = rememberConnectivityForegroundEpoch()
+    LaunchedEffect(controller, activeAccountRef, runtimeGeneration, renderedPresentation.displayed, foregroundEpoch) {
+        controller.noteConnectionPresentation(
+            when (renderedPresentation.displayed) {
+                ConnectivityBannerState.Hidden -> PerformancePhase.CONNECTION_BANNER_HIDDEN
+                ConnectivityBannerState.Offline -> PerformancePhase.CONNECTION_BANNER_OFFLINE
+                ConnectivityBannerState.Connecting -> PerformancePhase.CONNECTION_BANNER_CONNECTING
+                ConnectivityBannerState.JustConnected -> PerformancePhase.CONNECTION_BANNER_CONNECTED
+            },
+        )
+    }
     // Built once per appState rather than invoking map{} directly in the composable body, which
     // would construct a new Flow on every recomposition (FlowOperatorInvokedInComposition).
     val relaysConnectedFlow = remember(appState) { appState.connectivitySignals.map { it.relaysConnected } }
@@ -255,7 +266,7 @@ internal fun rememberChatListConnectivityState(
         connectivitySignals = { appState.connectivitySignals.value },
         relaysConnectedFlow = relaysConnectedFlow,
         refreshRelayConnectivity = appState::refreshRelayConnectivity,
-        revalidateConnectionReadiness = controller::revalidateConnectionReadiness,
+        revalidateConnectionReadiness = controller::revalidateConnectionReadinessOnRelaySample,
     )
     ValidatedInternetRefreshEffect(appState, controller, activeAccountRef, runtimeGeneration)
     ConnectivityEdgeRefreshEffects(
@@ -266,6 +277,8 @@ internal fun rememberChatListConnectivityState(
         relaysConnected = signals.relaysConnected,
         foregroundEpoch = foregroundEpoch,
         revalidateConnectionReadiness = controller::revalidateConnectionReadiness,
+        revalidateOnForeground = controller::revalidateConnectionReadinessOnForeground,
+        revalidateOnRelaySample = controller::revalidateConnectionReadinessOnRelaySample,
     )
     LaunchedEffect(controller, activeAccountRef, runtimeGeneration, renderedPresentation) {
         if (renderedPresentation.displayed == ConnectivityBannerState.JustConnected) {

@@ -12,6 +12,16 @@
           "CON-031"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
+        "surface": "Fresh geometry after mention preposition",
+        "anchor": "resolveScrollOffset = { readLayout(it).readingStartOffset }",
+        "test_ids": [
+          "CON-032"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

@@ -520,7 +520,7 @@ class ChatListReconnectIntegrationTest {
         val acceptedMessageId: String,
     )
 
-    /** Reopening terminated local streams does not repeat the bind's one full catch-up. */
+    /** Either paired stream can end; each recovery remains current and never repeats full catch-up. */
     @Test
     fun repeatedStreamTerminationPerformsOnlyOneFullCatchUp() {
         val marmotCalls = AtomicInteger()
@@ -538,14 +538,19 @@ class ChatListReconnectIntegrationTest {
             awaitChatListCondition {
                 subscriptions.hasStarted(0) && marmotCalls.get() == EXPECTED_BIND_MARMOT_CALLS
             }
+            val initialAttempt = controller.connectionState.sessionAttemptId
             subscriptions.terminate(0)
             controller.retryLoad()
 
             awaitChatListCondition { subscriptions.hasStarted(1) }
-            subscriptions.terminate(1)
+            assertTrue(controller.connectionState.sessionAttemptId > initialAttempt)
+            val secondAttempt = controller.connectionState.sessionAttemptId
+            subscriptions.terminateChats(1)
             controller.retryLoad()
 
             awaitChatListCondition { subscriptions.hasStarted(2) }
+            assertTrue(controller.connectionState.sessionAttemptId > secondAttempt)
+            assertEquals(ConversationTimelineTestIds.ACCOUNT_REF, controller.connectionState.accountRef)
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
 
             assertEquals(
@@ -905,6 +910,11 @@ private class RestartingChatListSubscriptions {
     /** Ends the numbered chat-list stream to force a controller reopen. */
     fun terminate(index: Int) {
         checkNotNull(chatListStreams.getOrNull(index)).terminate()
+    }
+
+    /** Ends the paired group stream independently of its chat-list window. */
+    fun terminateChats(index: Int) {
+        checkNotNull(chatStreams.getOrNull(index)).close()
     }
 
     /** Releases every stream created by this factory. */

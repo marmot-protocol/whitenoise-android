@@ -735,6 +735,14 @@
         "test_ids": [
           "INT-012"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Retained live timeline consumption during metadata refresh",
+        "anchor": "private suspend fun runConversationSubscriptionIteration(",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },
