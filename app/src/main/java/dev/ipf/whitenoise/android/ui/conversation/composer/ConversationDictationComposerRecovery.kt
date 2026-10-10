@@ -25,7 +25,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerAccess
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
-import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /** Dictate remains useful while the single capture owner holds unresolved audio or native closure. */
@@ -62,10 +61,11 @@ internal fun rememberComposerDictationAction(
             },
             onDiscard = { if (binding.active) controller.discardComposerAudio(access) },
             onKeepForLater = {
-                val kept =
-                    controller.state !is ConversationDictationState.Failed ||
-                        (binding.active && controller.keepComposerAudioForLater(access))
-                if (binding.active && kept) panelOwner = null
+                if (binding.active) {
+                    // A refused transfer keeps the existing owner; dismissing never discards its audio.
+                    controller.keepComposerAudioForLater(access)
+                    panelOwner = null
+                }
             },
             onDismiss = { panelOwner = null },
         )

@@ -609,7 +609,10 @@ internal class ConversationDictationController internal constructor(
     private var draftRecovery = ConversationDictationDraftRecovery(readDraft, writeDraft)
     private val parkedRecoveries = mutableStateMapOf<ConversationDictationKey, ParkedRecovery>()
 
-    internal fun hasParkedComposerAudio(accountRef: String, groupIdHex: String): Boolean =
+    internal fun hasParkedComposerAudio(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean =
         ConversationDictationKey.from(accountRef, groupIdHex) in parkedRecoveries
 
     private data class ParkedRecovery(
@@ -649,6 +652,7 @@ internal class ConversationDictationController internal constructor(
     private var dispatchedSessionId by mutableStateOf<Long?>(null)
     private var sendJob: Job? = null
     private var pendingDispatchClaim: ConversationDictationDispatchClaim? = null
+    private var sendBlockedNotifiedSession: Long? = null
     private val completionIntent = ConversationDictationCompletionIntent()
     private val requestedDeliveryMode: ConversationDictationDeliveryMode?
         get() = completionIntent.mode
@@ -800,10 +804,9 @@ internal class ConversationDictationController internal constructor(
     ): ConversationDictationComposerAccess {
         val current = state
         val failed = current as? ConversationDictationState.Failed
-        parkedComposerAccess(current, accountRef, groupIdHex)?.let { return it }
+        parkedComposerAccess(accountRef, groupIdHex)?.let { return it }
         val phase =
             when {
-                failed != null && !foregroundMicrophoneRequired -> failedComposerPhase(failed)
                 current.target != null && !isOwnedBy(accountRef, groupIdHex) ->
                     ConversationDictationComposerPhase.OtherConversation
                 pendingCaptureLeaseReleaseGeneration != null -> ConversationDictationComposerPhase.ClosingMicrophone
@@ -823,11 +826,9 @@ internal class ConversationDictationController internal constructor(
     }
 
     private fun parkedComposerAccess(
-        current: ConversationDictationState,
         accountRef: String,
         groupIdHex: String,
     ): ConversationDictationComposerAccess? {
-        if (current !is ConversationDictationState.Idle) return null
         return parkedRecoveries[ConversationDictationKey.from(accountRef, groupIdHex)]?.let { parked ->
             ConversationDictationComposerAccess(
                 parked.failure.sessionId,
@@ -906,7 +907,7 @@ internal class ConversationDictationController internal constructor(
         val parked = parkedRecoveries.entries.firstOrNull {
             it.value.failure.sessionId == access.sessionId && it.value.actionGeneration == access.actionGeneration
         }
-        if (parked != null && state is ConversationDictationState.Idle) {
+        if (parked != null) {
             parkedRecoveries.remove(parked.key)?.audio?.discard()
             return
         }
@@ -1275,6 +1276,7 @@ internal class ConversationDictationController internal constructor(
         failed: ConversationDictationState.Failed,
         mode: ConversationDictationDeliveryMode,
     ) {
+        if (mode == ConversationDictationDeliveryMode.SendOnFinish) sendBlockedNotifiedSession = null
         recoveryTimeoutHandle?.cancel()
         recoveryTimeoutHandle = null
         recoveryDeadlineElapsedMillis = null
@@ -1713,6 +1715,7 @@ internal class ConversationDictationController internal constructor(
         accountRef: String,
         groupIdHex: String,
     ) {
+        parkedRecoveries.remove(ConversationDictationKey.from(accountRef, groupIdHex))?.audio?.discard()
         if (!isOwnedBy(accountRef, groupIdHex)) return
         draftTargetRemoved = true
         val current = state
@@ -2781,7 +2784,7 @@ internal class ConversationDictationController internal constructor(
         // An explicit Send requests the whole recording, never automatic submission of a prefix.
         val recovery = recoverRecognizedDraftResult(sessionId, target, retained)
         if (state.sessionId != sessionId) return
-        if (explicitSendRequested) runCatching(onSendBlocked)
+        notifyBlockedSend(sessionId, retained)
         if (!recovery.draftRecovered && recovery != ConversationDictationDraftRecovery.Result.Superseded) {
             recoveryHandedToComposer = false
         }
@@ -3331,7 +3334,7 @@ internal class ConversationDictationController internal constructor(
         conversationDictationDiagnostic("event=session_failed failure=${failure.name}")
         val recovery = recoverRecognizedDraftResult(sessionId, target, retainedTranscript)
         if (state.sessionId != sessionId) return
-        if (explicitSendRequested && failure == ConversationDictationFailure.SendBlocked) runCatching(onSendBlocked)
+        notifyBlockedSend(sessionId, retainedTranscript, failure)
         val recoverable =
             failure != ConversationDictationFailure.DeliveryUnknown && !retainedTranscript.isNullOrBlank()
         clearRecognitionSession(
@@ -3375,6 +3378,18 @@ internal class ConversationDictationController internal constructor(
                     closeRecoveryCapture(failed, drainAlreadyExpired = false, captureAlreadyDiscarded = true)
                 }
             }
+    }
+
+    /** One explicit Send gesture produces at most one notice for useful text held back from transport. */
+    private fun notifyBlockedSend(
+        sessionId: Long,
+        transcript: String?,
+        failure: ConversationDictationFailure? = null,
+    ) {
+        if (failure == ConversationDictationFailure.DeliveryUnknown) return
+        if (!explicitSendRequested || transcript.isNullOrBlank() || sendBlockedNotifiedSession == sessionId) return
+        sendBlockedNotifiedSession = sessionId
+        runCatching(onSendBlocked)
     }
 
     /** Send failures retain the explicit send choice while uncertain delivery keeps its separate warning. */

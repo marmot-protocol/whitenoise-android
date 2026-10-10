@@ -19,7 +19,8 @@ class ConversationDictationCaptureOwnerTest {
     fun parkedCaptureRequiresNativeClosureAndRestoresItsExactBuffer() {
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 17L, chunkBytes = 4, maxBufferedBytes = 8)
         val capture = ConversationDictationCallerAudio(FakeCaptureDevice(shortArrayOf(1, 2)), buffer)
-        val replacement = ConversationDictationCallerAudio(FakeCaptureDevice(), ConversationDictationAudioChunkBuffer(18L))
+        val replacement =
+            ConversationDictationCallerAudio(FakeCaptureDevice(), ConversationDictationAudioChunkBuffer(18L))
         var creates = 0
         val owner = ConversationDictationCaptureOwner { if (creates++ == 0) capture else replacement }
         assertTrue(owner.acquire() === capture)
@@ -58,7 +59,10 @@ class ConversationDictationCaptureOwnerTest {
 
         override fun start() = Unit
 
-        override fun read(target: ShortArray, waitForSamples: Boolean): Int {
+        override fun read(
+            target: ShortArray,
+            waitForSamples: Boolean,
+        ): Int {
             val next = samples ?: return 0
             samples = null
             next.copyInto(target)

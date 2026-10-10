@@ -38,7 +38,7 @@ class ConversationDictationControllerTest {
             f.platform.allowAudioParking = true
             failRecognizedTail(f, send = true)
             val access = f.controller.composerAccess(ACCOUNT, "other-group")
-            assertEquals(ConversationDictationComposerPhase.RemainingAudio, access.phase)
+            assertEquals(ConversationDictationComposerPhase.OtherConversation, access.phase)
             assertTrue(f.controller.keepComposerAudioForLater(access))
             assertTrue(f.controller.state is ConversationDictationState.Idle)
             assertFalse(f.controller.hasDurableSession)
@@ -67,6 +67,73 @@ class ConversationDictationControllerTest {
             assertEquals("new recording", f.drafts.getValue(other).text)
             assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
+
+    /** A panel from another chat may keep the recording, but cannot retry or discard its PCM. */
+    @Test
+    fun anotherChatCannotRetryOrDiscardTheOriginRecording() {
+        val f = fixture(draft = TextFieldValue(""))
+        failRecognizedTail(f, send = false)
+        val failed = f.controller.state
+        val access = f.controller.composerAccess(ACCOUNT, "other-group")
+        assertEquals(ConversationDictationComposerPhase.OtherConversation, access.phase)
+        assertFalse(f.controller.canRetryComposerAudio(access))
+        f.controller.retryComposerAudio(access)
+        f.controller.discardComposerAudio(access)
+        assertEquals(failed, f.controller.state)
+        assertTrue(f.platform.pendingCallerAudio)
+    }
+
+    /** A parked chat always exposes its own receipt, even when another chat has failed meanwhile. */
+    @Test
+    fun parkedOriginNeverActsOnAnotherFailedRecording() {
+        val f = fixture(draft = TextFieldValue(""))
+        f.platform.allowAudioParking = true
+        failRecognizedTail(f, send = false)
+        val original = f.controller.composerAccess(ACCOUNT, GROUP)
+        assertTrue(f.controller.keepComposerAudioForLater(original))
+        val other = ACCOUNT to "other-group"
+        f.drafts[other] = TextFieldValue("")
+        f.platform.pendingCallerAudio = true
+        assertTrue(f.controller.requestStart(ACCOUNT, other.second, f.drafts.getValue(other)))
+        f.scheduler.runDelay(500L)
+        f.controller.paste()
+        f.platform.session.callerAudioFinalChunk = true
+        f.platform.listener.onError(ConversationDictationFailure.NoMatch)
+        val failedOther = f.controller.state
+        val parked = f.controller.composerAccess(ACCOUNT, GROUP)
+        assertEquals(original.sessionId, parked.sessionId)
+        assertFalse(f.controller.canRetryComposerAudio(parked))
+        f.controller.retryComposerAudio(parked)
+        assertFalse(f.controller.keepComposerAudioForLater(parked))
+        assertEquals(failedOther, f.controller.state)
+        assertTrue(f.platform.pendingCallerAudio)
+        assertTrue(f.controller.hasParkedComposerAudio(ACCOUNT, GROUP))
+        f.controller.discardComposerAudio(parked)
+        assertFalse(f.controller.hasParkedComposerAudio(ACCOUNT, GROUP))
+        assertEquals(1, f.platform.parkedAudioDiscards)
+        assertEquals(failedOther, f.controller.state)
+        assertTrue(f.platform.pendingCallerAudio)
+    }
+
+    /** Removing the origin or signing its account out retires its private PCM and frees the recovery slot. */
+    @Test
+    fun removedOriginsDiscardTheirParkedAudio() {
+        for (removeAccount in listOf(false, true)) {
+            val f = fixture(draft = TextFieldValue(""))
+            f.platform.allowAudioParking = true
+            failRecognizedTail(f, send = false)
+            val access = f.controller.composerAccess(ACCOUNT, GROUP)
+            assertTrue(f.controller.keepComposerAudioForLater(access))
+            if (removeAccount) {
+                f.controller.onAccountUnavailable(ACCOUNT)
+            } else {
+                f.controller.onTargetRemoved(ACCOUNT, GROUP)
+            }
+            assertFalse(f.controller.hasParkedComposerAudio(ACCOUNT, GROUP))
+            assertEquals(1, f.platform.parkedAudioDiscards)
+            assertFalse(f.controller.canRetryComposerAudio(access))
+        }
+    }
 
     /** Failed parking cannot clear ownership, erase PCM, or permit a replacement recording. */
     @Test
@@ -4419,7 +4486,7 @@ class ConversationDictationControllerTest {
                 assertEquals(generation, f.controller.notificationActionGeneration)
                 assertEquals(sessions, f.platform.sessions.size)
                 assertEquals(captures, f.platform.captureSessionsStarted)
-                assertEquals(1, attempts)
+                assertEquals(0, attempts)
                 assertTrue(sent.isEmpty())
                 assertTrue(f.platform.pendingCallerAudio)
                 assertEquals(0, f.platform.discardedCallerAudio)
@@ -4622,7 +4689,7 @@ class ConversationDictationControllerTest {
             advanceUntilIdle()
             assertTrue(sent.isEmpty())
             assertFalse(f.controller.foregroundMicrophoneRequired)
-            assertTrue(f.controller.state is ConversationDictationState.Failed)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
 
     /** A draft read outage after native closure cannot escape the Send guard or dispatch stale text. */
@@ -4658,7 +4725,7 @@ class ConversationDictationControllerTest {
             assertEquals(0, sends)
             assertFalse(f.controller.foregroundMicrophoneRequired)
             assertEquals("first", f.drafts.getValue(key()).text)
-            assertTrue(f.controller.state is ConversationDictationState.Failed)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
 
     /** The closure watchdog consumes Send before a synchronous forced-close callback is allowed to run. */
@@ -7901,6 +7968,7 @@ class ConversationDictationControllerTest {
         }
 
         var allowAudioParking = false
+        var parkedAudioDiscards = 0
 
         override fun parkCallerAudio(): ConversationDictationParkedAudio? {
             if (!allowAudioParking || !pendingCallerAudio || deferCallerAudioFinish) return null
@@ -7921,6 +7989,7 @@ class ConversationDictationControllerTest {
                 override fun discard() {
                     if (!owned) return
                     owned = false
+                    parkedAudioDiscards++
                     retainedBuffer?.discard()
                 }
             }

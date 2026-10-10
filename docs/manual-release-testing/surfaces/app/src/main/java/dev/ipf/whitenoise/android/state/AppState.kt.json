@@ -307,6 +307,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "R.string.dictation_send_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.dictation_send_blocked",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

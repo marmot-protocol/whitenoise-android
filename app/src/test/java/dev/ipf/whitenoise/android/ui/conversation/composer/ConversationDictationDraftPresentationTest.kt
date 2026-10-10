@@ -28,10 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.ConversationDictationParkedAudio
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
+import dev.ipf.whitenoise.android.audio.ConversationDictationParkedAudio
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
@@ -251,6 +251,23 @@ class ConversationDictationDraftPresentationTest {
     }
 
     @Test
+    fun refusedKeepForLaterClosesThePanelWithoutDiscardingAudio() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val f = Fixture(allowParking = false)
+        composeRule.setContent { f.RenderComposer() }
+        composeRule.runOnIdle { f.retainTail() }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
+        composeRule.onNodeWithTag("dictation-recovery-panel").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.dictation_keep_later)).performClick()
+        composeRule.onNodeWithTag("dictation-recovery-panel").assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertTrue(f.pendingAudio)
+            assertFalse(f.keptAudio)
+            assertTrue(f.controller.state is ConversationDictationState.Failed)
+        }
+    }
+
+    @Test
     fun staleDiscardDialogCannotConsumeAudioAfterConversationNavigation() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val f = Fixture()
@@ -276,11 +293,12 @@ class ConversationDictationDraftPresentationTest {
             assertTrue(f.controller.state is ConversationDictationState.Failed)
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.dictation_retry_remaining)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.dictation_original_conversation)).assertIsDisplayed()
     }
 
     private class Fixture(
         private val dispatchRecognized: Boolean = false,
+        private val allowParking: Boolean = true,
     ) {
         var draft by mutableStateOf(TextFieldValue("Draft", TextRange(5)))
         var visibleGroup by mutableStateOf(GROUP)
@@ -311,7 +329,7 @@ class ConversationDictationDraftPresentationTest {
                         override fun callerAudioHasPending(): Boolean = pendingAudio
 
                         override fun parkCallerAudio(): ConversationDictationParkedAudio? {
-                            if (!pendingAudio) return null
+                            if (!allowParking || !pendingAudio) return null
                             pendingAudio = false
                             keptAudio = true
                             return object : ConversationDictationParkedAudio {
