@@ -108,6 +108,7 @@ class AccountSetupDefaultsTest {
                     if (step == OnboardingStepFfi.RELAYS) listOf("wss://relay.example") else emptyList(),
                     null,
                     null,
+                    relayRepair = null,
                 )
         }
 

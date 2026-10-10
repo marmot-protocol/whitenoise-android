@@ -129,6 +129,7 @@ class AccountSetupApprovalRevisionTest {
                 emptyList(),
                 null,
                 null,
+                relayRepair = null,
             ),
     )
 }

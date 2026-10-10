@@ -31601,7 +31601,7 @@
         ]
       },
       {
-        "surface": "MarmotKit SDK pin: backed-up in-place upgrade across the 0.11.0 recovery and 0.12.0 attachment migrations 99–101, retained sent files, responsive startup comparison recovery, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade through snapshot d4e91c8d file-transfer migrations 0103–0106 and manual relay-edit onboarding checkpoint version 7, retained drafts and sent/received files, interrupted download recovery, responsive startup comparison recovery, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [

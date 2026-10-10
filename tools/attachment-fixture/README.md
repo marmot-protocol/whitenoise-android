@@ -266,7 +266,14 @@ Run `bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play refere
 The generated 4 MiB body has no Content-Length; native total/fraction must remain
 unknown while positive bytes are rendered in a real Android file control. Exact
 plaintext, 48 dp localized RTL/large-font semantics and zero repeat acquisition
-are required. `unknown_length_checker.py` rejects incomplete evidence. This mode
+are required. The published MDK first probes the response headers, then uses one
+file-backed GET when the length is unknown. The fixture requires that initial
+probe to disconnect without completing or reaching the hold, and allows at most
+64 KiB (four paced 16 KiB server writes) to race that disconnect. This allowance
+accounts for fixture socket scheduling; it is not a transport guarantee. Exactly
+one subsequent GET must complete with the full ciphertext, with no HEAD, range
+request, duplicate completed download or later refetch. Every response event is
+correlated to its request. `unknown_length_checker.py` rejects incomplete evidence. This mode
 qualifies functional behavior only; representative performance and complete
 manual flows remain deferred. See the [source/APK qualification report](../../docs/performance-data/attachment-unknown-length-2026-10-03.md).
 

@@ -148,6 +148,7 @@ class AccountSetupContentScreenshotTest {
                 listOf("wss://write.example", "wss://relay.eu.whitenoise.chat", "wss://relay.us.whitenoise.chat"),
                 null,
                 null,
+                relayRepair = null,
             )
         return AccountSetupState(snapshot = snapshot)
     }
@@ -191,6 +192,7 @@ class AccountSetupContentScreenshotTest {
                 listOf("wss://write.example"),
                 null,
                 null,
+                relayRepair = null,
             )
         capture("approved_repair_retry", AccountSetupState(snapshot = snapshot))
     }

@@ -123,6 +123,7 @@ class AccountSetupReadOnlyRecoveryTest {
                     listOf("wss://write.example"),
                     null,
                     null,
+                    relayRepair = null,
                 ),
         )
 

@@ -154,6 +154,20 @@ internal class MainShellProcessState(
             entry.controller.hasLoadedLocalSnapshot
     }
 
+    /** Returns only the current account/runtime's unfinished projection owner for startup recovery. */
+    fun startupRecoveryController(
+        activeAccountRef: String?,
+        runtimeGeneration: Int,
+    ): ChatsController? {
+        val entry = chatsEntry ?: return null
+        return entry.controller.takeIf {
+            entry.accountRef == activeAccountRef &&
+                entry.runtimeGeneration == runtimeGeneration &&
+                it.boundAccountRef == activeAccountRef &&
+                !it.hasLoadedLocalSnapshot
+        }
+    }
+
     /**
      * A removed Android task is a navigation boundary even when Keep Connected
      * retains this process. Drop conversation-only state so a later launcher
@@ -500,6 +514,12 @@ internal class MainShellStateHolder(
         activeAccountRef: String?,
         runtimeGeneration: Int,
     ): Boolean = processState.localProjectionAvailable(activeAccountRef, runtimeGeneration)
+
+    /** Recovery never grants access to the protected shell or consumes its saved route. */
+    fun startupRecoveryController(
+        activeAccountRef: String?,
+        runtimeGeneration: Int,
+    ): ChatsController? = processState.startupRecoveryController(activeAccountRef, runtimeGeneration)
 
     override fun onCleared() {
         // The Application-owned process state transfers to a fresh Activity.
