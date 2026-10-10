@@ -752,11 +752,14 @@ internal class ConversationScrollCoordinator(
          * Keeps distance-independent navigation responsive: snap near a far target, then animate only
          * the final few rows. Message-backed callers can re-resolve after each snap because paging may
          * insert or remove list headers while the command is suspended.
+         * [resolveScrollOffset] reads geometry after prepositioning so a later settle pass can use
+         * the actual approach coordinate instead of an obsolete measurement.
          */
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
             traceMentionJump: Boolean = false,
+            resolveScrollOffset: (Int) -> Int = { scrollOffset },
             resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
@@ -772,15 +775,19 @@ internal class ConversationScrollCoordinator(
                 targetIndex = resolveIndex()?.coerceAtLeast(0)
             }
             val resolvedTargetIndex = targetIndex ?: return false
+            // Prepositioning can suspend through a keyboard/header/row measurement change.
+            // Use the geometry now available, not an offset captured before that handoff.
+            val resolvedScrollOffset = resolveScrollOffset(resolvedTargetIndex)
             if (isFar(resolvedTargetIndex)) {
                 traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.POSITION) {
-                    writer.scrollToItem(resolvedTargetIndex, scrollOffset)
+                    writer.scrollToItem(resolvedTargetIndex, resolvedScrollOffset)
                 }
             } else {
                 traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.ANIMATION) {
-                    writer.animateScrollToItem(resolvedTargetIndex, scrollOffset)
+                    writer.animateScrollToItem(resolvedTargetIndex, resolvedScrollOffset)
                 }
             }
+            ensureCurrent()
             return true
         }
 
@@ -916,9 +923,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
             resultingMode = ConversationScrollMode.ReadingHistory(targetMessageId, 0),
         ) {
             targetResolved =
-                animateScrollToItem(initialTargetIndex, 0) {
-                    resolveUnreadIndex()
-                }
+                animateScrollToItem(initialTargetIndex, 0, resolveIndex = resolveUnreadIndex)
             // The reversed transcript reaches a row by its newest edge, so an
             // unread message taller than the viewport would open at its end.
             if (targetResolved) alignReadingStart(resolveUnreadIndex() ?: initialTargetIndex)

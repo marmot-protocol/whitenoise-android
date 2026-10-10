@@ -1,0 +1,53 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+  "legacy_sha256": "d10279c0a05e69e57a0ac4743257ee4703df044f8a5229dc8c03ecf2123920c5",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConnectivityEdgeRefreshEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+        "anchor": "fun ConnectivityEdgeRefreshEffects(",
+        "test_ids": [
+          "INT-008"
+        ]
+      },
+      {
+        "surface": "rememberChatListPollingStopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+        "anchor": "fun rememberChatListPollingStopped(",
+        "test_ids": [
+          "INT-007",
+          "INT-008"
+        ]
+      },
+      {
+        "surface": "RelayConnectivityPollingEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+        "anchor": "fun RelayConnectivityPollingEffect(",
+        "test_ids": [
+          "INT-007",
+          "INT-008"
+        ]
+      },
+      {
+        "surface": "ValidatedInternetRefreshEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+        "anchor": "fun ValidatedInternetRefreshEffect(",
+        "test_ids": [
+          "INT-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ConnectivityBannerEffects.kt",
+        "surface": "Foreground versus relay readiness attribution",
+        "anchor": "internal fun ConnectivityEdgeRefreshEffects(",
+        "test_ids": [
+          "CHL-030"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

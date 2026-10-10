@@ -2679,7 +2679,18 @@ class ChatsController private constructor(
 
     fun revalidateConnectionReadiness() = connectionOwner.refresh(presentAttempt = false)
 
-    fun invalidateConnectionReadiness() = connectionOwner.invalidate()
+    /** Revalidates retained subscriptions silently and attributes the foreground source. */
+    internal fun revalidateConnectionReadinessOnForeground() =
+        connectionOwner.refresh(presentAttempt = false, source = PerformancePhase.CONNECTION_FOREGROUND)
+
+    /** Keeps a disconnected aggregate relay sample distinct from a foreground lifecycle edge. */
+    internal fun revalidateConnectionReadinessOnRelaySample() =
+        connectionOwner.refresh(presentAttempt = false, source = PerformancePhase.CONNECTION_RELAY_SAMPLE)
+
+    /** Records a closed rendered banner state in the active opt-in readiness episode. */
+    internal fun noteConnectionPresentation(phase: PerformancePhase) = connectionOwner.notePresentation(phase)
+
+    fun invalidateConnectionReadiness() = connectionOwner.invalidate(PerformancePhase.CONNECTION_NETWORK_LOST)
 
     /** Ends account-owned streams and invalidates roster results before closing their handles. */
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
@@ -2796,8 +2807,10 @@ class ChatsController private constructor(
                     val chatListStream =
                         liveSubscriptions.openFolderSource(accountRef, completeChatList)
                     chatListSubscription = chatListStream
+                    connectionOwner.noteSubscriptionBoundary(connectionAttempt, PerformancePhase.CONNECTION_CHAT_LIST_OPEN)
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
+                    connectionOwner.noteSubscriptionBoundary(connectionAttempt, PerformancePhase.CONNECTION_CHATS_OPEN)
                     if (!shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
                     synchronized(liveSubscriptionLock) {
                         if (shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
@@ -2866,6 +2879,10 @@ class ChatsController private constructor(
                                             connectionOwner.noteLiveUpdate(connectionAttempt)
                                             appState.schedulePendingLocalGroupDeleteCleanup()
                                         }
+                                        connectionOwner.noteSubscriptionBoundary(
+                                            connectionAttempt,
+                                            PerformancePhase.CONNECTION_CHAT_LIST_COMPLETED,
+                                        )
                                     },
                                     second = {
                                         while (isActive) {
@@ -2881,13 +2898,31 @@ class ChatsController private constructor(
                                             }
                                             foldGroup(update)
                                         }
+                                        connectionOwner.noteSubscriptionBoundary(
+                                            connectionAttempt,
+                                            PerformancePhase.CONNECTION_CHATS_COMPLETED,
+                                        )
                                     },
                                 )
                             }
                         }
+                    if (folderSourceChanged) {
+                        connectionOwner.noteSubscriptionBoundary(
+                            connectionAttempt,
+                            PerformancePhase.CONNECTION_SOURCE_CHANGED,
+                        )
+                    }
                 } catch (cancel: CancellationException) {
+                    connectionOwner.noteSubscriptionBoundary(
+                        connectionAttempt,
+                        PerformancePhase.CONNECTION_SUBSCRIPTION_CANCELLED,
+                    )
                     throw cancel
                 } catch (throwable: Throwable) {
+                    connectionOwner.noteSubscriptionBoundary(
+                        connectionAttempt,
+                        PerformancePhase.CONNECTION_SUBSCRIPTION_FAILED,
+                    )
                     chatListLoad.failure()
                     archivedChatListLoad.failure()
                     chatsDebug(throwable) {
@@ -2944,7 +2979,9 @@ class ChatsController private constructor(
                 // finishes, so poll them briskly instead of letting the connectivity backoff stretch.
                 if (lastFailureNotReady) retryDelayMs = minOf(retryDelayMs, NOT_READY_RETRY_DELAY_MS)
                 chatsDebug { "chat subscriptions ended; retrying in ${retryDelayMs}ms account=${accountRef.take(8)}" }
+                connectionOwner.notePresentation(PerformancePhase.CONNECTION_RETRY_WAIT, durationMs = retryDelayMs)
                 val userRequestedRetry = withTimeoutOrNull(retryDelayMs) { retryLoadSignal.receive() } != null
+                if (userRequestedRetry) connectionOwner.notePresentation(PerformancePhase.CONNECTION_RETRY_REQUESTED)
                 retryDelayMs =
                     if (userRequestedRetry) {
                         LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
@@ -7360,27 +7397,6 @@ class ConversationController(
             // layer now drives mark-read as the user scrolls so partial-read
             // sessions retain accurate unread counts on the chat list.
 
-            val groupStream = liveSubscriptions.openGroupState(account, group.groupIdHex)
-            groupSubscription = groupStream
-            val stopAfterGroupOpen =
-                synchronized(liveSubscriptionLock) {
-                    if (accountTeardownRequested) {
-                        true
-                    } else {
-                        groupStateSubscription = groupStream
-                        false
-                    }
-                }
-            if (stopAfterGroupOpen) return true to false
-            val groupSnapshot =
-                withContext(Dispatchers.IO) {
-                    groupStream.snapshot()
-                }
-            groupSnapshot?.let(::applyGroupState)
-            refreshGroupRecoveryStatus()
-            refreshMembers(prefetchedRoster = rosterPrefetch)
-            isLoading = false
-            subscriptionError = null
             var connected = false
 
             coroutineScope {
@@ -7395,12 +7411,38 @@ class ConversationController(
                                 launch { watchAgentTextStream(account, streamId) }
                             }
                         }
-                        connected = true
                     },
                     first = {
                         runTimelineSubscriptionPipeline(account, timelineStream)
                     },
                     second = {
+                        // The authoritative timeline is already installed. Keep consuming its
+                        // bounded replacements while independent group/roster reads settle;
+                        // transcript consent and membership presentation retain their own gates.
+                        // Otherwise a slow roster can leave background messages queued until
+                        // well after the retained conversation's first foreground frame (#3178).
+                        val groupStream = liveSubscriptions.openGroupState(account, group.groupIdHex)
+                        groupSubscription = groupStream
+                        val stopAfterGroupOpen =
+                            synchronized(liveSubscriptionLock) {
+                                if (accountTeardownRequested) {
+                                    true
+                                } else {
+                                    groupStateSubscription = groupStream
+                                    false
+                                }
+                            }
+                        if (stopAfterGroupOpen) return@runUntilFirstLiveSubscriptionEndsWithAttemptJobs
+                        val groupSnapshot =
+                            withContext(Dispatchers.IO) {
+                                groupStream.snapshot()
+                            }
+                        groupSnapshot?.let(::applyGroupState)
+                        refreshGroupRecoveryStatus()
+                        refreshMembers(prefetchedRoster = rosterPrefetch)
+                        isLoading = false
+                        subscriptionError = null
+                        connected = true
                         runGroupStateSubscriptionLoop(groupStream)
                     },
                 )

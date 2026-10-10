@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt",
+        "surface": "Connection phase diagnostic vocabulary",
+        "anchor": "CONNECTION_SESSION_ATTEMPT",
+        "test_ids": [
+          "CHL-030"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
