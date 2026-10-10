@@ -2,16 +2,58 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MediaFileTransferControlFfi
 import dev.ipf.marmotkit.NoPointer
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedDocumentRead
+import dev.ipf.whitenoise.android.ui.conversation.media.readStagedDocument
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.ByteArrayInputStream
 
 class FileBackedComposerUploadTest {
+    @get:Rule
+    val temporary = TemporaryFolder()
+
+    /**
+     * An account switch that cancels the caller while staging runs still releases the staged batch: the
+     * temporary snapshot of an in-memory item is deleted and the file-backed item's pin is dropped.
+     */
+    @Test
+    fun cancellationDuringStagingStillReleasesTheStagedBatch() =
+        runTest {
+            val directory = temporary.newFolder("upload_sources")
+            val read = readStagedDocument(directory, 8) { ByteArrayInputStream(ByteArray(8)) }
+            val pinned = (read as StagedDocumentRead.Success).source
+            val attachments =
+                listOf(
+                    PendingAttachment(byteArrayOf(1, 2, 3), "image/jpeg", "cover.jpg"),
+                    PendingAttachment(ByteArray(0), "video/mp4", "clip.mp4", sourceFile = pinned),
+                )
+            var uploaded = false
+
+            val call =
+                launch {
+                    coroutineContext.job.cancel()
+                    withFileUploadRequest(attachments, caption = null, directory, maxCiphertextBytes = 1_000_000) {
+                        uploaded = true
+                    }
+                }
+            call.join()
+
+            assertFalse(uploaded)
+            assertEquals("only the send's own snapshot is left", listOf(pinned.file.name), directory.list()!!.toList())
+            pinned.close()
+            assertFalse("its pin was released, so closing it deletes the file", pinned.file.exists())
+        }
+
     /** The control is exposed to Cancel only while the native call runs, and withdrawn before it is released. */
     @Test
     fun controlIsRegisteredForTheCallAndWithdrawnBeforeRelease() =

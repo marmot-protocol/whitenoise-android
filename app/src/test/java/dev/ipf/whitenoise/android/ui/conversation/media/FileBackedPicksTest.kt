@@ -168,4 +168,50 @@ class FileBackedPicksTest {
         assertEquals(listOf(kept), reported)
         kept.close()
     }
+
+    /**
+     * Free space is judged for the whole album: the copies MDK still has to write for items already
+     * staged stay reserved, so a second large video cannot leave too little room for the first one.
+     */
+    @Test
+    fun albumStagingReservesTheNativeCopiesOfEarlierItems() {
+        var written = 0L
+        val budget =
+            FileBackedPickBudget(
+                directory = File(temporary.root, "album"),
+                limits = FileBackedSendLimits(perFileBytes = 1_000, batchCiphertextBytes = 10_000),
+                usableBytes = { APP_RESERVE_BYTES + 55 - written },
+            )
+
+        val first = checkNotNull(budget.stage(10) { ByteArrayInputStream(ByteArray(10)) }.source)
+        written += first.byteCount
+
+        assertEquals(
+            "10 more bytes need 30 for their own copies plus 20 still owed to the first item",
+            FileBackedPickFailure.STORAGE,
+            budget.stage(10) { ByteArrayInputStream(ByteArray(10)) }.failure,
+        )
+        first.close()
+    }
+
+    /** An item past the message bound is refused; an admitted in-memory item reserves its three disk copies. */
+    @Test
+    fun admitRefusesItemsPastTheBoundAndReservesInMemoryCopies() {
+        val budget =
+            FileBackedPickBudget(
+                directory = File(temporary.root, "admit"),
+                limits = FileBackedSendLimits(perFileBytes = 1_000, batchCiphertextBytes = 100),
+                usableBytes = { APP_RESERVE_BYTES + 100 },
+            )
+
+        assertTrue(budget.admit(30, inMemory = true))
+        assertFalse("only 38 bytes of the bound are left", budget.admit(39, inMemory = true))
+        assertEquals(
+            "4 bytes need 12 for their copies plus the 90 reserved for the in-memory item",
+            FileBackedPickFailure.STORAGE,
+            budget.stage(4) { ByteArrayInputStream(ByteArray(4)) }.failure,
+        )
+    }
 }
+
+private const val APP_RESERVE_BYTES = 64L * 1024L * 1024L

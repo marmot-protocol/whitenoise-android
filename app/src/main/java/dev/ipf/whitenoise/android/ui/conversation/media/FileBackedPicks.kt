@@ -107,6 +107,11 @@ internal class FileBackedPickBudget(
 ) {
     private var remainingCiphertextBytes = limits.batchCiphertextBytes
 
+    // Disk this message's upload still has to write: MDK's snapshot and ciphertext of every staged item,
+    // plus all three copies of each in-memory item the upload converts to a file. Every free-space check
+    // counts it, so an album is admitted only if the whole send fits, not just its latest item.
+    private var pendingDiskBytes = 0L
+
     /** The largest pick the next item may be, given the per-file ceiling and what this message has used. */
     fun nextPickMaxBytes(): Long {
         val batchRoom = remainingCiphertextBytes - FILE_BACKED_TAG_BYTES
@@ -116,6 +121,20 @@ internal class FileBackedPickBudget(
     /** Charges an accepted attachment of [byteCount] bytes against this message's ciphertext bound. */
     fun charge(byteCount: Long) {
         remainingCiphertextBytes -= byteCount + FILE_BACKED_TAG_BYTES
+    }
+
+    /**
+     * Admits one album item of [byteCount] bytes, or refuses it when it no longer fits this message's
+     * ciphertext bound. An [inMemory] item also reserves the three disk copies its upload will write.
+     */
+    fun admit(
+        byteCount: Long,
+        inMemory: Boolean,
+    ): Boolean {
+        if (byteCount > nextPickMaxBytes()) return false
+        charge(byteCount)
+        if (inMemory) pendingDiskBytes += byteCount * FILE_BACKED_DISK_COPIES
+        return true
     }
 
     /**
@@ -145,6 +164,8 @@ internal class FileBackedPickBudget(
         when (val read = readStagedDocument(directory, maxBytes, checkCancellation, open)) {
             is StagedDocumentRead.Success ->
                 if (hasStorageFor(read.source.byteCount, FILE_BACKED_DISK_COPIES - 1)) {
+                    // The snapshot is on disk now; MDK's snapshot and ciphertext of it are still to come.
+                    pendingDiskBytes += read.source.byteCount * (FILE_BACKED_DISK_COPIES - 1)
                     onStaged(read.source)
                     FileBackedPick(read.source, null)
                 } else {
@@ -159,12 +180,15 @@ internal class FileBackedPickBudget(
                 )
         }
 
-    /** Whether [copies] more copies of [byteCount] bytes fit while leaving the app its reserve. */
+    /**
+     * Whether [copies] more copies of [byteCount] bytes fit beside everything this message has already
+     * reserved, while leaving the app its reserve.
+     */
     private fun hasStorageFor(
         byteCount: Long,
         copies: Long,
     ): Boolean {
-        val needed = byteCount * copies + FILE_BACKED_DISK_RESERVE_BYTES
+        val needed = byteCount * copies + pendingDiskBytes + FILE_BACKED_DISK_RESERVE_BYTES
         return usableBytes() >= needed
     }
 

@@ -390,13 +390,13 @@ internal class ConversationAttachmentReader(
                 overflowed = overflowed || outcome.overflowed
                 storageUnavailable = storageUnavailable || outcome.storageUnavailable
                 outcome.attachment?.let { attachment ->
-                    if (fileBacked != null && attachment.byteCount > fileBacked.nextPickMaxBytes()) {
+                    val inMemory = attachment.sourceFile == null
+                    if (fileBacked != null && !fileBacked.admit(attachment.byteCount, inMemory)) {
                         // The message's native ciphertext bound is spent; the item cannot join this album.
                         attachment.sourceFile?.closeQuietly()
                         overflowed = true
                     } else {
                         consumedBytes += attachment.plaintextBytes.size
-                        fileBacked?.charge(attachment.byteCount)
                         attachments += attachment
                     }
                 }
@@ -872,10 +872,12 @@ internal class ConversationMediaSender(
         var inMemoryBytes = 0L
         imageSlots.forEach { slot ->
             val prepared = preparedImageAttachments[slot.id]
-            if (prepared != null) {
+            if (prepared != null && fileBacked?.admit(prepared.byteCount, prepared.sourceFile == null) == false) {
+                // A draft photo after large videos must fit the same native bound, or the whole album fails.
+                overflowed = true
+            } else if (prepared != null) {
                 attachments += prepared
                 inMemoryBytes += prepared.plaintextBytes.size
-                fileBacked?.charge(prepared.byteCount)
             } else {
                 val read =
                     if (fileBacked == null) {

@@ -56,6 +56,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ScriptedPickProvider
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_ATTACHMENT_MAX_BYTES
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
 import kotlinx.coroutines.CompletableDeferred
@@ -1583,6 +1584,72 @@ class ConversationFileBackedMediaSendTest {
             }
         }
 
+    /**
+     * A draft photo that follows a large video is left out once the album's native ciphertext bound is spent,
+     * so the video still sends instead of the whole album failing on every Retry.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun albumLeavesOutADraftPhotoThatNoLongerFitsAfterALargeVideo() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
+            val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
+            val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
+            val uploaded = CompletableDeferred<List<String>>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    uploaded.complete(request.attachments.map { it.fileName })
+                    oneAttachmentUpload()
+                }
+            val albumLimits =
+                FileBackedSendLimits(
+                    perFileBytes = ALBUM_VIDEO_BYTES,
+                    batchCiphertextBytes = ALBUM_VIDEO_BYTES + ALBUM_TAG_AND_SLACK_BYTES,
+                )
+            val sender =
+                ConversationMediaSender(state, controller, state.appContext, fileBackedLimits = { albumLimits }) {}
+            try {
+                controller.retryMembers()
+                sender.sendStagedAttachments(
+                    imageSlots = listOf(PendingMediaSlot("video", video), PendingMediaSlot("photo", photo)),
+                    documentUris = emptyList(),
+                    caption = "",
+                    preparedImageAttachments = mapOf("photo" to draftPhoto()),
+                )
+
+                assertEquals(listOf("clip.mp4"), uploaded.await())
+                assertEquals(
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.media_album_too_large),
+                    state.toast?.title,
+                )
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A photo the composer already prepared and kept in memory for its native draft. */
+    private fun draftPhoto(): PendingAttachment {
+        val bytes = ByteArray(DRAFT_PHOTO_BYTES) { 1 }
+        return PendingAttachment(bytes, "image/jpeg", "photo.jpg")
+    }
+
+    /** Publishes one sparse provider file of [size] bytes under [name] and returns its content Uri. */
+    private fun scriptedPick(
+        state: WhiteNoiseAppState,
+        name: String,
+        mediaType: String,
+        size: Long,
+    ): android.net.Uri {
+        val file = java.io.File(state.appContext.cacheDir, "sender-$name-${System.nanoTime()}")
+        java.io.RandomAccessFile(file, "rw").use { it.setLength(size) }
+        ScriptedPickProvider.picks[name] = ScriptedPick(file, mediaType, size)
+        return android.net.Uri.parse("content://$SENDER_PICKS_AUTHORITY/$name")
+    }
+
     /** A reply keeps picks in memory, so a large document is refused with the size notice, not a draft conflict. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -1724,6 +1791,9 @@ private const val IN_MEMORY_DOCUMENT_BYTES = 20 * 1024 * 1024
 private const val SCRIPTED_DOCUMENT_BYTES = 4096
 private const val SCRIPTED_DECLARED_BYTES = 40L * 1024L * 1024L
 private const val SENDER_PICKS_AUTHORITY = "dev.ipf.whitenoise.test.senderpicks"
+private const val ALBUM_VIDEO_BYTES = 33L * 1024L * 1024L
+private const val ALBUM_TAG_AND_SLACK_BYTES = 116L
+private const val DRAFT_PHOTO_BYTES = 200
 private const val FILE_BATCH_CIPHERTEXT_BYTES = 900L * 1024L * 1024L
 private const val DELETE_POLL_ATTEMPTS = 200
 private const val DELETE_POLL_INTERVAL_MS = 10L

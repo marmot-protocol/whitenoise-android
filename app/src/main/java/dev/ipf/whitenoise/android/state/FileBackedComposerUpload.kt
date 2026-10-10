@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.MediaFileTransferControlFfi
 import dev.ipf.marmotkit.MediaFileUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaFileUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
+import dev.ipf.whitenoise.android.ui.conversation.media.FileUploadSources
 import dev.ipf.whitenoise.android.ui.conversation.media.stageFileUploadSources
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +13,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Test seam for file-backed composer uploads: (account, group, request, registerCancel) -> upload result.
@@ -27,8 +29,9 @@ internal val RetainedMediaUpload.isFileBacked: Boolean
 /**
  * Builds the native request for one file-backed send and keeps every source path pinned until [upload]
  * returns. In-memory album items become private snapshots for this call only and are deleted afterwards;
- * the send's own staged files stay with its retained upload so a retry reuses them. Staging cannot be
- * abandoned half-way: a cancellation that arrives during it is observed only once its pins are owned here.
+ * the send's own staged files stay with its retained upload so a retry reuses them. Ownership of the staged
+ * batch is taken inside the staging block itself: `withContext` discards its result when the caller is
+ * cancelled on the way back, so returning the batch would leak its snapshots and pins.
  */
 internal suspend fun <T> withFileUploadRequest(
     attachments: List<PendingAttachment>,
@@ -37,12 +40,13 @@ internal suspend fun <T> withFileUploadRequest(
     maxCiphertextBytes: Long,
     upload: suspend (MediaFileUploadRequestFfi) -> T,
 ): T {
-    val sources =
-        withContext(NonCancellable + Dispatchers.IO) {
-            stageFileUploadSources(attachments, stagingDirectory, maxCiphertextBytes)
-        }
+    val owned = AtomicReference<FileUploadSources?>(null)
     try {
+        withContext(NonCancellable + Dispatchers.IO) {
+            owned.set(stageFileUploadSources(attachments, stagingDirectory, maxCiphertextBytes))
+        }
         currentCoroutineContext().ensureActive()
+        val sources = checkNotNull(owned.get())
         val request =
             MediaFileUploadRequestFfi(
                 attachments =
@@ -63,7 +67,9 @@ internal suspend fun <T> withFileUploadRequest(
         return upload(request)
     } finally {
         // A failed unlink must not replace the upload's own result or error; the startup sweep retries it.
-        withContext(NonCancellable + Dispatchers.IO) { runCatching { sources.close() } }
+        owned.getAndSet(null)?.let { sources ->
+            withContext(NonCancellable + Dispatchers.IO) { runCatching { sources.close() } }
+        }
     }
 }
 
