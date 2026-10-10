@@ -84,12 +84,18 @@ internal suspend fun WhiteNoiseAppState.openNoteToSelf(
                 ensureCurrent()
                 markStarted()
                 val created =
-                    createGroupWithOptionsDetailed(
-                        accountRef,
-                        NOTE_TO_SELF_GROUP_NAME,
-                        emptyList(),
-                        CreateGroupOptionsFfi(null, null, retention),
-                    )
+                    try {
+                        createGroupWithOptionsDetailed(
+                            accountRef,
+                            NOTE_TO_SELF_GROUP_NAME,
+                            emptyList(),
+                            CreateGroupOptionsFfi(null, null, retention),
+                        )
+                    } catch (error: MarmotKitException.CreatedGroupProjectionUnavailable) {
+                        // Preserve the failure's canonical ID before IO cancellation can discard it.
+                        markCreated(error.groupIdHex)
+                        throw error
+                    }
                 // Retain identity inside the IO boundary: cancellation can discard its returned value.
                 markCreated(created.groupIdHex)
                 created.groupIdHex to chatListItemFromProjection(created.chatListRow)
