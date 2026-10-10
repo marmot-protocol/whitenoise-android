@@ -20,15 +20,21 @@ import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.ui.chats.returnSmartFolderWindowsToTop
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -566,6 +572,18 @@ class ChatListReconnectIntegrationTest {
         }
     }
 
+    /** Both ordinary EOF sources and their simultaneous end use one automatic bounded retry. */
+    @Test
+    fun automaticStreamCompletionRetriesOnceWithoutAnotherCatchUp() {
+        AutomaticStreamRetryCase.entries.forEach { assertAutomaticStreamRetry(it, failed = false) }
+    }
+
+    /** Unexpected failure of either source follows the same current-owner retry without manual Retry. */
+    @Test
+    fun automaticStreamFailureRetriesOnceWithoutAnotherCatchUp() {
+        AutomaticStreamRetryCase.entries.forEach { assertAutomaticStreamRetry(it, failed = true) }
+    }
+
     /** An early open failure retains the already-started catch-up for the successful reopen. */
     @Test
     fun earlyOpenFailureRetainsPendingCatchUpUntilReopen() {
@@ -871,6 +889,17 @@ private class DroppedChatSubscriptions(
 /** Stable companion group subscription that lives until the controller closes it. */
 private class ScriptedChatsSubscription : ChatsSubscriptionHandle {
     private val closed = CompletableDeferred<Unit>()
+    var wasClosed = false
+        private set
+
+    /** Ends only this input, normally or with a fixture failure. */
+    fun terminate(failed: Boolean) {
+        if (failed) {
+            closed.completeExceptionally(IllegalStateException("fixture stream failure"))
+        } else {
+            closed.complete(Unit)
+        }
+    }
 
     /** No group-state row is needed for the named chat-list fixture. */
     override fun snapshot(): List<AppGroupRecordFfi> = emptyList()
@@ -883,6 +912,7 @@ private class ScriptedChatsSubscription : ChatsSubscriptionHandle {
 
     /** Releases the paired stream. */
     override fun close() {
+        wasClosed = true
         closed.complete(Unit)
     }
 }
@@ -908,14 +938,20 @@ private class RestartingChatListSubscriptions {
     fun hasStarted(index: Int): Boolean = chatListStreams.getOrNull(index)?.nextUpdateStarted?.isCompleted == true
 
     /** Ends the numbered chat-list stream to force a controller reopen. */
-    fun terminate(index: Int) {
-        checkNotNull(chatListStreams.getOrNull(index)).terminate()
+    fun terminate(index: Int, failed: Boolean = false) {
+        checkNotNull(chatListStreams.getOrNull(index)).terminate(failed)
     }
 
     /** Ends the paired group stream independently of its chat-list window. */
-    fun terminateChats(index: Int) {
-        checkNotNull(chatStreams.getOrNull(index)).close()
+    fun terminateChats(index: Int, failed: Boolean = false) {
+        checkNotNull(chatStreams.getOrNull(index)).terminate(failed)
     }
+
+    val activeOpenCount: Int get() = chatListStreams.size
+
+    /** Reports paired retirement before the controlled retry deadline is advanced. */
+    fun retired(index: Int): Boolean =
+        chatListStreams.getOrNull(index)?.wasClosed == true && chatStreams.getOrNull(index)?.wasClosed == true
 
     /** Releases every stream created by this factory. */
     fun closeAll() {
@@ -929,6 +965,8 @@ private class TerminatingChatListSubscription(
     private val view: ChatListViewFfi = ChatListViewFfi.CHATS,
 ) : ChatListWindowHandle {
     private val terminated = CompletableDeferred<Unit>()
+    var wasClosed = false
+        private set
     val nextUpdateStarted = CompletableDeferred<Unit>()
 
     /** Returns the empty initial replacement for this handle. */
@@ -958,12 +996,17 @@ private class TerminatingChatListSubscription(
     override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = snapshot()
 
     /** Completes the stream normally. */
-    fun terminate() {
-        terminated.complete(Unit)
+    fun terminate(failed: Boolean = false) {
+        if (failed) {
+            terminated.completeExceptionally(IllegalStateException("fixture stream failure"))
+        } else {
+            terminated.complete(Unit)
+        }
     }
 
     /** Ends any pending wait during fixture teardown. */
     override fun close() {
+        wasClosed = true
         terminate()
     }
 }
@@ -1029,4 +1072,79 @@ private class FailFirstChatListSubscriptions {
         stableChatList.close()
         chatStreams.forEach(ScriptedChatsSubscription::close)
     }
+}
+
+private enum class AutomaticStreamRetryCase { Window, Chats, Both }
+
+/** Exercises the actual paired controller loop with an explicitly advanced retry scheduler. */
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun assertAutomaticStreamRetry(
+    source: AutomaticStreamRetryCase,
+    failed: Boolean,
+) {
+    val scheduler = TestCoroutineScheduler()
+    Dispatchers.setMain(StandardTestDispatcher(scheduler))
+    PerformanceDiagnostics.stop()
+    assertTrue(PerformanceDiagnostics.start().active)
+    val calls = AtomicInteger()
+    val subscriptions = RestartingChatListSubscriptions()
+    val appState =
+        chatListTestAppState(
+            diagnostics = testRecoveryDiagnostics(),
+            liveSubscriptions = subscriptions.liveSubscriptions,
+            marmotAccessObserver = { calls.incrementAndGet() },
+        )
+    val controller = testChatsController(appState)
+    val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+    try {
+        awaitControlledChatList(scheduler) { subscriptions.hasStarted(0) && calls.get() == 2 }
+        val initialAttempt = controller.connectionState.sessionAttemptId
+        if (source != AutomaticStreamRetryCase.Chats) subscriptions.terminate(0, failed)
+        if (source != AutomaticStreamRetryCase.Window) subscriptions.terminateChats(0, failed)
+        awaitControlledChatList(scheduler) {
+            subscriptions.retired(0) &&
+                PerformanceDiagnostics.exportLines().any { "phase=connection_retry_wait " in it }
+        }
+        val retry = PerformanceDiagnostics.exportLines().single { "phase=connection_retry_wait " in it }
+        assertTrue(retry.contains("duration_ms=$LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS"))
+        assertEquals(1, subscriptions.activeOpenCount)
+        scheduler.advanceTimeBy(LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS - 1)
+        scheduler.runCurrent()
+        assertEquals("no retry before its declared deadline", 1, subscriptions.activeOpenCount)
+        scheduler.advanceTimeBy(1)
+        awaitControlledChatList(scheduler) { subscriptions.hasStarted(1) }
+        assertEquals("simultaneous input termination owns one reopen", 2, subscriptions.activeOpenCount)
+        assertTrue(controller.connectionState.sessionAttemptId > initialAttempt)
+        assertEquals("reopen cannot amplify account-wide catch-up", 2, calls.get())
+        val boundaries =
+            if (failed) {
+                listOf("connection_subscription_failed")
+            } else {
+                listOf("connection_chat_list_completed", "connection_chats_completed")
+            }
+        assertTrue(PerformanceDiagnostics.exportLines().any { line -> boundaries.any { "phase=$it " in line } })
+    } finally {
+        controller.onCleared()
+        subscriptions.closeAll()
+        bindScope.cancel()
+        scheduler.runCurrent()
+        PerformanceDiagnostics.stop()
+        Dispatchers.resetMain()
+    }
+}
+
+/** Waits for an external IO event while advancing only ready jobs, never guessing a sleep or retry duration. */
+private fun awaitControlledChatList(
+    scheduler: TestCoroutineScheduler,
+    condition: () -> Boolean,
+) {
+    val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+    while (System.nanoTime() < deadline) {
+        scheduler.runCurrent()
+        shadowOf(Looper.getMainLooper()).idle()
+        if (condition()) return
+        Thread.yield()
+    }
+    error("controlled chat-list event did not arrive")
 }

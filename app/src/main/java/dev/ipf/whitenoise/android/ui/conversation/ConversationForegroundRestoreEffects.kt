@@ -193,6 +193,7 @@ internal fun ConversationForegroundRestoreEffects(
             foregroundPreDrawSignals.tryReceive()
             val restoreToken = foregroundRestoreToken
             foregroundRestoreToken = null
+            val pendingLocalTimeline = controller.pendingTimelineAtForeground()
             resumeScrollRestoreCoordinator.launchResumeWork(scope) {
                 when {
                     restoreFocus -> {
@@ -212,6 +213,14 @@ internal fun ConversationForegroundRestoreEffects(
                             currentState = currentForegroundSettleStateProvider,
                             expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
                             expectedVisibilityTimeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
+                            awaitLocalTimeline = {
+                                if (pendingLocalTimeline != null) {
+                                    pendingLocalTimeline.await()
+                                    // Discard a pre-draw from the old composition while local apply was held.
+                                    // The next signal measures the post-handoff transcript/chrome together.
+                                    foregroundPreDrawSignals.tryReceive()
+                                }
+                            },
                             // Past the deadline the snapshot stays armed, so the
                             // wait below still applies one correction when
                             // geometry finally settles — only user intent,
