@@ -2417,6 +2417,23 @@ internal fun ConversationScreen(
             }
     }
 
+    /** Captures current mention geometry after each suspended positioning step. */
+    fun mentionJumpLayout(targetMessageId: String, index: Int): ConversationMentionJumpLayout {
+        val layout = timelineViewport.readingLayoutInfo()
+        return ConversationMentionJumpLayout(
+            viewportEndOffsetPx = layout.viewportEndOffset,
+            itemHeightPx =
+                layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+            estimatedItemHeightPx =
+                navigationState.timelineItemHeightsPx[targetMessageId]
+                    ?: ReplyNavigation.estimateItemHeightPx(
+                        layout.visibleItemsInfo.map { it.size },
+                    ),
+            isNewest = index == controller.conversationTrailingRowCount(renderedTimeline.size),
+            itemOffsetPx = layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset,
+        )
+    }
+
     fun jumpToNextUnreadMention() {
         val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
         navigationState.searchJob?.cancel()
@@ -2449,21 +2466,7 @@ internal fun ConversationScreen(
                         scrollCoordinator.jumpToMentionReadingStart(
                             targetMessageId = targetMessageId,
                             resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
-                            readLayout = { index ->
-                                val layout = timelineViewport.readingLayoutInfo()
-                                ConversationMentionJumpLayout(
-                                    viewportEndOffsetPx = layout.viewportEndOffset,
-                                    itemHeightPx =
-                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-                                    estimatedItemHeightPx =
-                                        navigationState.timelineItemHeightsPx[targetMessageId]
-                                            ?: ReplyNavigation.estimateItemHeightPx(
-                                                layout.visibleItemsInfo.map { it.size },
-                                            ),
-                                    isNewest = index == controller.conversationTrailingRowCount(renderedTimeline.size),
-                                    itemOffsetPx = layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset,
-                                )
-                            },
+                            readLayout = { index -> mentionJumpLayout(targetMessageId, index) },
                             onCompleted = {
                                 if (navigationRequest.isCurrent()) {
                                     scrollCoordinator.settleReadingAt(currentScrollAnchor())

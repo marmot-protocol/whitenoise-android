@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -333,12 +334,7 @@ class ConversationMentionNavigationUiTest {
                                 (-state.incomingCount..maxOf(targetIndex, initialIndex) + 12).toList(),
                                 key = { "message-$it" },
                             ) { index ->
-                                val height =
-                                    when {
-                                        index == targetIndex -> state.targetHeight
-                                        mixedRows && index % 9 == 0 -> 480
-                                        else -> 72
-                                    }
+                                val height = mentionFixtureRowHeight(index, targetIndex, mixedRows, state)
                                 Text(
                                     "Message $index",
                                     modifier =
@@ -359,21 +355,7 @@ class ConversationMentionNavigationUiTest {
                                                 targetIndex + state.incomingCount + state.headerCount
                                             },
                                             readLayout = { index ->
-                                                val layout =
-                                                    conversationReadingLayoutInfo(listState.layoutInfo, overlap)
-                                                val isNewest = index == state.headerCount
-                                                state.newestEvaluations.add(isNewest)
-                                                ConversationMentionJumpLayout(
-                                                    viewportEndOffsetPx = layout.viewportEndOffset,
-                                                    itemHeightPx =
-                                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-                                                    estimatedItemHeightPx = state.targetHeight,
-                                                    isNewest = isNewest,
-                                                    itemOffsetPx =
-                                                        layout.visibleItemsInfo
-                                                            .firstOrNull { it.index == index }
-                                                            ?.offset,
-                                                )
+                                                mentionJumpLayout(listState.layoutInfo, overlap, index, state)
                                             },
                                             awaitLayout = {
                                                 withFrameNanos { }
@@ -461,6 +443,39 @@ class ConversationMentionNavigationUiTest {
             assertFalse("the new message--1 supersedes it as newest", state.newestEvaluations.last())
         }
         assertMentionFollowUps(fixture, state, listTop)
+    }
+
+    /** Resolves mixed-height rows independently of the real-list interaction harness. */
+    private fun mentionFixtureRowHeight(
+        index: Int,
+        targetIndex: Int,
+        mixedRows: Boolean,
+        state: MentionHarnessState,
+    ): Int =
+        when {
+            index == targetIndex -> state.targetHeight
+            mixedRows && index % 9 == 0 -> 480
+            else -> 72
+        }
+
+    /** Records newest classification and captures the current measured reading viewport. */
+    private fun mentionJumpLayout(
+        layoutInfo: LazyListLayoutInfo,
+        overlap: Int,
+        index: Int,
+        state: MentionHarnessState,
+    ): ConversationMentionJumpLayout {
+        val layout = conversationReadingLayoutInfo(layoutInfo, overlap)
+        val isNewest = index == state.headerCount
+        state.newestEvaluations.add(isNewest)
+        val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
+        return ConversationMentionJumpLayout(
+            viewportEndOffsetPx = layout.viewportEndOffset,
+            itemHeightPx = item?.size,
+            estimatedItemHeightPx = state.targetHeight,
+            isNewest = isNewest,
+            itemOffsetPx = item?.offset,
+        )
     }
 
     /** Mutates the actual list while the command awaits a controlled layout continuation. */
