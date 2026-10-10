@@ -7,6 +7,7 @@ test_package="dev.ipf.whitenoise.android.benchmark"
 runner="$test_package/androidx.test.runner.AndroidJUnitRunner"
 allow_network_toggle="${ALLOW_NETWORK_TOGGLE:-false}"
 network_recovery_benchmark_class="dev.ipf.whitenoise.android.benchmark.NetworkRecoveryBenchmark"
+offline_startup_benchmark_class="dev.ipf.whitenoise.android.benchmark.PopulatedProcessDeathStartupBenchmark"
 startup_local_frame_budget_ms="${STARTUP_LOCAL_FRAME_BUDGET_MS:-}"
 if [[ -n "$startup_local_frame_budget_ms" && ! "$startup_local_frame_budget_ms" =~ ^[1-9][0-9]{0,8}$ ]]; then
   echo "STARTUP_LOCAL_FRAME_BUDGET_MS must be a positive reviewed budget (at most 9 digits)." >&2
@@ -17,6 +18,12 @@ if [[ -z "${BENCHMARK_CLASS_FILTER:-}" || "${BENCHMARK_CLASS_FILTER:-}" == *"Sta
     echo "Startup qualification requires a reviewed STARTUP_LOCAL_FRAME_BUDGET_MS before device changes." >&2
     exit 2
   fi
+fi
+
+if [[ "${BENCHMARK_CLASS_FILTER:-}" == *"$offline_startup_benchmark_class"* &&
+  "${REQUIRE_OFFLINE_STARTUP:-false}" != true ]]; then
+  echo "Populated process-death startup requires REQUIRE_OFFLINE_STARTUP=true and a host-owned offline fixture." >&2
+  exit 2
 fi
 
 if [[ "${BENCHMARK_CLASS_FILTER:-}" == *"$network_recovery_benchmark_class"* &&
@@ -702,6 +709,9 @@ instrument_command="am instrument --user $benchmark_user -w -r \
 -e class $(quote_device_shell_arg "$benchmark_classes") \
 -e androidx.benchmark.output.enable true \
 -e additionalTestOutputDir $(quote_device_shell_arg "$device_output")"
+if [[ "${REQUIRE_OFFLINE_STARTUP:-false}" == true ]]; then
+  instrument_command="$instrument_command -e requireOfflineStartup true"
+fi
 if [[ -n "$group_name" ]]; then
   instrument_command="$instrument_command \
 -e groupName $(quote_device_shell_arg "$group_name")"

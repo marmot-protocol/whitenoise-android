@@ -184,6 +184,32 @@ may uninstall the target during teardown and erase the local identity and messag
 history. After profile collection, restore the normal dev APK in place without
 uninstalling or clearing data.
 
+## Populated process-death startup regression
+
+`PopulatedProcessDeathStartupBenchmark#populatedLocalRowsRemainInteractiveBeforeNetworkRelease`
+uses the separate benchmark process and the ordinary target Application. Prepare an
+owned authenticated fixture with persisted chats and a known `groupName` through
+normal app/MDK operations before the run. The test does not reset accounts or
+create an Android protocol-data cache.
+
+The host must capture and restore the original connectivity state, make every
+internet-capable transport unavailable, and pass `requireOfflineStartup=true`.
+When using the state-preserving runner, set `REQUIRE_OFFLINE_STARTUP=true` and
+select this class with `BENCHMARK_CLASS_FILTER`; supply the reviewed
+`STARTUP_LOCAL_FRAME_BUDGET_MS` as for other startup qualification. This test does
+not toggle radios itself and refuses online or switched-user fixtures.
+
+Each of three iterations verifies the populated local list, presses Home, calls
+`am kill` for only the fixture user, requires the old process to disappear, and
+reopens the retained task. It rejects a retained PID, loading/recovery in place of
+the populated local checkpoint, missing rows, or a row action that cannot open
+the local transcript before network release. A foreground service that prevents
+`am kill` is a failed qualification, not a skipped test. Macrobenchmark's
+`killProcess()` uses force-stop and cannot substitute for this ordinary
+process-death scenario. Retain the startup traces and instrumentation result
+alongside exact APK/source/MDK provenance. Emulator runs qualify behavior only;
+physical release-like timings and a reviewed device budget remain separate gates.
+
 ## Run Macrobenchmarks
 
 ### Isolated media component probe
