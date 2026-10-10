@@ -1900,8 +1900,8 @@
     <string name="setup_status_skipped">Atlandı</string>
     <string name="setup_action_retry">Yeniden dene</string>
     <string name="setup_action_continue_without">Şimdi değil</string>
-    <string name="setup_action_use_recommended_relays">Önerilen aktarıcıları kullan</string>
-    <string name="setup_action_edit_relays">Röle seç</string>
+    <string name="setup_action_use_recommended_relays">Aktarıcı kurulumunu düzelt</string>
+    <string name="setup_action_edit_relays">Aktarıcıları incele</string>
     <string name="setup_action_edit_profile">Profili düzenle</string>
     <string name="setup_action_edit_follows">Takipleri düzenle</string>
     <string name="setup_action_approve_repair">Değişiklikleri kaydet</string>

@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 
 /** Orders presentation only: every offered action retains its exact native revision, recovery epoch, and callback. */
@@ -27,7 +28,7 @@ internal fun SetupActionButtons(
     val step = state.currentStep ?: return
     val recoveryEpoch = snapshot.recoveryEpoch
     val ordered =
-        setupOrderedActions(step.actions).filterNot {
+        state.orderedRelayActions(step.actions).filterNot {
             it == OnboardingActionFfi.RETRY && state.routineDeviceNotice
         }
     val actions =
@@ -51,6 +52,24 @@ internal fun SetupActionButtons(
                 onAction(SetupRequest(revision, step.step, action, recoveryEpoch = recoveryEpoch))
             }
         }
+    }
+    if (state.offersRelayReset()) {
+        TextButton(
+            onClick = {
+                onAction(
+                    SetupRequest(
+                        snapshot.revision,
+                        step.step,
+                        OnboardingActionFfi.USE_RECOMMENDED_RELAYS,
+                        recoveryEpoch = recoveryEpoch,
+                        resetRelays = true,
+                    ),
+                )
+            },
+            enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth().testTag("setup-reset-relays"),
+            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) { Text(stringResource(R.string.setup_reset_relays)) }
     }
 }
 
@@ -99,3 +118,21 @@ private val setupActionOrder =
         OnboardingActionFfi.CANCEL_REPAIR,
         OnboardingActionFfi.CANCEL_ONBOARDING,
     )
+
+/** Keeps manual review beside minimal repair without changing the native offered action set. */
+private fun AccountSetupState.orderedRelayActions(actions: List<OnboardingActionFfi>): List<OnboardingActionFfi> {
+    val ordered = setupOrderedActions(actions)
+    return if (currentStep?.step in relaySetupSteps && snapshot?.proposal == null) {
+        listOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS, OnboardingActionFfi.EDIT_RELAYS)
+            .filter { it in ordered } + ordered.filterNot { it in relaySetupActions }
+    } else {
+        ordered
+    }
+}
+
+/** Reset is visible only among expanded native repair choices, before a proposal exists. */
+private fun AccountSetupState.offersRelayReset(): Boolean {
+    if (!detailsExpanded || snapshot?.proposal != null) return false
+    val step = currentStep
+    return step != null && step.step in relaySetupSteps && OnboardingActionFfi.USE_RECOMMENDED_RELAYS in step.actions
+}
