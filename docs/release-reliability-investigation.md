@@ -49,8 +49,9 @@ Measure a generated large transfer on a real phone; a host staging test is not t
 ## Public group-photo uploads
 
 [Group-photo InvalidMediaReference #2899](https://github.com/marmot-protocol/whitenoise-android/issues/2899)
-has no supplied image, copied error report, installed source revision or signer/network
-cohort. The current public-avatar path is `GroupAvatarUploadAttempt`, distinct from
+includes an upload-stage error report from `2026.9.21 (19)` on Android 15 / API 35.
+The image, signer and network cohort remain unknown; no additional reporter
+artifacts are available. The current public-avatar path is `GroupAvatarUploadAttempt`, distinct from
 the encrypted group-image mutation. MDK's default public-profile upload endpoint
 is `https://blossom.primal.net`.
 
