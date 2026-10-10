@@ -233,10 +233,10 @@ private fun SmartFolderGroup(
                 }
                 Row(Modifier.fillMaxWidth()) {
                     if (path.size < SmartFolderCodec.MAX_DEPTH && root.nodeCount() < SmartFolderCodec.MAX_NODES) {
-                        TextButton(
+                        FolderAddFilterButton(
                             onClick = { onEdit(path, true) },
                             modifier = Modifier.weight(1f).testTag("folder.add." + path.joinToString(".")),
-                        ) { Text(stringResource(R.string.smart_folder_add)) }
+                        )
                     }
                     TextButton(
                         onClick = { optionsExpanded = !optionsExpanded },
