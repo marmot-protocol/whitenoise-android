@@ -115,14 +115,31 @@ class ConversationLiveWindowHandoffTest {
 
     /** Normal EOF cannot close the attempt while its initial loading/disclosure metadata is unsettled. */
     @Test
-    fun normalTimelineEndWaitsForTheHeldInitialRosterToSettle() =
+    fun normalTimelineEndWaitsForTheHeldInitialRosterToSettle() = assertNormalEndSettlesRoster(false)
+
+    /** A final live window followed by EOF must retain the same initial-metadata settlement contract. */
+    @Test
+    fun timelineEndDuringFinalBatchWaitsForTheHeldInitialRosterToSettle() = assertNormalEndSettlesRoster(true)
+
+    /** Holds initialization across normal producer end, with or without a final coalesced window. */
+    private fun assertNormalEndSettlesRoster(finalWindow: Boolean) =
         runBlocking {
             val rosterStarted = CompletableDeferred<Unit>()
             val rosterReply = CompletableDeferred<GroupRosterFfi>()
             val timeline =
                 ScriptedConversationTimelineSubscription(
                     timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL)),
-                ).apply { endWindows() }
+                ).apply {
+                    if (finalWindow) {
+                        emitWindow(
+                            timelinePage(
+                                timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL),
+                                timelineRecord(ConversationTimelineTestIds.MESSAGE_B, 2uL),
+                            ),
+                        )
+                    }
+                    endWindows()
+                }
             val scripts =
                 ScriptedConversationLiveSubscriptions(
                     timelineScripts = listOf(timeline),
@@ -152,7 +169,10 @@ class ConversationLiveWindowHandoffTest {
             }
             controller.start()
             try {
-                awaitConversationCondition { rosterStarted.isCompleted && timeline.windowEndObserved.isCompleted }
+                awaitAdvancingTimelineClock {
+                    rosterStarted.isCompleted && timeline.windowEndObserved.isCompleted &&
+                        (!finalWindow || ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller))
+                }
                 assertEquals(
                     "normal EOF must not reopen while initialization is held",
                     1,
