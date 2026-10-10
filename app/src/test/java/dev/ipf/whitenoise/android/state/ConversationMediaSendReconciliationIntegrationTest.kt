@@ -731,7 +731,9 @@ class ConversationMediaSendReconciliationThumbnailTest {
         }
 }
 
-/** Joins every fixture-owned IO handoff before resetting the process-global Main dispatcher, including after timeout. */
+/**
+ * Joins every fixture-owned IO handoff before resetting Main, including after timeout.
+ */
 private suspend fun finishMediaFixture(
     controller: ConversationController,
     state: WhiteNoiseAppState,
