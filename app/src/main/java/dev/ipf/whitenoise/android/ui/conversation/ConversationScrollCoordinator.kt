@@ -743,12 +743,8 @@ internal class ConversationScrollCoordinator(
         /** Restores resting padding before an explicit command supersedes the mention's reading intent. */
         suspend fun prepareReadingSpace(reason: ConversationScrollReason?) {
             ensureCurrent()
-            if (
-                reason == null ||
-                    reason == ConversationScrollReason.Mention ||
-                    reason == ConversationScrollReason.SavedRestore ||
-                    mentionReadingRowHeightPx == null
-            ) return
+            if (reason == null || mentionReadingRowHeightPx == null) return
+            if (reason == ConversationScrollReason.Mention || reason == ConversationScrollReason.SavedRestore) return
             mentionReadingRowHeightPx = null
             withFrameNanos { }
             ensureCurrent()
