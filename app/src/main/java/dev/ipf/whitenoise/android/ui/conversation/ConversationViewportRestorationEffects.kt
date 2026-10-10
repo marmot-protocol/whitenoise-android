@@ -70,6 +70,7 @@ internal fun ConversationViewportStructureEffect(
     structure: ConversationTimelineStructure,
     anchored: Boolean,
     resolveAnchor: (ConversationScrollAnchor) -> Int?,
+    currentAnchor: () -> ConversationScrollAnchor? = { null },
 ) {
     // Keep the existing trigger set: same-row hydration does not restart anchoring.
     LaunchedEffect(
@@ -80,7 +81,7 @@ internal fun ConversationViewportStructureEffect(
         anchored,
         owner,
     ) {
-        owner.onStructure(structure, anchored, resolveAnchor)
+        owner.onStructure(structure, anchored, currentAnchor, resolveAnchor)
     }
 }
 

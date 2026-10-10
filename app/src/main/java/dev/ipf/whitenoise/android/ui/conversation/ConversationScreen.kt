@@ -3102,7 +3102,12 @@ internal fun ConversationScreen(
             ),
         callbacks =
             ConversationViewportRestorationCallbacks(
-                navigation = ConversationViewportNavigation(::resolveScrollAnchorIndex) { currentTailIndex },
+                navigation =
+                    ConversationViewportNavigation(
+                        resolveAnchor = ::resolveScrollAnchorIndex,
+                        currentAnchor = { currentScrollAnchor() },
+                        tailIndex = { currentTailIndex },
+                    ),
                 onAnchored = { latestId ->
                     initialTimelineAnchored = true
                     navigationState.lastFollowedLatestId = latestId
@@ -3178,6 +3183,7 @@ internal fun ConversationScreen(
             ),
         anchored = initialTimelineAnchored,
         resolveAnchor = ::resolveScrollAnchorIndex,
+        currentAnchor = { currentScrollAnchor() },
     )
 
     // Reacting to the last message grows its bubble height (a reaction chip) but
