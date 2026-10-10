@@ -4,8 +4,11 @@ import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaFileTransferControlFfi
+import dev.ipf.marmotkit.MediaFileUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
+import dev.ipf.marmotkit.MediaUploadSubmissionFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -120,6 +123,49 @@ internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
     capturedReply: Boolean = false,
 ): DurableComposerMediaUpload {
     require(!request.send) { "controller request must begin as upload-only" }
+    return uploadOrAdmitComposerSubmission(
+        account = account,
+        group = group,
+        token = token,
+        capturedReply = capturedReply,
+        descriptors = request.attachments.map { it.fileName to it.mediaType },
+    ) { send -> uploadMediaWithClientToken(account, group, request.copy(send = send), token) }
+}
+
+/**
+ * File-backed twin of [uploadOrAdmitComposerMediaWithToken] with the same draft and admission rules.
+ * MDK snapshots every source path before its first upload; [control] cancels that work before admission.
+ * Captured replies never reach this path because native reply drafts hold attachment bytes.
+ */
+internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaFilesWithToken(
+    account: String,
+    group: String,
+    request: MediaFileUploadRequestFfi,
+    control: MediaFileTransferControlFfi,
+    token: String,
+): DurableComposerMediaUpload {
+    require(!request.send) { "controller request must begin as upload-only" }
+    return uploadOrAdmitComposerSubmission(
+        account = account,
+        group = group,
+        token = token,
+        capturedReply = false,
+        descriptors = request.attachments.map { it.fileName to it.mediaType },
+    ) { send -> uploadMediaFilesWithClientToken(account, group, request.copy(send = send), control, token) }
+}
+
+/**
+ * Shared admission rule: recover a submission MDK already owns, keep a matching non-reply draft
+ * upload-only for revision-safe publication, and otherwise require the upload call to admit the send.
+ */
+private suspend fun MarmotInterface.uploadOrAdmitComposerSubmission(
+    account: String,
+    group: String,
+    token: String,
+    capturedReply: Boolean,
+    descriptors: List<Pair<String, String>>,
+    upload: suspend (send: Boolean) -> MediaUploadSubmissionFfi,
+): DurableComposerMediaUpload {
     recoveredLocalSend(account, group, token)?.let { recovered ->
         return DurableComposerMediaUpload(
             upload = MediaUploadResultFfi(emptyList(), null),
@@ -134,8 +180,8 @@ internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
         capturedReply ||
             selectedDraftOrNull(account, group)
                 ?.draft
-                ?.let { it.replyToMessageIdHex == null && draftDescribesUpload(it, request.attachments) } == true
-    val submission = uploadMediaWithClientToken(account, group, request.copy(send = !draftBacked), token)
+                ?.let { it.replyToMessageIdHex == null && draftDescribesUpload(it, descriptors) } == true
+    val submission = upload(!draftBacked)
     val acceptance =
         submission.acceptance?.also {
             check(it.clientToken == token) { "media acceptance changed the caller token" }

@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
@@ -106,14 +105,14 @@ internal fun draftDescribes(
             descriptor.fileName == reference.fileName && descriptor.mediaType == reference.mediaType
         }
 
-/** Whether upload-ready plaintext has the exact ordered descriptors owned by the selected draft. */
+/** Whether an upload's ordered (file name, media type) descriptors are exactly those the selected draft owns. */
 internal fun draftDescribesUpload(
     draft: SelectedMessageDraftContentFfi,
-    attachments: List<MediaUploadAttachmentRequestFfi>,
+    descriptors: List<Pair<String, String>>,
 ): Boolean =
-    draft.mediaAttachments.size == attachments.size &&
-        draft.mediaAttachments.zip(attachments).all { (descriptor, attachment) ->
-            descriptor.fileName == attachment.fileName && descriptor.mediaType == attachment.mediaType
+    draft.mediaAttachments.size == descriptors.size &&
+        draft.mediaAttachments.zip(descriptors).all { (descriptor, upload) ->
+            descriptor.fileName == upload.first && descriptor.mediaType == upload.second
         }
 
 @Suppress("SwallowedException") // A draft read failure only means the direct send path is used.

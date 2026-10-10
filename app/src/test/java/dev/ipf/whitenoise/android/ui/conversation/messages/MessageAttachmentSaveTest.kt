@@ -44,6 +44,7 @@ class MessageAttachmentSaveTest {
         composeRule.onNodeWithText(string(R.string.save_attachments)).assertDoesNotExist()
     }
 
+    /** Video saves stream the materialized file into the gallery instead of resolving another array. */
     @Test
     fun videoSaveReusesTheMaterializedFile() {
         val saveBody = saveMediaBody()
@@ -56,16 +57,32 @@ class MessageAttachmentSaveTest {
         )
     }
 
+    /**
+     * Document saves stream a reusable artifact from the native source, as Open does, so a document larger
+     * than the preview budget still saves; only the sender's in-memory retry bytes skip the source.
+     */
     @Test
     fun documentSaveReusesTheMaterializedFile() {
         val saveBody = saveMediaBody()
+        val materializer =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaFileAccess.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaFileAccess.kt"),
+            ).first(File::exists)
+                .readText()
+                .functionBody("materializeDocumentFile")
 
         assertTrue(
-            "document saves must join the transfer and stream its reusable artifact",
-            "materializeDocumentAttachment(" in saveBody &&
-                "requestAttachmentTransfer(" in saveBody &&
+            "document saves must stream the reusable artifact instead of a preview-bounded ByteArray",
+            "materializeDocumentFile(" in saveBody &&
                 "saveDocumentWithFallback(" in saveBody &&
                 "documentSaveFallback" in saveBody,
+        )
+        assertTrue(
+            "the shared materializer must back its stream with durable work and join only retained retry bytes",
+            "downloadAttachmentSource(" in materializer &&
+                "enqueueInteractiveAttachmentDownload(" in materializer &&
+                "requestAttachmentTransfer(" in materializer,
         )
     }
 

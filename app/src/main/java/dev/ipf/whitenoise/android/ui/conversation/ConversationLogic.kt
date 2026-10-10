@@ -126,6 +126,7 @@ internal fun conversationScrollRestoreListIndex(
 internal data class ImageAttachmentReadOutcome(
     val attachment: PendingAttachment?,
     val overflowed: Boolean = false,
+    val storageUnavailable: Boolean = false,
 )
 
 // Start the next 50-row history page halfway through the current page. Four rows was too little

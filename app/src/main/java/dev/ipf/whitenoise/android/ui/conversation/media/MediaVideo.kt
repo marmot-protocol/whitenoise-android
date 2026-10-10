@@ -217,9 +217,9 @@ internal fun MediaVideoGridTile(
             .pendingAttachmentsList(messageIdHex)
             .getOrNull(attachmentIndex)
             ?.takeIf { mine && it.isPendingVideo }
-            ?.plaintextBytes
+            ?.inMemoryBytes
     val retainedPlaintextOnEntry =
-        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.inMemoryBytes != null
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageGridTile). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -615,9 +615,9 @@ internal fun MediaVideoBubble(
             .pendingAttachmentsList(messageIdHex)
             .getOrNull(attachmentIndex)
             ?.takeIf { mine && it.isPendingVideo }
-            ?.plaintextBytes
+            ?.inMemoryBytes
     val retainedPlaintextOnEntry =
-        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.inMemoryBytes != null
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
@@ -1053,7 +1053,7 @@ internal suspend fun materializeVideoAttachment(
                     controller
                         .pendingAttachmentsList(messageIdHex)
                         .getOrNull(attachmentIndex)
-                        ?.plaintextBytes
+                        ?.inMemoryBytes
                 } else {
                     null
                 }

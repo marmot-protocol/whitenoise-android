@@ -25,6 +25,7 @@ import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaFileUploadRequestFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
@@ -50,7 +51,13 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationMediaSender
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
+import dev.ipf.whitenoise.android.ui.conversation.ScriptedPick
+import dev.ipf.whitenoise.android.ui.conversation.ScriptedPickProvider
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
+import dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_ATTACHMENT_MAX_BYTES
+import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +73,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
@@ -76,6 +84,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -1233,3 +1242,674 @@ private fun voiceRetryReview(
         }
     },
 )
+
+/** Large picks staged to private files go through MDK's file upload with the composer's send semantics. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ConversationFileBackedMediaSendTest {
+    /** A mixed album is sent from paths; temporary snapshots and the pick's own file are both gone afterwards. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun mixedAlbumUploadsFromPathsAndDeletesEverySnapshotAfterAcceptance() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val video = stagedVideo(state)
+            val videoFile = checkNotNull(video.sourceFile).file
+            val requests = mutableListOf<MediaFileUploadRequestFfi>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    requests += request
+                    assertTrue(request.attachments.all { java.io.File(it.sourcePath).isFile })
+                    twoAttachmentUpload()
+                }
+            try {
+                controller.retryMembers()
+                val cover = PendingAttachment(VIDEO_BYTES, "image/jpeg", "cover.jpg")
+                controller.sendAttachments(listOf(cover, video), "trip")
+
+                val request = requests.single()
+                assertFalse(request.send)
+                assertEquals("trip", request.caption)
+                assertEquals(listOf("cover.jpg", "clip.mp4"), request.attachments.map { it.fileName })
+                val expectedSizes = listOf(VIDEO_BYTES.size.toULong(), STAGED_VIDEO_BYTES.toULong())
+                assertEquals(expectedSizes, request.attachments.map { it.expectedSize })
+                assertEquals(videoFile.absolutePath, request.attachments[1].sourcePath)
+                val coverSnapshot = java.io.File(request.attachments[0].sourcePath)
+                assertFalse("the in-memory item's temporary snapshot is call-scoped", coverSnapshot.exists())
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID,
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex,
+                )
+                assertNull(
+                    "a file-backed item must not seed the host cache with an empty array",
+                    state.cachedMediaPlaintext(mediaCacheKey(ACCOUNT_REF, GROUP_ID, CONFIRMED_MESSAGE_ID, 1)),
+                )
+                awaitDeleted(videoFile)
+            } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A failed transfer keeps the pick's private snapshot, and Retry uploads the very same file. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun failedTransferKeepsItsSnapshotAndRetryReusesTheSamePath() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val video = stagedVideo(state)
+            val videoFile = checkNotNull(video.sourceFile).file
+            val paths = mutableListOf<String>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    paths += request.attachments.single().sourcePath
+                    if (paths.size == 1) error("endpoint unavailable") else oneAttachmentUpload()
+                }
+            try {
+                controller.retryMembers()
+                controller.sendAttachments(listOf(video), null)
+
+                val failed = controller.timeline.single()
+                assertEquals(MessageStatus.Failed, failed.status)
+                assertTrue("a failed send keeps its snapshot for Retry", videoFile.exists())
+
+                controller.retryFailedSend(failed)
+
+                assertEquals(listOf(videoFile.absolutePath, videoFile.absolutePath), paths)
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID,
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex,
+                )
+                awaitDeleted(videoFile)
+            } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** Cancel stops a running transfer before admission, settles the row as cancelled and deletes the pick. */
+    @Test
+    fun cancelStopsARunningTransferBeforeAdmission() = assertCancelStopsRunningTransfer(holdCommitLock = false)
+
+    /**
+     * The production transfer holds the group commit lock that Cancel also needs. Cancel must reach the
+     * transfer before waiting for that lock, or the two would wait on each other for the whole upload.
+     */
+    @Test
+    fun cancelReachesATransferThatHoldsTheCommitLock() = assertCancelStopsRunningTransfer(holdCommitLock = true)
+
+    /** Runs one file-backed send until its transfer is running, then cancels it through the bubble's delete. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun assertCancelStopsRunningTransfer(holdCommitLock: Boolean) =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val video = stagedVideo(state)
+            val videoFile = checkNotNull(video.sourceFile).file
+            val transferRunning = CompletableDeferred<Unit>()
+            val stopped = CompletableDeferred<Unit>()
+            var published = false
+            val transfer: suspend (((() -> Unit)?) -> Unit) -> MediaUploadResultFfi = { register ->
+                register { stopped.complete(Unit) }
+                transferRunning.complete(Unit)
+                stopped.await()
+                register(null)
+                error("media transfer cancelled")
+            }
+            val controller =
+                fileBackedController(state, publish = { published = true }) { _, register ->
+                    if (holdCommitLock) {
+                        state.withGroupCommitLock(ACCOUNT_REF, GROUP_ID) { transfer(register) }
+                    } else {
+                        transfer(register)
+                    }
+                }
+            try {
+                controller.retryMembers()
+                val send = launch { controller.sendAttachments(listOf(video), null) }
+                transferRunning.await()
+                val pending = controller.timeline.single()
+                assertEquals(MessageStatus.Pending, pending.status)
+
+                assertTrue(controller.deleteMessageResult(pending.record, presentFailure = false).isSuccess)
+                send.join()
+
+                assertTrue(stopped.isCompleted)
+                assertFalse(published)
+                assertTrue("a cancelled send leaves no row, failed or pending", controller.timeline.isEmpty())
+                assertNull("a cancelled send is not reported as a failure", state.toast)
+                awaitDeleted(videoFile)
+            } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A reply keeps every attachment in memory; a file-backed item is refused before any row exists. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun replyRefusesAFileBackedItemWhileAnOrdinarySendQueuesIt() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val video = stagedVideo(state)
+            val controller = fileBackedController(state) { _, _ -> error("nothing is uploaded") }
+            try {
+                controller.retryMembers()
+                assertNull(
+                    controller.queueAttachments(
+                        listOf(video),
+                        caption = null,
+                        replyTarget = "e1".repeat(32),
+                        replyVersion = controller.replySelectionVersion,
+                    ),
+                )
+                assertTrue(controller.timeline.isEmpty())
+                assertEquals(
+                    "the refusal names the size, not a draft conflict",
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.media_file_too_large),
+                    state.toast?.title,
+                )
+                assertTrue("a refused pick stays with its caller", checkNotNull(video.sourceFile).file.exists())
+
+                assertTrue(controller.queueAttachments(listOf(video), caption = null, replyTarget = null) != null)
+            } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** Once the upload has its references, the snapshot goes even while MDK still owns the unpublished send. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun uploadedSnapshotIsReleasedWhileTheSendIsStillPending() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val video = stagedVideo(state)
+            val videoFile = checkNotNull(video.sourceFile).file
+            val controller =
+                fileBackedController(state, publishSummary = { acceptedPendingSummary() }) { _, _ ->
+                    oneAttachmentUpload()
+                }
+            try {
+                controller.retryMembers()
+                controller.sendAttachments(listOf(video), null)
+
+                assertEquals(
+                    "the accepted-pending send keeps its retained entry",
+                    1,
+                    state.retainedMediaUploads(ACCOUNT_REF, GROUP_ID).size(),
+                )
+                awaitDeleted(videoFile)
+            } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** In-memory sends that overflow the retained heap evict each other, never a failed file-backed send. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun failedFileBackedSendSurvivesHeapPressureAndRetriesFromItsSnapshot() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val video = stagedVideo(state)
+            val videoFile = checkNotNull(video.sourceFile).file
+            val paths = mutableListOf<String>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    paths += request.attachments.single().sourcePath
+                    if (paths.size == 1) error("endpoint unavailable") else oneAttachmentUpload()
+                }
+            try {
+                controller.retryMembers()
+                controller.sendAttachments(listOf(video), null)
+                val failed = controller.timeline.single()
+                assertEquals(MessageStatus.Failed, failed.status)
+
+                val first = controller.queueAttachments(listOf(inMemoryDocument("first.pdf")), caption = null)
+                controller.queueAttachments(listOf(inMemoryDocument("second.pdf")), caption = null)
+
+                assertTrue(controller.pendingAttachmentsList(failed.record.messageIdHex).isNotEmpty())
+                assertTrue(videoFile.exists())
+                assertTrue(
+                    "the older in-memory send made room",
+                    controller.pendingAttachmentsList(checkNotNull(first).tempId).isEmpty(),
+                )
+                controller.retryFailedSend(failed)
+                assertEquals(listOf(videoFile.absolutePath, videoFile.absolutePath), paths)
+            } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * Cancel pressed while the send waits behind another upload for the commit lock is kept, so the send
+     * never transfers once it gets the lock and nothing is published.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancelWhileWaitingBehindAnotherUploadStopsItBeforeAnyTransfer() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val video = stagedVideo(state)
+            val videoFile = checkNotNull(video.sourceFile).file
+            val waitingForLock = CompletableDeferred<Unit>()
+            var transfers = 0
+            var published = false
+            val controller =
+                fileBackedController(state, publish = { published = true }) { _, register ->
+                    waitingForLock.complete(Unit)
+                    state.withGroupCommitLock(ACCOUNT_REF, GROUP_ID) {
+                        var stopped = false
+                        register { stopped = true }
+                        register(null)
+                        if (stopped) error("media transfer cancelled")
+                        transfers += 1
+                        oneAttachmentUpload()
+                    }
+                }
+            val otherUploadDone = CompletableDeferred<Unit>()
+            try {
+                controller.retryMembers()
+                val otherUpload =
+                    launch {
+                        state.withGroupCommitLock(ACCOUNT_REF, GROUP_ID) { otherUploadDone.await() }
+                    }
+                runCurrent()
+                val send = launch { controller.sendAttachments(listOf(video), null) }
+                waitingForLock.await()
+                val pending = controller.timeline.single()
+                val cancel = async { controller.deleteMessageResult(pending.record, presentFailure = false) }
+                runCurrent()
+
+                otherUploadDone.complete(Unit)
+                otherUpload.join()
+                send.join()
+
+                assertTrue(cancel.await().isSuccess)
+                assertEquals(0, transfers)
+                assertFalse(published)
+                assertTrue(controller.timeline.isEmpty())
+                assertNull(state.toast)
+                awaitDeleted(videoFile)
+            } finally {
+                otherUploadDone.complete(Unit)
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A large document picked in the composer is staged privately, sent from its path and deleted once sent. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun composerSendStagesALargeDocumentAndDeletesItOnceSent() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val uri = scriptedDocument(state)
+            val uploaded = CompletableDeferred<String>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    val path = request.attachments.single().sourcePath
+                    assertTrue(java.io.File(path).isFile)
+                    uploaded.complete(path)
+                    oneAttachmentUpload()
+                }
+            val sender = composerSender(state, controller)
+            try {
+                controller.retryMembers()
+                sender.sendStagedAttachments(imageSlots = emptyList(), documentUris = listOf(uri), caption = "")
+
+                val staged = java.io.File(uploaded.await())
+                assertEquals(
+                    uploadSourcesDirectory(state.appContext.cacheDir).canonicalFile,
+                    staged.parentFile?.canonicalFile,
+                )
+                awaitDeleted(staged) { testScheduler.advanceUntilIdle() }
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * A draft photo that follows a large video is left out once the album's native ciphertext bound is spent,
+     * so the video still sends instead of the whole album failing on every Retry.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun albumLeavesOutADraftPhotoThatNoLongerFitsAfterALargeVideo() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
+            val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
+            val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
+            val uploaded = CompletableDeferred<List<String>>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    uploaded.complete(request.attachments.map { it.fileName })
+                    oneAttachmentUpload()
+                }
+            val albumLimits =
+                FileBackedSendLimits(
+                    perFileBytes = ALBUM_VIDEO_BYTES,
+                    batchCiphertextBytes = ALBUM_VIDEO_BYTES + ALBUM_TAG_AND_SLACK_BYTES,
+                )
+            val sender =
+                ConversationMediaSender(state, controller, state.appContext, fileBackedLimits = { albumLimits }) {}
+            try {
+                controller.retryMembers()
+                sender.sendStagedAttachments(
+                    imageSlots = listOf(PendingMediaSlot("video", video), PendingMediaSlot("photo", photo)),
+                    documentUris = emptyList(),
+                    caption = "",
+                    preparedImageAttachments = mapOf("photo" to draftPhoto()),
+                )
+
+                assertEquals(listOf("clip.mp4"), uploaded.await())
+                assertEquals(
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.media_album_too_large),
+                    state.toast?.title,
+                )
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * A draft photo after a large video uploads from a file too, so its three disk copies must fit beside
+     * the copies still owed to the video. When they do not, the photo is left out with the storage notice
+     * and the video still sends, instead of the whole album failing during upload.
+     */
+    @Test
+    fun albumLeavesOutADraftPhotoWhoseCopiesNoLongerFitBesideALargeVideo() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
+            val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
+            val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
+            val uploaded = CompletableDeferred<List<String>>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    uploaded.complete(request.attachments.map { it.fileName })
+                    oneAttachmentUpload()
+                }
+            val roomyLimits =
+                FileBackedSendLimits(perFileBytes = ALBUM_VIDEO_BYTES, batchCiphertextBytes = 4 * ALBUM_VIDEO_BYTES)
+            // The video's three copies fit with less to spare than the photo's three copies need.
+            val initialFree = SEND_RESERVE_BYTES + 3 * ALBUM_VIDEO_BYTES + DRAFT_PHOTO_BYTES
+            val stagingDirectory = uploadSourcesDirectory(state.appContext.cacheDir)
+            val alreadyStaged = stagedBytes(stagingDirectory)
+            val usableSpace: (java.io.File) -> Long = { initialFree - (stagedBytes(stagingDirectory) - alreadyStaged) }
+            val sender =
+                ConversationMediaSender(
+                    state,
+                    controller,
+                    state.appContext,
+                    fileBackedLimits = { roomyLimits },
+                    usableSpace = usableSpace,
+                ) {}
+            try {
+                controller.retryMembers()
+                sender.sendStagedAttachments(
+                    imageSlots = listOf(PendingMediaSlot("video", video), PendingMediaSlot("photo", photo)),
+                    documentUris = emptyList(),
+                    caption = "",
+                    preparedImageAttachments = mapOf("photo" to draftPhoto()),
+                )
+
+                assertEquals(listOf("clip.mp4"), uploaded.await())
+                assertEquals(
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
+                    state.toast?.title,
+                )
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * The album and a large document picked together are separate messages of one send, so the document's
+     * snapshot must leave room for the album's upload. When it does not, the document is refused with the
+     * storage notice before anything is queued for it, and the album still sends.
+     */
+    @Test
+    fun aLargeDocumentCountsTheCopiesTheAlbumStillOwes() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val document = scriptedDocument(state)
+            val video = scriptedPick(state, "clip.mp4", "video/mp4", LARGER_VIDEO_BYTES)
+            val uploaded = CompletableDeferred<List<String>>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    uploaded.complete(request.attachments.map { it.fileName })
+                    oneAttachmentUpload()
+                }
+            // After the video lands there is room for the document's three copies alone, but not for its
+            // snapshot beside the video's larger upload: 40 + 96 MiB are needed and 1 byte less is free.
+            val initialFree = SEND_RESERVE_BYTES + 3 * LARGER_VIDEO_BYTES + SCRIPTED_DECLARED_BYTES - 1L
+            val stagingDirectory = uploadSourcesDirectory(state.appContext.cacheDir)
+            val alreadyStaged = stagedBytes(stagingDirectory)
+            val usableSpace: (java.io.File) -> Long = { initialFree - (stagedBytes(stagingDirectory) - alreadyStaged) }
+            val sender =
+                ConversationMediaSender(
+                    state,
+                    controller,
+                    state.appContext,
+                    fileBackedLimits = ::senderLimits,
+                    usableSpace = usableSpace,
+                ) {}
+            try {
+                controller.retryMembers()
+                sender.sendStagedAttachments(
+                    imageSlots = listOf(PendingMediaSlot("video", video)),
+                    documentUris = listOf(document),
+                    caption = "",
+                )
+
+                assertEquals(listOf("clip.mp4"), uploaded.await())
+                assertEquals(
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
+                    state.toast?.title,
+                )
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** Bytes of every snapshot currently written under [directory]. */
+    private fun stagedBytes(directory: java.io.File): Long = directory.walk().filter { it.isFile }.sumOf { it.length() }
+
+    /** A photo the composer already prepared and kept in memory for its native draft. */
+    private fun draftPhoto(): PendingAttachment {
+        val bytes = ByteArray(DRAFT_PHOTO_BYTES) { 1 }
+        return PendingAttachment(bytes, "image/jpeg", "photo.jpg")
+    }
+
+    /** Publishes one sparse provider file of [size] bytes under [name] and returns its content Uri. */
+    private fun scriptedPick(
+        state: WhiteNoiseAppState,
+        name: String,
+        mediaType: String,
+        size: Long,
+    ): android.net.Uri {
+        val file = java.io.File(state.appContext.cacheDir, "sender-$name-${System.nanoTime()}")
+        java.io.RandomAccessFile(file, "rw").use { it.setLength(size) }
+        ScriptedPickProvider.picks[name] = ScriptedPick(file, mediaType, size)
+        return android.net.Uri.parse("content://$SENDER_PICKS_AUTHORITY/$name")
+    }
+
+    /** A reply keeps picks in memory, so a large document is refused with the size notice, not a draft conflict. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun composerReplyRefusesALargeDocumentWithTheSizeNotice() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val uri = scriptedDocument(state)
+            val controller = fileBackedController(state) { _, _ -> error("nothing is uploaded") }
+            val sender = composerSender(state, controller)
+            val rejected = CompletableDeferred<Unit>()
+            try {
+                controller.retryMembers()
+                controller.replyingTo =
+                    TimelineProjector
+                        .toAppMessageRecord(projectedMediaMessage(1uL, mediaReference()))
+                        .copy(messageIdHex = "e1".repeat(32))
+                sender.sendStagedAttachments(
+                    imageSlots = emptyList(),
+                    documentUris = listOf(uri),
+                    caption = "",
+                    onRejected = { rejected.complete(Unit) },
+                )
+
+                rejected.await()
+                assertEquals(
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.media_file_too_large),
+                    state.toast?.title,
+                )
+                assertTrue(controller.timeline.isEmpty())
+                assertTrue(uploadSourcesDirectory(state.appContext.cacheDir).list().orEmpty().isEmpty())
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A 20 MiB in-memory document; two of them overflow the 32 MiB retained heap. */
+    private fun inMemoryDocument(name: String): PendingAttachment {
+        val bytes = ByteArray(IN_MEMORY_DOCUMENT_BYTES)
+        return PendingAttachment(bytes, "application/pdf", name)
+    }
+
+    /** The composer's media sender with native limits supplied, so no MarmotKit library is loaded. */
+    private fun composerSender(
+        state: WhiteNoiseAppState,
+        controller: ConversationController,
+    ) = ConversationMediaSender(state, controller, state.appContext, fileBackedLimits = ::senderLimits) {}
+
+    /** Native limits for the composer's reader, without loading MarmotKit. */
+    private fun senderLimits() = FileBackedSendLimits(FILE_BACKED_ATTACHMENT_MAX_BYTES, FILE_BATCH_CIPHERTEXT_BYTES)
+
+    /** Publishes a 4 KiB document whose provider declares 40 MiB, larger than the in-memory cap. */
+    private fun scriptedDocument(state: WhiteNoiseAppState): android.net.Uri {
+        Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
+        val file =
+            java.io.File(state.appContext.cacheDir, "sender-pick-${System.nanoTime()}.pdf").apply {
+                writeBytes(ByteArray(SCRIPTED_DOCUMENT_BYTES) { 3 })
+            }
+        ScriptedPickProvider.picks["report.pdf"] = ScriptedPick(file, "application/pdf", SCRIPTED_DECLARED_BYTES)
+        return android.net.Uri.parse("content://$SENDER_PICKS_AUTHORITY/report.pdf")
+    }
+
+    /**
+     * A controller whose file uploads run [upload] with the cancel registration the native control would
+     * receive; the in-memory uploader must never be reached, and every publish reports relay acceptance.
+     */
+    private fun fileBackedController(
+        state: WhiteNoiseAppState,
+        publish: () -> Unit = {},
+        publishSummary: () -> SendSummaryFfi = { requireNotNull(uploadResult(mediaReference()).sent) },
+        upload: suspend (MediaFileUploadRequestFfi, ((() -> Unit)?) -> Unit) -> MediaUploadResultFfi,
+    ) = ConversationController(
+        appState = state,
+        initialGroup = group(),
+        initialMemberSnapshot = memberSnapshot(),
+        groupRosterReader = { _, _ -> authoritativeRoster() },
+        mediaUploader = { _, _, _ -> error("the in-memory upload path must not run") },
+        mediaFileUploader = { _, _, request, register -> upload(request, register) },
+        fileBatchCiphertextBytes = { FILE_BATCH_CIPHERTEXT_BYTES },
+        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+        mediaPublisher = { _, _, _, _ ->
+            publish()
+            publishSummary()
+        },
+        markdownParser = { emptyMarkdownDocument() },
+    )
+
+    /** A video pick already staged to a private snapshot under the app's upload directory. */
+    private fun stagedVideo(state: WhiteNoiseAppState): PendingAttachment {
+        val directory = uploadSourcesDirectory(state.appContext.cacheDir)
+        val read =
+            dev.ipf.whitenoise.android.ui.conversation.media.readStagedDocument(directory, STAGED_VIDEO_BYTES) {
+                java.io.ByteArrayInputStream(ByteArray(STAGED_VIDEO_BYTES.toInt()))
+            }
+        val source = (read as dev.ipf.whitenoise.android.ui.conversation.media.StagedDocumentRead.Success).source
+        return PendingAttachment(ByteArray(0), VIDEO_MEDIA_TYPE, "clip.mp4", "1280x720", sourceFile = source)
+    }
+
+    /** One accepted upload result per attachment of a two-item album. */
+    private fun twoAttachmentUpload() =
+        MediaUploadResultFfi(
+            attachments =
+                listOf(
+                    MediaUploadAttachmentResultFfi(mediaReference(), 4uL),
+                    MediaUploadAttachmentResultFfi(videoReference(), 4uL),
+                ),
+            sent = null,
+        )
+
+    /** The accepted reference of the staged video. */
+    private fun videoReference() = mediaReference().copy(fileName = "clip.mp4", mediaType = VIDEO_MEDIA_TYPE)
+
+    /** One accepted upload result for a single file-backed item. */
+    private fun oneAttachmentUpload() =
+        MediaUploadResultFfi(
+            attachments = listOf(MediaUploadAttachmentResultFfi(mediaReference().copy(fileName = "clip.mp4"), 4uL)),
+            sent = null,
+        )
+
+    /** Waits for the off-Main deletion that follows a retained upload's release, running [drive] between checks. */
+    private fun awaitDeleted(
+        file: java.io.File,
+        drive: () -> Unit = {},
+    ) {
+        repeat(DELETE_POLL_ATTEMPTS) {
+            drive()
+            shadowOf(Looper.getMainLooper()).idle()
+            if (!file.exists()) return
+            Thread.sleep(DELETE_POLL_INTERVAL_MS)
+        }
+        throw AssertionError("the private snapshot was not deleted")
+    }
+}
+
+private const val STAGED_VIDEO_BYTES = 2L * 1024L * 1024L
+private const val IN_MEMORY_DOCUMENT_BYTES = 20 * 1024 * 1024
+private const val SCRIPTED_DOCUMENT_BYTES = 4096
+private const val SCRIPTED_DECLARED_BYTES = 40L * 1024L * 1024L
+private const val SENDER_PICKS_AUTHORITY = "dev.ipf.whitenoise.test.senderpicks"
+private const val ALBUM_VIDEO_BYTES = 33L * 1024L * 1024L
+private const val ALBUM_TAG_AND_SLACK_BYTES = 116L
+private const val DRAFT_PHOTO_BYTES = 200
+
+// A sparse video whose upload writes more than a 40 MiB document's.
+private const val LARGER_VIDEO_BYTES = 48L * 1024L * 1024L
+
+// The free space every file-backed staging check leaves to the rest of the app.
+private const val SEND_RESERVE_BYTES = 64L * 1024L * 1024L
+private const val FILE_BATCH_CIPHERTEXT_BYTES = 900L * 1024L * 1024L
+private const val DELETE_POLL_ATTEMPTS = 200
+private const val DELETE_POLL_INTERVAL_MS = 10L

@@ -44,20 +44,44 @@ internal suspend fun ConversationController.downloadAttachmentSource(
     priority: AttachmentDownloadPriority,
 ): AttachmentPlaintext {
     val account = boundAccountRef ?: error("no active account")
-    val request =
-        AttachmentTransferRequest(
-            account,
-            group.groupIdHex,
-            messageIdHex,
-            attachmentIndex,
-            sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
-        )
     return appState.downloadAttachmentPlaintextSource(
-        request = request,
+        request = attachmentSourceRequest(account, messageIdHex, attachmentIndex),
         reference = reference,
         priority = priority,
     )
 }
+
+/**
+ * Enqueues the durable interactive download for a confirmed attachment, as the byte-transfer path does,
+ * so a streaming Open or Save that fails in the foreground still has durable work to wait for. A repeat
+ * request coalesces onto the same transfer.
+ */
+internal fun ConversationController.enqueueInteractiveAttachmentDownload(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+) {
+    val account = boundAccountRef ?: return
+    if (reference.sourceEpoch == 0uL) return
+    appState.enqueueAttachmentDownload(
+        attachmentSourceRequest(account, messageIdHex, attachmentIndex),
+        AttachmentDownloadPriority.Interactive,
+    )
+}
+
+/** The durable identity of one attachment slot, keyed by its native source message when the projection has one. */
+private fun ConversationController.attachmentSourceRequest(
+    account: String,
+    messageIdHex: String,
+    attachmentIndex: Int,
+): AttachmentTransferRequest =
+    AttachmentTransferRequest(
+        account,
+        group.groupIdHex,
+        messageIdHex,
+        attachmentIndex,
+        sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
+    )
 
 /** Returns the authoritative source id for a loaded projection, never the display id as a fallback. */
 internal fun ConversationController.nativeAttachmentSourceId(messageIdHex: String): String? =
