@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingRelayRepairFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
@@ -28,6 +29,10 @@ internal data class SetupEditor(
     val originalProfile: UserProfileMetadataFfi? = null,
     val displayNameEdited: Boolean = false,
     val aboutEdited: Boolean = false,
+    val originalReads: String = "",
+    val originalWrites: String = "",
+    val relayDeclaration: OnboardingRelayRepairFfi? = null,
+    val recoveryEpoch: String? = null,
 )
 
 /** Immutable presentation envelope around the authoritative native snapshot. */
@@ -125,6 +130,11 @@ internal class AccountSetupController(
     /** Rejects repeated taps and stale rendered actions before issuing any protocol mutation. */
     fun submit(request: SetupRequest) {
         if (!mutableState.canAct(request, account, isCurrent())) return
+        if (request.action == OnboardingActionFfi.EDIT_RELAYS &&
+            mutableState.value.editor?.canReviewRelayEdit != true
+        ) {
+            return
+        }
         operate {
             val latest = client.snapshot()
             if (latest == null || !latest.matchesDecision(account, request)) {
@@ -142,29 +152,45 @@ internal class AccountSetupController(
         }
     }
 
-    /** Loads the existing profile before editing so untouched metadata is retained. */
+    /** Loads authoritative relay/profile data before exposing an editor; failures never create an empty replacement. */
     fun edit(
         step: OnboardingStepFfi,
         action: OnboardingActionFfi,
         revision: ULong,
     ) {
-        val request = SetupRequest(revision, step, action)
+        val request = SetupRequest(revision, step, action, recoveryEpoch = mutableState.value.snapshot?.recoveryEpoch)
         if (!mutableState.canAct(request, account, isCurrent())) return
         operate {
+            val latest = client.snapshot()
+            if (latest == null || !latest.matchesDecision(account, request)) {
+                latest?.let(::accept)
+                mutableState.value = mutableState.value.copy(staleDecision = true)
+                return@operate
+            }
+            if (action == OnboardingActionFfi.EDIT_RELAYS) {
+                val discarded =
+                    client.installRelayPreview(request.step) { preview ->
+                        val editor = preview.relayEditor(request)
+                        val matchesLoad = preview.matchesRelayEditorLoad(account, request, mutableState.value.snapshot)
+                        if (!isCurrent() || !matchesLoad) {
+                            false
+                        } else {
+                            accept(preview)
+                            mutableState.value = mutableState.value.copy(editor = editor)
+                            true
+                        }
+                    }
+                discarded?.let(::accept)
+                return@operate
+            }
             val existing = mutableState.value.editor
             val profile = if (action == OnboardingActionFfi.EDIT_PROFILE) client.profile() else null
+            if (!isCurrent() || mutableState.value.snapshot?.revision != revision) return@operate
+            if (mutableState.value.snapshot?.recoveryEpoch != request.recoveryEpoch) return@operate
             mutableState.value =
                 mutableState.value.copy(
                     editor =
-                        existing?.takeIf { it.step == step && it.action == action }?.copy(revision = revision)
-                            ?: SetupEditor(
-                                revision,
-                                step,
-                                action,
-                                displayName = profile?.displayName ?: profile?.name.orEmpty(),
-                                about = profile?.about.orEmpty(),
-                                originalProfile = profile,
-                            ),
+                        existing.forRequest(request, profile),
                 )
         }
     }
@@ -172,7 +198,11 @@ internal class AccountSetupController(
     /** Updates only the draft associated with the currently displayed editor. */
     fun updateEditor(editor: SetupEditor) {
         val previous = mutableState.value.editor ?: return
-        if (!mutableState.value.busy && previous.revision == editor.revision) {
+        if (!isCurrent() || mutableState.value.busy) return
+        if (previous.revision == editor.revision &&
+            mutableState.value.snapshot?.revision == editor.revision &&
+            previous.recoveryEpoch == editor.recoveryEpoch
+        ) {
             mutableState.value =
                 mutableState.value.copy(
                     editor =
@@ -185,9 +215,20 @@ internal class AccountSetupController(
         }
     }
 
-    /** Closes the editor without changing or publishing any account metadata. */
+    /** Discards the editor's native preview before returning to relay choices; failed cleanup stays retryable. */
     fun dismissEditor() {
-        if (!mutableState.value.busy) mutableState.value = mutableState.value.copy(editor = null)
+        val current = mutableState.value
+        if (current.busy || !isCurrent()) return
+        val preview = current.snapshot.takeIf { current.editor?.action == OnboardingActionFfi.EDIT_RELAYS }
+        if (preview == null) {
+            mutableState.value = current.copy(editor = null)
+        } else {
+            operate {
+                val latest = client.discardRelayPreview(preview) ?: client.snapshot()
+                latest?.let(::accept)
+                if (isCurrent()) mutableState.value = mutableState.value.copy(editor = null)
+            }
+        }
     }
 
     /** Owns one foreground operation at a time without logging keys or raw engine errors. */
@@ -236,7 +277,15 @@ internal class AccountSetupController(
         if (!isCurrent() || snapshot.accountIdHex != account) return
         val current = mutableState.value
         if (snapshot.revision >= (current.snapshot?.revision ?: 0uL)) {
-            mutableState.value = current.copy(snapshot = snapshot)
+            mutableState.value =
+                current.copy(
+                    snapshot = snapshot,
+                    editor =
+                        current.editor?.takeIf {
+                            it.revision == snapshot.revision &&
+                                it.recoveryEpoch == snapshot.recoveryEpoch
+                        },
+                )
         }
     }
 }
@@ -260,8 +309,17 @@ private fun OnboardingSnapshotFfi.matchesDecision(
     val grantsConsent =
         request.action == OnboardingActionFfi.APPROVE_REPAIR ||
             request.action == OnboardingActionFfi.CONTINUE_ANYWAY
-    val epochMatches = !grantsConsent || request.recoveryEpoch == recoveryEpoch
-    return accountIdHex == account && request.action in actions && request.revision == expectedRevision && epochMatches
+    val requiresEpoch = grantsConsent || request.action in setupEditorActions
+    val epochMatches = (!requiresEpoch && request.recoveryEpoch == null) || request.recoveryEpoch == recoveryEpoch
+    val editsTypedPreview =
+        request.action == OnboardingActionFfi.EDIT_RELAYS &&
+            proposal?.step == request.step &&
+            proposal?.relayRepair != null &&
+            OnboardingActionFfi.APPROVE_REPAIR in actions
+    return accountIdHex == account &&
+        (request.action in actions || editsTypedPreview) &&
+        request.revision == expectedRevision &&
+        epochMatches
 }
 
 /** Converts an editor draft into a proposal request without approving publication. */
@@ -272,6 +330,7 @@ internal fun SetupEditor.request(): SetupRequest {
         editor.revision,
         editor.step,
         editor.action,
+        recoveryEpoch = editor.recoveryEpoch,
         readRelays =
             editor.reads
                 .lines()
@@ -303,3 +362,26 @@ private fun MutableStateFlow<AccountSetupState>.canAct(
     if (!valid) value = current.copy(staleDecision = true)
     return valid
 }
+
+/** Projects only a matching native relay proposal into an editor bound to that preview's revision and epoch. */
+private fun OnboardingSnapshotFfi.relayEditor(request: SetupRequest): SetupEditor {
+    val repair = checkNotNull(proposal?.takeIf { it.step == request.step }?.relayRepair)
+    return SetupEditor(revision, request.step, request.action, recoveryEpoch = recoveryEpoch)
+        .withRelayDeclaration(repair)
+}
+
+/** Reuses a current draft or prefills profile metadata without losing fields the editor does not expose. */
+private fun SetupEditor?.forRequest(
+    request: SetupRequest,
+    profile: UserProfileMetadataFfi?,
+): SetupEditor =
+    this?.takeIf { it.step == request.step && it.action == request.action }?.copy(revision = request.revision)
+        ?: SetupEditor(
+            request.revision,
+            request.step,
+            request.action,
+            displayName = profile?.displayName ?: profile?.name.orEmpty(),
+            about = profile?.about.orEmpty(),
+            originalProfile = profile,
+            recoveryEpoch = request.recoveryEpoch,
+        )

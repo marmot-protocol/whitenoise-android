@@ -34,6 +34,32 @@
           "ONB-021",
           "ONB-023"
         ]
+      },
+      {
+        "surface": "R.string.setup_repair_edit_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_repair_edit_unavailable",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "R.string.setup_repair_edit_unchanged",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "R.string.setup_repair_edit_unchanged",
+        "test_ids": [
+          "ONB-017"
+        ]
+      },
+      {
+        "surface": "SetupProfileFields",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
+        "anchor": "fun SetupProfileFields(",
+        "test_ids": [
+          "ONB-013",
+          "ONB-023",
+          "PRO-010"
+        ]
       }
     ],
     "source_coverage": [
@@ -116,21 +142,6 @@
         "surface": "Native setup presentation: R.string.setup_read_list",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
         "anchor": "R.string.setup_read_list",
-        "test_ids": [
-          "ONB-013",
-          "ONB-014",
-          "ONB-015",
-          "ONB-016",
-          "ONB-018",
-          "ONB-019",
-          "ONB-021",
-          "ONB-023"
-        ]
-      },
-      {
-        "surface": "Native setup presentation: R.string.setup_relays_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
-        "anchor": "R.string.setup_relays_help",
         "test_ids": [
           "ONB-013",
           "ONB-014",

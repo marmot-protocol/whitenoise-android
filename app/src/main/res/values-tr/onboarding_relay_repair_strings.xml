@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_reset_relays">Önerilen aktarıcılara sıfırla</string>
+    <string name="setup_repair_preview">Yayımlamadan önce bu aktarıcı düzeltmesini inceleyin. Diğer Nostr uygulamalarınız da aynı değişikliği görecek.</string>
+    <string name="setup_repair_manual">Bu aktarıcı ayrıntıları elle incelenmelidir. Otomatik düzeltme yayımlanmayacak.</string>
+    <string name="setup_repair_before">Mevcut bildirim</string>
+    <string name="setup_repair_after">Önerilen bildirim</string>
+    <string name="setup_repair_retained">Koru</string>
+    <string name="setup_repair_removed">Kaldır</string>
+    <string name="setup_repair_added">Ekle</string>
+    <string name="setup_repair_read">Okuma</string>
+    <string name="setup_repair_write">Yayımlama</string>
+    <string name="setup_repair_both">Okuma ve yayımlama</string>
+    <string name="setup_repair_inbox">Davet alma</string>
+    <string name="setup_repair_other">Diğer üst veriler</string>
+    <string name="setup_repair_content">Olay içeriği</string>
+    <string name="setup_repair_edit_unavailable">Bu bildirim, elle düzenleyicinin koruyamayacağı ayrıntılar içeriyor. Tam düzeltme önizlemesini kullanın veya bu ayrıntıları destekleyen bir istemcide inceleyin.</string>
+    <string name="setup_repair_edit_unchanged">Yeni bildirimi incelemeden önce bir aktarıcıyı değiştirin. Onayınız olmadan hiçbir şey yayımlanmaz.</string>
+</resources>

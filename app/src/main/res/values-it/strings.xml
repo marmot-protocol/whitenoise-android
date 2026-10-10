@@ -1902,8 +1902,8 @@
     <string name="setup_status_skipped">Saltato</string>
     <string name="setup_action_retry">Riprova</string>
     <string name="setup_action_continue_without">Non ora</string>
-    <string name="setup_action_use_recommended_relays">Usa relay consigliati</string>
-    <string name="setup_action_edit_relays">Scegli i relay</string>
+    <string name="setup_action_use_recommended_relays">Correggi configurazione relay</string>
+    <string name="setup_action_edit_relays">Controlla relay</string>
     <string name="setup_action_edit_profile">Modifica il profilo</string>
     <string name="setup_action_edit_follows">Modifica gli account seguiti</string>
     <string name="setup_action_approve_repair">Salva modifiche</string>

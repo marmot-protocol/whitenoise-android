@@ -1919,8 +1919,8 @@
     <string name="setup_status_skipped">Übersprungen</string>
     <string name="setup_action_retry">Erneut versuchen</string>
     <string name="setup_action_continue_without">Nicht jetzt</string>
-    <string name="setup_action_use_recommended_relays">Empfohlene Relays verwenden</string>
-    <string name="setup_action_edit_relays">Relays auswählen</string>
+    <string name="setup_action_use_recommended_relays">Relay-Einrichtung korrigieren</string>
+    <string name="setup_action_edit_relays">Relays prüfen</string>
     <string name="setup_action_edit_profile">Profil bearbeiten</string>
     <string name="setup_action_edit_follows">Kontaktliste bearbeiten</string>
     <string name="setup_action_approve_repair">Änderungen speichern</string>

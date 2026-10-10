@@ -296,6 +296,24 @@ class GroupMemberAdministrationGateTest {
             }
         }
 
+    /** A retired controller keeps its diagnostic without overwriting another account's current notice. */
+    @Test
+    fun retiredConversationFailurePreservesCurrentAccountsNotice() {
+        val state = appState()
+        val retired = ConversationController(state, group(), accountRefOverride = "previous-account")
+        state.present(R.string.toast_group_roster_changed)
+        val currentNotice = state.toast
+
+        retired.recordMutationFailure(
+            R.string.toast_couldnt_add_members,
+            "GROUP_INVITE_MEMBER",
+            MarmotKitException.Runtime("private"),
+        )
+
+        assertEquals(AppText.Resource(R.string.error_try_again), retired.lastMutationError?.message)
+        assertEquals(currentNotice, state.toast)
+    }
+
     @Test
     fun conversationInvalidKeyDoesNotBlameOneMemberInAMultipleMemberInvite() =
         runBlocking {

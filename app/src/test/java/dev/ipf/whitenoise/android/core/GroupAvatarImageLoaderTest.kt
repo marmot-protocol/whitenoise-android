@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.whitenoise.android.media.MediaPipeline
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -31,10 +32,13 @@ class GroupAvatarImageLoaderTest {
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             val queuedCalls = AtomicInteger()
+            val queuedEntered = CompletableDeferred<Unit>()
             val bytes =
                 Base64.getDecoder().decode(
                     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
                 )
+            // Initialize Robolectric's bitmap decoder before testing IO permit scheduling.
+            requireNotNull(MediaPipeline.decodeSampledBitmap(bytes, 512)).recycle()
             val first =
                 async {
                     GroupAvatarImageLoader.load("held") {
@@ -59,12 +63,14 @@ class GroupAvatarImageLoaderTest {
                     async(start = CoroutineStart.UNDISPATCHED) {
                         GroupAvatarImageLoader.load("queued") {
                             queuedCalls.incrementAndGet()
+                            queuedEntered.complete(Unit)
                             bytes
                         }
                     }
                 assertFalse(current.isCompleted)
                 assertEquals(0, queuedCalls.get())
                 release.complete(Unit)
+                withTimeout(5_000) { queuedEntered.await() }
                 assertNotNull(withTimeout(5_000) { current.await() })
                 assertEquals(1, queuedCalls.get())
                 assertNull(GroupAvatarImageLoader.peek("held"))

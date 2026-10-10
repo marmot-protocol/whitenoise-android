@@ -1902,8 +1902,8 @@
     <string name="setup_status_skipped">Ignoré</string>
     <string name="setup_action_retry">Réessayer</string>
     <string name="setup_action_continue_without">Pas maintenant</string>
-    <string name="setup_action_use_recommended_relays">Utiliser les relais recommandés</string>
-    <string name="setup_action_edit_relays">Choisir les relais</string>
+    <string name="setup_action_use_recommended_relays">Corriger la configuration des relais</string>
+    <string name="setup_action_edit_relays">Vérifier les relais</string>
     <string name="setup_action_edit_profile">Modifier le profil</string>
     <string name="setup_action_edit_follows">Modifier les abonnements</string>
     <string name="setup_action_approve_repair">Enregistrer les modifications</string>
