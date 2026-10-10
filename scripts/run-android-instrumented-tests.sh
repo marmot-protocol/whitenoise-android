@@ -18,7 +18,9 @@ if [[ "$event_name" == "workflow_dispatch" && "$responsiveness_only" == "true" ]
     echo "Select one opt-in instrumented suite per dispatch" >&2
     exit 2
   fi
-  ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+  # Bound stalled Compose setup/cleanup too; JUnit only times the test body.
+  # A timeout fails this hosted-only campaign and the workflow retains its reports.
+  timeout --signal=INT --kill-after=30s 25m ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
     -Pandroid.testInstrumentationRunnerArguments.annotation=dev.ipf.whitenoise.android.ResponsivenessDeviceAcceptance \
     -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000 \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \

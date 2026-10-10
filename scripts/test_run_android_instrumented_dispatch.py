@@ -108,6 +108,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
         output = self.run_dispatch("workflow_dispatch", "false", "false", "true")
         self.assertIn("ResponsivenessDeviceAcceptance", output)
         self.assertIn("timeout_msec=120000", output)
+        self.assertIn("timeout --signal=INT --kill-after=30s 25m", (ROOT / "scripts/run-android-instrumented-tests.sh").read_text())
         self.assertIn("required-cases", output)
         self.assertNotIn(":cryptoBenchmark:", output)
         with self.assertRaises(subprocess.CalledProcessError):
