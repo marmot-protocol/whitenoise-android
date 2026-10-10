@@ -191,7 +191,10 @@ internal class ConversationReadingStartIntent(
      * Fresh viewport end and measured row height for the target, the inputs that decide its reading start.
      * It is null while the row is not laid out, which includes a user scrolling it out of view by any input,
      * not only a touch drag. Only a change in measured geometry may rerun the settle, so leaving the landed
-     * message is never answered by pulling the list back to it.
+     * message is never answered by pulling the list back to it. A row that scrolls back into view at a different
+     * height is settled once, to its own reading start, and any gesture or newer command retires the intent. The
+     * intent is deliberately not retired when the row merely leaves the viewport, because the keyboard and layout
+     * churn also move it, and the late-media correction a landing needs would be lost with it.
      */
     fun geometry(): Pair<Int, Int>? {
         val layout = probe.resolveTargetIndex()?.let(probe.readLayout)
