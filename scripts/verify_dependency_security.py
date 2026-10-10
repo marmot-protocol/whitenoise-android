@@ -25,7 +25,19 @@ def below(version: str, minimum: str) -> bool:
     return actual < floor or (actual == floor and bool(match[2]))
 
 
-def verify(report: dict, minimums: dict[str, str], expected_source: str | None = None) -> int:
+def unsafe_prerelease(version: str, fixed: str | None) -> bool:
+    if fixed is None:
+        return False
+    boundary = re.fullmatch(r"(\d+(?:[.]\d+)*)-alpha(\d+)", fixed)
+    if boundary is None:
+        raise InvalidEvidence("unsupported prerelease policy")
+    actual = re.fullmatch(r"(\d+(?:[.]\d+)*)-alpha(\d*)(?:[.+-].*)?", version)
+    return (actual is not None and actual[1] == boundary[1]
+            and int(actual[2] or "0") < int(boundary[2]))
+
+
+def verify(report: dict, minimums: dict[str, str], expected_source: str | None = None,
+           prereleases: dict[str, str] | None = None) -> int:
     if (report.get("schema") != 1 or not isinstance(report.get("project"), str)
             or report.get("scope") not in {"project", "plugin"}
             or not isinstance(report.get("configuration"), str)
@@ -45,7 +57,8 @@ def verify(report: dict, minimums: dict[str, str], expected_source: str | None =
         key = f"{component['group']}:{component['name']}"
         if key in minimums:
             count += 1
-            if below(component["version"], minimums[key]):
+            if below(component["version"], minimums[key]) or unsafe_prerelease(
+                    component["version"], (prereleases or {}).get(key)):
                 raise InvalidEvidence(f"security floor not met: {key}@{component['version']}")
     return count
 
@@ -64,7 +77,7 @@ def main() -> int:
         if not paths:
             raise InvalidEvidence("selected dependency evidence missing")
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, timeout=10).strip()
-        checked = sum(verify(json.loads(path.read_text()), minimums, source) for path in paths)
+        checked = sum(verify(json.loads(path.read_text()), minimums, source, policy.get("fixed_prerelease_versions", {})) for path in paths)
         print(f"Verified {len(paths)} resolved configurations; {checked} security-floor selections")
         return 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:

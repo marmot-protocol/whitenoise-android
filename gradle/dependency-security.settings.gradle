@@ -8,6 +8,19 @@ import org.gradle.api.artifacts.result.UnresolvedDependencyResult
 // No dependencies are added here. Only existing requests for affected modules
 // are raised, before metadata is downloaded (including project plugin classpaths).
 class SecurityVersions {
+    static boolean exactRequest(String version) {
+        return version == null || version.isEmpty() || version ==~ /\d+(?:\.\d+)*(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?/
+    }
+
+    static boolean unsafePrerelease(String version, String fixed) {
+        if (fixed == null || version == null) return false
+        def boundary = fixed =~ /^(\d+(?:\.\d+)*)-alpha(\d+)$/
+        if (!boundary.matches()) throw new GradleException('Unsupported prerelease policy')
+        def actual = version =~ /^(\d+(?:\.\d+)*)-alpha(\d*)(?:[.+-].*)?$/
+        if (!actual.matches() || actual[0][1] != boundary[0][1]) return false
+        return (actual[0][2].isEmpty() ? 0 : actual[0][2].toInteger()) < boundary[0][2].toInteger()
+    }
+
     static boolean below(String version, String minimum) {
         if (version == null || version.isEmpty()) return true
         def match = version =~ /^(\d+(?:\.\d+)*)(.*)$/
@@ -32,6 +45,7 @@ if (policy.schema != 1 || !(policy.minimum_versions instanceof Map)) {
     throw new GradleException('Invalid dependency security policy')
 }
 def minimums = policy.minimum_versions
+def prereleases = policy.fixed_prerelease_versions ?: [:]
 def sourceSha = providers.exec {
     commandLine('git', '-C', settingsDir.absolutePath, 'rev-parse', 'HEAD')
 }.standardOutput.asText.get().trim()
@@ -42,9 +56,25 @@ gradle.beforeProject { project ->
         configuration.resolutionStrategy.eachDependency { details ->
             def coordinate = "${details.requested.group}:${details.requested.name}".toString()
             def minimum = minimums[coordinate]
-            if (minimum != null && SecurityVersions.below(details.requested.version, minimum)) {
-                details.useVersion(minimum)
-                details.because('minimum release containing the dependency security fixes')
+            if (minimum != null && SecurityVersions.exactRequest(details.requested.version)) {
+                if (SecurityVersions.unsafePrerelease(details.requested.version, prereleases[coordinate])) {
+                    details.useVersion(prereleases[coordinate])
+                    details.because('first patched release on the requested prerelease line')
+                } else if (SecurityVersions.below(details.requested.version, minimum)) {
+                    details.useVersion(minimum)
+                    details.because('minimum release containing the dependency security fixes')
+                }
+            }
+        }
+        // Candidate filtering retains dynamic/range selectors while refusing affected versions.
+        configuration.resolutionStrategy.componentSelection {
+            all { selection ->
+                def coordinate = "${selection.candidate.group}:${selection.candidate.module}".toString()
+                def minimum = minimums[coordinate]
+                if (minimum != null && (SecurityVersions.below(selection.candidate.version, minimum) ||
+                        SecurityVersions.unsafePrerelease(selection.candidate.version, prereleases[coordinate]))) {
+                    selection.reject('affected dependency version rejected by security policy')
+                }
             }
         }
         configuration.incoming.afterResolve { dependencies ->
@@ -64,7 +94,9 @@ gradle.beforeProject { project ->
                 .collect { it.requested.displayName }.sort()
             def violations = components.findAll { component ->
                 def minimum = minimums["${component.group}:${component.name}".toString()]
-                minimum != null && SecurityVersions.below(component.version, minimum)
+                def coordinate = "${component.group}:${component.name}".toString()
+                minimum != null && (SecurityVersions.below(component.version, minimum) ||
+                    SecurityVersions.unsafePrerelease(component.version, prereleases[coordinate]))
             }
             def reportDir = new File(project.rootDir, 'build/reports/dependency-security')
             reportDir.mkdirs()

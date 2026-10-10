@@ -33,3 +33,10 @@ actual configuration selection and compatibility tasks, then refresh GitHub's
 graph. Preserve version-family alignment and avoid blanket exclusions or
 `transitive=false` workarounds. Revisit the rules as upstream producers adopt
 fixed versions; a floor is not a complete advisory scanner or dependency lock.
+
+Wire also rejects 7.0.0 alpha versions before alpha04, per the upstream advisory;
+its stable 6.4.5 floor alone cannot express that branch. Exact affected alpha
+requests move to alpha04. Dynamic/range selectors retain their selection intent
+and use candidate rejection, followed by independent selected-version checks.
+A range containing only affected versions fails rather than silently escaping
+the requested range.
