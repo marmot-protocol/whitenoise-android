@@ -21,6 +21,14 @@
         "test_ids": [
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
+        "surface": "Physical destination validation for a clamped newest mention",
+        "anchor": "val isAtReadingStart: Boolean",
+        "test_ids": [
+          "CON-032"
+        ]
       }
     ]
   },
