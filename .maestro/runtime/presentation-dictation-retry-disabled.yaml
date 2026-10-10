@@ -3,9 +3,11 @@ name: presentation-dictation-retry-disabled
 ---
 - assertVisible: Remaining dictation audio
 - assertVisible: Recording stopped. Some audio is not transcribed.
+- assertVisible: Retry remaining audio
 - assertVisible:
-    text: Retry remaining audio
     enabled: false
+    containsChild:
+      text: Retry remaining audio
 - tapOn: Keep for later
 - assertVisible:
     id: presentation.complete
