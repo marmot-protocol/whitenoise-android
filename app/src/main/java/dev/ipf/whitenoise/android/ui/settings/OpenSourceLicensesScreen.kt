@@ -27,9 +27,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -39,11 +39,13 @@ import kotlinx.coroutines.withContext
 internal fun OpenSourceLicensesScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var retry by rememberSaveable { mutableIntStateOf(0) }
-    val notices by produceState<Result<List<OpenSourceNotice>>?>(null, retry, context.resources) {
-        value = withContext(Dispatchers.IO) {
-            runCatchingCancellable { readOpenSourceNotices(context.resources, context.packageName) }
+    val notices by
+        produceState<Result<List<OpenSourceNotice>>?>(null, retry, context.resources) {
+            value =
+                withContext(Dispatchers.IO) {
+                    runCatchingCancellable { readOpenSourceNotices(context.resources, context.packageName) }
+                }
         }
-    }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val selected = notices?.getOrNull()?.firstOrNull { it.id == selectedId }
     val back = { if (selectedId != null) selectedId = null else onBack() }
@@ -63,29 +65,37 @@ internal fun OpenSourceLicensesContent(
 ) {
     when {
         notices == null -> CircularProgressIndicator(modifier = Modifier.padding(24.dp))
-        notices.isFailure -> Column(modifier = Modifier.padding(24.dp).testTag("licenses.failed")) {
-            Text(stringResource(R.string.licenses_open_failed_title))
-            TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
-        }
-        selected != null -> SelectionContainer {
-            Text(
-                text = selected.text,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.fillMaxSize().fadingVerticalScroll(rememberScrollState())
-                    .padding(24.dp).testTag("licenses.text"),
-            )
-        }
-        else -> WhiteNoiseLazyColumn(modifier = Modifier.fillMaxSize().testTag("licenses.list")) {
-            items(notices.getOrThrow(), key = OpenSourceNotice::id) { notice ->
+        notices.isFailure ->
+            Column(modifier = Modifier.padding(24.dp).testTag("licenses.failed")) {
+                Text(stringResource(R.string.licenses_open_failed_title))
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+            }
+        selected != null ->
+            SelectionContainer {
                 Text(
-                    text = notice.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button) { onSelect(notice) }
-                        .padding(24.dp),
+                    text = selected.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .fadingVerticalScroll(rememberScrollState())
+                            .padding(24.dp)
+                            .testTag("licenses.text"),
                 )
             }
-        }
+        else ->
+            WhiteNoiseLazyColumn(modifier = Modifier.fillMaxSize().testTag("licenses.list")) {
+                items(notices.getOrThrow(), key = OpenSourceNotice::id) { notice ->
+                    Text(
+                        text = notice.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(role = Role.Button) { onSelect(notice) }
+                                .padding(24.dp),
+                    )
+                }
+            }
     }
 }

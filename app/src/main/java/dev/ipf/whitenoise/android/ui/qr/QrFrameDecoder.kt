@@ -25,9 +25,17 @@ internal class QrFrameDecoder {
         val frame = rotateLuminance(luminance, width, height, rotationDegrees)
         val outputWidth = if (rotationDegrees % HALF_TURN == 0) width else height
         val outputHeight = if (rotationDegrees % HALF_TURN == 0) height else width
-        val source = PlanarYUVLuminanceSource(
-            frame, outputWidth, outputHeight, 0, 0, outputWidth, outputHeight, false,
-        )
+        val source =
+            PlanarYUVLuminanceSource(
+                frame,
+                outputWidth,
+                outputHeight,
+                0,
+                0,
+                outputWidth,
+                outputHeight,
+                false,
+            )
         for (candidate in listOf(source, source.invert())) {
             try {
                 return reader.decode(BinaryBitmap(HybridBinarizer(candidate)), hints).text
@@ -45,7 +53,12 @@ internal class QrFrameDecoder {
     }
 }
 
-internal data class QrLuminanceCrop(val left: Int, val top: Int, val width: Int, val height: Int)
+internal data class QrLuminanceCrop(
+    val left: Int,
+    val top: Int,
+    val width: Int,
+    val height: Int,
+)
 
 /** Copy only the crop's Y samples, respecting buffer position and CameraX row/pixel padding. */
 internal fun copyQrLuminance(
@@ -63,12 +76,14 @@ internal fun copyQrLuminance(
     require((cropLeft.toLong() + cropWidth - 1) * pixelStride < rowStride)
     val view = buffer.asReadOnlyBuffer()
     val start = view.position().toLong()
-    val last = start + (cropTop.toLong() + cropHeight - 1) * rowStride +
-        (cropLeft.toLong() + cropWidth - 1) * pixelStride
+    val last =
+        start + (cropTop.toLong() + cropHeight - 1) * rowStride +
+            (cropLeft.toLong() + cropWidth - 1) * pixelStride
     require(last < view.limit())
     return ByteArray(cropWidth * cropHeight) { index ->
-        val offset = start + (cropTop.toLong() + index / cropWidth) * rowStride +
-            (cropLeft.toLong() + index % cropWidth) * pixelStride
+        val offset =
+            start + (cropTop.toLong() + index / cropWidth) * rowStride +
+                (cropLeft.toLong() + index % cropWidth) * pixelStride
         view.get(offset.toInt())
     }
 }

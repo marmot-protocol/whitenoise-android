@@ -47,11 +47,12 @@ class OpenSourceLicensesScreenshotTest {
         failed: Boolean = false,
         largeRtl: Boolean = false,
     ) {
-        val notice = OpenSourceNotice(
-            "example",
-            "Example library",
-            "Copyright Example\n\nFull licence notice text.",
-        )
+        val notice =
+            OpenSourceNotice(
+                "example",
+                "Example library",
+                "Copyright Example\n\nFull licence notice text.",
+            )
         val result: Result<List<OpenSourceNotice>> =
             if (failed) {
                 Result.failure(IllegalArgumentException())

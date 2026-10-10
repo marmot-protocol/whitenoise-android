@@ -12,7 +12,10 @@ internal data class OpenSourceNotice(
     val text: String,
 )
 
-internal fun readOpenSourceNotices(resources: Resources, packageName: String): List<OpenSourceNotice> {
+internal fun readOpenSourceNotices(
+    resources: Resources,
+    packageName: String,
+): List<OpenSourceNotice> {
     val metadata = resources.getIdentifier("third_party_license_metadata", "raw", packageName)
     val texts = resources.getIdentifier("third_party_licenses", "raw", packageName)
     require(metadata != 0 && texts != 0) { "Missing generated open source notices" }
@@ -25,28 +28,36 @@ internal fun readOpenSourceNotices(resources: Resources, packageName: String): L
 }
 
 /** Offsets are bytes, not UTF-16 characters; malformed/truncated notices fail visibly instead of disappearing. */
-internal fun parseOpenSourceNotices(metadata: ByteArray, texts: ByteArray): List<OpenSourceNotice> {
+internal fun parseOpenSourceNotices(
+    metadata: ByteArray,
+    texts: ByteArray,
+): List<OpenSourceNotice> {
     require(metadata.size <= MAX_METADATA_BYTES && texts.size <= MAX_LICENSE_BYTES)
-    val entries = strictUtf8(metadata).lineSequence().filter(String::isNotBlank).map { line ->
-        val separator = line.indexOf(' ')
-        require(separator > 0)
-        val range = line.substring(0, separator).split(':')
-        require(range.size == 2)
-        val offset = range[0].toLongOrNull()
-        val length = range[1].toLongOrNull()
-        val name = line.substring(separator + 1).trim()
-        require(offset != null && length != null && offset >= 0 && length > 0 && name.isNotEmpty())
-        require(offset <= texts.size.toLong() && length <= texts.size.toLong() - offset)
-        val text = strictUtf8(texts.copyOfRange(offset.toInt(), (offset + length).toInt()))
-        require(text.isNotBlank())
-        OpenSourceNotice("$offset:$length:$name", name, text)
-    }.toList()
+    val entries =
+        strictUtf8(metadata)
+            .lineSequence()
+            .filter(String::isNotBlank)
+            .map { line ->
+                val separator = line.indexOf(' ')
+                require(separator > 0)
+                val range = line.substring(0, separator).split(':')
+                require(range.size == 2)
+                val offset = range[0].toLongOrNull()
+                val length = range[1].toLongOrNull()
+                val name = line.substring(separator + 1).trim()
+                require(offset != null && length != null && offset >= 0 && length > 0 && name.isNotEmpty())
+                require(offset <= texts.size.toLong() && length <= texts.size.toLong() - offset)
+                val text = strictUtf8(texts.copyOfRange(offset.toInt(), (offset + length).toInt()))
+                require(text.isNotBlank())
+                OpenSourceNotice("$offset:$length:$name", name, text)
+            }.toList()
     require(entries.isNotEmpty() && entries.size <= MAX_NOTICES)
     return entries.distinctBy(OpenSourceNotice::id).sortedBy { it.name.lowercase(java.util.Locale.ROOT) }
 }
 
 private fun strictUtf8(bytes: ByteArray): String =
-    Charsets.UTF_8.newDecoder()
+    Charsets.UTF_8
+        .newDecoder()
         .onMalformedInput(CodingErrorAction.REPORT)
         .onUnmappableCharacter(CodingErrorAction.REPORT)
         .decode(ByteBuffer.wrap(bytes))

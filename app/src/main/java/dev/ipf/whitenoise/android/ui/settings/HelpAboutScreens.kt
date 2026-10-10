@@ -351,7 +351,6 @@ private fun openHelpUrl(
     return runCatching { context.startActivity(intent) }.isSuccess
 }
 
-
 private val HelpLeadingIconSize = 24.dp
 
 private const val DEVELOPER_UNLOCK_TAPS = 7

@@ -15,9 +15,10 @@ class QrFrameDecoderTest {
     fun decodesQrPayloadsWithRotationAndInvertedLuminance() {
         val payload = "nostr:npub1test-" + "0123456789abcdef".repeat(24)
         val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, 640, 480, mapOf(EncodeHintType.MARGIN to 4))
-        val normal = ByteArray(matrix.width * matrix.height) { index ->
-            if (matrix[index % matrix.width, index / matrix.width]) 0 else 255.toByte()
-        }
+        val normal =
+            ByteArray(matrix.width * matrix.height) { index ->
+                if (matrix[index % matrix.width, index / matrix.width]) 0 else 255.toByte()
+            }
         for (rotation in listOf(0, 90, 180, 270)) {
             assertEquals(payload, QrFrameDecoder().decode(normal, matrix.width, matrix.height, rotation))
             val inverted = ByteArray(normal.size) { index -> (255 - (normal[index].toInt() and 255)).toByte() }

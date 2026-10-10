@@ -324,15 +324,20 @@ private fun createQrAnalysis(
             if (disposedRef.get() || didScan.get()) return@setAnalyzer
             val plane = imageProxy.planes.firstOrNull() ?: return@setAnalyzer
             val crop = imageProxy.cropRect
-            val pixels = copyQrLuminance(
-                plane.buffer,
-                plane.rowStride,
-                plane.pixelStride,
-                QrLuminanceCrop(crop.left, crop.top, crop.width(), crop.height()),
-            )
-            val raw = decoder.decode(
-                pixels, crop.width(), crop.height(), imageProxy.imageInfo.rotationDegrees,
-            )
+            val pixels =
+                copyQrLuminance(
+                    plane.buffer,
+                    plane.rowStride,
+                    plane.pixelStride,
+                    QrLuminanceCrop(crop.left, crop.top, crop.width(), crop.height()),
+                )
+            val raw =
+                decoder.decode(
+                    pixels,
+                    crop.width(),
+                    crop.height(),
+                    imageProxy.imageInfo.rotationDegrees,
+                )
             if (raw != null) {
                 resultExecutor.execute {
                     if (!disposedRef.get() && didScan.compareAndSet(false, true)) onScan(raw)
