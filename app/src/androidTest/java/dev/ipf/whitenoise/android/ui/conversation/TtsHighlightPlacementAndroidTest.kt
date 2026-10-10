@@ -689,5 +689,4 @@ class TtsHighlightPlacementAndroidTest {
 
     private fun timelineMessage(record: AppMessageRecordFfi) =
         TimelineMessage(id = "msg:${record.messageIdHex}", record = record, status = MessageStatus.Received)
-
 }
