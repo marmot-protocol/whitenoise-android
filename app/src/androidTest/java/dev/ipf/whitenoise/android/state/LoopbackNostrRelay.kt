@@ -21,17 +21,43 @@ import kotlin.concurrent.thread
  * takes every client offline, which is how the cold-start test models a process that relaunches without
  * network.
  */
-internal class LoopbackNostrRelay : Closeable {
-    private val server = ServerSocket(0, BACKLOG, InetAddress.getByName(LOOPBACK))
+internal class LoopbackNostrRelay(
+    port: Int = 0,
+) : Closeable {
+    private val server = ServerSocket(port, BACKLOG, InetAddress.getByName(LOOPBACK))
     private val lock = Any()
     private val events = LinkedHashMap<String, JSONObject>()
+    private val publications = mutableListOf<JSONObject>()
+    private val requests = mutableListOf<JSONObject>()
     private val clients = ConcurrentHashMap.newKeySet<Client>()
 
     /** Test-controlled visibility models an advertised outbox without a discovery-only package. */
     @Volatile var hiddenKinds: Set<Int> = emptySet()
 
+    /** Models a relay requiring authentication instead of reporting package absence. */
+    @Volatile var authRequiredKinds: Set<Int> = emptySet()
+
+    /** Hides only the selected author's declarations while keeping other fixture accounts healthy. */
+    @Volatile var hiddenAuthorsByKind: Map<Int, Set<String>> = emptyMap()
+
+    /** Records every publication attempt, including repeated sends with the same event ID. */
+    fun publicationAttempts(kind: Int): List<JSONObject> =
+        synchronized(lock) {
+            publications.filter { it.optInt("kind") == kind }.map { JSONObject(it.toString()) }
+        }
+
+    /** Returns requested filters so tests can attribute discovery work to a particular recipient. */
+    fun recordedRequests(): List<JSONObject> = synchronized(lock) { requests.map { JSONObject(it.toString()) } }
+
     /** Counts exact kind reads so recovery tests can prove the actual route used. */
     val kindReads = ConcurrentHashMap<Int, java.util.concurrent.atomic.AtomicInteger>()
+
+    /** Installs already signed public fixture records without recording an outbound app publication. */
+    fun seedEvents(records: List<JSONObject>) {
+        synchronized(lock) {
+            records.forEach { event -> events[event.getString("id")] = JSONObject(event.toString()) }
+        }
+    }
 
     /** Returns immutable copies of fixture events without exposing user-owned storage. */
     fun recordedEvents(kind: Int): List<JSONObject> =
@@ -50,6 +76,11 @@ internal class LoopbackNostrRelay : Closeable {
             }
         }
     }
+
+    /** Keeps query and live-delivery visibility identical for controlled negative fixtures. */
+    private fun visible(event: JSONObject): Boolean =
+        event.optInt("kind") !in hiddenKinds &&
+            event.optString("pubkey") !in hiddenAuthorsByKind[event.optInt("kind")].orEmpty()
 
     /** Stops accepting and drops every open connection. */
     override fun close() {
@@ -123,12 +154,13 @@ internal class LoopbackNostrRelay : Closeable {
             }
         }
 
-        /** Handles EVENT, REQ and CLOSE; this fixture deliberately has no authentication. */
+        /** Handles EVENT, REQ and CLOSE, including controlled authentication-required query failures. */
         private fun handle(message: JSONArray) {
             when (message.getString(0)) {
                 "EVENT" -> {
                     val event = message.getJSONObject(1)
                     synchronized(lock) {
+                        publications += JSONObject(event.toString())
                         events[event.getString("id")] = event
                         clients.forEach { client -> runCatching { client.deliver(event) } }
                     }
@@ -143,6 +175,16 @@ internal class LoopbackNostrRelay : Closeable {
                 "REQ" -> {
                     val id = message.getString(1)
                     val filters = (2 until message.length()).map(message::getJSONObject)
+                    synchronized(lock) { requests += filters.map { JSONObject(it.toString()) } }
+                    if (filters.any { filter ->
+                            val kinds = filter.optJSONArray("kinds")
+                            kinds != null && (0 until kinds.length()).any { kinds.getInt(it) in authRequiredKinds }
+                        }
+                    ) {
+                        sendJson(JSONArray().put("AUTH").put("isolated-fixture-challenge"))
+                        sendJson(JSONArray().put("CLOSED").put(id).put("auth-required: fixture access denied"))
+                        return
+                    }
                     filters.forEach { filter ->
                         val kinds = filter.optJSONArray("kinds")
                         if (kinds != null) {
@@ -171,7 +213,7 @@ internal class LoopbackNostrRelay : Closeable {
             val selected = LinkedHashMap<String, JSONObject>()
             filters.forEach { filter ->
                 newestFirst
-                    .filter { it.optInt("kind") !in hiddenKinds && matches(it, filter) }
+                    .filter { visible(it) && matches(it, filter) }
                     .take(filter.optInt("limit", Int.MAX_VALUE))
                     .forEach { selected[it.getString("id")] = it }
             }
@@ -180,7 +222,7 @@ internal class LoopbackNostrRelay : Closeable {
 
         /** Pushes a newly accepted event to each matching live subscription. */
         fun deliver(event: JSONObject) {
-            if (event.optInt("kind") in hiddenKinds) return
+            if (!visible(event)) return
             subscriptions.forEach { (id, filters) ->
                 if (filters.any { matches(event, it) }) sendJson(JSONArray().put("EVENT").put(id).put(event))
             }

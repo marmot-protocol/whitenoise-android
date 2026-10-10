@@ -73,14 +73,14 @@ class OnboardingRelayRepairFfiIntegrationTest {
         assertEquals(OnboardingRelayRepairModeFfi.ADDITIVE, repair.mode)
         assertTrue(repair.beforeTags.isEmpty())
         assertEquals(listOf(listOf("r", relay.url)), repair.afterTags.map { it.fields })
-        assertTrue(relay.recordedEvents(RELAY_LIST).isEmpty())
+        assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
         val cancelled =
             requireNotNull(
                 client.execute(request.copy(revision = first.revision, action = OnboardingActionFfi.CANCEL_REPAIR)),
             )
         assertNull(cancelled.proposal)
         assertNull(requireNotNull(client.snapshot()).proposal)
-        assertTrue(relay.recordedEvents(RELAY_LIST).isEmpty())
+        assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
         val second = requireNotNull(client.execute(request.copy(revision = cancelled.revision)))
         val approvedRequest =
             request.copy(
@@ -99,9 +99,10 @@ class OnboardingRelayRepairFfiIntegrationTest {
             }
         assertTrue("A cancelled preview must not authorize its replacement", staleApproval)
         assertEquals(second.proposal, requireNotNull(client.snapshot()).proposal)
-        assertTrue(relay.recordedEvents(RELAY_LIST).isEmpty())
+        assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
         val approvedRepair = requireNotNull(second.proposal?.relayRepair)
         client.execute(approvedRequest)
+        assertEquals(1, relay.publicationAttempts(RELAY_LIST).size)
         val event = relay.recordedEvents(RELAY_LIST).single()
         assertEquals(
             JSONArray(approvedRepair.afterTags.map { it.fields }).toString(),
@@ -124,7 +125,7 @@ class OnboardingRelayRepairFfiIntegrationTest {
                         val repair = requireNotNull(preview.proposal?.relayRepair)
                         assertEquals(OnboardingRelayRepairModeFfi.ADDITIVE, repair.mode)
                         assertEquals(listOf(listOf("r", relay.url)), repair.afterTags.map { it.fields })
-                        assertTrue(relay.recordedEvents(RELAY_LIST).isEmpty())
+                        assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
                         val native = openNative(root, relay.url)
                         try {
                             val restored = requireNotNull(native.onboardingSnapshot(preview.accountIdHex))
@@ -134,8 +135,9 @@ class OnboardingRelayRepairFfiIntegrationTest {
                                     native.approveOnboardingRepair(preview.accountIdHex, preview.revision - 1uL)
                                 }.isFailure,
                             )
-                            assertTrue(relay.recordedEvents(RELAY_LIST).isEmpty())
+                            assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
                             native.approveOnboardingRepair(preview.accountIdHex, preview.revision)
+                            assertEquals(1, relay.publicationAttempts(RELAY_LIST).size)
                             val event = relay.recordedEvents(RELAY_LIST).single()
                             assertEquals(
                                 JSONArray(repair.afterTags.map { it.fields }).toString(),

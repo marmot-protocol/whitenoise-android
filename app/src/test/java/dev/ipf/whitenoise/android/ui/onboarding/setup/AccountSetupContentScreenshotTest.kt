@@ -47,6 +47,21 @@ class AccountSetupContentScreenshotTest {
             theme = SetupScreenshotTheme.AMOLED,
         )
 
+    /** Narrow screens keep the two explicit relay choices reachable at double text size. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h640dp-mdpi")
+    fun relayChoicesNarrowLarge() = capture("relay_choices_narrow_large", relayChoicesState(), fontScale = 2f)
+
+    /** A failed editor operation preserves its fields and exposes the retryable error in a short AMOLED viewport. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h640dp-mdpi")
+    fun relayEditorFailureNarrowAmoled() =
+        capture(
+            "relay_editor_failure_narrow_amoled",
+            mixedRelayEditorState().copy(error = true),
+            theme = SetupScreenshotTheme.AMOLED,
+        )
+
     /** Supplies the same native repair decision to each theme baseline. */
     private fun relayChoicesState() =
         AccountSetupState(
