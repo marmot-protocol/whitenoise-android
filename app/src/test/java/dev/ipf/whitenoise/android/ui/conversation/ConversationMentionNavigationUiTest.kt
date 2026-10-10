@@ -23,7 +23,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -187,30 +186,24 @@ class ConversationMentionNavigationUiTest {
         val viewportHeight = fixture.viewportHeight
         val padding = fixture.padding
         val overlap = fixture.overlap
-        val rtl = fixture.rtl
         val initialIndex = fixture.initialIndex
         val mixedRows = fixture.mixedRows
         val restoreTail = fixture.restoreTail
-        val incomingAfterLanding = fixture.incomingAfterLanding
-        val gestureAfterLanding = fixture.gestureAfterLanding
         val reopenAfterLanding = fixture.reopenAfterLanding
-        var completed = false
+        val state = MentionHarnessState()
         val targetIndex = target.index
-        var tailReturned = false
-        var incomingCount by mutableIntStateOf(0)
-        var routeGeneration by mutableIntStateOf(0)
-        var savedSnapshot: ConversationScrollSnapshot? = null
-        var activeCoordinator: ConversationScrollCoordinator? = null
         composeRule.setContent {
             WhiteNoiseTheme {
                 CompositionLocalProvider(
-                    LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                    LocalLayoutDirection provides fixture.layoutDirection,
                 ) {
                     val listState =
-                        key(routeGeneration) {
+                        key(state.routeGeneration) {
                             rememberLazyListState(
-                                initialFirstVisibleItemIndex = savedSnapshot?.firstVisibleItemIndex ?: initialIndex,
-                                initialFirstVisibleItemScrollOffset = savedSnapshot?.firstVisibleItemScrollOffset ?: 0,
+                                initialFirstVisibleItemIndex =
+                                    state.savedSnapshot?.firstVisibleItemIndex ?: initialIndex,
+                                initialFirstVisibleItemScrollOffset =
+                                    state.savedSnapshot?.firstVisibleItemScrollOffset ?: 0,
                             )
                         }
                     val scope = rememberCoroutineScope()
@@ -219,19 +212,19 @@ class ConversationMentionNavigationUiTest {
                             ConversationScrollCoordinator(
                                 writer = LazyListConversationScrollWriter(listState),
                                 initialMode =
-                                    savedSnapshot?.let {
+                                    state.savedSnapshot?.let {
                                         ConversationScrollMode.ReadingHistory(
                                             it.anchorMessageIdHex,
                                             it.firstVisibleItemScrollOffset,
                                         )
                                     } ?: ConversationScrollMode.FollowingTail,
-                                initialMentionReadingRowHeightPx = savedSnapshot?.mentionReadingRowHeightPx,
+                                initialMentionReadingRowHeightPx = state.savedSnapshot?.mentionReadingRowHeightPx,
                             )
                         }
-                    activeCoordinator = coordinator
+                    state.activeCoordinator = coordinator
                     fun anchor(): ConversationScrollAnchor {
                         val index = listState.firstVisibleItemIndex
-                        val id = "message-${index - incomingCount}"
+                        val id = "message-${index - state.incomingCount}"
                         return ConversationScrollAnchor(index, listState.firstVisibleItemScrollOffset, id, id)
                     }
                     LaunchedEffect(listState, coordinator) {
@@ -245,7 +238,7 @@ class ConversationMentionNavigationUiTest {
                                     anchor(),
                                     isNearBottom(
                                         listState,
-                                        maxOf(targetIndex, initialIndex) + 13 + incomingCount,
+                                        maxOf(targetIndex, initialIndex) + 13 + state.incomingCount,
                                         mentionReadingRowHeightPx = coordinator.mentionReadingRowHeightPx,
                                     ),
                                 )
@@ -253,7 +246,7 @@ class ConversationMentionNavigationUiTest {
                         )
                     }
                     LaunchedEffect(listState, coordinator) {
-                        val restore = savedSnapshot ?: return@LaunchedEffect
+                        val restore = state.savedSnapshot ?: return@LaunchedEffect
                         coordinator.commitInitialAnchor(
                             targetMessageId = restore.anchorMessageIdHex,
                             reason = ConversationScrollReason.SavedRestore,
@@ -277,7 +270,7 @@ class ConversationMentionNavigationUiTest {
                     val nearBottom =
                         rememberConversationNearBottom(
                             listState,
-                            maxOf(targetIndex, initialIndex) + 13 + incomingCount,
+                            maxOf(targetIndex, initialIndex) + 13 + state.incomingCount,
                             mentionReadingRowHeightPx = coordinator.mentionReadingRowHeightPx,
                         )
                     val readingReserve =
@@ -294,7 +287,7 @@ class ConversationMentionNavigationUiTest {
                             contentPadding = PaddingValues(bottom = (padding + readingReserve).dp),
                         ) {
                             items(
-                                (-incomingCount..maxOf(targetIndex, initialIndex) + 12).toList(),
+                                (-state.incomingCount..maxOf(targetIndex, initialIndex) + 12).toList(),
                                 key = { "message-$it" },
                             ) { index ->
                                 val height =
@@ -316,7 +309,7 @@ class ConversationMentionNavigationUiTest {
                         TextButton(
                             onClick = {
                                 scope.launch {
-                                    completed =
+                                    state.completed =
                                         coordinator.jumpToMentionReadingStart(
                                             targetMessageId = "message-$targetIndex",
                                             resolveTargetIndex = { targetIndex },
@@ -348,7 +341,7 @@ class ConversationMentionNavigationUiTest {
                                 unreadIncomingCount = 0,
                                 onClick = {
                                     scope.launch {
-                                        tailReturned = coordinator.programmaticJump(
+                                        state.tailReturned = coordinator.programmaticJump(
                                             targetMessageId = null,
                                             reason = ConversationScrollReason.JumpToNewest,
                                             resultingMode = ConversationScrollMode.FollowingTail,
@@ -361,7 +354,7 @@ class ConversationMentionNavigationUiTest {
                         if (reopenAfterLanding) {
                             TextButton(
                                 onClick = {
-                                    savedSnapshot = conversationScrollSnapshotOnLeave(
+                                    state.savedSnapshot = conversationScrollSnapshotOnLeave(
                                         listState.firstVisibleItemIndex,
                                         listState.firstVisibleItemScrollOffset,
                                         coordinator.isFollowingTail,
@@ -369,7 +362,7 @@ class ConversationMentionNavigationUiTest {
                                         "message-$targetIndex",
                                         coordinator.mentionReadingRowHeightPx,
                                     )
-                                    routeGeneration++
+                                    state.routeGeneration++
                                 },
                                 modifier = Modifier.offset(y = 96.dp).testTag("mention-reopen"),
                             ) { Text("Reopen") }
@@ -392,35 +385,46 @@ class ConversationMentionNavigationUiTest {
                 .top.value
         assertEquals(listTop, messageTop, 1f)
         composeRule.runOnIdle {
-            assertTrue(completed)
-            assertTrue(activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
+            assertTrue(state.completed)
+            assertTrue(state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
         }
-        if (incomingAfterLanding) {
-            composeRule.runOnIdle { incomingCount++ }
+        assertMentionFollowUps(fixture, state, listTop)
+    }
+
+    /** Exercises reading-intent lifetime through incoming rows, gestures, route recreation and explicit return. */
+    private fun assertMentionFollowUps(
+        fixture: MentionFixture,
+        state: MentionHarnessState,
+        listTop: Float,
+    ) {
+        val target = fixture.target
+        val targetIndex = target.index
+        if (fixture.incomingAfterLanding) {
+            composeRule.runOnIdle { state.incomingCount++ }
             composeRule.waitForIdle()
             val afterIncoming =
                 composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
             assertEquals(listTop, afterIncoming, 1f)
         }
-        if (gestureAfterLanding) {
+        if (fixture.gestureAfterLanding) {
             composeRule.onNodeWithTag("mention-list").performTouchInput { swipeUp() }
             composeRule.waitForIdle()
-            composeRule.runOnIdle { assertTrue(activeCoordinator?.mode is ConversationScrollMode.ReadingHistory) }
+            composeRule.runOnIdle { assertTrue(state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory) }
         }
-        if (reopenAfterLanding) {
+        if (fixture.reopenAfterLanding) {
             composeRule.onNodeWithTag("mention-reopen").performClick()
             composeRule.waitForIdle()
             val reopenedTop =
                 composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
             assertEquals(listTop, reopenedTop, 1f)
-            composeRule.runOnIdle { assertEquals(target.height, savedSnapshot?.mentionReadingRowHeightPx) }
+            composeRule.runOnIdle { assertEquals(target.height, state.savedSnapshot?.mentionReadingRowHeightPx) }
         }
-        if (restoreTail) {
+        if (fixture.restoreTail) {
             composeRule.onNodeWithTag("mention-tail").assertIsDisplayed().performClick()
             composeRule.waitForIdle()
             val restingTop = composeRule.onNodeWithTag("message-0").getUnclippedBoundsInRoot().top.value
-            assertEquals(listTop + viewportHeight - padding - target.height, restingTop, 1f)
-            composeRule.runOnIdle { assertTrue(tailReturned) }
+            assertEquals(listTop + fixture.viewportHeight - fixture.padding - target.height, restingTop, 1f)
+            composeRule.runOnIdle { assertTrue(state.tailReturned) }
             composeRule.onNodeWithTag("mention-tail").assertDoesNotExist()
         }
     }
@@ -438,7 +442,20 @@ class ConversationMentionNavigationUiTest {
         val incomingAfterLanding: Boolean = false,
         val gestureAfterLanding: Boolean = false,
         val reopenAfterLanding: Boolean = false,
-    )
+    ) {
+        val layoutDirection: LayoutDirection
+            get() = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+    }
+
+    /** Mutable controls belong to this one test's composition and never escape to the app. */
+    private class MentionHarnessState {
+        var completed = false
+        var tailReturned = false
+        var incomingCount by mutableIntStateOf(0)
+        var routeGeneration by mutableIntStateOf(0)
+        var savedSnapshot: ConversationScrollSnapshot? = null
+        var activeCoordinator: ConversationScrollCoordinator? = null
+    }
 
     private data class Target(
         val height: Int,
