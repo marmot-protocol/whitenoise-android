@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-startup-projection-retryable
+---
+- assertVisible:
+    id: startup-failure
+- assertVisible:
+    id: startup-retry
+    enabled: true
+- tapOn:
+    id: startup-retry
+- assertVisible:
+    id: presentation.complete

@@ -12,7 +12,15 @@ import java.io.File
 @Suppress("FunctionNaming")
 internal fun MaestroUpdatePresentation(fixture: MaestroPresentationFixture) {
     val asset =
-        ZapstoreApkAsset("a".repeat(64), "test", "2099.1.2", "b".repeat(64), "https://example.invalid/test.apk", 100, emptySet())
+        ZapstoreApkAsset(
+            "a".repeat(64),
+            "test",
+            "2099.1.2",
+            "b".repeat(64),
+            "https://example.invalid/test.apk",
+            100,
+            emptySet(),
+        )
     val state =
         when (fixture.scenario) {
             "update-resolving" -> AppSelfUpdateState.Resolving

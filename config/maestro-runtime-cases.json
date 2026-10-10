@@ -4670,6 +4670,45 @@
         "dismiss"
       ],
       "layer": "production-presentation-ui"
+    },
+    "presentation-startup-projection-loading": {
+      "suite": "presentation",
+      "manual_ids": [
+        "INT-012"
+      ],
+      "assertions": "Actual startup local-projection branch renders loading or diagnostic recovery and exact Retry/host-exit callback; no database corruption or native recovery completion claim.",
+      "postcondition": "presentation-checked",
+      "presentation": "startup-projection-loading",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-startup-projection-retryable": {
+      "suite": "presentation",
+      "manual_ids": [
+        "INT-012"
+      ],
+      "assertions": "Actual startup local-projection branch renders loading or diagnostic recovery and exact Retry/host-exit callback; no database corruption or native recovery completion claim.",
+      "postcondition": "presentation-checked",
+      "presentation": "startup-projection-retryable",
+      "presentation_actions": [
+        "retry"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-startup-projection-terminal": {
+      "suite": "presentation",
+      "manual_ids": [
+        "INT-012"
+      ],
+      "assertions": "Actual startup local-projection branch renders loading or diagnostic recovery and exact Retry/host-exit callback; no database corruption or native recovery completion claim.",
+      "postcondition": "presentation-checked",
+      "presentation": "startup-projection-terminal",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
     }
   }
 }

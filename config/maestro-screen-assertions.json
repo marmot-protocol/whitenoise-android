@@ -60,8 +60,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
       "symbol": "ProfileSwitcherSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileSwitcherSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "navigation-selector-cancel",
+          "selector": {
+            "text": "Maestro Carol"
+          },
+          "scope": "Actual switcher child reached through AccountSelectorSheet/AccountSelectorContent; generated Carol row asserted before dismissal."
+        }
+      ],
+      "remaining": "Signed-out, readonly and pending-switch state edges retain dedicated native campaigns."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
@@ -1987,6 +1995,20 @@
       "symbol": "ShareImportErrorDialog",
       "bindings": [],
       "remaining": "Audit direct navigation and exceptional-state assertions for ShareImportErrorDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+      "symbol": "StartupLocalProjectionScreen",
+      "bindings": [
+        {
+          "case": "presentation-startup-projection-retryable",
+          "selector": {
+            "id": "startup-failure"
+          },
+          "scope": "Actual no-local-snapshot projection recovery wrapper renders production failure and exact Retry callback."
+        }
+      ],
+      "remaining": "Native recovery convergence and process-death benchmark remain separate from injected presentation phases."
     }
   ]
 }
