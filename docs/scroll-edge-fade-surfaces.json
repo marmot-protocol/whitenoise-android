@@ -1427,6 +1427,18 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
+      "family": "settings",
+      "calls": {
+        "fadingVerticalScroll": 1,
+        "WhiteNoiseLazyColumn": 1
+      },
+      "policy": "Local generated licence list and selectable text retain native remembered scroll owners; shared viewport fades mask content and leave fixed navigation chrome unchanged.",
+      "test_ids": [
+        "SET-019"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
       "calls": {
         "SettingsList": 1
@@ -1638,5 +1650,5 @@
       ]
     }
   ],
-  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport’s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
+  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport\u2019s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
 }

@@ -6,11 +6,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,6 +27,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -71,11 +71,11 @@ internal fun OpenSourceLicensesContent(
             Text(
                 text = selected.text,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                modifier = Modifier.fillMaxSize().fadingVerticalScroll(rememberScrollState())
                     .padding(24.dp).testTag("licenses.text"),
             )
         }
-        else -> LazyColumn(modifier = Modifier.fillMaxSize().testTag("licenses.list")) {
+        else -> WhiteNoiseLazyColumn(modifier = Modifier.fillMaxSize().testTag("licenses.list")) {
             items(notices.getOrThrow(), key = OpenSourceNotice::id) { notice ->
                 Text(
                     text = notice.name,
