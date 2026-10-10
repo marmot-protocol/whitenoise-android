@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import android.os.Process
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -19,6 +20,7 @@ import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import dev.ipf.whitenoise.android.state.beginReadinessRefresh
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -48,6 +50,22 @@ class ChatListConnectionResumeDeviceTest {
         assertSame(activity, composeRule.activity)
         assertEquals(process, Process.myPid())
         assertEquals(ChatListConnectionPhase.Validating, fixture.connection.phase)
+        assertTrue(fixture.frames.all { it == ConnectivityBannerState.Hidden })
+    }
+
+    /** A new Activity paints the retained healthy readiness without inheriting or manufacturing a recovery flash. */
+    @Test
+    fun healthySameProcessActivityRecreationDrawsZeroConnectingFrames() {
+        val fixture = mountFixture()
+        val original = composeRule.activity
+        val process = Process.myPid()
+        fixture.frames.clear()
+        composeRule.activityRule.scenario.recreate()
+        composeRule.activityRule.scenario.onActivity { activity -> activity.setContent { fixture.Content() } }
+        composeRule.waitUntil { fixture.frames.isNotEmpty() }
+
+        assertNotSame(original, composeRule.activity)
+        assertEquals(process, Process.myPid())
         assertTrue(fixture.frames.all { it == ConnectivityBannerState.Hidden })
     }
 

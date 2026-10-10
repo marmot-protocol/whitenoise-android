@@ -215,7 +215,7 @@ internal fun ConversationForegroundRestoreEffects(
                             expectedVisibilityTimeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
                             awaitLocalTimeline = {
                                 if (pendingLocalTimeline != null) {
-                                    pendingLocalTimeline.await()
+                                    awaitCommittedConversationTimeline(pendingLocalTimeline)
                                     // Discard a pre-draw from the old composition while local apply was held.
                                     // The next signal measures the post-handoff transcript/chrome together.
                                     foregroundPreDrawSignals.tryReceive()

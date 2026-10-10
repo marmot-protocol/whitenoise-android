@@ -361,12 +361,14 @@ class ConversationMentionNavigationUiTest {
                                             readLayout = { index ->
                                                 val layout =
                                                     conversationReadingLayoutInfo(listState.layoutInfo, overlap)
+                                                val isNewest = index == state.headerCount
+                                                state.newestEvaluations.add(isNewest)
                                                 ConversationMentionJumpLayout(
                                                     viewportEndOffsetPx = layout.viewportEndOffset,
                                                     itemHeightPx =
                                                         layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
                                                     estimatedItemHeightPx = state.targetHeight,
-                                                    isNewest = index == state.incomingCount + state.headerCount,
+                                                    isNewest = isNewest,
                                                     itemOffsetPx =
                                                         layout.visibleItemsInfo
                                                             .firstOrNull { it.index == index }
@@ -453,6 +455,10 @@ class ConversationMentionNavigationUiTest {
             assertTrue(state.completed)
             assertEquals(1, state.completionCount)
             assertTrue(state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
+        }
+        if (fixture.suspendedAction == SuspendedMentionAction.Window) {
+            assertTrue("original message-0 was newest", state.newestEvaluations.first())
+            assertFalse("the new message--1 supersedes it as newest", state.newestEvaluations.last())
         }
         assertMentionFollowUps(fixture, state, listTop)
     }
@@ -551,6 +557,7 @@ class ConversationMentionNavigationUiTest {
         var awaitingLayout = false
         var suspensionUsed = false
         var completionCount = 0
+        val newestEvaluations = mutableListOf<Boolean>()
         val layoutRelease = CompletableDeferred<Unit>()
         var completed = false
         var tailReturned = false

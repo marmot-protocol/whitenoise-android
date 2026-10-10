@@ -17,6 +17,36 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationForegroundPresentationTest {
+    /** Superseded preparation remains blocked until the same deadline instead of treating false as readiness. */
+    @Test
+    fun nonCommittedReceiptCannotReleasePresentationBeforeItsDeadline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val receipt = CompletableDeferred(false)
+            var released = false
+            val settled = ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = signals,
+                        currentState = { settled },
+                        expectedImeVisible = false,
+                        expectedVisibilityTimeoutMillis = 1_500,
+                        onSettleDeadlineExpired = { released = true },
+                        awaitLocalTimeline = { awaitCommittedConversationTimeline(receipt) },
+                    )
+                }
+            signals.trySend(Unit)
+            advanceTimeBy(1_499)
+            runCurrent()
+            assertFalse(result.isCompleted)
+            assertFalse(released)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(settled, result.await())
+            assertTrue(released)
+        }
+
     /** Coherent geometry cannot expose a locally received replacement before it has committed. */
     @Test
     fun coherentPreDrawStillWaitsForTheCapturedLocalTimeline() =
