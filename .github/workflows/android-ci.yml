@@ -357,6 +357,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Verify dependency security resolution fixture
+        if: matrix.phase == 'tooling'
+        run: python3 scripts/test_dependency_security_fixture.py
+
       # Read existing resolutions only; retain proof without a second build.
       - name: Verify selected dependency security floors
         if: success()

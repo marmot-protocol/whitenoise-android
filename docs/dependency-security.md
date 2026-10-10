@@ -40,3 +40,10 @@ requests move to alpha04. Dynamic/range selectors retain their selection intent
 and use candidate rejection, followed by independent selected-version checks.
 A range containing only affected versions fails rather than silently escaping
 the requested range.
+
+The graph-only fixture runs in the existing tooling job using a temporary local
+Maven repository and no app compilation. It checks exact lower/newer requests,
+dynamic selectors, affected-only range rejection and plugin/project report
+coverage. Source archives retain enforcement withoutGit; CI separately requires
+valid commit identity. Detached configurations, settings-plugin classpaths and
+included builds are outside this hook and must keep their own dependency checks.

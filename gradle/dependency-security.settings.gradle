@@ -46,10 +46,18 @@ if (policy.schema != 1 || !(policy.minimum_versions instanceof Map)) {
 }
 def minimums = policy.minimum_versions
 def prereleases = policy.fixed_prerelease_versions ?: [:]
-def sourceSha = providers.exec {
-    commandLine('git', '-C', settingsDir.absolutePath, 'rev-parse', 'HEAD')
-}.standardOutput.asText.get().trim()
-if (!(sourceSha ==~ /[a-f0-9]{40}/)) throw new GradleException('Missing dependency evidence source SHA')
+// Source identity is evidence metadata, not a prerequisite for security enforcement.
+def sourceSha = providers.gradleProperty('dependencySecurity.sourceSha')
+    .orElse(providers.environmentVariable('GITHUB_SHA')).orNull ?: 'unknown'
+try {
+    def gitSource = providers.exec {
+        commandLine('git', '-C', settingsDir.absolutePath, 'rev-parse', 'HEAD')
+        ignoreExitValue = true
+    }.standardOutput.asText.get().trim()
+    if (gitSource ==~ /[a-f0-9]{40}/) sourceSha = gitSource
+} catch (Exception ignored) {
+    // ZIP/source archives and machines without git retain the floor policy.
+}
 
 gradle.beforeProject { project ->
     def install = { configuration, scope ->
