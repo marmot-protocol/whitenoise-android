@@ -40,6 +40,7 @@ class PopulatedProcessDeathStartupBenchmark {
             "The host must explicitly prepare and restore an offline populated startup fixture."
         }
         val groupName = BenchmarkConfig.requireGeneratorFixture(BenchmarkConfig.groupName, "groupName")
+        val budgetMs = reviewedLocalFrameBudget()
         requireOfflineFixture()
         manager.registerNetworkCallback(
             NetworkRequest.Builder().clearCapabilities().build(),
@@ -47,7 +48,7 @@ class PopulatedProcessDeathStartupBenchmark {
             Handler(Looper.getMainLooper()),
         )
         try {
-            measureOfflineProcessRestoration(groupName)
+            measureOfflineProcessRestoration(groupName, budgetMs)
             instrumentation.waitForIdleSync()
             requireOfflineFixture()
         } finally {
@@ -56,7 +57,10 @@ class PopulatedProcessDeathStartupBenchmark {
     }
 
     /** Measures only launches whose ordinary dead process and continuously offline host have been verified. */
-    private fun measureOfflineProcessRestoration(groupName: String) {
+    private fun measureOfflineProcessRestoration(
+        groupName: String,
+        budgetMs: Long,
+    ) {
         val journeys = WhiteNoiseJourneys()
         var previousPid = 0
         benchmarkRule.measureRepeated(
@@ -80,14 +84,25 @@ class PopulatedProcessDeathStartupBenchmark {
             measureBlock = {
                 requireOfflineFixture()
                 check(targetPid() == null) { "A background owner prewarmed the replacement process." }
+                val launchStartedAt = SystemClock.elapsedRealtime()
                 journeys.run { launchRestoredTaskAndWait(BenchmarkUsefulSurface.ChatList) }
                 val currentPid = requireNotNull(targetPid()) { "The restored fixture process is absent." }
                 check(currentPid != previousPid) { "The fixture process was retained rather than restored." }
                 journeys.requirePopulatedLocalList(groupName)
+                check(SystemClock.elapsedRealtime() - launchStartedAt <= budgetMs) {
+                    "The populated local checkpoint exceeded the reviewed device budget."
+                }
                 journeys.openLocalTranscript(groupName)
                 requireOfflineFixture()
             },
         )
+    }
+
+    /** Requires the same pre-reviewed positive device budget supplied to the package-replacement reporter. */
+    private fun reviewedLocalFrameBudget(): Long {
+        val value = InstrumentationRegistry.getArguments().getString("localFrameBudgetMs").orEmpty()
+        require(value.matches(Regex("[1-9][0-9]{0,8}"))) { "Pass the reviewed device localFrameBudgetMs." }
+        return value.toLong()
     }
 
     /** Rejects a profile switch, available LAN/relay link or any network edge observed during qualification. */

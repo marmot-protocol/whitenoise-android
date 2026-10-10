@@ -710,7 +710,8 @@ instrument_command="am instrument --user $benchmark_user -w -r \
 -e androidx.benchmark.output.enable true \
 -e additionalTestOutputDir $(quote_device_shell_arg "$device_output")"
 if [[ "${REQUIRE_OFFLINE_STARTUP:-false}" == true ]]; then
-  instrument_command="$instrument_command -e requireOfflineStartup true"
+  instrument_command="$instrument_command -e requireOfflineStartup true \
+-e localFrameBudgetMs $(quote_device_shell_arg "$startup_local_frame_budget_ms")"
 fi
 if [[ -n "$group_name" ]]; then
   instrument_command="$instrument_command \

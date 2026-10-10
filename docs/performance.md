@@ -203,7 +203,10 @@ Each of three iterations verifies the populated local list, presses Home, calls
 `am kill` for only the fixture user, requires the old process to disappear, and
 reopens the retained task. It rejects a retained PID, loading/recovery in place of
 the populated local checkpoint, missing rows, or a row action that cannot open
-the local transcript before network release. A foreground service that prevents
+the local transcript before network release. Every restored launch enforces the
+reviewed `localFrameBudgetMs` against the launch-to-populated-checkpoint elapsed
+time, including UI-automation observation overhead. The runner passes the same
+reviewed budget to both this test and its package-replacement reporter. A foreground service that prevents
 `am kill` is a failed qualification, not a skipped test. Macrobenchmark's
 `killProcess()` uses force-stop and cannot substitute for this ordinary
 process-death scenario. Retain the startup traces and instrumentation result
