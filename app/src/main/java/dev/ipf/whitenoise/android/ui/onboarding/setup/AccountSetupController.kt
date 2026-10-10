@@ -215,9 +215,20 @@ internal class AccountSetupController(
         }
     }
 
-    /** Closes the editor without changing or publishing any account metadata. */
+    /** Discards the editor's native preview before returning to relay choices; failed cleanup stays retryable. */
     fun dismissEditor() {
-        if (!mutableState.value.busy) mutableState.value = mutableState.value.copy(editor = null)
+        val current = mutableState.value
+        if (current.busy || !isCurrent()) return
+        val preview = current.snapshot.takeIf { current.editor?.action == OnboardingActionFfi.EDIT_RELAYS }
+        if (preview == null) {
+            mutableState.value = current.copy(editor = null)
+        } else {
+            operate {
+                val latest = client.discardRelayPreview(preview) ?: client.snapshot()
+                latest?.let(::accept)
+                if (isCurrent()) mutableState.value = mutableState.value.copy(editor = null)
+            }
+        }
     }
 
     /** Owns one foreground operation at a time without logging keys or raw engine errors. */

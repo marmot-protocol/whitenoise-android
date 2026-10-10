@@ -69,11 +69,12 @@ internal fun SetupEditorContent(
     if (editor.action == OnboardingActionFfi.EDIT_PROFILE) {
         SetupProfileFields(fields, busy, randomName)
     } else {
+        val discovery = editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
         if (editor.action == OnboardingActionFfi.EDIT_RELAYS) {
             Text(stringResource(editor.relayEditHelp()))
+        } else {
+            Text(stringResource(R.string.setup_discovery_help))
         }
-        val discovery = editor.action == OnboardingActionFfi.EDIT_DISCOVERY_RELAYS
-        Text(stringResource(if (discovery) R.string.setup_discovery_help else R.string.setup_relays_help))
         WhiteNoiseTextField(
             state = fields.reads,
             enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.canEditRelayDeclaration),

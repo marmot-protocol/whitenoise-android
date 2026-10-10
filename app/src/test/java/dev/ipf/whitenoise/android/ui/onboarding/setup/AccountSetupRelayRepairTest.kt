@@ -30,6 +30,31 @@ class AccountSetupRelayRepairTest {
         assertFalse(editor.copy(reads = "", writes = "").canReviewRelayEdit)
     }
 
+    /** Field formatting that request() discards cannot enable an unchanged repair. */
+    @Test fun whitespaceAndBlankLinesDoNotEnableReview() {
+        val editor =
+            SetupEditor(4uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS)
+                .withRelayDeclaration(relayRepairFixture())
+        val formatted = editor.copy(reads = "\n ${editor.reads} \n\n", writes = "\t${editor.writes}\t\n")
+        assertEquals(editor.request(), formatted.request())
+        assertFalse(formatted.canReviewRelayEdit)
+        assertTrue(formatted.copy(writes = "\n wss://changed.example \n").canReviewRelayEdit)
+    }
+
+    /** Inbox edits use the same submitted-line comparison and still require a nonempty list. */
+    @Test fun inboxWhitespaceAndEmptyListsCannotBeReviewed() {
+        val repair = relayRepairFixture()
+        val inboxTags = listOf(repair.beforeTags.single().copy(role = OnboardingRelayTagRoleFfi.INBOX))
+        val editor =
+            SetupEditor(4uL, OnboardingStepFfi.INBOX_RELAYS, OnboardingActionFfi.EDIT_RELAYS)
+                .withRelayDeclaration(
+                    repair.copy(beforeTags = inboxTags),
+                )
+        assertFalse(editor.copy(reads = "\n ${editor.reads} \n").canReviewRelayEdit)
+        assertFalse(editor.copy(reads = " \n\t").canReviewRelayEdit)
+        assertTrue(editor.copy(reads = " wss://changed.example\n").canReviewRelayEdit)
+    }
+
     /** The published lossless setter accepts mixed roles, duplicate occurrences and opaque extension fields. */
     @Test fun complexDeclarationsCanBeReviewedWithoutChangingTheirPrefill() {
         val repair = relayRepairFixture()

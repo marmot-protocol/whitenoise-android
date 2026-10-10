@@ -154,21 +154,6 @@
         ]
       },
       {
-        "surface": "Native setup presentation: R.string.setup_relays_help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
-        "anchor": "R.string.setup_relays_help",
-        "test_ids": [
-          "ONB-013",
-          "ONB-014",
-          "ONB-015",
-          "ONB-016",
-          "ONB-018",
-          "ONB-019",
-          "ONB-021",
-          "ONB-023"
-        ]
-      },
-      {
         "surface": "Native setup presentation: R.string.setup_write_list",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupEditor.kt",
         "anchor": "R.string.setup_write_list",

@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
+import android.util.JsonWriter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
@@ -18,7 +19,7 @@ import dev.ipf.marmotkit.OnboardingRelayTagDispositionFfi
 import dev.ipf.marmotkit.OnboardingRelayTagRoleFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.Dimens
-import org.json.JSONArray
+import java.io.StringWriter
 
 /** Shows the native diff and complete ordered declarations without hiding unknown tag fields. */
 @Composable
@@ -47,7 +48,7 @@ internal fun SetupRelayRepairContent(repair: OnboardingRelayRepairFfi) {
                 style = MaterialTheme.typography.labelLarge,
             )
             Text(
-                change.endpoint ?: JSONArray(change.fields).toString(),
+                change.endpoint ?: relayTagJson(change.fields),
                 style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Ltr),
             )
         }
@@ -57,13 +58,13 @@ internal fun SetupRelayRepairContent(repair: OnboardingRelayRepairFfi) {
         SetupNotice(
             repair.beforeTags
                 .joinToString("\n") {
-                    JSONArray(it.fields).toString()
+                    relayTagJson(it.fields)
                 }.ifEmpty { stringResource(R.string.setup_empty_list) },
         )
     }
     Text(stringResource(R.string.setup_repair_content), style = MaterialTheme.typography.labelLarge)
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        SetupNotice(JSONArray(listOf(repair.originalContent)).toString())
+        SetupNotice(repair.originalContent.ifEmpty { stringResource(R.string.setup_empty_list) })
     }
     if (repair.mode != OnboardingRelayRepairModeFfi.MANUAL_REVIEW) {
         Text(stringResource(R.string.setup_repair_after), style = MaterialTheme.typography.titleMedium)
@@ -71,16 +72,27 @@ internal fun SetupRelayRepairContent(repair: OnboardingRelayRepairFfi) {
             SetupNotice(
                 repair.afterTags
                     .joinToString("\n") {
-                        JSONArray(it.fields).toString()
+                        relayTagJson(it.fields)
                     }.ifEmpty { stringResource(R.string.setup_empty_list) },
             )
         }
         Text(stringResource(R.string.setup_repair_content), style = MaterialTheme.typography.labelLarge)
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            SetupNotice(JSONArray(listOf(repair.proposedContent)).toString())
+            SetupNotice(repair.proposedContent.ifEmpty { stringResource(R.string.setup_empty_list) })
         }
     }
 }
+
+/** Quotes opaque fields as JSON while keeping relay URL slashes readable. */
+internal fun relayTagJson(fields: List<String>): String =
+    StringWriter()
+        .also { output ->
+            JsonWriter(output).use { json ->
+                json.beginArray()
+                fields.forEach { json.value(it) }
+                json.endArray()
+            }
+        }.toString()
 
 /** Uses native role annotations instead of interpreting NIP-65 fields in Compose. */
 private fun relayRoleLabel(role: OnboardingRelayTagRoleFfi): Int =

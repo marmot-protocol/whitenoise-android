@@ -3,11 +3,13 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingSubscription
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -66,7 +68,7 @@ class MarmotAccountSetupClientTest {
                     override fun snapshot() = setupSnapshot()
 
                     /** Records the dispatcher used to enter native next. */
-                    override suspend fun next(): dev.ipf.marmotkit.OnboardingSnapshotFfi? {
+                    override suspend fun next(): OnboardingSnapshotFfi? {
                         nextOffCaller.set(Thread.currentThread() !== caller)
                         nextStarted.complete(Unit)
                         return null
@@ -90,7 +92,7 @@ class MarmotAccountSetupClientTest {
                 launch {
                     try {
                         stream.next()
-                        kotlinx.coroutines.awaitCancellation()
+                        awaitCancellation()
                     } finally {
                         stream.close()
                     }

@@ -43,9 +43,13 @@ internal val SetupEditor.canEditRelayDeclaration: Boolean
         }
     }
 
-/** Prevents accidental empty or unchanged replacement; MDK remains the endpoint-validation authority. */
+/** Compares submitted lines so whitespace-only edits cannot create a no-op preview; MDK validates endpoints. */
 internal val SetupEditor.canReviewRelayEdit: Boolean
-    get() =
-        canEditRelayDeclaration &&
-            (reads != originalReads || writes != originalWrites) &&
-            (if (step == OnboardingStepFfi.INBOX_RELAYS) reads.isNotBlank() else writes.isNotBlank())
+    get() {
+        if (!canEditRelayDeclaration) return false
+        val edited = request()
+        val original = copy(reads = originalReads, writes = originalWrites).request()
+        val requiredRelays = if (step == OnboardingStepFfi.INBOX_RELAYS) edited.readRelays else edited.writeRelays
+        return requiredRelays.isNotEmpty() &&
+            (edited.readRelays != original.readRelays || edited.writeRelays != original.writeRelays)
+    }
