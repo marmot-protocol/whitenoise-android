@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-tts-custom-cancel
+---
+- assertVisible: Custom
+- assertVisible: Speech rate
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

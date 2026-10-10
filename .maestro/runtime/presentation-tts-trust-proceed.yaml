@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-tts-trust-proceed
+---
+- assertVisible: External text-to-speech engine
+- tapOn: Speak anyway
+- assertVisible:
+    id: presentation.complete

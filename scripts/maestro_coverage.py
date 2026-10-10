@@ -10,11 +10,13 @@ try:
     from scripts.maestro_suite import CASES as OFFLINE
     from scripts.maestro_runtime import CASES as RUNTIME
     from scripts.check_manual_test_guide import composable_names
+    from scripts.maestro_screen_coverage import screen_bindings, executed_screens
 except ModuleNotFoundError:
     from manual_test_fragments import definitions, load_guide, load_inventory
     from maestro_suite import CASES as OFFLINE
     from maestro_runtime import CASES as RUNTIME
     from check_manual_test_guide import composable_names
+    from maestro_screen_coverage import screen_bindings, executed_screens
 
 ROOT = Path(__file__).resolve().parents[1]
 LAYERS = {'core-ci', 'offline-ui', 'native-runtime-ui', 'controlled-integration', 'physical-human', 'release-audit'}
@@ -127,7 +129,7 @@ def inventory(root=ROOT, include_companions=False):
     surfaces = load_inventory(root)['categories']
     cases = {name: {'manual_ids': values[1], 'layer': 'offline-ui', 'flow': '.maestro/' + values[0]}
              for name, values in OFFLINE.items()}
-    cases.update({name: {**case, 'layer': 'native-runtime-ui', 'flow': f'.maestro/runtime/{name}.yaml'}
+    cases.update({name: {**case, 'layer': case.get('layer', 'native-runtime-ui'), 'flow': f'.maestro/runtime/{name}.yaml'}
                   for name, case in RUNTIME.items()})
     unknown = {test_id for case in cases.values() for test_id in case['manual_ids']} - set(requirements)
     if unknown:
@@ -139,8 +141,12 @@ def inventory(root=ROOT, include_companions=False):
                               'full_release_proof': False}
                     for test_id, text in requirements.items()}
     screens = screen_catalog(root, surfaces, cases, include_companions)
+    direct = {(row["source"], row["symbol"]): row for row in screen_bindings(root, screens, cases)}
+    screens = [{**screen, **direct[(screen["source"], screen["symbol"]) ]} for screen in screens]
     return {'schema': 1, 'requirements': requirements, 'surfaces': surfaces, 'cases': cases,
             'screen_catalog': screens, 'discovered_screen_count': len(screens),
+            'planned_screen_assertion_count': sum(bool(screen['bindings']) for screen in screens),
+            'screens_without_direct_assertions': [screen['symbol'] for screen in screens if not screen['bindings']],
             'screen_edge_check_count': sum(len(screen['edge_plan']) for screen in screens),
             'named_edge_cases': edges, 'named_edge_case_count': len(edges),
             'required_edge_dimensions': list(EDGE_DIMENSIONS),
@@ -181,6 +187,10 @@ def markdown_inventory(result, source_sha=None):
     for screen in result['screen_catalog']:
         lines.extend([f"### [{screen['symbol']}]({base}{screen['source']})", '',
                       'Permanent requirements: ' + ', '.join(screen['manual_ids']) + '.', ''])
+        for binding in screen['bindings']:
+            lines.extend([f"Direct planned assertion: [{binding['case']}]({base}{result['cases'][binding['case']]['flow']}) — {binding['scope']} Execution remains unverified.", ''])
+        if not screen['bindings']:
+            lines.extend(['Remaining screen coverage: ' + screen['remaining'], ''])
         if screen['companion_test_source_references']:
             references = [f'[{Path(item["source"]).name}]({base}{item["source"]})'
                           for item in screen['companion_test_source_references']]
@@ -199,6 +209,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--require-full', action='store_true')
+    parser.add_argument('--require-screens', action='store_true', help='Require a direct maintained assertion for every discovered surface')
     parser.add_argument('--markdown-output', type=Path)
     parser.add_argument('--source-sha')
     args = parser.parse_args()
@@ -213,6 +224,8 @@ def main():
         args.markdown_output.write_text(markdown_inventory(result, args.source_sha))
     print(f"{result['case_count']} UI journeys; {result['requirement_count']} maintained requirements; "
           f"{result['discovered_screen_count']} named UI surfaces; full release proof remains required")
+    if args.require_screens and result['screens_without_direct_assertions']:
+        parser.exit(1, 'Screens still need direct assertions: ' + ', '.join(result['screens_without_direct_assertions']) + '\n')
     if args.require_full and not result['full_release_coverage']:
         parser.exit(1, 'Partial UI assertions cannot certify every screen and edge case\n')
 

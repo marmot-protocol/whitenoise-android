@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'account-actions', 'app-lock', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation', 'inbound-share')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'account-actions', 'app-lock', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation', 'inbound-share', 'presentation')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 660
 UI_TIMEOUTS = {'polls-question-boundary': 240}
@@ -93,6 +93,30 @@ def disable_fixture_boot_receiver():
         raise ValueError('Isolated fixture boot receiver was not disabled')
 
 
+def presentation_arguments(case):
+    """Only maintained presentation cases may replace content in the isolated test Activity."""
+    scenario = case.get('presentation')
+    if scenario is None:
+        return []
+    actions = case.get('presentation_actions', [])
+    if (case['postcondition'] != 'presentation-checked' or not re.fullmatch('[a-z][a-z0-9-]+', scenario)
+            or not isinstance(actions, list) or not actions
+            or any(not isinstance(action, str) or not re.fullmatch('[a-z][a-z0-9-]+', action) for action in actions)):
+        raise ValueError('Invalid production presentation fixture')
+    return ['-e', 'presentationScenario', scenario, '-e', 'presentationActions', ','.join(actions)]
+
+
+def qualify_presentation(case, verified):
+    """A UI pass cannot replace the actual production callback/payload sequence."""
+    if case['postcondition'] != 'presentation-checked':
+        return
+    observed = verified.get('presentation')
+    if (not isinstance(observed, dict) or observed.get('verified') is not True
+            or observed.get('scenario') != case.get('presentation')
+            or observed.get('callbacks') != case.get('presentation_actions')):
+        raise ValueError('Production presentation dispatch was not verified')
+
+
 def run_fixture(name, directory, generation):
     """Native fixture lifetime; outer credential ownership covers early setup and launch failures."""
     relative = f'files/maestro-{generation}'
@@ -119,6 +143,7 @@ def run_fixture(name, directory, generation):
                                          '-e', 'class', HOST, '-e', 'fixtureGeneration', generation,
                                          '-e', 'postcondition', CASES[name]['postcondition'],
                                          '-e', 'fixtureScenario', fixture,
+                                         *presentation_arguments(CASES[name]),
                                          f'{PACKAGE}.test/{RUNNER}'], stdout=log, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 120
@@ -162,6 +187,7 @@ def run_fixture(name, directory, generation):
                 record['cleanup_safe'] = True
                 verified = receipt(read('verified'), generation, 'verified')
                 (directory / 'verified.json').write_text(json.dumps(verified, indent=2) + '\n')
+                qualify_presentation(CASES[name], verified)
                 if (CASES[name]['postcondition'].startswith('speech-rate-')
                         and verified.get('speechRateVerified') is not True):
                     raise ValueError('Persisted speech rate was not verified')

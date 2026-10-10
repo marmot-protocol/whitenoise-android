@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-image-editor-coordinates
+---
+- assertVisible:
+    id: photo.editor
+- assertVisible: Edit photo
+- scrollUntilVisible:
+    element:
+      text: Adjust crop
+    direction: DOWN
+- tapOn: Adjust crop
+- assertVisible: Adjust crop
+- tapOn: Cancel
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

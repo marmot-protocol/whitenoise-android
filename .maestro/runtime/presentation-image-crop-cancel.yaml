@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-image-crop-cancel
+---
+- assertVisible:
+    id: identity_crop.dialog
+- assertVisible:
+    id: identity_crop.canvas
+- tapOn:
+    id: identity_crop.cancel
+- assertVisible:
+    id: presentation.complete

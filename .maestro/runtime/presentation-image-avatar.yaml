@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-image-avatar
+---
+- assertVisible: Maestro synthetic avatar
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

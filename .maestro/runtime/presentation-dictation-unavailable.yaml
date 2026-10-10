@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-unavailable
+---
+- assertVisible: Remaining dictation audio
+- assertVisible: Could not check the retained audio. Keep it and try again.
+- assertNotVisible: Retry remaining audio
+- tapOn: Keep for later
+- assertVisible:
+    id: presentation.complete

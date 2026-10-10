@@ -30,6 +30,7 @@ import java.io.File
 private val MAESTRO_POSTCONDITIONS =
     setOf(
         "none",
+        "presentation-checked",
         "send",
         "message-reply",
         "message-edit",
@@ -139,6 +140,7 @@ class MaestroRuntimeHostTest {
             var inboundShareBaseline: MaestroInboundShareBaseline? = null
             var accountActionBaseline: MaestroAccountActionBaseline? = null
             var credentialJournal: MaestroCredentialJournal? = null
+            var presentation: MaestroPresentationFixture? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -243,6 +245,13 @@ class MaestroRuntimeHostTest {
                     checkNotNull(activity).onActivity { originalActivity = it }
                     inboundShareBaseline =
                         captureMaestroInboundShare(native, app, checkNotNull(activity), group, fixture)
+                    val presentationScenario = InstrumentationRegistry.getArguments().getString("presentationScenario")
+                    if (presentationScenario != null) {
+                        check(postcondition == "presentation-checked")
+                        val expected = checkNotNull(InstrumentationRegistry.getArguments().getString("presentationActions"))
+                        presentation = MaestroPresentationFixture(presentationScenario, expected.split(","))
+                        checkNotNull(activity).onActivity { checkNotNull(presentation).install(it) }
+                    }
                     // Maestro alone owns Android accessibility; this receipt certifies native handoff only.
                     File(directory, "ready.json").writeText(
                         JSONObject()
@@ -308,6 +317,7 @@ class MaestroRuntimeHostTest {
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
+                        .put("presentation", presentation?.verify() ?: JSONObject.NULL)
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
@@ -373,6 +383,7 @@ class MaestroRuntimeHostTest {
                 )
             } finally {
                 val activityClosed = runCatching { activity?.close() }
+                presentation?.close()
                 val listenerStopped =
                     runCatching { withTimeout(10_000L) { state?.stopNotificationListenerForAccountTeardown() } }
                 state?.mutationsScope?.cancel()

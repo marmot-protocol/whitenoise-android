@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-startup-loading
+---
+- assertVisible:
+    id: startup-loading
+- back
+- assertVisible:
+    id: presentation.complete

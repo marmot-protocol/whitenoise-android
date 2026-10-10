@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-partial-disabled
+---
+- assertVisible: Incomplete dictation
+- assertVisible:
+    text: Send recognized text
+    enabled: false
+- back
+- assertVisible:
+    id: presentation.complete

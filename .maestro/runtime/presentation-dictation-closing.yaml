@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-closing
+---
+- assertVisible: Remaining dictation audio
+- assertVisible: Finishing microphone…
+- assertNotVisible: Retry remaining audio
+- tapOn: Keep for later
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-ready
+---
+- assertVisible: Maestro complete filename.txt
+- assertVisible: Maestro document first line.*
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

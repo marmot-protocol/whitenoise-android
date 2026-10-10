@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-image-editor-draw
+---
+- assertVisible:
+    id: photo.editor
+- assertVisible: Edit photo
+- scrollUntilVisible:
+    element:
+      text: Draw
+    direction: DOWN
+- tapOn: Draw
+- scrollUntilVisible:
+    element:
+      text: Draw a line
+    direction: DOWN
+- tapOn: Draw a line
+- assertVisible: Draw a line
+- tapOn: Cancel
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

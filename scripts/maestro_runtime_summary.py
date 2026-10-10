@@ -8,12 +8,12 @@ import re
 import xml.etree.ElementTree as ET
 
 try:
-    from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result
+    from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation
     from scripts.maestro_runtime_selection import matrix_selection
     from scripts.maestro_environment import qualify
     from scripts.maestro_credential import qualify_credential
 except ModuleNotFoundError:
-    from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result
+    from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation
     from maestro_runtime_selection import matrix_selection
     from maestro_environment import qualify
     from maestro_credential import qualify_credential
@@ -98,6 +98,7 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 generations.add(generation)
                 for flag in ('ready', 'verified', 'closed'):
                     receipt(json.dumps(read_json(leaf / f'{flag}.json')), generation, flag)
+                qualify_presentation(CASES[name], read_json(leaf / 'verified.json'))
                 if (CASES[name]['postcondition'] == 'composer-recreated'
                         and read_json(leaf / 'verified.json').get('activityRecreated') is not True):
                     raise ValueError('Actual Activity recreation was not verified')

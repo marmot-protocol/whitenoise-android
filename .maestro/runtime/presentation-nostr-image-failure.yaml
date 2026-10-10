@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-nostr-image-failure
+---
+- tapOn: View image
+- assertVisible: Couldn’t load this image. Try again.
+- tapOn: Retry
+- assertVisible: Couldn’t load this image. Try again.
+- back
+- assertVisible:
+    id: presentation.complete

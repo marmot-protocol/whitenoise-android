@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-follows
+---
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-FOLLOWS
+- assertVisible: Follow list
+- back
+- assertVisible: Account setup
+- back
+- assertVisible:
+    id: presentation.complete

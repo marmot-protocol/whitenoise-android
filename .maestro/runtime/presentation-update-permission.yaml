@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-update-permission
+---
+- assertVisible: Allow installs from this app
+- assertVisible:
+    id: appUpdate.settings
+    enabled: true
+- tapOn:
+    id: appUpdate.settings
+- assertVisible:
+    id: presentation.complete

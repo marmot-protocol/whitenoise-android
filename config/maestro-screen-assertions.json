@@ -1,0 +1,1319 @@
+{
+  "schema": 1,
+  "screens": [
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsTrustWarning.kt",
+      "symbol": "TtsTrustWarningDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TtsTrustWarningDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppSelfUpdateDialog.kt",
+      "symbol": "AppSelfUpdateDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AppSelfUpdateDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppSelfUpdateDialog.kt",
+      "symbol": "AppSelfUpdateProgressDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AppSelfUpdateProgressDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/AccountSelectorSheet.kt",
+      "symbol": "AccountSelectorSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AccountSelectorSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+      "symbol": "ProfileSwitcherSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileSwitcherSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+      "symbol": "ChatContextMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatContextMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+      "symbol": "ChatDeleteConfirmationDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatDeleteConfirmationDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+      "symbol": "ChatLeaveAndDeleteConfirmationDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatLeaveAndDeleteConfirmationDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+      "symbol": "ChatDepartureBatchDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatDepartureBatchDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
+      "symbol": "ChatFolderPickerSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFolderPickerSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRelayFeedbackDialog.kt",
+      "symbol": "ChatRelayFeedbackDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatRelayFeedbackDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+      "symbol": "ChatsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+      "symbol": "GlobalAttachmentBrowser",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalAttachmentBrowser; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+      "symbol": "GlobalSearchChatTypePicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchChatTypePicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+      "symbol": "GlobalSearchCheckDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchCheckDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+      "symbol": "GlobalSearchDatePicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchDatePicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+      "symbol": "GlobalSearchEntityPicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchEntityPicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+      "symbol": "GlobalSearchFilterPicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchFilterPicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+      "symbol": "GlobalSearchFolderPicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchFolderPicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+      "symbol": "GlobalSearchFilterMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchFilterMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+      "symbol": "ContactPickerScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ContactPickerScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+      "symbol": "NewMessageAccountScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NewMessageAccountScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+      "symbol": "NewMessageScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NewMessageScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupPhotoMenu.kt",
+      "symbol": "NewGroupPhotoMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupPhotoMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+      "symbol": "NewGroupRecipientAccountScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupRecipientAccountScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+      "symbol": "NewGroupRecipientPickerScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupRecipientPickerScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+      "symbol": "NewGroupSetupAccountScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupSetupAccountScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+      "symbol": "NewGroupSetupScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupSetupScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+      "symbol": "SelectedMembersReviewScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SelectedMembersReviewScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+      "symbol": "AnimatedProfileAvatarOverlay",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AnimatedProfileAvatarOverlay; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
+      "symbol": "AppLockScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AppLockScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
+      "symbol": "ConfirmDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConfirmDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
+      "symbol": "IdentityImageCropDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for IdentityImageCropDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+      "symbol": "StartupFailureScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for StartupFailureScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+      "symbol": "LoadingScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for LoadingScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
+      "symbol": "StartupLoadingScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for StartupLoadingScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseAnchoredMenu.kt",
+      "symbol": "WhiteNoiseAnchoredMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseAnchoredMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+      "symbol": "ChoiceDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChoiceDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+      "symbol": "SpeechChoiceDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SpeechChoiceDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+      "symbol": "WhiteNoiseAlertDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseAlertDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+      "symbol": "WhiteNoiseEntityPickerSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseEntityPickerSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseMenus.kt",
+      "symbol": "WhiteNoiseDropdownMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseDropdownMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSheets.kt",
+      "symbol": "WhiteNoiseModalBottomSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseModalBottomSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+      "symbol": "AgentOperationDeleteDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AgentOperationDeleteDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
+      "symbol": "ConversationInitialLoadingOverlay",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationInitialLoadingOverlay; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+      "symbol": "ConversationScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+      "symbol": "GroupRejoinInvitationDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupRejoinInvitationDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+      "symbol": "GroupSystemSummaryMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupSystemSummaryMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackDialog.kt",
+      "symbol": "PlaybackDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for PlaybackDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+      "symbol": "PollCreateDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for PollCreateDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+      "symbol": "PollVotesSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for PollVotesSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
+      "symbol": "TtsTransportRatePicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TtsTransportRatePicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+      "symbol": "ComposerAttachmentMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ComposerAttachmentMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
+      "symbol": "ConversationDictationRecoveryPanel",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationDictationRecoveryPanel; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+      "symbol": "ConversationDictationMicrophoneDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationDictationMicrophoneDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+      "symbol": "ConversationDictationPartialSendDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationDictationPartialSendDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
+      "symbol": "ComposerEmojiPickerPane",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ComposerEmojiPickerPane; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
+      "symbol": "EmojiPickerSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for EmojiPickerSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+      "symbol": "EmojiPickerContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for EmojiPickerContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+      "symbol": "MentionPicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MentionPicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
+      "symbol": "PendingStatusOverlay",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for PendingStatusOverlay; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+      "symbol": "MediaPreviewScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MediaPreviewScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+      "symbol": "ConversationMediaViewer",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationMediaViewer; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
+      "symbol": "FullScreenMediaViewer",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for FullScreenMediaViewer; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+      "symbol": "TextAttachmentFilenameDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TextAttachmentFilenameDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+      "symbol": "TextAttachmentReaderDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TextAttachmentReaderDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+      "symbol": "TextAttachmentReaderScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TextAttachmentReaderScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorCoordinatesDialog.kt",
+      "symbol": "PhotoEditorCoordinatesDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for PhotoEditorCoordinatesDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt",
+      "symbol": "PhotoEditorDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for PhotoEditorDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt",
+      "symbol": "PhotoEditorScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for PhotoEditorScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+      "symbol": "EditHistoryDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for EditHistoryDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+      "symbol": "FocusedActionMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for FocusedActionMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+      "symbol": "ForwardMessagePickerContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ForwardMessagePickerContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+      "symbol": "ForwardMessagePickerFullScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ForwardMessagePickerFullScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+      "symbol": "ForwardOperationDetailsSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ForwardOperationDetailsSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+      "symbol": "KeptMessagesOverlay",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for KeptMessagesOverlay; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCardParts.kt",
+      "symbol": "KeptMessageMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for KeptMessageMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+      "symbol": "ForwardMessageSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ForwardMessageSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+      "symbol": "MessageActionMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MessageActionMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+      "symbol": "BatchMessageDeleteDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for BatchMessageDeleteDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+      "symbol": "BatchMessageDeleteDialogContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for BatchMessageDeleteDialogContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+      "symbol": "MessageDeleteDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MessageDeleteDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+      "symbol": "MessageDeleteDialogContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MessageDeleteDialogContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+      "symbol": "MessageDetailsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MessageDetailsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+      "symbol": "MessageFullScreenView",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MessageFullScreenView; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageInlineFooter.kt",
+      "symbol": "BoxScope.MediaFooterOverlay",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for BoxScope.MediaFooterOverlay; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+      "symbol": "ReportMessageSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ReportMessageSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
+      "symbol": "NostrEventImagePane",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NostrEventImagePane; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "symbol": "NostrEventReaderDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NostrEventReaderDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "symbol": "NostrEventReaderScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NostrEventReaderScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "symbol": "NostrVideoPlayerDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NostrVideoPlayerDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/CompleteReactionDetailsSheet.kt",
+      "symbol": "CompleteReactionDetailsSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for CompleteReactionDetailsSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+      "symbol": "ConfigureReactionsSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConfigureReactionsSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+      "symbol": "ReactionDetailsSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ReactionDetailsSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
+      "symbol": "ContactPreviewScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ContactPreviewScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/LocationPickerScreen.kt",
+      "symbol": "LocationPickerScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for LocationPickerScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AppMenus.kt",
+      "symbol": "KeyboardPreservingDropdownMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for KeyboardPreservingDropdownMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AppSheets.kt",
+      "symbol": "KeyboardPreservingBottomSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for KeyboardPreservingBottomSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt",
+      "symbol": "KeyboardSafePopup",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for KeyboardSafePopup; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+      "symbol": "NotificationSoundScopeDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NotificationSoundScopeDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+      "symbol": "ConversationNotificationSettingsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationNotificationSettingsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+      "symbol": "NotifyForDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NotifyForDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+      "symbol": "VibrationPatternDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for VibrationPatternDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
+      "symbol": "ConversationSoundAppearanceSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationSoundAppearanceSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+      "symbol": "DisappearingCustomDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DisappearingCustomDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+      "symbol": "DisappearingMessagesPickerDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DisappearingMessagesPickerDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+      "symbol": "DeveloperInfoPanel",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DeveloperInfoPanel; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+      "symbol": "GroupDetailsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupDetailsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+      "symbol": "GroupDisbandConfirmDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupDisbandConfirmDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+      "symbol": "GroupEditPhotoMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupEditPhotoMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+      "symbol": "GroupEditScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupEditScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
+      "symbol": "GroupEmojiImagePickerSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupEmojiImagePickerSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt",
+      "symbol": "ImageSearchSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ImageSearchSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+      "symbol": "ChatRelaysScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatRelaysScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+      "symbol": "GroupInfoScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupInfoScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+      "symbol": "SoleAdminDeletePicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SoleAdminDeletePicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+      "symbol": "TransferAdminSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TransferAdminSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembersScreen.kt",
+      "symbol": "GroupMembersScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GroupMembersScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+      "symbol": "LargeGroupInviteConfirmationDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for LargeGroupInviteConfirmationDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
+      "symbol": "CustomMuteDateDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for CustomMuteDateDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
+      "symbol": "CustomMuteTimeDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for CustomMuteTimeDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
+      "symbol": "MuteDurationChoiceDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MuteDurationChoiceDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
+      "symbol": "MuteDurationDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for MuteDurationDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+      "symbol": "TtsAutoReadPickerContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TtsAutoReadPickerContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadPickerDialog.kt",
+      "symbol": "TtsAutoReadPickerDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TtsAutoReadPickerDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+      "symbol": "QuickAccountSwitchTransitionOverlay",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for QuickAccountSwitchTransitionOverlay; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/TtsReturnTransitionScreen.kt",
+      "symbol": "TtsReturnTransitionScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TtsReturnTransitionScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+      "symbol": "RetainedProfilesSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for RetainedProfilesSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+      "symbol": "OnboardingScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for OnboardingScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+      "symbol": "SignUpScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SignUpScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+      "symbol": "WelcomeScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for WelcomeScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+      "symbol": "AccountSetupScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AccountSetupScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddAccountSheetContent.kt",
+      "symbol": "AddAccountSheetContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AddAccountSheetContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddIdentitySheet.kt",
+      "symbol": "AddIdentitySheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AddIdentitySheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileFeedbackDialog.kt",
+      "symbol": "AddProfileFeedbackDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AddProfileFeedbackDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+      "symbol": "AvatarFullScreenViewer",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AvatarFullScreenViewer; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileFeedbackDialog.kt",
+      "symbol": "PersonProfileFeedbackDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for PersonProfileFeedbackDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
+      "symbol": "ProfileEditScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileEditScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileNotificationOverrideScreen.kt",
+      "symbol": "ProfileNotificationOverrideScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileNotificationOverrideScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+      "symbol": "ProfileQrSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileQrSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "symbol": "ContactPrivateDetailsDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ContactPrivateDetailsDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "symbol": "ProfileAddToGroupsSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileAddToGroupsSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "symbol": "ProfileSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "symbol": "ProfileSheetModerationConfirmDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileSheetModerationConfirmDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+      "symbol": "QrScannerSheetContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for QrScannerSheetContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+      "symbol": "ScannerErrorDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ScannerErrorDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
+      "symbol": "QrScannerSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for QrScannerSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+      "symbol": "GlobalSearchCivilDatePickerDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchCivilDatePickerDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+      "symbol": "GlobalSearchCustomRangeReviewDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchCustomRangeReviewDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+      "symbol": "GlobalSearchDateCustomStageDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchDateCustomStageDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+      "symbol": "GlobalSearchDateFilterDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchDateFilterDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+      "symbol": "GlobalSearchDatePresetDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchDatePresetDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "symbol": "AccountKeysScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AccountKeysScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "symbol": "EncryptedBackupResultDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for EncryptedBackupResultDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "symbol": "ExportPasswordDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ExportPasswordDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "symbol": "SignOutAndWipeSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SignOutAndWipeSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "symbol": "SignOutProgressDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SignOutProgressDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "symbol": "SignOutSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SignOutSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "symbol": "WipeOutcomeSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for WipeOutcomeSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "symbol": "WipeProgressSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for WipeProgressSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+      "symbol": "ActionColorScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ActionColorScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+      "symbol": "AgentSetupSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AgentSetupSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+      "symbol": "AiAgentsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AiAgentsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+      "symbol": "AppearanceScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AppearanceScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+      "symbol": "BlockedUsersScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for BlockedUsersScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+      "symbol": "ChatBubbleColorsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatBubbleColorsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+      "symbol": "ChatFolderEditScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFolderEditScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+      "symbol": "ChatFolderDeleteDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFolderDeleteDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+      "symbol": "ChatFoldersAccountScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFoldersAccountScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+      "symbol": "ChatFoldersScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFoldersScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+      "symbol": "ConversationFixtureSeedDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationFixtureSeedDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+      "symbol": "ConversationFixtureSeedDialogContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationFixtureSeedDialogContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+      "symbol": "CustomEmojiNameDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for CustomEmojiNameDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+      "symbol": "CustomEmojiScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for CustomEmojiScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+      "symbol": "DataUsageScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DataUsageScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+      "symbol": "DeveloperScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DeveloperScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+      "symbol": "DevicePrivacyScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DevicePrivacyScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+      "symbol": "AuditLogExportConsentDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AuditLogExportConsentDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+      "symbol": "AuditLogExportDestinationDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AuditLogExportDestinationDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+      "symbol": "DiagnosticsImprovementsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DiagnosticsImprovementsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+      "symbol": "DiagnosticsHealthSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DiagnosticsHealthSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+      "symbol": "DiagnosticsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DiagnosticsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+      "symbol": "DictationProviderSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DictationProviderSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+      "symbol": "DictationSettingsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DictationSettingsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+      "symbol": "DonateScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for DonateScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+      "symbol": "FullSpectrumColorPicker",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for FullSpectrumColorPicker; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+      "symbol": "GestureSettingsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for GestureSettingsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+      "symbol": "AboutScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AboutScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+      "symbol": "BugReportScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for BugReportScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+      "symbol": "HelpOpenFailureDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for HelpOpenFailureDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+      "symbol": "HelpScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for HelpScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
+      "symbol": "KeyPackagesScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for KeyPackagesScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
+      "symbol": "KeyPackagesScreenForAccount",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for KeyPackagesScreenForAccount; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
+      "symbol": "LanguageScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for LanguageScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+      "symbol": "NotificationsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for NotificationsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+      "symbol": "QuarantinedGroupsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for QuarantinedGroupsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+      "symbol": "AddRelaySheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AddRelaySheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+      "symbol": "RelayDetailsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for RelayDetailsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+      "symbol": "RelaysScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for RelaysScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+      "symbol": "SettingsGroupPanel",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SettingsGroupPanel; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+      "symbol": "SettingsPanel",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SettingsPanel; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+      "symbol": "SettingsHomeScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SettingsHomeScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+      "symbol": "SettingsScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SettingsScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+      "symbol": "ShareConnectScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ShareConnectScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+      "symbol": "SmartFolderConditionDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SmartFolderConditionDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+      "symbol": "SmartFolderPresetMenu",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SmartFolderPresetMenu; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+      "symbol": "SmartFolderRulePanel",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SmartFolderRulePanel; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+      "symbol": "SupportScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SupportScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+      "symbol": "SpeechCustomRateDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for SpeechCustomRateDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+      "symbol": "TextToSpeechScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TextToSpeechScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsRatePicker.kt",
+      "symbol": "TtsCustomRateDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for TtsCustomRateDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+      "symbol": "AuditUploadConsentDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for AuditUploadConsentDialog; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+      "symbol": "ShareChatPickerAccountSheet",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerAccountSheet; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+      "symbol": "ShareChatPickerAccountSheetContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerAccountSheetContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerBack.kt",
+      "symbol": "ShareChatPickerBackAwareScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerBackAwareScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerDialog.kt",
+      "symbol": "ShareChatPickerFullScreen",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerFullScreen; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+      "symbol": "ShareChatPickerContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+      "symbol": "ShareChatPickerFullScreenContent",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerFullScreenContent; related manual IDs provide no screen execution proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+      "symbol": "ShareImportErrorDialog",
+      "bindings": [],
+      "remaining": "Audit direct navigation and exceptional-state assertions for ShareImportErrorDialog; related manual IDs provide no screen execution proof."
+    }
+  ]
+}

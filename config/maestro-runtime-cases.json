@@ -1514,7 +1514,7 @@
       "manual_ids": [
         "NTF-033"
       ],
-      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
       "postcondition": "none"
     },
     "alerts-chat-sounds-back": {
@@ -1628,7 +1628,7 @@
       "manual_ids": [
         "MSG-005"
       ],
-      "assertions": "Filtering to the owner’s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
       "postcondition": "reactions-retained",
       "fixture": "reactions"
     },
@@ -1680,7 +1680,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
+      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
@@ -1704,7 +1704,7 @@
       "manual_ids": [
         "SET-008"
       ],
-      "assertions": "繁體中文 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
       "postcondition": "language-system"
     },
     "advanced-relay-empty": {
@@ -1860,7 +1860,7 @@
       "manual_ids": [
         "ACC-007"
       ],
-      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice’s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -1888,7 +1888,7 @@
         "ACC-007",
         "NAV-004"
       ],
-      "assertions": "Save Alice’s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice’s retained private records, every other viewer empty and unchanged public profiles.",
+      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -2147,7 +2147,7 @@
       "manual_ids": [
         "TTS-002"
       ],
-      "assertions": "Apply custom rate then replace with 0\\.5×; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
+      "assertions": "Apply custom rate then replace with 0\\.5\u00d7; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
       "postcondition": "speech-rate-preset"
     },
     "speech-invalid-keeps-saved-rate": {
@@ -3188,7 +3188,7 @@
       "manual_ids": [
         "FIND-008"
       ],
-      "assertions": "Select the actual ANY_ATTACHMENT attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "assertions": "Select the actual ANY_ATTACHMENT attachment mode; require selected-chip semantics, the browser\u2019s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
     },
     "search-library-empty-photos": {
@@ -3196,7 +3196,7 @@
       "manual_ids": [
         "FIND-008"
       ],
-      "assertions": "Select the actual IMAGES_VIDEO attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "assertions": "Select the actual IMAGES_VIDEO attachment mode; require selected-chip semantics, the browser\u2019s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
     },
     "search-library-empty-files": {
@@ -3204,7 +3204,7 @@
       "manual_ids": [
         "FIND-008"
       ],
-      "assertions": "Select the actual FILES_DOCUMENTS attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "assertions": "Select the actual FILES_DOCUMENTS attachment mode; require selected-chip semantics, the browser\u2019s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
     },
     "search-library-empty-audio": {
@@ -3212,7 +3212,7 @@
       "manual_ids": [
         "FIND-008"
       ],
-      "assertions": "Select the actual VOICE_AUDIO attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "assertions": "Select the actual VOICE_AUDIO attachment mode; require selected-chip semantics, the browser\u2019s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
     },
     "search-library-empty-rotation": {
@@ -3323,7 +3323,7 @@
         "ACC-010",
         "ACC-017"
       ],
-      "assertions": "Switch from Alice to Bob through the actual profile selector and copy Bob’s raw key while hidden. Native proof requires active Bob from the original peer baseline, exact SDK Bob nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. All three original identities and both original messages must remain. This deliberate active-account change does not require restored active Alice. Disposable loopback accounts only; no pending-result races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance claim.",
+      "assertions": "Switch from Alice to Bob through the actual profile selector and copy Bob\u2019s raw key while hidden. Native proof requires active Bob from the original peer baseline, exact SDK Bob nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. All three original identities and both original messages must remain. This deliberate active-account change does not require restored active Alice. Disposable loopback accounts only; no pending-result races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance claim.",
       "postcondition": "private-key-copy-peer"
     },
     "keys-private-account-switch-copy": {
@@ -3332,8 +3332,905 @@
         "ACC-010",
         "ACC-017"
       ],
-      "assertions": "Visit Bob’s actual Profile Keys and deliberately reveal/hide his disposable key, then restore Alice and copy Alice while hidden. Native proof requires restored active Alice and her exact original SDK nsec in one plain-text Android clipboard item with private-key label/sensitive flag and no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; no key contents enter evidence. Three original identities and both original messages must remain. This completed account-return route does not qualify pending-key callbacks/owner races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance.",
+      "assertions": "Visit Bob\u2019s actual Profile Keys and deliberately reveal/hide his disposable key, then restore Alice and copy Alice while hidden. Native proof requires restored active Alice and her exact original SDK nsec in one plain-text Android clipboard item with private-key label/sensitive flag and no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; no key contents enter evidence. Three original identities and both original messages must remain. This completed account-return route does not qualify pending-key callbacks/owner races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance.",
       "postcondition": "private-key-copy-owner"
+    },
+    "presentation-update-resolving": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Real update resolving chrome offers Cancel and no premature installation; actual Cancel dispatch verified.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-resolving",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-download": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Real update download chrome offers Cancel and no premature installation; actual Cancel dispatch verified.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-download",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-complete-bytes": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Real update complete-bytes chrome offers Cancel and no premature installation; actual Cancel dispatch verified.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-complete-bytes",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-unknown-total": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Real update unknown-total chrome offers Cancel and no premature installation; actual Cancel dispatch verified.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-unknown-total",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-verifying": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Real update verifying chrome offers Cancel and no premature installation; actual Cancel dispatch verified.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-verifying",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-confirm": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update confirm control dispatches its exact callback without performing external installation or download.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-confirm",
+      "presentation_actions": [
+        "download"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-verified": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update verified control dispatches its exact callback without performing external installation or download.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-verified",
+      "presentation_actions": [
+        "install-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-permission": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update permission control dispatches its exact callback without performing external installation or download.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-permission",
+      "presentation_actions": [
+        "settings-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-retryable": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update retryable control dispatches its exact callback without performing external installation or download.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-retryable",
+      "presentation_actions": [
+        "retry"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-terminal": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Terminal verification failure offers Close and no Retry or Install.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-terminal",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-startup-loading": {
+      "suite": "presentation",
+      "manual_ids": [
+        "INT-003",
+        "INT-004"
+      ],
+      "assertions": "Production loading state is visible; presentation host Back closes only the synthetic state.",
+      "postcondition": "presentation-checked",
+      "presentation": "startup-loading",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-startup-destination-loading": {
+      "suite": "presentation",
+      "manual_ids": [
+        "INT-003",
+        "INT-004"
+      ],
+      "assertions": "Production destination-loading state is visible; presentation host Back closes only the synthetic state.",
+      "postcondition": "presentation-checked",
+      "presentation": "startup-destination-loading",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-startup-retryable": {
+      "suite": "presentation",
+      "manual_ids": [
+        "INT-003",
+        "INT-004"
+      ],
+      "assertions": "Retryable startup renders actual recovery control and dispatches Retry exactly once.",
+      "postcondition": "presentation-checked",
+      "presentation": "startup-retryable",
+      "presentation_actions": [
+        "retry"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-startup-terminal": {
+      "suite": "presentation",
+      "manual_ids": [
+        "INT-003",
+        "INT-004"
+      ],
+      "assertions": "Terminal startup error exposes Copy report but no retry grant; host dismissal is not account recovery proof.",
+      "postcondition": "presentation-checked",
+      "presentation": "startup-terminal",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-loading": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Text reader loading presents the actual state and Back dispatch; decoder and storage results are separate native proof.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-loading",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-binary": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Text reader binary presents the actual state and Back dispatch; decoder and storage results are separate native proof.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-binary",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-too-large": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Text reader too-large presents the actual state and Back dispatch; decoder and storage results are separate native proof.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-too-large",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-invalid": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Text reader invalid presents the actual state and Back dispatch; decoder and storage results are separate native proof.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-invalid",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-ready": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Text reader ready presents the actual state and Back dispatch; decoder and storage results are separate native proof.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-ready",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-retry": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Text download failure has a real Retry control with exactly one dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-retry",
+      "presentation_actions": [
+        "retry"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-filename": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Full filename dialog copies the exact complete filename and closes; Back then dismisses the reader.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-filename",
+      "presentation_actions": [
+        "copy-filename",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-copy": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Reader Copy passes the complete synthetic document body, then Back closes.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-copy",
+      "presentation_actions": [
+        "copy-body",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-text-read": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-010"
+      ],
+      "assertions": "Reader Read Aloud hands the exact candidate/body to its callback without using a hardware engine.",
+      "postcondition": "presentation-checked",
+      "presentation": "text-read",
+      "presentation_actions": [
+        "read-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-image-crop-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "PRO-002",
+        "GRP-003"
+      ],
+      "assertions": "Real identity image crop cancel checks canvas and resulting quarter-turn count; no image is published.",
+      "postcondition": "presentation-checked",
+      "presentation": "image-crop-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-image-crop-rotate": {
+      "suite": "presentation",
+      "manual_ids": [
+        "PRO-002",
+        "GRP-003"
+      ],
+      "assertions": "Real identity image crop rotate checks canvas and resulting quarter-turn count; no image is published.",
+      "postcondition": "presentation-checked",
+      "presentation": "image-crop-rotate",
+      "presentation_actions": [
+        "crop-confirm"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-image-crop-square": {
+      "suite": "presentation",
+      "manual_ids": [
+        "PRO-002",
+        "GRP-003"
+      ],
+      "assertions": "Real identity image crop square checks canvas and resulting quarter-turn count; no image is published.",
+      "postcondition": "presentation-checked",
+      "presentation": "image-crop-square",
+      "presentation_actions": [
+        "crop-confirm"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-image-avatar": {
+      "suite": "presentation",
+      "manual_ids": [
+        "PRO-006",
+        "ACC-004"
+      ],
+      "assertions": "Actual full-screen avatar renders generated pixels and closes without export or profile changes.",
+      "postcondition": "presentation-checked",
+      "presentation": "image-avatar",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-image-editor-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-006"
+      ],
+      "assertions": "Real staged photo editor opens and cancels an unchanged recipe.",
+      "postcondition": "presentation-checked",
+      "presentation": "image-editor-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-image-editor-coordinates": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-006"
+      ],
+      "assertions": "Photo coordinates numeric controls open and cancel without modifying the staged recipe.",
+      "postcondition": "presentation-checked",
+      "presentation": "image-editor-coordinates",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-image-editor-draw": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-006"
+      ],
+      "assertions": "Photo draw numeric controls open and cancel without modifying the staged recipe.",
+      "postcondition": "presentation-checked",
+      "presentation": "image-editor-draw",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-image-editor-quality": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-006"
+      ],
+      "assertions": "Editor output-quality picker opens and cancels without saving or exporting.",
+      "postcondition": "presentation-checked",
+      "presentation": "image-editor-quality",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-nostr-note": {
+      "suite": "presentation",
+      "manual_ids": [
+        "RDR-001",
+        "RDR-002"
+      ],
+      "assertions": "Actual resolved note reader renders full synthetic content and closes; signature/relay resolution is not simulated proof.",
+      "postcondition": "presentation-checked",
+      "presentation": "nostr-note",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-nostr-article": {
+      "suite": "presentation",
+      "manual_ids": [
+        "RDR-001",
+        "RDR-002"
+      ],
+      "assertions": "Actual resolved article reader renders full synthetic content and closes; signature/relay resolution is not simulated proof.",
+      "postcondition": "presentation-checked",
+      "presentation": "nostr-article",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-nostr-image": {
+      "suite": "presentation",
+      "manual_ids": [
+        "RDR-004"
+      ],
+      "assertions": "Public image pane explicitly requests generated pixels, opens the real fullscreen viewer and dismisses it; no network fetch.",
+      "postcondition": "presentation-checked",
+      "presentation": "nostr-image",
+      "presentation_actions": [
+        "image-load",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-nostr-image-failure": {
+      "suite": "presentation",
+      "manual_ids": [
+        "RDR-004"
+      ],
+      "assertions": "Public image failure exposes Retry and makes exactly two explicit bounded loader requests.",
+      "postcondition": "presentation-checked",
+      "presentation": "nostr-image-failure",
+      "presentation_actions": [
+        "image-load",
+        "image-load",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-tts-trust-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-003"
+      ],
+      "assertions": "Real external engine privacy warning cancel dispatch; no decrypted real data or engine interaction.",
+      "postcondition": "presentation-checked",
+      "presentation": "tts-trust-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-tts-trust-proceed": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-003"
+      ],
+      "assertions": "Real external engine privacy warning proceed dispatch; no decrypted real data or engine interaction.",
+      "postcondition": "presentation-checked",
+      "presentation": "tts-trust-proceed",
+      "presentation_actions": [
+        "proceed"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-tts-custom-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-001",
+        "TTS-004"
+      ],
+      "assertions": "Legacy custom speed dialog cancel uses actual locale editor and verifies exact1.1 callback when applied.",
+      "postcondition": "presentation-checked",
+      "presentation": "tts-custom-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-tts-custom-apply": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-001",
+        "TTS-004"
+      ],
+      "assertions": "Legacy custom speed dialog apply uses actual locale editor and verifies exact1.1 callback when applied.",
+      "postcondition": "presentation-checked",
+      "presentation": "tts-custom-apply",
+      "presentation_actions": [
+        "rate-applied"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-tts-return": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-001",
+        "TTS-004"
+      ],
+      "assertions": "Real TTS return surface renders the production transition; host dismissal does not certify source routing.",
+      "postcondition": "presentation-checked",
+      "presentation": "tts-return",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-group-large-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-005"
+      ],
+      "assertions": "Actual large-group invitation warning cancel dispatch without sending invitations.",
+      "postcondition": "presentation-checked",
+      "presentation": "group-large-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-group-large-continue": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-005"
+      ],
+      "assertions": "Actual large-group invitation warning continue dispatch without sending invitations.",
+      "postcondition": "presentation-checked",
+      "presentation": "group-large-continue",
+      "presentation_actions": [
+        "continue"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-feedback-add-copyable": {
+      "suite": "presentation",
+      "manual_ids": [
+        "PRO-004"
+      ],
+      "assertions": "Actual add feedback distinguishes diagnostics Copy from informational notices and dismisses.",
+      "postcondition": "presentation-checked",
+      "presentation": "feedback-add-copyable",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-feedback-add-informational": {
+      "suite": "presentation",
+      "manual_ids": [
+        "PRO-004"
+      ],
+      "assertions": "Actual add feedback distinguishes diagnostics Copy from informational notices and dismisses.",
+      "postcondition": "presentation-checked",
+      "presentation": "feedback-add-informational",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-feedback-person-copyable": {
+      "suite": "presentation",
+      "manual_ids": [
+        "PRO-004"
+      ],
+      "assertions": "Actual person feedback distinguishes diagnostics Copy from informational notices and dismisses.",
+      "postcondition": "presentation-checked",
+      "presentation": "feedback-person-copyable",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-feedback-person-informational": {
+      "suite": "presentation",
+      "manual_ids": [
+        "PRO-004"
+      ],
+      "assertions": "Actual person feedback distinguishes diagnostics Copy from informational notices and dismisses.",
+      "postcondition": "presentation-checked",
+      "presentation": "feedback-person-informational",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-microphone-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-001"
+      ],
+      "assertions": "Actual microphone warning dispatches cancel without touching hardware.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-microphone-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-microphone-settings": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-001"
+      ],
+      "assertions": "Actual microphone warning dispatches settings without touching hardware.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-microphone-settings",
+      "presentation_actions": [
+        "settings-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-partial-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Partial-send confirmation cancel checks the real availability and action boundary; no message sent.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-partial-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-partial-send": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Partial-send confirmation send checks the real availability and action boundary; no message sent.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-partial-send",
+      "presentation_actions": [
+        "send-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-partial-disabled": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Partial-send confirmation disabled checks the real availability and action boundary; no message sent.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-partial-disabled",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-transcribing": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual transcribing recovery state keeps audio and exposes no unsupported retry.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-transcribing",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-closing": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual closing recovery state keeps audio and exposes no unsupported retry.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-closing",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-unavailable": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual unavailable recovery state keeps audio and exposes no unsupported retry.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-unavailable",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-other-chat": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual other-chat recovery state keeps audio and exposes no unsupported retry.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-other-chat",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-target-gone": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual target-gone recovery state keeps audio and exposes no unsupported retry.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-target-gone",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-retry": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual retained audio recovery retry verifies callback order and parent return.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-retry",
+      "presentation_actions": [
+        "retry"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-retry-disabled": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual retained audio recovery retry-disabled verifies callback order and parent return.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-retry-disabled",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-discard": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual retained audio recovery discard verifies callback order and parent return.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-discard",
+      "presentation_actions": [
+        "discard",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-dictation-discard-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "Actual retained audio recovery discard-cancel verifies callback order and parent return.",
+      "postcondition": "presentation-checked",
+      "presentation": "dictation-discard-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-profile": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production account setup controller/checklist opens Profile and returns without acknowledging a native checkpoint.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-profile",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-relays": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production account setup controller/checklist opens Read and write relays and returns without acknowledging a native checkpoint.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-relays",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-inbox": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production account setup controller/checklist opens Inbox relays and returns without acknowledging a native checkpoint.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-inbox",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-device": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production account setup controller/checklist opens Your chats stay here and returns without acknowledging a native checkpoint.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-device",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-follows": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Production account setup controller/checklist opens Follow list and returns without acknowledging a native checkpoint.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-follows",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-setup-error": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-006"
+      ],
+      "assertions": "Synthetic client failure renders the actual account setup recovery action; no native repair is claimed.",
+      "postcondition": "presentation-checked",
+      "presentation": "setup-error",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
     }
   }
 }
