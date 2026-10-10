@@ -17,6 +17,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 CHUNK = 16 * 1024
 PACED_INTERVAL_SECONDS = 0.002
 MAX_BYTES = 128 * 1024 * 1024
+# A genuine upload may be as large as one file-backed send: 512 MiB - 16 bytes of plaintext plus its 16-byte tag.
+# Generated, registered and served bodies keep the smaller MAX_BYTES bound.
+UPLOAD_MAX_BYTES = 512 * 1024 * 1024
 TOKEN = re.compile(r"[a-z0-9-]{1,64}\Z")
 HASH = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -341,7 +344,7 @@ class Handler(BaseHTTPRequestHandler):
             size = int(self.headers.get("Content-Length", "-1"))
         except ValueError:
             size = -1
-        if not 0 <= size <= MAX_BYTES:
+        if not 0 <= size <= UPLOAD_MAX_BYTES:
             self.close_connection = True
             self.reply(413, {})
             return

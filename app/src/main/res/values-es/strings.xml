@@ -1038,6 +1038,12 @@
     <string name="media_download_queued">En cola para descargar</string>
     <string name="media_download_body_known">%1$s de %2$s</string>
     <string name="media_download_body_unknown">%1$s recibidos</string>
+    <string name="media_upload_preparing_body">Preparando %1$s de %2$s</string>
+    <string name="media_upload_encrypting_body">Cifrando %1$s de %2$s</string>
+    <string name="media_upload_body_known">Subiendo %1$s de %2$s</string>
+    <string name="media_upload_preparing">Preparando</string>
+    <string name="media_upload_encrypting">Cifrando</string>
+    <string name="media_upload_bytes">%1$s de %2$s</string>
     <string name="media_verifying_download">Verificando descarga</string>
     <string name="media_decrypting_download">Descifrando descarga</string>
     <string name="media_download_retry_scheduled">Esperando para reintentar</string>

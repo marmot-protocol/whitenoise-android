@@ -1084,6 +1084,12 @@
     <string name="media_download_queued">В очереди на скачивание</string>
     <string name="media_download_body_known">%1$s из %2$s</string>
     <string name="media_download_body_unknown">Получено %1$s</string>
+    <string name="media_upload_preparing_body">Подготовка: %1$s из %2$s</string>
+    <string name="media_upload_encrypting_body">Шифрование: %1$s из %2$s</string>
+    <string name="media_upload_body_known">Отправка: %1$s из %2$s</string>
+    <string name="media_upload_preparing">Подготовка</string>
+    <string name="media_upload_encrypting">Шифрование</string>
+    <string name="media_upload_bytes">%1$s из %2$s</string>
     <string name="media_verifying_download">Проверка скачанного файла</string>
     <string name="media_decrypting_download">Расшифровка скачанного файла</string>
     <string name="media_download_retry_scheduled">Ожидание повторной попытки</string>
