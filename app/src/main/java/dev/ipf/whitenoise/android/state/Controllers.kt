@@ -8010,11 +8010,17 @@ class ConversationController(
                 // drop a Rust subscription window.
                 val batch = mutableListOf(first)
                 while (batch.size < TIMELINE_BATCH_CAP) {
-                    val more =
-                        timelineWindows.tryReceive().getOrNull()
-                            ?: withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
-                                timelineWindows.receiveCatching().getOrNull()
-                            } ?: break
+                    val available = timelineWindows.tryReceive()
+                    val received =
+                        if (available.isSuccess || available.isClosed) {
+                            available
+                        } else {
+                            withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
+                                timelineWindows.receiveCatching()
+                            }
+                        }
+                    if (received?.isClosed == true) observedProducerEnd = true
+                    val more = received?.getOrNull() ?: break
                     batch += more
                 }
                 val newest = batch.last()
