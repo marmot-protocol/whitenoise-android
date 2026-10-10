@@ -16,9 +16,11 @@ class SecurityVersions {
         if (fixed == null || version == null) return false
         def boundary = fixed =~ /^(\d+(?:\.\d+)*)-alpha(\d+)$/
         if (!boundary.matches()) throw new GradleException('Unsupported prerelease policy')
-        def actual = version =~ /^(\d+(?:\.\d+)*)-alpha(\d*)(?:[.+-].*)?$/
+        def actual = version =~ /^(\d+(?:\.\d+)*)-alpha(\d*)([.+-].*)?$/
         if (!actual.matches() || actual[0][1] != boundary[0][1]) return false
-        return (actual[0][2].isEmpty() ? 0 : actual[0][2].toInteger()) < boundary[0][2].toInteger()
+        def alpha = actual[0][2].isEmpty() ? 0 : actual[0][2].toInteger()
+        def boundaryAlpha = boundary[0][2].toInteger()
+        return alpha < boundaryAlpha || (alpha == boundaryAlpha && actual[0][3] != null)
     }
 
     static boolean below(String version, String minimum) {

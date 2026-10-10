@@ -31,9 +31,12 @@ def unsafe_prerelease(version: str, fixed: str | None) -> bool:
     boundary = re.fullmatch(r"(\d+(?:[.]\d+)*)-alpha(\d+)", fixed)
     if boundary is None:
         raise InvalidEvidence("unsupported prerelease policy")
-    actual = re.fullmatch(r"(\d+(?:[.]\d+)*)-alpha(\d*)(?:[.+-].*)?", version)
-    return (actual is not None and actual[1] == boundary[1]
-            and int(actual[2] or "0") < int(boundary[2]))
+    actual = re.fullmatch(r"(\d+(?:[.]\d+)*)-alpha(\d*)([.+-].*)?", version)
+    if actual is None or actual[1] != boundary[1]:
+        return False
+    alpha = int(actual[2] or "0")
+    boundary_alpha = int(boundary[2])
+    return alpha < boundary_alpha or (alpha == boundary_alpha and actual[3] is not None)
 
 
 def verify(report: dict, minimums: dict[str, str], expected_source: str | None = None,

@@ -11,11 +11,11 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def module(repository, artifact, version):
-    folder = repository / 'org/freemarker' / artifact / version
+def module(repository, artifact, version, group='org.freemarker'):
+    folder = repository / group.replace('.', '/') / artifact / version
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f'{artifact}-{version}.pom').write_text(
-        '<project><modelVersion>4.0.0</modelVersion><groupId>org.freemarker</groupId>'
+        f'<project><modelVersion>4.0.0</modelVersion><groupId>{group}</groupId>'
         f'<artifactId>{artifact}</artifactId><version>{version}</version></project>')
     with zipfile.ZipFile(folder / f'{artifact}-{version}.jar', 'w'):
         pass
@@ -28,6 +28,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix='dependency-security-fixture-') as temporary:
         project = Path(temporary)
         repository = project / 'maven'
+        wire_versions = ['7.0.0-alpha03', '7.0.0-alpha04', '7.0.0-alpha04-SNAPSHOT', '7.0.0-alpha05']
+        for version in wire_versions:
+            module(repository, 'wire-runtime', version, group='com.squareup.wire')
+        (repository / 'com/squareup/wire/wire-runtime/maven-metadata.xml').write_text(
+            '<metadata><groupId>com.squareup.wire</groupId><artifactId>wire-runtime</artifactId>'
+            '<versioning><latest>7.0.0-alpha05</latest><release>7.0.0-alpha05</release><versions>'
+            + ''.join(f'<version>{version}</version>' for version in wire_versions)
+            + '</versions><lastUpdated>20261010000000</lastUpdated></versioning></metadata>')
         for artifact, versions in {'freemarker': ['2.3.32', '2.3.35', '2.3.36'],
                                    'affected': ['2.3.32']}.items():
             for version in versions:
@@ -45,7 +53,9 @@ def main():
                         project / 'gradle/dependency-security.settings.gradle')
         (project / 'gradle/dependency-security.json').write_text(json.dumps({
             'schema': 1, 'minimum_versions': {'org.freemarker:freemarker': '2.3.35',
-                                            'org.freemarker:affected': '2.3.35'}}))
+                                            'org.freemarker:affected': '2.3.35',
+                                            'com.squareup.wire:wire-runtime': '6.4.5'},
+            'fixed_prerelease_versions': {'com.squareup.wire:wire-runtime': '7.0.0-alpha04'}}))
         (project / 'settings.gradle').write_text(
             "rootProject.name='security-fixture'\napply from: 'gradle/dependency-security.settings.gradle'\n")
         (project / 'build.gradle').write_text(r'''
@@ -54,12 +64,15 @@ buildscript {
     dependencies { classpath 'org.freemarker:freemarker:2.3.32' }
 }
 repositories { maven { url = uri('maven') } }
-configurations { belowFloor; newer; dynamic; affectedRange }
+configurations { belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic }
 dependencies {
     belowFloor 'org.freemarker:freemarker:2.3.32'
     newer 'org.freemarker:freemarker:2.3.36'
     dynamic 'org.freemarker:freemarker:2.+'
     affectedRange 'org.freemarker:affected:[2.3.0,2.3.34]'
+    wireAlpha 'com.squareup.wire:wire-runtime:7.0.0-alpha03'
+    wireSuffix 'com.squareup.wire:wire-runtime:7.0.0-alpha04-SNAPSHOT'
+    wireDynamic 'com.squareup.wire:wire-runtime:7.0.0-alpha04+'
 }
 tasks.register('verifySecurityFixture') {
     doLast {
@@ -72,6 +85,9 @@ tasks.register('verifySecurityFixture') {
         assert selected(configurations.belowFloor) == '2.3.35'
         assert selected(configurations.newer) == '2.3.36'
         assert selected(configurations.dynamic) == '2.3.36'
+        assert selected(configurations.wireAlpha) == '7.0.0-alpha04'
+        assert selected(configurations.wireSuffix) == '7.0.0-alpha04'
+        assert selected(configurations.wireDynamic) == '7.0.0-alpha04'
         assert buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts*.moduleVersion*.id*.version == ['2.3.35']
         boolean rejected = false
         try { configurations.affectedRange.resolve() }
@@ -88,7 +104,8 @@ tasks.register('verifySecurityFixture') {
         reports = [json.loads(path.read_text()) for path in (project / 'build/reports/dependency-security').glob('*.json')]
         assert any(r['scope'] == 'plugin' and r['configuration'] == 'classpath' for r in reports)
         assert any(r['scope'] == 'project' and r['configuration'] == 'belowFloor' for r in reports)
-        print('Gradle fixture PASS: raised exact request, retained newer/dynamic selection, rejected affected-only range, plugin/project reports')
+        print('Gradle fixture PASS: raised exact request, retained newer/dynamic selection, '
+              'rejected affected-only range and unsafe Wire alpha/suffixes, plugin/project reports')
 
 
 if __name__ == '__main__':

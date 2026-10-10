@@ -38,14 +38,16 @@ class SelectedSecurityEvidenceTest(unittest.TestCase):
             verify(self.report, self.policy)
 
     def test_wire_prerelease_advisory_boundary_is_independent_of_stable_floor(self):
-        for version in ("7.0.0-alpha", "7.0.0-alpha01", "7.0.0-alpha03", "7.0.0-alpha3-SNAPSHOT"):
+        for version in ("7.0.0-alpha", "7.0.0-alpha01", "7.0.0-alpha03", "7.0.0-alpha3-SNAPSHOT",
+                        "7.0.0-alpha04-SNAPSHOT", "7.0.0-alpha04-rc1"):
             self.assertTrue(unsafe_prerelease(version, "7.0.0-alpha04"))
         for version in ("6.4.5", "7.0.0-alpha04", "7.0.0-alpha05", "7.0.0-RC01", "7.0.0"):
             self.assertFalse(unsafe_prerelease(version, "7.0.0-alpha04"))
         wire = "com.squareup.wire:wire-runtime"
-        self.report["components"] = [{"group": "com.squareup.wire", "name": "wire-runtime", "version": "7.0.0-alpha03"}]
-        with self.assertRaises(InvalidEvidence):
-            verify(self.report, {wire: "6.4.5"}, prereleases={wire: "7.0.0-alpha04"})
+        for version in ("7.0.0-alpha03", "7.0.0-alpha04-SNAPSHOT", "7.0.0-alpha04-rc1"):
+            self.report["components"] = [{"group": "com.squareup.wire", "name": "wire-runtime", "version": version}]
+            with self.assertRaises(InvalidEvidence):
+                verify(self.report, {wire: "6.4.5"}, prereleases={wire: "7.0.0-alpha04"})
 
     def test_does_not_treat_fixed_prerelease_as_stable_fix(self):
         self.assertTrue(below("2.3.35-rc1", "2.3.35"))
