@@ -1631,6 +1631,116 @@ class ConversationFileBackedMediaSendTest {
             }
         }
 
+    /**
+     * A draft photo after a large video uploads from a file too, so its three disk copies must fit beside
+     * the copies still owed to the video. When they do not, the photo is left out with the storage notice
+     * and the video still sends, instead of the whole album failing during upload.
+     */
+    @Test
+    fun albumLeavesOutADraftPhotoWhoseCopiesNoLongerFitBesideALargeVideo() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
+            val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
+            val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
+            val uploaded = CompletableDeferred<List<String>>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    uploaded.complete(request.attachments.map { it.fileName })
+                    oneAttachmentUpload()
+                }
+            val roomyLimits =
+                FileBackedSendLimits(perFileBytes = ALBUM_VIDEO_BYTES, batchCiphertextBytes = 4 * ALBUM_VIDEO_BYTES)
+            // The video's three copies fit with less to spare than the photo's three copies need.
+            val initialFree = SEND_RESERVE_BYTES + 3 * ALBUM_VIDEO_BYTES + DRAFT_PHOTO_BYTES
+            val stagingDirectory = uploadSourcesDirectory(state.appContext.cacheDir)
+            val alreadyStaged = stagedBytes(stagingDirectory)
+            val usableSpace: (java.io.File) -> Long = { initialFree - (stagedBytes(stagingDirectory) - alreadyStaged) }
+            val sender =
+                ConversationMediaSender(
+                    state,
+                    controller,
+                    state.appContext,
+                    fileBackedLimits = { roomyLimits },
+                    usableSpace = usableSpace,
+                ) {}
+            try {
+                controller.retryMembers()
+                sender.sendStagedAttachments(
+                    imageSlots = listOf(PendingMediaSlot("video", video), PendingMediaSlot("photo", photo)),
+                    documentUris = emptyList(),
+                    caption = "",
+                    preparedImageAttachments = mapOf("photo" to draftPhoto()),
+                )
+
+                assertEquals(listOf("clip.mp4"), uploaded.await())
+                assertEquals(
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
+                    state.toast?.title,
+                )
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * The album and a large document picked together are separate messages of one send, so the document's
+     * snapshot must leave room for the album's upload. When it does not, the document is refused with the
+     * storage notice before anything is queued for it, and the album still sends.
+     */
+    @Test
+    fun aLargeDocumentCountsTheCopiesTheAlbumStillOwes() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val document = scriptedDocument(state)
+            val video = scriptedPick(state, "clip.mp4", "video/mp4", LARGER_VIDEO_BYTES)
+            val uploaded = CompletableDeferred<List<String>>()
+            val controller =
+                fileBackedController(state) { request, _ ->
+                    uploaded.complete(request.attachments.map { it.fileName })
+                    oneAttachmentUpload()
+                }
+            // After the video lands there is room for the document's three copies alone, but not for its
+            // snapshot beside the video's larger upload: 40 + 96 MiB are needed and 1 byte less is free.
+            val initialFree = SEND_RESERVE_BYTES + 3 * LARGER_VIDEO_BYTES + SCRIPTED_DECLARED_BYTES - 1L
+            val stagingDirectory = uploadSourcesDirectory(state.appContext.cacheDir)
+            val alreadyStaged = stagedBytes(stagingDirectory)
+            val usableSpace: (java.io.File) -> Long = { initialFree - (stagedBytes(stagingDirectory) - alreadyStaged) }
+            val sender =
+                ConversationMediaSender(
+                    state,
+                    controller,
+                    state.appContext,
+                    fileBackedLimits = ::senderLimits,
+                    usableSpace = usableSpace,
+                ) {}
+            try {
+                controller.retryMembers()
+                sender.sendStagedAttachments(
+                    imageSlots = listOf(PendingMediaSlot("video", video)),
+                    documentUris = listOf(document),
+                    caption = "",
+                )
+
+                assertEquals(listOf("clip.mp4"), uploaded.await())
+                assertEquals(
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
+                    state.toast?.title,
+                )
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** Bytes of every snapshot currently written under [directory]. */
+    private fun stagedBytes(directory: java.io.File): Long = directory.walk().filter { it.isFile }.sumOf { it.length() }
+
     /** A photo the composer already prepared and kept in memory for its native draft. */
     private fun draftPhoto(): PendingAttachment {
         val bytes = ByteArray(DRAFT_PHOTO_BYTES) { 1 }
@@ -1794,6 +1904,12 @@ private const val SENDER_PICKS_AUTHORITY = "dev.ipf.whitenoise.test.senderpicks"
 private const val ALBUM_VIDEO_BYTES = 33L * 1024L * 1024L
 private const val ALBUM_TAG_AND_SLACK_BYTES = 116L
 private const val DRAFT_PHOTO_BYTES = 200
+
+// A sparse video whose upload writes more than a 40 MiB document's.
+private const val LARGER_VIDEO_BYTES = 48L * 1024L * 1024L
+
+// The free space every file-backed staging check leaves to the rest of the app.
+private const val SEND_RESERVE_BYTES = 64L * 1024L * 1024L
 private const val FILE_BATCH_CIPHERTEXT_BYTES = 900L * 1024L * 1024L
 private const val DELETE_POLL_ATTEMPTS = 200
 private const val DELETE_POLL_INTERVAL_MS = 10L

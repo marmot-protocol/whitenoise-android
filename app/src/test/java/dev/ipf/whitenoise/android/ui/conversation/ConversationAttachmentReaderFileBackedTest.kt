@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
+import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendStaging
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import kotlinx.coroutines.runBlocking
@@ -60,7 +61,12 @@ class ConversationAttachmentReaderFileBackedTest {
             val uri = pick("report.pdf", "application/pdf", bytes, declaredSize = 40L * MIB)
 
             val reported = mutableListOf<StagedUploadSource>()
-            val outcome = reader().readPickedDocuments(listOf(uri), allowFileBacked = true, onStaged = reported::add)
+            val outcome =
+                reader().readPickedDocuments(
+                    listOf(uri),
+                    allowFileBacked = true,
+                    staging = FileBackedSendStaging(reported::add),
+                )
 
             val attachment = outcome.attachments.single()
             val source = checkNotNull(attachment.sourceFile)
@@ -153,6 +159,31 @@ class ConversationAttachmentReaderFileBackedTest {
             assertTrue("the refused video leaves no snapshot", uploadSources.list().orEmpty().isEmpty())
         }
 
+    /**
+     * A video small enough for memory that follows a staged one still uploads from a file, so its three
+     * disk copies must fit beside the copies owed to the first, or it is left out for storage.
+     */
+    @Test
+    fun anInMemoryVideoAfterAStagedOneIsLeftOutWhenItsCopiesDoNotFit() =
+        runBlocking {
+            val large = pick("large.mp4", "video/mp4", ByteArray(4096), declaredSize = 4096)
+            val small = pick("small.mp4", "video/mp4", ByteArray(512), declaredSize = 512)
+            val albumLimits = FileBackedSendLimits(perFileBytes = 8192, batchCiphertextBytes = 16_384)
+            // Room for the large video's three copies with 100 bytes to spare, shrinking as snapshots land.
+            val free = { APP_RESERVE_BYTES + 3 * 4096 + 100 - stagedBytes(uploadSources) }
+            val budget = FileBackedPickBudget(uploadSources, albumLimits, usableBytes = free)
+
+            val outcome = reader().readPickedImages(listOf(large, small), budget, inMemoryBytesBudget = 1024)
+
+            assertEquals(listOf("large.mp4"), outcome.attachments.map { it.fileName })
+            assertTrue("the small video's 1536 bytes do not fit beside the 8192 still owed", outcome.storageUnavailable)
+            assertFalse(outcome.albumOverflowed)
+            outcome.attachments.forEach { checkNotNull(it.sourceFile).close() }
+        }
+
+    /** Bytes of every snapshot currently written under [directory]. */
+    private fun stagedBytes(directory: File): Long = directory.walk().filter(File::isFile).sumOf(File::length)
+
     /** Builds the production reader with inert draft persistence and scripted native limits. */
     private fun reader(perFileBytes: Long = 64L * MIB): ConversationAttachmentReader {
         val persistence =
@@ -175,9 +206,11 @@ class ConversationAttachmentReaderFileBackedTest {
                 "fixture",
                 inboundShareTextStager = { _, _, _ -> },
             )
-        return ConversationAttachmentReader(state, context) {
-            FileBackedSendLimits(perFileBytes = perFileBytes, batchCiphertextBytes = 900L * MIB)
-        }
+        return ConversationAttachmentReader(
+            state,
+            context,
+            fileBackedLimits = { FileBackedSendLimits(perFileBytes = perFileBytes, batchCiphertextBytes = 900L * MIB) },
+        )
     }
 
     /** Publishes one scripted pick through the provider and returns its content Uri. */
@@ -268,3 +301,6 @@ class ScriptedPickProvider : ContentProvider() {
 
 private const val AUTHORITY = "dev.ipf.whitenoise.test.largepicks"
 private const val MIB = 1024L * 1024L
+
+// The free space every file-backed staging check leaves to the rest of the app.
+private const val APP_RESERVE_BYTES = 64L * 1024L * 1024L

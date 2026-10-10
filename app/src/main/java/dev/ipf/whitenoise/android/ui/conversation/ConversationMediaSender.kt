@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.BoundedDocumentRead
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickBudget
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedPickFailure
 import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendLimits
+import dev.ipf.whitenoise.android.ui.conversation.media.FileBackedSendStaging
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
@@ -29,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.releaseUnadoptedStagedSo
 import dev.ipf.whitenoise.android.ui.conversation.media.safeDocumentDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
+import dev.ipf.whitenoise.android.ui.conversation.media.usableSpaceFor
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.attachedVCardContact
@@ -76,19 +78,26 @@ internal data class VisualReadOutcome(
     val storageUnavailable: Boolean = false,
 )
 
+/**
+ * Reads picks for a send. [fileBackedLimits] and [usableSpace] are the native file-upload bounds and the
+ * free space of a staging directory, both replaceable so tests can script them.
+ */
 @Suppress("TooManyFunctions") // MIME-specific readers share one byte-budget and sanitization policy.
 internal class ConversationAttachmentReader(
     private val appState: WhiteNoiseAppState,
     private val context: Context,
     private val fileBackedLimits: () -> FileBackedSendLimits? = ::nativeFileBackedSendLimits,
+    private val usableSpace: (java.io.File) -> Long = ::usableSpaceFor,
 ) {
     /**
-     * The file-backed budget of one outgoing message, staging under the private upload directory,
-     * or null when native limits are unavailable and every pick must fit in memory.
+     * The file-backed budget of one outgoing message, staging under the private upload directory and
+     * reserving disk through its send's [staging], or null when native limits are unavailable and every
+     * pick must fit in memory.
      */
-    fun fileBackedBudget(onStaged: (StagedUploadSource) -> Unit = {}): FileBackedPickBudget? =
+    fun fileBackedBudget(staging: FileBackedSendStaging = FileBackedSendStaging()): FileBackedPickBudget? =
         fileBackedLimits()?.let { limits ->
-            FileBackedPickBudget(uploadSourcesDirectory(context.cacheDir), limits, onStaged = onStaged)
+            val directory = uploadSourcesDirectory(context.cacheDir)
+            FileBackedPickBudget(directory, limits, usableBytes = { usableSpace(directory) }, staging = staging)
         }
 
     fun readImageAttachment(
@@ -225,7 +234,7 @@ internal class ConversationAttachmentReader(
         var albumOverflowed: Boolean = false,
         var totalBytes: Long = 0L,
         val checkCancellation: () -> Unit = {},
-        val onStaged: (StagedUploadSource) -> Unit = {},
+        val staging: FileBackedSendStaging = FileBackedSendStaging(),
     ) {
         /** Freezes this pass into the result callers blend with the image decode. */
         fun outcome(): DocumentReadOutcome = DocumentReadOutcome(attachments, failures, albumOverflowed, totalBytes)
@@ -235,16 +244,17 @@ internal class ConversationAttachmentReader(
      * Reads document picks against the in-memory [bytesBudget]. With [allowFileBacked], a non-image
      * document that does not fit in memory is staged to a private file instead; each document is sent
      * as its own message, so each gets its own file-backed budget. [DocumentReadOutcome.totalBytes]
-     * counts in-memory bytes only, and [onStaged] receives every snapshot as soon as it is created.
+     * counts in-memory bytes only, and the send's [staging] hears about every snapshot as soon as it is
+     * created and reserves the disk its upload still needs.
      */
     suspend fun readPickedDocuments(
         uris: List<android.net.Uri>,
         bytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
         allowFileBacked: Boolean = false,
-        onStaged: (StagedUploadSource) -> Unit = {},
+        staging: FileBackedSendStaging = FileBackedSendStaging(),
     ): DocumentReadOutcome =
         withContext(Dispatchers.IO) {
-            val state = DocumentReadAccumulator(checkCancellation = { ensureActive() }, onStaged = onStaged)
+            val state = DocumentReadAccumulator(checkCancellation = { ensureActive() }, staging = staging)
             for (uri in uris) {
                 if (!allowFileBacked && state.totalBytes >= bytesBudget) {
                     state.albumOverflowed = true
@@ -346,7 +356,7 @@ internal class ConversationAttachmentReader(
         declaredSize: Long,
         state: DocumentReadAccumulator,
     ) {
-        val budget = fileBackedBudget(state.onStaged)
+        val budget = fileBackedBudget(state.staging)
         val pick = budget?.stage(declaredSize, state.checkCancellation) { context.contentResolver.openInputStream(uri) }
         val source = pick?.source
         if (source == null) {
@@ -390,14 +400,16 @@ internal class ConversationAttachmentReader(
                 overflowed = overflowed || outcome.overflowed
                 storageUnavailable = storageUnavailable || outcome.storageUnavailable
                 outcome.attachment?.let { attachment ->
-                    val inMemory = attachment.sourceFile == null
-                    if (fileBacked != null && !fileBacked.admit(attachment.byteCount, inMemory)) {
-                        // The message's native ciphertext bound is spent; the item cannot join this album.
-                        attachment.sourceFile?.closeQuietly()
-                        overflowed = true
-                    } else {
+                    // Null when there is no file budget to answer to, or when the item fits it.
+                    val refusal = fileBacked?.admit(attachment.byteCount, attachment.sourceFile == null)
+                    if (refusal == null) {
                         consumedBytes += attachment.plaintextBytes.size
                         attachments += attachment
+                    } else {
+                        // The message's ciphertext bound is spent, or the item's disk copies no longer fit the send.
+                        attachment.sourceFile?.closeQuietly()
+                        overflowed = overflowed || refusal == FileBackedPickFailure.TOO_LARGE
+                        storageUnavailable = storageUnavailable || refusal == FileBackedPickFailure.STORAGE
                     }
                 }
             }
@@ -465,7 +477,10 @@ internal class ConversationAttachmentReader(
             MediaPipeline.VideoReadResult.Failed -> ImageAttachmentReadOutcome(null)
         }
 
-    /** Stages a large video into a private file and reads its poster metadata from that snapshot. */
+    /**
+     * Stages a large video into a private file and reads its poster metadata from that snapshot. A snapshot
+     * whose metadata cannot be read is refused inside staging, before the budget reserves any disk for it.
+     */
     private fun readFileBackedVideo(
         uri: android.net.Uri,
         mediaType: String,
@@ -473,20 +488,22 @@ internal class ConversationAttachmentReader(
         fileBacked: FileBackedPickBudget,
         checkCancellation: () -> Unit,
     ): ImageAttachmentReadOutcome {
-        val pick = fileBacked.stage(declaredSize, checkCancellation) { context.contentResolver.openInputStream(uri) }
+        var metadata: MediaPipeline.VideoFileMetadata? = null
+        val pick =
+            fileBacked.stage(
+                declaredSize,
+                checkCancellation,
+                accept = { source -> MediaPipeline.readVideoFileMetadata(source.file).also { metadata = it } != null },
+            ) { context.contentResolver.openInputStream(uri) }
         val source = pick.source
-        val metadata = source?.let { MediaPipeline.readVideoFileMetadata(it.file) }
+        val poster = metadata
         return when {
-            source == null ->
+            source == null || poster == null ->
                 when (pick.failure) {
                     FileBackedPickFailure.TOO_LARGE -> ImageAttachmentReadOutcome(null, overflowed = true)
                     FileBackedPickFailure.STORAGE -> ImageAttachmentReadOutcome(null, storageUnavailable = true)
                     else -> ImageAttachmentReadOutcome(null)
                 }
-            metadata == null -> {
-                source.closeQuietly()
-                ImageAttachmentReadOutcome(null)
-            }
             else ->
                 ImageAttachmentReadOutcome(
                     PendingAttachment(
@@ -497,8 +514,8 @@ internal class ConversationAttachmentReader(
                                 queryDisplayName(context.contentResolver, uri).orEmpty(),
                                 VIDEO_FALLBACK_NAME,
                             ),
-                        dim = "${metadata.width}x${metadata.height}",
-                        thumbhash = metadata.thumbhash,
+                        dim = "${poster.width}x${poster.height}",
+                        thumbhash = poster.thumbhash,
                         sourceFile = source,
                     ),
                 )
@@ -518,15 +535,17 @@ internal fun isImageDocumentPick(
  * Keeping this holder outside [ConversationScreen] removes blocking I/O and
  * attachment policy from the screen's already busy composition scope while
  * preserving the controller and app-state lifetime of each operation.
+ * `fileBackedLimits` and `usableSpace` pass straight to its [ConversationAttachmentReader].
  */
 internal class ConversationMediaSender(
     private val appState: WhiteNoiseAppState,
     private val controller: ConversationController,
     private val context: Context,
     fileBackedLimits: () -> FileBackedSendLimits? = ::nativeFileBackedSendLimits,
+    usableSpace: (java.io.File) -> Long = ::usableSpaceFor,
     private val onRevealSent: () -> Unit,
 ) {
-    private val attachmentReader = ConversationAttachmentReader(appState, context, fileBackedLimits)
+    private val attachmentReader = ConversationAttachmentReader(appState, context, fileBackedLimits, usableSpace)
 
     /** Captures the reply before contact serialization can suspend. */
     fun sendSharedContact(contact: SharedContact) {
@@ -670,7 +689,7 @@ internal class ConversationMediaSender(
                         preparedImageAttachments,
                         preparedDocumentAttachments,
                         allowFileBacked = replyTarget == null,
-                        onStaged = { stagedSources += it },
+                        staging = FileBackedSendStaging { stagedSources += it },
                     )
                 val ready =
                     preparedForReplySend(prepared, imageSlots.size, documentUris.size, replyTarget != null)
@@ -762,8 +781,8 @@ internal class ConversationMediaSender(
      * Reads the shelf's visual album and documents for one send. [allowFileBacked] lets picks that do
      * not fit the in-memory budget be staged to private files; the album shares one file-backed budget.
      * Replies pass false: native reply drafts carry attachment bytes, so every reply pick stays in memory.
-     * [onStaged] receives every snapshot as soon as it exists, so a preparation that fails part-way can
-     * still be cleaned up by its caller.
+     * [staging] hears about every snapshot as soon as it exists, so a preparation that fails part-way can
+     * still be cleaned up by its caller, and reserves disk for the whole send across the album and documents.
      */
     private suspend fun prepareStagedAttachments(
         imageSlots: List<PendingMediaSlot>,
@@ -771,12 +790,12 @@ internal class ConversationMediaSender(
         preparedImageAttachments: Map<String, PendingAttachment>,
         preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment>,
         allowFileBacked: Boolean,
-        onStaged: (StagedUploadSource) -> Unit,
+        staging: FileBackedSendStaging,
     ): PreparedStagedAttachments {
         // Reading the native limit is a binding call, so it stays off Main.
         val albumFileBudget =
             if (allowFileBacked) {
-                withContext(Dispatchers.IO) { attachmentReader.fileBackedBudget(onStaged) }
+                withContext(Dispatchers.IO) { attachmentReader.fileBackedBudget(staging) }
             } else {
                 null
             }
@@ -792,7 +811,7 @@ internal class ConversationMediaSender(
                     preparedDocumentAttachments,
                     documentBudget,
                     allowFileBacked,
-                    onStaged,
+                    staging,
                 )
             }
         val pickHasVideo =
@@ -812,14 +831,14 @@ internal class ConversationMediaSender(
     /**
      * Reuses native-draft bytes and reads only picks that have not finished staging. With
      * [allowFileBacked], a draft document that no longer fits the in-memory budget is copied to a
-     * private file, and an unstaged pick may be read straight into one; [onStaged] hears about each copy.
+     * private file, and an unstaged pick may be read straight into one. [staging] hears about each copy.
      */
     private suspend fun readStagedDocuments(
         documentUris: List<android.net.Uri>,
         preparedDocumentAttachments: Map<android.net.Uri, PendingAttachment>,
         bytesBudget: Long,
         allowFileBacked: Boolean,
-        onStaged: (StagedUploadSource) -> Unit,
+        staging: FileBackedSendStaging,
     ): DocumentReadOutcome {
         val attachments = mutableListOf<PendingAttachment>()
         var totalBytes = 0L
@@ -840,13 +859,13 @@ internal class ConversationMediaSender(
             } else if (staged != null) {
                 val copied =
                     withContext(Dispatchers.IO) {
-                        val budget = attachmentReader.fileBackedBudget(onStaged)
+                        val budget = attachmentReader.fileBackedBudget(staging)
                         stageDraftDocumentToFile(staged, budget)
                     }
                 attachments += copied.attachments
                 failures += copied.failures
             } else {
-                val read = attachmentReader.readPickedDocuments(listOf(uri), remaining, allowFileBacked, onStaged)
+                val read = attachmentReader.readPickedDocuments(listOf(uri), remaining, allowFileBacked, staging)
                 attachments += read.attachments
                 totalBytes += read.totalBytes
                 failures += read.failures
@@ -872,9 +891,18 @@ internal class ConversationMediaSender(
         var inMemoryBytes = 0L
         imageSlots.forEach { slot ->
             val prepared = preparedImageAttachments[slot.id]
-            if (prepared != null && fileBacked?.admit(prepared.byteCount, prepared.sourceFile == null) == false) {
-                // A draft photo after large videos must fit the same native bound, or the whole album fails.
-                overflowed = true
+            // A draft item after large videos must fit the same native bound and the send's disk, or the album fails.
+            // Draft visuals are always held in memory, only a pick staged through the budget lives in a file.
+            // The disk check asks the filesystem for free space, so it runs on the IO pool rather than Main.
+            val refusal =
+                if (prepared != null && fileBacked != null) {
+                    withContext(Dispatchers.IO) { fileBacked.admit(prepared.byteCount, prepared.sourceFile == null) }
+                } else {
+                    null
+                }
+            if (refusal != null) {
+                overflowed = overflowed || refusal == FileBackedPickFailure.TOO_LARGE
+                storageUnavailable = storageUnavailable || refusal == FileBackedPickFailure.STORAGE
             } else if (prepared != null) {
                 attachments += prepared
                 inMemoryBytes += prepared.plaintextBytes.size

@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 /** The AEAD tag MDK appends to every encrypted attachment. */
 internal const val FILE_BACKED_TAG_BYTES = 16L
@@ -74,7 +75,7 @@ internal fun StagedUploadSource.closeQuietly() {
 }
 
 /** Free space on the volume holding [directory], measured at its nearest existing ancestor. */
-private fun usableSpaceFor(directory: File): Long {
+internal fun usableSpaceFor(directory: File): Long {
     val existing = generateSequence(directory) { it.parentFile }.firstOrNull(File::exists)
     return existing?.usableSpace ?: 0L
 }
@@ -94,23 +95,50 @@ internal data class FileBackedPick(
 )
 
 /**
+ * The file-backed staging of one send operation, shared by its album and every document it sends.
+ * [onStaged] hears about every snapshot as soon as it exists, so a caller can release it if a later
+ * step of the same preparation fails. The messages of a send upload one at a time, and MDK deletes each
+ * message's snapshots and ciphertext when its upload ends, so the send needs room for its largest
+ * message's upload at once, beside the snapshots of every message still waiting, never the sum of all.
+ * MDK may also keep a plaintext copy of an uploaded message for the sender, but only when it finds room
+ * for four times that message, so that optional copy is not reserved here.
+ */
+internal class FileBackedSendStaging(
+    private val onStaged: (StagedUploadSource) -> Unit = {},
+) {
+    private val largestUploadWrite = AtomicLong()
+
+    /** The most disk any one message of this send still has to write while it uploads. */
+    val largestUploadWriteBytes: Long get() = largestUploadWrite.get()
+
+    /** Records that one message's upload, as admitted so far, will write [uploadWriteBytes] bytes. */
+    fun reserve(uploadWriteBytes: Long) {
+        largestUploadWrite.accumulateAndGet(uploadWriteBytes) { current, next -> maxOf(current, next) }
+    }
+
+    /** Reports a snapshot the send now owns. */
+    fun staged(source: StagedUploadSource) = onStaged(source)
+}
+
+/**
  * The file-backed budget of one outgoing message. Each staged item, and each in-memory item that the
  * upload converts to a file, costs its bytes plus one AEAD tag against the native per-send ciphertext bound.
- * [onStaged] hears about every snapshot as soon as it exists, so a caller can release it if a later
- * step of the same preparation fails.
+ * Disk is checked against the send's shared [staging], so a document staged after a large album must fit
+ * its own snapshot beside the album's upload, and the album's upload still has room once it lands.
  */
 internal class FileBackedPickBudget(
     val directory: File,
     private val limits: FileBackedSendLimits,
     private val usableBytes: () -> Long = { usableSpaceFor(directory) },
-    private val onStaged: (StagedUploadSource) -> Unit = {},
+    private val staging: FileBackedSendStaging = FileBackedSendStaging(),
 ) {
     private var remainingCiphertextBytes = limits.batchCiphertextBytes
 
-    // Disk this message's upload still has to write: MDK's snapshot and ciphertext of every staged item,
-    // plus all three copies of each in-memory item the upload converts to a file. Every free-space check
-    // counts it, so an album is admitted only if the whole send fits, not just its latest item.
-    private var pendingDiskBytes = 0L
+    // What this message's upload writes: MDK's snapshot and ciphertext of each staged item, and all three
+    // copies of each in-memory item it converts to a file. It costs disk only once the message uploads from
+    // files, which the first staged snapshot decides. Until then an all-in-memory message uploads from bytes.
+    private var uploadWriteBytes = 0L
+    private var uploadsFromFiles = false
 
     /** The largest pick the next item may be, given the per-file ceiling and what this message has used. */
     fun nextPickMaxBytes(): Long {
@@ -118,78 +146,104 @@ internal class FileBackedPickBudget(
         return minOf(limits.perFileBytes, batchRoom).coerceAtLeast(0L)
     }
 
-    /** Charges an accepted attachment of [byteCount] bytes against this message's ciphertext bound. */
-    fun charge(byteCount: Long) {
-        remainingCiphertextBytes -= byteCount + FILE_BACKED_TAG_BYTES
-    }
-
     /**
-     * Admits one album item of [byteCount] bytes, or refuses it when it no longer fits this message's
-     * ciphertext bound. An [inMemory] item also reserves the three disk copies its upload will write.
+     * Admits one album item of [byteCount] bytes and returns null, or returns why it cannot join: it no
+     * longer fits this message's ciphertext bound, or it is [inMemory] in a message that uploads from
+     * files and the three disk copies its upload will write do not fit beside the rest of the send.
      */
     fun admit(
         byteCount: Long,
         inMemory: Boolean,
-    ): Boolean {
-        if (byteCount > nextPickMaxBytes()) return false
-        charge(byteCount)
-        if (inMemory) pendingDiskBytes += byteCount * FILE_BACKED_DISK_COPIES
-        return true
+    ): FileBackedPickFailure? {
+        val writeAfter = uploadWriteBytes + if (inMemory) byteCount * FILE_BACKED_DISK_COPIES else 0L
+        return when {
+            byteCount > nextPickMaxBytes() -> FileBackedPickFailure.TOO_LARGE
+            uploadsFromFiles && inMemory && !hasStorageFor(0L, writeAfter) -> FileBackedPickFailure.STORAGE
+            else -> {
+                remainingCiphertextBytes -= byteCount + FILE_BACKED_TAG_BYTES
+                uploadWriteBytes = writeAfter
+                if (uploadsFromFiles) staging.reserve(uploadWriteBytes)
+                null
+            }
+        }
     }
 
     /**
      * Copies one provider stream into a private snapshot. A declared size is only a hint: it can refuse
      * early, but the copy itself enforces the ceiling and the free-space check is repeated afterwards.
+     * [accept] inspects the finished snapshot before anything is reserved. A refused one is deleted and
+     * reported as unreadable, so it leaves no reservation behind.
      */
     fun stage(
         declaredSize: Long,
         checkCancellation: () -> Unit = {},
+        accept: (StagedUploadSource) -> Boolean = { true },
         open: () -> InputStream?,
     ): FileBackedPick {
         val maxBytes = nextPickMaxBytes()
         return when {
             maxBytes <= 0L || declaredSize > maxBytes -> refused(FileBackedPickFailure.TOO_LARGE)
-            declaredSize > 0L && !hasStorageFor(declaredSize, FILE_BACKED_DISK_COPIES) ->
+            declaredSize > 0L && !hasStorageFor(declaredSize, uploadWriteBytes + nativeCopies(declaredSize)) ->
                 refused(FileBackedPickFailure.STORAGE)
-            else -> stageWithin(maxBytes, checkCancellation, open)
+            else -> stageWithin(maxBytes, checkCancellation, accept, open)
         }
     }
 
-    /** Runs the bounded copy, then confirms the native copies still fit beside the finished snapshot. */
+    /**
+     * Runs the bounded copy, lets [accept] inspect it, then confirms this message's upload still fits beside
+     * the finished snapshot. The first snapshot makes the whole message upload from files, so the copies its
+     * in-memory items will write count from then on.
+     */
     private fun stageWithin(
         maxBytes: Long,
         checkCancellation: () -> Unit,
+        accept: (StagedUploadSource) -> Boolean,
         open: () -> InputStream?,
     ): FileBackedPick =
         when (val read = readStagedDocument(directory, maxBytes, checkCancellation, open)) {
-            is StagedDocumentRead.Success ->
-                if (hasStorageFor(read.source.byteCount, FILE_BACKED_DISK_COPIES - 1)) {
-                    // The snapshot is on disk now; MDK's snapshot and ciphertext of it are still to come.
-                    pendingDiskBytes += read.source.byteCount * (FILE_BACKED_DISK_COPIES - 1)
-                    onStaged(read.source)
+            is StagedDocumentRead.Success -> {
+                // The snapshot is on disk now, MDK's snapshot and ciphertext of it are still to come.
+                val writeAfter = uploadWriteBytes + nativeCopies(read.source.byteCount)
+                if (!accept(read.source)) {
+                    read.source.closeQuietly()
+                    refused(FileBackedPickFailure.UNREADABLE)
+                } else if (hasStorageFor(0L, writeAfter)) {
+                    uploadWriteBytes = writeAfter
+                    uploadsFromFiles = true
+                    staging.reserve(uploadWriteBytes)
+                    staging.staged(read.source)
                     FileBackedPick(read.source, null)
                 } else {
                     read.source.closeQuietly()
                     refused(FileBackedPickFailure.STORAGE)
                 }
+            }
             StagedDocumentRead.TooLarge -> refused(FileBackedPickFailure.TOO_LARGE)
             StagedDocumentRead.Empty -> refused(FileBackedPickFailure.EMPTY)
+            // The partial copy is already deleted, so only a disk still inside the app's reserve reads as storage.
             StagedDocumentRead.Unreadable ->
                 refused(
-                    if (hasStorageFor(0L, 0L)) FileBackedPickFailure.UNREADABLE else FileBackedPickFailure.STORAGE,
+                    if (usableBytes() >= FILE_BACKED_DISK_RESERVE_BYTES) {
+                        FileBackedPickFailure.UNREADABLE
+                    } else {
+                        FileBackedPickFailure.STORAGE
+                    },
                 )
         }
 
+    /** MDK's private snapshot and ciphertext of a staged item of [byteCount] bytes. */
+    private fun nativeCopies(byteCount: Long): Long = byteCount * (FILE_BACKED_DISK_COPIES - 1)
+
     /**
-     * Whether [copies] more copies of [byteCount] bytes fit beside everything this message has already
-     * reserved, while leaving the app its reserve.
+     * Whether [snapshotBytes] still to be copied fit on disk together with the largest upload of the send,
+     * counting this message's upload as [uploadWriteAfter], while leaving the app its reserve.
      */
     private fun hasStorageFor(
-        byteCount: Long,
-        copies: Long,
+        snapshotBytes: Long,
+        uploadWriteAfter: Long,
     ): Boolean {
-        val needed = byteCount * copies + pendingDiskBytes + FILE_BACKED_DISK_RESERVE_BYTES
-        return usableBytes() >= needed
+        val largestUpload = maxOf(staging.largestUploadWriteBytes, uploadWriteAfter)
+        return usableBytes() >= snapshotBytes + largestUpload + FILE_BACKED_DISK_RESERVE_BYTES
     }
 
     /** A pick that was not staged, carrying only the reason. */
