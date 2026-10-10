@@ -30,8 +30,8 @@ class AccountSetupRelayRepairTest {
         assertFalse(editor.copy(reads = "", writes = "").canReviewRelayEdit)
     }
 
-    /** Raw extensions and mixed roles cannot silently pass through the lossy legacy list setter. */
-    @Test fun complexDeclarationsStayReadOnly() {
+    /** The published lossless setter accepts mixed roles, duplicate occurrences and opaque extension fields. */
+    @Test fun complexDeclarationsCanBeReviewedWithoutChangingTheirPrefill() {
         val repair = relayRepairFixture()
         val tag = repair.beforeTags.single()
         val examples =
@@ -52,7 +52,22 @@ class AccountSetupRelayRepairTest {
             val editor =
                 SetupEditor(4uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS)
                     .withRelayDeclaration(repair.copy(beforeTags = tags))
-            assertFalse(editor.preservesRelayDeclaration)
+            assertTrue(editor.canEditRelayDeclaration)
+            assertTrue(editor.copy(writes = "wss://changed.example").canReviewRelayEdit)
+        }
+    }
+
+    /** Missing source data and endpoint strings that line fields would alter remain non-submittable. */
+    @Test fun unavailableOrUnrepresentableDeclarationsStayReadOnly() {
+        val draft = SetupEditor(4uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS)
+        assertFalse(draft.canEditRelayDeclaration)
+        val repair = relayRepairFixture()
+        val endpoints =
+            listOf(null, "", " wss://relay.example", "wss://relay.example\npath", "wss://relay.example\rpath")
+        for (endpoint in endpoints) {
+            val tag = repair.beforeTags.single().copy(endpoint = endpoint)
+            val editor = draft.withRelayDeclaration(repair.copy(beforeTags = listOf(tag)))
+            assertFalse(editor.canEditRelayDeclaration)
             assertFalse(editor.copy(writes = "wss://changed.example").canReviewRelayEdit)
         }
     }

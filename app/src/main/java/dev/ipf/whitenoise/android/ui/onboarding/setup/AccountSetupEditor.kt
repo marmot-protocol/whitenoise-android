@@ -76,7 +76,7 @@ internal fun SetupEditorContent(
         Text(stringResource(if (discovery) R.string.setup_discovery_help else R.string.setup_relays_help))
         WhiteNoiseTextField(
             state = fields.reads,
-            enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.preservesRelayDeclaration),
+            enabled = !busy && (editor.action != OnboardingActionFfi.EDIT_RELAYS || editor.canEditRelayDeclaration),
             lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
             label = {
                 Text(
@@ -94,7 +94,7 @@ internal fun SetupEditorContent(
         if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
             WhiteNoiseTextField(
                 state = fields.writes,
-                enabled = !busy && editor.preservesRelayDeclaration,
+                enabled = !busy && editor.canEditRelayDeclaration,
                 lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                 label = { Text(stringResource(R.string.setup_write_list)) },
                 modifier = Modifier.fillMaxWidth(),
@@ -139,6 +139,6 @@ private fun SetupProfileFields(
 
 /** Explains whether the current artifact can safely submit this exact declaration. */
 private fun SetupEditor.relayEditHelp(): Int {
-    if (preservesRelayDeclaration) return R.string.setup_repair_edit_unchanged
+    if (canEditRelayDeclaration) return R.string.setup_repair_edit_unchanged
     return R.string.setup_repair_edit_unavailable
 }

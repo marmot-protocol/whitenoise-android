@@ -33,31 +33,19 @@ private val relayReadRoles =
     setOf(OnboardingRelayTagRoleFfi.READ, OnboardingRelayTagRoleFfi.UNMARKED, OnboardingRelayTagRoleFfi.INBOX)
 private val relayWriteRoles = setOf(OnboardingRelayTagRoleFfi.WRITE, OnboardingRelayTagRoleFfi.UNMARKED)
 
-/** The legacy list editor cannot round-trip mixed/raw tags. Keep those declarations read-only. */
-internal val SetupEditor.preservesRelayDeclaration: Boolean
+/** MDK preserves raw tags; only endpoint text that cannot round-trip through line fields is read-only. */
+internal val SetupEditor.canEditRelayDeclaration: Boolean
     get() {
         val tags = relayDeclaration?.beforeTags ?: return false
-        if (tags.isEmpty()) return true
-        val role = tags.first().role
-        if (role == OnboardingRelayTagRoleFfi.OTHER || tags.any { it.role != role }) return false
-        if (tags.map { it.endpoint }.distinct().size != tags.size) return false
-        return tags.all { tag ->
+        return tags.filter { it.role != OnboardingRelayTagRoleFfi.OTHER }.all { tag ->
             val endpoint = tag.endpoint ?: return@all false
-            val expected =
-                when (role) {
-                    OnboardingRelayTagRoleFfi.INBOX -> listOf("relay", endpoint)
-                    OnboardingRelayTagRoleFfi.UNMARKED -> listOf("r", endpoint)
-                    OnboardingRelayTagRoleFfi.READ -> listOf("r", endpoint, "read")
-                    OnboardingRelayTagRoleFfi.WRITE -> listOf("r", endpoint, "write")
-                    OnboardingRelayTagRoleFfi.OTHER -> emptyList()
-                }
-            tag.fields == expected && endpoint == endpoint.trim() && '\n' !in endpoint && '\r' !in endpoint
+            endpoint.isNotBlank() && endpoint == endpoint.trim() && '\n' !in endpoint && '\r' !in endpoint
         }
     }
 
 /** Prevents accidental empty or unchanged replacement; MDK remains the endpoint-validation authority. */
 internal val SetupEditor.canReviewRelayEdit: Boolean
     get() =
-        preservesRelayDeclaration &&
+        canEditRelayDeclaration &&
             (reads != originalReads || writes != originalWrites) &&
             (if (step == OnboardingStepFfi.INBOX_RELAYS) reads.isNotBlank() else writes.isNotBlank())

@@ -171,6 +171,30 @@ class AccountSetupContentScreenshotTest {
             ),
         )
 
+    /** Mixed native read/write declarations are editable without rebuilding their raw tags in Android. */
+    @Test fun mixedRelayEditor() = capture("relay_repair_editor", mixedRelayEditorState())
+
+    /** The enabled mixed-role editor remains usable with mirrored layout and double-sized dark text. */
+    @Test fun mixedRelayEditorDarkRtlLarge() =
+        capture(
+            "relay_repair_editor_dark_rtl_large",
+            mixedRelayEditorState(),
+            dark = true,
+            rtl = true,
+            fontScale = 2f,
+        )
+
+    /** Keeps the editor tied to the proposal that supplied its source declaration. */
+    private fun mixedRelayEditorState(): AccountSetupState {
+        val snapshot = relayDiffSnapshot()
+        return AccountSetupState(
+            snapshot = snapshot,
+            editor =
+                SetupEditor(snapshot.revision, OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS)
+                    .withRelayDeclaration(requireNotNull(snapshot.proposal?.relayRepair)),
+        )
+    }
+
     /** Checks the bounded content width on a tablet-sized surface. */
     @Test
     @Config(qualifiers = "en-w720dp-h1024dp-mdpi")
