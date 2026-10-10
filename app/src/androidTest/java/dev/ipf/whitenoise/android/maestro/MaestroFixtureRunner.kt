@@ -40,7 +40,7 @@ class MaestroFixtureApplication : WhiteNoiseApplication() {
         check(
             packageManager.getComponentEnabledSetting(
                 ComponentName(this, BackgroundConnectionBootReceiver::class.java),
-            ) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
+            ) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
         ) { "Production boot receiver must be disabled for the isolated native fixture" }
         DictationDiagnostics.attach(this)
         PerformanceDiagnostics.bind(this)

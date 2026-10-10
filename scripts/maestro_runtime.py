@@ -91,7 +91,7 @@ def run_fixture(name, directory, generation):
     # A fresh AVD can deliver BOOT_COMPLETED while the native fixture is still being prepared.
     # Suppress only this disposable package's production boot entry point, before clearing or launching it.
     boot = f'{PACKAGE}/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'
-    if not command(adb + ['shell', 'pm', 'disable-user', '--user', '0', boot]).strip().endswith('new state: disabled-user'):
+    if not command(adb + ['shell', 'pm', 'disable', '--user', '0', boot]).strip().endswith('new state: disabled'):
         raise ValueError('Isolated fixture boot receiver was not disabled')
     if command(adb + ['shell', 'pm', 'clear', PACKAGE]).strip() != 'Success':
         raise ValueError('Isolated fixture data reset failed before instrumentation')

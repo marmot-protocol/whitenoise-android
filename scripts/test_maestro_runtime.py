@@ -1475,8 +1475,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
                         return process
 
                     def command(arguments):
-                        if 'disable-user' in arguments:
-                            return 'Component new state: disabled-user'
+                        if 'disable' in arguments:
+                            return 'Component new state: disabled'
                         if arguments[-2:] == ['clear', runtime.PACKAGE]:
                             return 'Success'
                         path = arguments[-1]
@@ -1593,7 +1593,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
     def test_failed_fixture_data_reset_never_launches_a_host(self):
         """Prevent a fresh-generation claim when Android did not clear isolated global stores."""
         with tempfile.TemporaryDirectory() as temporary:
-            with patch.object(runtime, 'command', side_effect=['Component new state: disabled-user', 'Failed']), \
+            with patch.object(runtime, 'command', side_effect=['Component new state: disabled', 'Failed']), \
                  patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(ValueError):
                 runtime.run_case('navigation-settings-back', Path(temporary))
             start.assert_not_called()
@@ -1602,7 +1602,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         """A preceding permission decision must not silently leak into the next generation."""
         for reset_step in (1, 2):
             with self.subTest(reset_step=reset_step), tempfile.TemporaryDirectory() as temporary:
-                results = ['Component new state: disabled-user', 'Success'] + [''] * (reset_step - 1)
+                results = ['Component new state: disabled', 'Success'] + [''] * (reset_step - 1)
                 results.append(subprocess.CalledProcessError(1, 'permission reset'))
                 with patch.object(runtime, 'command', side_effect=results), \
                      patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(subprocess.CalledProcessError):
@@ -1611,14 +1611,14 @@ class RuntimeEvidenceTest(unittest.TestCase):
 
     def test_unqualified_boot_component_never_launches_a_fixture(self):
         """A boot receiver must not race the uninitialized fixture Application or disable a user package."""
-        for result in ('', 'new state: enabled', 'new state: disabled'):
+        for result in ('', 'new state: enabled', 'new state: disabled-user'):
             with self.subTest(result=result), tempfile.TemporaryDirectory() as temporary:
                 with patch.object(runtime, 'command', return_value=result) as commands, \
                      patch.object(runtime.subprocess, 'Popen') as start, self.assertRaisesRegex(ValueError, 'boot receiver'):
                     runtime.run_case('navigation-settings-back', Path(temporary))
                 start.assert_not_called()
                 self.assertEqual(commands.call_args.args[0], ['adb', '-s', 'emulator-5554', 'shell', 'pm',
-                    'disable-user', '--user', '0',
+                    'disable', '--user', '0',
                     runtime.PACKAGE + '/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'])
 
     def test_runtime_cases_never_kill_or_replace_the_instrumentation_host(self):
