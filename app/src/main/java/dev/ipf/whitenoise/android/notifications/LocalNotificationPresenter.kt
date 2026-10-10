@@ -559,6 +559,8 @@ class LocalNotificationPresenter(
      * avatar bitmap is authoritative for this write; the matching URL is metadata
      * only and never causes a second fetch when its bitmap is present. The optional
      * write observer runs after the first successful platform notification write.
+     * A quiet write settles its alert flags at that final write, against the live
+     * same-key card, so it never ends a heads-up banner that card is still showing.
      */
     @SuppressLint("MissingPermission")
     suspend fun show(
@@ -809,11 +811,8 @@ class LocalNotificationPresenter(
                             .setPriority(decision.importance.toCompatPriority())
                             .setShowWhen(true)
                             .setAutoCancel(true)
-                            .setOnlyAlertOnce(silentPost)
+                            // Quiet flags are settled at the final write, against the live same-key card.
                             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                            // The explicit group is installed before setSilent, which still suppresses
-                            // only this child. A later alerting child keeps GROUP_ALERT_CHILDREN.
-                            .setSilent(silentPost && !replaceCurrentMessage)
                     // Name the recipient identity in the header when multi-account (#836).
                     if (!redactContent && !recipientAccountSubtext.isNullOrBlank()) {
                         builder.setSubText(recipientAccountSubtext)
@@ -942,6 +941,17 @@ class LocalNotificationPresenter(
                         }
                     }
 
+                    // Builds under the card lock, so the quiet flags see the card the platform will update.
+                    val buildSettled = {
+                        builder
+                            .settledForWrite(
+                                heldAlert,
+                                silentPost,
+                                replaceCurrentMessage,
+                                notificationContent.notificationTag,
+                                notificationContent.notificationId,
+                            ).build()
+                    }
                     // Reserve a write slot before the serialized write so a burst of updates for one busy
                     // conversation never exceeds the platform's per-app notification rate limit.
                     postPacer.awaitSlot()
@@ -987,11 +997,13 @@ class LocalNotificationPresenter(
                                     )
                                     val presentationTimestampMs = nowMillis()
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                                    // Hidden previews rewrite the card as a generic conversation, and only the
+                                    // conversation template keeps Android's conversation classification.
                                     if (
                                         shouldUseExpandedSingleMessageStyle(
                                             body = notificationContent.body,
                                             carriedMessageCount = carried.orEmpty().size,
-                                            redactContent = redactContent,
+                                            redactContent = redactContent || !previewToken.allowed,
                                         ) &&
                                         emojiArtifact == null
                                     ) {
@@ -1034,13 +1046,7 @@ class LocalNotificationPresenter(
                                             ),
                                         )
                                     }
-                                    val notification =
-                                        builder
-                                            .silencedIfSuperseded(
-                                                heldAlert,
-                                                replaceCurrentMessage,
-                                                notificationContent.notificationId,
-                                            ).build()
+                                    val notification = buildSettled()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -1104,13 +1110,7 @@ class LocalNotificationPresenter(
                                                     emojiArtwork = null,
                                                 ),
                                             )
-                                            val cleanNotification =
-                                                builder
-                                                    .silencedIfSuperseded(
-                                                        heldAlert,
-                                                        replaceCurrentMessage,
-                                                        notificationContent.notificationId,
-                                                    ).build()
+                                            val cleanNotification = buildSettled()
                                             val retryResult =
                                                 postNotificationSafely(
                                                     notificationManager,
@@ -1170,13 +1170,7 @@ class LocalNotificationPresenter(
                                     }
                                     val presentationTimestampMs = nowMillis()
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                                    val notification =
-                                        builder
-                                            .silencedIfSuperseded(
-                                                heldAlert,
-                                                replaceCurrentMessage,
-                                                notificationContent.notificationId,
-                                            ).build()
+                                    val notification = buildSettled()
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -1552,20 +1546,30 @@ class LocalNotificationPresenter(
             }
 
     /**
-     * Applies the silent flags at write time when a later alert took the ring while this post was still
-     * waiting for its pacer slot or card lock, and hands the claim back so the account may ring later.
+     * Applies the quiet flags at write time for a post that already decided to stay quiet, or whose ring a later
+     * alert took while it waited for its pacer slot or card lock, and hands that claim back so the account may
+     * ring later. The live same-key card is read here, under the card lock, so [quietWrite] sees the card the
+     * platform is about to update.
      */
-    private fun NotificationCompat.Builder.silencedIfSuperseded(
+    private fun NotificationCompat.Builder.settledForWrite(
         heldAlert: NotificationAlertReservation?,
+        quiet: Boolean,
         replaceCurrentMessage: Boolean,
+        notificationTag: String,
         notificationId: Int,
     ): NotificationCompat.Builder {
-        if (heldAlert == null || heldAlert.stillHoldsTheRing()) return this
-        notificationDebug { "silent first post reason=Superseded" }
-        heldAlert.release()
-        return setOnlyAlertOnce(true)
-            .setSortKey(UserEventNotificationGroup.attentionSortKey(notificationId, silent = true))
-            .setSilent(!replaceCurrentMessage)
+        var superseded = false
+        if (heldAlert != null && !heldAlert.stillHoldsTheRing()) {
+            notificationDebug { "silent first post reason=Superseded" }
+            heldAlert.release()
+            superseded = true
+        }
+        if (!quiet && !superseded) return this
+        val liveCard =
+            synchronized(UserEventNotificationGroup.mutationLock) {
+                activeConversationCard(notificationTag, notificationId)
+            }
+        return quietWrite(replaceCurrentMessage, notificationId, liveCard)
     }
 
     /** Platform metadata carries only the existing opaque ownership scope, never a local account label. */
