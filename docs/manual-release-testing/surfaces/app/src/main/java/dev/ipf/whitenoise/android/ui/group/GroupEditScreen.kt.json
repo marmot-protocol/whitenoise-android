@@ -244,6 +244,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Private notes name remains discoverable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "val notesNameLocked =",
+        "test_ids": [
+          "NCH-004"
+        ]
       }
     ]
   },

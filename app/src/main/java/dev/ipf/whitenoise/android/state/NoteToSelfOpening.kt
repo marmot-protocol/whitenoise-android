@@ -69,7 +69,8 @@ internal suspend fun WhiteNoiseAppState.openNoteToSelf(
 ): ChatListItem {
     fun ensureCurrent() {
         val sameOwner = activeAccountRef == accountRef && runtimeGeneration == generation
-        if (!isCurrent() || !sameOwner || signOutInProgress || wipeInProgress) {
+        val accountUnavailable = signOutInProgress || wipeInProgress
+        if (!isCurrent() || !sameOwner || accountUnavailable) {
             throw CancellationException("Note to self owner changed")
         }
     }

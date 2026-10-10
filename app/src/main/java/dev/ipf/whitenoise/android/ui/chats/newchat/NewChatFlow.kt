@@ -370,7 +370,10 @@ private fun NewMessageAccountScreen(
     LaunchedEffect(creatingHex, appState.signOutInProgress, appState.wipeInProgress) {
         if (creatingHex != null || !session.isCurrent()) scannerSession = null
     }
-    LaunchedEffect(query) { startChatError = null }
+    LaunchedEffect(query) {
+        startChatError = null
+        noteToSelfFailed = false
+    }
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val inviteTitle = stringResource(R.string.invite_to_white_noise)
