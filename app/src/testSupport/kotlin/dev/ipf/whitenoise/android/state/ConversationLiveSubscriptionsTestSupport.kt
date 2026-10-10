@@ -415,9 +415,8 @@ internal fun notificationChatListRow(): ChatListRowFfi =
     )
 
 /** Returns the bounded authoritative message keys without confusing them with presentation keys. */
-internal fun timelineMessageIds(controller: ConversationController): List<String> {
-    return controller.timeline.map { it.record.messageIdHex }
-}
+internal fun timelineMessageIds(controller: ConversationController): List<String> =
+    controller.timeline.map { it.record.messageIdHex }
 
 /** Keeps markdown enrichment absent while timeline ownership and ordering are exercised. */
 private fun emptyMarkdown(): MarkdownDocumentFfi =

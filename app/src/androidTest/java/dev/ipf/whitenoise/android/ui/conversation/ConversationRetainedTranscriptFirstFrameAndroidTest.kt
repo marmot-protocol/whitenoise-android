@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
+import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
@@ -10,6 +11,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.hasSetTextAction
@@ -69,6 +71,9 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
 
     @get:Rule(order = 1)
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @get:Rule(order = 2)
+    val bodyFailureReporter = stallWatchdog.bodyFailureReporter()
 
     private lateinit var retainedActivity: ComponentActivity
 
@@ -177,6 +182,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     ) {
         val fixture = mountFixture(replacement = boundary == UpdateBoundary.Replacement, olderReader = olderReader)
         val original = retainedActivity
+        var bodyFailure: Throwable? = null
         try {
             if (focusComposer) establishFocusedComposer(fixture)
             val olderAnchor = if (olderReader) paintedOlderAnchor(fixture) else null
@@ -221,12 +227,41 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             assertResumedTranscript(fixture, olderAnchor, resumedAt, denyIme)
             stallWatchdog.phase("post-draw editor input")
             composeRule.onNode(hasSetTextAction()).performTextInput(" editable")
+        } catch (failure: Throwable) {
+            bodyFailure = failure
+            throw failure
         } finally {
-            stallWatchdog.phase("cleanup window flags main hop")
-            composeRule.runOnUiThread { original.window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM) }
-            stallWatchdog.phase("fixture cleanup")
-            fixture.close()
+            closeFirstDrawFixture(fixture, original, bodyFailure)
         }
+    }
+
+    /** Keeps the original assertion primary even if disposing the failed fixture also throws. */
+    private fun closeFirstDrawFixture(
+        fixture: RetainedFixture,
+        original: ComponentActivity,
+        bodyFailure: Throwable?,
+    ) {
+        var primaryFailure = bodyFailure
+        val cleanups =
+            listOf<() -> Unit>(
+                {
+                    stallWatchdog.phase("cleanup window flags main hop")
+                    composeRule.runOnUiThread { original.window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM) }
+                },
+                {
+                    stallWatchdog.phase("fixture cleanup")
+                    fixture.close()
+                },
+            )
+        cleanups.forEach { cleanup ->
+            try {
+                cleanup()
+            } catch (failure: Throwable) {
+                val prior = primaryFailure
+                if (prior == null) primaryFailure = failure else prior.addSuppressed(failure)
+            }
+        }
+        if (bodyFailure == null) primaryFailure?.let { throw it }
     }
 
     /** Requires the exact saved older anchor to have been painted before backgrounding. */
@@ -377,6 +412,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         val view = LocalView.current
         fixture.keyboard = LocalSoftwareKeyboardController.current
         DisposableEffect(view) {
+            fixture.composition = checkNotNull(view.parent as? AbstractComposeView)
             val lifecycle = retainedActivity.lifecycle
             val lifecycleObserver =
                 LifecycleEventObserver { _, event ->
@@ -487,6 +523,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 memberSnapshot = conversationTimelineMemberSnapshot(),
                 projection = retainedChatRow(baseRows.last()),
             )
+        var composition: AbstractComposeView? = null
         var mounted by mutableStateOf(true)
         var paintStaleControl by mutableStateOf(false)
         var staleRows: List<TimelineMessage> = emptyList()
@@ -524,12 +561,21 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             }
         }
 
-        /** Removes the probe before releasing controller scopes and their held local work. */
+        /** Disposes the draw gate before controller cancellation so ActivityScenario cleanup can become idle. */
         fun close() {
             ConversationTranscriptDrawProbe.observer = null
-            rosterReply.complete(conversationTimelineGroupRoster())
-            dispatcher.release()
-            InstrumentationRegistry.getInstrumentation().runOnMainSync { controller.onCleared() }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                val host = composition
+                composition = null
+                try {
+                    (host?.parent as? ViewGroup)?.removeView(host)
+                    host?.disposeComposition()
+                } finally {
+                    rosterReply.complete(conversationTimelineGroupRoster())
+                    dispatcher.release()
+                    controller.onCleared()
+                }
+            }
         }
     }
 
