@@ -1,0 +1,34 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-library-empty-account-switch
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow:
+    file: ../fixtures/open-empty-library.yaml
+    env:
+      LIBRARY_KIND: ANY_ATTACHMENT
+- runFlow: ../fixtures/return-from-empty-library.yaml
+- tapOn: Switch Profile, Maestro Alice
+- assertVisible: Switch Profile
+- tapOn: Maestro Carol
+- assertVisible: Switch Profile, Maestro Carol
+- assertVisible: No Chats
+- assertNotVisible: Maestro group
+- runFlow:
+    file: ../fixtures/open-empty-library.yaml
+    env:
+      LIBRARY_KIND: ANY_ATTACHMENT
+- back
+- assertNotVisible:
+    id: global.library
+- assertVisible: No Chats
+- tapOn: Switch Profile, Maestro Carol
+- assertVisible: Switch Profile
+- tapOn: Maestro Alice
+- assertVisible: Switch Profile, Maestro Alice
+- assertVisible: Maestro group
+- runFlow:
+    file: ../fixtures/open-empty-library.yaml
+    env:
+      LIBRARY_KIND: IMAGES_VIDEO
+- runFlow: ../fixtures/return-from-empty-library.yaml

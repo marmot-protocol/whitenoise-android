@@ -7,7 +7,7 @@ name: keys-back-clears
 - assertVisible: "Settings"
 - tapOn: "Profile Keys"
 - assertVisible: "Private key hidden"
-- tapOn: "Export Encrypted Private Key"
+- runFlow: ../fixtures/open-encrypted-key-editor.yaml
 - assertVisible: "Encrypted Private Key"
 - tapOn: "Password"
 - inputText: "Maestro-test1!"
@@ -22,7 +22,7 @@ name: keys-back-clears
     enabled: true
 - back
 - assertVisible: "Private key hidden"
-- tapOn: "Export Encrypted Private Key"
+- runFlow: ../fixtures/open-encrypted-key-editor.yaml
 - assertVisible: "Encrypted Private Key"
 - assertVisible:
     id: "profile_keys.export_password"

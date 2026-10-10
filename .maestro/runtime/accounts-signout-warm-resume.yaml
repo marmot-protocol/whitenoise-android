@@ -1,0 +1,55 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: accounts-signout-warm-resume
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Message
+- assertVisible:
+    focused: true
+- inputText: Maestro account action draft
+- assertVisible:
+    text: ^Maestro account action draft$
+- hideKeyboard
+- back
+- assertVisible: 'Draft: Maestro account action draft'
+- runFlow: ../fixtures/open-signout-sheet.yaml
+- assertVisible:
+    id: profile_keys.signout_invitation_keys
+    checked: true
+- tapOn:
+    id: profile_keys.signout_invitation_keys
+- assertVisible:
+    id: profile_keys.signout_invitation_keys
+    checked: false
+- tapOn:
+    text: ^Sign Out$
+    below: Remove invitation keys from relays
+    enabled: true
+- assertNotVisible: Stays on this device
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible:
+    text: ^Maestro (Bob|Carol)$
+- assertNotVisible: Maestro Alice
+- tapOn:
+    id: settings.switch_profile
+- tapOn:
+    text: ^Maestro Bob$
+- assertVisible:
+    id: chats.scope.chats
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Maestro Bob
+- back
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertNotVisible: Maestro account action draft
+- assertVisible:
+    text: ^Message$
+- back
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Maestro Bob
+- assertNotVisible: Maestro Alice
+- back

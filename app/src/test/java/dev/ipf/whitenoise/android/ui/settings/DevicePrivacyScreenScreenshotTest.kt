@@ -30,7 +30,9 @@ import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshotHandoff
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
+import dev.ipf.whitenoise.android.ui.navigation.MainSection
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -53,6 +55,35 @@ import java.util.concurrent.TimeUnit
 class DevicePrivacyScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** Tests protected composition disposal; actual credential verification stays in Maestro. */
+    @Test
+    fun appLockDisposesPrivacyScreenAndRestoresItsDestinationAfterUnlock() {
+        val state = privacyAppState(UsageDiagnosticsDecisionFfi.DECLINED)
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        val shell = presentBootstrappedApp(state, AppPhase.Ready)
+        val setLockVisible =
+            WhiteNoiseAppState::class.java
+                .getDeclaredMethod("setAppLockScreenVisible", Boolean::class.javaPrimitiveType)
+                .apply { isAccessible = true }
+        try {
+            composeRule.runOnIdle {
+                shell.sectionState.sectionName = MainSection.Settings.name
+                shell.sectionState.settingsDetailName = SettingsDetail.DevicePrivacy.name
+            }
+            composeRule.onNodeWithTag("privacy.device_protection.group").assertIsDisplayed()
+            repeat(3) {
+                composeRule.runOnIdle { setLockVisible.invoke(state, true) }
+                composeRule.onNodeWithTag("app.lock").assertIsDisplayed()
+                composeRule.onNodeWithTag("privacy.device_protection.group").assertDoesNotExist()
+                composeRule.runOnIdle { setLockVisible.invoke(state, false) }
+                composeRule.onNodeWithTag("app.lock").assertDoesNotExist()
+                composeRule.onNodeWithTag("privacy.device_protection.group").assertIsDisplayed()
+            }
+        } finally {
+            composeRule.runOnIdle { shell.release() }
+        }
+    }
 
     /** A pending native receipt must leave Welcome and the sign-in form unobstructed. */
     @Test

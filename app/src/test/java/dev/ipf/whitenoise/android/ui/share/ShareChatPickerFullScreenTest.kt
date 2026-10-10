@@ -654,13 +654,16 @@ class ShareChatPickerFullScreenTest {
                 }
             }
         }
-        composeRule.onNodeWithText("Alice").performClick()
+        val destinations = composeRule.onNodeWithTag("share.destinations")
+        destinations.performScrollToNode(hasText("Alice"))
+        composeRule.onNodeWithText("Alice").assertIsDisplayed().performClick()
 
-        composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).assertIsDisplayed()
         composeRule.onNodeWithText("Alice").assertIsDisplayed()
         composeRule
             .onNodeWithText(app.resources.getQuantityString(R.plurals.share_to_chats_count, 1, 1))
             .assertIsDisplayed()
+        destinations.performScrollToNode(hasSetTextAction())
+        composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).assertIsDisplayed()
     }
 
     /** Delivers a window-inset change with the IME occupying [bottomPx] from the bottom. */
@@ -691,4 +694,51 @@ class ShareChatPickerFullScreenTest {
                 presentation = presented.presentation.copy(title = PresentationTextFfi.Literal(title)),
             )
         }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36])
+class ShareChatPickerLandscapeTest {
+    @get:Rule
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
+    private val app = ApplicationProvider.getApplicationContext<Context>()
+    private val payload = SharePayload("shared text", emptyList(), "text/plain")
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w640dp-h320dp-land-mdpi")
+    fun shortLandscapeCanScrollToSelectAWholeRecipientAndReturnToSearch() {
+        val chats = (0 until 12).map { hexId(0x20 + it) to hexId(0x40 + it) }
+        val profiles = chats.mapIndexed { index, (_, peer) -> peer to profile(displayName = "Person $index") }
+        val appState = appStateWithDirectChats(*chats.toTypedArray(), profiles = profiles.toMap(mutableMapOf()))
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = { _, _ -> true },
+                )
+            }
+        }
+        val destinations = composeRule.onNodeWithTag("share.destinations")
+        val recipientRow = hasText("Person 11") and !hasSetTextAction()
+        val viewport = destinations.fetchSemanticsNode().boundsInRoot
+        assertTrue("Short landscape must retain room for whole touch targets", viewport.height >= 128f)
+        destinations.performScrollToNode(recipientRow)
+        val recipient = composeRule.onNode(recipientRow).assertIsDisplayed()
+        val bounds = recipient.fetchSemanticsNode().boundsInRoot
+        assertTrue("Recipient title must fit inside the scroll viewport", bounds.top >= viewport.top)
+        assertTrue("Recipient must remain above the footer", bounds.bottom <= viewport.bottom)
+        recipient.performClick().assertIsSelected()
+        composeRule
+            .onNodeWithText(app.resources.getQuantityString(R.plurals.share_to_chats_count, 1, 1))
+            .assertIsDisplayed()
+        destinations.performScrollToNode(hasSetTextAction())
+        composeRule.onNode(hasSetTextAction()).performTextInput("Person 11")
+        destinations.performScrollToNode(recipientRow)
+        composeRule.onNode(recipientRow).assertIsDisplayed().assertIsSelected()
+    }
+
+    private fun hexId(byte: Int): String = byte.toString(16).padStart(2, '0').repeat(32)
 }

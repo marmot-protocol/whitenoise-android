@@ -5,9 +5,12 @@ import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.functionBody
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -108,8 +111,9 @@ class NativeAttachmentFastReadyTest {
             val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
             val typed = MarmotKitException.InvalidMediaReference("synthetic integrity failure")
             val peeks = AtomicInteger()
+            val terminalReadCompleted = CompletableDeferred<Unit>()
             launch {
-                delay(120)
+                withTimeout(WAIT_MILLIS) { terminalReadCompleted.await() }
                 feed.fail(typed)
             }
 
@@ -119,7 +123,17 @@ class NativeAttachmentFastReadyTest {
                         withTimeout(WAIT_MILLIS) {
                             awaitNativeAttachment(
                                 feed = feed,
-                                peek = after(peeks, 2, AttachmentTransferStateFfi.FAILED),
+                                peek = {
+                                    if (peeks.incrementAndGet() >= 2) {
+                                        // Release the feed only after the actual IO read returns successfully.
+                                        currentCoroutineContext().job.invokeOnCompletion { cause ->
+                                            if (cause == null) terminalReadCompleted.complete(Unit)
+                                        }
+                                        AttachmentTransferStateFfi.FAILED
+                                    } else {
+                                        AttachmentTransferStateFfi.QUEUED
+                                    }
+                                },
                             ) { AttachmentTransferStateFfi.QUEUED }
                         }
                     }
@@ -215,8 +229,9 @@ class NativeAttachmentFastReadyTest {
         runBlocking {
             val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
             val peeks = AtomicInteger()
+            val failedReadCompleted = CompletableDeferred<Unit>()
             launch {
-                delay(80)
+                withTimeout(WAIT_MILLIS) { failedReadCompleted.await() }
                 feed.deliver(AttachmentTransferStateFfi.READY)
             }
 
@@ -225,6 +240,9 @@ class NativeAttachmentFastReadyTest {
                     feed = feed,
                     peek = {
                         peeks.incrementAndGet()
+                        currentCoroutineContext().job.invokeOnCompletion { cause ->
+                            if (cause == null) failedReadCompleted.complete(Unit)
+                        }
                         throw IOException("snapshot unavailable")
                     },
                 ) { AttachmentTransferStateFfi.QUEUED }
@@ -304,23 +322,25 @@ class NativeAttachmentFastReadyTest {
         runBlocking {
             val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
             val peeks = AtomicInteger()
+            val samplingStarted = CompletableDeferred<Unit>()
             val owner =
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     awaitNativeAttachment(
                         feed = feed,
                         peek = {
-                            peeks.incrementAndGet()
+                            if (peeks.incrementAndGet() == 3) samplingStarted.complete(Unit)
                             AttachmentTransferStateFfi.QUEUED
                         },
                     ) { AttachmentTransferStateFfi.QUEUED }
                 }
 
+            withTimeout(WAIT_MILLIS) { samplingStarted.await() }
             delay(SETTLE_MILLIS)
             val observed = peeks.get()
             owner.cancel()
             owner.join()
 
-            // 10, 20, 40, 80, 160, then 250 ms windows: roughly eight reads in 700 ms, never one per millisecond.
+            // Start from three actual IO reads; the 700 ms sample must still reject one read per millisecond.
             assertTrue("read $observed times", observed in 3..MAX_PEEKS)
         }
 

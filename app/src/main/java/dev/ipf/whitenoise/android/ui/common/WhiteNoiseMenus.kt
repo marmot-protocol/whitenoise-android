@@ -32,7 +32,7 @@ fun WhiteNoiseDropdownMenu(
         scrollState = menuScrollState,
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = modifier.scrollEdgeFade(menuScrollState),
+        modifier = modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
         shape = MaterialTheme.shapes.medium,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         border = amoledOutlineBorder(),

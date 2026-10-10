@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-dictation-warm-resume
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Dictation
+- assertVisible:
+    id: dictation.ostt_recommendation.group
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible:
+    id: dictation.ostt_recommendation.group
+- back
+- assertVisible: Settings

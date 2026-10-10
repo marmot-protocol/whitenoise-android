@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: relay-add-roles-recovery-cancel
+---
+- runFlow: ../fixtures/open-fixture-empty-relay-draft.yaml
+- inputText: wss://relay.example.invalid
+- assertVisible:
+    id: relay.add.url
+    text: ^wss://relay\.example\.invalid$
+- hideKeyboard
+- assertVisible:
+    id: relay.add.submit
+    enabled: true
+- tapOn: Profile
+- tapOn: Inbox
+- assertVisible: Choose at least one role.
+- assertVisible:
+    id: relay.add.submit
+    enabled: false
+- tapOn: Profile
+- assertNotVisible: Choose at least one role.
+- assertVisible:
+    id: relay.add.submit
+    enabled: true
+- back
+- assertNotVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relays.group
+- back
+- assertVisible: Settings

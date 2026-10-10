@@ -8,6 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
         "anchor": "fun WhiteNoiseSecureTextField(",
         "test_ids": [
+          "ACC-009",
+          "ACC-011",
           "SET-001"
         ]
       },
@@ -15,15 +17,21 @@
         "surface": "WhiteNoiseTextField",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
         "anchor": "fun WhiteNoiseTextField(",
-        "test_ids": [],
-        "coverage_exception": "Shared form field with no release-build user path yet. Covered by WhiteNoiseTextFieldScreenshotTest and WhiteNoiseTextFieldBehaviorTest; assign permanent manual route IDs when a form flow adopts it."
+        "test_ids": [
+          "PRO-001",
+          "FLD-004",
+          "SYS-002"
+        ]
       },
       {
         "surface": "WhiteNoiseTextFieldContainer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseTextField.kt",
         "anchor": "fun WhiteNoiseTextFieldContainer(",
-        "test_ids": [],
-        "coverage_exception": "Shared form field with no release-build user path yet. Covered by WhiteNoiseTextFieldScreenshotTest and WhiteNoiseTextFieldBehaviorTest; assign permanent manual route IDs when a form flow adopts it."
+        "test_ids": [
+          "PRO-001",
+          "FLD-004",
+          "SYS-002"
+        ]
       }
     ],
     "settings_controls": []

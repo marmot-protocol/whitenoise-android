@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 private val SCANNER_PERMISSION_BACKGROUND = Color(0xFF202020)
@@ -83,6 +84,7 @@ internal fun QrScannerSheetContent(
         modifier
             .fillMaxWidth()
             .fillMaxSize()
+            .exposePerformanceTestTags()
             .testTag(QR_SCANNER_SHEET_CONTENT_TAG)
             .background(if (permissionGranted) Color.Black else SCANNER_PERMISSION_BACKGROUND),
     ) {

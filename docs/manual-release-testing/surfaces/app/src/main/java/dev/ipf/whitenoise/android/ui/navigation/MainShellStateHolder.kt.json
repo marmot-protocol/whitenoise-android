@@ -1,0 +1,31 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt",
+  "legacy_sha256": "7c6d67e81b0c06e7b8fe98d04078bc992b4d2ec6208953c1d7134bdd5617a941",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PrepareMainShellFirstFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt",
+        "anchor": "fun PrepareMainShellFirstFrame(",
+        "test_ids": [
+          "INT-002",
+          "INT-003",
+          "NTF-009"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Account/runtime ownership of retained Settings destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellStateHolder.kt",
+        "anchor": "sectionState.bind(accountRef, runtimeGeneration)",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004",
+          "ACC-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

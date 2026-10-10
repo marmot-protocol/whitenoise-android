@@ -116,6 +116,18 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Short share picker: scroll controls and recipients without losing the selected targets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "share-picker-controls",
+        "test_ids": [
+          "SYS-004",
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
       }
     ]
   },

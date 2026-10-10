@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: speech-apply-rounded-reopen
+---
+- runFlow: ../fixtures/open-fixture-empty-custom-rate.yaml
+- inputText: '2.75'
+- assertVisible:
+    id: speech.custom_rate
+    text: ^2\.75$
+- hideKeyboard
+- tapOn: Apply
+- assertNotVisible:
+    id: speech.custom_rate
+- assertVisible: 2\.8×
+- back
+- assertVisible: Settings
+- tapOn: Read Aloud
+- assertVisible:
+    id: speech.engine.group
+- assertVisible: 2\.8×
+- tapOn: Speech rate
+- runFlow: ../fixtures/scroll-speech-custom.yaml
+- tapOn: Custom
+- assertVisible:
+    id: speech.custom_rate
+- assertVisible:
+    id: speech.custom_rate
+    text: ^2\.8$
+- tapOn: Cancel
+- assertNotVisible:
+    id: speech.custom_rate

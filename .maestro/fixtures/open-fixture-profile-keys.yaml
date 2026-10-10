@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: open-settings.yaml
+- tapOn: Profile Keys
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: DOWN
+- assertVisible: Private key hidden
+- scrollUntilVisible:
+    element:
+      id: profile_keys.public_key_value
+    direction: UP
+- assertVisible:
+    id: profile_keys.public_key_value
+    text: '^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$'

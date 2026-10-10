@@ -77,6 +77,16 @@
         "test_ids": [
           "MED-028"
         ]
+      },
+      {
+        "surface": "App-lock return to the previous Settings destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "shellStateHolder.sectionState",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004",
+          "ACC-004"
+        ]
       }
     ]
   },

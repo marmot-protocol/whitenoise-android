@@ -1,0 +1,36 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-search-no-match-clear
+---
+- runFlow: ../fixtures/runtime-share-picker-ready.yaml
+- tapOn: Search chats
+- assertVisible:
+    focused: true
+- inputText: ZZZMaestroNoDestination
+- assertVisible:
+    focused: true
+    text: ^ZZZMaestroNoDestination$
+# Search submits this single-line field without invoking the picker's cancellation Back.
+- pressKey: Enter
+- assertVisible:
+    text: ^No chats match your search.$
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: ^Share$
+# Clear owns the entire query; backspacing from an arbitrary tap position can leave a suffix.
+- tapOn: Clear
+- assertVisible: Search chats
+- assertNotVisible:
+    text: ^ZZZMaestroNoDestination$
+- assertNotVisible:
+    text: ^No chats match your search.$
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: ^Share$
+- tapOn: Close
+- runFlow: ../fixtures/share-closed.yaml

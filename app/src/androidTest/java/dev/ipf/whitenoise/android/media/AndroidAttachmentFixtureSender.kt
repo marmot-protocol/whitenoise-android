@@ -82,7 +82,16 @@ internal suspend fun sendAndroidFixtureMedia(
             harness.controller.retryMembers()
             check(harness.controller.canSendMessages) { "generated sender membership not ready" }
             if (qualifyOwnLocalCache || awaitOwnHostPublication) harness.controller.start()
-            harness.controller.sendAttachments(attachments, caption = null)
+        }
+        if (qualifyOwnLocalCache || awaitOwnHostPublication) {
+            awaitAndroidFixtureSenderReady(harness.controller)
+        }
+        withContext(Dispatchers.Main.immediate) {
+            val queued =
+                checkNotNull(harness.controller.queueAttachments(attachments, caption = null)) {
+                    "generated sender did not admit its media"
+                }
+            harness.controller.uploadQueued(queued)
         }
         val published = awaitAndroidFixtureReferences(marmot, sender.label, group, attachments.map { it.fileName })
         val sent =
@@ -148,6 +157,20 @@ internal suspend fun openSenderHarness(
             ConversationController(state, details.group, GroupMemberSnapshot(members))
         }
     return SenderHarness(state, controller, hold)
+}
+
+/** Initial live startup may replace send eligibility while attachment preparation is suspended. */
+private suspend fun awaitAndroidFixtureSenderReady(controller: ConversationController) {
+    withTimeout(30_000L) {
+        while (true) {
+            val ready =
+                withContext(Dispatchers.Main.immediate) {
+                    controller.hasPublishedAuthoritativeTimeline && !controller.isLoading && controller.canSendMessages
+                }
+            if (ready) return@withTimeout
+            delay(10L)
+        }
+    }
 }
 
 /** Waits for the shipping publication, which runs in the state's own scope and would die with an early teardown. */

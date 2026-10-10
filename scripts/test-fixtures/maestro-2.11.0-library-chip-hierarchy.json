@@ -1,0 +1,253 @@
+{
+  "source_sha": "a50e263925e74c39a3f1b5e9cda0e3a4fde8fd01",
+  "run_id": "37909377817",
+  "run_attempt": "1",
+  "maestro_version": "2.11.0",
+  "case": "search-library-empty-all",
+  "nodes": {
+    "global.library.mode.IMAGES_VIDEO": {
+      "attributes": {
+        "ignoreBoundsFiltering": "false",
+        "resource-id": "global.library.mode.IMAGES_VIDEO",
+        "clickable": "true",
+        "bounds": "[0,88][67,136]",
+        "enabled": "true",
+        "focused": "false",
+        "checked": "false",
+        "scrollable": "false",
+        "selected": "false",
+        "class": "android.view.View",
+        "important-for-accessibility": "true"
+      },
+      "children": [
+        {
+          "attributes": {
+            "text": "Photos & videos",
+            "ignoreBoundsFiltering": "false",
+            "clickable": "false",
+            "bounds": "[0,102][51,122]",
+            "enabled": "true",
+            "focused": "false",
+            "checked": "false",
+            "scrollable": "false",
+            "selected": "false",
+            "class": "android.widget.TextView",
+            "important-for-accessibility": "true"
+          },
+          "clickable": false,
+          "enabled": true,
+          "focused": false,
+          "checked": false,
+          "selected": false
+        },
+        {
+          "attributes": {
+            "ignoreBoundsFiltering": "false",
+            "clickable": "false",
+            "bounds": "[0,96][67,128]",
+            "enabled": "true",
+            "focused": "false",
+            "checked": "false",
+            "scrollable": "false",
+            "selected": "false",
+            "class": "android.widget.CheckBox",
+            "important-for-accessibility": "true"
+          },
+          "clickable": false,
+          "enabled": true,
+          "focused": false,
+          "checked": false,
+          "selected": false
+        }
+      ],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "checked": false,
+      "selected": false
+    },
+    "global.library.mode.FILES_DOCUMENTS": {
+      "attributes": {
+        "ignoreBoundsFiltering": "false",
+        "resource-id": "global.library.mode.FILES_DOCUMENTS",
+        "clickable": "true",
+        "bounds": "[75,88][140,136]",
+        "enabled": "true",
+        "focused": "false",
+        "checked": "false",
+        "scrollable": "false",
+        "selected": "false",
+        "class": "android.view.View",
+        "important-for-accessibility": "true"
+      },
+      "children": [
+        {
+          "attributes": {
+            "text": "Files",
+            "ignoreBoundsFiltering": "false",
+            "clickable": "false",
+            "bounds": "[91,102][124,122]",
+            "enabled": "true",
+            "focused": "false",
+            "checked": "false",
+            "scrollable": "false",
+            "selected": "false",
+            "class": "android.widget.TextView",
+            "important-for-accessibility": "true"
+          },
+          "clickable": false,
+          "enabled": true,
+          "focused": false,
+          "checked": false,
+          "selected": false
+        },
+        {
+          "attributes": {
+            "ignoreBoundsFiltering": "false",
+            "clickable": "false",
+            "bounds": "[75,96][140,128]",
+            "enabled": "true",
+            "focused": "false",
+            "checked": "false",
+            "scrollable": "false",
+            "selected": "false",
+            "class": "android.widget.CheckBox",
+            "important-for-accessibility": "true"
+          },
+          "clickable": false,
+          "enabled": true,
+          "focused": false,
+          "checked": false,
+          "selected": false
+        }
+      ],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "checked": false,
+      "selected": false
+    },
+    "global.library.mode.VOICE_AUDIO": {
+      "attributes": {
+        "ignoreBoundsFiltering": "false",
+        "resource-id": "global.library.mode.VOICE_AUDIO",
+        "clickable": "true",
+        "bounds": "[148,88][219,136]",
+        "enabled": "true",
+        "focused": "false",
+        "checked": "false",
+        "scrollable": "false",
+        "selected": "false",
+        "class": "android.view.View",
+        "important-for-accessibility": "true"
+      },
+      "children": [
+        {
+          "attributes": {
+            "text": "Audio",
+            "ignoreBoundsFiltering": "false",
+            "clickable": "false",
+            "bounds": "[164,102][203,122]",
+            "enabled": "true",
+            "focused": "false",
+            "checked": "false",
+            "scrollable": "false",
+            "selected": "false",
+            "class": "android.widget.TextView",
+            "important-for-accessibility": "true"
+          },
+          "clickable": false,
+          "enabled": true,
+          "focused": false,
+          "checked": false,
+          "selected": false
+        },
+        {
+          "attributes": {
+            "ignoreBoundsFiltering": "false",
+            "clickable": "false",
+            "bounds": "[148,96][219,128]",
+            "enabled": "true",
+            "focused": "false",
+            "checked": "false",
+            "scrollable": "false",
+            "selected": "false",
+            "class": "android.widget.CheckBox",
+            "important-for-accessibility": "true"
+          },
+          "clickable": false,
+          "enabled": true,
+          "focused": false,
+          "checked": false,
+          "selected": false
+        }
+      ],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "checked": false,
+      "selected": false
+    },
+    "global.library.mode.ANY_ATTACHMENT": {
+      "attributes": {
+        "ignoreBoundsFiltering": "false",
+        "resource-id": "global.library.mode.ANY_ATTACHMENT",
+        "clickable": "true",
+        "bounds": "[227,88][320,136]",
+        "enabled": "true",
+        "focused": "false",
+        "checked": "true",
+        "scrollable": "false",
+        "selected": "false",
+        "class": "android.view.View",
+        "important-for-accessibility": "true"
+      },
+      "children": [
+        {
+          "attributes": {
+            "text": "All attachments",
+            "ignoreBoundsFiltering": "false",
+            "clickable": "false",
+            "bounds": "[243,102][320,122]",
+            "enabled": "true",
+            "focused": "false",
+            "checked": "false",
+            "scrollable": "false",
+            "selected": "false",
+            "class": "android.widget.TextView",
+            "important-for-accessibility": "true"
+          },
+          "clickable": false,
+          "enabled": true,
+          "focused": false,
+          "checked": false,
+          "selected": false
+        },
+        {
+          "attributes": {
+            "ignoreBoundsFiltering": "false",
+            "clickable": "false",
+            "bounds": "[227,96][320,128]",
+            "enabled": "true",
+            "focused": "false",
+            "checked": "false",
+            "scrollable": "false",
+            "selected": "false",
+            "class": "android.widget.CheckBox",
+            "important-for-accessibility": "true"
+          },
+          "clickable": false,
+          "enabled": true,
+          "focused": false,
+          "checked": false,
+          "selected": false
+        }
+      ],
+      "clickable": true,
+      "enabled": true,
+      "focused": false,
+      "checked": true,
+      "selected": false
+    }
+  }
+}

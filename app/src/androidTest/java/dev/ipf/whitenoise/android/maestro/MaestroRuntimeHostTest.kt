@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.maestro
 
 import android.content.Context
-import androidx.test.core.app.ActivityScenario
+import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
@@ -60,10 +60,44 @@ private val MAESTRO_POSTCONDITIONS =
         "notification-denied",
         "notification-granted",
         "camera-denied",
+        "app-lock-unavailable",
+        "app-lock-credential-retry",
+        "app-lock-credential-rotation",
+        "app-lock-credential-warm-disabled",
+        "app-lock-credential-delay",
         "accounts-retained",
+        "public-key-copy-owner",
+        "public-key-copy-peer",
+        "global-library-empty",
+        "private-key-copy-owner",
+        "private-key-copy-peer",
+        "account-action-signed-out",
+        "account-action-wiped",
         "contact-private-saved",
         "contact-private-cleared",
         "contact-private-boundary",
+        "speech-rate-custom",
+        "speech-rate-minimum",
+        "speech-rate-maximum",
+        "speech-rate-preset",
+        "speech-rate-system",
+        "public-profile-text-saved",
+        "public-profile-about-cleared",
+        "public-profile-unchanged",
+        "public-profile-text-trimmed",
+        "public-profile-name-cleared",
+        "smart-rule-read",
+        "smart-rule-mentions",
+        "smart-rule-any",
+        "smart-rule-excluded",
+        "smart-rule-unread",
+        "smart-rule-defaults",
+        "smart-rule-title",
+        "smart-rule-absent",
+        "relay-lists-unchanged",
+        "share-request-cancelled",
+        "share-request-staged",
+        "share-request-files-removed",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -94,13 +128,17 @@ class MaestroRuntimeHostTest {
                     MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
                 )
             var state: WhiteNoiseAppState? = null
-            var activity: ActivityScenario<MainActivity>? = null
+            var activity: MaestroActivityOwner? = null
             var originalActivity: MainActivity? = null
             var peerLabel: String? = null
             var groupId: String? = null
             var messageBaseline: MaestroMessageBaseline? = null
             var expectedAccountIds: Set<String> = emptySet()
             var externalContact: MaestroExternalContact? = null
+            var editorBaselines: MaestroEditorBaselines? = null
+            var inboundShareBaseline: MaestroInboundShareBaseline? = null
+            var accountActionBaseline: MaestroAccountActionBaseline? = null
+            var credentialJournal: MaestroCredentialJournal? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -171,7 +209,21 @@ class MaestroRuntimeHostTest {
                             "Generated group missing from native presentation"
                         }
                     val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
-                    if (postcondition.startsWith("message-") || postcondition == "accounts-retained") {
+                    val appLockFixtureNoCredential =
+                        verifyMaestroNoAppLockCredential(
+                            context,
+                            app,
+                            context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                            postcondition,
+                        )
+                    val appLockFixtureCredential = requireMaestroSyntheticCredential(context, app, postcondition)
+                    if (appLockFixtureCredential) {
+                        credentialJournal =
+                            MaestroCredentialJournal(context.getSharedPreferences(directory.name, Context.MODE_PRIVATE))
+                    }
+                    editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
+                    accountActionBaseline = captureMaestroAccountAction(native, app, group, postcondition)
+                    if (requiresMaestroMessageBaseline(postcondition)) {
                         expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
                         val original = checkNotNull(nativeRow.row.lastMessage)
                         check(original.plaintext == "Generated fixture message")
@@ -186,8 +238,11 @@ class MaestroRuntimeHostTest {
                             .put("title", nativeRow.presentation.title.toString())
                             .toString(),
                     )
-                    activity = ActivityScenario.launch(MainActivity::class.java)
+                    activity = MaestroActivityOwner(context.applicationContext as MaestroFixtureApplication)
+                    launchMaestroRuntimeActivity(context, fixture, checkNotNull(activity))
                     checkNotNull(activity).onActivity { originalActivity = it }
+                    inboundShareBaseline =
+                        captureMaestroInboundShare(native, app, checkNotNull(activity), group, fixture)
                     // Maestro alone owns Android accessibility; this receipt certifies native handoff only.
                     File(directory, "ready.json").writeText(
                         JSONObject()
@@ -195,13 +250,19 @@ class MaestroRuntimeHostTest {
                             .put("accounts", accounts.size)
                             .put("fixture", fixture)
                             .put("uiObserver", "maestro")
+                            .put("appLockFixtureNoCredential", appLockFixtureNoCredential)
+                            .put("appLockFixtureCredential", appLockFixtureCredential)
+                            .put("nativePid", Process.myPid())
                             .put("ready", true)
                             .toString(),
                     )
                 }
                 // The controller writes only this generation's finish file; no arbitrary commands.
                 withTimeout(300_000L) {
-                    while (!File(directory, "finish").exists()) delay(100L)
+                    while (!File(directory, "finish").exists()) {
+                        credentialJournal?.observe(checkNotNull(state), checkNotNull(originalActivity))
+                        delay(100L)
+                    }
                 }
                 verifyNativeState(native, state, checkNotNull(peerLabel), checkNotNull(groupId), messageBaseline)
                 val postcondition = InstrumentationRegistry.getArguments().getString("postcondition")
@@ -228,13 +289,87 @@ class MaestroRuntimeHostTest {
                         context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
                         postcondition,
                     )
+                val publicKeyCopyVerified =
+                    verifyMaestroPublicKeyCopy(
+                        checkNotNull(originalActivity),
+                        native,
+                        checkNotNull(state),
+                        messageBaseline,
+                        postcondition,
+                    )
+                val appLockVerification =
+                    verifyMaestroAppLock(
+                        credentialJournal,
+                        checkNotNull(originalActivity),
+                        checkNotNull(state),
+                        context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                        postcondition,
+                    )
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
-                        .toString(),
+                        .put("publicKeyCopyVerified", publicKeyCopyVerified)
+                        .put("globalLibraryVerified", verifyMaestroEmptyLibrary(native, messageBaseline, postcondition))
+                        .put(
+                            "privateKeyCopyVerified",
+                            verifyMaestroPrivateKeyCopy(
+                                checkNotNull(originalActivity),
+                                native,
+                                checkNotNull(state),
+                                messageBaseline,
+                                postcondition,
+                            ),
+                        ).put("credentialEvidence", appLockVerification.credentialJsonValue)
+                        .put("appLockVerified", appLockVerification.verified)
+                        .put(
+                            "accountActionVerified",
+                            verifyMaestroAccountAction(
+                                native,
+                                checkNotNull(state),
+                                accountActionBaseline,
+                                postcondition,
+                            ),
+                        ).put(
+                            "speechRateVerified",
+                            verifyMaestroSpeechRate(context, checkNotNull(state), postcondition),
+                        ).put(
+                            "smartFolderRuleVerified",
+                            verifyMaestroFolderRules(
+                                context,
+                                checkNotNull(state),
+                                checkNotNull(editorBaselines).folderRules,
+                                postcondition,
+                            ),
+                        ).put(
+                            "shareImportVerified",
+                            verifyMaestroInboundShare(
+                                native,
+                                checkNotNull(state),
+                                checkNotNull(activity),
+                                inboundShareBaseline,
+                                postcondition,
+                            ),
+                        ).put(
+                            "relayListsVerified",
+                            verifyMaestroRelayLists(
+                                native,
+                                checkNotNull(state),
+                                checkNotNull(editorBaselines).relayLists,
+                                postcondition,
+                            ),
+                        ).put(
+                            "publicProfileVerified",
+                            verifyMaestroPublicProfile(
+                                native,
+                                checkNotNull(state),
+                                checkNotNull(editorBaselines).publicProfiles,
+                                checkNotNull(editorBaselines).profileOwner,
+                                postcondition,
+                            ),
+                        ).toString(),
                 )
             } finally {
                 val activityClosed = runCatching { activity?.close() }
@@ -252,11 +387,14 @@ class MaestroRuntimeHostTest {
                         }
                     }
                 val relayClosed = runCatching { relay.close() }
+                val shareStorageCleared =
+                    runCatching { withTimeout(15_000L) { clearMaestroInboundShareFixture(context) } }
                 val preferencesRemoved = runCatching { context.deleteSharedPreferences(directory.name) }
                 val rootRemoved = nativeClosed.isSuccess && root.deleteRecursively()
-                check(activityClosed.isSuccess && listenerStopped.isSuccess && nativeClosed.isSuccess) {
-                    "Fixture owner teardown failed"
-                }
+                check(activityClosed.isSuccess) { "Fixture Activity teardown failed" }
+                check(listenerStopped.isSuccess) { "Fixture notification listener teardown failed" }
+                check(nativeClosed.isSuccess) { "Fixture native runtime teardown failed" }
+                check(shareStorageCleared.isSuccess) { "Fixture Android share storage cleanup failed" }
                 check(relayClosed.isSuccess && preferencesRemoved.isSuccess && rootRemoved) {
                     "Fixture storage cleanup failed"
                 }

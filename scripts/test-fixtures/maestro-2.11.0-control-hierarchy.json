@@ -1,0 +1,102 @@
+{
+  "source_sha": "e0273c2308a652d07f0c0cc27f0585bda87b3f93",
+  "run_id": "37836469200",
+  "maestro_version": "2.11.0",
+  "nodes": {
+    "folder.match.": {
+      "attributes": {
+        "resource-id": "folder.match.",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      "children": [
+        {
+          "attributes": {
+            "text": "Match any",
+            "clickable": "false",
+            "enabled": "true"
+          },
+          "children": []
+        },
+        {
+          "attributes": {
+            "clickable": "false",
+            "enabled": "true"
+          },
+          "children": []
+        }
+      ]
+    },
+    "folder.not.": {
+      "attributes": {
+        "resource-id": "folder.not.",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      "children": [
+        {
+          "attributes": {
+            "text": "Exclude chats that match this group",
+            "clickable": "false",
+            "enabled": "true"
+          },
+          "children": []
+        },
+        {
+          "attributes": {
+            "clickable": "false",
+            "enabled": "true"
+          },
+          "children": []
+        }
+      ]
+    },
+    "folder.mode": {
+      "attributes": {
+        "resource-id": "folder.mode",
+        "clickable": "true",
+        "enabled": "true"
+      },
+      "children": [
+        {
+          "attributes": {
+            "text": "Has unread messages",
+            "clickable": "false",
+            "enabled": "true"
+          },
+          "children": []
+        },
+        {
+          "attributes": {
+            "clickable": "false",
+            "enabled": "true"
+          },
+          "children": []
+        }
+      ]
+    },
+    "Share": {
+      "attributes": {
+        "clickable": "true",
+        "enabled": "false"
+      },
+      "children": [
+        {
+          "attributes": {
+            "text": "Share",
+            "clickable": "false",
+            "enabled": "true"
+          },
+          "children": []
+        },
+        {
+          "attributes": {
+            "clickable": "false",
+            "enabled": "true"
+          },
+          "children": []
+        }
+      ]
+    }
+  }
+}

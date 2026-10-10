@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-private-reveal-warm-resume-copy
+---
+- runFlow: ../fixtures/runtime-profile-keys-ready.yaml
+- runFlow: ../fixtures/reveal-fixture-private-key.yaml
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible: Private key hidden
+- runFlow: ../fixtures/copy-hidden-fixture-private-key.yaml

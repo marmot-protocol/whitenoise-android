@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- assertVisible:
+    id: '^(com.android.systemui|com.android.settings):id/(pinEntry|password_entry|lockPassword)$'
+- back
+- runFlow:
+    when:
+      visible:
+        id: '^(com.android.systemui|com.android.settings):id/(pinEntry|password_entry|lockPassword)$'
+    commands:
+    - back
+- runFlow: assert-cancelled-app-lock.yaml

@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-owned-error-close
+---
+- runFlow: ../fixtures/runtime-share-error-ready.yaml
+- assertVisible: Only content-provider files are supported.
+- assertVisible: 'Files not imported: 1'
+- assertNotVisible: Share to
+- tapOn: Close
+- runFlow: ../fixtures/share-closed.yaml

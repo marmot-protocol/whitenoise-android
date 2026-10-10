@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-document-cancel-close
+---
+- runFlow: ../fixtures/runtime-share-picker-ready.yaml
+- tapOn: Close
+- assertNotVisible:
+    id: performance.share_picker
+- assertNotVisible: Some files could not be imported
+- runFlow: ../fixtures/runtime-ready.yaml

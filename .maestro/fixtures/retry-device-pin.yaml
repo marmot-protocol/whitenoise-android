@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- tapOn:
+    id: app.unlock
+- runFlow: enter-device-pin.yaml
+- assertVisible:
+    id: privacy.device_protection.group
+- scrollUntilVisible:
+    element:
+      text: '(?s).*Require device authentication.*'
+    direction: UP
+- assertVisible:
+    id: privacy.device_authentication
+    enabled: true
+    checked: true
+    containsChild:
+      text: '(?s).*Require device authentication.*'
+- assertVisible: Auto-lock
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

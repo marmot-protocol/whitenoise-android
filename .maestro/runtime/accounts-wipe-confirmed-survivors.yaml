@@ -1,0 +1,53 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: accounts-wipe-confirmed-survivors
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Message
+- assertVisible:
+    focused: true
+- inputText: Maestro account action draft
+- assertVisible:
+    text: ^Maestro account action draft$
+- hideKeyboard
+- back
+- assertVisible: 'Draft: Maestro account action draft'
+- runFlow: ../fixtures/open-wipe-confirm.yaml
+- tapOn: Confirmation
+- inputText: WIPE
+- hideKeyboard
+- assertVisible:
+    id: profile_keys.wipe_confirm
+    enabled: true
+- tapOn:
+    id: profile_keys.wipe_confirm
+- assertNotVisible: Stays on this device
+- assertVisible:
+    text: ^Wipe finished with [0-9]+ issues?$
+- assertVisible: Local data wiped
+- tapOn: Close
+- assertNotVisible:
+    text: ^Wipe finished with [0-9]+ issues?$
+- assertVisible:
+    id: chats.scope.chats
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible:
+    text: ^Maestro (Bob|Carol)$
+- assertNotVisible: Maestro Alice
+- tapOn:
+    id: settings.switch_profile
+- tapOn:
+    text: ^Maestro Bob$
+- assertVisible:
+    id: chats.scope.chats
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Maestro Bob
+- back
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertNotVisible: Maestro account action draft
+- assertVisible:
+    text: ^Message$
+- back

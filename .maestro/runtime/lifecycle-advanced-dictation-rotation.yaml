@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-dictation-rotation
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Dictation
+- assertVisible:
+    id: dictation.ostt_recommendation.group
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: dictation.ostt_recommendation.group
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: dictation.ostt_recommendation.group
+- back
+- assertVisible: Settings

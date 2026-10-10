@@ -36,8 +36,7 @@ name: smart-folders-title-draft-cancel
     id: folder.conditionDone
     enabled: true
 - tapOn: Cancel
-- assertVisible:
-    id: folder.name
+- runFlow: ../fixtures/return-from-smart-folder-filter.yaml
 - back
 - assertVisible:
     id: chat-folders-content

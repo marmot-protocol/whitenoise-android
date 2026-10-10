@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-partial-cancel
+---
+- runFlow: ../fixtures/runtime-share-error-ready.yaml
+- assertVisible: Only content-provider files are supported.
+- assertVisible: 'Files not imported: 1'
+- assertVisible: Share to
+- assertVisible: Cancel
+- tapOn: Cancel
+- runFlow: ../fixtures/share-closed.yaml

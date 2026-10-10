@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-documents-multiple-stage
+---
+- runFlow: ../fixtures/stage-fixture-shared-document.yaml
+- assertVisible:
+    id: conversation.composer.attachment.1
+- assertNotVisible:
+    id: conversation.composer.attachment.2

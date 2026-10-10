@@ -1,0 +1,68 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profile-text-save-reopen
+---
+- runFlow: ../fixtures/open-fixture-empty-profile-name.yaml
+- inputText: Maestro edited Alice
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro edited Alice$
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: profile.about_field
+    direction: DOWN
+- assertVisible:
+    id: profile.about_field
+- tapOn:
+    id: profile.about_field
+- longPressOn:
+    id: profile.about_field
+- runFlow:
+    when:
+      visible: (?i)select all
+    commands:
+    - tapOn: (?i)select all
+- assertVisible:
+    id: profile.about_field
+    focused: true
+- eraseText: 100
+- assertNotVisible:
+    id: profile.about_field
+    text: .+
+- inputText: Maestro saved biography
+- assertVisible:
+    id: profile.about_field
+    text: ^Maestro saved biography$
+- hideKeyboard
+- assertVisible:
+    id: profile.save
+    enabled: true
+- tapOn:
+    id: profile.save
+- assertVisible:
+    id: profile.edit
+- assertNotVisible:
+    id: profile.save
+- tapOn:
+    id: profile.edit
+- scrollUntilVisible:
+    element:
+      id: profile.name_field
+    direction: UP
+- assertVisible:
+    id: profile.name_field
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro edited Alice$
+- scrollUntilVisible:
+    element:
+      id: profile.about_field
+    direction: DOWN
+- assertVisible:
+    id: profile.about_field
+- assertVisible:
+    id: profile.about_field
+    text: ^Maestro saved biography$
+- back
+- assertVisible:
+    id: profile.edit

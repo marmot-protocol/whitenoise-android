@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-document-caption-stage
+---
+- runFlow: ../fixtures/stage-fixture-shared-document.yaml
+- assertNotVisible:
+    id: conversation.composer.attachment.1
+- assertVisible:
+    text: '^\ \ Maestro\ café\ 👋\
+
+      second\ line\ \ $'

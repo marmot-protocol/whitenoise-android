@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-profile-keys-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- tapOn: Profile Keys
+- assertVisible: Show private key
+- assertVisible: Private key hidden
+- setOrientation: LANDSCAPE_LEFT
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: DOWN
+    timeout: 10000
+- assertVisible: Show private key
+- assertVisible: Private key hidden
+- setOrientation: PORTRAIT
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: DOWN
+    timeout: 10000
+- assertVisible: Show private key
+- assertVisible: Private key hidden
+- back
+- assertVisible: Settings

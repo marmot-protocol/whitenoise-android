@@ -81,15 +81,17 @@ internal fun Modifier.verticalEdgeFade(
     bottomFade: () -> Dp,
     bottomInset: () -> Dp = { 0.dp },
     maxBandFraction: Float = 1f,
+    stableRenderTarget: Boolean = false,
 ): Modifier =
     this
         .graphicsLayer {
             outsets = SCROLL_LAYER_OUTSETS
+            // Popup callers retain one render target while their animated edge bands change.
             compositingStrategy =
-                if (topFade() > 0.dp || bottomFade() > 0.dp || bottomInset() > 0.dp) {
-                    CompositingStrategy.Offscreen
-                } else {
-                    CompositingStrategy.Auto
+                when {
+                    stableRenderTarget -> CompositingStrategy.Offscreen
+                    topFade() > 0.dp || bottomFade() > 0.dp || bottomInset() > 0.dp -> CompositingStrategy.Offscreen
+                    else -> CompositingStrategy.Auto
                 }
         }.drawWithCache {
             val stops =

@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-documents-multiple-remove
+---
+- runFlow: ../fixtures/stage-fixture-shared-document.yaml
+- assertVisible:
+    id: conversation.composer.attachment.1
+- assertNotVisible:
+    id: conversation.composer.attachment.2
+- tapOn: 'Remove attachment: maestro-document.md'
+- assertNotVisible: 'Remove attachment: maestro-document.md'
+- tapOn: 'Remove attachment: maestro-table.csv'
+- assertNotVisible: 'Remove attachment: maestro-table.csv'
+- assertNotVisible:
+    id: conversation.composer.attachment.0
+- assertVisible:
+    text: ^Message$
+- assertNotVisible:
+    text: ^Send$

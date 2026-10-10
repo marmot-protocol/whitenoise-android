@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-all-read-reopen
+---
+- runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: '^Read status: No unread messages$'
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

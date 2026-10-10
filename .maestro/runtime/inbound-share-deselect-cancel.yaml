@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-deselect-cancel
+---
+- runFlow: ../fixtures/select-fixture-share-recipient.yaml
+- tapOn: Maestro group
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: ^Share$
+- tapOn: Close
+- runFlow: ../fixtures/share-closed.yaml

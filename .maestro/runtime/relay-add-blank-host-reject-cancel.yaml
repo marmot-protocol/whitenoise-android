@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: relay-add-blank-host-reject-cancel
+---
+- runFlow: ../fixtures/open-fixture-empty-relay-draft.yaml
+- inputText: wss://
+- assertVisible:
+    id: relay.add.url
+    text: ^wss://$
+- hideKeyboard
+- assertVisible:
+    id: relay.add.submit
+    enabled: false
+- back
+- assertNotVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relays.group
+- back
+- assertVisible: Settings

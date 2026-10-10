@@ -11,21 +11,23 @@ python3 scripts/maestro_coverage.py --output build/test-coverage-inventory.json 
 python3 scripts/check_manual_test_guide.py
 ```
 
-The inventory assembles every maintained case and every surface fragment. It also discovers named Screen, Sheet, Dialog, Picker, Viewer, Drawer, Overlay, Pane and full-screen View, menu, panel, popup and named dialog/sheet/picker content composables throughout production app source, including generic and receiver-qualified functions and dialogs owned outside the UI package. Each requires a permanent requirement/source mapping. The inventory lists requirement IDs without any partial UI mapping. The screen catalog labels shared-ID journey links as discovery only: those links do not prove that the named dialog itself was opened. Newly discovered surfaces without maintained requirements fail inventory generation. It lists the exact UI journeys associated with each permanent ID. Mappings are partial assertions: opening Appearance does not certify its theme, language, typography, persistence and accessibility cases. Discovered files, test names, screenshots, passing setup and a green aggregate are not proof that every case passed. `--require-full` deliberately fails while only partial UI coverage is available.
+The inventory combines maintained cases/fragments with discovery of production screens, dialogs, sheets, pickers, viewers, panes, overlays and menus, including receiver composables and non-UI packages. New surfaces require permanent source/requirement mappings. Parent/shared-ID journeys qualify discovery only. The report lists unmapped requirements and partial journeys; `--require-full` rejects partial coverage. Names, screenshots and green aggregates cannot prove every edge case.
 
 Keep the original checklist and its subcases available during a release campaign. Report unmapped requirements and fixtures explicitly. Never automatically check its release boxes after a Maestro run.
 
-The generated campaign guide includes every permanent requirement, its campaign prerequisites, explicitly named checklist subcases, all discovered screens/sheets/dialogs/pickers/viewers/overlays/panes and the required edge dimensions. The [requirement-layer plan](../config/test-requirement-layers.json) assigns each maintained family to its appropriate execution layers; a newly added family without a plan fails validation. Existing test references to each UI source file help locate unit/component/connected companions; a same-file reference may exercise only a parent, so those references also remain unverified. This is an execution plan, with every checkbox unchecked. The ordinary CI manual-guide artifact retains its JSON and Markdown alongside the full assembled checklist and source identity; generating it does not start an emulator or another build. Use that complete artifact when qualifying a candidate, then attach actual results separately. Never infer a named subcase's outcome from its parent's UI mapping. Each discovered surface also receives its own fifteen-point edge plan, including separate Activity recreation and process death, input bounds, account changes, interruptions, permissions, accessibility and keyboard behavior. The inventory names all 3,210 current surface/edge qualification points with an unexecuted status, empty evidence and no automatic N/A. Record concrete source-bound results or a justified N/A for each; this matrix is an explicit qualification checklist, not a claim of 3,210 automated tests.
+The generated guide lists permanent requirements, prerequisites, named subcases and discovered surfaces. [Requirement-layer plans](../config/test-requirement-layers.json) classify every family. Companion tests aid discovery without proving child coverage. Normal CI retains the assembled checklist, source identity and JSON/Markdown reports without extra emulators.
+
+The generated matrix plans fifteen unexecuted edges per surface: recreation/process death, input bounds, identity changes, interruption, permissions, accessibility and keyboard behavior. Leave evidence empty and boxes unchecked until source-bound execution or justified N/A; parent success cannot qualify children.
 
 ## Whole-suite execution order
 
-For a candidate, preserve its full source SHA, current base and SDK pin before starting. Run the existing normal CI once for that candidate and retain its unit, screenshot, connected, media, packaging and guide reports. Classify every failed job before retrying it; a passing distribution does not qualify the other one.
+Preserve source SHA, current base and SDK pin. Run normal CI once; retain both-distribution unit/golden, connected, media, packaging and guide reports. Diagnose failed jobs before retrying; one distribution cannot qualify another.
 
-Run the optional Maestro campaigns serially: `offline-signin` (nine cases), `offline-signup` (seven), `offline-edge` (six), then `runtime-all` (224). Use a verified retained dev APK for offline campaigns and record its source separately from the selected flow revision. Runtime builds one exact-revision isolated pair and executes all 64 partitions. Never dispatch a newer manual campaign while one is running or pending: it can replace pending work. The complete written UI inventory is 246 journeys; none of these counts means all release acceptance is automated. The optional fixture-pair producer restores only the same Gradle job’s cache and retains successful branch-scoped state for subsequent campaigns, using the pinned action’s [strict matching option](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/docs/setup-gradle.md#strict-cache-matching). A cache miss builds normally within the original budget; compilation, wrapper validation and APK checksums remain required.
+Run manual campaigns serially: `offline-signin` (9), `offline-signup` (7), `offline-edge` (6), then `runtime-all` (384), which executes all 107 partitions. Offline records retained dev-APK source separately from flow source; runtime requires one exact-source checksummed isolated pair. Never dispatch over a running/pending manual run. The written UI inventory is 406 journeys; it does not qualify full release acceptance. Pair builds use only successful branch-scoped caches with [strict matching](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/docs/setup-gradle.md#strict-cache-matching); misses retain original budgets and wrapper/compilation/checksum checks.
 
-Inspect the individual case results and final reconciliation reports. A failed or missing case remains failed or unexecuted in the overall result even when the rest passed. Diagnose its captured hierarchy, native postcondition and teardown first, correct the owning source or fixture, and rerun the affected campaign at the corrected revision. Retain the earlier failure and do not combine different manifests into one pass count. Changes to application behavior also need the affected normal CI and release layers again.
+Inspect individual UI, native and cleanup results plus final reconciliation. Missing/failed cases stay unexecuted/failed; diagnose hierarchy/postcondition/teardown, fix the owner source and rerun the affected corrected-source campaign. Retain failures and never merge different manifests into a pass count. App behavior changes also need affected normal CI/release layers.
 
-Then follow the generated guide for every remaining permanent requirement and named subcase. Each of the 214 surfaces has a separate edge checklist. Execute its applicable input, Back/keyboard, navigation, identity-change, lifecycle, interruption, permission, accessibility, localization and layout checks using the stated layer and disposable fixture. Record actual device/OS, APK digest, source, steps and outcome; an inapplicable point needs a concrete reason. A screen opening, passing companion test or handled rotation cannot qualify its untested edges or process recreation.
+Then execute remaining permanent subcases/surface edges at their stated layer and fixture: input, Back/keyboard, identity changes, lifecycle/process death, interruption, permissions, offline/reconnect, accessibility/localization/layout. Record device/OS, APK digest, source, steps/outcome or concrete N/A. A screen opening, companion test or handled rotation cannot qualify unexecuted edges.
 
 ## Layers and execution
 
@@ -62,7 +64,7 @@ gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-andro
   -f review_demo_e2e=false -f document_provider_matrix=false
 ```
 
-For a focused run select `runtime-navigation`, `runtime-settings`, `runtime-conversation`, `runtime-preferences`, `runtime-advanced`, `runtime-connectors`, `runtime-groups`, `runtime-creation`, `runtime-actions`, `runtime-polls`, `runtime-folders`, `runtime-nested`, `runtime-reader`, `runtime-composer`, `runtime-developer`, `runtime-support`, `runtime-ballots`, `runtime-profiles`, `runtime-chats`, `runtime-chatstate`, `runtime-consent`, `runtime-keys`, `runtime-search`, `runtime-permissions`, `runtime-reports`, `runtime-acquisition`, `runtime-speech`, `runtime-speech-validation`, `runtime-dictation`, `runtime-reactions`, `runtime-alert-dialogs`, `runtime-smart-folders` or `runtime-account-guards`. Runtime mode rejects repetitions, the offline negative-control option and mixed demo/document requests. APK artifact inputs are used only in offline mode.
+For a focused run choose a named `runtime-<suite>` from the [runtime manifest](../config/maestro-runtime-cases.json), such as `runtime-smart-folders`, `runtime-keys`, `runtime-app-lock` or `runtime-inbound-share`. The workflow exposes every maintained slice; `runtime-all` selects them all. Runtime rejects repetitions, offline negative controls and mixed demo/document requests. APK inputs apply only to offline mode.
 
 The build produces one checksummed Zapstore debug app/test pair at the exact selected revision. Each shard reuses those bytes. The isolated application ID is `dev.ipf.whitenoise.android.maestrolab`; fixture classes and the custom runner reside only in the test APK. No fixture classes enter normal app APKs. The controller accepts only the disposable GitHub emulator, checks a fresh random fixture generation, and runs at most four journeys per partition. Logical suites split into disjoint partitions with a 44-minute controller ceiling (four complete eleven-minute reserves) and a reserved setup/UI/cleanup window. A case that cannot fit is reported as unexecuted and fails the campaign. Emulator boot is bounded at five minutes. At most two shards run concurrently.
 
@@ -78,7 +80,7 @@ Speech cases enter the actual rate chooser and custom-rate dialog. They test Can
 
 Smart-folder cases dismiss the filter picker, open/cancel Unread and Chat type conditions, require Save disabled for an empty participant/title condition, cancel the nested people picker and an entered title, and rotate a live condition dialog. Each requires the native custom-folder store to remain empty. These editor assertions do not prove smart matching, rule persistence, nested-group depth limits or cross-account updates. Generated fixtures contain three signing identities, so their Chats avatar opens Switch Profile; the shared Settings entry subflow explicitly enters Settings from that selector instead of expecting a single-account Open settings label.
 
-The `composer-expanded-locale-recreation` journey exercises actual Activity recreation: it preserves an expanded native draft, applies German through Language, restores System and reopens the same conversation. The host captures the original MainActivity object before UI handoff and requires the current ActivityScenario object to differ. It also verifies the original account/group draft, FullScreen preference and empty application locale. Its native receipt must explicitly record `activityRecreated: true`; generic native success cannot substitute. This qualifies only that composer/locale path, and requires fresh execution. It does not simulate process death or mark other surfaces' recreation checks passed.
+`composer-expanded-locale-recreation` applies German and restores System around an expanded draft. Require a different resumed MainActivity, unchanged account/group draft, FullScreen preference, empty application locale and `activityRecreated: true`. Rerun the exact path; neither generic success nor rotation proves recreation/process death elsewhere.
 
 ## Required edge-case matrix
 
@@ -117,3 +119,95 @@ Each edit first requires keyboard focus on the named editor, then checks its exa
 These cases require fresh compilation and emulator execution. Account replacement during Save, Unicode normalization, private pictures, process-death persistence and private notification rendering remain separate acceptance points.
 
 The private-details rotation flow uses a bounded fragment scroll in its API-34 landscape fixture. The captured dialog's scrollable region occupies only 27%–62% of screen height, so a full-screen scroll can miss the retained field. Short swipes stay inside that region, find the captured `Name (from profile)` anchor with escaped parentheses, then require the exact nickname; portrait still requires the notes and Cancel. This follows [Maestro's partial-screen scrolling guidance](https://docs.maestro.dev/examples/recipes/custom-scrolling-for-screen-fragments). It needs fresh execution and does not qualify other screen sizes or large-font geometry.
+
+Eight QR permission journeys cover actual Share & Connect scanner denial, Close/Back, reopening, repeated/permanent denial, Open settings, rotation and warm return. Reset permission flags per generation. Require CAMERA denied, all three identities/active Alice/both histories retained, and real scanner Close/recovery controls absent on exit. Grants, scanning, torch, camera teardown and Android Settings return need separate evidence.
+
+On API 34 the second camera denial uses Android's `permission_deny_and_dont_ask_again_button`, although its label still says Don't allow. Both denial actions must execute before the enabled Open settings recovery action qualifies permanent denial; an optional tap cannot prove that transition. Only the manual isolated app/test build sets `android.injected.testOnly=true`: Android 14 rejects shell component changes for an ordinary debug app. The controller disables only the disposable Maestro package's boot receiver before resetting data and before any credential probe; its test Application independently requires the test-only APK flag and actual disabled state. This prevents a fresh AVD's delayed boot broadcast from starting production services before generated state exists. Ordinary APK builds and production boot delivery retain their own contracts.
+
+Four completion journeys start with an Alice draft, confirm sign-out (both invitation-key options/warm return) or wipe only disposable Alice, select Bob and require his empty composer. Typed `accountActionVerified` must prove native identities/sessions, surviving public metadata, unchanged original member records and peer drafts; sign-out retains the exact MDK owner draft. Missing/false/generic proof fails. Wipe permits only MDK-authenticated MLS system additions. Relay revocation, last-account teardown, re-import/rejoin, process death, physical erasure and full cache coverage remain unqualified.
+
+### App-lock prerequisite without a device credential
+
+Four no-credential `runtime-app-lock` journeys check the disabled/unchecked switch, setup guidance, absent Auto-lock and Android Settings across Back, both orientations and warm return. Require actual Keyguard/biometric unavailability, unchanged lock preferences/accounts/session/messages and typed `appLockFixtureNoCredential`/`appLockVerified`. They configure no credential or hardware; enabled authentication needs the PIN cases below.
+
+## Disposable device-credential journeys
+
+Four `runtime-app-lock` journeys own one real synthetic PIN on the hosted API34/user-0 AVD/isolated package. A native probe requires QEMU, SDK/Keyguard and no strong biometric. Fail on existing credentials without altering them; reject unsupported APIs before admission. Install once without `--old`, verify ownership and never replay an uncertain write.
+
+Use the real switch/OS prompt: cancel to opaque Retry with protected UI absent; rotate both ways; authenticate twice on immediate warm return/disable; reopen all four delays, Cancel/rotate and finish at fifteen minutes. Require secure cover, ordered orientations, newer unlocked session, exact preferences and unchanged identities/messages. Process-bound WNAppUnlock cancel/success markers, PIN UI and no enrolled alternative prove crypto/session without recording credentials. Injected callbacks, availability or lock mutation cannot qualify.
+
+Successful PIN authentication must return to Privacy & Security. Account/process/runtime-scoped Activity state retains only destination enums while protected composition is absent. Software removal/reentry, process-counter restoration and account/runtime replacement tests cannot certify authentication or secret editors; real PIN cancel/retry/rotation/warm-return/delay proof remains mandatory.
+
+PIN ownership spans every failure stage. Keep the 60-second restoration budget, original deadlines and 660-second reserve. Clear only the generation-owned PIN with `--old`, independently prove original no-credential state and read an uncertain clear back once without replay. Missing/false/foreign/substituted restoration fails and leaves later cases unexecuted. Never target personal/shared-phone credentials.
+
+Delay choices qualify storage; elapsed thresholds, OS-prompt recreation, ten-cycle stability, biometrics, notification/account routing, frame/Recents secrecy, process death and other APIs remain unchecked.
+
+## Public-key clipboard journeys
+
+Four public-key journeys copy with private keys hidden through rotation/warm return/Bob→Alice. Require focus and one SDK npub/public-label plain-text clip, no sensitive flag/URI/Intent/HTML. Clear only that matched clip while focused; prove empty clipboard/retained identities/messages and key-free typed proof. Delivery, expiry, process death and full ACC-010/ACC-017 remain unqualified.
+
+## Empty attachment-library journeys
+
+Eight `runtime-search` library cases check all/photos-videos/files/audio chips, actual empty/loading/results content, query clearing, rotation, warm return and Alice/Carol/Alice switching, then return to Messages/Chats. Swipes start in the chip row. GlobalAttachmentBrowser retains its separate edge plan.
+
+Require complete media-free owner/peer native timelines, original identities/messages, active Alice and execution/reconciliation `globalLibraryVerified`; truncated pages fail. Populated cards/downloads, pending/cache/account races, source navigation, focus/coordinates, expiry/recreation and full FIND-012/FIND-013 remain unqualified.
+
+## Disposable private-key journeys
+
+Eight secret-copy journeys test hidden/revealed/rehidden, rotation, warm return, departure, real expiry and switching. Peer-copy ends Bob; others Alice. State-only selectors finish at hidden Profile Keys. Require focus/FLAG_SECURE and one SDK-key plain-text clip with private label/sensitive flag, no URI/Intent/HTML. Compare in memory within the async-copy deadline; clear only the matched clip and prove absence/unchanged accounts/messages. Execution/reconciliation require `privateKeyCopyVerified`; fake clips/fixed delay cannot qualify.
+
+Raw Export Cancel and Back add two journeys without starting either destination. Expiry waits for hidden state within 35 seconds on the real 30-second timer, not a precise lower threshold. Document/share delivery, pending races, hardware authentication, Recents/frame secrecy, process death and full ACC-010/ACC-017 remain separate. No installed personal account or key contents enter evidence.
+
+Discard real CLI hierarchy/screenshots/raw output on every exit, including secure-window failures. Retain only sanitized JUnit with actual identity/count/duration/status and failure/error/skipped markers plus generic diagnostics. Missing/malformed reports fail; key comparisons/sanitization cannot invent success.
+
+## Fixture lifecycle and recovery diagnostics
+
+Non-secret UI runs retain numerical `runner-memory-before.json` and `runner-memory-after.json` OOM counters to diagnose vanished emulators. These contain no UI, process names or commands. Missing counters stay unavailable; neither diagnostics nor timeouts can override the failed exit or replace UI/native/cleanup proof. Private-key UI retains only sanitized JUnit.
+
+Capture native logs after instrumentation ends, preserving late `emulator-errors.txt` failures/setup snapshot before deletion. Share-timeout logs expose only request/state/history/shelf/copy/removal/ownership predicates, never identity/URI/content. Missing logs or diagnostic timeout cannot certify cleanup or override failure.
+
+Landscape share cases scroll `share.destinations`, avoiding fixed controls. Within the existing bound, require the real group and correct Share enabled state before portrait. No-match recovery uses Clear; require empty Search chats, original recipient and absent no-match state. Cursor deletion cannot prove clearing.
+
+Track actual MainActivity owners through consumed share Intents/warm launches. Passively await one resumed owner within existing deadlines; absent/multiple/foreign owners fail. Recreation compares identities. Require every observed Activity’s destroyed callback before listener/runtime/storage teardown; missing/substituted cleanup fails.
+
+## Additional campaign contracts
+
+### Password correction and returned folder forms
+
+Backup correction requires focused secure editors, exact synthetic values and whole-confirmation selection/empty-input proof before replacement. Select all may be absent for a full selection. Both destinations disable on mismatch and enable on equality. Cancel without export. Protected captures can be blank; inspect hierarchy/buttons.
+
+Nine smart-folder Cancel journeys require returned editor, no picker/condition, bounded scroll to unchanged empty Name, disabled Save and native `folder-absent`. NAV-009 permits dialog dismissal/restoration on rotation: prove opening, inspect both orientations, cancel any restored dialog and check the outer form. Never apply a rule tree. Keep Editing retains the exact named draft before Discard. Rerun 22 keys and nine smart-folder cases on the corrected source.
+
+The pinned CLI rejects YAML aliases. Preserve expanded assertions; tooling rejects anchors/aliases/malformed runtime/helper/offline commands. Quoted ampersands/asterisks stay valid. Retain failures; guards cannot replace hosted execution.
+
+### Settings lifecycle and persisted speech rates
+
+The 24 `runtime-settings-lifecycle` cases rotate or Home/foreground twelve destinations, verify controls and return to Settings. [Home](https://docs.maestro.dev/reference/commands-available/presskey)/[launchApp](https://docs.maestro.dev/reference/commands-available/launchapp) keeps stopApp/clearState false and permissions denied. Recreation/process death/accessibility remain separate.
+
+Six `runtime-speech-persistence` journeys save/reopen min/max/rounded rates, replace/reset and retain saved rates after invalid replacement. Require whole-input selection/empty proof, exact owner preferences and fresh production reader agreement. Execution/reconciliation require `speechRateVerified`. Audio, engines and restart remain separate.
+
+### Saved smart-folder rules
+
+Eleven `runtime-folder-rules` journeys save/reopen read/unread presets, Match any, exclusion, edited Read status, condition removal, invalid empty nested group/removal, preset Cancel/Confirm replacement, new-preset discard and a title keyword. Name/description remain exact.
+
+Snapshot three identities before handoff. Independently compare complete expected rule tree/metadata/original folders/membership/exclusion and unchanged other identities; fresh production reader must agree. Require execution/reconciliation `smartFolderRuleVerified`; timeout retains false proof/actual teardown. Loaded/unknown matching data, pagination, Unicode bounds and account replacement during Save remain unqualified.
+
+### Public profile save, restoration and lifecycle
+
+Twelve `runtime-profile-text` cases save/reopen Name/About, clear About, restore saved names after manual/generated edits, cancel rotation/warm-return drafts, correct malformed NIP-05/Lightning without resolution and save trimmed/blank optional text. Focus and fully replace each editor; scroll to Name. Warm-return discard uses toolbar Back because system Back dismissed the IME.
+
+Require complete authoritative owner metadata, both other original profiles and `publicProfileVerified`. Peer propagation, Lightning resolution, photos and process death need separate proof. [Android inputText lacks Unicode support](https://docs.maestro.dev/reference/commands-available/inputtext); qualify Unicode with native/paste or physical input.
+
+### Relay URL and role validation
+
+Fourteen `runtime-relay-validation` cases check empty/whitespace/malformed/insecure URLs, secure/trimmed corrections, zero/restored roles, local/private hosts, credentials, host/port bounds and secure 443 path/query/mixed case. Cancel without DNS/publication. Require unchanged complete three-account projections and `relayListsVerified`. Publishing, duplicates, availability, post-DNS policy/defaults and account replacement remain separate.
+
+### Inbound share errors, cancellation and Unicode text staging
+
+Fifty `runtime-inbound-share` journeys use real ACTION_SEND for pre-access rejection of app-owned/HTTPS sources, empty/partial recovery, cancellation, exact captions, lifecycle, recipient/account selection and search/IME recovery. Picker account changes cannot alter the global account or drafts on cancellation. Intent supplies Unicode/newlines/whitespace; landscape swipes start inside `share.destinations`, and Clear must restore the empty query and recipient.
+
+The 24 provider journeys cover grants/revocation, denied/empty sources, ordered/deduplicated copies, captions, cancel/removal and seven-type batches including log/calendar/font/model/unknown. Sources grant three-byte files; denial revokes only target grants. Expired originals must leave exact name/MIME/length/byte copies. Require seven ordered mixed-batch shelf entries; upload/rendering remain unqualified.
+
+Before UI handoff, verify actual import error/count/text and encrypted pending recovery. Execution/reconciliation require converged `shareImportVerified`: cleared Activity request/token, original identities and complete owner/peer message IDs/content/deletion/edit/reply, no extra message, exact owner draft/unchanged others. File-only drafts require empty text, ordered IDs/name/MIME/bytes, no reply/extra metadata. Cancel/final caption-free removal requires absent native draft, empty Message and no Send/microphone. Captions retain exact native text. Mocks/projections cannot qualify.
+
+Fresh production leases require exact ordered owner shelf, empty peer shelves and no extra original/metadata/lease files. Cancel/removal empties private storage. Missing/false proof fails. Large files, interrupted copies, concurrent targets, lock privacy, process death and delivery need controlled/physical campaigns.

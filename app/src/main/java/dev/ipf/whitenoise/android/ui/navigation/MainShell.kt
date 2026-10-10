@@ -460,8 +460,8 @@ internal fun MainShell(
         }
     }
     shellStateHolder.restoreConversationIfReady(chatsController, appState.activeAccountRef)
-    var sectionName by rememberSaveable { mutableStateOf(MainSection.Chats.name) }
-    var settingsDetailName by rememberSaveable { mutableStateOf<String?>(null) }
+    var sectionName by shellStateHolder.sectionState::sectionName
+    var settingsDetailName by shellStateHolder.sectionState::settingsDetailName
     var settingsHomeViewport by
         rememberSaveable(stateSaver = SettingsHomeViewport.Saver) {
             mutableStateOf(SettingsHomeViewport.Top)

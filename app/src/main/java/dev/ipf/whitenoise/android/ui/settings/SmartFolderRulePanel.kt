@@ -166,7 +166,7 @@ private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
         val menuScrollState = rememberScrollState()
         DropdownMenu(
             scrollState = menuScrollState,
-            modifier = Modifier.scrollEdgeFade(menuScrollState),
+            modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
             expanded = open,
             onDismissRequest = { open = false },
         ) {

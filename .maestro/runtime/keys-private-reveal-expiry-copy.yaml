@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-private-reveal-expiry-copy
+---
+- runFlow: ../fixtures/runtime-profile-keys-ready.yaml
+- runFlow: ../fixtures/reveal-fixture-private-key.yaml
+- extendedWaitUntil:
+    visible: Private key hidden
+    timeout: 35000
+- runFlow: ../fixtures/copy-hidden-fixture-private-key.yaml

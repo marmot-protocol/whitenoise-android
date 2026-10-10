@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: DOWN
+- assertVisible: Private key hidden
+- scrollUntilVisible:
+    element:
+      text: Copy Private Key
+    direction: DOWN
+- tapOn: Copy Private Key
+# Only native verification reads the generated secret; UI evidence never selects or prints it.
+- assertVisible: Private key hidden

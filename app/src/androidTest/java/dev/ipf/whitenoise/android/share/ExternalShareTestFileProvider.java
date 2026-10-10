@@ -31,6 +31,10 @@ public final class ExternalShareTestFileProvider extends ContentProvider {
         String name = resolve(uri).getName();
         if (name.endsWith(".md")) return "text/markdown";
         if (name.endsWith(".csv")) return "text/csv";
+        if (name.endsWith(".log")) return "text/x-log";
+        if (name.endsWith(".ics")) return "text/calendar";
+        if (name.endsWith(".ttf")) return "font/ttf";
+        if (name.endsWith(".gltf")) return "model/gltf+json";
         return OCTET_STREAM_MIME_TYPE;
     }
 

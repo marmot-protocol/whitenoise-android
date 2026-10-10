@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-folders-rotation
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Folders
+- assertVisible:
+    id: chat-folders-content
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: chat-folders-content
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: chat-folders-content
+- back
+- assertVisible: Settings

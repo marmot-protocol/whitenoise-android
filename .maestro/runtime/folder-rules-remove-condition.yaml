@@ -1,0 +1,32 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-remove-condition
+---
+- runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
+- tapOn:
+    id: folder.condition.2
+- assertVisible:
+    id: folder.conditionDone
+- scrollUntilVisible:
+    element:
+      text: Remove filter
+    direction: DOWN
+- tapOn: Remove filter
+- assertNotVisible:
+    id: folder.conditionDone
+- assertNotVisible:
+    id: folder.condition.2
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.add.
+    direction: DOWN
+- assertNotVisible:
+    id: folder.condition.2
+- assertVisible:
+    id: folder.condition.0
+- assertVisible:
+    id: folder.condition.1
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

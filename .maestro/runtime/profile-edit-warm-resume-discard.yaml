@@ -1,0 +1,33 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profile-edit-warm-resume-discard
+---
+- runFlow: ../fixtures/open-fixture-empty-profile-name.yaml
+- inputText: Maestro unsaved name
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro unsaved name$
+- hideKeyboard
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- scrollUntilVisible:
+    element:
+      id: profile.name_field
+    direction: DOWN
+- assertVisible:
+    id: profile.name_field
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro unsaved name$
+# Use the actual editor action; foreground restoration may reopen its focused IME.
+- tapOn: Back
+- assertVisible:
+    id: profile.edit
+- scrollUntilVisible:
+    element:
+      id: profile.name_field
+    direction: DOWN
+- assertVisible:
+    id: profile.name_field
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro Alice$
+- assertNotVisible: Maestro unsaved name

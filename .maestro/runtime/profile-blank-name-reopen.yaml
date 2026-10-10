@@ -1,0 +1,32 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profile-blank-name-reopen
+---
+- runFlow: ../fixtures/open-fixture-empty-profile-name.yaml
+- inputText: '   '
+- assertVisible:
+    id: profile.name_field
+    text: ^   $
+- hideKeyboard
+- assertVisible:
+    id: profile.save
+    enabled: true
+- tapOn:
+    id: profile.save
+- assertVisible:
+    id: profile.edit
+- assertNotVisible:
+    id: profile.save
+- tapOn:
+    id: profile.edit
+- scrollUntilVisible:
+    element:
+      id: profile.name_field
+    direction: UP
+- assertVisible:
+    id: profile.name_field
+- assertNotVisible:
+    id: profile.name_field
+    text: .+
+- back
+- assertVisible:
+    id: profile.edit

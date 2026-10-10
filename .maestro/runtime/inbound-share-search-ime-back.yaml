@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-search-ime-back
+---
+- runFlow: ../fixtures/runtime-share-picker-ready.yaml
+- tapOn: Search chats
+- assertVisible:
+    focused: true
+- inputText: Maestro
+- assertVisible:
+    focused: true
+    text: ^Maestro$
+# The picker intentionally consumes focused Back as request cancellation.
+- back
+- runFlow: ../fixtures/share-closed.yaml

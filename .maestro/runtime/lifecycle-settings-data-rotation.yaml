@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-data-rotation
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Data Usage
+- assertVisible:
+    id: data_usage.downloads.group
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: data_usage.downloads.group
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: data_usage.downloads.group
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

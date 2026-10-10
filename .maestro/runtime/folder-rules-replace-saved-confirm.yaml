@@ -1,0 +1,38 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-replace-saved-confirm
+---
+- runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.presets
+    direction: DOWN
+- tapOn:
+    id: folder.presets
+- tapOn: Unread mentions
+- assertVisible:
+    id: folder.confirmPreset
+    enabled: true
+- tapOn:
+    id: folder.confirmPreset
+- assertNotVisible:
+    id: folder.confirmPreset
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: ^Has unread mentions$
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: ^Has unread mentions$
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

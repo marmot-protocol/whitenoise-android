@@ -1,0 +1,34 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-exclusion-reopen
+---
+- runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.options.
+    direction: DOWN
+- tapOn:
+    id: folder.options.
+- scrollUntilVisible:
+    element:
+      id: folder.not.
+    direction: DOWN
+- tapOn:
+    id: folder.not.
+- tapOn: Exclude chats that match this group
+- assertVisible:
+    id: folder.not.
+    containsChild:
+      text: ^Exclude chats that match this group$
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.not.
+    direction: DOWN
+- assertVisible:
+    id: folder.not.
+    containsChild:
+      text: ^Exclude chats that match this group$
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

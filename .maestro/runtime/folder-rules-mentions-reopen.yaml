@@ -1,0 +1,29 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-mentions-reopen
+---
+- runFlow: ../fixtures/open-named-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.presetMentions
+    direction: DOWN
+- tapOn:
+    id: folder.presetMentions
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: ^Has unread mentions$
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.condition.2
+    direction: DOWN
+- assertVisible:
+    id: folder.condition.2
+- assertVisible: ^Has unread mentions$
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

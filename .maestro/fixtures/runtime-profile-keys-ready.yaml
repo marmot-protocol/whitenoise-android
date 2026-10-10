@@ -1,0 +1,5 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: open-fixture-profile-keys.yaml

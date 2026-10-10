@@ -1,0 +1,42 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profile-edit-rotation-discard
+---
+- runFlow: ../fixtures/open-fixture-empty-profile-name.yaml
+- inputText: Maestro unsaved name
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro unsaved name$
+- hideKeyboard
+- setOrientation: LANDSCAPE_LEFT
+- scrollUntilVisible:
+    element:
+      id: profile.name_field
+    direction: DOWN
+- assertVisible:
+    id: profile.name_field
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro unsaved name$
+- setOrientation: PORTRAIT
+- scrollUntilVisible:
+    element:
+      id: profile.name_field
+    direction: DOWN
+- assertVisible:
+    id: profile.name_field
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro unsaved name$
+- back
+- assertVisible:
+    id: profile.edit
+- scrollUntilVisible:
+    element:
+      id: profile.name_field
+    direction: DOWN
+- assertVisible:
+    id: profile.name_field
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro Alice$
+- assertNotVisible: Maestro unsaved name

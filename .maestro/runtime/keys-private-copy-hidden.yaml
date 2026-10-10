@@ -1,0 +1,5 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-private-copy-hidden
+---
+- runFlow: ../fixtures/runtime-profile-keys-ready.yaml
+- runFlow: ../fixtures/copy-hidden-fixture-private-key.yaml

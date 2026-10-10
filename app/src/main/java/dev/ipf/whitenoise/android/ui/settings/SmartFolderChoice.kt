@@ -41,7 +41,7 @@ internal fun <T> FolderChoice(
         val menuScrollState = rememberScrollState()
         DropdownMenu(
             scrollState = menuScrollState,
-            modifier = Modifier.scrollEdgeFade(menuScrollState),
+            modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
             expanded = open,
             onDismissRequest = { open = false },
         ) {

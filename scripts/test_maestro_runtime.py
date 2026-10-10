@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import xml.etree.ElementTree as ET
 import yaml
 
@@ -19,6 +19,22 @@ from scripts.maestro_runtime_summary import campaign
 from scripts.maestro_runtime_pair import pair
 from scripts.maestro_runtime_selection import selection, matrix_selection
 from scripts.manual_test_fragments import definitions, load_guide
+
+
+def expanded_flow_commands(path, parents=()):
+    """Inspect the actual mandatory commands when a journey uses a shared entry fixture."""
+    path = path.resolve()
+    if path in parents:
+        raise ValueError('Cyclic Maestro fixture')
+    commands = list(yaml.safe_load_all(path.read_text()))[1]
+    result = []
+    for command in commands:
+        child = command.get('runFlow') if isinstance(command, dict) else None
+        if isinstance(child, str):
+            result.extend(expanded_flow_commands(path.parent / child, (*parents, path)))
+        else:
+            result.append(command)
+    return result
 
 
 class CampaignSummaryTest(unittest.TestCase):
@@ -206,6 +222,211 @@ class CampaignSummaryTest(unittest.TestCase):
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
 
+    def test_generic_native_success_cannot_certify_persisted_speech_rate(self):
+        """Require the actual preference-owner/fresh-reader proof, not a generic native receipt."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            replacement = {**runtime.CASES[name], 'postcondition': 'speech-rate-custom'}
+            with patch.dict(runtime.CASES, {name: replacement}):
+                result = self.result(root)
+                self.assertEqual(result['passed_count'], 5)
+                self.assertFalse(result['evidence_complete'])
+                self.assertIn('speech rate', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['speechRateVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
+                record['speechRateVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
+    def test_generic_native_success_cannot_certify_saved_public_profile(self):
+        """A successful UI leaf cannot replace whole-profile and other-account persistence proof."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            replacement = {**runtime.CASES[name], 'postcondition': 'public-profile-text-saved'}
+            with patch.dict(runtime.CASES, {name: replacement}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('public profile', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['publicProfileVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
+                record['publicProfileVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
+    def test_generic_native_success_cannot_certify_complete_folder_rules(self):
+        """Require persisted rule/metadata/account isolation proof alongside visible editor success."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'smart-rule-read'}}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('smart-folder', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['smartFolderRuleVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
+                record['smartFolderRuleVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
+    def test_generic_native_success_cannot_certify_unchanged_relay_lists(self):
+        """Relay cancellation must compare all native account projections before it qualifies."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'relay-lists-unchanged'}}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('native relay lists', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['relayListsVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
+                record['relayListsVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
+    def test_generic_native_success_cannot_certify_account_actions(self):
+        """Signed-out/wiped UI must have matching native account, survivor and durable-draft proof."""
+        for postcondition in ('account-action-signed-out', 'account-action-wiped'):
+            with self.subTest(postcondition=postcondition), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                leaves, _ = self.prepare(root)
+                name = runtime.case_selection('navigation', 1)[0]
+                with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': postcondition}}):
+                    result = self.result(root)
+                    self.assertFalse(result['evidence_complete'])
+                    self.assertIn('account action', result['results'][0]['failure'])
+                    path = leaves[0] / 'verified.json'
+                    record = json.loads(path.read_text())
+                    record['accountActionVerified'] = False
+                    path.write_text(json.dumps(record))
+                    self.assertFalse(self.result(root)['evidence_complete'])
+                    record['accountActionVerified'] = True
+                    path.write_text(json.dumps(record))
+                    self.assertTrue(self.result(root)['evidence_complete'])
+
+    def test_public_key_copy_requires_typed_native_clipboard_and_owned_cleanup(self):
+        """The copy glyph plus generic verified cannot prove the expected native identity was copied."""
+        for post in ('public-key-copy-owner', 'public-key-copy-peer'):
+            for proof in (None, False, 1, 'true', True):
+                with self.subTest(post=post, proof=proof), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    leaves, _ = self.prepare(root)
+                    name = runtime.case_selection('navigation', 1)[0]
+                    path = leaves[0] / 'verified.json'
+                    row = json.loads(path.read_text())
+                    if proof is not None:
+                        row['publicKeyCopyVerified'] = proof
+                    path.write_text(json.dumps(row))
+                    with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': post}}):
+                        result = self.result(root)
+                    self.assertEqual(result['evidence_complete'], proof is True)
+                    if proof is not True:
+                        self.assertIn('public-key clipboard', result['results'][0]['failure'])
+
+    def test_private_copy_needs_its_own_typed_sensitive_clipboard_and_cleanup_proof(self):
+        """Public clipboard success cannot stand in for actual private identity and sensitivity checks."""
+        for post in ('private-key-copy-owner', 'private-key-copy-peer'):
+            for proof in (None, False, 1, 'true', True):
+                with self.subTest(post=post, proof=proof), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    leaves, _ = self.prepare(root)
+                    name = runtime.case_selection('navigation', 1)[0]
+                    path = leaves[0] / 'verified.json'
+                    row = json.loads(path.read_text())
+                    row['publicKeyCopyVerified'] = True
+                    if proof is not None:
+                        row['privateKeyCopyVerified'] = proof
+                    path.write_text(json.dumps(row))
+                    with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': post}}):
+                        result = self.result(root)
+                    self.assertEqual(result['evidence_complete'], proof is True)
+                    if proof is not True:
+                        self.assertIn('private-key clipboard sensitivity', result['results'][0]['failure'])
+
+    def test_empty_library_needs_typed_native_timeline_proof(self):
+        """Empty visible UI must fail qualification if the actual SDK attachment proof is absent."""
+        for proof in (None, False, 1, 'true', True):
+            with self.subTest(proof=proof), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                leaves, _ = self.prepare(root)
+                name = runtime.case_selection('navigation', 1)[0]
+                path = leaves[0] / 'verified.json'
+                row = json.loads(path.read_text())
+                if proof is not None:
+                    row['globalLibraryVerified'] = proof
+                path.write_text(json.dumps(row))
+                with patch.dict(runtime.CASES, {name: {**runtime.CASES[name],
+                                                      'postcondition': 'global-library-empty'}}):
+                    result = self.result(root)
+                self.assertEqual(result['evidence_complete'], proof is True)
+                if proof is not True:
+                    self.assertIn('empty native attachment timelines', result['results'][0]['failure'])
+
+    def test_app_lock_needs_typed_real_credential_state_before_and_after_ui(self):
+        """Final OS state cannot certify a fake prerequisite or replace its native postcondition."""
+        for phase, field in (('ready', 'appLockFixtureNoCredential'), ('verified', 'appLockVerified')):
+            for proof in (None, False, 'true', 1, True):
+                with self.subTest(phase=phase, proof=proof), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    leaves, _ = self.prepare(root)
+                    name = runtime.case_selection('navigation', 1)[0]
+                    for receipt_phase, receipt_field in (
+                        ('ready', 'appLockFixtureNoCredential'), ('verified', 'appLockVerified'),
+                    ):
+                        path = leaves[0] / f'{receipt_phase}.json'
+                        record = json.loads(path.read_text())
+                        if receipt_phase != phase:
+                            record[receipt_field] = True
+                        elif proof is not None:
+                            record[receipt_field] = proof
+                        path.write_text(json.dumps(record))
+                    with patch.dict(runtime.CASES, {name: {**runtime.CASES[name],
+                                                          'postcondition': 'app-lock-unavailable'}}):
+                        result = self.result(root)
+                    self.assertEqual(result['evidence_complete'], proof is True)
+                    if proof is not True:
+                        self.assertIn('app-lock', result['results'][0]['failure'])
+
+    def test_generic_native_success_cannot_certify_inbound_share_recovery(self):
+        """UI navigation needs real imported-error/request-cleanup/no-send native evidence."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': 'share-request-staged'}}):
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertEqual(result['passed_count'], 5)
+                self.assertIn('inbound share', result['results'][0]['failure'])
+                path = leaves[0] / 'verified.json'
+                record = json.loads(path.read_text())
+                record['shareImportVerified'] = False
+                path.write_text(json.dumps(record))
+                self.assertFalse(self.result(root)['evidence_complete'])
+                record['shareImportVerified'] = True
+                path.write_text(json.dumps(record))
+                self.assertTrue(self.result(root)['evidence_complete'])
+
     def test_future_shard_attempt_cannot_certify_current_run(self):
         """A future artifact is invalid even when older matching evidence passes."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -307,6 +528,45 @@ class CampaignSummaryTest(unittest.TestCase):
 
 
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_every_configured_case_is_admitted_by_the_actual_native_host(self):
+        """Prefix-based Python reconciliation cannot certify a condition the Kotlin host refuses."""
+        host = (runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro/'
+                'MaestroRuntimeHostTest.kt').read_text()
+        match = re.search(r'MAESTRO_POSTCONDITIONS\s*=\s*setOf\((.*?)\n    \)', host, re.S)
+        self.assertIsNotNone(match)
+        allowed = set(re.findall(r'"([^"]+)"', match.group(1)))
+        configured = {case['postcondition'] for case in runtime.CASES.values()}
+        self.assertFalse(configured - allowed, configured - allowed)
+        seeds = (runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro/'
+                 'MaestroFixtureSeeds.kt').read_text()
+        match = re.search(r'require\(\s*fixture in\s*listOf\((.*?)\),', seeds, re.S)
+        self.assertIsNotNone(match)
+        allowed = set(re.findall(r'"([^"]+)"', match.group(1)))
+        configured = {case.get('fixture', 'basic') for case in runtime.CASES.values()}
+        self.assertFalse(configured - allowed, configured - allowed)
+
+    def test_named_warm_resume_cases_map_to_return_not_rotation(self):
+        """A Home/foreground journey must not credit the rotation requirement in the inventory."""
+        for name, case in runtime.CASES.items():
+            if 'warm-resume' in name:
+                with self.subTest(case=name):
+                    self.assertIn('NAV-010', case['manual_ids'])
+                    if 'rotation' not in name:
+                        self.assertNotIn('NAV-009', case['manual_ids'])
+
+    def test_canonical_runtime_recipe_matches_the_selected_inventory(self):
+        """An expanding suite must not leave operators reconciling an obsolete case/partition count."""
+        guide = (runtime.ROOT / 'docs/automated-testing.md').read_text()
+        cases = re.search(r'`runtime-all` \((\d+)\)', guide)
+        partitions = re.search(r'executes all (\d+) partitions', guide)
+        journeys = re.search(r'written UI inventory is (\d+) journeys', guide)
+        self.assertIsNotNone(cases)
+        self.assertIsNotNone(partitions)
+        self.assertIsNotNone(journeys)
+        self.assertEqual(int(cases.group(1)), len(runtime.CASES))
+        self.assertEqual(int(partitions.group(1)), len(matrix_selection('runtime-all')))
+        self.assertEqual(int(journeys.group(1)), inventory()['case_count'])
+
     def test_long_input_timeout_fits_existing_fixture_and_cleanup_reserves(self):
         """A measured typing overrun cannot silently enlarge the host lifetime or shard allowance."""
         self.assertEqual(set(runtime.UI_TIMEOUTS), {'polls-question-boundary'})
@@ -334,6 +594,250 @@ class RuntimeEvidenceTest(unittest.TestCase):
         text = markdown_inventory(result)
         for dimension in EDGE_DIMENSIONS:
             self.assertEqual(text.count(f'- [ ] **{dimension}**'), len(result['screen_catalog']))
+
+    def test_runtime_flow_commands_reject_yaml_sets_and_unsupported_shapes(self):
+        """Valid YAML sets and aliases are invalid Maestro commands; inspect original tokens too."""
+        def no_aliases(text):
+            # PyYAML expands aliases before shape validation; Maestro rejects their command token.
+            self.assertFalse(any(isinstance(token, (yaml.tokens.AnchorToken, yaml.tokens.AliasToken))
+                                 for token in yaml.scan(text)))
+
+        def validate(commands):
+            self.assertIsInstance(commands, list)
+            for command in commands:
+                if isinstance(command, str):
+                    self.assertIn(command, ('hideKeyboard', 'back', 'eraseText', 'stopApp'))
+                    continue
+                self.assertIsInstance(command, dict)
+                self.assertEqual(len(command), 1)
+                name, args = next(iter(command.items()))
+                self.assertNotIn(name, ('hideKeyboard', 'back'))
+                if name == 'swipe' and isinstance(args, dict) and 'direction' in args:
+                    # Maestro 2.11.0 deserializes this enum before script evaluation.
+                    self.assertIsInstance(args['direction'], str)
+                    self.assertIn(args['direction'].upper(), ('LEFT', 'RIGHT', 'UP', 'DOWN'))
+                if name in ('retry', 'repeat') or (
+                        name == 'runFlow' and isinstance(args, dict) and 'commands' in args):
+                    validate(args['commands'])
+        for path in (runtime.ROOT / '.maestro').rglob('*.yaml'):
+            with self.subTest(flow=str(path.relative_to(runtime.ROOT))):
+                no_aliases(path.read_text())
+                documents = list(yaml.safe_load_all(path.read_text()))
+                if path.name != 'config.yaml':
+                    self.assertEqual(len(documents), 2)
+                    validate(documents[1])
+        for invalid in ([{'hideKeyboard'}], [{'back': None}], [{'tapOn': 'X', 'hideKeyboard': None}],
+                        [{'swipe': {'direction': '${LIBRARY_DIRECTION}'}}],
+                        [{'swipe': {'direction': 'SIDEWAYS'}}], [{'swipe': {'direction': True}}],
+                        [{'repeat': {'times': 1, 'commands': [{'swipe': {'direction': '${DIRECTION}'}}]}}]):
+            with self.subTest(invalid=invalid), self.assertRaises(AssertionError):
+                validate(invalid)
+        for text in ('- &repeat\n  assertVisible: Settings\n- *repeat\n',
+                     '- assertVisible: &name Settings\n- assertVisible: *name\n'):
+            with self.subTest(unsupported_yaml=text), self.assertRaises(AssertionError):
+                no_aliases(text)
+        no_aliases('- inputText: "literal &repeat and *repeat"\n')
+
+    def test_saved_folder_rule_checks_return_from_the_reopened_title_viewport(self):
+        """Reopen parks at the title, so the Match any proof must move toward the lower rules."""
+        path = runtime.ROOT / '.maestro/runtime/folder-rules-match-any-reopen.yaml'
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        reopen = commands.index({'runFlow': '../fixtures/save-and-reopen-smart-folder.yaml'})
+        self.assertEqual(commands[reopen + 1], {
+            'scrollUntilVisible': {'element': {'id': 'folder.match.'}, 'direction': 'DOWN'}})
+        keyword = runtime.ROOT / '.maestro/runtime/folder-rules-title-save-reopen.yaml'
+        commands = list(yaml.safe_load_all(keyword.read_text()))[1]
+        typing = commands.index({'inputText': 'Maestro'})
+        self.assertEqual(commands[typing - 1], {'assertVisible': {'focused': True}})
+        self.assertEqual(commands[typing + 1], {
+            'assertVisible': {'focused': True, 'text': '^Maestro$'}})
+
+    def test_captured_parent_controls_keep_child_text_and_button_state_separate(self):
+        """Regress actual accessibility subtrees from the failed hosted run, not flattened UI labels."""
+        root = runtime.ROOT
+        capture = json.loads((root / 'scripts/test-fixtures/maestro-2.11.0-control-hierarchy.json').read_text())
+        self.assertEqual(capture['maestro_version'], '2.11.0')
+        for name, tag, text in (
+                ('folder-rules-match-any-reopen', 'folder.match.', '^Match any$'),
+                ('folder-rules-exclusion-reopen', 'folder.not.', '^Exclude chats that match this group$'),
+                ('folder-rules-edit-read-status', 'folder.mode', '^Has unread messages$')):
+            node = capture['nodes'][tag]
+            self.assertNotIn('text', node['attributes'])
+            self.assertTrue(any(re.fullmatch(text, child['attributes'].get('text', ''))
+                                for child in node['children']))
+            commands = list(yaml.safe_load_all((root / '.maestro/runtime' / f'{name}.yaml').read_text()))[1]
+            expected = {'assertVisible': {'id': tag, 'containsChild': {'text': text}}}
+            self.assertIn(expected, commands)
+        button = capture['nodes']['Share']
+        self.assertEqual(button['attributes']['enabled'], 'false')
+        label = next(child for child in button['children'] if child['attributes'].get('text') == 'Share')
+        self.assertEqual(label['attributes']['enabled'], 'true')
+        checked = 0
+        for path in (root / '.maestro/runtime').glob('inbound-share-*.yaml'):
+            commands = expanded_flow_commands(path)
+            for command in commands:
+                selector = command.get('assertVisible', {}) if isinstance(command, dict) else {}
+                if isinstance(selector, dict) and selector.get('enabled') is False:
+                    self.assertNotEqual(selector.get('text'), '^Share$')
+                    if selector.get('containsChild') == {'text': '^Share$'}:
+                        checked += 1
+        self.assertGreater(checked, 30)
+
+    def test_editor_controls_are_scrolled_into_view_before_tapping(self):
+        """A tag or label elsewhere in a scrollable screen is not proof its control can be tapped."""
+        paths = list((runtime.ROOT / '.maestro/runtime').glob('relay-add-*.yaml'))
+        self.assertEqual(len(paths), 14)
+        paths.append(runtime.ROOT / '.maestro/runtime/folder-rules-empty-group-blocks-save.yaml')
+        for path in paths:
+            text = 'Add group' if path.name.startswith('folder-') else 'Add relay'
+            commands = expanded_flow_commands(path)
+            tap = commands.index({'tapOn': text})
+            self.assertEqual(commands[tap - 1], {
+                'scrollUntilVisible': {'element': {'text': f'^{text}$'}, 'direction': 'DOWN'}})
+
+    def test_account_action_drafts_use_the_shipping_composer_control(self):
+        """The real composer exports Message, not the nonexistent conversation.composer.input tag."""
+        root = runtime.ROOT / '.maestro/runtime'
+        paths = [root / f'{name}.yaml' for name, case in runtime.CASES.items()
+                 if case['postcondition'].startswith('account-action-')]
+        self.assertEqual(len(paths), 4)
+        for path in paths:
+            text = path.read_text()
+            self.assertNotIn('conversation.composer.input', text)
+            commands = list(yaml.safe_load_all(text))[1]
+            tap = commands.index({'tapOn': 'Message'})
+            self.assertEqual(commands[tap + 1], {'assertVisible': {'focused': True}})
+            self.assertEqual(commands[tap + 2], {'inputText': 'Maestro account action draft'})
+            self.assertIn({'assertVisible': {'text': '^Message$'}}, commands)
+            selected = commands.index({'tapOn': {'text': '^Maestro Bob$'}})
+            self.assertEqual(commands[selected + 1], {'assertVisible': {'id': 'chats.scope.chats'}})
+            self.assertEqual(commands[selected + 2], {'runFlow': '../fixtures/open-settings.yaml'})
+            if path.name == 'accounts-wipe-confirmed-survivors.yaml':
+                wiped = commands.index({'tapOn': {'id': 'profile_keys.wipe_confirm'}})
+                close = commands.index({'tapOn': 'Close'})
+                settings = commands.index({'runFlow': '../fixtures/open-settings.yaml'})
+                self.assertLess(wiped, close)
+                self.assertLess(close, settings)
+                self.assertIn({'assertVisible': 'Local data wiped'}, commands[wiped:close])
+
+    def test_security_return_checks_the_actual_android_security_center_owner(self):
+        path = runtime.ROOT / '.maestro/runtime/app-lock-no-credential-security-return.yaml'
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        external = commands.index({'tapOn': 'Open Android security settings'})
+        self.assertEqual(commands[external + 1], {
+            'assertVisible': {'id': '^com.android.(settings|permissioncontroller):id/.*'}})
+        self.assertEqual(commands[external + 2], {
+            'assertNotVisible': {'id': 'privacy.device_protection.group'}})
+        self.assertEqual(runtime.CASES[path.stem]['postcondition'], 'app-lock-unavailable')
+
+    def test_scanner_popup_uses_exported_recovery_controls_and_native_permission_proof(self):
+        """Modal tags missing from the captured tree cannot qualify visible or absent scanner state."""
+        root = runtime.ROOT / '.maestro'
+        paths = [root / 'fixtures/runtime-qr-denied-ready.yaml', *list((root / 'runtime').glob('qr-permission-*.yaml'))]
+        self.assertEqual(len(paths), 9)
+        for path in paths:
+            text = path.read_text()
+            self.assertNotIn('id: qr_scanner.screen', text)
+            self.assertTrue('^Scan QR Code$' in text or
+                            'runFlow: ../fixtures/runtime-qr-denied-ready.yaml' in text)
+            for command in list(yaml.safe_load_all(text))[1]:
+                selector = command.get('assertVisible') if isinstance(command, dict) else None
+                if isinstance(selector, dict) and selector.get('containsChild') == {
+                    'text': '^(Allow Camera|Open settings)$'
+                }:
+                    self.assertEqual(selector.get('id'), 'qr_scanner.recovery', path.name)
+                    self.assertIs(selector['enabled'], True)
+            if path.parent.name == 'runtime':
+                commands = expanded_flow_commands(path)
+                self.assertNotIn({'assertNotVisible': {'text': '^Scan QR Code$'}}, commands)
+                for control in ('qr_scanner.recovery', 'qr_scanner.close'):
+                    self.assertIn({'assertNotVisible': {'id': control}}, commands)
+                self.assertEqual(runtime.CASES[path.stem]['postcondition'], 'camera-denied')
+                self.assertNotIn('no target/torch', runtime.CASES[path.stem]['assertions'])
+                if 'rotation' in path.stem:
+                    self.assertIn('NAV-009', runtime.CASES[path.stem]['manual_ids'])
+        initial = list(yaml.safe_load_all(paths[0].read_text()))[1]
+        self.assertIn({'assertVisible': {'id': 'qr_scanner.recovery', 'enabled': True,
+                                        'containsChild': {'text': '^(Allow Camera|Open settings)$'}}}, initial)
+        self.assertIn({'assertVisible': {'text': '^Allow Camera$'}}, initial)
+        chrome = (runtime.ROOT / 'app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt').read_text()
+        self.assertIn('.exposePerformanceTestTags()', chrome)
+        self.assertIn('.testTag("qr_scanner.recovery")', chrome)
+        captured = json.loads((runtime.ROOT / 'scripts/test-fixtures/'
+                               'maestro-2.11.0-qr-recovery-button.json').read_text())
+        self.assertIs(captured['node']['enabled'], True)
+        self.assertIs(captured['node']['clickable'], True)
+        self.assertEqual(captured['node']['children'][0]['attributes']['text'], 'Allow Camera')
+
+    def test_lightning_clear_retaps_remaining_suffix_and_requires_empty_actual_field(self):
+        """A word selection deleted the prefix and left /path in the observed failure."""
+        root = runtime.ROOT / '.maestro'
+        commands = list(yaml.safe_load_all((root / 'fixtures/clear-profile-lightning.yaml').read_text()))[1]
+        repeated = commands[2]['repeat']
+        self.assertEqual(repeated['times'], 4)
+        flow = repeated['commands'][0]['runFlow']
+        self.assertEqual(flow['when'], {'visible': {'id': 'profile.lightning_field', 'text': '.+'}})
+        self.assertEqual(flow['commands'], [
+            {'tapOn': {'id': 'profile.lightning_field'}},
+            {'assertVisible': {'id': 'profile.lightning_field', 'focused': True}}, {'eraseText': 100}])
+        self.assertEqual(commands[-1], {'assertNotVisible': {'id': 'profile.lightning_field', 'text': '.+'}})
+        for name in ('profile-lightning-invalid-clear', 'profile-lightning-malformed-correction-cancel'):
+            text = (root / 'runtime' / f'{name}.yaml').read_text()
+            self.assertEqual(text.count('runFlow: ../fixtures/clear-profile-lightning.yaml'), 2)
+            self.assertNotIn('longPressOn', text)
+
+    def test_runtime_lifecycle_owner_keeps_actual_activity_identity_and_destroyed_cleanup(self):
+        """Consumed share/launcher Intents must not break ownership or weaken cleanup certification."""
+        root = runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro'
+        owner = (root / 'MaestroActivityOwner.kt').read_text()
+        for required in ('ActivityLifecycleMonitorRegistry.getInstance()', 'activity.application === application',
+                         'application.fixtureState === fixtureState', 'observed[activity] = stage',
+                         'monitor.addLifecycleCallback(callback)', 'monitor.removeLifecycleCallback(callback)',
+                         'observed.isNotEmpty()', 'it.finish()', 'observed.values.all { it == Stage.DESTROYED }',
+                         'filterValues { it == Stage.RESUMED }.keys', 'resumed.singleOrNull()',
+                         'check(resumed.size <= 1)', 'suspend fun onActivity', 'withTimeout(30_000L)',
+                         'withTimeout(10_000L)'):
+            self.assertIn(required, owner)
+        self.assertNotIn('setIntent(', owner)
+        self.assertNotIn('ActivityScenario', owner)
+        self.assertNotIn('runOnMainSync', owner)
+        read = owner[owner.index('suspend fun onActivity'):owner.index('suspend fun close')]
+        self.assertIn('if (invoked) return@withTimeout', read)
+        self.assertIn('delay(100L)', read)
+        host = (root / 'MaestroRuntimeHostTest.kt').read_text()
+        self.assertLess(host.index('activity = MaestroActivityOwner'), host.index('launchMaestroRuntimeActivity(context'))
+        self.assertLess(host.index('activity?.close()'), host.index('"closed.json"'))
+        for stage in ('activityClosed', 'listenerStopped', 'nativeClosed'):
+            self.assertLess(host.index(f'check({stage}.isSuccess)'), host.index('"closed.json"'))
+        recreation = (root / 'MaestroLifecycleVerification.kt').read_text()
+        self.assertIn('recreated = it !== original', recreation)
+
+    def test_share_account_sheet_dismissal_distinguishes_the_persistent_open_button(self):
+        """The opener's accessible label survives dismissal and cannot certify an absent sheet."""
+        for path in (runtime.ROOT / '.maestro/runtime').glob('inbound-share-account-*.yaml'):
+            commands = list(yaml.safe_load_all(path.read_text()))[1]
+            self.assertNotIn({'assertNotVisible': '^Choose sending account$'}, commands)
+            self.assertIn({'assertNotVisible':
+                           '^Choose which signed-in account will own these shared drafts\\.$'}, commands)
+            case = runtime.CASES[path.stem]
+            self.assertEqual(case['fixture'], 'share-text')
+            self.assertEqual(case['postcondition'], 'share-request-cancelled')
+
+    def test_share_removal_requires_the_empty_composer_without_a_send_action(self):
+        """Removing all content restores Message/microphone, rather than a disabled Send button."""
+        for name, removed in (('inbound-share-document-remove', ['maestro-document.md']),
+                              ('inbound-share-documents-multiple-remove', ['maestro-document.md', 'maestro-table.csv'])):
+            with self.subTest(case=name):
+                case = runtime.CASES[name]
+                self.assertEqual(case['postcondition'], 'share-request-files-removed')
+                commands = list(yaml.safe_load_all(
+                    (runtime.ROOT / '.maestro/runtime' / f'{name}.yaml').read_text()))[1]
+                for filename in removed:
+                    self.assertIn({'tapOn': 'Remove attachment: ' + filename}, commands)
+                    self.assertIn({'assertNotVisible': 'Remove attachment: ' + filename}, commands)
+                self.assertEqual(commands[-3:], [
+                    {'assertNotVisible': {'id': 'conversation.composer.attachment.0'}},
+                    {'assertVisible': {'text': '^Message$'}}, {'assertNotVisible': {'text': '^Send$'}}])
 
     def test_long_press_uses_a_command_not_an_unsupported_tap_property(self):
         """Regress the actual CLI parse failure that prevented all contextual-menu journeys."""
@@ -382,6 +886,66 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for path in root.glob('*.kt'):
             with self.subTest(source=path.name):
                 self.assertNotRegex(path.read_text(), r'\.\s*uiAutomation|\bgetUiAutomation\s*\(|\bUiDevice\b')
+
+    def test_generated_readiness_resets_a_failed_predecessors_orientation(self):
+        """A failed landscape journey must not silently change the next case's initial viewport."""
+        path = runtime.ROOT / '.maestro/fixtures/runtime-ready.yaml'
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        self.assertEqual(commands[0], {'setOrientation': 'PORTRAIT'})
+        self.assertIn({'runFlow': 'emulator-interruption.yaml'}, commands[1:])
+
+    def test_relay_lifecycle_requires_visible_real_rows_and_native_unchanged_lists(self):
+        """Lazy relay controls below publication warnings need scrolling, including in landscape."""
+        root = runtime.ROOT / '.maestro'
+        helper = list(yaml.safe_load_all((root / 'fixtures/assert-relays-list.yaml').read_text()))[1]
+        self.assertEqual(helper[0], {'assertVisible': 'Relays'})
+        scroll = helper[1]['scrollUntilVisible']
+        self.assertEqual(scroll['element'], {'id': r'^relays\.row\..+'})
+        self.assertEqual(scroll['direction'], 'DOWN')
+        self.assertEqual(scroll['timeout'], 15000)
+        self.assertEqual(helper[2], {'assertVisible': {'id': 'relays.group'}})
+        for name in ('lifecycle-advanced-relays-rotation', 'lifecycle-advanced-relays-warm-resume'):
+            commands = list(yaml.safe_load_all((root / 'runtime' / f'{name}.yaml').read_text()))[1]
+            proof = {'runFlow': '../fixtures/assert-relays-list.yaml'}
+            self.assertEqual(runtime.CASES[name]['postcondition'], 'relay-lists-unchanged')
+            self.assertEqual(commands.count(proof), 3 if name.endswith('rotation') else 2)
+            for index, command in enumerate(commands):
+                if 'setOrientation' in command or command == {'runFlow': '../fixtures/runtime-warm-resume.yaml'}:
+                    self.assertEqual(commands[index + 1], proof)
+            self.assertEqual(commands[-1], {'assertVisible': 'Settings'})
+
+    def test_share_no_match_recovery_clears_the_whole_query_before_recipient_assertion(self):
+        """The hosted capture retained Destination after deletion at a mid-string caret."""
+        path = runtime.ROOT / '.maestro/runtime/inbound-share-search-no-match-clear.yaml'
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        clear = commands.index({'tapOn': 'Clear'})
+        self.assertEqual(commands[clear + 1], {'assertVisible': 'Search chats'})
+        self.assertEqual(commands[clear + 2], {'assertNotVisible': {'text': '^ZZZMaestroNoDestination$'}})
+        self.assertEqual(commands[clear + 3], {'assertNotVisible': {'text': '^No chats match your search.$'}})
+        self.assertIn({'assertVisible': {'text': '^Maestro group$'}}, commands[clear + 4:])
+        self.assertFalse(any(isinstance(c, dict) and 'eraseText' in c for c in commands))
+        self.assertEqual(runtime.CASES['inbound-share-search-no-match-clear']['postcondition'],
+                         'share-request-cancelled')
+
+    def test_share_rotation_searches_inside_actual_destination_fragment(self):
+        """A static landscape search/filter bar must never receive the recipient-list gesture."""
+        root = runtime.ROOT / '.maestro'
+        helper = list(yaml.safe_load_all((root / 'fixtures/share-recipient-visible.yaml').read_text()))[1]
+        self.assertEqual(helper[0], {'assertVisible': {'id': 'share.destinations'}})
+        repeat = helper[1]['repeat']
+        self.assertLessEqual(repeat['times'], 6)
+        search = repeat['commands'][0]['runFlow']
+        self.assertEqual(search['when'], {'notVisible': {'text': '^Maestro group$'}})
+        self.assertEqual(search['commands'], [{'swipe': {
+            'from': {'id': 'share.destinations'}, 'direction': 'UP'}}])
+        self.assertEqual(helper[-1], {'assertVisible': {'text': '^Maestro group$'}})
+        for name in ('inbound-share-picker-rotation', 'inbound-share-selected-rotation'):
+            commands = list(yaml.safe_load_all((root / 'runtime' / f'{name}.yaml').read_text()))[1]
+            rotation = commands.index({'setOrientation': 'LANDSCAPE_LEFT'})
+            self.assertEqual(commands[rotation + 2], {'runFlow': '../fixtures/share-recipient-visible.yaml'})
+            self.assertNotIn('scrollUntilVisible', {key for command in commands for key in command})
+            self.assertIn({'setOrientation': 'PORTRAIT'}, commands[rotation + 3:])
+            self.assertIn('share-request-', runtime.CASES[name]['postcondition'])
 
     def test_rotation_commands_use_supported_pinned_cli_orientations(self):
         """Reject flow parse failures before requesting an emulator; include every offline and runtime flow."""
@@ -439,10 +1003,25 @@ class RuntimeEvidenceTest(unittest.TestCase):
             path.write_text('@Composable fun <T> ColumnScope.GenericDialog(value: T) {}\n'
                             '// @Composable fun PhantomScreen() {}\n'
                             'val example = "@Composable fun QuotedSheet() {}"\n'
+                            '@Composable fun AttachmentBrowser() {}\n'
+                            '// @Composable fun PhantomBrowser() {}\n'
+                            'val browser = "@Composable fun QuotedBrowser() {}"\n'
+                            'fun FormatBrowser() {}\n'
                             'fun FormatDialog() {}\n')
             screens = screen_catalog(root, {'ui': [{'source': source, 'test_ids': ['INT-001']}]}, {})
-            self.assertEqual([screen['symbol'] for screen in screens], ['ColumnScope.GenericDialog'])
+            self.assertEqual([screen['symbol'] for screen in screens],
+                             ['AttachmentBrowser', 'ColumnScope.GenericDialog'])
             self.assertEqual(len(screens[0]['edge_plan']), len(EDGE_DIMENSIONS))
+
+    def test_actual_attachment_browser_has_its_own_unexecuted_edge_plan(self):
+        """A real full-area browser must not disappear from the screen audit due to its suffix."""
+        screens = inventory()['screen_catalog']
+        rows = [row for row in screens if row['symbol'] == 'GlobalAttachmentBrowser']
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]['source'].endswith('ui/chats/GlobalAttachmentBrowser.kt'))
+        self.assertEqual(len(rows[0]['edge_plan']), len(EDGE_DIMENSIONS))
+        self.assertFalse(rows[0]['execution_verified'])
+        self.assertTrue(all(edge['status'] == 'unexecuted' for edge in rows[0]['edge_plan']))
 
     def test_dialogs_outside_ui_package_require_the_same_maintained_edge_plan(self):
         """Speech/platform dialogs cannot disappear because their owner is outside the UI directory."""
@@ -631,9 +1210,10 @@ class RuntimeEvidenceTest(unittest.TestCase):
 
     def test_backup_checks_use_button_state_and_verify_both_cleared_inputs(self):
         """Reject the captured false label-state proof and unintended Back on an unfocused dialog."""
-        for name, case in runtime.CASES.items():
-            if case['suite'] != 'keys':
-                continue
+        backups = {name: case for name, case in runtime.CASES.items()
+                   if case['suite'] == 'keys' and 'ACC-011' in case['manual_ids']}
+        self.assertEqual(len(backups), 8)
+        for name, case in backups.items():
             flow = (runtime.ROOT / '.maestro/runtime' / (name + '.yaml')).read_text()
             with self.subTest(case=name):
                 self.assertNotIn('- assertVisible: "Encrypted Private Key"\n- hideKeyboard', flow)
@@ -647,6 +1227,96 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     for field in ('export_password', 'export_confirmation'):
                         self.assertIn('- assertVisible:\n    id: "profile_keys.' + field + '"', flow)
                         self.assertIn('- assertNotVisible:\n    id: "profile_keys.' + field + '"\n    text: ".+"', flow)
+
+    def test_backup_correction_proves_complete_replacement_before_matching_buttons(self):
+        """Reject cursor-relative clearing that left st2! behind the corrected confirmation."""
+        _, commands = list(yaml.safe_load_all(
+            (runtime.ROOT / '.maestro/runtime/keys-correct-mismatch.yaml').read_text()))
+        expected = [('export_password', 'Maestro-test1!'),
+                    ('export_confirmation', 'Maestro-test2!'),
+                    ('export_confirmation', 'Maestro-test1!')]
+        inputs = [(index, command['inputText']) for index, command in enumerate(commands)
+                  if isinstance(command, dict) and 'inputText' in command]
+        self.assertEqual(len(inputs), len(expected))
+        for (index, value), (field, wanted) in zip(inputs, expected):
+            tag = 'profile_keys.' + field
+            self.assertEqual(value, wanted)
+            self.assertEqual(commands[index - 1], {'assertVisible': {'id': tag, 'focused': True}})
+            self.assertEqual(commands[index + 1], {'assertVisible': {'id': tag, 'text': '^' + wanted + '$'}})
+            self.assertEqual(commands[index + 2], 'hideKeyboard')
+        erase = next(index for index, command in enumerate(commands)
+                     if isinstance(command, dict) and 'eraseText' in command)
+        confirmation = 'profile_keys.export_confirmation'
+        self.assertIn({'longPressOn': {'id': confirmation}}, commands[inputs[1][0]:erase])
+        self.assertEqual(commands[erase - 1], {'assertVisible': {'id': confirmation, 'focused': True}})
+        self.assertEqual(commands[erase + 1], {'assertNotVisible': {'id': confirmation, 'text': '.+'}})
+        self.assertLess(inputs[1][0], erase)
+        self.assertLess(erase, inputs[2][0])
+        for tag in ('view_backup', 'export_file'):
+            disabled = {'assertVisible': {'id': 'profile_keys.' + tag, 'enabled': False}}
+            enabled = {'assertVisible': {'id': 'profile_keys.' + tag, 'enabled': True}}
+            self.assertIn(disabled, commands[inputs[1][0]:erase])
+            self.assertIn(enabled, commands[inputs[2][0]:])
+        self.assertIn({'tapOn': 'Cancel'}, commands)
+        self.assertNotIn({'tapOn': {'id': 'profile_keys.export_file'}}, commands)
+
+    def test_folder_cancel_return_restores_viewport_before_untouched_name_assertion(self):
+        """The returned LazyColumn stays at filters; an off-screen name is not a failed dismissal."""
+        cases = {name: case for name, case in runtime.CASES.items()
+                 if case['suite'] == 'smart-folders' and name != 'smart-folders-draft-rotation-discard'}
+        self.assertEqual(len(cases), 8)
+        returned = {'runFlow': '../fixtures/return-from-smart-folder-filter.yaml'}
+        for name, case in cases.items():
+            with self.subTest(case=name):
+                _, commands = list(yaml.safe_load_all(
+                    (runtime.ROOT / '.maestro/runtime' / (name + '.yaml')).read_text()))
+                self.assertEqual(case['postcondition'], 'folder-absent')
+                self.assertEqual(commands.count(returned), 1)
+                # Preserve initial form discovery; the later return must restore its viewport.
+                self.assertEqual(commands.count({'assertVisible': {'id': 'folder.name'}}), 1)
+                self.assertEqual(commands[-3:], [returned, 'back', {'assertVisible': {'id': 'chat-folders-content'}}])
+        _, commands = list(yaml.safe_load_all(
+            (runtime.ROOT / '.maestro/fixtures/return-from-smart-folder-filter.yaml').read_text()))
+        self.assertEqual(commands[0], {'assertVisible': {'id': 'chat-folder-edit-content'}})
+        for tag in ('folder.addField.PARTICIPANTS', 'folder.conditionDone'):
+            self.assertIn({'assertNotVisible': {'id': tag}}, commands[:3])
+        scroll = next(index for index, command in enumerate(commands) if 'scrollUntilVisible' in command)
+        self.assertEqual(commands[scroll]['scrollUntilVisible'], {'element': {'id': 'folder.name'}, 'direction': 'UP'})
+        self.assertEqual(commands[scroll + 1], {'assertVisible': {'id': 'folder.name'}})
+        self.assertEqual(commands[scroll + 2], {'assertNotVisible': {'id': 'folder.name', 'text': '.+'}})
+        self.assertEqual(commands[scroll + 3], {'assertVisible': {'id': 'folder.save', 'enabled': False}})
+
+    def test_folder_rotation_proves_open_dialog_before_changing_orientation(self):
+        """Prove the initial dialog, then handle its observed reappearance on return to portrait."""
+        helper = '../fixtures/dismiss-restored-folder-condition.yaml'
+        _, dismissal = list(yaml.safe_load_all((runtime.ROOT / '.maestro/fixtures' / Path(helper).name).read_text()))
+        retained = dismissal[0]['runFlow']
+        self.assertEqual(retained['when'], {'visible': {'id': 'folder.conditionDone'}})
+        self.assertIn({'assertVisible': {'id': 'folder.conditionDone', 'enabled': True}}, retained['commands'])
+        self.assertIn({'assertVisible': {'id': 'folder.mode'}}, retained['commands'])
+        self.assertEqual(retained['commands'][-1], {'tapOn': 'Cancel'})
+        self.assertEqual(dismissal[1:], [
+            {'assertNotVisible': {'id': 'folder.mode'}},
+            {'assertNotVisible': {'id': 'folder.conditionDone'}},
+        ])
+        for name in ('smart-folders-condition-rotation', 'smart-folders-draft-rotation-discard'):
+            with self.subTest(case=name):
+                _, commands = list(yaml.safe_load_all((runtime.ROOT / '.maestro/runtime' / f'{name}.yaml').read_text()))
+                selected = commands.index({'tapOn': {'id': 'folder.addField.UNREAD'}})
+                rotation = commands.index({'setOrientation': 'LANDSCAPE_LEFT'})
+                self.assertEqual(commands[selected + 1:rotation], [
+                    {'assertVisible': {'id': 'folder.conditionDone', 'enabled': True}},
+                    {'assertVisible': {'id': 'folder.mode'}},
+                    {'assertNotVisible': {'id': 'folder.addField.PARTICIPANTS'}},
+                    {'takeScreenshot': 'smart-folder-condition-before-rotation'},
+                ])
+                self.assertEqual(commands[rotation + 1], {'takeScreenshot': 'smart-folder-condition-after-rotation'})
+                self.assertEqual(commands[rotation + 2], {'runFlow': helper})
+                portrait = commands.index({'setOrientation': 'PORTRAIT'})
+                self.assertEqual(commands[portrait + 1], {'runFlow': helper})
+                self.assertEqual(commands[portrait + 2], {'assertVisible': {'id': 'chat-folder-edit-content'}})
+                self.assertIn({'assertNotVisible': {'id': 'folder.group.'}}, commands[portrait:])
+                self.assertEqual(runtime.CASES[name]['postcondition'], 'folder-absent')
 
     def test_private_contact_editing_proves_recipient_focus_and_dismisses_each_ime(self):
         """Reject the captured notes-in-nickname failure and keyboard suggestion Save match."""
@@ -778,6 +1448,74 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 with self.subTest(value=value), self.assertRaises(ValueError):
                     runtime.receipt(json.dumps(value), generation, flag)
 
+    def test_executor_rejects_missing_false_or_untyped_native_state_proof(self):
+        """Successful UI and teardown cannot certify absent account or real OS-credential proof."""
+        generation = 'a' * 32
+        name = 'navigation-settings-back'
+        requirements = (
+            ('account-action-signed-out', 'accountActionVerified', 'verified', 'account action'),
+            ('account-action-wiped', 'accountActionVerified', 'verified', 'account action'),
+            ('public-key-copy-owner', 'publicKeyCopyVerified', 'verified', 'public-key clipboard'),
+            ('public-key-copy-peer', 'publicKeyCopyVerified', 'verified', 'public-key clipboard'),
+            ('global-library-empty', 'globalLibraryVerified', 'verified', 'empty native attachment timelines'),
+            ('private-key-copy-owner', 'privateKeyCopyVerified', 'verified', 'private-key clipboard sensitivity'),
+            ('private-key-copy-peer', 'privateKeyCopyVerified', 'verified', 'private-key clipboard sensitivity'),
+            ('app-lock-unavailable', 'appLockFixtureNoCredential', 'ready', 'app-lock prerequisite'),
+            ('app-lock-unavailable', 'appLockVerified', 'verified', 'app-lock state'),
+        )
+        for postcondition, field, phase, message in requirements:
+            for proof in (None, False, 'true', 1, True):
+                with self.subTest(postcondition=postcondition, proof=proof), tempfile.TemporaryDirectory() as temporary:
+                    process = Mock(returncode=0)
+                    process.poll.side_effect = [None, 0, 0]
+
+                    def start(*args, **kwargs):
+                        kwargs['stdout'].write('OK (1 test)\n')
+                        kwargs['stdout'].flush()
+                        return process
+
+                    def command(arguments):
+                        if 'disable' in arguments:
+                            return 'Component new state: disabled'
+                        if arguments[-2:] == ['clear', runtime.PACKAGE]:
+                            return 'Success'
+                        path = arguments[-1]
+                        if path.endswith('/ready.json'):
+                            record = {'generation': generation, 'ready': True, 'accounts': 3,
+                                      'fixture': 'basic', 'uiObserver': 'maestro',
+                                      'appLockFixtureNoCredential': True}
+                            if phase == 'ready':
+                                record.pop(field)
+                                if proof is not None:
+                                    record[field] = proof
+                            return json.dumps(record)
+                        if path.endswith('/closed.json'):
+                            return json.dumps({'generation': generation, 'closed': True})
+                        if path.endswith('/verified.json'):
+                            record = {'generation': generation, 'verified': True, 'appLockVerified': True}
+                            if phase == 'verified':
+                                record.pop(field, None)
+                                if proof is not None:
+                                    record[field] = proof
+                            return json.dumps(record)
+                        return ''
+
+                    def ui(case, directory):
+                        (directory / 'junit.xml').write_text(
+                            f'<testsuite><testcase name="{case}" status="SUCCESS" time="1"/></testsuite>')
+                        return Mock(returncode=0)
+
+                    with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': postcondition}}), \
+                         patch.object(runtime.uuid, 'uuid4', return_value=Mock(hex=generation)), \
+                         patch.object(runtime, 'command', side_effect=command), \
+                         patch.object(runtime.subprocess, 'Popen', side_effect=start), \
+                         patch.object(runtime, 'run_ui', side_effect=ui):
+                        result = runtime.run_case(name, Path(temporary))
+                    self.assertTrue(result['cleanup_safe'])
+                    self.assertEqual(result['passed'], proof is True)
+                    if proof is not True:
+                        self.assertIn(message, result['failure' if phase == 'ready' else 'cleanup_failure'])
+
     def test_missing_duplicate_skipped_wrong_and_failed_ui_results_are_rejected(self):
         """Require exactly the selected named assertion without skipped or failure children."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -855,7 +1593,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
     def test_failed_fixture_data_reset_never_launches_a_host(self):
         """Prevent a fresh-generation claim when Android did not clear isolated global stores."""
         with tempfile.TemporaryDirectory() as temporary:
-            with patch.object(runtime, 'command', return_value='Failed'), \
+            with patch.object(runtime, 'command', side_effect=['Component new state: disabled', 'Failed']), \
                  patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(ValueError):
                 runtime.run_case('navigation-settings-back', Path(temporary))
             start.assert_not_called()
@@ -864,12 +1602,62 @@ class RuntimeEvidenceTest(unittest.TestCase):
         """A preceding permission decision must not silently leak into the next generation."""
         for reset_step in (1, 2):
             with self.subTest(reset_step=reset_step), tempfile.TemporaryDirectory() as temporary:
-                results = ['Success'] + [''] * (reset_step - 1)
+                results = ['Component new state: disabled', 'Success'] + [''] * (reset_step - 1)
                 results.append(subprocess.CalledProcessError(1, 'permission reset'))
                 with patch.object(runtime, 'command', side_effect=results), \
                      patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(subprocess.CalledProcessError):
                     runtime.run_case('navigation-settings-back', Path(temporary))
                 start.assert_not_called()
+
+    def test_unqualified_boot_component_never_launches_a_fixture(self):
+        """A boot receiver must not race the uninitialized fixture Application or disable a user package."""
+        for result in ('', 'new state: enabled', 'new state: disabled-user'):
+            with self.subTest(result=result), tempfile.TemporaryDirectory() as temporary:
+                with patch.object(runtime, 'command', return_value=result) as commands, \
+                     patch.object(runtime.subprocess, 'Popen') as start, self.assertRaisesRegex(ValueError, 'boot receiver'):
+                    runtime.run_case('navigation-settings-back', Path(temporary))
+                start.assert_not_called()
+                self.assertEqual(commands.call_args.args[0], ['adb', '-s', 'emulator-5554', 'shell', 'pm',
+                    'disable', '--user', '0',
+                    runtime.PACKAGE + '/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'])
+
+    def test_credential_baseline_never_precedes_boot_suppression(self):
+        """Read-only credential probes instantiate the same Application and need its boot guard first."""
+        names = [name for name, case in runtime.CASES.items()
+                 if case['postcondition'].startswith('app-lock-credential-')]
+        self.assertEqual(len(names), 4)
+        for name in names:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                observed = []
+                def disable(arguments):
+                    observed.append('boot-disabled')
+                    self.assertIn('disable', arguments)
+                    return 'Component new state: disabled'
+                def fixture(*_):
+                    observed.append('fixture')
+                    return {'case': name, 'passed': True, 'cleanup_safe': True}
+                with patch.object(runtime, 'command', side_effect=disable), \
+                     patch.object(runtime, 'DisposableCredential') as credential, \
+                     patch.object(runtime, 'run_fixture', side_effect=fixture):
+                    credential.return_value.install.side_effect = lambda: observed.append('baseline-and-install')
+                    credential.return_value.restore.side_effect = lambda: observed.append('restored')
+                    result = runtime.run_case(name, Path(temporary))
+                self.assertEqual(observed, ['boot-disabled', 'baseline-and-install', 'fixture', 'restored'])
+                self.assertTrue(result['passed'])
+
+    def test_unqualified_boot_never_starts_a_credential_probe_or_pin_write(self):
+        """A refused component change stops before credential ownership or installation can begin."""
+        name = next(name for name, case in runtime.CASES.items()
+                    if case['postcondition'].startswith('app-lock-credential-'))
+        for failure in ('new state: enabled', subprocess.CalledProcessError(255, 'component denied')):
+            with self.subTest(failure=type(failure).__name__), tempfile.TemporaryDirectory() as temporary:
+                with patch.object(runtime, 'command', side_effect=[failure]), \
+                     patch.object(runtime, 'DisposableCredential') as credential, \
+                     patch.object(runtime, 'run_fixture') as fixture:
+                    with self.assertRaises((ValueError, subprocess.CalledProcessError)):
+                        runtime.run_case(name, Path(temporary))
+                credential.assert_not_called()
+                fixture.assert_not_called()
 
     def test_runtime_cases_never_kill_or_replace_the_instrumentation_host(self):
         """Keep UI flows inside their native host lifetime and permanent acceptance scope."""
@@ -889,6 +1677,283 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 self.assertTrue(case['assertions'])
                 self.assertTrue(set(case['manual_ids']) <= set(ids), case['manual_ids'])
 
+    def test_switch_assertions_use_checked_accessibility_state(self):
+        """Regression: selected is not Android switch state and can prevent actual teardown."""
+        paths = [('.maestro/fixtures/assert-no-credential-privacy.yaml', [False]),
+                 ('.maestro/runtime/accounts-signout-keep-invitations.yaml', [True, False]),
+                 ('.maestro/runtime/accounts-signout-warm-resume.yaml', [True, False])]
+        for path, expected in paths:
+            _, commands = list(yaml.safe_load_all((runtime.ROOT / path).read_text()))
+            states = []
+            for command in commands:
+                node = command.get('assertVisible') if isinstance(command, dict) else None
+                if isinstance(node, dict) and (node.get('id') == 'profile_keys.signout_invitation_keys'
+                                              or node.get('containsChild', {}).get('text') == '^Require device authentication$'):
+                    self.assertNotIn('selected', node)
+                    self.assertIs(type(node.get('checked')), bool)
+                    states.append(node['checked'])
+            self.assertEqual(states, expected)
+
+    def test_credential_helpers_check_the_actual_switch_and_radio_parent(self):
+        """Shared retry/reopen helpers must not reintroduce state checks on plain text labels."""
+        root = runtime.ROOT / '.maestro'
+        paths = list((root / 'fixtures').glob('*.yaml')) + list((root / 'runtime').glob('app-lock-*.yaml'))
+        checked = 0
+        for path in paths:
+            documents = list(yaml.safe_load_all(path.read_text()))
+            for command in documents[1]:
+                if not isinstance(command, dict):
+                    continue
+                for key in ('assertVisible', 'tapOn'):
+                    node = command.get(key)
+                    if isinstance(node, dict) and 'checked' in node:
+                        self.assertNotIn('text', node, path.name)
+                        label = node.get('containsChild', {}).get('text', '')
+                        if 'Require device authentication' in label:
+                            self.assertEqual(node.get('id'), 'privacy.device_authentication', path.name)
+                        elif 'id' in node:
+                            self.assertIn((path.name, node['id']), {
+                                ('select-library-mode.yaml', 'global.library.mode.${LIBRARY_KIND}'),
+                                ('select-library-messages.yaml', 'global.library.mode.Messages'),
+                            })
+                        else:
+                            self.assertTrue(node.get('containsChild', {}).get('text'), path.name)
+                        checked += 1
+        self.assertGreaterEqual(checked, 10)
+        source = (runtime.ROOT / 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt').read_text()
+        self.assertIn('modifier = Modifier.testTag("privacy.device_authentication"),', source)
+
+    def test_public_key_copy_flows_use_acknowledged_real_controls_and_keep_private_key_hidden(self):
+        """Regress copy/account/lifecycle routes without crediting the raw-key or external-share criteria."""
+        names = ('keys-public-copy', 'keys-public-copy-rotation-return',
+                 'keys-public-copy-warm-resume', 'keys-public-copy-account-switch')
+        root = runtime.ROOT / '.maestro'
+        for name in names:
+            text = (root / 'runtime' / f'{name}.yaml').read_text()
+            commands = expanded_flow_commands(root / 'runtime' / f'{name}.yaml')
+            self.assertIn({'tapOn': 'Profile Keys'}, commands)
+            self.assertIn({'assertVisible': 'Private key hidden'}, commands)
+            self.assertIn('runFlow: ../fixtures/copy-fixture-public-key.yaml', text)
+            self.assertIn('ACC-010', runtime.CASES[name]['manual_ids'])
+            self.assertNotIn('Show private key', text)
+            self.assertNotIn('Copy private key', text)
+        peer = (root / 'runtime/keys-public-copy-account-switch.yaml').read_text()
+        self.assertLess(peer.index('- tapOn: Maestro Bob'), peer.index('- tapOn: Maestro Alice'))
+        self.assertEqual(runtime.CASES[names[-1]]['postcondition'], 'public-key-copy-peer')
+        self.assertIn('runtime-warm-resume.yaml', (root / 'runtime' / f'{names[2]}.yaml').read_text())
+        rotated = (root / 'runtime' / f'{names[1]}.yaml').read_text()
+        self.assertIn('LANDSCAPE_LEFT', rotated)
+        self.assertIn('PORTRAIT', rotated)
+        helper = (root / 'fixtures/copy-fixture-public-key.yaml').read_text()
+        commands = list(yaml.safe_load_all(helper))[1]
+        tap = next(command['tapOn'] for command in commands if 'tapOn' in command)
+        self.assertEqual(tap['text'], 'Copy public key')
+        self.assertIs(type(tap['waitToSettleTimeoutMs']), int)
+        self.assertGreaterEqual(tap['waitToSettleTimeoutMs'], 0)
+        self.assertLess(tap['waitToSettleTimeoutMs'], 2000)
+        self.assertIn('- assertVisible: Public key copied', helper)
+        self.assertIn('- assertVisible: Private key hidden', helper)
+
+    def test_empty_library_flows_select_real_modes_and_preserve_native_owner(self):
+        """Empty results, partial-screen chips and lifecycle routes need explicit, bounded UI assertions."""
+        root = runtime.ROOT / '.maestro'
+        cases = {name: case for name, case in runtime.CASES.items() if name.startswith('search-library-empty-')}
+        self.assertEqual(len(cases), 8)
+        kinds = set()
+        for name, case in cases.items():
+            self.assertEqual(case['postcondition'], 'global-library-empty')
+            self.assertEqual(case['suite'], 'search')
+            self.assertIn('FIND-008', case['manual_ids'])
+            commands = list(yaml.safe_load_all((root / 'runtime' / f'{name}.yaml').read_text()))[1]
+            for command in commands:
+                flow = command.get('runFlow') if isinstance(command, dict) else None
+                if isinstance(flow, dict) and flow.get('file') == '../fixtures/open-empty-library.yaml':
+                    kinds.add(flow['env']['LIBRARY_KIND'])
+        self.assertEqual(kinds, {'ANY_ATTACHMENT', 'IMAGES_VIDEO', 'FILES_DOCUMENTS', 'VOICE_AUDIO'})
+        helper = list(yaml.safe_load_all((root / 'fixtures/select-library-mode.yaml').read_text()))[1]
+        repeat = helper[1]['repeat']
+        self.assertEqual(repeat['times'], 6)
+        swipe = repeat['commands'][0]['runFlow']['commands'][0]['swipe']
+        self.assertEqual(swipe['from'], {'id': 'global.library.modes'})
+        self.assertEqual(swipe['direction'], 'LEFT')
+        self.assertNotIn('start', swipe)
+        self.assertNotIn('end', swipe)
+        self.assertIs(helper[-1]['assertVisible']['checked'], True)
+        capture = json.loads((runtime.ROOT / 'scripts/test-fixtures/'
+                              'maestro-2.11.0-library-chip-hierarchy.json').read_text())
+        self.assertEqual(capture['maestro_version'], '2.11.0')
+        self.assertEqual(capture['case'], 'search-library-empty-all')
+        chosen = capture['nodes']['global.library.mode.ANY_ATTACHMENT']['attributes']
+        self.assertEqual(chosen['checked'], 'true')
+        self.assertEqual(chosen['selected'], 'false')
+        self.assertNotIn('selected', helper[-1]['assertVisible'])
+        for tag, node in capture['nodes'].items():
+            if tag != 'global.library.mode.ANY_ATTACHMENT':
+                self.assertEqual(node['attributes']['checked'], 'false')
+        messages = list(yaml.safe_load_all((root / 'fixtures/select-library-messages.yaml').read_text()))[1]
+        self.assertEqual(messages[1]['repeat']['times'], 6)
+        return_swipe = messages[1]['repeat']['commands'][0]['runFlow']['commands'][0]['swipe']
+        self.assertEqual(return_swipe, {'from': {'id': 'global.library.modes'}, 'direction': 'RIGHT'})
+        self.assertEqual(messages[-1]['assertVisible'], {'id': 'global.library.mode.Messages', 'checked': True})
+        for kind in ('all', 'photos', 'files', 'audio'):
+            text = (root / 'runtime' / f'search-library-empty-{kind}.yaml').read_text()
+            self.assertIn('file: ../fixtures/select-library-messages.yaml', text)
+            self.assertNotIn('LIBRARY_DIRECTION', text)
+        empty = list(yaml.safe_load_all((root / 'fixtures/assert-empty-library.yaml').read_text()))[1]
+        self.assertIn({'assertVisible': 'No files or media found'}, empty)
+        self.assertIn({'assertNotVisible': {'id': 'global.library.results'}}, empty)
+        self.assertIn({'assertNotVisible': {'id': 'global.library.loading'}}, empty)
+        rotation = (root / 'runtime/search-library-empty-rotation.yaml').read_text()
+        self.assertIn('LANDSCAPE_LEFT', rotation)
+        self.assertIn('PORTRAIT', rotation)
+        warm = (root / 'runtime/search-library-empty-warm-resume.yaml').read_text()
+        self.assertIn('runtime-warm-resume.yaml', warm)
+        for text in (rotation, warm):
+            commands = list(yaml.safe_load_all(text))[1]
+            self.assertIn({'assertVisible': {'id': 'global.library.mode.ANY_ATTACHMENT', 'checked': True}}, commands)
+        returned = list(yaml.safe_load_all((root / 'fixtures/return-from-empty-library.yaml').read_text()))[1]
+        self.assertNotIn('hideKeyboard', returned)
+        guarded = returned[0]['runFlow']
+        keyboard_pattern = guarded['when']['visible']['id']
+        self.assertRegex('com.google.android.inputmethod.latin:id/keyboard_view', keyboard_pattern)
+        self.assertNotRegex('dev.ipf.whitenoise.android.maestrolab:id/chats.searchField', keyboard_pattern)
+        self.assertEqual(guarded['commands'], ['hideKeyboard'])
+        self.assertEqual(returned[1:3], [{'assertVisible': {'id': 'global.library'}}, 'back'])
+        self.assertEqual(returned.count('back'), 1)
+        self.assertIn({'assertNotVisible': {'id': 'global.library'}}, returned)
+        self.assertIn({'assertNotVisible': {'id': 'chats.searchField'}}, returned)
+        self.assertEqual(returned[-1], {'assertVisible': 'Maestro group'})
+        switch = (root / 'runtime/search-library-empty-account-switch.yaml').read_text()
+        self.assertLess(switch.index('- tapOn: Maestro Carol'), switch.index('- tapOn: Maestro Alice'))
+        self.assertIn('- assertVisible: No Chats', switch)
+        self.assertIn('- assertNotVisible: Maestro group', switch)
+        query = (root / 'runtime/search-library-empty-query-clear.yaml').read_text()
+        self.assertIn('- inputText: Maestro absent attachment 934867', query)
+        self.assertIn('- eraseText', query)
+
+    def test_disposable_private_key_routes_use_state_descriptions_and_actual_hide_controls(self):
+        """Lifecycle hiding and private-copy routes must never extract raw UI values into evidence."""
+        root = runtime.ROOT / '.maestro'
+        names = [name for name, case in runtime.CASES.items() if case['postcondition'].startswith('private-key-copy-')]
+        self.assertEqual(len(names), 8)
+        for name in names:
+            text = (root / 'runtime' / f'{name}.yaml').read_text()
+            self.assertIn('copy-hidden-fixture-private-key.yaml', text)
+            self.assertIn('ACC-010', runtime.CASES[name]['manual_ids'])
+            self.assertNotIn('copyTextFrom', text)
+            self.assertNotIn('inputText', text)
+            self.assertNotIn('nsec1', text)
+        reveal = (root / 'fixtures/reveal-fixture-private-key.yaml').read_text()
+        self.assertIn('- tapOn: Show private key', reveal)
+        self.assertIn('- assertVisible: Private key revealed.*', reveal)
+        self.assertIn('- assertVisible: Hide private key', reveal)
+        copy = (root / 'fixtures/copy-hidden-fixture-private-key.yaml').read_text()
+        self.assertIn('- tapOn: Copy Private Key', copy)
+        self.assertIn('- assertVisible: Private key hidden', copy)
+        for route in ('warm-resume', 'departure', 'rotation', 'expiry'):
+            text = (root / 'runtime' / f'keys-private-reveal-{route}-copy.yaml').read_text()
+            self.assertIn('reveal-fixture-private-key.yaml', text)
+            if route == 'warm-resume':
+                self.assertIn('runtime-warm-resume.yaml', text)
+            elif route == 'rotation':
+                self.assertIn('LANDSCAPE_LEFT', text)
+                self.assertIn('PORTRAIT', text)
+                self.assertIn('- tapOn: Hide private key', text)
+            elif route == 'departure':
+                self.assertIn('- assertVisible: Maestro group', text)
+                commands = expanded_flow_commands(root / 'runtime' / f'keys-private-reveal-{route}-copy.yaml')
+                self.assertEqual(commands.count({'tapOn': 'Profile Keys'}), 2)
+            else:
+                commands = list(yaml.safe_load_all(text))[1]
+                waits = [row['extendedWaitUntil'] for row in commands if isinstance(row, dict)
+                         and 'extendedWaitUntil' in row]
+                self.assertEqual(waits, [{'visible': 'Private key hidden', 'timeout': 35000}])
+        peer = (root / 'runtime/keys-private-copy-peer.yaml').read_text()
+        self.assertIn('- tapOn: Maestro Bob', peer)
+        self.assertNotIn('- tapOn: Maestro Alice', peer)
+        self.assertEqual(runtime.CASES['keys-private-copy-peer']['postcondition'], 'private-key-copy-peer')
+        returned = (root / 'runtime/keys-private-account-switch-copy.yaml').read_text()
+        self.assertLess(returned.index('- tapOn: Maestro Bob'), returned.index('- tapOn: Maestro Alice'))
+        self.assertEqual(runtime.CASES['keys-private-account-switch-copy']['postcondition'], 'private-key-copy-owner')
+        for action in ('cancel', 'back'):
+            text = (root / 'runtime' / f'keys-raw-export-{action}.yaml').read_text()
+            self.assertIn('- tapOn: Export Private Key', text)
+            self.assertIn('- assertVisible: Keep Your Private Key Safe', text)
+            self.assertIn('- assertVisible: Share', text)
+            self.assertNotIn('- tapOn: Share', text)
+            self.assertIn('- assertNotVisible: Keep Your Private Key Safe', text)
+            self.assertEqual(runtime.CASES['keys-raw-export-' + action]['postcondition'], 'accounts-retained')
+
+    def test_private_ui_diagnostics_are_discarded_even_when_cli_fails_or_times_out(self):
+        """A broken secure-window regression must not publish the revealed disposable secret."""
+        name = 'keys-private-reveal-hide-copy'
+        for outcome in ('pass', 'failure', 'timeout'):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                captures = []
+                def cli(arguments, **options):
+                    target = Path(arguments[arguments.index('--output') + 1]).parent
+                    captures.append(target)
+                    self.assertNotEqual(target, directory)
+                    (target / 'debug').mkdir()
+                    (target / 'debug/screenshot.png').write_bytes(b'synthetic-secret')
+                    options['stdout'].write('synthetic-secret')
+                    failed = outcome != 'pass'
+                    (target / 'junit.xml').write_text(
+                        f'<testsuite><testcase name="{name}" status="{("FAILURE" if failed else "SUCCESS")}" '
+                        f'time="2.5" secret="synthetic-secret">'
+                        + ('<failure message="synthetic-secret">synthetic-secret</failure>' if failed else '')
+                        + '<system-out>synthetic-secret</system-out></testcase></testsuite>')
+                    if outcome == 'timeout':
+                        raise subprocess.TimeoutExpired(arguments, 120)
+                    return subprocess.CompletedProcess(arguments, int(failed))
+                with patch.object(runtime.subprocess, 'run', side_effect=cli):
+                    if outcome == 'timeout':
+                        with self.assertRaises(subprocess.TimeoutExpired):
+                            runtime.run_ui(name, directory)
+                    else:
+                        self.assertEqual(runtime.run_ui(name, directory).returncode, int(outcome == 'failure'))
+                self.assertTrue(captures)
+                self.assertFalse(captures[0].exists())
+                self.assertEqual([p.name for p in directory.iterdir()], ['junit.xml'])
+                self.assertNotIn('synthetic-secret', (directory / 'junit.xml').read_text())
+                if outcome == 'pass':
+                    self.assertEqual(runtime.ui_result(directory / 'junit.xml', name), 2.5)
+                else:
+                    with self.assertRaises(ValueError):
+                        runtime.ui_result(directory / 'junit.xml', name)
+
+    def test_private_ui_report_preserves_invalid_or_missing_results_as_failures(self):
+        """Redaction cannot manufacture a passed case from absent, duplicate, foreign or invalid XML."""
+        name = 'keys-private-reveal-hide-copy'
+        records = ['<testsuite/>',
+                   '<testsuite><testcase name="foreign" status="SUCCESS"/></testsuite>',
+                   f'<testsuite><testcase name="{name}" status="SUCCESS" time="NaN"/></testsuite>',
+                   f'<testsuite><testcase name="{name}" status="SUCCESS"><skipped/></testcase></testsuite>',
+                   '<testsuite>' + f'<testcase name="{name}" status="SUCCESS"/>' * 2 + '</testsuite>']
+        with tempfile.TemporaryDirectory() as temporary:
+            source, destination = Path(temporary) / 'source.xml', Path(temporary) / 'result.xml'
+            runtime.private_ui_result(source, destination, name)
+            self.assertFalse(destination.exists())
+            for text in records:
+                source.write_text(text)
+                runtime.private_ui_result(source, destination, name)
+                with self.assertRaises(ValueError):
+                    runtime.ui_result(destination, name)
+            source.write_text('not XML')
+            with self.assertRaises(ET.ParseError):
+                runtime.private_ui_result(source, destination, name)
+
+    def test_private_key_verifier_keeps_secret_values_out_of_native_evidence(self):
+        """A raw-key assertion must not introduce a logging/output route or value-printing comparison."""
+        source = (runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro/'
+                  'MaestroPrivateKeyCopyVerification.kt').read_text()
+        self.assertNotRegex(source, r'\b(?:assertEquals|JSONObject|JSONArray|writeText|println|print)\s*\(')
+        self.assertNotRegex(source, r'\b(?:Log|System\.out|System\.err)\.')
+        self.assertNotIn('.put(', source)
+        self.assertIn('runCatchingCancellable { native.revealNsec(target) }.getOrNull()', source)
+        self.assertNotRegex(source, r'\$\{?(?:expected|secret|clip|item)\b')
+
     def test_settings_entry_uses_real_multi_identity_selector(self):
         """Regress the hosted tree where the avatar says Switch Profile rather than Open settings."""
         helper = (runtime.ROOT / '.maestro/fixtures/open-settings.yaml').read_text()
@@ -896,6 +1961,19 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn('- tapOn: "Settings"', helper)
         for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
             self.assertNotIn('Open settings.*', path.read_text(), path.name)
+
+    def test_camera_second_denial_uses_the_observed_permanent_denial_control(self):
+        """The real API-34 second dialog exposes a different ID despite the same Don't allow label."""
+        control = 'com.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button'
+        for name in ('deny-reopen', 'permanent-close', 'permanent-back', 'permanent-reopen'):
+            commands = expanded_flow_commands(runtime.ROOT / f'.maestro/runtime/qr-permission-{name}.yaml')
+            denies = [item['tapOn']['id'] for item in commands
+                      if isinstance(item, dict) and isinstance(item.get('tapOn'), dict)
+                      and 'permission_deny' in item['tapOn'].get('id', '')]
+            self.assertEqual(denies, ['com.android.permissioncontroller:id/permission_deny_button', control])
+            self.assertIn({'assertVisible': {'id': 'qr_scanner.recovery', 'enabled': True,
+                                           'containsChild': {'text': '^Open settings$'}}}, commands)
+            self.assertFalse(any('optional' in str(item) for item in commands))
 
     def test_emulator_interruption_guard_is_limited_to_the_external_launcher(self):
         """Never hide a tested-app crash behind the disposable launcher's known boot interruption."""
@@ -919,6 +1997,13 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertEqual(target.parent, runtime.ROOT / '.maestro/fixtures')
                     header, _ = list(yaml.safe_load_all(target.read_text()))
                     self.assertEqual(header['appId'], runtime.PACKAGE)
+                    if target.name == 'runtime-warm-resume.yaml':
+                        _, resume = list(yaml.safe_load_all(target.read_text()))
+                        self.assertEqual(resume, [
+                            {'pressKey': 'Home'},
+                            {'launchApp': {'stopApp': False, 'clearState': False, 'permissions': {'all': 'deny'}}},
+                        ])
+                        continue
                     for forbidden in ('launchApp', 'stopApp', 'clearState', 'point:', 'openLink:'):
                         self.assertNotIn(forbidden, target.read_text())
 
@@ -945,6 +2030,34 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for part in (0, -1, 99):
             with self.subTest(partition=part), self.assertRaises(ValueError):
                 runtime.case_selection('navigation', part)
+
+    def test_maintained_numeric_relay_case_reaches_actual_runtime_cli_ledger(self):
+        """The secure443 case must pass the same admission before APK production and actual execution."""
+        selected = runtime.case_selection('relay-validation', 4)
+        self.assertIn('relay-add-secure-443-accept-cancel', selected)
+        self.assertIn({'slice': 'relay-validation', 'partition': 4, 'partitions': 4},
+                      matrix_selection('runtime-relay-validation'))
+        with tempfile.TemporaryDirectory() as temporary:
+            reports = Path(temporary) / 'report'
+            with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+                 patch('sys.argv', ['runtime', '--suite', 'relay-validation', '--partition', '4',
+                                    '--reports', str(reports)]), \
+                 patch.object(runtime, 'command', return_value='1'), \
+                 patch.object(runtime, 'run_case', side_effect=lambda name, _: {
+                     'case': name, 'passed': True, 'cleanup_safe': True}) as runner:
+                runtime.main()
+            self.assertEqual([call.args[0] for call in runner.call_args_list], selected)
+            self.assertTrue(json.loads((reports / 'results.json').read_text())['evidence_complete'])
+
+    def test_prebuild_and_runtime_reject_unsafe_configured_case_paths(self):
+        """Numeric support must not admit traversal, shell fragments, Unicode or empty path segments."""
+        for name in ('../escape', 'relay/escape', 'relay-443\n', 'relay-443;echo',
+                     'relay--443', 'relay-４４３', '443-relay', 'relay..443'):
+            with self.subTest(name=name), patch.dict(runtime.CASES, {name: {'suite': 'relay-validation'}}, clear=True):
+                with self.assertRaisesRegex(ValueError, 'allowlist'):
+                    runtime.case_selection('relay-validation', 1)
+                with self.assertRaisesRegex(ValueError, 'allowlist'):
+                    matrix_selection('runtime-relay-validation')
 
     def test_full_partition_admits_every_case_at_its_reserved_ceiling(self):
         """Worst-case reserved durations must leave enough time to admit the entire selected partition."""
@@ -1003,8 +2116,359 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(emulator['with']['emulator-boot-timeout'], 300)
         fixture_build = (runtime.ROOT / 'scripts/maestro-runtime.init.gradle').read_text()
         self.assertIn("'ENABLE_PERFORMANCE_TEST_SELECTORS', 'true'", fixture_build)
+        # API34 permits shell receiver suppression only for a FLAG_TEST_ONLY target APK.
+        test_only = '-Pandroid.injected.testOnly=true'
+        self.assertIn(test_only, json.dumps(jobs['maestro-runtime-build']))
+        for job_name, job in jobs.items():
+            if job_name != 'maestro-runtime-build':
+                self.assertNotIn(test_only, json.dumps(job))
+        application = (runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro/MaestroFixtureRunner.kt').read_text()
+        self.assertIn('applicationInfo.flags and ApplicationInfo.FLAG_TEST_ONLY != 0', application)
         for path in (runtime.ROOT / 'app/src/main').rglob('*MaestroFixture*'):
             self.fail(f'Fixture must remain outside app APK: {path}')
+
+class CredentialControlTest(unittest.TestCase):
+    """Never certify mocked unlocks, stale OS probes or a credential left behind by failed setup."""
+    generation = 'a' * 32
+    environment = {'GITHUB_ACTIONS': 'true', 'MAESTRO_ANDROID_API': '34',
+                   'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '123'}
+
+    def row(self, stage, secure=False):
+        return {'schema': 1, 'generation': self.generation, 'stage': stage, 'package': runtime.PACKAGE,
+                'user': 0, 'sdk': 34, 'qemu': True, 'noBiometricAlternative': True,
+                'secure': secure, 'credentialAvailable': secure}
+
+    def output(self, row):
+        return 'INSTRUMENTATION_STATUS: maestroCredential=' + json.dumps(row) + '\nOK (1 test)\n'
+
+    def trace(self):
+        return '\n'.join('10-08 12:00:00.001  456  789 I WNAppUnlock: activity=10 session=' + s
+                         for s in ['1 event=prompt-launched', '1 event=prompt-terminated',
+                                   '2 event=prompt-launched', '2 event=prompt-succeeded'])
+
+    def evidence(self, rotated=False):
+        cancelled = {'cover': True, 'secure': True, 'cancelled': True, 'evaluating': False,
+                     'activeSession': None, 'latestSession': 1, 'required': True,
+                     'available': True, 'orientation': 1, 'delay': 'immediately',
+                     'storedDelay': None, 'lifecycle': 'RESUMED'}
+        final = {**cancelled, 'cover': False, 'cancelled': False, 'latestSession': 2}
+        rows = [cancelled]
+        if rotated:
+            rows.extend([{**cancelled, 'orientation': 2}, dict(cancelled)])
+        rows.append(final)
+        return {'cancelledSecure': True, 'rotatedCover': rotated, 'cancelledSession': 1,
+                'acceptedSession': 2, 'acceptedState': True, 'disabledWarmReturn': False,
+                'delayChoicesVerified': False, 'observations': rows}
+
+    def test_native_probe_requires_completed_exact_typed_os_observation(self):
+        from scripts import maestro_credential as credential
+        row = self.row('baseline')
+        self.assertEqual(credential.probe_record(self.output(row), self.generation, 'baseline'), row)
+        for key, value in [('schema', True), ('generation', 'b' * 32), ('stage', 'installed'),
+                           ('user', 1), ('user', False), ('sdk', 36), ('qemu', 1),
+                           ('noBiometricAlternative', False), ('secure', 0), ('credentialAvailable', 'false')]:
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                credential.probe_record(self.output({**row, key: value}), self.generation, 'baseline')
+        for output in ['', self.output(row).replace('OK (1 test)', 'FAILURES!!!'), self.output(row) * 2]:
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                credential.probe_record(output, self.generation, 'baseline')
+
+    def test_preexisting_credential_never_reaches_set_or_clear(self):
+        from scripts import maestro_credential as credential
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment), \
+                patch.object(credential, 'command') as command:
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            with patch.object(owner, 'observe', return_value=self.row('baseline', True)):
+                with self.assertRaisesRegex(ValueError, 'Pre-existing'):
+                    owner.install()
+                with self.assertRaisesRegex(ValueError, 'No admitted baseline'):
+                    owner.restore()
+            command.assert_not_called()
+
+    def test_wrong_host_or_api_cannot_reach_native_probe(self):
+        from scripts import maestro_credential as credential
+        for key, value in [('GITHUB_ACTIONS', 'false'), ('MAESTRO_ANDROID_API', '36'),
+                           ('GITHUB_SHA', ''), ('GITHUB_RUN_ID', '')]:
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as temporary, \
+                    patch.dict(os.environ, {**self.environment, key: value}):
+                owner = credential.DisposableCredential(self.generation, Path(temporary))
+                with patch.object(owner, 'observe') as probe, self.assertRaises(ValueError):
+                    owner.install()
+                probe.assert_not_called()
+
+    def test_uncertain_installation_is_read_back_and_restored_without_replay(self):
+        from scripts import maestro_credential as credential
+        calls = []
+        def command(arguments, **options):
+            calls.append(arguments)
+            if 'set-pin' in arguments:
+                raise subprocess.TimeoutExpired(arguments, 15)
+            if 'verify' in arguments:
+                return 'Lock credential verified successfully'
+            return 'Lock credential cleared'
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment), \
+                patch.object(credential, 'command', side_effect=command):
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            with patch.object(owner, 'observe', side_effect=[self.row('baseline'), self.row('installed', True),
+                                                            self.row('before-clear', True), self.row('restored')]):
+                with self.assertRaisesRegex(ValueError, 'Uncertain'):
+                    owner.install()
+                self.assertTrue(owner.owned)
+                owner.restore()
+                self.assertTrue(json.loads((Path(temporary) / 'credential-restored.json').read_text())['credentialRestored'])
+                with self.assertRaisesRegex(ValueError, 'cannot be replayed'):
+                    owner.install()
+                with self.assertRaisesRegex(ValueError, 'cannot be replayed'):
+                    owner.restore()
+        self.assertEqual(sum('set-pin' in call for call in calls), 1)
+        self.assertEqual(sum('clear' in call for call in calls), 1)
+        installation = next(call for call in calls if 'set-pin' in call)
+        self.assertNotIn('--old', installation)
+        self.assertTrue(all(call[:3] == ['adb', '-s', 'emulator-5554'] for call in calls))
+
+    def test_unknown_or_foreign_credential_cannot_be_cleared(self):
+        from scripts import maestro_credential as credential
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment), \
+                patch.object(credential, 'command', return_value='Credential did not match') as command:
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            with patch.object(owner, 'observe', side_effect=[self.row('baseline'), self.row('installed', True),
+                                                            self.row('before-clear', True), self.row('installed', True)]):
+                with self.assertRaisesRegex(ValueError, 'does not belong'):
+                    owner.install()
+                with self.assertRaisesRegex(ValueError, 'does not belong'):
+                    owner.restore()
+            self.assertFalse(any('clear' in call.args[0] for call in command.call_args_list))
+            self.assertFalse((Path(temporary) / 'credential-restored.json').exists())
+
+    def test_verified_pin_can_be_restored_even_when_app_authentication_is_unavailable(self):
+        from scripts import maestro_credential as credential
+        unavailable = {**self.row('installed', True), 'credentialAvailable': False}
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, self.environment), \
+                patch.object(credential, 'command', return_value='Lock credential verified successfully') as command:
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            with patch.object(owner, 'observe', side_effect=[self.row('baseline'), unavailable,
+                                                            self.row('before-clear', True), self.row('restored')]):
+                with self.assertRaisesRegex(ValueError, 'unavailable to real app'):
+                    owner.install()
+                self.assertTrue(owner.owned)
+                owner.restore()
+            self.assertEqual(sum('clear' in call.args[0] for call in command.call_args_list), 1)
+
+    def test_uncertain_clear_requires_actual_native_restoration_and_cannot_retry(self):
+        from scripts import maestro_credential as credential
+        for still_secure in (False, True):
+            with self.subTest(still_secure=still_secure), tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(credential, 'command', side_effect=subprocess.TimeoutExpired('clear', 15)) as command:
+                owner = credential.DisposableCredential(self.generation, Path(temporary))
+                owner.admitted = owner.attempted = owner.owned = True
+                with patch.object(owner, 'observe', side_effect=[self.row('before-clear', True),
+                                                                self.row('restored', still_secure)]):
+                    if still_secure:
+                        with self.assertRaisesRegex(ValueError, 'not independently certified'):
+                            owner.restore()
+                    else:
+                        owner.restore()
+                    with self.assertRaisesRegex(ValueError, 'cannot be replayed'):
+                        owner.restore()
+                self.assertEqual(command.call_count, 1)
+                self.assertEqual((Path(temporary) / 'credential-restored.json').exists(), not still_secure)
+
+    def test_credential_cleanup_covers_early_fixture_failure_and_invalidates_unsafe_success(self):
+        from scripts import maestro_credential as credential
+        for early_failure, restoration_failure in [(True, False), (False, True), (False, False)]:
+            with self.subTest(early_failure=early_failure, restoration_failure=restoration_failure), \
+                    tempfile.TemporaryDirectory() as temporary:
+                owner = Mock()
+                if restoration_failure:
+                    owner.restore.side_effect = ValueError('OS restoration unavailable')
+                returned = {'case': 'navigation-settings-back', 'generation': self.generation,
+                            'passed': True, 'cleanup_safe': True}
+                with patch.dict(runtime.CASES, {'navigation-settings-back': {
+                        **runtime.CASES['navigation-settings-back'], 'postcondition': 'app-lock-credential-retry'}}), \
+                        patch.object(runtime.uuid, 'uuid4', return_value=Mock(hex=self.generation)), \
+                        patch.object(runtime, 'DisposableCredential', return_value=owner), \
+                        patch.object(runtime, 'command', return_value='Component new state: disabled'), \
+                        patch.object(runtime, 'run_fixture', side_effect=ValueError('Early setup failure')
+                                     if early_failure else None, return_value=returned):
+                    result = runtime.run_case('navigation-settings-back', Path(temporary))
+                owner.install.assert_called_once()
+                owner.restore.assert_called_once()
+                self.assertEqual(result['passed'], not early_failure and not restoration_failure)
+                self.assertEqual(result['cleanup_safe'], not early_failure and not restoration_failure)
+                self.assertEqual(json.loads((Path(temporary) / 'navigation-settings-back/result.json').read_text()), result)
+
+    def test_accepted_callback_requires_same_process_ordered_cancel_and_later_crypto_success(self):
+        from scripts import maestro_credential as credential
+        self.assertEqual(credential.accepted_unlock(self.trace(), 456)['acceptedSession'], 2)
+        for output, pid in [(self.trace(), 457), (self.trace(), True), (self.trace(), '456'),
+                            (self.trace().replace('2 event=prompt-succeeded', '1 event=prompt-succeeded'), 456),
+                            (self.trace().replace('prompt-succeeded', 'stale-success-ignored'), 456),
+                            (self.trace() + '\n' + self.trace(), 456),
+                            ('\n'.join(reversed(self.trace().splitlines())), 456),
+                            (self.trace().replace('activity=10 session=2', 'activity=20 session=2'), 456)]:
+            with self.subTest(output=output, pid=pid), self.assertRaises(ValueError):
+                credential.accepted_unlock(output, pid)
+
+    def test_native_credential_evidence_rejects_generic_success_untyped_or_unsecured_cover(self):
+        from scripts import maestro_credential as credential
+        ready = {'appLockFixtureCredential': True, 'nativePid': 456}
+        for rotated in (False, True):
+            postcondition = 'app-lock-credential-rotation' if rotated else 'app-lock-credential-retry'
+            verified = {'appLockVerified': True, 'credentialEvidence': self.evidence(rotated)}
+            credential.credential_state(ready, verified, postcondition)
+            for field, value in [('cancelledSecure', False), ('cancelledSecure', 1), ('acceptedState', 'true'),
+                                  ('acceptedSession', True), ('acceptedSession', 1), ('rotatedCover', not rotated)]:
+                with self.subTest(field=field, rotated=rotated), self.assertRaises(ValueError):
+                    credential.credential_state(ready, {**verified, 'credentialEvidence': {
+                        **verified['credentialEvidence'], field: value}}, postcondition)
+            for field, value in [('secure', False), ('secure', 1), ('activeSession', 1), ('cancelled', False)]:
+                changed = self.evidence(rotated)
+                changed['observations'] = [{**row, field: value} for row in changed['observations']]
+                with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                    credential.credential_state(ready, {**verified, 'credentialEvidence': changed}, postcondition)
+            with self.assertRaises(ValueError):
+                credential.credential_state({**ready, 'nativePid': '456'}, verified, postcondition)
+
+    def test_complete_credential_chain_rejects_forged_restoration_foreign_callback_and_symlink(self):
+        from scripts import maestro_credential as credential
+        with tempfile.TemporaryDirectory() as temporary:
+            leaf = Path(temporary)
+            for stage, secure in [('baseline', False), ('installed', True), ('restored', False)]:
+                row = self.row(stage, secure)
+                (leaf / f'credential-probe-{stage}.txt').write_text(self.output(row))
+                (leaf / f'credential-{stage}.json').write_text(json.dumps(row))
+            restored = {**self.row('restored'), 'credentialRestored': True}
+            (leaf / 'credential-restored.json').write_text(json.dumps(restored))
+            (leaf / 'credential-ownership.txt').write_text('Lock credential verified successfully')
+            (leaf / 'app-unlock-trace.txt').write_text(self.trace())
+            (leaf / 'credential-accepted.json').write_text(json.dumps({
+                'generation': self.generation, **credential.accepted_unlock(self.trace(), 456)}))
+            ready = {'appLockFixtureCredential': True, 'nativePid': 456}
+            verified = {'appLockVerified': True, 'credentialEvidence': self.evidence()}
+            credential.qualify_credential(leaf, self.generation, ready, verified, 'app-lock-credential-retry')
+            for field, value in [('generation', 'b' * 32), ('credentialRestored', 1),
+                                  ('secure', True), ('user', True)]:
+                (leaf / 'credential-restored.json').write_text(json.dumps({**restored, field: value}))
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    credential.qualify_credential(leaf, self.generation, ready, verified, 'app-lock-credential-retry')
+            (leaf / 'credential-restored.json').write_text(json.dumps(restored))
+            trace = leaf / 'app-unlock-trace.txt'
+            saved = leaf / 'saved-trace.txt'
+            trace.rename(saved)
+            trace.symlink_to(saved)
+            with self.assertRaisesRegex(ValueError, 'regular'):
+                credential.qualify_credential(leaf, self.generation, ready, verified, 'app-lock-credential-retry')
+
+    def test_unsupported_pin_platform_is_rejected_before_the_fixture_build(self):
+        from scripts.maestro_runtime_selection import validate_credential_platform
+        for suite in ('runtime-all', 'runtime-app-lock'):
+            validate_credential_platform(suite, '34')
+            for api in ('33', '36', '37.0'):
+                with self.subTest(suite=suite, api=api), self.assertRaisesRegex(ValueError, 'require API34'):
+                    validate_credential_platform(suite, api)
+        for api in ('33', '34', '36', '37.0'):
+            validate_credential_platform('runtime-navigation', api)
+        workflow = (runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text()
+        self.assertIn('maestro_runtime_selection "$SELECTED" "$ANDROID_API"', workflow)
+
+    def test_warm_disabling_needs_real_second_pin_and_ordered_disabled_lifecycle(self):
+        from scripts import maestro_credential as credential
+        ready = {'appLockFixtureCredential': True, 'nativePid': 456}
+        evidence = self.evidence()
+        final = {**evidence['observations'][-1], 'latestSession': 3, 'required': False}
+        evidence.update(acceptedSession=3, disabledWarmReturn=True)
+        evidence['observations'].extend([{**final, 'lifecycle': 'CREATED'}, final])
+        verified = {'appLockVerified': True, 'credentialEvidence': evidence}
+        credential.credential_state(ready, verified, 'app-lock-credential-warm-disabled')
+        trace = self.trace() + '\n' + '\n'.join([
+            '10-08 12:00:01.001  456  789 I WNAppUnlock: activity=10 session=3 event=prompt-launched',
+            '10-08 12:00:02.001  456  789 I WNAppUnlock: activity=10 session=3 event=prompt-succeeded'])
+        self.assertEqual(credential.accepted_unlock(trace, 456, 2)['acceptedSessions'], [2, 3])
+        for output, count in [(trace, 1), (self.trace(), 2), (trace, True),
+                              (trace.replace('3 event=prompt-launched', '2 event=prompt-launched'), 2)]:
+            with self.subTest(output=output, count=count), self.assertRaises(ValueError):
+                credential.accepted_unlock(output, 456, count)
+        interleaved = trace.splitlines()
+        interleaved[3], interleaved[4] = interleaved[4], interleaved[3]
+        with self.assertRaisesRegex(ValueError, 'preceding session'):
+            credential.accepted_unlock('\n'.join(interleaved), 456, 2)
+        for key, value in [('disabledWarmReturn', False), ('disabledWarmReturn', 1), ('acceptedSession', 2)]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                credential.credential_state(ready, {**verified, 'credentialEvidence': {
+                    **evidence, key: value}}, 'app-lock-credential-warm-disabled')
+        for deleted in (-1, -2):
+            altered = json.loads(json.dumps(evidence))
+            altered['observations'].pop(deleted)
+            with self.subTest(deleted=deleted), self.assertRaises(ValueError):
+                credential.credential_state(ready, {**verified, 'credentialEvidence': altered},
+                                            'app-lock-credential-warm-disabled')
+        altered = json.loads(json.dumps(evidence))
+        altered['observations'][-2]['cover'] = True
+        with self.assertRaisesRegex(ValueError, 'new lock/session'):
+            credential.credential_state(ready, {**verified, 'credentialEvidence': altered},
+                                        'app-lock-credential-warm-disabled')
+
+    def test_delay_picker_requires_all_explicit_persisted_choices_in_order(self):
+        from scripts import maestro_credential as credential
+        ready = {'appLockFixtureCredential': True, 'nativePid': 456}
+        evidence = self.evidence()
+        final = evidence['observations'][-1]
+        evidence.update(delayChoicesVerified=True)
+        evidence['observations'].extend([{**final, 'delay': value, 'storedDelay': value}
+                                        for value in ('immediately', '1m', '5m', '15m')])
+        verified = {'appLockVerified': True, 'credentialEvidence': evidence}
+        credential.credential_state(ready, verified, 'app-lock-credential-delay')
+        for removed in range(2, 6):
+            altered = json.loads(json.dumps(evidence))
+            altered['observations'].pop(removed)
+            with self.subTest(removed=removed), self.assertRaises(ValueError):
+                credential.credential_state(ready, {**verified, 'credentialEvidence': altered},
+                                            'app-lock-credential-delay')
+        for index, key, value in [(2, 'storedDelay', None), (3, 'storedDelay', '5m'),
+                                  (-1, 'storedDelay', None), (-1, 'delay', '1m'),
+                                  (-1, 'lifecycle', True)]:
+            altered = json.loads(json.dumps(evidence))
+            altered['observations'][index][key] = value
+            with self.subTest(index=index, key=key), self.assertRaises(ValueError):
+                credential.credential_state(ready, {**verified, 'credentialEvidence': altered},
+                                            'app-lock-credential-delay')
+        with self.assertRaises(ValueError):
+            credential.credential_state(ready, {**verified, 'credentialEvidence': {
+                **evidence, 'delayChoicesVerified': 1}}, 'app-lock-credential-delay')
+
+    def test_app_lock_extended_flows_reuse_real_pin_controls_without_state_or_clock_injection(self):
+        root = runtime.ROOT / '.maestro'
+        warm = (root / 'runtime/app-lock-credential-warm-resume-disable.yaml').read_text()
+        self.assertEqual(warm.count('runFlow: ../fixtures/runtime-warm-resume.yaml'), 2)
+        self.assertIn('runFlow: ../fixtures/enter-device-pin.yaml', warm)
+        self.assertEqual(runtime.CASES['app-lock-credential-warm-resume-disable']['manual_ids'],
+                         ['SEC-002', 'SEC-004', 'NAV-010'])
+        delay = (root / 'runtime/app-lock-credential-delay-picker-return.yaml').read_text()
+        for label in ('Immediately', 'After 1 minute', 'After 5 minutes', 'After 15 minutes'):
+            self.assertIn(label, delay)
+        self.assertIn('LANDSCAPE_LEFT', delay)
+        self.assertIn('PORTRAIT', delay)
+        self.assertEqual(delay.count('- tapOn: Cancel'), 2)
+        commands = list(yaml.safe_load_all(delay))[1]
+        self.assertTrue(any('assertNotVisible' in command and command['assertNotVisible'] == 'Cancel'
+                            for command in commands if isinstance(command, dict)))
+        for text in (warm, delay):
+            for forbidden in ('clearState:', 'runScript:', 'evalScript:', 'stopApp:', 'setAppLockDelay',
+                              'credentialAvailableOverride', 'markAppUnlockSucceeded'):
+                if forbidden == 'stopApp:':
+                    self.assertNotIn('stopApp: true', text)
+                else:
+                    self.assertNotIn(forbidden, text)
+
+    def test_restoration_commands_share_a_bounded_deadline(self):
+        from scripts import maestro_credential as credential
+        with tempfile.TemporaryDirectory() as temporary, patch.object(credential.time, 'monotonic', return_value=61), \
+                patch.object(credential, 'command') as command:
+            owner = credential.DisposableCredential(self.generation, Path(temporary))
+            owner.restore_deadline = 60
+            with self.assertRaisesRegex(TimeoutError, 'deadline'):
+                owner.execute(['adb'])
+            command.assert_not_called()
 
 
 if __name__ == '__main__':

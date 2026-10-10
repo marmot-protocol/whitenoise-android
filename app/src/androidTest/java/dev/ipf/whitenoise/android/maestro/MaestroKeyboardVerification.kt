@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.maestro
 
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.test.core.app.ActivityScenario
-import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
@@ -12,7 +10,7 @@ import kotlinx.coroutines.withTimeout
 internal suspend fun verifyMaestroReactionKeyboard(
     state: WhiteNoiseAppState,
     group: String,
-    activity: ActivityScenario<MainActivity>,
+    activity: MaestroActivityOwner,
     postcondition: String?,
 ) {
     if (postcondition != "reactions-draft-retained") return

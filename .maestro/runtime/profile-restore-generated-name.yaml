@@ -1,0 +1,32 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profile-restore-generated-name
+---
+- runFlow: ../fixtures/open-fixture-profile-editor.yaml
+- scrollUntilVisible:
+    element:
+      id: profile.restore_name
+    direction: DOWN
+- assertVisible:
+    id: profile.restore_name
+- assertVisible:
+    id: profile.restore_name
+    enabled: false
+- tapOn:
+    id: profile.suggest_name
+- assertVisible:
+    id: profile.restore_name
+    enabled: true
+- tapOn:
+    id: profile.restore_name
+- scrollUntilVisible:
+    element:
+      id: profile.name_field
+    direction: UP
+- assertVisible:
+    id: profile.name_field
+- assertVisible:
+    id: profile.name_field
+    text: ^Maestro Alice$
+- back
+- assertVisible:
+    id: profile.edit

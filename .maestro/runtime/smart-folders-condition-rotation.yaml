@@ -25,13 +25,30 @@ name: smart-folders-condition-rotation
     id: folder.addField.PARTICIPANTS
 - tapOn:
     id: folder.addField.UNREAD
-- setOrientation: LANDSCAPE_LEFT
 - assertVisible:
     id: folder.conditionDone
-- setOrientation: PORTRAIT
-- tapOn: Cancel
+    enabled: true
 - assertVisible:
-    id: folder.name
+    id: folder.mode
+- assertNotVisible:
+    id: folder.addField.PARTICIPANTS
+- takeScreenshot: smart-folder-condition-before-rotation
+- setOrientation: LANDSCAPE_LEFT
+- takeScreenshot: smart-folder-condition-after-rotation
+- runFlow: ../fixtures/dismiss-restored-folder-condition.yaml
+- assertVisible:
+    id: chat-folder-edit-content
+- setOrientation: PORTRAIT
+- runFlow: ../fixtures/dismiss-restored-folder-condition.yaml
+- assertVisible:
+    id: chat-folder-edit-content
+- scrollUntilVisible:
+    element:
+      id: folder.add.
+    direction: DOWN
+- assertNotVisible:
+    id: folder.group.
+- runFlow: ../fixtures/return-from-smart-folder-filter.yaml
 - back
 - assertVisible:
     id: chat-folders-content

@@ -1,0 +1,44 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Folders
+    direction: DOWN
+- tapOn: Folders
+- assertVisible:
+    id: chat-folders-content
+- tapOn: New Folder
+- assertVisible:
+    id: folder.name
+- tapOn:
+    id: folder.name
+- assertVisible:
+    id: folder.name
+    focused: true
+- inputText: Maestro rules folder
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rules folder$
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: folder.addDescription
+    direction: DOWN
+- tapOn:
+    id: folder.addDescription
+- assertVisible:
+    id: folder.description
+- tapOn:
+    id: folder.description
+- assertVisible:
+    id: folder.description
+    focused: true
+- inputText: Maestro rules description
+- assertVisible:
+    id: folder.description
+    text: ^Maestro rules description$
+- hideKeyboard

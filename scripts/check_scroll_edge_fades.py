@@ -52,6 +52,13 @@ def calls(text: str) -> Counter:
     return result
 
 
+def menu_scroll_state_bound(text: str) -> bool:
+    code = code_only(text)
+    return (re.search(r'\bscrollState\s*=\s*menuScrollState\b', code) is not None
+            and re.search(r'\.scrollEdgeFade\(\s*menuScrollState\s*'
+                          r'(?:,\s*stableRenderTarget\s*=\s*true\s*)?\)', code) is not None)
+
+
 def inventory_errors(root: Path = ROOT) -> list[str]:
     document = json.loads((root / INVENTORY).read_text())
     entries = {entry['source']: entry for entry in document['surfaces']}
@@ -75,7 +82,7 @@ def inventory_errors(root: Path = ROOT) -> list[str]:
             short = path.relative_to(root / SOURCE).as_posix()
             if (short, method) not in RAW_ALLOWED:
                 errors.append(f'{relative}: use the shared fade container for {method}')
-        if 'DropdownMenu' in found and not ('scrollState = menuScrollState' in text and '.scrollEdgeFade(menuScrollState)' in text):
+        if 'DropdownMenu' in found and not menu_scroll_state_bound(text):
             errors.append(f'{relative}: native menu must bind its mask to its actual scroll state')
     for stale in entries.keys() - observed:
         errors.append(f'{stale}: stale viewport inventory')

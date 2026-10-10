@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-owned-error-warm-resume
+---
+- runFlow: ../fixtures/runtime-share-error-ready.yaml
+- runFlow: ../fixtures/assert-unsupported-share-error.yaml
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- runFlow: ../fixtures/assert-unsupported-share-error.yaml
+- tapOn: Close
+- runFlow: ../fixtures/share-closed.yaml

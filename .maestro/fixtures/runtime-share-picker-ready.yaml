@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: ../fixtures/runtime-share-text-ready.yaml
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: ^Share$

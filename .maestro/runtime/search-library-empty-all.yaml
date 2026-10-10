@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-library-empty-all
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow:
+    file: ../fixtures/open-empty-library.yaml
+    env:
+      LIBRARY_KIND: ANY_ATTACHMENT
+- runFlow:
+    file: ../fixtures/select-library-messages.yaml
+- assertNotVisible:
+    id: global.library
+- assertVisible: Maestro group
+- back
+- assertVisible: Maestro group

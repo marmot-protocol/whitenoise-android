@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-relays-rotation
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Relays
+- runFlow: ../fixtures/assert-relays-list.yaml
+- setOrientation: LANDSCAPE_LEFT
+- runFlow: ../fixtures/assert-relays-list.yaml
+- setOrientation: PORTRAIT
+- runFlow: ../fixtures/assert-relays-list.yaml
+- back
+- assertVisible: Settings

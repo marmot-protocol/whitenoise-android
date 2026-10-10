@@ -1,0 +1,31 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-search-mixed-case
+---
+- runFlow: ../fixtures/runtime-share-picker-ready.yaml
+- tapOn: Search chats
+- assertVisible:
+    focused: true
+- inputText: mAeStRo
+- assertVisible:
+    focused: true
+    text: ^mAeStRo$
+# Search submits this single-line field without invoking the picker's cancellation Back.
+- pressKey: Enter
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: ^Share$
+- tapOn: Maestro group
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: true
+    text: ^Share to 1 chat$
+- tapOn: Close
+- runFlow: ../fixtures/share-closed.yaml

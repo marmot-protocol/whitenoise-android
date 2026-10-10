@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-library-empty-warm-resume
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow:
+    file: ../fixtures/open-empty-library.yaml
+    env:
+      LIBRARY_KIND: ANY_ATTACHMENT
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- runFlow: ../fixtures/assert-empty-library.yaml
+- assertVisible:
+    id: global.library.mode.ANY_ATTACHMENT
+    checked: true
+- runFlow: ../fixtures/return-from-empty-library.yaml
