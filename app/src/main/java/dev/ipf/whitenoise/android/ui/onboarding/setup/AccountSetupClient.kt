@@ -37,6 +37,9 @@ internal interface AccountSetupClient {
     /** Dispatches a user decision with its reviewed proposal data and revision. */
     suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi?
 
+    /** Creates an unapproved relay preview without advancing optional setup decisions. */
+    suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi
+
     /** Loads existing metadata so profile edits can preserve untouched fields. */
     suspend fun profile(): UserProfileMetadataFfi?
 }
@@ -121,6 +124,26 @@ internal class MarmotAccountSetupClient(
                     request.step in setOf(OnboardingStepFfi.RELAYS, OnboardingStepFfi.INBOX_RELAYS)
             if (result == null || cancelledRelayDraft) result else defaults.advance(result)
         }
+
+    /** Retains ownership until IO delivery succeeds, cleaning up previews discarded by cancellation. */
+    override suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi {
+        var acquired: OnboardingSnapshotFfi? = null
+        var delivered = false
+        var failure: Exception? = null
+        try {
+            val preview =
+                withContext(Dispatchers.IO) {
+                    marmot.proposeOnboardingRelayRepair(account, step).also { acquired = it }
+                }
+            delivered = true
+            return preview
+        } catch (expectedFailure: Exception) {
+            failure = expectedFailure
+            throw expectedFailure
+        } finally {
+            if (!delivered) acquired?.let { discardRelayPreview(it, failure) }
+        }
+    }
 
     /** Keeps full replacement an explicit action separate from the default native minimal preview. */
     private suspend fun proposeRelayRepair(request: SetupRequest): OnboardingSnapshotFfi =

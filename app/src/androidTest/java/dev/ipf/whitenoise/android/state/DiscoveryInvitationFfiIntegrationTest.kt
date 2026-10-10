@@ -6,9 +6,11 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -79,11 +81,29 @@ class DiscoveryInvitationFfiIntegrationTest {
         account: String,
         group: String,
     ) {
-        while (runCatching { native.acceptGroupInvite(account, group) }.isFailure) delay(100L)
+        var lastError: Exception? = null
+        val accepted =
+            withTimeoutOrNull(INVITE_TIMEOUT_MS) {
+                var pending = true
+                while (pending) {
+                    try {
+                        native.acceptGroupInvite(account, group)
+                        pending = false
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        lastError = error
+                        delay(100L)
+                    }
+                }
+                true
+            }
+        check(accepted == true) { "Invite for account $account in group $group was not accepted: $lastError" }
         assertTrue(native.chatList(account, true).any { it.groupIdHex == group })
     }
 
     private companion object {
+        const val INVITE_TIMEOUT_MS = 30_000L
         const val KEY_PACKAGE = 30443
     }
 }

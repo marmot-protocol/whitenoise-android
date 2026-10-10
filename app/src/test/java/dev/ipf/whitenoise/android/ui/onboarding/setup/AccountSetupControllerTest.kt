@@ -411,6 +411,10 @@ internal class FakeSetupClient(
     /** Returns fixture metadata for field-preservation tests. */
     override suspend fun profile(): UserProfileMetadataFfi? = metadata
 
+    /** Uses the existing scripted proposal response while recording a distinct preview-only call. */
+    override suspend fun previewRelayRepair(step: OnboardingStepFfi): OnboardingSnapshotFfi =
+        checkNotNull(execute(SetupRequest(current.revision, step, OnboardingActionFfi.USE_RECOMMENDED_RELAYS)))
+
     /** Records decisions and can suspend, fail, or cancel them at controlled test boundaries. */
     override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi? {
         requests += request

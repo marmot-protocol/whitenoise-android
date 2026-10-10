@@ -168,13 +168,19 @@ internal class AccountSetupController(
                 return@operate
             }
             if (action == OnboardingActionFfi.EDIT_RELAYS) {
-                val preview =
-                    checkNotNull(client.execute(request.copy(action = OnboardingActionFfi.USE_RECOMMENDED_RELAYS)))
-                val editor = preview.relayEditor(request)
-                if (!isCurrent() || preview.accountIdHex != account) return@operate
-                accept(preview)
-                if (mutableState.value.snapshot?.revision != preview.revision) return@operate
-                mutableState.value = mutableState.value.copy(editor = editor)
+                val discarded =
+                    client.installRelayPreview(request.step) { preview ->
+                        val editor = preview.relayEditor(request)
+                        val matchesLoad = preview.matchesRelayEditorLoad(account, request, mutableState.value.snapshot)
+                        if (!isCurrent() || !matchesLoad) {
+                            false
+                        } else {
+                            accept(preview)
+                            mutableState.value = mutableState.value.copy(editor = editor)
+                            true
+                        }
+                    }
+                discarded?.let(::accept)
                 return@operate
             }
             val existing = mutableState.value.editor
