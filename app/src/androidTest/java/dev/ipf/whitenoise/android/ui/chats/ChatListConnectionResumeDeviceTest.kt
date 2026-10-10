@@ -59,9 +59,11 @@ class ChatListConnectionResumeDeviceTest {
         val fixture = mountFixture()
         val original = composeRule.activity
         val process = Process.myPid()
-        fixture.frames.clear()
         composeRule.activityRule.scenario.recreate()
-        composeRule.activityRule.scenario.onActivity { activity -> activity.setContent { fixture.Content() } }
+        composeRule.activityRule.scenario.onActivity { activity ->
+            fixture.frames.clear()
+            activity.setContent { fixture.Content() }
+        }
         composeRule.waitUntil { fixture.frames.isNotEmpty() }
 
         assertNotSame(original, composeRule.activity)

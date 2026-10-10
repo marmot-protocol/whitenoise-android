@@ -19,6 +19,11 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -243,6 +248,11 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     ): RetainedFixture {
         lateinit var fixture: RetainedFixture
         composeRule.runOnUiThread { fixture = RetainedFixture(replacement, olderReader) }
+        // This suite starts from a retained, authoritative transcript, not a cold route whose
+        // unread boundary still depends on the native read-state initialization fixture.
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+            fixture.controller.hasPublishedAuthoritativeTimeline && fixture.controller.timeline.isNotEmpty()
+        }
         ConversationTranscriptDrawProbe.observer = fixture::observe
         ConversationTranscriptDrawProbe.compositionRowsOverride = { controller, rows ->
             if (controller === fixture.controller && fixture.paintStaleControl) fixture.staleRows else rows
@@ -282,7 +292,12 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 }
             }
         }
-        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.initialDrawObserved.get() }
+        try {
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.initialDrawObserved.get() }
+        } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
+            fixture.close()
+            throw failure
+        }
         return fixture
     }
 
@@ -342,6 +357,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 otherMemberAccount = null,
                 memberCount = 1,
                 memberSnapshot = conversationTimelineMemberSnapshot(),
+                projection = retainedChatRow(baseRows.last()),
             )
         var mounted by mutableStateOf(true)
         var paintStaleControl by mutableStateOf(false)
@@ -404,3 +420,38 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
 }
 
 private const val FIRST_FRAME_TIMEOUT_MS = 10_000L
+
+/** Supplies the authoritative fully-read entry metadata required by the retained-resume fixture. */
+private fun retainedChatRow(lastRecord: TimelineMessageRecordFfi): ChatListRowFfi =
+    ChatListRowFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
+        unreadMentionCount = 0uL,
+        unreadMention = false,
+        groupIdHex = ConversationTimelineTestIds.GROUP_ID,
+        archived = false,
+        pendingConfirmation = false,
+        title = "Retained transcript fixture",
+        groupName = "Retained transcript fixture",
+        avatarUrl = null,
+        avatar = null,
+        lastMessage = null,
+        unreadCount = 0uL,
+        hasUnread = false,
+        firstUnreadMessageIdHex = null,
+        lastReadMessageIdHex = lastRecord.messageIdHex,
+        lastReadTimelineAt = lastRecord.timelineAt,
+        conversationCreatedAt = 1uL,
+        activitySortAt = lastRecord.timelineAt,
+        updatedAt = lastRecord.timelineAt,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        manuallyMarkedUnread = false,
+        conversationKind = ChatConversationKindFfi.GROUP,
+        muted = false,
+        mutedUntilMs = null,
+        pinned = false,
+        pinnedPosition = null,
+        lifecycleState = GroupLifecycleStateFfi.STABLE,
+        disbanding = false,
+        disbandRequest = null,
+    )
