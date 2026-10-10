@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
@@ -17,12 +16,10 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.ResolvedTextDirection
@@ -31,27 +28,43 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AppBlobEndpointFfi
-import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.AppProtocolProfileFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
-import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.MarkdownInlineFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
-import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.DraftPersistence
-import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.BODY
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.FIRST_SENTENCE
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.MAX_WRAP_WIDTH
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.MESSAGE_ID
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.MIN_WRAP_WIDTH
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.PREFIX
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.RTL_SECOND_SENTENCE
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.RTL_THREE_SENTENCES
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.RenderedFrame
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.ReplayEngine
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.SECOND_SENTENCE
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.SECOND_SENTENCE_START
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.SENDER_NAME
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.SentenceStartPlacement
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.TEST_LOG_TAG
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.THREE_SENTENCES
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.TWO_SENTENCES
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.WORDS
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.WRAP_WIDTH_STEP_DP
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.appState
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.contains
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.descendants
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.group
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.markdownSentenceDocument
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.plainTextDocument
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.speakableRecord
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.text
+import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.translate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
@@ -60,8 +73,10 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.highlightBoundingBoxe
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsHighlightTextRange
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -93,9 +108,74 @@ class TtsHighlightPlacementAndroidTest {
 
     @Before
     fun setUp() {
-        appState = appState()
+        appState = appState(context)
         controller = ConversationController(appState = appState, initialGroup = group())
         appState.ttsController.attachEngine(engine)
+    }
+
+    @After
+    fun stopPlayback() {
+        appState.ttsController.stop()
+        appState.ttsController.detachEngine()
+    }
+
+    /** The production row keeps a sentence band when an engine reports no native ranges. */
+    @Test
+    fun rangeSilentPlaybackKeepsTheSentenceAndMapsEstimatedWords() {
+        startSpeaking(TWO_SENTENCES)
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+        engine.start(0)
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            appState.ttsController.state.value.passage
+                ?.visibleWord
+                .orEmpty()
+                .isNotEmpty()
+        }
+        composeRule.waitForIdle()
+        val leaf = checkNotNull(leafCarryingHighlight())
+        val word = checkNotNull(leaf.config.getOrNull(TtsReadAloudHighlightRangeKey))
+        assertTrue(word.first >= 0 && word.last < FIRST_SENTENCE.length)
+        assertTrue(leaf.text().substring(word.first, word.last + 1).isNotBlank())
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+    }
+
+    /** Stopping revokes the active passage even when native callbacks arrive afterwards. */
+    @Test
+    fun stopClearsTheRenderedPassageAndRejectsLateEngineCallbacks() {
+        startSpeaking(TWO_SENTENCES)
+        rangeWithin(chunkIndex = 0, word = "first")
+        assertNotNull(leafCarryingHighlight())
+        appState.ttsController.stop()
+        engine.range(0, PREFIX.length, PREFIX.length + 4)
+        engine.start(0)
+        engine.done(0)
+        composeRule.waitForIdle()
+
+        assertNull(appState.ttsController.state.value.passage)
+        assertNull(leafCarryingHighlight())
+    }
+
+    /** Pause retains sentence context; resumed playback refuses the superseded utterance's ranges. */
+    @Test
+    fun resumedPlaybackRetainsTheSentenceAndIgnoresOldWordRanges() {
+        startSpeaking(TWO_SENTENCES)
+        rangeWithin(chunkIndex = 0, word = "first")
+        val session = appState.ttsController.state.value.sessionId
+        appState.ttsController.pause()
+        composeRule.waitForIdle()
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
+        val resumedIndex = engine.submitted.size
+        appState.ttsController.resume()
+        rangeWithin(chunkIndex = resumedIndex, word = "sentence")
+        val currentPassage = appState.ttsController.state.value.passage
+
+        engine.range(0, PREFIX.length, PREFIX.length + 4)
+        engine.done(0)
+        composeRule.waitForIdle()
+
+        assertEquals(session, appState.ttsController.state.value.sessionId)
+        assertEquals(currentPassage, appState.ttsController.state.value.passage)
+        assertEquals(FIRST_SENTENCE, renderedSentenceBand())
     }
 
     @Test
@@ -515,46 +595,6 @@ class TtsHighlightPlacementAndroidTest {
         )
     }
 
-    private data class PixelPoint(
-        val x: Float,
-        val y: Float,
-    )
-
-    private data class RenderedFrame(
-        val width: Int,
-        val height: Int,
-        val pixels: IntArray,
-    ) {
-        /** Lists centers of pixels changed between equal-sized frames. */
-        fun changedPixels(other: RenderedFrame): List<PixelPoint> {
-            assertEquals(width, other.width)
-            assertEquals(height, other.height)
-            return pixels.indices
-                .filter { pixels[it] != other.pixels[it] }
-                .map { index -> PixelPoint(index % width + 0.5f, index / width + 0.5f) }
-        }
-    }
-
-    private enum class SentenceStartPlacement {
-        WrappedLineStart,
-        MidLine,
-    }
-
-    /** Places a local character cell into root coordinates. */
-    private fun androidx.compose.ui.geometry.Rect.translate(
-        x: Float,
-        y: Float,
-    ): androidx.compose.ui.geometry.Rect =
-        androidx.compose.ui.geometry
-            .Rect(left + x, top + y, right + x, bottom + y)
-
-    /** Pixel-center containment with one-pixel rasterization tolerance by default. */
-    private fun androidx.compose.ui.geometry.Rect.contains(
-        x: Float,
-        y: Float,
-        tolerance: Float = 1f,
-    ): Boolean = x >= left - tolerance && x <= right + tolerance && y >= top - tolerance && y <= bottom + tolerance
-
     private fun renderedSentenceBand(): String {
         val leaf = leafCarryingHighlight()
         assertNotNull("no rendered highlight", leaf)
@@ -606,14 +646,6 @@ class TtsHighlightPlacementAndroidTest {
             .descendants()
             .filter { it.config.getOrNull(TtsReadAloudSentenceHighlightRangeKey) != null }
 
-    private fun SemanticsNode.descendants(): List<SemanticsNode> = children + children.flatMap { it.descendants() }
-
-    private fun SemanticsNode.text(): String =
-        config
-            .getOrNull(SemanticsProperties.Text)
-            .orEmpty()
-            .joinToString("") { annotated: AnnotatedString -> annotated.text }
-
     @Composable
     @Suppress("FunctionNaming", "LongMethod")
     private fun row(item: TimelineMessage) {
@@ -657,213 +689,4 @@ class TtsHighlightPlacementAndroidTest {
 
     private fun timelineMessage(record: AppMessageRecordFfi) =
         TimelineMessage(id = "msg:${record.messageIdHex}", record = record, status = MessageStatus.Received)
-
-    private fun speakableRecord(
-        plaintext: String,
-        document: MarkdownDocumentFfi = plainTextDocument(plaintext),
-    ) = AppMessageRecordFfi(
-        messageIdHex = MESSAGE_ID,
-        direction = "received",
-        groupIdHex = GROUP_ID,
-        sender = SENDER_ID,
-        plaintext = plaintext,
-        contentTokens = document,
-        kind = 9uL,
-        tags = emptyList(),
-        sourceEpoch = null,
-        retentionSeconds = null,
-        retentionExpiresAt = null,
-        recordedAt = 1uL,
-        receivedAt = 1uL,
-    )
-
-    private fun plainTextDocument(text: String) =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blankLinesBefore = byteArrayOf(),
-            blocks = listOf(MarkdownBlockFfi.Paragraph(inlines = listOf(MarkdownInlineFfi.Text(text)))),
-        )
-
-    /** Keeps the selected second sentence in a styled Markdown leaf between plain siblings. */
-    private fun markdownSentenceDocument() =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blankLinesBefore = byteArrayOf(),
-            blocks =
-                listOf(
-                    MarkdownBlockFfi.Paragraph(
-                        inlines =
-                            listOf(
-                                MarkdownInlineFfi.Text("$FIRST_SENTENCE "),
-                                MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text(SECOND_SENTENCE))),
-                                MarkdownInlineFfi.Text(" $THIRD_SENTENCE"),
-                            ),
-                    ),
-                ),
-        )
-
-    private fun appState() =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence()),
-            accountIdHexResolver = { null },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
-                ),
-            activeAccountRef = ACCOUNT_REF,
-        )
-
-    private fun group() =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Read-aloud placement group",
-            description = "",
-            admins = listOf(ACCOUNT_ID),
-            relays = emptyList(),
-            nostrGroupIdHex = "03".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
-                        ),
-                ),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
-
-    private class EmptyDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
-
-    private class ReplayEngine : TtsSpeechEngine {
-        val submitted = mutableListOf<String>()
-        private val spoken = mutableListOf<String>()
-        private var current = 0
-        private var rangeCallback: ((String?, Int, Int, Int) -> Unit)? = null
-        private var startCallback: ((String?) -> Unit)? = null
-        private var doneCallback: ((String?) -> Unit)? = null
-
-        override fun setLanguage(locale: Locale): Int = TextToSpeech.LANG_AVAILABLE
-
-        override fun setSpeechRate(rate: Float) = Unit
-
-        override fun setCallbacks(
-            onStart: (String?) -> Unit,
-            onDone: (String?) -> Unit,
-            onError: (String?, Int) -> Unit,
-            onRangeStart: (String?, Int, Int, Int) -> Unit,
-            onStop: (String?, Boolean) -> Unit,
-        ) {
-            startCallback = onStart
-            doneCallback = onDone
-            rangeCallback = onRangeStart
-        }
-
-        override fun clearCallbacks() {
-            rangeCallback = null
-            startCallback = null
-            doneCallback = null
-        }
-
-        /** Completes utterances until [chunkIndex] is the one being spoken. */
-        fun advanceTo(chunkIndex: Int) {
-            while (current < chunkIndex) {
-                doneCallback?.invoke(spoken[current])
-                current++
-                startCallback?.invoke(spoken[current])
-            }
-        }
-
-        override fun speak(
-            text: String,
-            utteranceId: String,
-        ): Int {
-            spoken += utteranceId
-            submitted += text
-            return TextToSpeech.SUCCESS
-        }
-
-        override fun stop() = Unit
-
-        /**
-         * The queue submits every chunk up front, so the utterance being spoken
-         * is not the last one submitted. Addressing the wrong one is silently
-         * rejected as stale, which looks exactly like a passing test.
-         */
-        fun range(
-            chunkIndex: Int,
-            start: Int,
-            end: Int,
-        ) {
-            rangeCallback?.invoke(spoken[chunkIndex], start, end, 0)
-        }
-    }
-
-    private companion object {
-        const val SENDER_NAME = "Alice"
-        const val PREFIX = "$SENDER_NAME: "
-        const val ACCOUNT_REF = "personal"
-        val ACCOUNT_ID = "01" + "00".repeat(31)
-        val SENDER_ID = "02" + "00".repeat(31)
-        val GROUP_ID = "04" + "00".repeat(31)
-        val MESSAGE_ID = "09" + "00".repeat(31)
-
-        const val BODY = "Hello bright world of steady careful reading."
-        val WORDS = listOf("Hello", "bright", "world", "steady", "careful", "reading")
-
-        const val FIRST_SENTENCE = "The first sentence sits here."
-        const val SECOND_SENTENCE = "The second one follows it."
-        const val TWO_SENTENCES = "$FIRST_SENTENCE $SECOND_SENTENCE"
-        const val THIRD_SENTENCE = "The third sentence stays clear."
-        const val THREE_SENTENCES = "$FIRST_SENTENCE $SECOND_SENTENCE $THIRD_SENTENCE"
-        val SECOND_SENTENCE_START = THREE_SENTENCES.indexOf(SECOND_SENTENCE)
-        const val MIN_WRAP_WIDTH = 120
-        const val MAX_WRAP_WIDTH = 480
-        const val WRAP_WIDTH_STEP_DP = 4
-        const val TEST_LOG_TAG = "WnTtsPlacement"
-        const val RTL_FIRST_SENTENCE = "המשפט הראשון כאן."
-        const val RTL_SECOND_SENTENCE = "המשפט השני מודגש."
-        const val RTL_THIRD_SENTENCE = "המשפט השלישי נשאר נקי."
-        const val RTL_THREE_SENTENCES = "$RTL_FIRST_SENTENCE $RTL_SECOND_SENTENCE $RTL_THIRD_SENTENCE"
-    }
 }

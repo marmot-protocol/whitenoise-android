@@ -30,14 +30,23 @@ func main() {
 	}
 }
 
-// offlineSignerRelay retains this disposable client's replies so publishing before
-// subscription cannot lose the connect response and consume the entire deadline.
+// The disposable publisher needs only a few replies. Keep replay bounded even if
+// a faulty client sends requests repeatedly until the rehearsal deadline.
+const offlineSignerResponseLimit = 16
+
+type offlineSignerSubscription struct {
+	id      string
+	filters nostr.Filters
+}
+
+// offlineSignerRelay retains this disposable client's recent replies so publishing
+// before subscription cannot lose the connect response and consume the deadline.
 type offlineSignerRelay struct {
 	ctx       context.Context
 	signer    *nip46.StaticKeySigner
 	clientPub string
 	mu        sync.Mutex
-	peers     map[*websocket.Conn]string
+	peers     map[*websocket.Conn]offlineSignerSubscription
 	responses []nostr.Event
 	requests  int
 	forbidden int
@@ -47,8 +56,18 @@ type offlineSignerRelay struct {
 func newOfflineSignerRelay(ctx context.Context, signer *nip46.StaticKeySigner, clientPub string) *offlineSignerRelay {
 	return &offlineSignerRelay{
 		ctx: ctx, signer: signer, clientPub: clientPub,
-		peers: map[*websocket.Conn]string{},
+		peers: map[*websocket.Conn]offlineSignerSubscription{},
 	}
+}
+
+// rememberResponse runs under mu and never keeps more than the fixed reply budget.
+func (relay *offlineSignerRelay) rememberResponse(response nostr.Event) {
+	if len(relay.responses) == offlineSignerResponseLimit {
+		copy(relay.responses, relay.responses[1:])
+		relay.responses[len(relay.responses)-1] = response
+		return
+	}
+	relay.responses = append(relay.responses, response)
 }
 
 // ServeHTTP serializes request handling and reply replay across connection orderings.
@@ -78,12 +97,36 @@ func (relay *offlineSignerRelay) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		switch kind {
 		case "REQ":
 			var sub string
-			json.Unmarshal(parts[1], &sub)
-			relay.peers[conn] = sub
+			var filters nostr.Filters
+			valid := len(parts) >= 3 && len(parts) <= 18 && json.Unmarshal(parts[1], &sub) == nil && sub != "" && len(sub) <= 64
+			if !valid {
+				break
+			}
+			for _, rawFilter := range parts[2:] {
+				var filter nostr.Filter
+				if len(rawFilter) == 0 || rawFilter[0] != '{' || json.Unmarshal(rawFilter, &filter) != nil {
+					valid = false
+					break
+				}
+				filters = append(filters, filter)
+			}
+			if !valid {
+				break
+			}
+			// This fixture has one active reply subscription per client socket.
+			// Replacing it discards the previous ID and predicate together.
+			relay.peers[conn] = offlineSignerSubscription{id: sub, filters: filters}
 			for _, response := range relay.responses {
-				send(conn, "EVENT", sub, response)
+				if filters.Match(&response) {
+					send(conn, "EVENT", sub, response)
+				}
 			}
 			send(conn, "EOSE", sub)
+		case "CLOSE":
+			var sub string
+			if len(parts) == 2 && json.Unmarshal(parts[1], &sub) == nil && relay.peers[conn].id == sub {
+				delete(relay.peers, conn)
+			}
 		case "EVENT":
 			var event nostr.Event
 			json.Unmarshal(parts[1], &event)
@@ -95,10 +138,12 @@ func (relay *offlineSignerRelay) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				_, _, response, err := relay.signer.HandleRequest(relay.ctx, &event)
 				if err == nil {
 					relay.requests++
-					relay.responses = append(relay.responses, response)
+					relay.rememberResponse(response)
 					send(conn, "OK", event.ID, true, "")
 					for peer, sub := range relay.peers {
-						send(peer, "EVENT", sub, response)
+						if sub.filters.Match(&response) {
+							send(peer, "EVENT", sub.id, response)
+						}
 					}
 				}
 			}

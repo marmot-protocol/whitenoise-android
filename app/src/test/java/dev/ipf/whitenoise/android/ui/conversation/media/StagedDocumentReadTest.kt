@@ -71,6 +71,40 @@ class StagedDocumentReadTest {
         assertEquals(0, root.listFiles()!!.size)
     }
 
+    /** Provider reads stay bounded even when the allowed byte count cannot fit in an Int. */
+    @Test
+    fun longSizedBudgetDoesNotOverflowTheReadLength() {
+        val root = temporary.newFolder("long-budget")
+        var remaining = 2L * 64 * 1024 + 1
+        val expected = remaining
+        val stream =
+            object : InputStream() {
+                override fun read(): Int = error("positive-length block reads must suffice")
+
+                override fun read(
+                    buffer: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ): Int {
+                    assertTrue(length in 1..64 * 1024)
+                    if (remaining == 0L) return -1
+                    val count = minOf(length.toLong(), remaining).toInt()
+                    buffer.fill(7, offset, offset + count)
+                    remaining -= count
+                    return count
+                }
+            }
+        val read = readStagedDocument(root, Int.MAX_VALUE.toLong() + 1) { stream }
+        val source = (read as StagedDocumentRead.Success).source
+        try {
+            assertEquals(expected, source.byteCount)
+            assertEquals(expected, source.file.length())
+        } finally {
+            source.close()
+        }
+        assertEquals(0, root.listFiles()!!.size)
+    }
+
     @Test
     fun cancellationIsPropagatedAndPartialSourceIsRemoved() {
         val root = temporary.newFolder("staged")
