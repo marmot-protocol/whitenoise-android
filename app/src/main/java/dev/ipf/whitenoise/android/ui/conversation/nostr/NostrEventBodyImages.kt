@@ -53,27 +53,38 @@ private class NostrBodyImageCollector {
         values: List<MarkdownBlockFfi>,
         depth: Int,
     ) {
-        if (depth < MARKDOWN_MAX_BLOCK_DEPTH) {
-            for (block in values.take(MARKDOWN_MAX_CONTAINER_SIBLINGS)) {
-                if (!visit()) return
-                when (block) {
-                    is MarkdownBlockFfi.Paragraph -> inlines(block.inlines, 0)
-                    is MarkdownBlockFfi.Heading -> inlines(block.inlines, 0)
-                    is MarkdownBlockFfi.BlockQuote -> blocks(block.blocks, depth + 1)
-                    is MarkdownBlockFfi.Details -> {
-                        inlines(block.summary, 0)
-                        blocks(block.body, depth + 1)
-                    }
-                    is MarkdownBlockFfi.ListBlock -> {
-                        for (item in block.items.take(MARKDOWN_MAX_CONTAINER_SIBLINGS)) {
-                            if (!visit()) return
-                            blocks(item.blocks, depth + 1)
-                        }
-                    }
-                    is MarkdownBlockFfi.Table -> table(block)
-                    else -> Unit
-                }
+        if (depth >= MARKDOWN_MAX_BLOCK_DEPTH) return
+        for (block in values.take(MARKDOWN_MAX_CONTAINER_SIBLINGS)) {
+            if (!visit()) return
+            block(block, depth)
+        }
+    }
+
+    private fun block(
+        value: MarkdownBlockFfi,
+        depth: Int,
+    ) {
+        when (value) {
+            is MarkdownBlockFfi.Paragraph -> inlines(value.inlines, 0)
+            is MarkdownBlockFfi.Heading -> inlines(value.inlines, 0)
+            is MarkdownBlockFfi.BlockQuote -> blocks(value.blocks, depth + 1)
+            is MarkdownBlockFfi.Details -> {
+                inlines(value.summary, 0)
+                blocks(value.body, depth + 1)
             }
+            is MarkdownBlockFfi.ListBlock -> listItems(value, depth)
+            is MarkdownBlockFfi.Table -> table(value)
+            else -> Unit
+        }
+    }
+
+    private fun listItems(
+        block: MarkdownBlockFfi.ListBlock,
+        depth: Int,
+    ) {
+        for (item in block.items.take(MARKDOWN_MAX_CONTAINER_SIBLINGS)) {
+            if (!visit()) return
+            blocks(item.blocks, depth + 1)
         }
     }
 

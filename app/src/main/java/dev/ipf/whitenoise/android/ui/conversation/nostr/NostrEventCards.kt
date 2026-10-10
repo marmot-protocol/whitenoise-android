@@ -317,7 +317,9 @@ private fun LoadedEventCard(
 internal fun nostrEventPreviewHeight(): Dp {
     val typography = MaterialTheme.typography
     return with(LocalDensity.current) {
-        val header = maxOf(48.dp, typography.labelLarge.lineHeight.toDp() + typography.labelSmall.lineHeight.toDp() + 2.dp)
+        val authorLine = typography.labelLarge.lineHeight.toDp()
+        val kindLine = typography.labelSmall.lineHeight.toDp()
+        val header = maxOf(48.dp, authorLine + kindLine + 2.dp)
         val title = typography.titleSmall.lineHeight.toDp() * 2
         val summary = maxOf(48.dp, typography.bodyMedium.lineHeight.toDp() * 3)
         val metadataAndReference = typography.labelSmall.lineHeight.toDp() * 3

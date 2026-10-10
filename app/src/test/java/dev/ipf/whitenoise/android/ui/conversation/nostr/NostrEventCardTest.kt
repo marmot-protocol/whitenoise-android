@@ -62,7 +62,10 @@ class NostrEventCardTest {
                 }
             }
             composeRule.waitUntil(10_000) {
-                composeRule.onAllNodesWithText(string(R.string.nostr_event_view_image)).fetchSemanticsNodes().isNotEmpty()
+                composeRule
+                    .onAllNodesWithText(string(R.string.nostr_event_view_image))
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
             }
             composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).assertIsDisplayed()
             composeRule.runOnIdle { assertEquals(0, downloads.get()) }
@@ -96,7 +99,9 @@ class NostrEventCardTest {
             composeRule.setContent {
                 WhiteNoiseTheme {
                     NostrEventCard(
-                        state = NostrEventCardState.Loaded(noteCard().copy(imageUrls = listOf("https://images.example/manual"))),
+                        state = NostrEventCardState.Loaded(
+                            noteCard().copy(imageUrls = listOf("https://images.example/manual")),
+                        ),
                         authorDisplayName = { "Alex" },
                         contentColor = Color.Black,
                         onRetry = {},
@@ -105,7 +110,10 @@ class NostrEventCardTest {
                     )
                 }
             }
-            composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).assertIsDisplayed().assertHasClickAction()
+            composeRule
+                .onNodeWithText(string(R.string.nostr_event_view_image))
+                .assertIsDisplayed()
+                .assertHasClickAction()
             composeRule.runOnIdle { assertEquals(0, downloads.get()) }
         } finally {
             AvatarImageLoader.resetProfileImageFetcherForTests()
