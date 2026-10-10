@@ -13,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
@@ -79,6 +80,86 @@ class ConversationBoundedScrollTest {
             val newRows = synchronized(composed) { composed.toSet() - initial }
             assertTrue(reached.get())
             assertTrue("only the bounded target region is composed: $newRows", newRows.all { it in 0..30 })
+            assertTrue(newRows.size < 40)
+        }
+    }
+
+    /**
+     * A notification for an older retained message lands on its beginning in one hidden write, composing
+     * only the target region instead of the history between the tail and that message.
+     */
+    @Test
+    @Suppress("LongMethod") // One real-list setup shares its composition tracking with the bounded-region assertions.
+    fun notificationLandingOnAnOlderTargetKeepsCompositionBoundedAndStartsAtTheTop() {
+        val composed = Collections.synchronizedSet(mutableSetOf<Int>())
+        val finished = AtomicBoolean(false)
+        val placed = AtomicBoolean(false)
+        lateinit var coordinator: ConversationScrollCoordinator
+        lateinit var listState: LazyListState
+        lateinit var scope: CoroutineScope
+        composeRule.setContent {
+            listState = rememberLazyListState()
+            coordinator =
+                remember(listState) { ConversationScrollCoordinator(LazyListConversationScrollWriter(listState)) }
+            scope = rememberCoroutineScope()
+            LazyColumn(
+                state = listState,
+                reverseLayout = true,
+                modifier = Modifier.height(240.dp).testTag("landing-list"),
+            ) {
+                items((0 until ITEM_COUNT).toList(), key = { it }) { index ->
+                    SideEffect { composed += index }
+                    val height = if (index == TARGET_INDEX) 480 else 40
+                    Text("Message $index", Modifier.fillMaxWidth().height(height.dp).testTag("landing-row-$index"))
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val initial = synchronized(composed) { composed.toSet() }
+        composeRule.runOnIdle {
+            scope.launch {
+                val placement =
+                    coordinator.commitInitialReadingStartAnchor(
+                        targetMessageId = "message-$TARGET_INDEX",
+                        resultingMode = ConversationScrollMode.ReadingHistory("message-$TARGET_INDEX", 0),
+                        probe =
+                            ConversationReadingStartProbe(
+                                resolveTargetIndex = { TARGET_INDEX },
+                                readLayout = { index ->
+                                    val layout = listState.layoutInfo
+                                    ConversationMentionJumpLayout(
+                                        layout.viewportEndOffset,
+                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+                                    )
+                                },
+                                traceSections = false,
+                            ),
+                    )
+                placed.set(placement != null)
+                finished.set(true)
+            }
+        }
+        composeRule.waitUntil(5_000) { finished.get() }
+        composeRule.waitForIdle()
+        val listTop =
+            composeRule
+                .onNodeWithTag("landing-list")
+                .getUnclippedBoundsInRoot()
+                .top.value
+        val rowTop =
+            composeRule
+                .onNodeWithTag("landing-row-$TARGET_INDEX")
+                .getUnclippedBoundsInRoot()
+                .top.value
+        assertEquals(listTop, rowTop, 1f)
+        composeRule.runOnIdle {
+            val newRows = synchronized(composed) { composed.toSet() - initial }
+            assertTrue(placed.get())
+            val boundedTargetWindow = (TARGET_INDEX - 20)..(TARGET_INDEX + 20)
+            assertTrue(
+                "only the bounded target region is composed: $newRows",
+                newRows.all { it in boundedTargetWindow },
+            )
             assertTrue(newRows.size < 40)
         }
     }

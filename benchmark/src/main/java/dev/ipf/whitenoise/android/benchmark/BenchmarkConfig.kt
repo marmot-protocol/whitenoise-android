@@ -47,6 +47,14 @@ internal object BenchmarkConfig {
     val notificationConversationTitles: List<String>
         get() = fixtureList("notificationConversationTitles")
 
+    /** True only when the fixture left the target account's runtime suspended before each sample (#586). */
+    val runtimeNotReadyFixture: Boolean
+        get() = arguments.getString("runtimeNotReadyFixture") == "true"
+
+    /** Host shell command that completes the device credential check, supplied by the qualification host. */
+    val appLockUnlockCommand: String?
+        get() = arguments.getString("appLockUnlockCommand")?.trim()?.takeIf(String::isNotEmpty)
+
     val allowNetworkToggle: Boolean
         get() = arguments.getString("allowNetworkToggle") == "true"
 

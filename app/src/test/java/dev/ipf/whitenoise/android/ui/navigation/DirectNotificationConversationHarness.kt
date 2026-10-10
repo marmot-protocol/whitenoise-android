@@ -1,7 +1,11 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.unit.LayoutDirection
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
@@ -12,6 +16,7 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
+import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 
 /** Owns one direct production conversation surface and its lifecycle-bound controller. */
@@ -21,14 +26,25 @@ internal data class DirectNotificationConversationFixture(
     val chat: ChatListItem,
 )
 
+/** Layout direction and font scale for one direct mount, so RTL and large-text cases share the harness. */
+internal data class DirectNotificationAppearance(
+    val rtl: Boolean = false,
+    val fontScale: Float = 1f,
+)
+
 /** Mounts real request-routed conversation content without involving the outer shell. */
 internal class DirectNotificationConversationHarness(
     private val composeRule: ComposeContentTestRule,
 ) {
-    /** Builds a real controller/screen fixture around a caller-supplied subscription boundary. */
-    fun create(liveSubscriptions: ConversationLiveSubscriptions): DirectNotificationConversationFixture {
+    /**
+     * Builds a real controller/screen fixture around a caller-supplied subscription boundary. [row] is the
+     * chat-list projection the open starts from, which decides the entry unread snapshot.
+     */
+    fun create(
+        liveSubscriptions: ConversationLiveSubscriptions,
+        row: ChatListRowFfi = notificationChatListRow(),
+    ): DirectNotificationConversationFixture {
         val group = conversationTimelineTestGroup()
-        val row = notificationChatListRow()
         val appState = conversationTimelineTestAppState(liveSubscriptions)
         val memberSnapshot = conversationTimelineMemberSnapshot()
         val controller =
@@ -52,27 +68,37 @@ internal class DirectNotificationConversationHarness(
         return DirectNotificationConversationFixture(appState, controller, chat)
     }
 
-    /** Mounts the real screen while allowing one retained controller's request generation to advance. */
+    /**
+     * Mounts the real screen while allowing one retained controller's request generation to advance.
+     * [landingTarget] is the card's captured message, and [appearance] sets the layout direction and font scale.
+     */
     fun mount(
         fixture: DirectNotificationConversationFixture,
         mounted: MutableState<Boolean>,
         notificationOpenRequestId: () -> Long,
+        landingTarget: NotificationLandingTarget? = null,
+        appearance: DirectNotificationAppearance = DirectNotificationAppearance(),
         onTimelineVisibilityChanged: (Long, Boolean) -> Unit = { _, _ -> },
     ) {
         composeRule.setContent {
             if (mounted.value) {
                 val presentedRequestId = notificationOpenRequestId()
-                WhiteNoiseTheme {
-                    ConversationScreen(
-                        appState = fixture.appState,
-                        chat = fixture.chat,
-                        controller = fixture.controller,
-                        onBack = {},
-                        notificationOpenRequestId = presentedRequestId,
-                        onNotificationTimelineVisibilityChanged = { visible ->
-                            onTimelineVisibilityChanged(presentedRequestId, visible)
-                        },
-                    )
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides if (appearance.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
+                    WhiteNoiseTheme(fontScale = appearance.fontScale) {
+                        ConversationScreen(
+                            appState = fixture.appState,
+                            chat = fixture.chat,
+                            controller = fixture.controller,
+                            onBack = {},
+                            notificationOpenRequestId = presentedRequestId,
+                            notificationLandingTarget = landingTarget,
+                            onNotificationTimelineVisibilityChanged = { visible ->
+                                onTimelineVisibilityChanged(presentedRequestId, visible)
+                            },
+                        )
+                    }
                 }
             }
         }

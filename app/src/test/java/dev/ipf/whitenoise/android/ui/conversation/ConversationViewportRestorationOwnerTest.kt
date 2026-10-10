@@ -9,6 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -277,6 +278,206 @@ class ConversationViewportRestorationOwnerTest {
             blocked.complete(Unit)
             job.join()
         }
+
+    /** A notified message lands hidden, and its placed offset becomes the durable reading anchor. */
+    @Test
+    fun notificationLandingCommitsHiddenThenSettlesWithThePlacedOffset() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            assertTrue(fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe()))
+            assertEquals(listOf(7 to 300), fixture.writer.writes)
+            assertTrue(fixture.owner.completeInitialPosition(position, structure(), 720))
+            assertEquals(ConversationScrollMode.ReadingHistory("message-4", 300), fixture.coordinator.mode)
+            assertEquals(500 to 800, fixture.owner.readingStartGeometry())
+        }
+
+    /** A tall row is only measurable after its first write, so the settled offset is the corrected one. */
+    @Test
+    fun notificationLandingSettlesTheCorrectedOffsetOfAnInitiallyUnmeasuredRow() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry(rowHeight = null)
+            val position = landingPosition()
+            val probe = geometry.probe()
+            assertTrue(
+                fixture.owner.commitInitialPosition(
+                    position,
+                    { measured() },
+                    { geometry.rowHeight = 800 },
+                    probe,
+                ),
+            )
+            assertTrue(fixture.owner.completeInitialPosition(position, structure(), 720))
+            assertEquals(listOf(7 to 0, 7 to 300), fixture.writer.writes)
+            assertEquals(ConversationScrollMode.ReadingHistory("message-4", 300), fixture.coordinator.mode)
+        }
+
+    /** A reveal is never authorized for a landing whose row could not be measured. */
+    @Test
+    fun anUnmeasurableNotificationLandingDoesNotAuthorizeRevealOrAnIntent() =
+        runTest {
+            val fixture = Fixture()
+            val position = landingPosition()
+            val probe = LandingGeometry(rowHeight = null).probe()
+            assertFalse(fixture.owner.commitInitialPosition(position, { measured() }, {}, probe))
+            assertTrue(fixture.owner.completeInitialPosition(position, structure(), 720))
+            assertNull(fixture.owner.readingStartGeometry())
+            assertEquals(ConversationScrollMode.ReadingHistory("message-4", 0), fixture.coordinator.mode)
+        }
+
+    /** A landing without the live geometry it needs is a wiring error, never a silent fallback. */
+    @Test
+    fun aReadingStartPositionWithoutAProbeIsRejected() =
+        runTest {
+            val fixture = Fixture()
+            try {
+                fixture.owner.commitInitialPosition(landingPosition(), { measured() }, {})
+                fail("a reading-start commit must require its geometry probe")
+            } catch (expected: IllegalArgumentException) {
+                assertTrue(fixture.writer.writes.isEmpty())
+            }
+        }
+
+    /** The viewport resizing reruns the measured settle rather than reapplying the old pixel offset. */
+    @Test
+    fun viewportChangeRerunsTheLandingSettleInsteadOfTheStalePixelOffset() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            geometry.viewportEnd = 400
+            fixture.owner.onViewportHeight(800, presentation(), navigation { error("stale anchor reapplied") })
+            assertEquals(listOf(7 to 300, 7 to 400), fixture.writer.writes)
+            assertEquals(ConversationScrollMode.ReadingHistory("message-4", 400), fixture.coordinator.mode)
+        }
+
+    /** A header or page structure change also reruns the settle against fresh geometry. */
+    @Test
+    fun structureChangeRerunsTheLandingSettle() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            geometry.rowHeight = 900
+            fixture.owner.onStructure(structure().copy(olderHeaderCount = 1), true) { error("stale anchor reapplied") }
+            assertEquals(listOf(7 to 300, 7 to 400), fixture.writer.writes)
+        }
+
+    /** Late media growth of the row alone, with no viewport or structure change, still re-settles. */
+    @Test
+    fun rowHeightChangeAloneRerunsTheLandingSettle() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            geometry.rowHeight = 1000
+            assertEquals(500 to 1000, fixture.owner.readingStartGeometry())
+            fixture.owner.onReadingStartGeometry()
+            assertEquals(listOf(7 to 300, 7 to 500), fixture.writer.writes)
+        }
+
+    /** A drag retires the landing: later geometry changes fall back to the ordinary history reanchor. */
+    @Test
+    fun aGestureRetiresTheLandingSoNoLaterGeometryChangeMovesTheReader() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            assertEquals(500 to 800, fixture.owner.readingStartGeometry())
+            fixture.coordinator.onUserGestureStarted(ConversationScrollAnchor(9, 12, "item-0", "message-0"))
+            assertNull(fixture.owner.readingStartGeometry())
+            geometry.viewportEnd = 400
+            fixture.owner.onViewportHeight(800, presentation(), navigation())
+            fixture.owner.onReadingStartGeometry()
+            assertEquals(listOf(7 to 300), fixture.writer.writes)
+            assertNull(fixture.owner.readingStartGeometry())
+        }
+
+    /** Another command that owns the list right now is never cancelled for a landing correction. */
+    @Test
+    fun aRunningCommandIsNotCancelledByALandingGeometryChange() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            val blocked = CompletableDeferred<Unit>()
+            var replyCompleted = false
+            val job =
+                launch {
+                    replyCompleted =
+                        fixture.coordinator.programmaticJump("reply", ConversationScrollReason.Reply) {
+                            blocked.await()
+                        }
+                }
+            runCurrent()
+            geometry.viewportEnd = 400
+            fixture.owner.onReadingStartGeometry()
+            blocked.complete(Unit)
+            job.join()
+            assertTrue(replyCompleted)
+            assertEquals(listOf(7 to 300), fixture.writer.writes)
+        }
+
+    /** A disposed owner, such as one whose chat or account was replaced, never writes for a landing. */
+    @Test
+    fun aDisposedOwnerIgnoresLandingGeometryChanges() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            fixture.owner.dispose()
+            geometry.viewportEnd = 400
+            fixture.owner.onReadingStartGeometry()
+            assertEquals(listOf(7 to 300), fixture.writer.writes)
+        }
+
+    /** The next initial position this owner completes replaces the landing's ownership of the viewport. */
+    @Test
+    fun completingAnotherInitialPositionReleasesTheLanding() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            val tail = requireNotNull(conversationViewportEntryPosition(rows(5), null, 1))
+            fixture.owner.completeInitialPosition(tail, structure(), 720)
+            assertNull(fixture.owner.readingStartGeometry())
+        }
+
+    /** Plans a landing on the fifth of ten rows behind two structural rows, so it is not the newest or oldest. */
+    private fun landingPosition(): ConversationViewportInitialPosition {
+        val planned = conversationViewportNotificationLandingPosition(rows(10), "message-4", 2)
+        return requireNotNull(planned)
+    }
+
+    /** Mutable measured geometry for one landing row, as a late media measurement or a resize would change it. */
+    private class LandingGeometry(
+        var viewportEnd: Int = 500,
+        var rowHeight: Int? = 800,
+    ) {
+        /** A probe resolving the landing row by identity at its planned index. */
+        fun probe() =
+            ConversationReadingStartProbe(
+                resolveTargetIndex = { 7 },
+                readLayout = { ConversationMentionJumpLayout(viewportEnd, rowHeight) },
+                traceSections = false,
+            )
+    }
 
     private fun rows(count: Int) = List(count) { "item-$it" to "message-$it" }
 

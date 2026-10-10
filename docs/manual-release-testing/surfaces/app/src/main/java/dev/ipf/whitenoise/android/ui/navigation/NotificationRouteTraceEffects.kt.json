@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationRouteTraceEffects.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NotificationRouteStartupSwapTrace",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationRouteTraceEffects.kt",
+        "anchor": "fun NotificationRouteStartupSwapTrace(",
+        "test_ids": [
+          "NTF-038"
+        ]
+      },
+      {
+        "surface": "NotificationRouteAppLockTrace",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationRouteTraceEffects.kt",
+        "anchor": "fun NotificationRouteAppLockTrace(",
+        "test_ids": [
+          "NTF-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -16,14 +19,24 @@ internal class ConversationViewportRestorationOwner(
     var isActive: Boolean = true
         private set
 
+    // The landing that still owns the viewport's reading start. State, so the row-height effect
+    // observes it appearing, and always replaced by the next initial position this owner completes.
+    private var readingStart by mutableStateOf<ConversationReadingStartIntent?>(null)
+    private var committedReadingStart: Pair<ConversationReadingStartProbe, ConversationReadingStartPlacement>? = null
+
     fun dispose() {
         isActive = false
     }
 
+    /**
+     * Places [position] under the hidden-transcript contract. A reading-start position additionally
+     * needs [readingStartProbe], which supplies the live geometry its measured settle reads.
+     */
     suspend fun commitInitialPosition(
         position: ConversationViewportInitialPosition,
         captureLayout: () -> ConversationInitialAnchorLayout,
         awaitFrame: suspend () -> Unit = { withFrameNanos { } },
+        readingStartProbe: ConversationReadingStartProbe? = null,
     ): Boolean {
         if (!isActive) return false
         val awaitCurrentFrame: suspend () -> Unit = {
@@ -32,37 +45,99 @@ internal class ConversationViewportRestorationOwner(
             if (!isActive) throw CancellationException("Viewport owner disposed")
         }
         val committed =
-            if (position.mode is ConversationScrollMode.FollowingTail) {
-                coordinator.commitInitialTailAnchor(position.index, captureLayout, awaitCurrentFrame)
-            } else {
-                coordinator.commitInitialAnchor(
-                    targetMessageId = position.targetMessageId,
-                    reason = position.reason,
-                    resultingMode = position.mode,
-                    targetIndex = position.index,
-                    pixelOffset = position.anchor.pixelOffset,
-                    captureLayout = captureLayout,
-                    awaitFrame = awaitCurrentFrame,
-                )
+            when {
+                position.mode is ConversationScrollMode.FollowingTail ->
+                    coordinator.commitInitialTailAnchor(position.index, captureLayout, awaitCurrentFrame)
+                position.readingStart ->
+                    commitReadingStart(
+                        position,
+                        requireNotNull(readingStartProbe).copy(awaitLayout = awaitCurrentFrame),
+                    )
+                else ->
+                    coordinator.commitInitialAnchor(
+                        targetMessageId = position.targetMessageId,
+                        reason = position.reason,
+                        resultingMode = position.mode,
+                        targetIndex = position.index,
+                        pixelOffset = position.anchor.pixelOffset,
+                        captureLayout = captureLayout,
+                        awaitFrame = awaitCurrentFrame,
+                    )
             }
         currentCoroutineContext().ensureActive()
         return committed && isActive
     }
 
+    /** Remembers the placed offset, not the planned one, because the settle may have corrected it. */
+    private suspend fun commitReadingStart(
+        position: ConversationViewportInitialPosition,
+        probe: ConversationReadingStartProbe,
+    ): Boolean {
+        val placement =
+            coordinator.commitInitialReadingStartAnchor(
+                targetMessageId = requireNotNull(position.targetMessageId),
+                resultingMode = position.mode,
+                probe = probe,
+                reason = position.reason,
+            )
+        committedReadingStart = placement?.let { probe to it }
+        return placement != null
+    }
+
+    /** Settles the committed position as the durable reading intent, with the placed offset for a landing. */
     fun completeInitialPosition(
         position: ConversationViewportInitialPosition,
         structure: ConversationTimelineStructure,
         viewportHeight: Int,
     ): Boolean {
         if (!isActive) return false
+        readingStart = null
         if (position.mode is ConversationScrollMode.ReadingHistory) {
-            coordinator.settleReadingAt(position.anchor)
+            val landing = committedReadingStart.takeIf { position.readingStart }
+            val anchor =
+                landing?.let { (_, placed) ->
+                    position.anchor.copy(listIndex = placed.index, pixelOffset = placed.offsetPx)
+                } ?: position.anchor
+            coordinator.settleReadingAt(anchor)
+            readingStart =
+                landing?.let { (probe, placed) ->
+                    ConversationReadingStartIntent(anchor, probe, placed, coordinator.intentToken.revision)
+                }
         }
         // The seeded-tail path shares this gate; it remains the single baseline.
         reanchorGate.commit(structure, viewportHeight)
         return true
     }
 
+    /** Fresh geometry of the landing's target while it still owns the viewport, null once nothing does. */
+    fun readingStartGeometry(): Pair<Int, Int?>? = readingStart?.takeIf { it.isCurrent(coordinator) }?.geometry()
+
+    /** Re-settles a landing after its row or viewport changed size, unless a gesture already took over. */
+    suspend fun onReadingStartGeometry() {
+        if (isActive) resettleReadingStart()
+    }
+
+    /**
+     * Reruns a still-current landing's measured settle. False hands the correction to the ordinary
+     * history reanchor, which is right only for a position that is not a reading start.
+     */
+    private suspend fun resettleReadingStart(): Boolean {
+        val intent = readingStart ?: return false
+        return when {
+            !intent.isCurrent(coordinator) -> {
+                readingStart = null
+                false
+            }
+            // Another command owns the list right now, so it must not be cancelled for a correction.
+            coordinator.mode !is ConversationScrollMode.ReadingHistory -> true
+            else -> {
+                intent.resettle(coordinator)
+                true
+            }
+        }
+    }
+
+    /** Corrects a changed clear viewport height, rerunning a landing's measured settle rather than a stale offset. */
     suspend fun onViewportHeight(
         height: Int,
         presentation: ConversationViewportPresentation,
@@ -80,11 +155,12 @@ internal class ConversationViewportRestorationOwner(
                     resultingMode = ConversationScrollMode.FollowingTail,
                 ) { scrollToTail(navigation.tailIndex()) }
             is ConversationScrollMode.ReadingHistory ->
-                coordinator.reanchorReadingHistory(navigation.resolveAnchor)
+                if (!resettleReadingStart()) coordinator.reanchorReadingHistory(navigation.resolveAnchor)
             else -> Unit
         }
     }
 
+    /** Reanchors after a row or header structure change, preferring a landing's measured settle over a stale offset. */
     suspend fun onStructure(
         structure: ConversationTimelineStructure,
         anchored: Boolean,
@@ -92,7 +168,7 @@ internal class ConversationViewportRestorationOwner(
     ) {
         if (!isActive) return
         val changed = reanchorGate.onStructure(structure)
-        if (anchored && changed) coordinator.reanchorReadingHistory(resolveAnchor)
+        if (anchored && changed && !resettleReadingStart()) coordinator.reanchorReadingHistory(resolveAnchor)
     }
 }
 
@@ -111,6 +187,8 @@ internal data class ConversationViewportInitialPosition(
     val mode: ConversationScrollMode,
     val reason: ConversationScrollReason = ConversationScrollReason.InitialAnchor,
     val targetMessageId: String? = anchor.messageId,
+    // A notification landing: the row's beginning, not its newest edge, meets the top of the clear viewport.
+    val readingStart: Boolean = false,
 ) {
     val index: Int get() = anchor.listIndex
 }

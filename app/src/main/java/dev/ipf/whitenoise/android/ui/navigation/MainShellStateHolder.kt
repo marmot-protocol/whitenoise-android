@@ -40,6 +40,9 @@ internal class MainShellProcessState(
     val selectedChatOpenedAsDmHint = mutableStateOf(false)
     val conversationScrollSnapshots = mutableStateMapOf<String, ConversationScrollSnapshot>()
 
+    /** First-frame priority of the notification-routed conversation, which must outlive any shell unmount (#586). */
+    val notificationFirstFrame = NotificationFirstFramePriority { appState.runtimeGeneration }
+
     private var chatsEntry by mutableStateOf<RetainedChatsController?>(null)
     private var initialConnectionPresentationAvailable = true
     private val conversationControllers = linkedMapOf<ConversationControllerKey, ConversationController>()
@@ -174,11 +177,14 @@ internal class MainShellProcessState(
      * Activity starts at the warm chat list instead of reopening private content.
      */
     fun onTaskRemoved() {
+        notificationFirstFrame.release()
         clearConversationControllers()
         clearRetainedRoute()
     }
 
+    /** Releases the first-frame priority, every retained controller and the retained route of this process state. */
     fun release() {
+        notificationFirstFrame.release()
         clearConversationControllers()
         clearRetainedRoute()
         val controller = chatsEntry?.controller
@@ -265,6 +271,7 @@ internal class MainShellStateHolder(
     val selectedChatJustCreated = processState.selectedChatJustCreated
     val selectedChatOpenedAsDmHint = processState.selectedChatOpenedAsDmHint
     val conversationScrollSnapshots = processState.conversationScrollSnapshots
+    val notificationFirstFrame = processState.notificationFirstFrame
 
     private var savedAccountRef: String? = savedStateHandle[SAVED_ACCOUNT_REF_KEY]
     private var savedGroupIdHex: String? = savedStateHandle[SAVED_GROUP_ID_KEY]
@@ -520,6 +527,26 @@ internal class MainShellStateHolder(
         activeAccountRef: String?,
         runtimeGeneration: Int,
     ): ChatsController? = processState.startupRecoveryController(activeAccountRef, runtimeGeneration)
+
+    /**
+     * Whether the retained notification-routed conversation must keep the shell composed while the
+     * target account's chat-list bind is still loading (#586). A shell that unmounts here leaves only a
+     * loading surface, and the conversation controller, which only the shell builds, waits behind the bind.
+     */
+    fun notificationRouteOwnsShell(
+        activeAccountRef: String?,
+        runtimeGeneration: Int,
+        appLockScreenVisible: Boolean,
+    ): Boolean =
+        notificationFirstFrame.ownsShell(
+            RetainedNotificationRouteState(
+                conversationSelected = selectedChat.value != null,
+                openContext = selectedChatOpenContext.value,
+                activeAccountRef = activeAccountRef,
+                localProjectionAvailable = localProjectionAvailable(activeAccountRef, runtimeGeneration),
+                appLockScreenVisible = appLockScreenVisible,
+            ),
+        )
 
     override fun onCleared() {
         // The Application-owned process state transfers to a fresh Activity.

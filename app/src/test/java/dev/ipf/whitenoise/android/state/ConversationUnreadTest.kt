@@ -37,6 +37,31 @@ class ConversationUnreadTest {
         assertEquals(true, state.initialized)
     }
 
+    /** A notification landing seeds the backlog target, which survives reconciliation while it stays loaded. */
+    @Test
+    fun unreadJump_landingSeededBacklogSurvivesReconciliationUntilItLeavesTheWindow() {
+        val seeded = ConversationUnreadJumpState(pendingMessageId = "r1", unreadStackActive = true, initialized = true)
+        val kept =
+            reconcileConversationUnreadJump(
+                current = seeded,
+                timeline = listOf(received("r1"), received("r2"), received("r3")),
+                readAnchorMessageId = null,
+                unreadCount = 3,
+                nearBottom = false,
+            )
+        val retired =
+            reconcileConversationUnreadJump(
+                current = seeded,
+                timeline = listOf(received("r2"), received("r3")),
+                readAnchorMessageId = null,
+                unreadCount = 3,
+                nearBottom = false,
+            )
+
+        assertEquals("r1", kept.pendingMessageId)
+        assertEquals(null, retired.pendingMessageId)
+    }
+
     @Test
     fun unreadJump_freezesFirstEligibleArrivalUntilStackResets() {
         val ready =
