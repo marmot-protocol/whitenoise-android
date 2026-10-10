@@ -43,10 +43,13 @@ class NotificationPushWakeCatchUpTest {
     private var previousKeepConnected = false
     private var recoveryNowMs = 1_000L
 
-    /** Model the production incident explicitly; the platform preference defaults to enabled. */
+    /** Model the production incident explicitly, from an empty tray; the platform preference defaults to enabled. */
     @Before
     fun useOneShotPushDelivery() {
         val context: Application = RuntimeEnvironment.getApplication()
+        // These tests assert an empty tray, and the Robolectric notification store outlives a test. A group summary
+        // that an earlier test's reconciler could not remove would otherwise surface here, so start from nothing.
+        context.getSystemService(NotificationManager::class.java).cancelAll()
         previousKeepConnected = BackgroundConnectionPreferences.isEnabled(context)
         BackgroundConnectionPreferences.setEnabled(context, false)
     }
