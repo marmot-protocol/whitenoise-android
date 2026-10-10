@@ -122,7 +122,8 @@ class PopulatedProcessDeathStartupBenchmark {
             .lineSequence()
             .map { it.trim().split(Regex("\\s+")) }
             .firstOrNull { fields ->
-                fields.size == 3 && fields[2] == BenchmarkConfig.TARGET_PACKAGE &&
+                fields.size == 3 &&
+                    fields[2] == BenchmarkConfig.TARGET_PACKAGE &&
                     fields[0].toIntOrNull()?.div(100_000) == fixtureUser
             }?.get(1)
             ?.toIntOrNull()
