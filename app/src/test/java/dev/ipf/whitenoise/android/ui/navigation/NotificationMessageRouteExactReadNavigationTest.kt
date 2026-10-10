@@ -80,17 +80,23 @@ class NotificationMessageRouteExactReadNavigationTest {
         val fixture = render(RowAnswer.FOUND, withHolder = true)
         val holder = requireNotNull(fixture.holder)
 
-        awaitCondition("the tap was never consumed") { fixture.handled.get() }
+        try {
+            awaitCondition("the tap was never consumed") { fixture.handled.get() }
 
-        val chat = requireNotNull(holder.selectedChat.value)
-        assertEquals(OLDEST_UNREAD_ID, chat.projection?.firstUnreadMessageIdHex)
-        assertEquals(NEWEST_ID, chat.projection?.lastMessage?.messageIdHex)
-        assertNotEquals(OLDEST_UNREAD_ID, MESSAGE_ID)
-        assertNotEquals(NEWEST_ID, MESSAGE_ID)
-        val context = holder.selectedChatOpenContext.value
-        assertEquals(NotificationLandingTarget(ACCOUNT_REF, GROUP_ID, MESSAGE_ID), context.notificationTarget)
-        assertEquals(MESSAGE_ID, context.notificationReadThroughMessageId)
-        assertNull("search focus is a different owner", context.focusMessageId)
+            val chat = requireNotNull(holder.selectedChat.value)
+            assertEquals(OLDEST_UNREAD_ID, chat.projection?.firstUnreadMessageIdHex)
+            assertEquals(NEWEST_ID, chat.projection?.lastMessage?.messageIdHex)
+            assertNotEquals(OLDEST_UNREAD_ID, MESSAGE_ID)
+            assertNotEquals(NEWEST_ID, MESSAGE_ID)
+            val context = holder.selectedChatOpenContext.value
+            assertEquals(NotificationLandingTarget(ACCOUNT_REF, GROUP_ID, MESSAGE_ID), context.notificationTarget)
+            assertEquals(MESSAGE_ID, context.notificationReadThroughMessageId)
+            assertNull("search focus is a different owner", context.focusMessageId)
+        } finally {
+            // MainShell releases only a holder it created, so this injected one would keep its controllers
+            // and their coroutines alive into later tests on the same JVM.
+            composeRule.runOnIdle { holder.release() }
+        }
     }
 
     /** A missing row is inconclusive: the tap stays pending with no toast and no handled callback. */

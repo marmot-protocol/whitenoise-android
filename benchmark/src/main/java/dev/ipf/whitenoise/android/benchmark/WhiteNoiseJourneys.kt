@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.benchmark
 import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Rect
+import android.os.Process
 import android.os.SystemClock
 import android.os.Trace
 import android.util.Log
@@ -47,6 +48,7 @@ internal enum class BenchmarkDeliveryMode(
 
 internal class WhiteNoiseJourneys {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+    private var surfaceLogMarker: String? = null
 
     /** Initializes the real fixture before Macrobenchmark resets compilation and starts tracing. */
     fun prepareAuthenticatedChatList() {
@@ -449,7 +451,7 @@ internal class WhiteNoiseJourneys {
     ): NotificationRouteSample {
         device.openNotification()
         val notification = waitForText(notificationText)
-        clearRenderedSurfaceLog()
+        markRenderedSurfaceLog()
         val intentDeliveryApproximationMs = SystemClock.elapsedRealtime()
         notification.click()
         val diagnosticDeadlineMs = intentDeliveryApproximationMs + NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS
@@ -477,13 +479,24 @@ internal class WhiteNoiseJourneys {
         )
     }
 
-    /** Empties the app's frame markers so the sample reads only the surfaces this tap caused. */
-    fun clearRenderedSurfaceLog() {
-        device.executeShellCommand("logcat -c")
+    /**
+     * Drops a unique marker line into the device log so [readRenderedSurfaceLog] reads only the surfaces
+     * this tap caused. It never clears the device-wide buffers, which other diagnostics still need.
+     */
+    fun markRenderedSurfaceLog() {
+        val marker = "route-sample-${SystemClock.elapsedRealtimeNanos()}"
+        device.executeShellCommand("log -t $SURFACE_MARKER_TAG -p i $marker")
+        surfaceLogMarker = marker
     }
 
-    /** The app's rendered-surface markers since [clearRenderedSurfaceLog], as the root recorded them. */
-    fun readRenderedSurfaceLog(): String = device.executeShellCommand("logcat -d -s WNWarmResume:I")
+    /** The app's rendered-surface markers after the last [markRenderedSurfaceLog], as the root recorded them. */
+    fun readRenderedSurfaceLog(): String {
+        val marker = checkNotNull(surfaceLogMarker) { "Mark the surface log before the tap that it should read." }
+        val lines = device.executeShellCommand("logcat -d -s WNWarmResume:I $SURFACE_MARKER_TAG:I").lines()
+        val markerLine = lines.indexOfLast { it.contains(marker) }
+        check(markerLine >= 0) { "The surface log marker was lost, so the sample cannot be attributed to its tap." }
+        return lines.drop(markerLine + 1).joinToString("\n")
+    }
 
     /** Restores the non-target account and leaves the device home, as the warm journey does before each sample. */
     fun prepareSourceAccountAtHome() {
@@ -495,12 +508,36 @@ internal class WhiteNoiseJourneys {
         device.waitForIdle()
     }
 
-    /** Kills the app process and leaves the device home, so the next tap starts a new process. */
+    /**
+     * Ends the app process the way the system does when it reclaims a cached app, then leaves the device
+     * home, so the next tap starts a new process. `am force-stop` is not used: it cancels the app's
+     * PendingIntents and removes its notifications, so there would be nothing left to tap. `am kill` keeps
+     * both and may be refused until the backgrounded process becomes killable, hence the bounded retry.
+     */
     fun killAppAndGoHome() {
-        device.executeShellCommand("am force-stop ${BenchmarkConfig.TARGET_PACKAGE}")
         check(device.pressHome()) { "Failed to return home before a cold-process notification tap." }
         device.waitForIdle()
+        val user = Process.myUid() / ANDROID_PER_USER_UID_RANGE
+        val deadline = SystemClock.elapsedRealtime() + PROCESS_EXIT_TIMEOUT_MS
+        while (appProcessId(user) != null && SystemClock.elapsedRealtime() < deadline) {
+            device.executeShellCommand("am kill --user $user ${BenchmarkConfig.TARGET_PACKAGE}")
+            SystemClock.sleep(PROCESS_KILL_RETRY_MS)
+        }
+        check(appProcessId(user) == null) { "Ordinary process death did not end the app, so the next tap would not be cold." }
     }
+
+    /** The main app process of Android [user], or null when it is not running. */
+    private fun appProcessId(user: Int): Int? =
+        device
+            .executeShellCommand("ps -A -o UID,PID,NAME")
+            .lineSequence()
+            .map { it.trim().split(Regex("\\s+")) }
+            .firstOrNull { fields ->
+                fields.size == 3 &&
+                    fields[2] == BenchmarkConfig.TARGET_PACKAGE &&
+                    fields[0].toIntOrNull()?.div(ANDROID_PER_USER_UID_RANGE) == user
+            }?.get(1)
+            ?.toIntOrNull()
 
     /** Taps a fresh notification and reports when the app lock surface, not any content, first appears. */
     fun openNotificationToAppLock(notificationText: String): Long {
@@ -923,6 +960,10 @@ internal class WhiteNoiseJourneys {
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L
         const val NOTIFICATION_ROUTE_TIMEOUT_MS = 10_000L
         const val NOTIFICATION_ROUTE_DIAGNOSTIC_TIMEOUT_MS = 15_000L
+        const val PROCESS_EXIT_TIMEOUT_MS = 5_000L
+        const val PROCESS_KILL_RETRY_MS = 50L
+        const val ANDROID_PER_USER_UID_RANGE = 100_000
+        const val SURFACE_MARKER_TAG = "WNBenchMarker"
         const val APP_LOCKED_TITLE = "White Noise is locked"
         const val SETTINGS_SCROLL_STEPS = 12
         const val MAX_CHAT_LIST_UNWIND_STEPS = 6

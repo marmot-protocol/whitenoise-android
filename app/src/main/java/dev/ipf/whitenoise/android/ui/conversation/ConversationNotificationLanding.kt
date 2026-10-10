@@ -209,6 +209,8 @@ internal class ConversationEntryPositioning(
                 controller.conversationTrailingRowCount(rendered.size),
             ) ?: return NotificationLandingOutcome.FALLBACK
         val structure = controller.conversationTimelineStructure()
+        val firstUnreadId = inputs.entryUnread.firstUnreadMessageId
+        if (hasSentMessageAfterUnreadBoundary(rendered, firstUnreadId)) callbacks.retireUnreadDivider()
         val committed = commitLanding(position)
         return if (committed == NotificationLandingOutcome.LANDED) {
             finishLanding(position, structure, rendered)

@@ -236,9 +236,18 @@ inbox template ellipsizes each line. A body is still cut at 1,000 code points ei
 
 The threshold is a conservative starting value and not a measured one. The text block
 carries no sender or conversation icon and Android classifies a conversation by its
-conversation template, so the value is kept well above zero. Hidden previews and app
-lock never use the text block, because their generic rewrite is a conversation card
-that keeps the conversation classification and its Do Not Disturb exceptions.
+conversation template, so the value is kept well above zero. The text block is not a
+conversation card, so a single message that now reaches it, from 120 code points where it
+used to be 160, loses the conversation classification, and with it the important
+conversation Do Not Disturb exception and the conversation section of the shade. That is
+the cost of showing more text and it applies to a message only while it is the sole
+message on its card. Cards that carry earlier messages keep the conversation template.
+
+Hidden previews and app lock never use the text block. Hidden previews rewrite the card
+as a generic conversation card that keeps its shortcut, so it keeps the conversation
+classification and its Do Not Disturb exceptions. App lock shows a generic card with no
+conversation shortcut, so Android does not treat it as a conversation. Neither reveals a
+sender, group or message text.
 
 Confirm or retune the threshold with before and after shade captures: one long DM, one
 long group message and a long newest message behind a carried message, each collapsed and

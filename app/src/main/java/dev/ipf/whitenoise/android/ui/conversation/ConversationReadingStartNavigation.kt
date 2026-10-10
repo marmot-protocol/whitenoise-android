@@ -171,7 +171,9 @@ private inline fun <T> ConversationReadingStartProbe.traced(
  * A notification landing's reading-start ownership. It lives beside the viewport owner so a viewport
  * or row-height change reruns the same measured settle, instead of reapplying the pixel offset that
  * was correct only for the geometry it was written under, until a gesture or newer command changes
- * the scroll intent this record was captured against.
+ * the scroll intent this record was captured against. Scrolling the message out of view by an input that
+ * is not a drag, such as an accessibility scroll action, a wheel or a key, leaves the intent in place but
+ * reports no geometry, so it cannot trigger a settle.
  */
 internal class ConversationReadingStartIntent(
     private val anchor: ConversationScrollAnchor,
@@ -185,10 +187,16 @@ internal class ConversationReadingStartIntent(
     /** True while no gesture, command or restore has replaced the intent this landing settled. */
     fun isCurrent(coordinator: ConversationScrollCoordinator) = coordinator.intentToken.revision == intentRevision
 
-    /** Fresh viewport end and row height for the target, the inputs that decide its reading start. */
-    fun geometry(): Pair<Int, Int?>? {
-        val layout = probe.resolveTargetIndex()?.let(probe.readLayout) ?: return null
-        return layout.viewportEndOffsetPx to layout.itemHeightPx
+    /**
+     * Fresh viewport end and measured row height for the target, the inputs that decide its reading start.
+     * It is null while the row is not laid out, which includes a user scrolling it out of view by any input,
+     * not only a touch drag. Only a change in measured geometry may rerun the settle, so leaving the landed
+     * message is never answered by pulling the list back to it.
+     */
+    fun geometry(): Pair<Int, Int>? {
+        val layout = probe.resolveTargetIndex()?.let(probe.readLayout)
+        val itemHeight = layout?.itemHeightPx ?: return null
+        return layout.viewportEndOffsetPx to itemHeight
     }
 
     /**

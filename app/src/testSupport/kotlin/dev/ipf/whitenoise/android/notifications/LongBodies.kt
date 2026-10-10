@@ -9,15 +9,6 @@ package dev.ipf.whitenoise.android.notifications
  * short on purpose: the zero-width-joiner variant exists to prove the bound never miscounts one.
  */
 object LongBodies {
-    /** One code point under the original 160 code point expanded-text threshold. */
-    const val BELOW_LEGACY_THRESHOLD = 159
-
-    /** Exactly the original 160 code point expanded-text threshold. */
-    const val AT_LEGACY_THRESHOLD = 160
-
-    /** One code point over the original 160 code point expanded-text threshold. */
-    const val ABOVE_LEGACY_THRESHOLD = 161
-
     /** The presenter's per-message safety bound, which no card may exceed. */
     const val SAFETY_BOUND = 1_000
 
@@ -38,9 +29,6 @@ object LongBodies {
 
     /** The number of code points in [body], the unit every threshold in the presenter uses. */
     fun codePoints(body: CharSequence): Int = body.toString().let { it.codePointCount(0, it.length) }
-
-    /** The body with [LongBodies.AT_LEGACY_THRESHOLD] code points. */
-    fun atLegacyThreshold(): String = plain(AT_LEGACY_THRESHOLD)
 
     /** The body with [LongBodies.SAFETY_BOUND] code points. */
     fun atSafetyBound(): String = plain(SAFETY_BOUND)
