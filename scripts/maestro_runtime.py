@@ -412,8 +412,11 @@ def invoke_ui(name, directory):
         raise ValueError('Qualified navigation mode required')
     credential_arguments = (['-e', f'APP_LOCK_FIXTURE_PIN={PIN}']
                             if CASES[name]['postcondition'].startswith('app-lock-credential-') else [])
+    # The driver listens on-device too; a host-free ephemeral port can collide with
+    # the native loopback relay there. One sequential driver owns this emulator.
     with (directory / 'maestro-output.txt').open('w') as log:
-        return subprocess.run(['maestro', '--device', 'emulator-5554', 'test', '--format', 'JUNIT',
+        return subprocess.run(['maestro', '--device', 'emulator-5554', '--driver-host-port', '7001',
+                               'test', '--format', 'JUNIT',
                                '-e', f'MAESTRO_NAVIGATION_MODE={navigation}', *credential_arguments,
                                '--output', str(directory / 'junit.xml'), '--debug-output', str(directory / 'debug'),
                                '--test-output-dir', str(directory / 'screenshots'),

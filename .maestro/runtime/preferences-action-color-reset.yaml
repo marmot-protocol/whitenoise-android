@@ -1,0 +1,80 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-action-color-reset
+---
+- runFlow: ../fixtures/open-action-color.yaml
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- assertVisible:
+    id: color.hex
+    text: ^#171717$
+- tapOn:
+    id: color.hex
+- eraseText: 100
+- assertNotVisible:
+    id: color.hex
+    text: .+
+- inputText: '#12ab34'
+- assertVisible:
+    id: color.hex
+    text: ^#12ab34$
+- hideKeyboard
+- assertVisible:
+    id: action_color.save
+    enabled: true
+- tapOn:
+    id: action_color.save
+- assertVisible:
+    id: appearance.theme.group
+- scrollUntilVisible:
+    element:
+      text: Action color
+    direction: DOWN
+- tapOn: Action color
+- scrollUntilVisible:
+    element:
+      id: color.hex
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+- assertVisible:
+    id: color.hex
+    text: ^#12AB34$
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: action_color.reset
+    direction: DOWN
+- assertVisible:
+    id: action_color.reset
+- tapOn:
+    id: action_color.reset
+- assertVisible:
+    id: action_color.save
+    enabled: true
+- tapOn:
+    id: action_color.save
+- assertVisible:
+    id: appearance.theme.group
+- scrollUntilVisible:
+    element:
+      text: Action color
+    direction: DOWN
+- tapOn: Action color
+- scrollUntilVisible:
+    element:
+      id: color.hex
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+- assertVisible:
+    id: color.hex
+    text: ^#171717$
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- back
+- assertVisible:
+    id: appearance.theme.group

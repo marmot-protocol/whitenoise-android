@@ -558,7 +558,7 @@
       "manual_ids": [
         "SET-002"
       ],
-      "assertions": "AMOLED theme survives leaving and reopening Appearance; fixture checks the state projection.",
+      "assertions": "AMOLED theme survives leaving and reopening Appearance; fixture checks the state projection. Actual color-editor group is absent in AMOLED.",
       "postcondition": "amoled"
     },
     "nested-action-color": {
@@ -6932,6 +6932,38 @@
         "dismiss"
       ],
       "layer": "production-presentation-ui"
+    },
+    "preferences-action-color-invalid": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-004"
+      ],
+      "assertions": "Short, overlong and nonhex input shows the actual validation error and disabled Save. Valid recovery enables Save; Back and reopening retain the original value. UI reopening only; no process-death or other-account proof. Generation-private preference cleanup is required.",
+      "postcondition": "none"
+    },
+    "preferences-action-color-save": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-004"
+      ],
+      "assertions": "Save actual lowercase hex and reopen the production editor to observe normalized committed #12AB34 and disabled unchanged Save. UI reopening only; no process-death or other-account proof. Generation-private preference cleanup is required.",
+      "postcondition": "none"
+    },
+    "preferences-action-color-reset": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-004"
+      ],
+      "assertions": "Save an override, Reset and Save, then reopen the actual editor with the override removed and unchanged Save disabled. UI reopening only; no process-death or other-account proof. Generation-private preference cleanup is required.",
+      "postcondition": "none"
+    },
+    "preferences-action-color-cancel": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-004"
+      ],
+      "assertions": "Save #12AB34, edit a different valid draft, Back and reopen to observe the saved value rather than the cancelled draft. UI reopening only; no process-death or other-account proof. Generation-private preference cleanup is required.",
+      "postcondition": "none"
     }
   }
 }

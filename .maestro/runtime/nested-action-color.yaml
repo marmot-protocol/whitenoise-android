@@ -17,6 +17,10 @@ name: nested-action-color
 - tapOn: "Action color"
 - assertVisible:
     id: "action_color.controls"
+- scrollUntilVisible:
+    element:
+      id: color.hex
+    direction: DOWN
 - assertVisible:
     id: color.hex
 - assertVisible:
