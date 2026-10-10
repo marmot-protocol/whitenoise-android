@@ -44,6 +44,18 @@ class ResponsivenessStallWatchdog : TestWatcher() {
         currentPhase = name
     }
 
+    /** Preserves body failures before an outer Activity rule can stall, without logging fixture content. */
+    fun bodyFailureReporter(): TestWatcher =
+        object : TestWatcher() {
+            override fun failed(
+                failure: Throwable,
+                description: Description,
+            ) {
+                Log.e("WNFirstFrameStall", "body_failure=${failure.javaClass.name} phase=$currentPhase")
+                failure.stackTrace.take(32).forEach { frame -> Log.e("WNFirstFrameStall", "body: $frame") }
+            }
+        }
+
     /** Cancels diagnostics only after rule cleanup has returned, including failed test cleanup. */
     override fun finished(description: Description) {
         timer?.cancel()
@@ -53,7 +65,10 @@ class ResponsivenessStallWatchdog : TestWatcher() {
     }
 
     /** Reads stack frames directly so a blocked Android main thread cannot block diagnostics. */
-    private fun dumpThread(label: String, thread: Thread?) {
+    private fun dumpThread(
+        label: String,
+        thread: Thread?,
+    ) {
         thread?.stackTrace?.take(64)?.forEach { frame -> Log.e("WNFirstFrameStall", "$label: $frame") }
     }
 }
