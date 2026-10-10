@@ -46,7 +46,12 @@ internal fun MaestroMessagePresentation(fixture: MaestroPresentationFixture) {
                 hasPreview = false,
                 statusLabel = "Fixture attachment status",
                 statusColor = MaterialTheme.colorScheme.error,
-                onRetry = if (fixture.scenario.endsWith("retry")) { { fixture.finish("retry-handoff") } } else null,
+                onRetry =
+                    if (fixture.scenario.endsWith("retry")) {
+                        { fixture.finish("retry-handoff") }
+                    } else {
+                        null
+                    },
             )
         else ->
             Box(Modifier.size(240.dp, 160.dp)) {

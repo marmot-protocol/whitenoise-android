@@ -25,9 +25,9 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 /** Presentation-only fault states use production composables, with no installer, signer or public network. */
 internal class MaestroPresentationFixture(
@@ -148,20 +148,31 @@ internal class MaestroPresentationFixture(
             check(complete && calls == expected) { "Production presentation callback mismatch: $scenario $calls" }
         }
         if (scenario.startsWith("feedback-") && scenario.endsWith("copyable")) {
-            check(clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "Synthetic diagnostic report") {
+            check(
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString() == "Synthetic diagnostic report",
+            ) {
                 "Production report Copy did not write the expected synthetic payload"
             }
         }
         if (scenario == "text-dialog-copy") {
             check(
-                clipboard.primaryClip?.getItemAt(0)?.text?.toString() ==
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString() ==
                     "Fixture decoded first line\nFixture decoded last line",
             )
         }
         if (scenario == "surface-profile-qr-copy") {
             val account = checkNotNull(appState.activeAccount)
             check(
-                clipboard.primaryClip?.getItemAt(0)?.text?.toString() == appState.npubForDisplay(account.accountIdHex),
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString() == appState.npubForDisplay(account.accountIdHex),
             )
         }
         if (scenario.startsWith("extra-native-viewer-")) {

@@ -37,7 +37,9 @@ internal fun MaestroSetupPresentation(fixture: MaestroPresentationFixture) {
     AccountSetupScreen(controller, randomName = { "Maestro setup name" }, onLater = { fixture.finish("dismiss") })
 }
 
-private class PresentationSetupClient(private val fixture: MaestroPresentationFixture) : AccountSetupClient {
+private class PresentationSetupClient(
+    private val fixture: MaestroPresentationFixture,
+) : AccountSetupClient {
     val account = "ab".repeat(32)
     private val step =
         when (fixture.scenario.substringBefore("-edit")) {
@@ -57,7 +59,10 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
         }
     private var current =
         OnboardingSnapshotFfi(
-            account, null, 3uL, false,
+            account,
+            null,
+            3uL,
+            false,
             OnboardingStepFfi.entries.map { item ->
                 OnboardingStepStateFfi(
                     item,
@@ -71,7 +76,9 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
                     null,
                 )
             },
-            null, null, false,
+            null,
+            null,
+            false,
         )
 
     override suspend fun snapshot() = current
@@ -79,7 +86,9 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
     override suspend fun subscribe(): AccountSetupSubscription =
         object : AccountSetupSubscription {
             override fun snapshot() = current
+
             override suspend fun next(): OnboardingSnapshotFfi? = awaitCancellation()
+
             override suspend fun close() = Unit
         }
 
@@ -104,7 +113,8 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
             }
             else -> {
                 check(
-                    request.revision == 3uL && request.step == step &&
+                    request.revision == 3uL &&
+                        request.step == step &&
                         request.action == OnboardingActionFfi.CONTINUE_WITHOUT,
                 )
                 fixture.finish("continue-without")

@@ -327,13 +327,12 @@ class MaestroRuntimeHostTest {
                         context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
                         postcondition,
                     )
+                val presentationVerification =
+                    withContext(Dispatchers.Main) { presentation?.verify() ?: JSONObject.NULL }
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
-                        .put(
-                            "presentation",
-                            withContext(Dispatchers.Main) { presentation?.verify() ?: JSONObject.NULL },
-                        )
+                        .put("presentation", presentationVerification)
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)

@@ -32,11 +32,12 @@ internal fun MaestroSelectionPresentation(fixture: MaestroPresentationFixture) {
                 selectedOverride = TtsAutoReadOverride.OFF,
                 onDismiss = { fixture.finish("dismiss") },
                 onSelect = {
-                    val expected = when (fixture.scenario) {
-                        "selection-autoread-on" -> TtsAutoReadOverride.ON
-                        "selection-autoread-off" -> TtsAutoReadOverride.OFF
-                        else -> null
-                    }
+                    val expected =
+                        when (fixture.scenario) {
+                            "selection-autoread-on" -> TtsAutoReadOverride.ON
+                            "selection-autoread-off" -> TtsAutoReadOverride.OFF
+                            else -> null
+                        }
                     check(it == expected)
                     fixture.record("override-selected")
                 },
@@ -55,15 +56,16 @@ internal fun MaestroSelectionPresentation(fixture: MaestroPresentationFixture) {
         fixture.scenario == "selection-conversation-loading" -> ConversationInitialLoadingOverlay(visible = true)
         fixture.scenario == "selection-quick-cue" ->
             QuickAccountSwitchTransitionOverlay(
-                transition = QuickAccountSwitchTransition(
-                    requestId = 1,
-                    sourceAccountRef = "synthetic-source",
-                    targetAccountRef = "synthetic-target",
-                    targetTitle = "Fixture Target",
-                    targetSeed = "synthetic-target",
-                    targetPictureUrl = null,
-                    motion = QuickAccountSwitchMotion.Animated,
-                ),
+                transition =
+                    QuickAccountSwitchTransition(
+                        requestId = 1,
+                        sourceAccountRef = "synthetic-source",
+                        targetAccountRef = "synthetic-target",
+                        targetTitle = "Fixture Target",
+                        targetSeed = "synthetic-target",
+                        targetPictureUrl = null,
+                        motion = QuickAccountSwitchMotion.Animated,
+                    ),
                 visible = true,
                 onFinished = { error("Awaiting-target cue cannot complete activation") },
             )
@@ -82,11 +84,12 @@ private fun ContactSelection(fixture: MaestroPresentationFixture) {
             if (empty) null else "fixture@example.invalid",
         )
     ContactPreviewScreen(contact = contact, onDismiss = { fixture.finish("dismiss") }, onSend = {
-        val expected = when (fixture.scenario) {
-            "selection-contact-phone" -> contact.copy(email = null)
-            "selection-contact-email" -> contact.copy(phone = null)
-            else -> contact
-        }
+        val expected =
+            when (fixture.scenario) {
+                "selection-contact-phone" -> contact.copy(email = null)
+                "selection-contact-email" -> contact.copy(phone = null)
+                else -> contact
+            }
         check(it == expected && !empty)
         fixture.finish("contact-selected")
     })
@@ -95,10 +98,11 @@ private fun ContactSelection(fixture: MaestroPresentationFixture) {
 @Composable
 @Suppress("FunctionNaming")
 private fun RetainedSelection(fixture: MaestroPresentationFixture) {
-    val accounts = listOf(
-        OnboardingSavedAccountUi("one", "11".repeat(32), "Fixture One", "fixture-one", null),
-        OnboardingSavedAccountUi("two", "22".repeat(32), "Fixture Two", "fixture-two", null),
-    )
+    val accounts =
+        listOf(
+            OnboardingSavedAccountUi("one", "11".repeat(32), "Fixture One", "fixture-one", null),
+            OnboardingSavedAccountUi("two", "22".repeat(32), "Fixture Two", "fixture-two", null),
+        )
     RetainedProfilesSheet(
         accounts = accounts,
         enabled = fixture.scenario != "selection-retained-disabled",

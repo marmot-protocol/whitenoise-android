@@ -8,8 +8,13 @@ import dev.ipf.whitenoise.android.ui.onboarding.setup.SetupRequest
 /** Complete synthetic metadata makes loss of fields outside the editor observable. */
 private val setupProfileMetadata =
     UserProfileMetadataFfi(
-        "Maestro", "Maestro setup", "Setup detail", "https://fixture.example.invalid/site",
-        "https://fixture.example.invalid/avatar.png", "fixture@example.invalid", "fixture@example.invalid",
+        "Maestro",
+        "Maestro setup",
+        "Setup detail",
+        "https://fixture.example.invalid/site",
+        "https://fixture.example.invalid/avatar.png",
+        "fixture@example.invalid",
+        "fixture@example.invalid",
     )
 
 /** The actual controller loads existing metadata or retains its load-error state. */

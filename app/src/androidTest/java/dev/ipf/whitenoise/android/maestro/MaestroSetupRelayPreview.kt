@@ -41,7 +41,14 @@ internal fun maestroSetupRelayPreview(current: OnboardingSnapshotFfi): Onboardin
             },
         proposal =
             OnboardingRepairProposalFfi(
-                OnboardingStepFfi.RELAYS, 4uL, "fixture-source", emptyList(), emptyList(), null, null, repair,
+                OnboardingStepFfi.RELAYS,
+                4uL,
+                "fixture-source",
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+                repair,
             ),
     )
 }
