@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-quick-cue
+---
+- assertVisible:
+    id: quick-account-switch-cue
+- assertVisible: Switching to Fixture Target.*
+- back
+- assertVisible:
+    id: presentation.complete

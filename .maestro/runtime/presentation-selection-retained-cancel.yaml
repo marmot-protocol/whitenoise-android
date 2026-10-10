@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-retained-cancel
+---
+- assertVisible: Choose profile
+- assertVisible: Fixture One
+- assertVisible:
+    text: Fixture Two
+    enabled: true
+- back
+- assertVisible:
+    id: presentation.complete

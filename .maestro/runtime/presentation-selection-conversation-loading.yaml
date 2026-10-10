@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-conversation-loading
+---
+- assertVisible:
+    id: conversation.initial_loading
+- back
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-preview-documents
+---
+- assertVisible: Preview
+- assertVisible:
+    id: conversation.media.preview.image.0
+- tapOn: Add more
+- assertVisible: Photo library
+- assertVisible: Document
+- tapOn: Document
+- assertVisible:
+    id: presentation.complete

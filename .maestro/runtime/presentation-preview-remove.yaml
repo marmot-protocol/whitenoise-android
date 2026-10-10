@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-preview-remove
+---
+- assertVisible: Preview
+- assertVisible:
+    id: conversation.media.preview.image.0
+- tapOn:
+    id: conversation.media.inclusion.target
+- tapOn: Done
+- assertVisible:
+    id: presentation.complete

@@ -35,6 +35,14 @@
         "test_ids": [
           "MED-001"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "surface": "Cross-window image editing selectors",
+        "anchor": ".exposePerformanceTestTags()",
+        "test_ids": [
+          "MED-006"
+        ]
       }
     ],
     "settings_controls": [

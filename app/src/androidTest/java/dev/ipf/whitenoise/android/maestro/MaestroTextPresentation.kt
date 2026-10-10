@@ -12,7 +12,8 @@ import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentUnavailabl
 @Composable
 @Suppress("FunctionNaming")
 internal fun MaestroTextPresentation(fixture: MaestroPresentationFixture) {
-    val candidate = TextAttachmentCandidate("Maestro complete filename.txt", "text/plain", TextAttachmentFormat.PlainText)
+    val candidate =
+        TextAttachmentCandidate("Maestro complete filename.txt", "text/plain", TextAttachmentFormat.PlainText)
     val body = "Maestro document first line\nMaestro document last line"
     val state =
         when (fixture.scenario) {

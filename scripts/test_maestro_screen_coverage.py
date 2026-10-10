@@ -45,18 +45,38 @@ class ScreenProofTest(unittest.TestCase):
                     screen_bindings(root, [screen], cases)
 
     def test_failed_missing_and_foreign_execution_get_no_screen_credit(self):
-        screens = [{'source': 'screen.kt', 'symbol': 'Screen', 'bindings': [{'case': 'real'}]}]
+        hashes = {'.maestro/real.yaml': 'b' * 64}
+        screens = [{'source': 'screen.kt', 'symbol': 'Screen', 'bindings': [{'case': 'real', 'flow_sha256': hashes}]}]
         source = 'a' * 40
         for outcomes in [[], [{'case': 'other', 'passed': True}], [{'case': 'real', 'passed': False}],
-                         [{'case': 'real', 'passed': True, 'failure': 'Native cleanup failed'}]]:
+                         [{'case': 'real', 'passed': True, 'failure': 'Native cleanup failed'}],
+                         [{'case': 'real', 'passed': True}],
+                         [{'case': 'real', 'passed': True, 'flow_sha256': {'.maestro/real.yaml': 'c' * 64}}],
+                         [{'case': 'real', 'passed': True, 'flow_sha256': hashes, 'not_run': True}]]:
             proof = executed_screens(screens, {'source_sha': source, 'errors': [], 'results': outcomes}, source)
             self.assertFalse(proof[0]['execution_verified'])
-        proof = executed_screens(screens, {'source_sha': source, 'errors': [], 'results': [{'case': 'real', 'passed': True}]}, source)
+        proof = executed_screens(screens, {'source_sha': source, 'errors': [], 'results': [{'case': 'real', 'passed': True, 'flow_sha256': hashes}]}, source)
         self.assertTrue(proof[0]['execution_verified'])
         for campaign in [{'source_sha': 'b' * 40}, {'source_sha': source, 'errors': ['Missing shard']},
                          {'source_sha': source, 'results': [{'case': 'real'}, {'case': 'real'}]}]:
             with self.assertRaises(ValueError):
                 executed_screens(screens, campaign, source)
+
+    def test_symlinked_flow_directory_cannot_substitute_assertions(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / '.maestro').mkdir()
+            (root / '.maestro/real').mkdir()
+            (root / '.maestro/real/main.yaml').write_text('appId: test\n---\n- assertVisible: Actual\n')
+            (root / '.maestro/link').symlink_to(root / '.maestro/real', target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, 'symlink'):
+                flow_assertions(root / '.maestro/link/main.yaml', root)
+
+    def test_malformed_presentation_cannot_run_without_native_verification(self):
+        for scenario in [None, '', 4, [], 'other,scenario', 'unsafe/path']:
+            with self.assertRaises(ValueError):
+                presentation_arguments({'postcondition': 'presentation-checked', 'presentation': scenario,
+                                        'presentation_actions': ['dismiss']})
 
     def test_presentation_callback_receipt_is_exact_and_independent_of_labels(self):
         case = {'postcondition': 'presentation-checked', 'presentation': 'update-confirm', 'presentation_actions': ['download']}

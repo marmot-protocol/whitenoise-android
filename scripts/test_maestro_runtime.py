@@ -111,7 +111,9 @@ class CampaignSummaryTest(unittest.TestCase):
                 leaf = reports / name
                 leaf.mkdir(parents=True)
                 generation = f'{len(leaves) + 1:032x}'
-                row = {'case': name, 'generation': generation, 'passed': True, 'cleanup_safe': True}
+                _, hashes = runtime.flow_assertions(runtime.ROOT / f'.maestro/runtime/{name}.yaml', runtime.ROOT)
+                row = {'case': name, 'generation': generation, 'passed': True, 'cleanup_safe': True,
+                       'flow_sha256': hashes}
                 rows.append(row)
                 (leaf / 'result.json').write_text(json.dumps(row))
                 for flag in ('ready', 'verified', 'closed'):

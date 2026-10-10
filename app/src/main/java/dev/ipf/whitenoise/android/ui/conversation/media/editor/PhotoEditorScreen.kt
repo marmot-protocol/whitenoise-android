@@ -80,6 +80,7 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -140,7 +141,7 @@ internal fun PhotoEditorScreen(
 
     BackHandler(enabled = true, onBack = ::requestCancel)
     Scaffold(
-        modifier = modifier.fillMaxSize().testTag("photo.editor"),
+        modifier = modifier.fillMaxSize().testTag("photo.editor").exposePerformanceTestTags(),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             PhotoEditorTopBar(

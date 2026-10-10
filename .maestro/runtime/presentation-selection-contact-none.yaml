@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-contact-none
+---
+- assertVisible: Share contact
+- assertVisible: Fixture Contact
+- tapOn: fixture@example.invalid
+- tapOn: \+15550100
+- assertVisible:
+    text: Send
+    enabled: false
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

@@ -4,26 +4,58 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsTrustWarning.kt",
       "symbol": "TtsTrustWarningDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TtsTrustWarningDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-tts-trust-cancel",
+          "selector": {
+            "text": "External text-to-speech engine"
+          },
+          "scope": "Actual production external-engine warning and Cancel dispatch; no engine execution."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppSelfUpdateDialog.kt",
       "symbol": "AppSelfUpdateDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AppSelfUpdateDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-update-confirm",
+          "selector": {
+            "text": "Download update?"
+          },
+          "scope": "Production confirmation chrome delegated to AppSelfUpdateContent, injecting its phase at the presentation boundary; no updater orchestration or download."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/AppSelfUpdateDialog.kt",
       "symbol": "AppSelfUpdateProgressDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AppSelfUpdateProgressDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-update-resolving",
+          "selector": {
+            "text": "Checking release"
+          },
+          "scope": "Actual progress dialog rendered by resolving phase, with Cancel callback."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/AccountSelectorSheet.kt",
       "symbol": "AccountSelectorSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AccountSelectorSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "navigation-selector-cancel",
+          "selector": {
+            "text": "Maestro Carol"
+          },
+          "scope": "Actual Settings account chooser offers generated Carol and dismisses without switching."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
@@ -70,26 +102,58 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
       "symbol": "ChatsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "navigation-account-empty",
+          "selector": {
+            "text": "No Chats"
+          },
+          "scope": "Actual generated Carol account empty chat list after native account switch, then switch back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
       "symbol": "GlobalAttachmentBrowser",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalAttachmentBrowser; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-library-empty-files",
+          "selector": {
+            "id": "global.library"
+          },
+          "scope": "Actual files-mode native empty attachment timeline and destination; no inherited content transfer claim."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
       "symbol": "GlobalSearchChatTypePicker",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchChatTypePicker; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-types-back",
+          "selector": {
+            "text": "Chat type"
+          },
+          "scope": "Actual global chat-type filter with direct/groups options and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
       "symbol": "GlobalSearchCheckDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchCheckDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-content-back",
+          "selector": {
+            "text": "Content"
+          },
+          "scope": "Actual global multiselect content-type filter and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
@@ -130,44 +194,100 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
       "symbol": "NewMessageAccountScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NewMessageAccountScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "creation-message-back",
+          "selector": {
+            "id": "new_message.screen"
+          },
+          "scope": "Actual new-message route/account child opened by Chats new-message action and backed out."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
       "symbol": "NewMessageScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NewMessageScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "creation-message-back",
+          "selector": {
+            "id": "new_message.screen"
+          },
+          "scope": "Actual new-message route/account child opened by Chats new-message action and backed out."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupPhotoMenu.kt",
       "symbol": "NewGroupPhotoMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupPhotoMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-photo-photos",
+          "selector": {
+            "text": "Choose from Photos"
+          },
+          "scope": "Actual bounded photo popup; dismissal precedes Photos callback, no system picker operation."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
       "symbol": "NewGroupRecipientAccountScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupRecipientAccountScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "creation-group-back",
+          "selector": {
+            "id": "new_group.screen"
+          },
+          "scope": "Actual new-group recipient route and bound-account child reached through New Message; Back restores parent."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
       "symbol": "NewGroupRecipientPickerScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupRecipientPickerScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "creation-group-back",
+          "selector": {
+            "id": "new_group.screen"
+          },
+          "scope": "Actual new-group recipient route and bound-account child reached through New Message; Back restores parent."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
       "symbol": "NewGroupSetupAccountScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupSetupAccountScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "creation-group-setup-cancel",
+          "selector": {
+            "id": "group_setup.screen"
+          },
+          "scope": "Actual group-setup route/account child reached by Next; cancel restores recipient selection."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
       "symbol": "NewGroupSetupScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NewGroupSetupScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "creation-group-setup-cancel",
+          "selector": {
+            "id": "group_setup.screen"
+          },
+          "scope": "Actual group-setup route/account child reached by Next; cancel restores recipient selection."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
@@ -190,32 +310,72 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
       "symbol": "ConfirmDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConfirmDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-disband-cancel",
+          "selector": {
+            "text": "Disband this group\\?"
+          },
+          "scope": "Shared production destructive confirm surface rendered by group disband confirmation."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/IdentityImageCropDialog.kt",
       "symbol": "IdentityImageCropDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for IdentityImageCropDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-image-crop-rotate",
+          "selector": {
+            "id": "identity_crop.canvas"
+          },
+          "scope": "Actual crop canvas, rotation and confirmed quarter-turn callback for generated pixels."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
       "symbol": "StartupFailureScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for StartupFailureScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-startup-retryable",
+          "selector": {
+            "id": "startup-failure"
+          },
+          "scope": "Actual production startup failure/retry chrome, with injected error rather than storage corruption."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
       "symbol": "LoadingScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for LoadingScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-startup-destination-loading",
+          "selector": {
+            "id": "full-screen-loading"
+          },
+          "scope": "Actual destination loader with supplied status, with host exit only."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StateScreens.kt",
       "symbol": "StartupLoadingScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for StartupLoadingScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-startup-loading",
+          "selector": {
+            "id": "startup-loading"
+          },
+          "scope": "Actual production startup loader, with host exit only."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseAnchoredMenu.kt",
@@ -238,8 +398,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
       "symbol": "WhiteNoiseAlertDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseAlertDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-tts-trust-cancel",
+          "selector": {
+            "text": "External text-to-speech engine"
+          },
+          "scope": "Shared production alert rendered by trust warning; visible title and Cancel dispatch."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
@@ -250,14 +418,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseMenus.kt",
       "symbol": "WhiteNoiseDropdownMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseDropdownMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-photo-files",
+          "selector": {
+            "text": "Choose from Files"
+          },
+          "scope": "Shared production dropdown rendered by group photo menu; item action and dismissal order checked."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseSheets.kt",
       "symbol": "WhiteNoiseModalBottomSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseModalBottomSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-retained-pick",
+          "selector": {
+            "text": "Choose profile"
+          },
+          "scope": "Shared production modal sheet rendered by retained chooser; exact selected account callback."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
@@ -268,8 +452,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
       "symbol": "ConversationInitialLoadingOverlay",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationInitialLoadingOverlay; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-conversation-loading",
+          "selector": {
+            "id": "conversation.initial_loading"
+          },
+          "scope": "Actual conversation grace-period loading overlay; host exit only, no transcript-ready claim."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
@@ -310,8 +502,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
       "symbol": "TtsTransportRatePicker",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TtsTransportRatePicker; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-transport-rate",
+          "selector": {
+            "text": "System \\(follow device setting\\)"
+          },
+          "scope": "Actual transport menu opens and sends null system-default rate payload."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
@@ -322,20 +522,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
       "symbol": "ConversationDictationRecoveryPanel",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationDictationRecoveryPanel; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-dictation-closing",
+          "selector": {
+            "text": "Finishing microphone…"
+          },
+          "scope": "Actual recovery panel closing-microphone state; native capture and disposal remain separate."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
       "symbol": "ConversationDictationMicrophoneDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationDictationMicrophoneDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-dictation-microphone-settings",
+          "selector": {
+            "text": "Microphone access is off"
+          },
+          "scope": "Actual microphone-denial dialog and Settings handoff callback, without microphone capture."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
       "symbol": "ConversationDictationPartialSendDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationDictationPartialSendDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-dictation-partial-cancel",
+          "selector": {
+            "text": "Incomplete dictation"
+          },
+          "scope": "Actual incomplete transcript confirmation cancelled before send."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
@@ -370,8 +594,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
       "symbol": "MediaPreviewScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for MediaPreviewScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-preview-cancel",
+          "selector": {
+            "id": "conversation.media.preview.image.0"
+          },
+          "scope": "Actual staged media preview decodes generated local PNG and displays caption; Cancel dispatch checked, with no transfer."
+        }
+      ],
+      "remaining": "Additional multi-item, video, native acquisition and lifecycle states retain their own campaigns."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
@@ -388,8 +620,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
       "symbol": "TextAttachmentFilenameDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TextAttachmentFilenameDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-text-filename",
+          "selector": {
+            "text": "File name"
+          },
+          "scope": "Actual filename dialog opened from the text reader; full name copied and callback checked."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
@@ -400,26 +640,58 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
       "symbol": "TextAttachmentReaderScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TextAttachmentReaderScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-text-ready",
+          "selector": {
+            "text": "Maestro document first line.*"
+          },
+          "scope": "Actual ready text reader body and Close; decoding/runtime transfer remain separate."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorCoordinatesDialog.kt",
       "symbol": "PhotoEditorCoordinatesDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for PhotoEditorCoordinatesDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-image-editor-coordinates",
+          "selector": {
+            "text": "Adjust crop"
+          },
+          "scope": "Actual coordinate editor opened from production photo editor, then dismissed."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt",
       "symbol": "PhotoEditorDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for PhotoEditorDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-image-editor-cancel",
+          "selector": {
+            "id": "photo.editor"
+          },
+          "scope": "Actual editor dialog and its child production screen; Cancel callback checked, no media upload."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt",
       "symbol": "PhotoEditorScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for PhotoEditorScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-image-editor-cancel",
+          "selector": {
+            "id": "photo.editor"
+          },
+          "scope": "Actual editor dialog and its child production screen; Cancel callback checked, no media upload."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
@@ -526,26 +798,58 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
       "symbol": "NostrEventImagePane",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NostrEventImagePane; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-nostr-image-failure",
+          "selector": {
+            "text": "Couldn’t load this image. Try again."
+          },
+          "scope": "Actual image-pane failure and retry against bounded null image loader."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
       "symbol": "NostrEventReaderDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NostrEventReaderDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-nostr-note",
+          "selector": {
+            "text": "Maestro resolved reader body"
+          },
+          "scope": "Actual referenced-note dialog and production reader child with supplied resolved card/body; resolver and signature validation remain native."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
       "symbol": "NostrEventReaderScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NostrEventReaderScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-nostr-note",
+          "selector": {
+            "text": "Maestro resolved reader body"
+          },
+          "scope": "Actual referenced-note dialog and production reader child with supplied resolved card/body; resolver and signature validation remain native."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
       "symbol": "NostrVideoPlayerDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NostrVideoPlayerDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-nostr-video-failure",
+          "selector": {
+            "text": "Couldn’t play this video\\."
+          },
+          "scope": "Actual ExoPlayer local missing-file failure and Close; no successful playback claim."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/CompleteReactionDetailsSheet.kt",
@@ -568,8 +872,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
       "symbol": "ContactPreviewScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ContactPreviewScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-contact-phone",
+          "selector": {
+            "text": "Share contact"
+          },
+          "scope": "Actual contact preview filters email before exact phone-only callback; no address-book or send."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/LocationPickerScreen.kt",
@@ -604,8 +916,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
       "symbol": "ConversationNotificationSettingsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationNotificationSettingsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-notifications-back",
+          "selector": {
+            "text": "Sounds & notifications"
+          },
+          "scope": "Actual per-chat notification destination and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
@@ -634,8 +954,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
       "symbol": "DisappearingMessagesPickerDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DisappearingMessagesPickerDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-retention-cancel",
+          "selector": {
+            "text": "Disappearing messages"
+          },
+          "scope": "Actual chat-retention picker and Cancel."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
@@ -646,14 +974,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
       "symbol": "GroupDetailsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GroupDetailsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-details-return",
+          "selector": {
+            "id": "chat_info.list"
+          },
+          "scope": "Actual group info route and detailed list child for generated two-member group, followed by Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
       "symbol": "GroupDisbandConfirmDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GroupDisbandConfirmDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-disband-cancel",
+          "selector": {
+            "text": "Disband this group\\?"
+          },
+          "scope": "Actual terminal confirmation chrome; Cancel prevents dispatch and no native group is ended."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
@@ -664,8 +1008,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
       "symbol": "GroupEditScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GroupEditScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-edit-cancel",
+          "selector": {
+            "id": "group_edit.photoAction"
+          },
+          "scope": "Actual group edit destination exposes photo action; Cancel preserves native group name."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
@@ -682,14 +1034,22 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
       "symbol": "ChatRelaysScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatRelaysScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-relays",
+          "selector": {
+            "text": "Relays"
+          },
+          "scope": "Actual group relay destination reached from chat info and backed out."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
       "symbol": "GroupInfoScreen",
       "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GroupInfoScreen; related manual IDs provide no screen execution proof."
+      "remaining": "Add direct technical group identifiers screen navigation; group-details list assertions do not exercise this separate destination."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
@@ -712,8 +1072,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
       "symbol": "LargeGroupInviteConfirmationDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for LargeGroupInviteConfirmationDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-large-cancel",
+          "selector": {
+            "text": "Invite to a large group?"
+          },
+          "scope": "Actual large-group warning cancellation; no native invite."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
@@ -730,44 +1098,100 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
       "symbol": "MuteDurationChoiceDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for MuteDurationChoiceDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-mute-cancel",
+          "selector": {
+            "text": "Mute for"
+          },
+          "scope": "Actual mute preset choices child inside production dialog, then Cancel."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
       "symbol": "MuteDurationDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for MuteDurationDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-mute-cancel",
+          "selector": {
+            "text": "Mute for"
+          },
+          "scope": "Actual per-chat mute picker opened then cancelled, without changing mute state."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
       "symbol": "TtsAutoReadPickerContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TtsAutoReadPickerContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-autoread-on",
+          "selector": {
+            "text": "On"
+          },
+          "scope": "Actual child read-aloud override choices with ON asserted and selected; exact payload precedes parent dismissal."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadPickerDialog.kt",
       "symbol": "TtsAutoReadPickerDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TtsAutoReadPickerDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-autoread-on",
+          "selector": {
+            "text": "Read messages aloud"
+          },
+          "scope": "Actual read-aloud override dialog and child options; exact ON payload precedes dismissal."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
       "symbol": "QuickAccountSwitchTransitionOverlay",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for QuickAccountSwitchTransitionOverlay; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-quick-cue",
+          "selector": {
+            "id": "quick-account-switch-cue"
+          },
+          "scope": "Actual awaiting-target identity cue; no native account activation completion claim."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/TtsReturnTransitionScreen.kt",
       "symbol": "TtsReturnTransitionScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TtsReturnTransitionScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-tts-return",
+          "selector": {
+            "id": "tts-return-transition"
+          },
+          "scope": "Actual return transition screen remains visible; host exit does not qualify route completion."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
       "symbol": "RetainedProfilesSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for RetainedProfilesSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-selection-retained-pick",
+          "selector": {
+            "text": "Choose profile"
+          },
+          "scope": "Actual retained-account chooser with two synthetic identities; exact second-account callback checked."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
@@ -790,8 +1214,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
       "symbol": "AccountSetupScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AccountSetupScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-setup-profile",
+          "selector": {
+            "text": "Profile"
+          },
+          "scope": "Actual setup screen/controller profile decision against bounded native-port fixture; no real onboarding qualification."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddAccountSheetContent.kt",
@@ -808,20 +1240,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileFeedbackDialog.kt",
       "symbol": "AddProfileFeedbackDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AddProfileFeedbackDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-feedback-add-copyable",
+          "selector": {
+            "text": "Synthetic account presentation detail"
+          },
+          "scope": "Actual add-profile error feedback with diagnostic Copy and OK, synthetic content only."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
       "symbol": "AvatarFullScreenViewer",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AvatarFullScreenViewer; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-image-avatar",
+          "selector": {
+            "text": "Maestro synthetic avatar"
+          },
+          "scope": "Actual avatar fullscreen viewer rendered from generated pixels; Close returns to test host."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileFeedbackDialog.kt",
       "symbol": "PersonProfileFeedbackDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for PersonProfileFeedbackDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-feedback-person-informational",
+          "selector": {
+            "text": "Synthetic account presentation detail"
+          },
+          "scope": "Actual noncopyable person-profile feedback and dismissal."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
@@ -844,8 +1300,17 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
       "symbol": "ContactPrivateDetailsDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ContactPrivateDetailsDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "profiles-private-cancel",
+          "selector": {
+            "id": "person_profile.nickname",
+            "focused": true
+          },
+          "scope": "Actual private contact details opened from profile; edits cancelled before persistence."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
@@ -856,14 +1321,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
       "symbol": "ProfileSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "profiles-member-back",
+          "selector": {
+            "text": "User Profile"
+          },
+          "scope": "Actual generated Bob profile opened from group member row then backed out."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
       "symbol": "ProfileSheetModerationConfirmDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileSheetModerationConfirmDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "profiles-admin-confirm-back",
+          "selector": {
+            "text": "Make Maestro Bob an admin[?]"
+          },
+          "scope": "Actual profile admin elevation confirmation; Back cancels before native mutation."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
@@ -886,8 +1367,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
       "symbol": "GlobalSearchCivilDatePickerDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchCivilDatePickerDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-custom-start-cancel",
+          "selector": {
+            "text": "Start date"
+          },
+          "scope": "Actual custom start-date stage and Material civil-date picker cancelled without applying."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
@@ -898,26 +1387,58 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
       "symbol": "GlobalSearchDateCustomStageDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchDateCustomStageDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-custom-start-cancel",
+          "selector": {
+            "text": "Start date"
+          },
+          "scope": "Actual custom start-date stage and Material civil-date picker cancelled without applying."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
       "symbol": "GlobalSearchDateFilterDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchDateFilterDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-date-cancel",
+          "selector": {
+            "text": "Date"
+          },
+          "scope": "Actual global date filter wrapper/preset list opened from search then cancelled."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
       "symbol": "GlobalSearchDatePresetDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchDatePresetDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-date-cancel",
+          "selector": {
+            "text": "Date"
+          },
+          "scope": "Actual global date filter wrapper/preset list opened from search then cancelled."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
       "symbol": "AccountKeysScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AccountKeysScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "settings-profile-keys",
+          "selector": {
+            "text": "Private key hidden"
+          },
+          "scope": "Actual profile keys destination initially redacted; no secret emitted in screen report."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
@@ -964,38 +1485,86 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
       "symbol": "ActionColorScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ActionColorScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-action-color",
+          "selector": {
+            "id": "action_color.controls"
+          },
+          "scope": "Actual action color controls and production preview; Back restores Appearance."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
       "symbol": "AgentSetupSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AgentSetupSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "connectors-hermes",
+          "selector": {
+            "id": "ai_agents.prompt.hermes"
+          },
+          "scope": "Actual Hermes connector setup sheet with copy control; cancel restores list."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
       "symbol": "AiAgentsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AiAgentsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "settings-connectors",
+          "selector": {
+            "id": "ai_agents.connectors"
+          },
+          "scope": "Actual AI Agents connector list and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
       "symbol": "AppearanceScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AppearanceScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "settings-appearance",
+          "selector": {
+            "id": "appearance.theme.group"
+          },
+          "scope": "Actual Appearance destination has its production theme group and toolbar Back restores Settings."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
       "symbol": "BlockedUsersScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for BlockedUsersScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-blocked-empty",
+          "selector": {
+            "text": "You haven’t blocked anyone."
+          },
+          "scope": "Actual empty blocked list of disposable account and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
       "symbol": "ChatBubbleColorsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatBubbleColorsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-bubble-colors",
+          "selector": {
+            "id": "bubble_colors.mine.picker"
+          },
+          "scope": "Actual outgoing bubble color picker/preview and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
@@ -1048,8 +1617,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
       "symbol": "DataUsageScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DataUsageScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "settings-data",
+          "selector": {
+            "id": "data_usage.downloads.group"
+          },
+          "scope": "Actual data-use download group and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
@@ -1060,8 +1637,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
       "symbol": "DevicePrivacyScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DevicePrivacyScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "settings-privacy",
+          "selector": {
+            "id": "privacy.device_protection.group"
+          },
+          "scope": "Actual Privacy and Security device protection controls and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
@@ -1090,8 +1675,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
       "symbol": "DiagnosticsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DiagnosticsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "id": "diagnostics.choices.group"
+          },
+          "scope": "Actual Diagnostics destination choice group and Back; no audit upload."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
@@ -1108,8 +1701,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
       "symbol": "DonateScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DonateScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-donate",
+          "selector": {
+            "id": "donate.open"
+          },
+          "scope": "Actual Donate screen and external-link control; no external link activation."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
@@ -1126,14 +1727,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
       "symbol": "AboutScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AboutScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "navigation-help-about",
+          "selector": {
+            "id": "about.version"
+          },
+          "scope": "Actual About destination shows app and version rows; Back restores Help."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
       "symbol": "BugReportScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for BugReportScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-bug-report",
+          "selector": {
+            "id": "help.bug.destination"
+          },
+          "scope": "Actual bug-report destination and open control; Back restores Help, without contacting third parties."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
@@ -1144,8 +1761,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
       "symbol": "HelpScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for HelpScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "settings-help",
+          "selector": {
+            "id": "help.destinations"
+          },
+          "scope": "Actual Help destination group and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
@@ -1168,8 +1793,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
       "symbol": "NotificationsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NotificationsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "settings-notifications",
+          "selector": {
+            "id": "notifications.permission.group"
+          },
+          "scope": "Actual global notification destination and permission group; toolbar Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
@@ -1210,20 +1843,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
       "symbol": "SettingsHomeScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SettingsHomeScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "navigation-settings-back",
+          "selector": {
+            "text": "Settings"
+          },
+          "scope": "Actual Settings route and home child opened from avatar, System Back restores Chats."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
       "symbol": "SettingsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SettingsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "navigation-settings-back",
+          "selector": {
+            "text": "Settings"
+          },
+          "scope": "Actual Settings route and home child opened from avatar, System Back restores Chats."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
       "symbol": "ShareConnectScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ShareConnectScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-share-connect",
+          "selector": {
+            "id": "share_connect.qr_surface"
+          },
+          "scope": "Actual share/connect QR destination using generated identity and Back."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
@@ -1258,14 +1915,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
       "symbol": "TextToSpeechScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TextToSpeechScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "settings-read-aloud",
+          "selector": {
+            "id": "speech.engine.group"
+          },
+          "scope": "Actual global speech destination and engine group; hardware speech remains separate."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TtsRatePicker.kt",
       "symbol": "TtsCustomRateDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TtsCustomRateDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-tts-custom-apply",
+          "selector": {
+            "text": "Speech rate"
+          },
+          "scope": "Actual custom speech dialog validates selected 1.1 rate callback; no engine execution."
+        }
+      ],
+      "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",

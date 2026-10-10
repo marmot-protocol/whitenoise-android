@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-photo-emoji
+---
+- assertVisible: Create from emoji
+- tapOn: Create from emoji
+- assertVisible:
+    id: presentation.complete

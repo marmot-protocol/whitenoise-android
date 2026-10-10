@@ -8,7 +8,7 @@ import yaml
 
 def flow_assertions(path, root, active=None):
     """Collect unconditional assertions; optional, conditional and substituted paths grant no credit."""
-    if path.is_symlink():
+    if any(part.is_symlink() for part in [path, *path.parents]):
         raise ValueError("Screen assertion flow cannot be a symlink")
     path = path.resolve()
     root = root.resolve()
@@ -55,7 +55,7 @@ def screen_bindings(root, screens, cases):
     if document.get('schema') != 1 or not isinstance(document.get('screens'), list):
         raise ValueError('Invalid direct screen assertion inventory')
     expected = {(screen['source'], screen['symbol']) for screen in screens}
-    found, result = set(), []
+    found, result, flows = set(), [], {}
     for row in document['screens']:
         key = (row.get('source'), row.get('symbol'))
         if key in found or key not in expected:
@@ -76,7 +76,9 @@ def screen_bindings(root, screens, cases):
             seen.add(identity)
             if not str(binding.get('scope', '')).strip():
                 raise ValueError(f'Screen assertion needs its precise fixture scope: {key}')
-            assertions, hashes = flow_assertions(root / cases[case]['flow'], root)
+            if case not in flows:
+                flows[case] = flow_assertions(root / cases[case]['flow'], root)
+            assertions, hashes = flows[case]
             if selector not in assertions:
                 raise ValueError(f'Screen selector is not directly asserted: {key} {case} {selector}')
             qualified.append({**binding, 'flow_sha256': hashes})
@@ -93,10 +95,17 @@ def executed_screens(bindings, campaign, source):
     results = campaign.get('results')
     if not isinstance(results, list):
         raise ValueError('Screen execution needs per-case outcomes')
+    if any(not isinstance(row, dict) or not isinstance(row.get('case'), str) for row in results):
+        raise ValueError('Malformed screen execution case')
     names = [row.get('case') for row in results]
     if len(names) != len(set(names)):
         raise ValueError('Duplicate screen execution case')
-    passed = {row['case'] for row in results if row.get('passed') is True and not row.get('failure')}
-    return [{**screen, 'execution_verified': any(binding['case'] in passed for binding in screen['bindings']),
-             'executed_cases': sorted({binding['case'] for binding in screen['bindings'] if binding['case'] in passed})}
+    passed = {row['case']: row for row in results if row.get('passed') is True
+              and row.get('not_run') is not True and not row.get('failure')}
+    def qualifies(binding):
+        hashes = binding.get('flow_sha256')
+        return (binding['case'] in passed and isinstance(hashes, dict) and bool(hashes)
+                and hashes == passed[binding['case']].get('flow_sha256'))
+    return [{**screen, 'execution_verified': any(qualifies(binding) for binding in screen['bindings']),
+             'executed_cases': sorted({binding['case'] for binding in screen['bindings'] if qualifies(binding)})}
             for screen in bindings]

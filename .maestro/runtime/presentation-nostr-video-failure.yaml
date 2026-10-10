@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-nostr-video-failure
+---
+- assertVisible: Couldn’t play this video\.
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

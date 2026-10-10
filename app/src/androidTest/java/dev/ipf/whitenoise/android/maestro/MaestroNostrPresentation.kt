@@ -6,12 +6,19 @@ import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardKind
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardModel
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventImagePane
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventReaderDialog
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrVideoPlayerDialog
 
 /** Reader presentation begins after resolution; signature/relay verification remains a native campaign. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun MaestroNostrPresentation(fixture: MaestroPresentationFixture) {
     when (fixture.scenario) {
+        "nostr-video-failure", "nostr-video-retry" ->
+            NostrVideoPlayerDialog(
+                mediaUrl = "file:///nonexistent/maestro-video-fixture.mp4",
+                mediaMimeType = "video/mp4",
+                onDismiss = { fixture.finish("dismiss") },
+            )
         "nostr-image", "nostr-image-failure" ->
             NostrEventImagePane(
                 url = "https://example.invalid/maestro.png",
@@ -39,7 +46,9 @@ internal fun MaestroNostrPresentation(fixture: MaestroPresentationFixture) {
                 authorDisplayName = { "Maestro author" },
                 mentionDisplayName = { null },
                 onNostrProfileTap = { fixture.record("profile") },
-                parseMarkdown = { MarkdownDocumentFfi(emptyList(), false) },
+                parseMarkdown = {
+                    MarkdownDocumentFfi(blocks = emptyList(), truncated = false, blankLinesBefore = byteArrayOf())
+                },
                 onDismiss = { fixture.finish("dismiss") },
             )
         }

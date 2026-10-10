@@ -62,8 +62,14 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
             OnboardingStepFfi.entries.map { item ->
                 OnboardingStepStateFfi(
                     item,
-                    if (item.ordinal < step.ordinal) OnboardingStatusFfi.PASSED else if (item == step) OnboardingStatusFfi.NEEDS_INPUT else OnboardingStatusFfi.PENDING,
-                    emptyList(), if (item == step) listOf(action, OnboardingActionFfi.CONTINUE_WITHOUT) else emptyList(), null,
+                    when {
+                        item.ordinal < step.ordinal -> OnboardingStatusFfi.PASSED
+                        item == step -> OnboardingStatusFfi.NEEDS_INPUT
+                        else -> OnboardingStatusFfi.PENDING
+                    },
+                    emptyList(),
+                    if (item == step) listOf(action, OnboardingActionFfi.CONTINUE_WITHOUT) else emptyList(),
+                    null,
                 )
             },
             null, null, false,
@@ -89,5 +95,6 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
         return current
     }
 
-    override suspend fun profile() = UserProfileMetadataFfi("Maestro", "Maestro setup", "Setup detail", null, null, null, null)
+    override suspend fun profile() =
+        UserProfileMetadataFfi("Maestro", "Maestro setup", "Setup detail", null, null, null, null)
 }

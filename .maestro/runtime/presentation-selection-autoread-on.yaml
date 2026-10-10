@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-autoread-on
+---
+- assertVisible: Read messages aloud
+- assertVisible: 'On'
+- tapOn: 'On'
+- assertVisible:
+    id: presentation.complete

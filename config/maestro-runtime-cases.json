@@ -1514,7 +1514,7 @@
       "manual_ids": [
         "NTF-033"
       ],
-      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
       "postcondition": "none"
     },
     "alerts-chat-sounds-back": {
@@ -1628,7 +1628,7 @@
       "manual_ids": [
         "MSG-005"
       ],
-      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "assertions": "Filtering to the owner’s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
       "postcondition": "reactions-retained",
       "fixture": "reactions"
     },
@@ -1680,7 +1680,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
+      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
@@ -1704,7 +1704,7 @@
       "manual_ids": [
         "SET-008"
       ],
-      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "assertions": "繁體中文 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
       "postcondition": "language-system"
     },
     "advanced-relay-empty": {
@@ -1860,7 +1860,7 @@
       "manual_ids": [
         "ACC-007"
       ],
-      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice’s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -1888,7 +1888,7 @@
         "ACC-007",
         "NAV-004"
       ],
-      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
+      "assertions": "Save Alice’s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice’s retained private records, every other viewer empty and unchanged public profiles.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -2147,7 +2147,7 @@
       "manual_ids": [
         "TTS-002"
       ],
-      "assertions": "Apply custom rate then replace with 0\\.5\u00d7; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
+      "assertions": "Apply custom rate then replace with 0\\.5×; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
       "postcondition": "speech-rate-preset"
     },
     "speech-invalid-keeps-saved-rate": {
@@ -3188,7 +3188,7 @@
       "manual_ids": [
         "FIND-008"
       ],
-      "assertions": "Select the actual ANY_ATTACHMENT attachment mode; require selected-chip semantics, the browser\u2019s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "assertions": "Select the actual ANY_ATTACHMENT attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
     },
     "search-library-empty-photos": {
@@ -3196,7 +3196,7 @@
       "manual_ids": [
         "FIND-008"
       ],
-      "assertions": "Select the actual IMAGES_VIDEO attachment mode; require selected-chip semantics, the browser\u2019s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "assertions": "Select the actual IMAGES_VIDEO attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
     },
     "search-library-empty-files": {
@@ -3204,7 +3204,7 @@
       "manual_ids": [
         "FIND-008"
       ],
-      "assertions": "Select the actual FILES_DOCUMENTS attachment mode; require selected-chip semantics, the browser\u2019s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "assertions": "Select the actual FILES_DOCUMENTS attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
     },
     "search-library-empty-audio": {
@@ -3212,7 +3212,7 @@
       "manual_ids": [
         "FIND-008"
       ],
-      "assertions": "Select the actual VOICE_AUDIO attachment mode; require selected-chip semantics, the browser\u2019s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "assertions": "Select the actual VOICE_AUDIO attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
       "postcondition": "global-library-empty"
     },
     "search-library-empty-rotation": {
@@ -3323,7 +3323,7 @@
         "ACC-010",
         "ACC-017"
       ],
-      "assertions": "Switch from Alice to Bob through the actual profile selector and copy Bob\u2019s raw key while hidden. Native proof requires active Bob from the original peer baseline, exact SDK Bob nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. All three original identities and both original messages must remain. This deliberate active-account change does not require restored active Alice. Disposable loopback accounts only; no pending-result races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance claim.",
+      "assertions": "Switch from Alice to Bob through the actual profile selector and copy Bob’s raw key while hidden. Native proof requires active Bob from the original peer baseline, exact SDK Bob nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. All three original identities and both original messages must remain. This deliberate active-account change does not require restored active Alice. Disposable loopback accounts only; no pending-result races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance claim.",
       "postcondition": "private-key-copy-peer"
     },
     "keys-private-account-switch-copy": {
@@ -3332,7 +3332,7 @@
         "ACC-010",
         "ACC-017"
       ],
-      "assertions": "Visit Bob\u2019s actual Profile Keys and deliberately reveal/hide his disposable key, then restore Alice and copy Alice while hidden. Native proof requires restored active Alice and her exact original SDK nsec in one plain-text Android clipboard item with private-key label/sensitive flag and no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; no key contents enter evidence. Three original identities and both original messages must remain. This completed account-return route does not qualify pending-key callbacks/owner races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance.",
+      "assertions": "Visit Bob’s actual Profile Keys and deliberately reveal/hide his disposable key, then restore Alice and copy Alice while hidden. Native proof requires restored active Alice and her exact original SDK nsec in one plain-text Android clipboard item with private-key label/sensitive flag and no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; no key contents enter evidence. Three original identities and both original messages must remain. This completed account-return route does not qualify pending-key callbacks/owner races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance.",
       "postcondition": "private-key-copy-owner"
     },
     "presentation-update-resolving": {
@@ -4228,6 +4228,445 @@
       "postcondition": "presentation-checked",
       "presentation": "setup-error",
       "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-contact-all": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual production contact preview, field filtering and enabled state; verify exact selected contact callback without address book or dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-contact-all",
+      "presentation_actions": [
+        "contact-selected"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-contact-phone": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual production contact preview, field filtering and enabled state; verify exact selected contact callback without address book or dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-contact-phone",
+      "presentation_actions": [
+        "contact-selected"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-contact-email": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual production contact preview, field filtering and enabled state; verify exact selected contact callback without address book or dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-contact-email",
+      "presentation_actions": [
+        "contact-selected"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-contact-empty": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual production contact preview, field filtering and enabled state; verify exact selected contact callback without address book or dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-contact-empty",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-contact-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual production contact preview, field filtering and enabled state; verify exact selected contact callback without address book or dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-contact-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-contact-none": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual production contact preview, field filtering and enabled state; verify exact selected contact callback without address book or dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-contact-none",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-retained-pick": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-001"
+      ],
+      "assertions": "Actual retained profile sheet with two synthetic identities; verify selected identity or disabled/cancelled callback boundary.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-retained-pick",
+      "presentation_actions": [
+        "profile-selected"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-retained-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-001"
+      ],
+      "assertions": "Actual retained profile sheet with two synthetic identities; verify selected identity or disabled/cancelled callback boundary.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-retained-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-retained-disabled": {
+      "suite": "presentation",
+      "manual_ids": [
+        "ONB-001"
+      ],
+      "assertions": "Actual retained profile sheet with two synthetic identities; verify selected identity or disabled/cancelled callback boundary.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-retained-disabled",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-autoread-on": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-001"
+      ],
+      "assertions": "Actual per-chat read-aloud picker and exact override payload/callback order; hardware speech remains separate.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-autoread-on",
+      "presentation_actions": [
+        "override-selected",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-autoread-off": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-001"
+      ],
+      "assertions": "Actual per-chat read-aloud picker and exact override payload/callback order; hardware speech remains separate.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-autoread-off",
+      "presentation_actions": [
+        "override-selected",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-autoread-default": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-001"
+      ],
+      "assertions": "Actual per-chat read-aloud picker and exact override payload/callback order; hardware speech remains separate.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-autoread-default",
+      "presentation_actions": [
+        "override-selected",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-autoread-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-001"
+      ],
+      "assertions": "Actual per-chat read-aloud picker and exact override payload/callback order; hardware speech remains separate.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-autoread-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-disband-confirm": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Actual destructive group confirmation; presentation callback does not disband the native fixture.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-disband-confirm",
+      "presentation_actions": [
+        "confirm"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-disband-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Actual destructive group confirmation; presentation callback does not disband the native fixture.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-disband-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-photo-photos": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Actual new-group photo popup with bounded trigger; verify selected acquisition action after dismissal, without opening system providers.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-photo-photos",
+      "presentation_actions": [
+        "menu-dismissed",
+        "photos"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-photo-files": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Actual new-group photo popup with bounded trigger; verify selected acquisition action after dismissal, without opening system providers.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-photo-files",
+      "presentation_actions": [
+        "menu-dismissed",
+        "files"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-photo-web": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Actual new-group photo popup with bounded trigger; verify selected acquisition action after dismissal, without opening system providers.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-photo-web",
+      "presentation_actions": [
+        "menu-dismissed",
+        "web"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-photo-emoji": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Actual new-group photo popup with bounded trigger; verify selected acquisition action after dismissal, without opening system providers.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-photo-emoji",
+      "presentation_actions": [
+        "menu-dismissed",
+        "emoji"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-photo-remove": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Actual new-group photo popup with bounded trigger; verify selected acquisition action after dismissal, without opening system providers.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-photo-remove",
+      "presentation_actions": [
+        "menu-dismissed",
+        "remove"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-transport-rate": {
+      "suite": "presentation",
+      "manual_ids": [
+        "TTS-001"
+      ],
+      "assertions": "Actual transport rate menu opens and verifies null system-default payload.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-transport-rate",
+      "presentation_actions": [
+        "default-selected"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-conversation-loading": {
+      "suite": "presentation",
+      "manual_ids": [
+        "NAV-001"
+      ],
+      "assertions": "Actual delayed conversation loading overlay remains visible after its grace; exit test host without implying route loading succeeded.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-conversation-loading",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-selection-quick-cue": {
+      "suite": "presentation",
+      "manual_ids": [
+        "NAV-001"
+      ],
+      "assertions": "Actual awaiting-target identity cue renders synthetic target; no activation completion or native account proof claimed.",
+      "postcondition": "presentation-checked",
+      "presentation": "selection-quick-cue",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-nostr-video-failure": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual ExoPlayer missing-local-file failure renders retry/close; no public transfer, successful playback or hardware decoder qualification claimed.",
+      "postcondition": "presentation-checked",
+      "presentation": "nostr-video-failure",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-nostr-video-retry": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual ExoPlayer missing-local-file failure renders retry/close; no public transfer, successful playback or hardware decoder qualification claimed.",
+      "postcondition": "presentation-checked",
+      "presentation": "nostr-video-retry",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-preview-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual staged preview decodes a generated PNG; cancellation, caption, exclusion or chosen callback boundary verified; no attachment dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "preview-cancel",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-preview-send": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual staged preview decodes a generated PNG; cancellation, caption, exclusion or chosen callback boundary verified; no attachment dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "preview-send",
+      "presentation_actions": [
+        "send-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-preview-rejected": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual staged preview decodes a generated PNG; cancellation, caption, exclusion or chosen callback boundary verified; no attachment dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "preview-rejected",
+      "presentation_actions": [
+        "send-rejected",
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-preview-edit": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual staged preview decodes a generated PNG; cancellation, caption, exclusion or chosen callback boundary verified; no attachment dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "preview-edit",
+      "presentation_actions": [
+        "edit-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-preview-photos": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual staged preview decodes a generated PNG; cancellation, caption, exclusion or chosen callback boundary verified; no attachment dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "preview-photos",
+      "presentation_actions": [
+        "photos-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-preview-documents": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual staged preview decodes a generated PNG; cancellation, caption, exclusion or chosen callback boundary verified; no attachment dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "preview-documents",
+      "presentation_actions": [
+        "documents-handoff"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-preview-view-only": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual staged preview decodes a generated PNG; cancellation, caption, exclusion or chosen callback boundary verified; no attachment dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "preview-view-only",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-preview-remove": {
+      "suite": "presentation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Actual staged preview decodes a generated PNG; cancellation, caption, exclusion or chosen callback boundary verified; no attachment dispatch.",
+      "postcondition": "presentation-checked",
+      "presentation": "preview-remove",
+      "presentation_actions": [
+        "remove-image",
         "dismiss"
       ],
       "layer": "production-presentation-ui"

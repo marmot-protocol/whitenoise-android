@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-photo-remove
+---
+- assertVisible: Remove Photo
+- tapOn: Remove Photo
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-preview-cancel
+---
+- assertVisible: Preview
+- assertVisible:
+    id: conversation.media.preview.image.0
+- assertVisible: Fixture caption
+- tapOn: Cancel Media Changes
+- assertVisible:
+    id: presentation.complete

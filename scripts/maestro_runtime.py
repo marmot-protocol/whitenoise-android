@@ -14,8 +14,10 @@ import xml.etree.ElementTree as ET
 
 try:
     from scripts.maestro_credential import DisposableCredential, PIN, accepted_unlock, credential_state
+    from scripts.maestro_screen_coverage import flow_assertions
 except ModuleNotFoundError:
     from maestro_credential import DisposableCredential, PIN, accepted_unlock, credential_state
+    from maestro_screen_coverage import flow_assertions
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
@@ -97,9 +99,12 @@ def presentation_arguments(case):
     """Only maintained presentation cases may replace content in the isolated test Activity."""
     scenario = case.get('presentation')
     if scenario is None:
+        if case.get('postcondition') == 'presentation-checked':
+            raise ValueError('Missing production presentation fixture')
         return []
     actions = case.get('presentation_actions', [])
-    if (case['postcondition'] != 'presentation-checked' or not re.fullmatch('[a-z][a-z0-9-]+', scenario)
+    if (case.get('postcondition') != 'presentation-checked' or not isinstance(scenario, str)
+            or not re.fullmatch('[a-z][a-z0-9-]+', scenario)
             or not isinstance(actions, list) or not actions
             or any(not isinstance(action, str) or not re.fullmatch('[a-z][a-z0-9-]+', action) for action in actions)):
         raise ValueError('Invalid production presentation fixture')
@@ -136,7 +141,9 @@ def run_fixture(name, directory, generation):
         command(adb + ['shell', 'pm', 'revoke', PACKAGE, camera])
         command(adb + ['shell', 'pm', 'clear-permission-flags', PACKAGE, camera, 'user-set', 'user-fixed'])
     fixture = CASES[name].get('fixture', 'basic')
-    record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False, **CASES[name]}
+    _, hashes = flow_assertions(ROOT / f'.maestro/runtime/{name}.yaml', ROOT)
+    record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False,
+              'flow_sha256': hashes, **CASES[name]}
     failure = None
     with (directory / 'instrumentation.txt').open('w') as log:
         process = subprocess.Popen(adb + ['shell', 'am', 'instrument', '-w', '-r',

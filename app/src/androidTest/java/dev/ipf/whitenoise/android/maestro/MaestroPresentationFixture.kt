@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.maestro
 
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -16,7 +17,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -29,6 +32,11 @@ internal class MaestroPresentationFixture(
     private var complete by mutableStateOf(false)
     val bitmap = Bitmap.createBitmap(160, 120, Bitmap.Config.ARGB_8888).apply { eraseColor(0xff4285f4.toInt()) }
     val image = bitmap.asImageBitmap()
+    lateinit var appState: WhiteNoiseAppState
+        private set
+    lateinit var imageUri: Uri
+        private set
+    private var imageFile: File? = null
 
     fun finish(action: String) {
         calls.add(action)
@@ -40,6 +48,13 @@ internal class MaestroPresentationFixture(
     }
 
     fun install(activity: MainActivity) {
+        appState = (activity.application as MaestroFixtureApplication).fixtureState
+        if (scenario.startsWith("preview-")) {
+            val file = File.createTempFile("maestro-preview-", ".png", activity.cacheDir)
+            imageFile = file
+            file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            imageUri = Uri.fromFile(file)
+        }
         activity.setContent {
             WhiteNoiseTheme {
                 Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
@@ -67,6 +82,8 @@ internal class MaestroPresentationFixture(
             scenario.startsWith("dictation-") -> MaestroDictationPresentation(this)
             scenario.startsWith("feedback-") -> MaestroFeedbackPresentation(this)
             scenario.startsWith("setup-") -> MaestroSetupPresentation(this)
+            scenario.startsWith("selection-") -> MaestroSelectionPresentation(this)
+            scenario.startsWith("preview-") -> MaestroPreviewPresentation(this)
             else -> MaestroBoundaryPresentation(this)
         }
     }
@@ -79,5 +96,6 @@ internal class MaestroPresentationFixture(
 
     override fun close() {
         bitmap.recycle()
+        imageFile?.let { check(!it.exists() || it.delete()) { "Generated preview file cleanup failed" } }
     }
 }

@@ -3,10 +3,10 @@ package dev.ipf.whitenoise.android.maestro
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
-import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
+import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorStateHolder
