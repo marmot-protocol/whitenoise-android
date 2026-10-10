@@ -125,7 +125,9 @@ jobs:
 
       # Inspect the optimized APK already built above; no extra compile or matrix.
       - name: Verify packaged open source notices
-        run: python3 scripts/verify_notice_resources.py --apk '${{ steps.apk.outputs.path }}'
+        env:
+          NOTICE_APK_PATH: ${{ steps.apk.outputs.path }}
+        run: python3 scripts/verify_notice_resources.py --apk "$NOTICE_APK_PATH"
 
       - name: Enable KVM
         run: |
@@ -257,9 +259,12 @@ jobs:
           done
 
       - name: Verify packaged open source notices
+        env:
+          NOTICE_ARM64_APK_PATH: ${{ steps.apks.outputs.arm64_v8a_path }}
+          NOTICE_X86_APK_PATH: ${{ steps.apks.outputs.x86_64_path }}
         run: |
-          python3 scripts/verify_notice_resources.py --apk '${{ steps.apks.outputs.arm64_v8a_path }}'
-          python3 scripts/verify_notice_resources.py --apk '${{ steps.apks.outputs.x86_64_path }}'
+          python3 scripts/verify_notice_resources.py --apk "$NOTICE_ARM64_APK_PATH"
+          python3 scripts/verify_notice_resources.py --apk "$NOTICE_X86_APK_PATH"
 
       # Native libraries are ABI-specific, but the verifier failure is in DEX
       # bytecode. Prove the emulator APK carries the exact DEX files shipped in
