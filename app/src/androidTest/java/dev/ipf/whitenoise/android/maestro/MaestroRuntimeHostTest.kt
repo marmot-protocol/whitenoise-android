@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatListItemFromProjection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -251,7 +252,7 @@ class MaestroRuntimeHostTest {
                     checkNotNull(activity).onActivity { originalActivity = it }
                     inboundShareBaseline =
                         captureMaestroInboundShare(native, app, checkNotNull(activity), group, fixture)
-                    presentation = loadMaestroPresentation(app, group, nativeRow.row.lastMessage)
+                    presentation = loadMaestroPresentation(app, group, chatListItemFromProjection(nativeRow.row).latest)
                     presentation?.let { fixturePresentation ->
                         checkNotNull(activity).onActivity { fixturePresentation.install(it) }
                     }
@@ -320,7 +321,10 @@ class MaestroRuntimeHostTest {
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
-                        .put("presentation", withContext(Dispatchers.Main) { presentation?.verify() ?: JSONObject.NULL })
+                        .put(
+                            "presentation",
+                            withContext(Dispatchers.Main) { presentation?.verify() ?: JSONObject.NULL },
+                        )
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)

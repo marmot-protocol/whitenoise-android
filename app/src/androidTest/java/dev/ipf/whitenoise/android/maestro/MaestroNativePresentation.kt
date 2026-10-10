@@ -17,6 +17,7 @@ internal fun MaestroNativePresentation(fixture: MaestroPresentationFixture) {
                 onDismiss = { fixture.finish("dismiss") },
                 onPick = { error("Cancellation must not hand off a location") },
                 useDataConnection = false,
+                locationLookup = { _, _ -> null },
             )
         else -> {
             val chat = checkNotNull(fixture.nativeChat)

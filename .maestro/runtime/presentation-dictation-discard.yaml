@@ -8,6 +8,8 @@ name: presentation-dictation-discard
     enabled: true
 - tapOn: Discard
 - assertVisible: Discard untranscribed audio? Text already in the composer stays.
-- tapOn: Discard
+- tapOn:
+    text: Discard
+    index: 1
 - assertVisible:
     id: presentation.complete

@@ -3,9 +3,13 @@ name: presentation-selection-retained-disabled
 ---
 - assertVisible: Choose profile
 - assertVisible: Fixture One
+- assertVisible: Fixture Two
 - assertVisible:
-    text: Fixture Two
     enabled: false
+    containsChild:
+      text: Fixture Two
+- tapOn: Fixture Two
+- assertVisible: Fixture Two
 - back
 - assertVisible:
     id: presentation.complete

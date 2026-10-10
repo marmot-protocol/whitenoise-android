@@ -2757,8 +2757,10 @@
         {
           "case": "presentation-extra-seed-cancel",
           "selector": {
-            "text": "Start",
-            "enabled": false
+            "enabled": false,
+            "containsChild": {
+              "text": "Start"
+            }
           },
           "scope": "Actual dialog content shows its guarded Start action inside the real developer parent."
         }
