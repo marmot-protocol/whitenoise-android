@@ -14,8 +14,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
@@ -63,10 +61,6 @@ class ChatFolderEditScreenTest {
         renderEditor(appState, {}, folderId = null)
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Archive")
         openFilterSheet()
-        composeRule.onNodeWithTag("sheet.dragHandle", useUnmergedTree = true).performTouchInput {
-            swipeUp(endY = -450f)
-        }
-        composeRule.mainClock.advanceTimeBy(1000L)
         composeRule
             .onNodeWithTag("folder.addField.ARCHIVED")
             .performScrollTo()

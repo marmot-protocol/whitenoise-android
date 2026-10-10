@@ -707,7 +707,7 @@ internal fun ChatFolderEditContent(
             }
             item {
                 Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin)) {
-                    folderDescription(state.description, compact = true)
+                    folderDescription(state.description)
                 }
             }
             item {
@@ -763,12 +763,9 @@ internal fun ChatFolderEditContent(
 
 /** Optional metadata is revealed only when needed; existing descriptions remain visible. */
 @Composable
-private fun folderDescription(
-    description: TextFieldState,
-    compact: Boolean,
-) {
+private fun folderDescription(description: TextFieldState) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    if (!compact || expanded || description.text.isNotEmpty()) {
+    if (expanded || description.text.isNotEmpty()) {
         WhiteNoiseTextField(
             state = description,
             emojiAction = true,

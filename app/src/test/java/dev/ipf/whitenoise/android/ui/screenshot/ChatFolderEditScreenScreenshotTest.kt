@@ -181,6 +181,11 @@ class ChatFolderEditScreenScreenshotTest {
                 }
             }
         }
+        if (name == "chat_folder_empty_visible_light") {
+            composeRule
+                .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+                .performScrollToNode(hasTestTag("folder.showWhenEmpty"))
+        }
         if (attention) {
             composeRule
                 .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)

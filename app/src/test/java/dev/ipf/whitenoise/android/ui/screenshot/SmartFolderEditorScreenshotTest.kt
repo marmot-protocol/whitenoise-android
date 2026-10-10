@@ -11,9 +11,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
@@ -69,7 +68,15 @@ class SmartFolderEditorScreenshotTest {
 
     @Test fun addFilterSheet() = capture("smart_folder_add_filter", add = true)
 
-    @Test fun moreFiltersSheet() = capture("smart_folder_more_filters", add = true, more = true)
+    @Test
+    @Config(qualifiers = "en-w640dp-h360dp-mdpi")
+    fun filterChoicesLandscapeLarge() =
+        capture(
+            "smart_folder_filters_landscape_large",
+            add = true,
+            scrollToLastFilter = true,
+            largeText = true,
+        )
 
     @Test fun addFilterDark() = capture("smart_folder_add_filter_dark", add = true, dark = true)
 
@@ -100,7 +107,8 @@ class SmartFolderEditorScreenshotTest {
         options: Boolean = false,
         replace: Boolean = false,
         add: Boolean = false,
-        more: Boolean = false,
+        scrollToLastFilter: Boolean = false,
+        largeText: Boolean = false,
     ) {
         var mentionLabel = ""
         val simpleExpanded = name.startsWith("smart_folder_simple_")
@@ -136,7 +144,7 @@ class SmartFolderEditorScreenshotTest {
         composeRule.setContent {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl || largeText) 2f else 1f) {
                     mentionLabel = stringResource(R.string.smart_folder_preset_mentions)
                     ChatFolderEditContent(
                         state =
@@ -194,7 +202,7 @@ class SmartFolderEditorScreenshotTest {
             }
         }
         prepareCapture(
-            CaptureActions(simpleExpanded, rtl, rules, add, more, options, replace, dialog),
+            CaptureActions(simpleExpanded, rtl, rules, add, scrollToLastFilter, options, replace, dialog),
             mentionLabel,
         )
         val target =
@@ -218,14 +226,10 @@ class SmartFolderEditorScreenshotTest {
             composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.add."))
             composeRule.onNodeWithTag("folder.add.").performClick()
             settleSheet()
-            if (actions.more) {
-                composeRule
-                    .onNodeWithTag(
-                        "sheet.dragHandle",
-                        useUnmergedTree = true,
-                    ).performTouchInput { swipeUp(endY = -450f) }
+            if (actions.scrollToLastFilter) {
+                composeRule.onNodeWithTag("folder.addField.PINNED").performScrollTo()
                 settleSheet()
-                composeRule.onNodeWithTag("folder.addField.DRAFT").assertExists()
+                composeRule.onNodeWithTag("folder.addField.PINNED").assertExists()
             }
         }
         if (actions.options) composeRule.onNodeWithTag("folder.options.").performClick()
@@ -287,7 +291,7 @@ private data class CaptureActions(
     val rtl: Boolean,
     val rules: Boolean,
     val add: Boolean,
-    val more: Boolean,
+    val scrollToLastFilter: Boolean,
     val options: Boolean,
     val replace: Boolean,
     val dialog: Boolean,
