@@ -181,15 +181,16 @@ class ConversationDictationControllerTest {
         runTest {
             var sends = 0
             var notices = 0
-            val f = fixture(
-                draft = TextFieldValue("Draft"),
-                targetValidationScope = this,
-                onSendBlocked = { notices++ },
-                sendTranscriptIfOriginUnchanged = {
-                    sends++
-                    true
-                },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft"),
+                    targetValidationScope = this,
+                    onSendBlocked = { notices++ },
+                    sendTranscriptIfOriginUnchanged = {
+                        sends++
+                        true
+                    },
+                )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.controller.send()
             f.edit(key(), TextFieldValue("New draft"))
