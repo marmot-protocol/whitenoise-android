@@ -359,11 +359,7 @@ class ConversationMentionNavigationUiTest {
                                             },
                                             awaitLayout = {
                                                 withFrameNanos { }
-                                                if (fixture.suspendedAction != null && !state.suspensionUsed) {
-                                                    state.suspensionUsed = true
-                                                    state.awaitingLayout = true
-                                                    state.layoutRelease.await()
-                                                }
+                                                state.awaitSuspendedLayout(fixture.suspendedAction)
                                             },
                                             onCompleted = {
                                                 state.completionCount++
@@ -567,6 +563,15 @@ class ConversationMentionNavigationUiTest {
 
     /** Mutable controls belong to this one test's composition and never escape to the app. */
     private class MentionHarnessState(initialHeight: Int) {
+        /** Holds exactly one layout continuation when a mutation or cancellation case requests it. */
+        suspend fun awaitSuspendedLayout(action: SuspendedMentionAction?) {
+            if (action != null && !suspensionUsed) {
+                suspensionUsed = true
+                awaitingLayout = true
+                layoutRelease.await()
+            }
+        }
+
         var targetHeight by mutableIntStateOf(initialHeight)
         var headerCount by mutableIntStateOf(0)
         var awaitingLayout = false

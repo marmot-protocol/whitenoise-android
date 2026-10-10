@@ -126,20 +126,7 @@ class ConversationLiveWindowHandoffTest {
         runBlocking {
             val rosterStarted = CompletableDeferred<Unit>()
             val rosterReply = CompletableDeferred<GroupRosterFfi>()
-            val timeline =
-                ScriptedConversationTimelineSubscription(
-                    timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL)),
-                ).apply {
-                    if (finalWindow) {
-                        emitWindow(
-                            timelinePage(
-                                timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL),
-                                timelineRecord(ConversationTimelineTestIds.MESSAGE_B, 2uL),
-                            ),
-                        )
-                    }
-                    endWindows()
-                }
+            val timeline = endedTimeline(finalWindow)
             val scripts =
                 ScriptedConversationLiveSubscriptions(
                     timelineScripts = listOf(timeline),
@@ -189,6 +176,22 @@ class ConversationLiveWindowHandoffTest {
                 controller.onCleared()
                 awaitOpenedTimelineSubscriptionsClosed(scripts)
             }
+        }
+
+    /** Produces normal EOF immediately after the initial window or one additional live window. */
+    private fun endedTimeline(finalWindow: Boolean) =
+        ScriptedConversationTimelineSubscription(
+            timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL)),
+        ).apply {
+            if (finalWindow) {
+                emitWindow(
+                    timelinePage(
+                        timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL),
+                        timelineRecord(ConversationTimelineTestIds.MESSAGE_B, 2uL),
+                    ),
+                )
+            }
+            endWindows()
         }
 
     /** Runs the production batch-drain timeout on Robolectric's paused main clock while IO remains live. */
