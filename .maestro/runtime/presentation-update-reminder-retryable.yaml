@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-update-reminder-retryable
+---
+- assertVisible:
+    id: appUpdate.dialog
+- assertVisible:
+    id: appUpdate.remindLater
+- tapOn:
+    id: appUpdate.remindLater
+- assertVisible:
+    id: presentation.complete

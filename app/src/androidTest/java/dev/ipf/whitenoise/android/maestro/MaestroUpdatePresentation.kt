@@ -21,27 +21,40 @@ internal fun MaestroUpdatePresentation(fixture: MaestroPresentationFixture) {
             100,
             emptySet(),
         )
-    val state =
-        when (fixture.scenario) {
-            "update-resolving" -> AppSelfUpdateState.Resolving
-            "update-confirm" -> AppSelfUpdateState.Confirming(asset)
-            "update-download", "update-complete-bytes" ->
-                AppSelfUpdateState.Downloading(asset, if (fixture.scenario == "update-complete-bytes") 100 else 25, 100)
-            "update-unknown-total" -> AppSelfUpdateState.Downloading(asset, 25, null)
-            "update-verifying" -> AppSelfUpdateState.Verifying(asset)
-            "update-verified" -> AppSelfUpdateState.Verified(asset, File("never-created.apk"))
-            "update-permission" -> AppSelfUpdateState.PermissionRequired(asset, File("never-created.apk"))
-            "update-retryable" -> AppSelfUpdateState.Error(R.string.app_self_update_hash_mismatch, true)
-            "update-terminal" -> AppSelfUpdateState.Error(R.string.app_self_update_hash_mismatch, false)
-            else -> error("Unknown presentation update phase")
-        }
+    val reminder = fixture.scenario.startsWith("update-reminder-")
+    val phase =
+        if (reminder) fixture.scenario.removePrefix("update-reminder-") else fixture.scenario.removePrefix("update-")
+    val state = maestroUpdateState(phase, asset)
     AppSelfUpdateContent(
         state = state,
-        selfUpdateEnabled = true,
+        selfUpdateEnabled = phase != "disabled",
+        canRemindLater = reminder,
         onCancel = { fixture.finish("cancel") },
         onDownload = { fixture.finish("download") },
         onInstall = { fixture.finish("install-handoff") },
         onOpenSettings = { fixture.finish("settings-handoff") },
         onRetry = { fixture.finish("retry") },
+        onRemindLater = { fixture.finish("remind-later") },
     )
 }
+
+/** Injects actual display phases while preventing all external updater operations. */
+private fun maestroUpdateState(
+    phase: String,
+    asset: ZapstoreApkAsset,
+): AppSelfUpdateState =
+    when (phase) {
+        "idle" -> AppSelfUpdateState.Idle
+        "disabled" -> AppSelfUpdateState.Confirming(asset)
+        "resolving" -> AppSelfUpdateState.Resolving
+        "confirm", "confirm-cancel" -> AppSelfUpdateState.Confirming(asset)
+        "download", "complete-bytes" ->
+            AppSelfUpdateState.Downloading(asset, if (phase == "complete-bytes") 100 else 25, 100)
+        "unknown-total" -> AppSelfUpdateState.Downloading(asset, 25, null)
+        "verifying" -> AppSelfUpdateState.Verifying(asset)
+        "verified" -> AppSelfUpdateState.Verified(asset, File("never-created.apk"))
+        "permission" -> AppSelfUpdateState.PermissionRequired(asset, File("never-created.apk"))
+        "retryable" -> AppSelfUpdateState.Error(R.string.app_self_update_hash_mismatch, true)
+        "terminal" -> AppSelfUpdateState.Error(R.string.app_self_update_hash_mismatch, false)
+        else -> error("Unknown presentation update phase")
+    }

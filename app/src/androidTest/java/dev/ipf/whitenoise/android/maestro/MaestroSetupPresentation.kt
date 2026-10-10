@@ -89,22 +89,27 @@ private class PresentationSetupClient(private val fixture: MaestroPresentationFi
     }
 
     override suspend fun execute(request: SetupRequest): OnboardingSnapshotFfi {
-        if (maestroSetupEditorRequest(fixture, request)) return current
-        if (request.action == OnboardingActionFfi.CANCEL_REPAIR) {
-            check(request.revision == 4uL && request.step == step)
-            fixture.record("preview-cancelled")
-            current = current.copy(revision = 5uL, proposal = null)
-            return current
+        when {
+            maestroSetupEditorRequest(fixture, request) -> Unit
+            request.action == OnboardingActionFfi.CANCEL_REPAIR -> {
+                check(request.revision == 4uL && request.step == step)
+                fixture.record("preview-cancelled")
+                current = current.copy(revision = 5uL, proposal = null)
+            }
+            request.action == OnboardingActionFfi.EDIT_RELAYS -> {
+                check(request.revision == 4uL && request.step == step)
+                check(request.readRelays == listOf(MAESTRO_SETUP_RELAY))
+                check(request.writeRelays == listOf("wss://changed.example.invalid/"))
+                fixture.finish("relay-review-requested")
+            }
+            else -> {
+                check(
+                    request.revision == 3uL && request.step == step &&
+                        request.action == OnboardingActionFfi.CONTINUE_WITHOUT,
+                )
+                fixture.finish("continue-without")
+            }
         }
-        if (request.action == OnboardingActionFfi.EDIT_RELAYS) {
-            check(request.revision == 4uL && request.step == step)
-            check(request.readRelays == listOf(MAESTRO_SETUP_RELAY))
-            check(request.writeRelays == listOf("wss://changed.example.invalid/"))
-            fixture.finish("relay-review-requested")
-            return current
-        }
-        check(request.revision == 3uL && request.step == step && request.action == OnboardingActionFfi.CONTINUE_WITHOUT)
-        fixture.finish("continue-without")
         return current
     }
 

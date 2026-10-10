@@ -3017,11 +3017,11 @@
       "symbol": "DiagnosticsScreen",
       "bindings": [
         {
-          "case": "nested-diagnostics",
+          "case": "developer-diagnostics-health",
           "selector": {
-            "id": "diagnostics.choices.group"
+            "id": "diagnostics-content"
           },
-          "scope": "Actual Diagnostics destination choice group and Back; no audit upload."
+          "scope": "Actual developer diagnostics destination reached through the unlocked Developer screen; its event-log scaffold is asserted before opening the Health & Performance sheet. Privacy diagnostics has a separate destination and binding."
         }
       ],
       "remaining": "Additional supported state and lifecycle dimensions remain tracked in the surface edge plan; this assertion qualifies only the stated scope."

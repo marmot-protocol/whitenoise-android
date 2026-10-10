@@ -6767,6 +6767,171 @@
         "dismiss"
       ],
       "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-resolving": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update resolving phase checks visible reminder choice and exact remind-later dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-resolving",
+      "presentation_actions": [
+        "remind-later"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-confirm": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update confirm phase checks visible reminder choice and exact remind-later dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-confirm",
+      "presentation_actions": [
+        "remind-later"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-retryable": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update retryable phase checks visible reminder choice and exact remind-later dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-retryable",
+      "presentation_actions": [
+        "remind-later"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-terminal": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update terminal phase checks visible reminder choice and exact remind-later dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-terminal",
+      "presentation_actions": [
+        "remind-later"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-confirm-cancel": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update confirm-cancel phase checks visible reminder choice and exact cancel dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-confirm-cancel",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-download": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update download phase checks hidden reminder choice and exact cancel dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-download",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-verifying": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update verifying phase checks hidden reminder choice and exact cancel dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-verifying",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-verified": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update verified phase checks hidden reminder choice and exact cancel dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-verified",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-permission": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update permission phase checks hidden reminder choice and exact cancel dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-permission",
+      "presentation_actions": [
+        "cancel"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-idle": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update idle phase checks hidden reminder choice and exact dismiss dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-idle",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-update-reminder-disabled": {
+      "suite": "presentation",
+      "manual_ids": [
+        "SYS-008",
+        "SYS-009",
+        "SYS-010"
+      ],
+      "assertions": "Production update disabled phase checks hidden reminder choice and exact dismiss dispatch. Synthetic eligible reminder input qualifies display and callback only; no download, installation or persisted reminder orchestration.",
+      "postcondition": "presentation-checked",
+      "presentation": "update-reminder-disabled",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
     }
   }
 }
