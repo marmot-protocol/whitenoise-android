@@ -47,29 +47,45 @@ internal interface TtsPlaybackSessionHost {
 internal class TtsPlaybackMediaSessionCallback(
     private val host: TtsPlaybackSessionHost,
 ) : MediaSession.Callback() {
+    private val controller = host.controller
+    private val sessionId = controller.state.value.sessionId
+
+    /** Platform callbacks may arrive after a new queue has replaced their session. */
+    private fun ownsSession(): Boolean =
+        host.controller === controller &&
+            controller.state.value.sessionId == sessionId &&
+            TtsPlaybackSessionModel.from(controller.state.value).isActive
+
+    /** Validate and operate under the controller's queue-replacement lock. */
+    private inline fun withOwnedSession(action: () -> Unit) {
+        synchronized(controller) {
+            if (ownsSession()) action()
+        }
+    }
+
     /** Resumes the paused controller without rebuilding its queue. */
     override fun onPlay() {
-        host.controller.resume()
+        withOwnedSession { controller.resume() }
     }
 
     /** Pauses the shared controller while retaining its sentence cursor. */
     override fun onPause() {
-        host.controller.pause()
+        withOwnedSession { controller.pause() }
     }
 
     /** Ends both platform playback and the app-owned history session. */
     override fun onStop() {
-        host.stopSession()
+        withOwnedSession { host.stopSession() }
     }
 
     /** Advances one logical sentence, paging history at a message edge when needed. */
     override fun onSkipToNext() {
-        host.nextSentence()
+        withOwnedSession { host.nextSentence() }
     }
 
     /** Moves back one logical sentence, paging history at a message edge when needed. */
     override fun onSkipToPrevious() {
-        host.previousSentence()
+        withOwnedSession { host.previousSentence() }
     }
 }
 
@@ -97,6 +113,9 @@ class TtsPlaybackForegroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var mediaSession: MediaSession? = null
     private var observeJob: Job? = null
+    private var playbackOwner: TtsPlaybackSessionHost? = null
+    private var playbackSessionId: Long? = null
+    private var observedController: TtsController? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -129,6 +148,10 @@ class TtsPlaybackForegroundService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (model.isActive) {
+            playbackOwner = host
+            playbackSessionId = host.controller.state.value.sessionId
+        }
         ensureSession(host)
         observe(host)
         intent?.action?.let { dispatchAction(host, it) }
@@ -146,9 +169,19 @@ class TtsPlaybackForegroundService : Service() {
     override fun onDestroy() {
         observeJob?.cancel()
         serviceScope.cancel()
-        hostResolver(this)
-            ?.takeIf { TtsPlaybackSessionModel.from(it.controller.state.value).isActive }
-            ?.stopSession()
+        playbackOwner
+            ?.let { owner ->
+                synchronized(owner.controller) {
+                    if (owner.controller.state.value.sessionId == playbackSessionId &&
+                        TtsPlaybackSessionModel.from(owner.controller.state.value).isActive
+                    ) {
+                        owner.stopSession()
+                    }
+                }
+            }
+        playbackOwner = null
+        playbackSessionId = null
+        observedController = null
         mediaSession?.release()
         mediaSession = null
         super.onDestroy()
@@ -170,7 +203,12 @@ class TtsPlaybackForegroundService : Service() {
 
     /** Creates the single platform session that mirrors the app-owned controller. */
     private fun ensureSession(host: TtsPlaybackSessionHost) {
-        if (mediaSession != null) return
+        mediaSession?.let {
+            // A new valid service start can retain the platform session while
+            // replacing the generation-bound callback that operates it.
+            it.setCallback(TtsPlaybackMediaSessionCallback(host))
+            return
+        }
         mediaSession =
             MediaSession(this, SESSION_TAG).apply {
                 setCallback(TtsPlaybackMediaSessionCallback(host))
@@ -190,7 +228,9 @@ class TtsPlaybackForegroundService : Service() {
     }
 
     private fun observe(host: TtsPlaybackSessionHost) {
-        if (observeJob?.isActive == true) return
+        if (observeJob?.isActive == true && observedController === host.controller) return
+        observeJob?.cancel()
+        observedController = host.controller
         observeJob =
             serviceScope.launch {
                 host.controller.state

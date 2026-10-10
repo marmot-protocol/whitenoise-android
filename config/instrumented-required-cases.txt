@@ -34,6 +34,11 @@ dev.ipf.whitenoise.android.ui.ComposerDraftNavigationAndroidTest#topActionCancel
 # Read-aloud must render sentences beyond a collapsed message cutoff.
 dev.ipf.whitenoise.android.ui.conversation.TimelineRowTtsHighlightPaintAndroidTest#collapsedBodyRevealsAndHighlightsSentencesBeyondItsCutoff
 
+# Read-aloud qualification: range-silent fallback and stale engine callbacks use real Compose semantics.
+dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementAndroidTest#rangeSilentPlaybackKeepsTheSentenceAndMapsEstimatedWords
+dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementAndroidTest#stopClearsTheRenderedPassageAndRejectsLateEngineCallbacks
+dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementAndroidTest#resumedPlaybackRetainsTheSentenceAndIgnoresOldWordRanges
+
 # Hidden-keyboard native selection and legal IME edit sequences.
 dev.ipf.whitenoise.android.ui.ComposerImeEditSequenceTest#hiddenKeyboardSelectionDefersInputConnectionUntilTap
 dev.ipf.whitenoise.android.ui.ComposerImeEditSequenceTest#emptyHiddenComposerPastesThroughNativeToolbar
