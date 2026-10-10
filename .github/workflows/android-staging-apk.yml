@@ -366,6 +366,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ inputs.responsiveness_pr_number }}
           BEFORE_SHA: ${{ inputs.responsiveness_before_sha }}
+          WORKFLOW_SOURCE_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -375,6 +376,7 @@ jobs:
           [[ $(jq -r .head.repo.full_name <<< "$pull") == "$REPOSITORY" ]]
           after=$(jq -r .head.sha <<< "$pull")
           [[ "$after" =~ ^[0-9a-f]{40}$ && "$after" != "$BEFORE_SHA" ]]
+          [[ "$after" == "$WORKFLOW_SOURCE_SHA" ]] || { echo "Dispatch from the current candidate branch" >&2; exit 1; }
           for revision in "$BEFORE_SHA" "$after"; do
             gh api "repos/$REPOSITORY/contents/app/src/main/marmotkit/MARMOT_VERSION?ref=$revision" \
               --jq .content | base64 --decode > "$RUNNER_TEMP/$revision.marmot-version"
@@ -390,27 +392,32 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        revision: [before, after]
+    timeout-minutes: 60
     env:
-      SOURCE_SHA: ${{ matrix.revision == 'before' && needs.responsiveness-source.outputs.before || needs.responsiveness-source.outputs.after }}
+      BEFORE_SHA: ${{ needs.responsiveness-source.outputs.before }}
       AFTER_SHA: ${{ needs.responsiveness-source.outputs.after }}
       PR_NUMBER: ${{ inputs.responsiveness_pr_number }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ env.SOURCE_SHA }}
+          ref: ${{ env.BEFORE_SHA }}
+          path: before
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.AFTER_SHA }}
+          path: after
           fetch-depth: 0
           persist-credentials: false
       - name: Configure private MarmotKit fixture cache
         run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
       - name: Verify exact ancestor relationship
+        working-directory: after
         run: |
-          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          git merge-base --is-ancestor "${{ needs.responsiveness-source.outputs.before }}" "$AFTER_SHA"
+          test "$(git rev-parse HEAD)" = "$AFTER_SHA"
+          test "$(git -C ../before rev-parse HEAD)" = "$BEFORE_SHA"
+          git merge-base --is-ancestor "$BEFORE_SHA" "$AFTER_SHA"
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -422,61 +429,95 @@ jobs:
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ needs.responsiveness-source.outputs.artifact }}
-      - name: Assemble owned-emulator measurement and content-test artifacts
+      # One runner owns one ephemeral default debug key for the entire pair.
+      # Both revisions must update the retained owned-emulator identity in place.
+      - name: Assemble both revisions under the same fixture signing identity
         run: |
-          ./gradlew :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest \
-            :app:assembleDevZapstoreBenchmarkRelease :benchmark:assembleDevZapstoreBenchmarkRelease \
-            -Pandroid.injected.build.abi=arm64-v8a --build-cache --no-daemon --stacktrace
-      - name: Stage immutable fixture bytes and provenance
+          for role in before after; do
+            (
+              cd "$role"
+              ./gradlew :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest \
+                :app:assembleDevZapstoreBenchmarkRelease :benchmark:assembleDevZapstoreBenchmarkRelease \
+                -Pandroid.injected.build.abi=arm64-v8a --build-cache --no-daemon --stacktrace
+            )
+          done
+      - name: Stage immutable fixture bytes and shared-certificate provenance
         env:
           BUILD_RUN_ID: ${{ github.run_id }}
           BUILD_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          python3 - <<'PY'
-          import hashlib, json, os, pathlib, shutil
-          root = pathlib.Path.cwd()
-          out = root / 'build/responsiveness-qualification'
-          out.mkdir(parents=True, exist_ok=True)
+          python3 - <<'PYTHON'
+          import hashlib, json, os, pathlib, re, shutil, subprocess
+          workspace = pathlib.Path.cwd()
+          sdk = pathlib.Path(os.environ['ANDROID_HOME'])
+          signers = sorted((sdk / 'build-tools').glob('*/apksigner'))
+          if not signers:
+              raise SystemExit('missing APK signature verifier')
+          campaign_certificate = None
           expected = [
               ('app', 'devZapstoreDebug', 'dev.ipf.whitenoise.android.dev'),
               ('app', 'devZapstoreDebugAndroidTest', 'dev.ipf.whitenoise.android.dev.test'),
               ('app', 'devZapstoreBenchmarkRelease', 'dev.ipf.whitenoise.android.dev'),
               ('benchmark', 'devZapstoreBenchmarkRelease', 'dev.ipf.whitenoise.android.benchmark'),
           ]
-          outputs = []
-          for module, variant, package in expected:
-              matches = []
-              for metadata in (root / module / 'build').rglob('output-metadata.json'):
-                  data = json.loads(metadata.read_text())
-                  if data.get('applicationId') != package or data.get('variantName') != variant:
-                      continue
-                  for element in data['elements']:
-                      abis = [f['value'] for f in element.get('filters', []) if f['filterType'] == 'ABI']
-                      apk = metadata.parent / element['outputFile']
-                      if (not abis or abis == ['arm64-v8a']) and apk.is_file():
-                          matches.append(apk.resolve())
-              matches = list(dict.fromkeys(matches))
-              if len(matches) != 1:
-                  raise SystemExit('expected one APK for ' + module + '/' + variant)
-              name = module + '-' + variant + '.apk'
-              target = out / name
-              shutil.copyfile(matches[0], target)
-              outputs.append({'file': name, 'package': package, 'variant': variant,
-                              'sha256': hashlib.sha256(target.read_bytes()).hexdigest()})
-          manifest = {'schema': 1, 'source_sha': os.environ['SOURCE_SHA'],
-                      'candidate_sha': os.environ['AFTER_SHA'], 'pr_number': os.environ['PR_NUMBER'],
-                      'build_run_id': os.environ['BUILD_RUN_ID'], 'build_run_attempt': os.environ['BUILD_RUN_ATTEMPT'],
-                      'device_scope': 'owned_emulator_only', 'outputs': outputs}
-          (out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-          shutil.copyfile(root / 'app/src/main/marmotkit/MARMOT_VERSION', out / 'MARMOT_VERSION')
-          PY
+          for role, source in [('before', os.environ['BEFORE_SHA']), ('after', os.environ['AFTER_SHA'])]:
+              root = workspace / role
+              if subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip() != source:
+                  raise SystemExit('fixture source mismatch')
+              out = workspace / 'build/responsiveness-qualification' / role
+              out.mkdir(parents=True, exist_ok=True)
+              outputs = []
+              for module, variant, package in expected:
+                  matches = []
+                  for metadata in (root / module / 'build').rglob('output-metadata.json'):
+                      data = json.loads(metadata.read_text())
+                      if data.get('applicationId') != package or data.get('variantName') != variant:
+                          continue
+                      for element in data['elements']:
+                          abis = [f['value'] for f in element.get('filters', []) if f['filterType'] == 'ABI']
+                          apk = metadata.parent / element['outputFile']
+                          if (not abis or abis == ['arm64-v8a']) and apk.is_file():
+                              matches.append(apk.resolve())
+                  matches = list(dict.fromkeys(matches))
+                  if len(matches) != 1:
+                      raise SystemExit('expected one APK for ' + role + '/' + module + '/' + variant)
+                  verification = subprocess.check_output(
+                      [str(signers[-1]), 'verify', '--verbose', '--print-certs', str(matches[0])], text=True)
+                  certificates = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-f]{64})$',
+                                            verification, re.MULTILINE)
+                  if len(certificates) != 1:
+                      raise SystemExit('expected one fixture signer')
+                  certificate = certificates[0]
+                  if campaign_certificate is None:
+                      campaign_certificate = certificate
+                  if certificate != campaign_certificate:
+                      raise SystemExit('before/after fixture certificates differ')
+                  name = module + '-' + variant + '.apk'
+                  target = out / name
+                  shutil.copyfile(matches[0], target)
+                  outputs.append({'file': name, 'package': package, 'variant': variant,
+                                  'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+                                  'certificate_sha256': certificate})
+              manifest = {'schema': 1, 'source_sha': source, 'role': role,
+                          'candidate_sha': os.environ['AFTER_SHA'], 'pr_number': os.environ['PR_NUMBER'],
+                          'build_run_id': os.environ['BUILD_RUN_ID'],
+                          'build_run_attempt': os.environ['BUILD_RUN_ATTEMPT'],
+                          'workflow_ref': os.environ['GITHUB_WORKFLOW_REF'],
+                          'device_scope': 'owned_emulator_only', 'outputs': outputs}
+              (out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+              shutil.copyfile(root / 'app/src/main/marmotkit/MARMOT_VERSION', out / 'MARMOT_VERSION')
+          before_pin = (workspace / 'before/app/src/main/marmotkit/MARMOT_VERSION').read_bytes()
+          after_pin = (workspace / 'after/app/src/main/marmotkit/MARMOT_VERSION').read_bytes()
+          if before_pin != after_pin:
+              raise SystemExit('fixture native pins differ')
+          PYTHON
       - name: Recheck candidate head before retaining artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: test "$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER" --jq .head.sha)" = "$AFTER_SHA"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: responsiveness-${{ matrix.revision }}-${{ env.SOURCE_SHA }}-${{ github.run_id }}
+          name: responsiveness-pair-${{ env.BEFORE_SHA }}-${{ env.AFTER_SHA }}-${{ github.run_id }}
           path: build/responsiveness-qualification/
           if-no-files-found: error
           compression-level: 0

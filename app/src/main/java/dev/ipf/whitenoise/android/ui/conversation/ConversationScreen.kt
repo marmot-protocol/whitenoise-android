@@ -872,9 +872,15 @@ internal fun ConversationScreen(
     // Edits mutate their original message and must not occupy a lazy-list slot.
     // Keep every reveal and scroll decision on the same filtered projection.
     val renderedTimeline =
-        remember(controller.timeline) {
-            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        }
+        ConversationTranscriptDrawProbe.rowsForComposition(
+            controller,
+            remember(controller.timeline) {
+                controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            },
+        )
+    DisposableEffect(controller) {
+        onDispose { ConversationTranscriptDrawProbe.retire(controller) }
+    }
 
     // The transcript renders as a reversed lazy column so the newest message is
     // the list's own layout origin. That keeps the bottom edge pinned while the
@@ -952,6 +958,9 @@ internal fun ConversationScreen(
         )
     val transcriptPresentationNeedsRetry =
         notificationOpenRequestId != 0L && controller.transcriptPresentationNeedsRetry
+    SideEffect {
+        if (!transcriptReadyToReveal) ConversationTranscriptDrawProbe.retire(controller)
+    }
 
     // Notification suppression follows only the transcript the user can
     // actually read. A routed conversation can already be selected while its
@@ -4173,6 +4182,8 @@ internal fun ConversationScreen(
                                                     composedTranscriptRows,
                                                     listState.layoutInfo,
                                                 )
+                                            } else {
+                                                ConversationTranscriptDrawProbe.retire(controller)
                                             }
                                         }.graphicsLayer {
                                             alpha = if (transcriptReadyToReveal) 1f else 0f

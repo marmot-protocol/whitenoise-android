@@ -6,10 +6,17 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalView
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.withTimeoutOrNull
 
 private typealias ForegroundSettlePredicate = (ConversationForegroundSettleState) -> Boolean
+
+/** A retired or superseded receipt cannot count as a commit; the shared presentation deadline owns fallback. */
+internal suspend fun awaitCommittedConversationTimeline(receipt: Deferred<Boolean>?) {
+    if (receipt?.await() == false) awaitCancellation()
+}
 
 /** Layout and IME animation state required before the foreground frame can be exposed. */
 internal data class ConversationForegroundSettleState(
