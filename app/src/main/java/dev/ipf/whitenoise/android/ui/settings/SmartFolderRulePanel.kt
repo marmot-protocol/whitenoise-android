@@ -91,9 +91,10 @@ internal fun SmartFolderRulePanel(
                     Text(stringResource(R.string.smart_folder_preset_mentions))
                 }
             }
-            TextButton(onClick = { adding = true }, modifier = Modifier.testTag("folder.add.")) {
-                Text(stringResource(R.string.smart_folder_add))
-            }
+            FolderAddFilterButton(
+                onClick = { adding = true },
+                modifier = Modifier.fillMaxWidth().testTag("folder.add."),
+            )
             if (editSimpleRules) {
                 TextButton(
                     onClick = { legacyExpanded = !legacyExpanded },

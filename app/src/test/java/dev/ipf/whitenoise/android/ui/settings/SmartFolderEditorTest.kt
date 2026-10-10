@@ -4,20 +4,18 @@ import android.content.Context
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
@@ -210,12 +208,6 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.add.").performClick()
         composeRule.onNodeWithTag("folder.moreFilters").assertDoesNotExist()
         composeRule.mainClock.advanceTimeBy(1000L)
-        composeRule
-            .onNodeWithTag(
-                "sheet.dragHandle",
-                useUnmergedTree = true,
-            ).performTouchInput { swipeUp(endY = -450f) }
-        composeRule.mainClock.advanceTimeBy(1000L)
         composeRule.onNodeWithTag("folder.addField.DRAFT").assertIsDisplayed()
         composeRule.onNodeWithTag("folder.addField.DRAFT").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_ignore)).assertDoesNotExist()
@@ -224,22 +216,21 @@ class SmartFolderEditorTest {
     }
 
     @Test
-    fun filterSheetStartsWithFourChoicesAndDragRevealsTheRest() {
+    fun filterSheetShowsAllChoicesWithoutExpandingAndKeepsCompactTouchTargets() {
         render(SmartFolderFilter.Group())
-        composeRule.onNodeWithTag("folder.add.").performClick()
-        composeRule.mainClock.advanceTimeBy(1000L)
-        listOf("PARTICIPANTS", "UNREAD", "MENTIONS", "TYPE").forEach {
-            composeRule.onNodeWithTag("folder.addField.$it").assertIsDisplayed()
-        }
-        composeRule.onNodeWithTag("folder.addField.DRAFT").assertIsNotDisplayed()
-        composeRule.onNodeWithTag("folder.moreFilters").assertDoesNotExist()
         composeRule
-            .onNodeWithTag(
-                "sheet.dragHandle",
-                useUnmergedTree = true,
-            ).performTouchInput { swipeUp(endY = -450f) }
+            .onNodeWithTag("folder.add.")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
         composeRule.mainClock.advanceTimeBy(1000L)
-        composeRule.onNodeWithTag("folder.addField.DRAFT").assertIsDisplayed()
+        FolderField.entries.forEach {
+            composeRule.onNodeWithTag("folder.addField.${it.name}").assertIsDisplayed()
+        }
+        val first = composeRule.onNodeWithTag("folder.addField.PARTICIPANTS").fetchSemanticsNode().boundsInRoot
+        val next = composeRule.onNodeWithTag("folder.addField.UNREAD").fetchSemanticsNode().boundsInRoot
+        assertTrue(first.height >= 48f)
+        assertTrue(next.top - first.top <= 56f)
+        composeRule.onNodeWithTag("folder.moreFilters").assertDoesNotExist()
     }
 
     @Test fun singleFilterHidesMatchChoiceWithoutChangingItsStoredMode() {
@@ -251,18 +242,6 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.conditionDone").performClick()
         composeRule.onNodeWithTag("folder.match.").assertExists()
         assertFalse(root.value.all)
-    }
-
-    @Test
-    fun filterSheetExposesAnAccessibleExpandAction() {
-        render(SmartFolderFilter.Group())
-        composeRule.onNodeWithTag("folder.add.").performClick()
-        composeRule.mainClock.advanceTimeBy(1000L)
-        composeRule
-            .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand), useUnmergedTree = true)
-            .performSemanticsAction(SemanticsActions.Expand) { it() }
-        composeRule.mainClock.advanceTimeBy(1000L)
-        composeRule.onNodeWithTag("folder.addField.DRAFT").assertIsDisplayed()
     }
 
     @Test

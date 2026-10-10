@@ -1,0 +1,55 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+  "legacy_sha256": "0c08aef7044fb7073021927a7b9f84e14b7edeac53bfb4eda69be1b5deac7950",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "FolderButtonLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "internal fun FolderButtonLabel(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "FolderChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "internal fun <T> FolderChoice(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "FolderAddFilterButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "internal fun FolderAddFilterButton(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "R.string.smart_folder_add",
+        "test_ids": [
+          "FLD-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Folder-choice popup visibility and scroll boundaries",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "stableRenderTarget = true",
+        "test_ids": [
+          "FLD-004",
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

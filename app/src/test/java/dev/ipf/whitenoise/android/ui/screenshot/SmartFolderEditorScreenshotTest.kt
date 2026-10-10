@@ -71,6 +71,10 @@ class SmartFolderEditorScreenshotTest {
 
     @Test fun moreFiltersSheet() = capture("smart_folder_more_filters", add = true, more = true)
 
+    @Test fun addFilterDark() = capture("smart_folder_add_filter_dark", add = true, dark = true)
+
+    @Test fun addFilterAmoled() = capture("smart_folder_add_filter_amoled", add = true, dark = true, amoled = true)
+
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
     fun addFilterRtlLarge() = capture("smart_folder_add_filter_rtl_large", add = true, rtl = true)

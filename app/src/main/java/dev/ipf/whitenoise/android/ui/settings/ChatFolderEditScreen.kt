@@ -566,7 +566,6 @@ internal fun ChatFolderEditContent(
                         label = { Text(stringResource(R.string.chat_folder_name)) },
                         lineLimits = TextFieldLineLimits.SingleLine,
                     )
-                    folderDescription(state.description, compact = rulesContent != null)
                     state.error?.let { error ->
                         Text(
                             error,
@@ -575,36 +574,6 @@ internal fun ChatFolderEditContent(
                         )
                     }
                 }
-            }
-            item {
-                SettingsGroup {
-                    row("showWhenEmpty") { context ->
-                        SettingsSwitch(
-                            context = context,
-                            title = stringResource(R.string.folder_show_when_empty),
-                            checked = state.showWhenEmpty,
-                            onCheckedChange = onShowWhenEmptyChange,
-                            modifier = Modifier.testTag("folder.showWhenEmpty"),
-                        )
-                    }
-                }
-            }
-            item {
-                SettingsSection(stringResource(R.string.folder_sort_title))
-                SettingsGroup {
-                    ChatFolderSort.entries.forEach { sort ->
-                        row(sort.name) { context ->
-                            SettingsChoice(
-                                context = context,
-                                title = stringResource(folderSortLabel(sort)),
-                                selected = state.sort == sort,
-                                onClick = { onSortChange(sort) },
-                                modifier = Modifier.testTag("folder.sort.${sort.name}"),
-                            )
-                        }
-                    }
-                }
-                SettingsExplainer(stringResource(R.string.folder_sort_hint))
             }
             if (!state.advancedRules) {
                 item {
@@ -621,20 +590,26 @@ internal fun ChatFolderEditContent(
                     }
                 }
             }
-            if (rulesContent == null) {
-                item {
-                    SettingsGroup {
-                        row("chats") { context ->
-                            SettingsLink(
-                                context = context,
-                                title = stringResource(R.string.folder_included_chats),
-                                onClick = onOpenManualChats,
-                                value = state.manualChatCount.toString(),
-                            )
-                        }
+            item {
+                SettingsGroup {
+                    row("chats") { context ->
+                        SettingsLink(
+                            context = context,
+                            title =
+                                stringResource(
+                                    if (rulesContent != null) {
+                                        R.string.smart_folder_always_include
+                                    } else {
+                                        R.string.folder_included_chats
+                                    },
+                                ),
+                            onClick = onOpenManualChats,
+                            value = state.manualChatCount.toString(),
+                            modifier = Modifier.testTag("folder.includedChats"),
+                        )
                     }
-                    SettingsExplainer(stringResource(R.string.folder_manual_hint))
                 }
+                if (rulesContent == null) SettingsExplainer(stringResource(R.string.folder_manual_hint))
             }
             if (rulesContent != null) {
                 item { rulesContent() }
@@ -713,6 +688,7 @@ internal fun ChatFolderEditContent(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.folder_preview),
+                            modifier = Modifier.testTag("folder.preview"),
                             onClick = onOpenPreview,
                             value = if (rulesContent != null) state.previewCount.toString() else null,
                             subtitle =
@@ -729,19 +705,40 @@ internal fun ChatFolderEditContent(
                     }
                 }
             }
-            if (rulesContent != null) {
-                item {
-                    SettingsGroup {
-                        row("chats") { context ->
-                            SettingsLink(
+            item {
+                Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin)) {
+                    folderDescription(state.description, compact = true)
+                }
+            }
+            item {
+                SettingsGroup {
+                    row("showWhenEmpty") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = stringResource(R.string.folder_show_when_empty),
+                            checked = state.showWhenEmpty,
+                            onCheckedChange = onShowWhenEmptyChange,
+                            modifier = Modifier.testTag("folder.showWhenEmpty"),
+                        )
+                    }
+                }
+            }
+            item {
+                SettingsSection(stringResource(R.string.folder_sort_title))
+                SettingsGroup {
+                    ChatFolderSort.entries.forEach { sort ->
+                        row(sort.name) { context ->
+                            SettingsChoice(
                                 context = context,
-                                title = stringResource(R.string.smart_folder_always_include),
-                                onClick = onOpenManualChats,
-                                value = state.manualChatCount.toString(),
+                                title = stringResource(folderSortLabel(sort)),
+                                selected = state.sort == sort,
+                                onClick = { onSortChange(sort) },
+                                modifier = Modifier.testTag("folder.sort.${sort.name}"),
                             )
                         }
                     }
                 }
+                SettingsExplainer(stringResource(R.string.folder_sort_hint))
             }
             if (!state.isNew) {
                 item {

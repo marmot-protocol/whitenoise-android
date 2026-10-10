@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatFolderSort
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +37,17 @@ class ChatFolderEditContentTest {
     val composeRule = createComposeRule()
 
     private val app = ApplicationProvider.getApplicationContext<Context>()
+
+    /** Core configuration is visible before secondary display preferences. */
+    @Test fun membershipAndPreviewPrecedeDisplayPreferences() {
+        render(state = editState(name = "Work"))
+        composeRule.onNodeWithTag("folder.name").assertExists()
+        val included = composeRule.onNodeWithTag("folder.includedChats").fetchSemanticsNode().boundsInRoot
+        val preview = composeRule.onNodeWithTag("folder.preview").fetchSemanticsNode().boundsInRoot
+        val visibility = composeRule.onNodeWithTag("folder.showWhenEmpty").fetchSemanticsNode().boundsInRoot
+        assertTrue(included.top < preview.top)
+        assertTrue(preview.top < visibility.top)
+    }
 
     /** Every sort mode is reachable and the default Chats all-active rule remains editable. */
     @Test fun sortingAndAllActiveControlsRouteEdits() {
