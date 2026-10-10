@@ -156,6 +156,6 @@ one process, not an Android process-death claim.
 
 ```sh
 adb -s <owned-emulator> shell am instrument -w -r -e lateSignerE2e true \
-  -e class dev.ipf.whitenoise.android.maestro.LateSignerRuntimeDeviceTest \
+  -e class dev.ipf.whitenoise.android.state.LateSignerRuntimeDeviceTest \
   dev.ipf.whitenoise.android.maestrolab.test/dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner
 ```

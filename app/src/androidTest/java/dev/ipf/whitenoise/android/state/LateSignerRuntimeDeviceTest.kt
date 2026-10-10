@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.maestro
+package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import android.os.Build
@@ -23,10 +23,8 @@ import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.amber.AmberSignerController
 import dev.ipf.whitenoise.android.amber.Nip55
-import dev.ipf.whitenoise.android.state.AppMarmotRuntime
-import dev.ipf.whitenoise.android.state.DraftStore
-import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
-import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.maestro.MaestroFixtureApplication
+import dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
