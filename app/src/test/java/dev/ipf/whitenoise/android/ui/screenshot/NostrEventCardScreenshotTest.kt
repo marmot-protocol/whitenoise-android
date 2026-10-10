@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -35,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardKind
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardModel
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardState
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventReaderScreen
+import dev.ipf.whitenoise.android.ui.conversation.nostr.rememberNostrEventPreviewState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -45,7 +47,7 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "w360dp-h1000dp-mdpi")
+@Config(sdk = [36], qualifiers = "w360dp-h1800dp-mdpi")
 class NostrEventCardScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -342,6 +344,78 @@ class NostrEventCardScreenshotTest {
             truncated = false,
             blankLinesBefore = byteArrayOf(),
         )
+
+    @Test
+    fun bodyImageCardUsesNativeDocumentAndManualAction() {
+        render(darkTheme = false) {
+            val state = rememberNostrEventPreviewState(
+                NostrEventCardState.Loaded(
+                    card(NostrEventCardKind.Note, 1, null, "A shared post with a photograph.")
+                        .copy(readerBody = "Photo in the full body"),
+                ),
+                mentionDisplayName = { null },
+                parseMarkdown = { text -> bodyImageSnapshotDocument(text) },
+            )
+            EventBubble(state, mine = false)
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("View image").fetchSemanticsNodes().isNotEmpty()
+        }
+        capture("nostr_event_body_image_card_light")
+    }
+
+    @Test
+    fun manualImageCardsKeepReadableContext() {
+        render(darkTheme = false) {
+            EventBubble(
+                NostrEventCardState.Loaded(
+                    card(NostrEventCardKind.Note, 1, null, "A note with an explicitly loaded image.")
+                        .copy(imageUrls = listOf("https://images.example/note")),
+                ),
+                mine = false,
+            )
+            EventBubble(
+                NostrEventCardState.Loaded(
+                    card(NostrEventCardKind.File, 1063, "Photo", "JPEG image", listOf("image/jpeg", "240 KB"))
+                        .copy(imageUrls = listOf("https://images.example/file")),
+                ),
+                mine = true,
+            )
+        }
+        capture("nostr_event_manual_image_cards_light")
+    }
+
+    @Test
+    fun manualImageCardSupportsLargeRtlText() {
+        render(darkTheme = true, amoled = true, fontScale = 2f, layoutDirection = LayoutDirection.Rtl) {
+            EventBubble(
+                NostrEventCardState.Loaded(
+                    card(NostrEventCardKind.Article, 30023, "Article cover", "Readable text beside optional media.")
+                        .copy(imageUrls = listOf("https://images.example/article")),
+                ),
+                mine = false,
+            )
+        }
+        capture("nostr_event_manual_image_card_large_rtl_amoled")
+    }
+
+    private fun bodyImageSnapshotDocument(text: String): dev.ipf.marmotkit.MarkdownDocumentFfi {
+        val inline = if (text == "Photo in the full body") {
+            dev.ipf.marmotkit.MarkdownInlineFfi.Image(
+                dest = "https://images.example/body-snapshot",
+                title = null,
+                alt = listOf(dev.ipf.marmotkit.MarkdownInlineFfi.Text("A photograph")),
+                classification = dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi.WEB,
+            )
+        } else {
+            dev.ipf.marmotkit.MarkdownInlineFfi.Text(text)
+        }
+        return dev.ipf.marmotkit.MarkdownDocumentFfi(
+            blocks = listOf(dev.ipf.marmotkit.MarkdownBlockFfi.Paragraph(listOf(inline))),
+            truncated = false,
+            blankLinesBefore = byteArrayOf(),
+        )
+    }
 
     private fun render(
         darkTheme: Boolean,

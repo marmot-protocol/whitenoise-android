@@ -18,6 +18,7 @@ internal data class NostrReaderPreparation(
     val blocks: List<MarkdownBlockFfi> = emptyList(),
     val textChunks: List<String> = emptyList(),
     val parsing: Boolean = true,
+    val imageUrls: List<String>? = null,
 )
 
 /** Prepares the complete body off the main thread and discards cancelled reader work. */
@@ -36,11 +37,21 @@ internal fun rememberNostrReaderPreparation(
                 try {
                     val document = parseMarkdown(body)
                     val blocks = document.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
-                    NostrReaderPreparation(document, blocks, textChunks, parsing = false)
+                    NostrReaderPreparation(
+                        document = document,
+                        blocks = blocks,
+                        textChunks = textChunks,
+                        parsing = false,
+                        imageUrls = nostrEventImageCandidates(card.imageUrls, document),
+                    )
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
-                    NostrReaderPreparation(textChunks = textChunks, parsing = false)
+                    NostrReaderPreparation(
+                        textChunks = textChunks,
+                        parsing = false,
+                        imageUrls = nostrEventImageCandidates(card.imageUrls, null),
+                    )
                 }
             }
     }

@@ -234,6 +234,9 @@ private fun NostrEventReaderBody(
         preparation?.textChunks ?: remember(card.readerBody, card.summary) {
             nostrReaderTextChunks(card.readerBody ?: card.summary.orEmpty())
         }
+    val imageUrls = preparation?.imageUrls ?: remember(card.imageUrls, document) {
+        nostrEventImageCandidates(card.imageUrls, document)
+    }
     WhiteNoiseLazyColumn(
         modifier = Modifier.fillMaxSize().testTag(NOSTR_EVENT_READER_BODY_TAG),
         contentPadding =
@@ -244,7 +247,7 @@ private fun NostrEventReaderBody(
         item("event-context") {
             NostrEventReaderContext(card, authoredReference, authorDisplayName, onPlayVideo)
         }
-        itemsIndexed(card.imageUrls.take(MAX_READER_IMAGES), key = { _, url -> "image:$url" }) { _, url ->
+        itemsIndexed(imageUrls, key = { _, url -> "image:$url" }) { _, url ->
             NostrEventImagePane(url = url)
         }
         if (parsing) {
