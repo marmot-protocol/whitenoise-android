@@ -91,15 +91,66 @@ class RunnerContractTest(unittest.TestCase):
                 raise subprocess.TimeoutExpired("adb", 180)
             return ""
 
-        with tempfile.TemporaryDirectory() as root, patch.object(device_runner, "adb_command", side_effect=adb):
+        with tempfile.TemporaryDirectory() as root, patch.object(device_runner, "adb_command", side_effect=adb), \
+                patch.object(device_runner.subprocess, "run", side_effect=subprocess.TimeoutExpired("logcat", 10)):
             output = Path(root) / "report.json"
             with self.assertRaises(RuntimeError):
                 device_runner.run("adb", "emulator-5554", Path(root) / "server", output)
             report = json.loads(output.read_text())
             self.assertEqual("TimeoutExpired", report["failure_class"])
+            self.assertTrue(report["failure_diagnostics"]["timed_out"])
+            self.assertEqual("instrumentation", report["failure_diagnostics"]["stage"])
+            self.assertEqual("unavailable", report["failure_diagnostics"]["crash_capture"])
             self.assertIn("ledger", report)
             self.assertTrue(report["reverse_cleanup_failed"])
             self.assertFalse(report["qualified"])
+
+    def test_failed_instrumentation_keeps_redacted_diagnostics_and_never_qualifies(self):
+        """Distinguish a crash from missing measurements without leaking captured messages or another process."""
+        secret = "PRIVATE-FIXTURE-CONTENT"
+        def adb(binary, serial, *args):
+            if args[:3] == ("shell", "getprop", "ro.kernel.qemu"):
+                return "1"
+            if args[:4] == ("shell", "pm", "list", "packages"):
+                return "package:" + device_runner.APP
+            if args[:3] == ("shell", "am", "instrument"):
+                raise subprocess.CalledProcessError(1, [binary, "-s", serial, *args],
+                    output="INSTRUMENTATION_RESULT: shortMsg=Process crashed.\n" + secret, stderr=secret)
+            return ""
+        raw = ("FATAL EXCEPTION: main\nProcess: unrelated.app, PID: 10\njava.lang.OutOfMemoryError: " + secret +
+               "\nFATAL EXCEPTION: main\nProcess: " + device_runner.APP +
+               ", PID: 20\njava.lang.IllegalStateException: " + secret)
+        with tempfile.TemporaryDirectory() as root, patch.object(device_runner, "adb_command", side_effect=adb), \
+                patch.object(device_runner.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, raw)) as capture, \
+                patch.object(device_runner, "wait_for_ledger_completion", return_value=([], False)):
+            output = Path(root) / "report.json"
+            with self.assertRaises(RuntimeError):
+                device_runner.run("chosen-adb", "emulator-5554", Path(root) / "server", output)
+            report = json.loads(output.read_text())
+            self.assertEqual("CalledProcessError", report["failure_class"])
+            self.assertEqual("process-crashed", report["failure_diagnostics"]["subprocess_status"])
+            self.assertEqual(1, report["failure_diagnostics"]["adb_returncode"])
+            self.assertTrue(report["failure_diagnostics"]["recent_app_crash"])
+            self.assertEqual("java.lang.IllegalStateException", report["failure_diagnostics"]["recent_app_crash_class"])
+            self.assertEqual([], report["metrics"])
+            self.assertFalse(report["qualified"])
+            self.assertFalse(report["reverse_cleanup_failed"])
+            self.assertNotIn(secret, output.read_text())
+            self.assertNotIn("unrelated.app", output.read_text())
+            self.assertEqual(["chosen-adb", "-s", "emulator-5554", "logcat", "-b", "crash", "-d", "-t", "100", "-v", "brief"],
+                             capture.call_args.args[0])
+            self.assertEqual(10, capture.call_args.kwargs["timeout"])
+
+    def test_failure_diagnostics_do_not_capture_physical_or_noninstrumentation_logs(self):
+        """The diagnostic opt-in stays narrower than the runner's physical-fixture contract."""
+        for physical, stage in ((True, "instrumentation"), (False, "reverse-binding")):
+            with self.subTest(physical=physical, stage=stage), patch.object(device_runner.subprocess, "run") as capture:
+                error = subprocess.CalledProcessError(1, ["PRIVATE-COMMAND"], stderr="PRIVATE-STDERR")
+                details = device_runner.failure_diagnostics(error, stage, "adb", "emulator-5554", physical)
+                capture.assert_not_called()
+                self.assertEqual("unknown", details["subprocess_status"])
+                self.assertNotIn("PRIVATE", json.dumps(details))
+                self.assertNotIn("recent_app_crash", details)
 
     def test_rejects_physical_devices_before_any_adb_call(self):
         """Physical-device rejection precedes even read-only adb interaction."""

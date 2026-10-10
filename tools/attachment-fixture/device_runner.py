@@ -29,6 +29,42 @@ def adb_command(adb, serial, *args):
     return subprocess.run([adb, "-s", serial, *args], check=True, capture_output=True, text=True, timeout=180).stdout
 
 
+def failure_diagnostics(error, stage, adb, serial, physical):
+    """Keep fixed failure categories; raw subprocess output and crash messages remain in memory."""
+    details = {"stage": stage, "timed_out": isinstance(error, subprocess.TimeoutExpired)}
+    code = getattr(error, "returncode", None)
+    if type(code) is int:
+        details["adb_returncode"] = code
+    transcript = "\n".join(value for value in (getattr(error, "stdout", None), getattr(error, "stderr", None))
+                           if isinstance(value, str))
+    statuses = (("INSTRUMENTATION_RESULT: shortMsg=Process crashed.", "process-crashed"),
+                ("Unable to find instrumentation info", "missing-instrumentation"),
+                ("error: device offline", "device-offline"),
+                (f"error: device '{serial}' not found", "device-missing"),
+                ("error: no devices/emulators found", "device-missing"),
+                ("error: closed", "transport-closed"), ("error: protocol fault", "transport-protocol-fault"),
+                ("INSTRUMENTATION_ABORTED", "instrumentation-aborted"),
+                ("INSTRUMENTATION_FAILED", "instrumentation-failed"))
+    details["subprocess_status"] = next((status for marker, status in statuses if marker in transcript), "unknown")
+    if stage not in ("instrumentation", "restart-instrumentation") or physical:
+        return details
+    try:
+        capture = subprocess.run([adb, "-s", serial, "logcat", "-b", "crash", "-d", "-t", "100", "-v", "brief"],
+                                 check=True, capture_output=True, text=True, timeout=10)
+        # Recent buffer evidence is diagnostic, not proof that a prior crash belongs to this invocation.
+        blocks = [block for block in capture.stdout.split("FATAL EXCEPTION:")[1:]
+                  if f"Process: {APP}, PID:" in block]
+        details["crash_capture"] = "captured"
+        details["recent_app_crash"] = bool(blocks) or f">>> {APP} <<<" in capture.stdout
+        classes = ("kotlin.UninitializedPropertyAccessException", "java.lang.OutOfMemoryError",
+                   "java.lang.NullPointerException", "java.lang.IllegalStateException",
+                   "java.lang.SecurityException", "java.lang.UnsatisfiedLinkError")
+        details["recent_app_crash_class"] = next((name for name in classes if any(name in b for b in blocks)), "unknown")
+    except (subprocess.SubprocessError, OSError):
+        details["crash_capture"] = "unavailable"
+    return details
+
+
 def wait_for_ledger_completion(ledger, start, timeout=LEDGER_COMPLETION_TIMEOUT_SECONDS):
     """Return durable events once the upload and acquisition finalize, or retain timeout evidence."""
     deadline = time.monotonic() + timeout
@@ -125,6 +161,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
               "device_kind": "physical" if physical else "emulator"}
     before = server.ledger.snapshot()
     failure = None
+    stage = "fixture-services"
     started_services = []
     try:
         for service in (server, relay):
@@ -132,10 +169,12 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             thread.start()
             threads.append(thread)
             started_services.append(service)
+        stage = "reverse-binding"
         for port in (server.server_port, relay.port):
             # --no-rebind fails instead of overwriting an existing reverse owned by another task.
             adb_command(adb, serial, "reverse", "--no-rebind", f"tcp:{port}", f"tcp:{port}")
             forwards.append(port)
+        stage = "instrumentation"
         result = adb_command(
             adb, serial, "shell", "am", "instrument", "-w", "-r",
             "-e", "class", ("dev.ipf.whitenoise.android.media.UnknownLengthAttachmentDeviceTest#nativeUnknownLengthProgressHasAccessibleByteOnlyControl" if unknown_length else PROBE),
@@ -154,7 +193,9 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         )
         results = [result]
         if process_restart and "OK (1 test)" in result and "FAILURES!!!" not in result:
+            stage = "restart-stop"
             adb_command(adb, serial, "shell", "am", "force-stop", APP)
+            stage = "restart-instrumentation"
             results.append(adb_command(
                 adb, serial, "shell", "am", "instrument", "-w", "-r",
                 "-e", "class", PROBE, "-e", "allowControlledAttachmentProbe", "true",
@@ -164,6 +205,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
                 APP + ".test/androidx.test.runner.AndroidJUnitRunner",
             ))
             result = "\n".join(results)
+        stage = "metrics-parse"
         if private_debug:
             # Explicit local debugging only; never archived by CI or copied into redacted reports.
             with os.fdopen(os.open(root / "instrumentation.txt", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as capture:
@@ -175,6 +217,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         report["instrumentation_passed"] = all("OK (1 test)" in run and "FAILURES!!!" not in run for run in results)
         if process_restart:
             report["instrumentation_passed"] = report["instrumentation_passed"] and len(results) == 2
+        stage = "device-environment"
         report["environment"] = {
             "api": adb_command(adb, serial, "shell", "getprop", "ro.build.version.sdk").strip(),
             "abi": adb_command(adb, serial, "shell", "getprop", "ro.product.cpu.abi").strip(),
@@ -182,6 +225,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
     except (subprocess.SubprocessError, OSError, ValueError) as error:
         failure = error
         report["failure_class"] = type(error).__name__
+        report["failure_diagnostics"] = failure_diagnostics(error, stage, adb, serial, physical)
     finally:
         # Retain failure/timeout evidence before cleanup; never discard failed attempts.
         if native_phases:
