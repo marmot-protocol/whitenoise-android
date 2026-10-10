@@ -41,8 +41,9 @@ class SelectedSecurityEvidenceTest(unittest.TestCase):
         self.assertTrue(below("2.3.35-rc1", "2.3.35"))
         self.assertTrue(below("2.3.9", "2.3.35"))
         self.assertFalse(below("2.3.35.0", "2.3.35"))
-        with self.assertRaises(InvalidEvidence):
-            below("latest.release", "2.3.35")
+        for selected in ("latest.release", ""):
+            with self.assertRaises(InvalidEvidence):
+                below(selected, "2.3.35")
 
 
 if __name__ == "__main__":

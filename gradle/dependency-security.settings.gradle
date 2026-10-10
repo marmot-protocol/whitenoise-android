@@ -9,7 +9,7 @@ import org.gradle.api.artifacts.result.UnresolvedDependencyResult
 // are raised, before metadata is downloaded (including project plugin classpaths).
 class SecurityVersions {
     static boolean below(String version, String minimum) {
-        if (version == null) return true
+        if (version == null || version.isEmpty()) return true
         def match = version =~ /^(\d+(?:\.\d+)*)(.*)$/
         if (!match.matches()) {
             throw new GradleException("Unsupported version selector for security floor: ${version}")
