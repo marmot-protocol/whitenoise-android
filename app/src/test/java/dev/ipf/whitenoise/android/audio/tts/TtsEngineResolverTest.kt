@@ -6,10 +6,12 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
@@ -500,10 +502,18 @@ class TtsEngineResolverTest {
             Unit
         }
 
+    /** The resolver's own deadline during construction releases its candidate and returns quietly. */
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun initTimeoutReturnsQuietUnusableResultAndShutsDownCandidate() =
-        runBlocking {
-            val factory = ControllableTtsFactory()
+        runTest {
+            val factory =
+                ControllableTtsFactory(
+                    beforeReturn = {
+                        testScheduler.advanceTimeBy(50L)
+                        testScheduler.runCurrent()
+                    },
+                )
             val resolver =
                 TtsEngineResolver(
                     context,
@@ -511,8 +521,10 @@ class TtsEngineResolverTest {
                     initTimeoutMs = 50L,
                 )
 
-            val result = resolver.resolve(null)
+            val resolution = async(start = CoroutineStart.UNDISPATCHED) { resolver.resolve(null) }
+            val result = resolution.await()
 
+            assertFalse(resolution.isCancelled)
             assertFalse(result.hasUsableEngine)
             assertNull(result.handle)
             assertEquals(1, factory.instances.single().shutdownCount)
@@ -539,25 +551,36 @@ class TtsEngineResolverTest {
         }
     }
 
+    /** A caller deadline before the factory returns must not become an ordinary engine error. */
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun outerTimeoutCancellationStillPropagatesFromResolve() {
-        val factory = ControllableTtsFactory()
-        val resolver =
-            TtsEngineResolver(
-                context,
-                ttsFactory = factory,
-                initTimeoutMs = 5_000L,
-            )
+    fun outerTimeoutCancellationStillPropagatesFromResolve() =
+        runTest {
+            val factory =
+                ControllableTtsFactory(
+                    beforeReturn = {
+                        testScheduler.advanceTimeBy(50L)
+                        testScheduler.runCurrent()
+                    },
+                )
+            val resolver =
+                TtsEngineResolver(
+                    context,
+                    ttsFactory = factory,
+                    initTimeoutMs = 5_000L,
+                )
 
-        assertThrows(TimeoutCancellationException::class.java) {
-            runBlocking {
-                withTimeout(50L) {
-                    resolver.resolve()
+            val resolution =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    withTimeout(50L) { resolver.resolve() }
                 }
+
+            assertTrue(resolution.isCancelled)
+            assertThrows(TimeoutCancellationException::class.java) {
+                runBlocking { resolution.await() }
             }
+            assertEquals(1, factory.instances.single().shutdownCount)
         }
-        assertEquals(1, factory.instances.single().shutdownCount)
-    }
 
     @Test
     fun offlineVoiceTriesNextCandidateWhenHighestQualitySetVoiceFails() =
@@ -679,12 +702,16 @@ class TtsEngineResolverTest {
         ): String? = connectedEngineForRequest(requestedPackage)
     }
 
-    private class ControllableTtsFactory : TtsFactory {
+    /** The construction hook drives cancellation before the resolver can publish its candidate. */
+    private class ControllableTtsFactory(
+        private val beforeReturn: () -> Unit = {},
+    ) : TtsFactory {
         private var listener: TextToSpeech.OnInitListener? = null
         val instances = mutableListOf<TrackingTextToSpeech>()
         var creationCount: Int = 0
             private set
 
+        /** Tracks the fixture engine before exercising the caller-controlled factory-return race. */
         override fun create(
             context: Context,
             listener: TextToSpeech.OnInitListener,
@@ -692,7 +719,10 @@ class TtsEngineResolverTest {
         ): TextToSpeech {
             creationCount += 1
             this.listener = listener
-            return TrackingTextToSpeech(context).also(instances::add)
+            return TrackingTextToSpeech(context).also {
+                instances.add(it)
+                beforeReturn()
+            }
         }
 
         fun completeInit(status: Int) {
