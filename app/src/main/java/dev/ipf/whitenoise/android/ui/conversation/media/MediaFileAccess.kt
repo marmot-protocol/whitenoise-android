@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
+import dev.ipf.whitenoise.android.state.enqueueInteractiveAttachmentDownload
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -25,35 +26,54 @@ internal suspend fun materializeMediaFile(
 ): File? {
     val retained = retainedMediaFileBytes(controller, messageIdHex, attachmentIndex, mine)
     return runCatchingCancellable {
-        materializeDocumentAttachmentSource(
-            context = context,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
-            reference = reference,
-            resolveSource = {
-                if (retained != null) {
-                    AttachmentPlaintext.Bytes(
-                        controller
-                            .requestAttachmentTransfer(
-                                messageIdHex = messageIdHex,
-                                attachmentIndex = attachmentIndex,
-                                reference = reference,
-                                retainedPlaintext = retained,
-                            ).await(),
-                    )
-                } else {
-                    controller.downloadAttachmentSource(
-                        messageIdHex,
-                        attachmentIndex,
-                        reference,
-                        AttachmentDownloadPriority.Interactive,
-                    )
-                }
-            },
-        )
+        materializeDocumentFile(context, controller, messageIdHex, attachmentIndex, reference, retained)
     }.onFailure {
         logMediaFileDownloadFailure()
     }.getOrNull()
+}
+
+/**
+ * Builds a document's reusable file from the sender's in-memory retry bytes when there are some, and
+ * otherwise streams it from the native source, so a file of any size is never read into one array.
+ * Open and Save share this path; failures propagate to the caller.
+ */
+internal suspend fun materializeDocumentFile(
+    context: Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    retained: ByteArray?,
+): File {
+    // Durable work backs the foreground stream, so a persisted Open or Save can still complete; enqueued
+    // from the caller's thread, as the byte-transfer path does, and coalesced with any earlier request.
+    if (retained == null) controller.enqueueInteractiveAttachmentDownload(messageIdHex, attachmentIndex, reference)
+    return materializeDocumentAttachmentSource(
+        context = context,
+        messageIdHex = messageIdHex,
+        attachmentIndex = attachmentIndex,
+        reference = reference,
+        resolveSource = {
+            if (retained != null) {
+                AttachmentPlaintext.Bytes(
+                    controller
+                        .requestAttachmentTransfer(
+                            messageIdHex = messageIdHex,
+                            attachmentIndex = attachmentIndex,
+                            reference = reference,
+                            retainedPlaintext = retained,
+                        ).await(),
+                )
+            } else {
+                controller.downloadAttachmentSource(
+                    messageIdHex,
+                    attachmentIndex,
+                    reference,
+                    AttachmentDownloadPriority.Interactive,
+                )
+            }
+        },
+    )
 }
 
 /**
@@ -142,6 +162,7 @@ internal suspend fun loadMediaFileBytes(
     }.getOrNull()
 }
 
+/** The sender's own in-memory retry bytes for a pending file, or null so the caller reads MDK's copy instead. */
 private fun retainedMediaFileBytes(
     controller: ConversationController,
     messageIdHex: String,
@@ -152,7 +173,7 @@ private fun retainedMediaFileBytes(
         controller
             .pendingAttachmentsList(messageIdHex)
             .getOrNull(attachmentIndex)
-            ?.plaintextBytes
+            ?.inMemoryBytes
     } else {
         null
     }

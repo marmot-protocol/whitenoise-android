@@ -68,8 +68,7 @@ internal suspend fun localAttachmentBytes(
             controller
                 .pendingAttachmentsList(messageIdHex)
                 .getOrNull(attachmentIndex)
-                ?.plaintextBytes
-                ?.takeIf { it.isNotEmpty() }
+                ?.inMemoryBytes
         } else {
             null
         }

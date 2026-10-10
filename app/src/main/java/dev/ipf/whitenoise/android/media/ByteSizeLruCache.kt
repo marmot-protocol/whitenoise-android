@@ -22,17 +22,30 @@ class ByteSizeLruCache<K : Any, V : Any>(
     private val maxEntryBytes: Long? = null,
     private val onEntryRemoved: (V) -> Unit = {},
     private val onEvicted: (V) -> Unit = {},
+    // Entries whose removal frees no counted heap can opt out of capacity eviction; they still leave
+    // through remove, replacement and clear.
+    private val isEvictable: (V) -> Boolean = { true },
 ) {
     // accessOrder = true → LinkedHashMap iterates in LRU order for eviction.
     private val entries = LinkedHashMap<K, V>(8, 0.75f, true)
     private var residentBytes: Long = 0L
 
+    /** The value for [key], promoted to most recently used. */
     fun get(key: K): V? = entries[key]
 
-    // Every entry is charged at least 1 byte: a 0 or negative sizeOf would
-    // break the cap invariant (entries that never count toward eviction), so
-    // the cache could grow without bound. Clamp here, in one place.
-    private fun chargeOf(value: V): Long = sizeOf(value).coerceAtLeast(1).toLong()
+    // Every evictable entry is charged at least 1 byte: a 0 or negative sizeOf
+    // would break the cap invariant (entries that never count toward eviction),
+    // so the cache could grow without bound. Clamp here, in one place. An entry
+    // that opted out of eviction holds no counted heap and is charged nothing,
+    // so it can never make an evictable entry evict itself on insert.
+
+    /** Bytes [value] counts against the cap: at least 1 when evictable, nothing when it opted out. */
+    private fun chargeOf(value: V): Long =
+        if (isEvictable(value)) {
+            sizeOf(value).coerceAtLeast(1).toLong()
+        } else {
+            0L
+        }
 
     /**
      * Inserts or replaces an entry. Updates resident-byte accounting,
@@ -89,9 +102,10 @@ class ByteSizeLruCache<K : Any, V : Any>(
      */
     fun keysSnapshot(): List<K> = entries.keys.toList()
 
+    /** Bytes currently counted against the cap. */
     fun residentBytes(): Long = residentBytes
 
-    /** Removes least recently used entries and reports only capacity-driven removals. */
+    /** Removes least recently used evictable entries and reports only capacity-driven removals. */
     private fun evictUntilUnderCap() {
         if (residentBytes <= maxBytes) return
         // CRITICAL: hold a *single* iterator across the whole loop. Each
@@ -101,6 +115,7 @@ class ByteSizeLruCache<K : Any, V : Any>(
         val it = entries.entries.iterator()
         while (it.hasNext() && residentBytes > maxBytes) {
             val eldest = it.next()
+            if (!isEvictable(eldest.value)) continue
             residentBytes -= chargeOf(eldest.value)
             onEntryRemoved(eldest.value)
             onEvicted(eldest.value)

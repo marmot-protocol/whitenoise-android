@@ -345,7 +345,7 @@ private fun PendingGridTile(
  */
 @Composable
 private fun rememberPendingVisualPreview(attachment: PendingAttachment?): ImageBitmap? {
-    val bytes = attachment?.plaintextBytes
+    val bytes = attachment?.inMemoryBytes
     val isVideo = attachment != null && attachment.isPendingVideo
     var bitmap by remember(bytes, isVideo) { mutableStateOf<android.graphics.Bitmap?>(null) }
     LaunchedEffect(bytes, isVideo) {

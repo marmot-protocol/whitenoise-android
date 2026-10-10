@@ -301,7 +301,7 @@ internal fun MediaVoiceBubble(
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
     val retainedPlaintextOnEntry =
-        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
+        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.inMemoryBytes != null
     var totalDurationMs by remember(pillKey, epoch) { mutableIntStateOf(0) }
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
@@ -935,7 +935,7 @@ internal suspend fun materializeVoiceAttachment(
                     controller
                         .pendingAttachmentsList(messageIdHex)
                         .getOrNull(attachmentIndex)
-                        ?.plaintextBytes
+                        ?.inMemoryBytes
                 } else {
                     null
                 }

@@ -106,7 +106,9 @@ import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
 import dev.ipf.whitenoise.android.ui.conversation.media.isPendingVideo
+import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
+import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -1078,17 +1080,20 @@ internal suspend fun removeMediaMemoryCacheKeys(
  * confirmed bubble opens on the poster the optimistic one already showed rather than waiting for
  * the file to be materialized and read again (#2732).
  */
-private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment) =
-    withContext(Dispatchers.Default) {
+private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment): android.graphics.Bitmap? {
+    // A file-backed item has no bytes here; its confirmed bubble paints the thumbhash, then MDK's copy.
+    val bytes = attachment.inMemoryBytes ?: return null
+    return withContext(Dispatchers.Default) {
         if (attachment.isPendingVideo) {
-            pendingVideoPosterFrame(attachment.plaintextBytes, extractPoster = true).bitmap
+            pendingVideoPosterFrame(bytes, extractPoster = true).bitmap
         } else {
             MediaPipeline.decodeSampledBitmap(
-                attachment.plaintextBytes,
+                bytes,
                 MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
             )
         }
     }
+}
 
 internal fun optimisticMessageIdForProjection(
     optimisticMessages: Collection<TimelineMessage>,
@@ -6149,6 +6154,9 @@ class ConversationController(
     private val pendingEditStatusReader: suspend (String, String, String) -> dev.ipf.marmotkit.LocalSendStatusFfi? =
         { account, groupId, token -> appState.marmotIo { localSendStatus(account, groupId, token) } },
     private val mediaUploader: MediaUploader? = null,
+    private val mediaFileUploader: MediaFileUploader? = null,
+    // The native per-send ciphertext bound for file-backed uploads; null when MarmotKit cannot report it.
+    private val fileBatchCiphertextBytes: () -> Long? = { nativeFileBackedSendLimits()?.batchCiphertextBytes },
     private val mediaImetaTagsBuilder: MediaImetaTagsBuilder = { account, groupIdHex, references ->
         appState.marmotIo {
             references.map { reference -> buildMediaImetaTag(account, groupIdHex, reference) }
@@ -8446,6 +8454,53 @@ class ConversationController(
             }
         }
 
+    /**
+     * Uploads a send with file-backed items through MDK's file path, with the same commit lock,
+     * cancellation check, retry capture and draft/admission rules as the in-memory path. While the
+     * transfer holds the lock, the user's Cancel reaches it through [RetainedMediaUpload.requestTransferCancel].
+     */
+    private suspend fun uploadFileBackedRetained(
+        account: String,
+        key: String,
+        tempId: String,
+        retained: RetainedMediaUpload,
+        startedAtMs: Long,
+    ): MediaUploadResultFfi {
+        val batchCiphertextBytes =
+            checkNotNull(withContext(Dispatchers.IO) { fileBatchCiphertextBytes() }) {
+                "file-backed upload limits unavailable"
+            }
+        val stagingDirectory = uploadSourcesDirectory(appState.appContext.cacheDir)
+        return withFileUploadRequest(
+            retained.attachments,
+            retained.caption,
+            stagingDirectory,
+            batchCiphertextBytes,
+        ) { request ->
+            mediaFileUploader?.invoke(account, group.groupIdHex, request, retained::attachTransferCancel)
+                ?: appState
+                    .withGroupCommitLock(account, group.groupIdHex) {
+                        requireOptimisticSendNotCancelled(key)
+                        val outcome =
+                            withNativeTransferControl(retained::attachTransferCancel) { control ->
+                                appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
+                                    uploadOrAdmitComposerMediaFilesWithToken(
+                                        account,
+                                        group.groupIdHex,
+                                        request,
+                                        control,
+                                        tempId,
+                                    )
+                                }
+                            }
+                        outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
+                        outcome
+                    }.also { outcome ->
+                        outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
+                    }.upload
+        }
+    }
+
     /** Records that a publish may have reached a relay, unless the send already moved past pre-acceptance. */
     private fun markAcceptanceUnknownIfPreAcceptance(optimisticKey: String) {
         if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
@@ -8774,7 +8829,7 @@ class ConversationController(
                     )
                 }
                 ?: return null
-        if (!canQueueAttachmentBytes(attachments)) return null
+        if (!canQueueAttachmentBytes(attachments, replyTarget)) return null
         val tempId = UUID.randomUUID().toString()
         val key = "msg:$tempId"
         val outboundVisibleAttempt =
@@ -8859,11 +8914,20 @@ class ConversationController(
         return QueuedAttachmentSend(account, key, tempId, optimisticOrder, optimistic)
     }
 
-    /** Rejects empty payloads before reserving a pending slot and reports the existing retained-byte limit. */
-    private fun canQueueAttachmentBytes(attachments: List<PendingAttachment>): Boolean {
-        if (!canSendMessages || attachments.isEmpty() || attachments.any { it.plaintextBytes.isEmpty() }) return false
+    /**
+     * Rejects empty payloads before reserving a pending slot and reports the retained-byte limit for
+     * in-memory items. A file-backed item cannot join a reply: native reply drafts carry attachment bytes.
+     */
+    private fun canQueueAttachmentBytes(
+        attachments: List<PendingAttachment>,
+        replyTarget: String?,
+    ): Boolean {
+        if (!canSendMessages || attachments.isEmpty() || attachments.any { !it.hasContent }) return false
         return if (albumExceedsRetainedCap(attachments)) {
             appState.present(R.string.media_album_too_large)
+            false
+        } else if (replyTarget != null && attachments.any { it.sourceFile != null }) {
+            appState.present(R.string.media_file_too_large)
             false
         } else {
             true
@@ -9047,7 +9111,9 @@ class ConversationController(
                         ?: run {
                             val startedAtMs = diagnostics.beginMediaUpload(tempId)
                             val uploaded =
-                                (
+                                if (retained.isFileBacked) {
+                                    uploadFileBackedRetained(account, key, tempId, retained, startedAtMs)
+                                } else {
                                     mediaUploader?.invoke(account, group.groupIdHex, request)
                                         ?: appState
                                             .withGroupCommitLock(account, group.groupIdHex) {
@@ -9072,7 +9138,7 @@ class ConversationController(
                                                     startedAtMs,
                                                 )
                                             }.upload
-                                ).attachments.map { it.reference }
+                                }.attachments.map { it.reference }
                             diagnostics.finishMediaUpload(tempId, startedAtMs)
                             uploaded
                                 .also {
@@ -9083,6 +9149,9 @@ class ConversationController(
                                         )
                                     }
                                 }.also { retained.uploadedReferences = it }
+                                // A publish-only retry reuses these references, so large snapshots can go now
+                                // instead of waiting, possibly offline for hours, for the send to settle.
+                                .also { retained.releaseStagedSources(appState::closeStagedUploadSourceOffMain) }
                         }
                 // Stop before publication after a discard; an unreferenced Blossom blob is inert.
                 if (discardedDuringRetry.remove(key)) {
@@ -9245,10 +9314,12 @@ class ConversationController(
                 if (confirmedId.isNotEmpty() && sessionStillValid) {
                     retained.attachments.forEachIndexed { index, attachment ->
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
+                        // MDK retains a file-backed item's own copy; only in-memory bytes seed the host cache.
+                        val bytes = attachment.inMemoryBytes ?: return@forEachIndexed
                         val confirmedKey = mediaCacheKey(account, confirmedId, index)
                         appState.cacheUploadedAttachment(
                             confirmedKey,
-                            attachment.plaintextBytes,
+                            bytes,
                             references.getOrNull(index)?.ciphertextSha256,
                         )
                         // Offload the multi-MB ARGB decode to Default; the
@@ -9358,6 +9429,16 @@ class ConversationController(
                 }
                 if (throwable is OptimisticSendCancelledException) {
                     sendHostAttempt.cancel()
+                    discardedDuringRetry.remove(key)
+                    removeCancelledOptimisticSend(key, tempId)
+                    trimCancelledSendTombstones()
+                    return
+                }
+                // Cancel stopped a file-backed transfer before admission: settle it as cancelled, not failed.
+                if (retained.consumeTransferCancelRequest() && !optimisticSendIsMdkOwnedOrUnknown(key)) {
+                    sendHostAttempt.cancel()
+                    optimisticSendPhases[key] = OptimisticSendPhase.CANCELLED
+                    optimisticCancellationGeneration.value += 1
                     discardedDuringRetry.remove(key)
                     removeCancelledOptimisticSend(key, tempId)
                     trimCancelledSendTombstones()
@@ -9696,6 +9777,8 @@ class ConversationController(
             optimisticKeyOverride
                 ?: optimisticSendKey(message)
                 ?: return Result.failure(IllegalStateException("Message is no longer locally cancellable"))
+        // A running file-backed transfer holds the commit lock for its whole upload; stop it first.
+        retainedMediaUploads.get(optimisticKey)?.requestTransferCancel()
         return appState.withGroupCommitLock(account, group.groupIdHex) {
             val current = optimisticMessages[optimisticKey]
             val tempId = current?.record?.messageIdHex ?: message.messageIdHex
@@ -10571,10 +10654,12 @@ class ConversationController(
         // hit immediately on reconcile.
         retained.attachments.forEachIndexed { index, attachment ->
             if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
+            // MDK retains a file-backed item's own copy; only in-memory bytes seed the host cache.
+            val bytes = attachment.inMemoryBytes ?: return@forEachIndexed
             val cacheKey = mediaCacheKey(account, projectedMessageIdHex, index)
             appState.cacheUploadedAttachment(
                 cacheKey,
-                attachment.plaintextBytes,
+                bytes,
                 retained.uploadedReferences?.getOrNull(index)?.ciphertextSha256,
             )
             // Register local publication before yielding, including files beyond L1 admission,
