@@ -80,7 +80,10 @@ internal fun OpenSourceLicensesContent(
                 Text(
                     text = notice.name,
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onSelect(notice) }.padding(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button) { onSelect(notice) }
+                        .padding(24.dp),
                 )
             }
         }

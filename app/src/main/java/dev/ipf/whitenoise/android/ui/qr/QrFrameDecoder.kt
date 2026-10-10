@@ -21,10 +21,10 @@ internal class QrFrameDecoder {
     ): String? {
         require(width > 0 && height > 0 && width.toLong() * height <= MAX_PIXELS)
         require(luminance.size == width * height)
-        require(rotationDegrees in setOf(0, 90, 180, 270))
+        require(rotationDegrees in setOf(0, QUARTER_TURN, HALF_TURN, THREE_QUARTER_TURN))
         val frame = rotateLuminance(luminance, width, height, rotationDegrees)
-        val outputWidth = if (rotationDegrees % 180 == 0) width else height
-        val outputHeight = if (rotationDegrees % 180 == 0) height else width
+        val outputWidth = if (rotationDegrees % HALF_TURN == 0) width else height
+        val outputHeight = if (rotationDegrees % HALF_TURN == 0) height else width
         val source = PlanarYUVLuminanceSource(
             frame, outputWidth, outputHeight, 0, 0, outputWidth, outputHeight, false,
         )
@@ -54,7 +54,10 @@ internal fun copyQrLuminance(
     pixelStride: Int,
     crop: QrLuminanceCrop,
 ): ByteArray {
-    val (cropLeft, cropTop, cropWidth, cropHeight) = crop
+    val cropLeft = crop.left
+    val cropTop = crop.top
+    val cropWidth = crop.width
+    val cropHeight = crop.height
     require(rowStride > 0 && pixelStride > 0 && cropLeft >= 0 && cropTop >= 0)
     require(cropWidth > 0 && cropHeight > 0 && cropWidth.toLong() * cropHeight <= QrFrameDecoder.MAX_PIXELS)
     require((cropLeft.toLong() + cropWidth - 1) * pixelStride < rowStride)
@@ -78,14 +81,14 @@ private fun rotateLuminance(
     rotation: Int,
 ): ByteArray {
     if (rotation == 0) return input
-    val outputWidth = if (rotation % 180 == 0) width else height
+    val outputWidth = if (rotation % HALF_TURN == 0) width else height
     return ByteArray(input.size).also { output ->
         for (y in 0 until height) {
             for (x in 0 until width) {
                 val destination =
                     when (rotation) {
-                        90 -> x * outputWidth + height - 1 - y
-                        180 -> (height - 1 - y) * outputWidth + width - 1 - x
+                        QUARTER_TURN -> x * outputWidth + height - 1 - y
+                        HALF_TURN -> (height - 1 - y) * outputWidth + width - 1 - x
                         else -> (width - 1 - x) * outputWidth + y
                     }
                 output[destination] = input[y * width + x]
@@ -93,3 +96,7 @@ private fun rotateLuminance(
         }
     }
 }
+
+private const val QUARTER_TURN = 90
+private const val HALF_TURN = 180
+private const val THREE_QUARTER_TURN = 270

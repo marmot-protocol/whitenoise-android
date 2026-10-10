@@ -272,44 +272,12 @@ private fun bindQrScannerCamera(
                 Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
-            val decoder = QrFrameDecoder()
-            val didScan = AtomicBoolean(false)
-            val analysis =
-                ImageAnalysis
-                    .Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-
+            val analysis = createQrAnalysis(analyzerExecutor, executor, disposedRef, onScan)
             if (disposedRef.get() || !analysisRef.compareAndSet(null, analysis)) {
                 runCatching { analysis.clearAnalyzer() }
                 runCatching { provider.unbindAll() }
                 providerRef.set(null)
                 return@addListener
-            }
-            analysis.setAnalyzer(analyzerExecutor) { imageProxy ->
-                try {
-                    if (disposedRef.get() || didScan.get()) return@setAnalyzer
-                    val plane = imageProxy.planes.firstOrNull() ?: return@setAnalyzer
-                    val crop = imageProxy.cropRect
-                    val pixels = copyQrLuminance(
-                        plane.buffer,
-                        plane.rowStride,
-                        plane.pixelStride,
-                        QrLuminanceCrop(crop.left, crop.top, crop.width(), crop.height()),
-                    )
-                    val raw = decoder.decode(
-                        pixels, crop.width(), crop.height(), imageProxy.imageInfo.rotationDegrees,
-                    )
-                    if (raw != null) {
-                        executor.execute {
-                            if (!disposedRef.get() && didScan.compareAndSet(false, true)) onScan(raw)
-                        }
-                    }
-                } catch (_: IllegalArgumentException) {
-                    // An invalid/truncated camera frame does not make the camera unavailable.
-                } finally {
-                    imageProxy.close()
-                }
             }
 
             runCatching {
@@ -334,4 +302,47 @@ private fun bindQrScannerCamera(
         },
         executor,
     )
+}
+
+/** One serial analysis owner closes every frame and delivers at most one live result on the main executor. */
+private fun createQrAnalysis(
+    analyzerExecutor: Executor,
+    resultExecutor: Executor,
+    disposedRef: AtomicBoolean,
+    onScan: (String) -> Unit,
+): ImageAnalysis {
+    val decoder = QrFrameDecoder()
+    val didScan = AtomicBoolean(false)
+    val analysis =
+        ImageAnalysis
+            .Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+
+    analysis.setAnalyzer(analyzerExecutor) { imageProxy ->
+        try {
+            if (disposedRef.get() || didScan.get()) return@setAnalyzer
+            val plane = imageProxy.planes.firstOrNull() ?: return@setAnalyzer
+            val crop = imageProxy.cropRect
+            val pixels = copyQrLuminance(
+                plane.buffer,
+                plane.rowStride,
+                plane.pixelStride,
+                QrLuminanceCrop(crop.left, crop.top, crop.width(), crop.height()),
+            )
+            val raw = decoder.decode(
+                pixels, crop.width(), crop.height(), imageProxy.imageInfo.rotationDegrees,
+            )
+            if (raw != null) {
+                resultExecutor.execute {
+                    if (!disposedRef.get() && didScan.compareAndSet(false, true)) onScan(raw)
+                }
+            }
+        } catch (_: IllegalArgumentException) {
+            // An invalid/truncated camera frame does not make the camera unavailable.
+        } finally {
+            imageProxy.close()
+        }
+    }
+    return analysis
 }
