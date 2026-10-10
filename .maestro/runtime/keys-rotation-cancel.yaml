@@ -7,7 +7,7 @@ name: keys-rotation-cancel
 - assertVisible: "Settings"
 - tapOn: "Profile Keys"
 - assertVisible: "Private key hidden"
-- tapOn: "Export Encrypted Private Key"
+- runFlow: ../fixtures/open-encrypted-key-editor.yaml
 - assertVisible: "Encrypted Private Key"
 - tapOn: "Password"
 - inputText: "Maestro-test1!"
@@ -30,7 +30,7 @@ name: keys-rotation-cancel
 - tapOn: "Cancel"
 - assertVisible: "Private key hidden"
 - assertNotVisible: "Encrypted Private Key"
-- tapOn: "Export Encrypted Private Key"
+- runFlow: ../fixtures/open-encrypted-key-editor.yaml
 - assertVisible: "Encrypted Private Key"
 - assertVisible:
     id: "profile_keys.export_password"

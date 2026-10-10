@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Landscape leaves a short list below the static search/filter controls.
+# Start in the actual list, and stop as soon as the recipient text is visible.
+- assertVisible:
+    id: share.destinations
+- repeat:
+    times: 6
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              text: ^Maestro group$
+          commands:
+            - swipe:
+                from:
+                  id: share.destinations
+                direction: UP
+- assertVisible:
+    text: ^Maestro group$

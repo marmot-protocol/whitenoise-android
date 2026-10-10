@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-partial-continue-back
+---
+- runFlow: ../fixtures/runtime-share-error-ready.yaml
+- assertVisible: Only content-provider files are supported.
+- assertVisible: 'Files not imported: 1'
+- tapOn: Share to
+- assertNotVisible: Some files could not be imported
+- assertVisible:
+    id: performance.share_picker
+- assertVisible: Maestro group
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: ^Share$
+- back
+- runFlow: ../fixtures/share-closed.yaml

@@ -1,0 +1,6 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: qr-permission-deny-back
+---
+- runFlow: ../fixtures/runtime-qr-denied-ready.yaml
+- back
+- runFlow: ../fixtures/qr-return.yaml

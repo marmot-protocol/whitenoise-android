@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: relay-add-loopback-ip-reject-cancel
+---
+- runFlow: ../fixtures/open-fixture-empty-relay-draft.yaml
+- inputText: wss://127.0.0.1
+- assertVisible:
+    id: relay.add.url
+    text: ^wss://127\.0\.0\.1$
+- hideKeyboard
+- assertVisible:
+    id: relay.add.submit
+    enabled: false
+- back
+- assertNotVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relays.group
+- back
+- assertVisible: Settings

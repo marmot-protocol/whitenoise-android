@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- assertVisible: Relays
+# The publication status and imported-relay warning can push this lazy section below the viewport.
+# Scroll to a row that fits landscape; the whole multi-row group need not fit at once.
+- scrollUntilVisible:
+    element:
+      id: '^relays\.row\..+'
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    id: relays.group

@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-notifications-warm-resume
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Notifications
+- assertVisible:
+    id: notifications.permission.group
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible:
+    id: notifications.permission.group
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

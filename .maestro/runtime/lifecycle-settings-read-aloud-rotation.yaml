@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-read-aloud-rotation
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Read Aloud
+- assertVisible:
+    id: speech.engine.group
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: speech.engine.group
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: speech.engine.group
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

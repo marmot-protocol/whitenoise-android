@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-gestures-rotation
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Swipe actions
+- assertVisible:
+    id: gestures.MessageLeft
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: gestures.MessageLeft
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: gestures.MessageLeft
+- back
+- assertVisible: Settings

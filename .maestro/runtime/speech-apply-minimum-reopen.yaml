@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: speech-apply-minimum-reopen
+---
+- runFlow: ../fixtures/open-fixture-empty-custom-rate.yaml
+- inputText: '0.1'
+- assertVisible:
+    id: speech.custom_rate
+    text: ^0\.1$
+- hideKeyboard
+- tapOn: Apply
+- assertNotVisible:
+    id: speech.custom_rate
+- assertVisible: 0\.1×
+- back
+- assertVisible: Settings
+- tapOn: Read Aloud
+- assertVisible:
+    id: speech.engine.group
+- assertVisible: 0\.1×
+- tapOn: Speech rate
+- runFlow: ../fixtures/scroll-speech-custom.yaml
+- tapOn: Custom
+- assertVisible:
+    id: speech.custom_rate
+- assertVisible:
+    id: speech.custom_rate
+    text: ^0\.1$
+- tapOn: Cancel
+- assertNotVisible:
+    id: speech.custom_rate

@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- assertVisible:
+    id: app.lock
+- assertVisible:
+    id: app.lock.error
+    text: Unlock was cancelled. Your chats are still hidden.
+- assertVisible:
+    id: app.unlock
+    enabled: true
+- assertNotVisible: Maestro group
+- assertNotVisible:
+    id: privacy.device_protection.group

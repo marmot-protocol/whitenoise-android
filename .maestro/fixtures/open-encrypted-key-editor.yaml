@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- scrollUntilVisible:
+    element:
+      text: Export Encrypted Private Key
+    direction: DOWN
+- tapOn: Export Encrypted Private Key

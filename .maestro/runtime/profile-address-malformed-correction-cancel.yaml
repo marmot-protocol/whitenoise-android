@@ -1,0 +1,78 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profile-address-malformed-correction-cancel
+---
+- runFlow: ../fixtures/open-fixture-profile-editor.yaml
+- scrollUntilVisible:
+    element:
+      id: profile.address_field
+    direction: DOWN
+- assertVisible:
+    id: profile.address_field
+- tapOn:
+    id: profile.address_field
+- longPressOn:
+    id: profile.address_field
+- runFlow:
+    when:
+      visible: (?i)select all
+    commands:
+    - tapOn: (?i)select all
+- assertVisible:
+    id: profile.address_field
+    focused: true
+- eraseText: 100
+- assertNotVisible:
+    id: profile.address_field
+    text: .+
+- inputText: bad@@example.invalid
+- assertVisible:
+    id: profile.address_field
+    text: ^bad@@example\.invalid$
+- hideKeyboard
+- assertVisible: Enter an address like name@example.com.
+- assertVisible:
+    id: profile.save
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: profile.address_field
+    direction: DOWN
+- assertVisible:
+    id: profile.address_field
+- tapOn:
+    id: profile.address_field
+- longPressOn:
+    id: profile.address_field
+- runFlow:
+    when:
+      visible: (?i)select all
+    commands:
+    - tapOn: (?i)select all
+- assertVisible:
+    id: profile.address_field
+    focused: true
+- eraseText: 100
+- assertNotVisible:
+    id: profile.address_field
+    text: .+
+- inputText: maestro@example.invalid
+- assertVisible:
+    id: profile.address_field
+    text: ^maestro@example\.invalid$
+- hideKeyboard
+- assertVisible:
+    id: profile.save
+    enabled: true
+- back
+- assertVisible:
+    id: profile.edit
+- scrollUntilVisible:
+    element:
+      id: profile.address_field
+    direction: DOWN
+- assertVisible:
+    id: profile.address_field
+- assertNotVisible:
+    id: profile.address_field
+    text: .+
+- assertNotVisible: Enter an address like name@example.com.

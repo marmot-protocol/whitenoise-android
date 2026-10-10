@@ -1,0 +1,48 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profile-lightning-malformed-correction-cancel
+---
+- runFlow: ../fixtures/open-fixture-profile-editor.yaml
+- scrollUntilVisible:
+    element:
+      id: profile.lightning_field
+    direction: DOWN
+- assertVisible:
+    id: profile.lightning_field
+- runFlow: ../fixtures/clear-profile-lightning.yaml
+- inputText: bad@@example.invalid
+- assertVisible:
+    id: profile.lightning_field
+    text: ^bad@@example\.invalid$
+- hideKeyboard
+- assertVisible: Enter a Lightning address like name@example.com.
+- assertVisible:
+    id: profile.save
+    enabled: false
+- scrollUntilVisible:
+    element:
+      id: profile.lightning_field
+    direction: DOWN
+- assertVisible:
+    id: profile.lightning_field
+- runFlow: ../fixtures/clear-profile-lightning.yaml
+- inputText: maestro@example.invalid
+- assertVisible:
+    id: profile.lightning_field
+    text: ^maestro@example\.invalid$
+- hideKeyboard
+- assertVisible:
+    id: profile.save
+    enabled: true
+- back
+- assertVisible:
+    id: profile.edit
+- scrollUntilVisible:
+    element:
+      id: profile.lightning_field
+    direction: DOWN
+- assertVisible:
+    id: profile.lightning_field
+- assertNotVisible:
+    id: profile.lightning_field
+    text: .+
+- assertNotVisible: Enter a Lightning address like name@example.com.

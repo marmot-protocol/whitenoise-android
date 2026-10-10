@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-profile-keys-warm-resume
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- tapOn: Profile Keys
+- assertVisible: Show private key
+- assertVisible: Private key hidden
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible: Show private key
+- assertVisible: Private key hidden
+- back
+- assertVisible: Settings

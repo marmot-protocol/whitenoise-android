@@ -965,8 +965,8 @@
         "CHL-011",
         "CHL-012"
       ],
-      "assertions": "Cancel from selection deletion preserves the row and permits normal navigation.",
-      "postcondition": "none"
+      "assertions": "Cancel bulk group departure preserves all three accounts, both native chat rows and their original histories, then exits selection mode.",
+      "postcondition": "accounts-retained"
     },
     "chatstate-pin": {
       "suite": "chatstate",
@@ -1514,7 +1514,7 @@
       "manual_ids": [
         "NTF-033"
       ],
-      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
       "postcondition": "none"
     },
     "alerts-chat-sounds-back": {
@@ -1592,9 +1592,10 @@
     "smart-folders-condition-rotation": {
       "suite": "smart-folders",
       "manual_ids": [
-        "FLD-004"
+        "FLD-004",
+        "NAV-009"
       ],
-      "assertions": "The Unread condition editor survives handled orientation changes before cancellation. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "assertions": "The proven open Unread condition either remains valid and is cancelled, or dismisses safely on handled rotation. Both paths require the unchanged empty outer form, no applied advanced rules and no persisted custom folder.",
       "postcondition": "folder-absent"
     },
     "smart-folders-title-empty": {
@@ -1627,7 +1628,7 @@
       "manual_ids": [
         "MSG-005"
       ],
-      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "assertions": "Filtering to the owner’s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
       "postcondition": "reactions-retained",
       "fixture": "reactions"
     },
@@ -1679,7 +1680,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
+      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
@@ -1703,7 +1704,7 @@
       "manual_ids": [
         "SET-008"
       ],
-      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "assertions": "繁體中文 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
       "postcondition": "language-system"
     },
     "advanced-relay-empty": {
@@ -1859,7 +1860,7 @@
       "manual_ids": [
         "ACC-007"
       ],
-      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice’s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -1887,9 +1888,1452 @@
         "ACC-007",
         "NAV-004"
       ],
-      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
+      "assertions": "Save Alice’s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice’s retained private records, every other viewer empty and unchanged public profiles.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
+    },
+    "lifecycle-settings-appearance-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-appearance actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-appearance-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-appearance actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-notifications-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-notifications actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-notifications-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-notifications actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-read-aloud-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-read-aloud actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-read-aloud-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-read-aloud actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-data-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "SET-010",
+        "NAV-009"
+      ],
+      "assertions": "settings-data actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-data-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "SET-010",
+        "NAV-010"
+      ],
+      "assertions": "settings-data actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-privacy-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-privacy actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-privacy-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-privacy actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-connectors-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-016",
+        "NAV-009"
+      ],
+      "assertions": "settings-connectors actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-connectors-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-016",
+        "NAV-010"
+      ],
+      "assertions": "settings-connectors actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-help-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-018",
+        "NAV-009"
+      ],
+      "assertions": "settings-help actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-help-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-018",
+        "NAV-010"
+      ],
+      "assertions": "settings-help actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-profile-keys-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "ACC-009",
+        "NAV-009"
+      ],
+      "assertions": "settings-profile-keys actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-profile-keys-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "ACC-009",
+        "NAV-010"
+      ],
+      "assertions": "settings-profile-keys actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-dictation-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-027",
+        "NAV-009"
+      ],
+      "assertions": "advanced-dictation actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-dictation-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-027",
+        "NAV-010"
+      ],
+      "assertions": "advanced-dictation actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-gestures-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-032",
+        "NAV-009"
+      ],
+      "assertions": "advanced-gestures actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-gestures-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-032",
+        "NAV-010"
+      ],
+      "assertions": "advanced-gestures actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-folders-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-009",
+        "NAV-009"
+      ],
+      "assertions": "advanced-folders actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-folders-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-009",
+        "NAV-010"
+      ],
+      "assertions": "advanced-folders actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-advanced-relays-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SYS-001",
+        "NAV-009"
+      ],
+      "assertions": "advanced-relays actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed. Bounded scrolling exposes a real relay row and its group in each viewport; native verification requires every generated identity's complete relay projection and the active owner to remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "lifecycle-advanced-relays-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SYS-001",
+        "NAV-010"
+      ],
+      "assertions": "advanced-relays actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed. Bounded scrolling exposes a real relay row and its group in each viewport; native verification requires every generated identity's complete relay projection and the active owner to remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "speech-apply-rounded-reopen": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate 2.75, verify displayed normalized value and reopen both screen and editor; independent fresh production preference reader verifies persisted rate. Audio output and process restart remain separate.",
+      "postcondition": "speech-rate-custom"
+    },
+    "speech-apply-minimum-reopen": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate 0.1, verify displayed normalized value and reopen both screen and editor; independent fresh production preference reader verifies persisted rate. Audio output and process restart remain separate.",
+      "postcondition": "speech-rate-minimum"
+    },
+    "speech-apply-maximum-reopen": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate 10.0, verify displayed normalized value and reopen both screen and editor; independent fresh production preference reader verifies persisted rate. Audio output and process restart remain separate.",
+      "postcondition": "speech-rate-maximum"
+    },
+    "speech-reset-system": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate then replace with System \\(follow device setting\\); screen re-entry retains the new choice. Independent production preference reload verifies the override is removed. Audio and process-death proof remain separate.",
+      "postcondition": "speech-rate-system"
+    },
+    "speech-preset-replaces-custom": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom rate then replace with 0\\.5×; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
+      "postcondition": "speech-rate-preset"
+    },
+    "speech-invalid-keeps-saved-rate": {
+      "suite": "speech-persistence",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Apply custom 2.75, attempt out-of-range 10.01, require exact editor/error and Cancel; re-entry plus fresh preference reader prove the saved normalized2.8 override was not replaced.",
+      "postcondition": "speech-rate-custom"
+    },
+    "profile-text-save-reopen": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Save and reopen actual Name/About. Native verification compares the complete target profile and unchanged metadata for both other generated accounts; no separate peer-delivery proof is claimed.",
+      "postcondition": "public-profile-text-saved"
+    },
+    "profile-about-clear-reopen": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Clear and save existing About, reopen to an empty editor; complete native profile comparison proves only Alice About changed, with both other accounts unchanged.",
+      "postcondition": "public-profile-about-cleared"
+    },
+    "profile-restore-manual-name": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Restore the saved name after replacing it manually; exact name and disabled Restore action return, while native profiles for all three accounts remain unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-restore-generated-name": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Generate a profile name through the actual dice, restore the saved name and leave without publishing; complete native profile comparison proves all accounts unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-edit-rotation-discard": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001",
+        "NAV-009"
+      ],
+      "assertions": "Exact unsaved profile name survives rotation inside the original host; Back discards it and read-mode plus complete native profile comparison prove all three accounts unchanged. No Activity recreation/process-death claim.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-edit-warm-resume-discard": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001",
+        "NAV-010"
+      ],
+      "assertions": "The exact unsaved Name survives Home and foreground return without stopping the fixture. The real toolbar Back discards it, restores the original Alice value and Edit action, and native proof requires complete owning/public profile metadata plus all other accounts unchanged. A system Back consumed by a restored IME does not qualify editor discard; no process-death or every-IME claim.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "smart-folders-draft-rotation-discard": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004",
+        "NAV-009"
+      ],
+      "assertions": "A named outer folder draft survives handled rotation while a transient condition restores safely or dismisses without applying a rule. Keep Editing retains the exact name; explicit Discard creates no custom folder. No Activity recreation or process-death proof.",
+      "postcondition": "folder-absent"
+    },
+    "folder-rules-all-read-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Save and reopen the All read preset with exact name, description and Read status. Native verification requires its complete rule tree and unchanged other accounts. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-read"
+    },
+    "folder-rules-mentions-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Save and reopen the Unread mentions preset and require its exact complete stored tree, metadata and unchanged other accounts. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-mentions"
+    },
+    "folder-rules-match-any-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Switch the preset root to Match any, save/reopen the actual selected mode and verify the entire stored group with all=false. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-any"
+    },
+    "folder-rules-exclusion-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Exclude the root group, save and reopen its actual exclusion control and exact stored tree without changing other folders or identities. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-excluded"
+    },
+    "folder-rules-edit-read-status": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Edit an existing Read status condition from No unread to Has unread, save/reopen its actual summary and independently verify the PRESENT rule. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-unread"
+    },
+    "folder-rules-remove-condition": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Remove the existing Read status condition while retaining Archived and Accepted defaults; save/reopen and verify exactly those two stored conditions. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-defaults"
+    },
+    "folder-rules-empty-group-blocks-save": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "An empty nested group disables the real Save action. Expand and remove it, then save/reopen the unchanged valid preset; no empty nested group may persist. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-read"
+    },
+    "folder-rules-replace-saved-cancel": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Cancel replacement of saved All read rules with mentions. The original complete persisted rule, name and description must remain intact. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-read"
+    },
+    "folder-rules-replace-saved-confirm": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Confirm replacement of saved All read rules with mentions, save/reopen the result and verify the exact new tree with retained metadata and unchanged other accounts. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-mentions"
+    },
+    "folder-rules-discard-new-preset": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Discard a named unsaved preset through the actual confirmation. Native whole-store and fresh-reader checks require every account to match its original state. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-absent"
+    },
+    "folder-rules-title-save-reopen": {
+      "suite": "folder-rules",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "Add a real title keyword condition, save/reopen its summary and verify the exact CONTAINS value together with all metadata and other accounts. This qualifies builder/storage behavior, not every matching source state.",
+      "postcondition": "smart-rule-title"
+    },
+    "profile-address-malformed-correction-cancel": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Malformed address input shows the actual format error and disables Save. A corrected synthetic identifier enables Save, but Back clears it without publication or external resolution; complete native profiles remain unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-lightning-malformed-correction-cancel": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Malformed lightning input shows the actual format error and disables Save. A corrected synthetic identifier enables Save, but Back clears it without publication or external resolution; complete native profiles remain unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-address-invalid-clear": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Reject malformed address input, then clear it to the original blank value. The error disappears and unchanged Save stays disabled; native metadata for every identity remains unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-lightning-invalid-clear": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Reject malformed lightning input, then clear it to the original blank value. The error disappears and unchanged Save stays disabled; native metadata for every identity remains unchanged.",
+      "postcondition": "public-profile-unchanged"
+    },
+    "profile-trimmed-text-reopen": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Save Name/About with surrounding whitespace and reopen their exact trimmed values. Native whole-profile verification requires trimmed metadata and unchanged other identities.",
+      "postcondition": "public-profile-text-trimmed"
+    },
+    "profile-blank-name-reopen": {
+      "suite": "profile-text",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Save a whitespace-only optional Name and reopen its empty normalized editor. Native verification requires both name and displayName absent while all remaining profile fields and other identities stay unchanged.",
+      "postcondition": "public-profile-name-cleared"
+    },
+    "relay-add-empty-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Empty URL disables Add; dismiss the actual sheet and leave all native relay lists unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-malformed-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Malformed URL disables Add and cancellation preserves all three account projections.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-insecure-correction-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Insecure URL disables Add; a structurally secure correction enables it, then cancel without submission or DNS/publication.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-roles-recovery-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "A secure URL with no roles disables Add and shows the actual explanation; restoring one role enables Add, then cancel without publishing.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-whitespace-correction-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002",
+        "SYS-003"
+      ],
+      "assertions": "Whitespace alone disables Add; surrounding whitespace on a secure identifier is accepted, then cancel and verify every original list remains unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-loopback-ip-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the loopback-ip URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-private-ip-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the private-ip URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-localhost-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the localhost URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-credentials-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the credentials URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-nonstandard-port-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the nonstandard-port URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-ws-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the ws URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-blank-host-reject-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor rejects the blank-host URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-secure-443-accept-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor accepts the secure-443 URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "relay-add-upper-case-accept-cancel": {
+      "suite": "relay-validation",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "The actual relay editor accepts the upper-case URL format and closes without Add; all three complete native account relay projections remain unchanged.",
+      "postcondition": "relay-lists-unchanged"
+    },
+    "inbound-share-owned-error-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-invalid-owned",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-http-error-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-invalid-http",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-continue-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; explicit partial acknowledgment/target staging preserves the exact Unicode/whitespace owner draft; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-text-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-text-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; actual Close/Back/Cancel returns to the prior shell without staging; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-text-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; explicit text-target staging preserves the exact Unicode/whitespace owner draft; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-owned-error-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share owned error rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-invalid-owned",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-http-error-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share http error rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-invalid-http",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-error-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share partial error rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-picker-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share picker rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-selected-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share selected rotation; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and exact Unicode owner draft with other drafts untouched.",
+      "fixture": "share-text",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-owned-error-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005",
+        "NAV-010"
+      ],
+      "assertions": "Real inbound share owned error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-invalid-owned",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-http-error-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005",
+        "NAV-010"
+      ],
+      "assertions": "Real inbound share http error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-invalid-http",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-partial-error-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005",
+        "NAV-010"
+      ],
+      "assertions": "Real inbound share partial error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-partial",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-picker-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005",
+        "NAV-010"
+      ],
+      "assertions": "Real inbound share picker warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-selected-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005",
+        "NAV-010"
+      ],
+      "assertions": "Real inbound share selected warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and exact Unicode owner draft with other drafts untouched.",
+      "fixture": "share-text",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-deselect-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share deselect cancel; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-reselect-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share reselect stage; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and exact Unicode owner draft with other drafts untouched.",
+      "fixture": "share-text",
+      "postcondition": "share-request-staged"
+    },
+    "inbound-share-account-sheet-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share account sheet back; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-account-switch-clears": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share account switch clears; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-account-return-clears": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share account return clears; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-search-no-match-clear": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share search no match clear; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-search-mixed-case": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share search mixed case; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-search-ime-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "assertions": "Real inbound share search ime back; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
+      "fixture": "share-text",
+      "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-document-cancel-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document cancel close. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-cancel-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document cancel back. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-caption-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-caption",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document caption stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-documents-multiple-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-multiple",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise documents multiple stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-duplicate-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-duplicate",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document duplicate stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-expired-grant-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-expired-grant",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document expired grant stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-documents-multiple-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-multiple",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise documents multiple cancel. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-remove": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-files-removed",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document remove. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-documents-multiple-remove": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-multiple",
+      "postcondition": "share-request-files-removed",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise documents multiple remove. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-expired-grant-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-expired-grant",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document expired grant rotation. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005",
+        "NAV-010"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document warm resume. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-denied-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-denied",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document denied close. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-denied-caption-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-denied-caption",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document denied caption cancel. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-denied-caption-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-denied-caption",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document denied caption stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-empty-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-empty",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document empty close. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-empty-caption-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-empty-caption",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document empty caption cancel. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-empty-caption-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-empty-caption",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document empty caption stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-log-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-log",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider log MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-calendar-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-calendar",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider calendar MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-font-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-font",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider font MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-model-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-model",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider model MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-unknown-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-unknown",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider unknown MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-mixed-types-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-mixed-types",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider mixed-types MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "qr-permission-deny-close": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "ACC-003"
+      ],
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. deny close. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "postcondition": "camera-denied"
+    },
+    "qr-permission-deny-back": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "ACC-003"
+      ],
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. deny back. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "postcondition": "camera-denied"
+    },
+    "qr-permission-deny-reopen": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "ACC-003"
+      ],
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. deny reopen. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "postcondition": "camera-denied"
+    },
+    "qr-permission-denied-rotation": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "ACC-003",
+        "NAV-009"
+      ],
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. denied rotation. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "postcondition": "camera-denied"
+    },
+    "qr-permission-denied-warm-resume": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "ACC-003",
+        "NAV-010"
+      ],
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. denied warm resume. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "postcondition": "camera-denied"
+    },
+    "qr-permission-permanent-close": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "ACC-003"
+      ],
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. permanent close. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "postcondition": "camera-denied"
+    },
+    "qr-permission-permanent-back": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "ACC-003"
+      ],
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. permanent back. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "postcondition": "camera-denied"
+    },
+    "qr-permission-permanent-reopen": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "ACC-003"
+      ],
+      "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and require the actual scanner title, camera-access recovery state and enabled recovery action. permanent reopen. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
+      "postcondition": "camera-denied"
+    },
+    "accounts-signout-keep-invitations": {
+      "suite": "account-actions",
+      "manual_ids": [
+        "ACC-013"
+      ],
+      "assertions": "Type a disposable Alice draft, complete real sign-out, then select Bob and require a clean Bob composer. Native proof distinguishes Alice removal from retained signed-out identity; complete surviving profiles and unchanged member histories/drafts are compared. Sign-out must retain the exact MDK owner draft; no public-relay or forensic byte-erasure claim.",
+      "postcondition": "account-action-signed-out"
+    },
+    "accounts-signout-remove-invitations": {
+      "suite": "account-actions",
+      "manual_ids": [
+        "ACC-013"
+      ],
+      "assertions": "Type a disposable Alice draft, complete real sign-out, then select Bob and require a clean Bob composer. Native proof distinguishes Alice removal from retained signed-out identity; complete surviving profiles and unchanged member histories/drafts are compared. Sign-out must retain the exact MDK owner draft; no public-relay or forensic byte-erasure claim.",
+      "postcondition": "account-action-signed-out"
+    },
+    "accounts-signout-warm-resume": {
+      "suite": "account-actions",
+      "manual_ids": [
+        "ACC-013",
+        "NAV-010"
+      ],
+      "assertions": "Type a disposable Alice draft, complete real sign-out, then select Bob and require a clean Bob composer. Native proof distinguishes Alice removal from retained signed-out identity; complete surviving profiles and unchanged member histories/drafts are compared. Sign-out must retain the exact MDK owner draft; no public-relay or forensic byte-erasure claim.",
+      "postcondition": "account-action-signed-out"
+    },
+    "accounts-wipe-confirmed-survivors": {
+      "suite": "account-actions",
+      "manual_ids": [
+        "ACC-014",
+        "ACC-015"
+      ],
+      "assertions": "Type a disposable Alice draft, complete real wipe, require Local data wiped and acknowledge the actual structured outcome, then select Bob and require a clean Bob composer. Loopback group-leave warnings are visible and do not qualify public-relay departure. Native proof requires Alice removal, unchanged surviving profiles, retained original member histories and untouched peer drafts; only MDK-authenticated new MLS system rows are allowed. The wiped owner draft is not retained or queried; no public-relay or forensic byte-erasure claim.",
+      "postcondition": "account-action-wiped"
+    },
+    "app-lock-no-credential-back": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-001"
+      ],
+      "assertions": "On a real emulator without an OS credential, require the disabled unchecked device-authentication switch, setup guidance, available Android security action and absent Auto-lock/lock cover. Toolbar Back returns to Settings and Chats. Independent native proof checks real Keyguard/biometric unavailability before UI and at completion, unchanged lock preferences, three original identities, Alice session and both original messages. No PIN setup, lock/unlock success or full SEC-001 completion claim.",
+      "postcondition": "app-lock-unavailable"
+    },
+    "app-lock-no-credential-rotation": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-001",
+        "NAV-009"
+      ],
+      "assertions": "On a real emulator without an OS credential, require the disabled unchecked device-authentication switch, setup guidance, available Android security action and absent Auto-lock/lock cover. Both orientations retain the actual unavailable state; return to portrait and Chats. Handled rotation does not qualify Activity recreation. Independent native proof checks real Keyguard/biometric unavailability before UI and at completion, unchanged lock preferences, three original identities, Alice session and both original messages. No PIN setup, lock/unlock success or full SEC-001 completion claim.",
+      "postcondition": "app-lock-unavailable"
+    },
+    "app-lock-no-credential-warm-resume": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-001",
+        "NAV-010"
+      ],
+      "assertions": "On a real emulator without an OS credential, require the disabled unchecked device-authentication switch, setup guidance, available Android security action and absent Auto-lock/lock cover. Home and foreground return retain the actual unavailable state without stopping the generated native host. Independent native proof checks real Keyguard/biometric unavailability before UI and at completion, unchanged lock preferences, three original identities, Alice session and both original messages. No PIN setup, lock/unlock success or full SEC-001 completion claim.",
+      "postcondition": "app-lock-unavailable"
+    },
+    "app-lock-no-credential-security-return": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-001"
+      ],
+      "assertions": "On a real emulator without an OS credential, require the disabled unchecked device-authentication switch, setup guidance, available Android security action and absent Auto-lock/lock cover. Open the real Android security screen, hosted by Settings or Permission Controller, and return without configuring a credential; require the unchanged unavailable state. Independent native proof checks real Keyguard/biometric unavailability before UI and at completion, unchanged lock preferences, three original identities, Alice session and both original messages. No PIN setup, lock/unlock success or full SEC-001 completion claim.",
+      "postcondition": "app-lock-unavailable"
+    },
+    "app-lock-credential-cancel-retry": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-002",
+        "SEC-004"
+      ],
+      "assertions": "A generation-owned synthetic PIN on a disposable hosted API34 AVD enables the real device-authentication switch. Cancel actual Android authentication, require the opaque app cover, cancellation error and Retry with protected UI absent, then enter the synthetic PIN through real Android UI. Native samples require secure cancelled cover, a later accepted unlocked session, persisted enabled preference, three identities and both original messages; same-process production callback markers prove accepted crypto/session retry. Independent OS probes require no enrolled biometric alternative and restored no-credential baseline after cleanup. No full SEC-002/SEC-004, frame-by-frame flash, Recents, prompt recreation or other-API claim.",
+      "postcondition": "app-lock-credential-retry"
+    },
+    "app-lock-credential-cover-rotation-retry": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-002",
+        "SEC-004",
+        "NAV-009"
+      ],
+      "assertions": "Cancel actual Android PIN authentication on a generation-owned disposable API34 AVD, rotate the cancelled opaque app cover to landscape and back, require the error, Retry and hidden protected UI in both orientations, then perform a real PIN retry. Ordered native samples require the secure cancelled cover in both orientations and a later unlocked session; actual accepted crypto/session markers, enabled preference, three identities, both original messages and independently restored OS credential baseline are mandatory. Rotation of the cancelled app cover does not claim rotation/recreation of the pending Android prompt, frame-by-frame flash, Recents or full manual acceptance.",
+      "postcondition": "app-lock-credential-rotation"
+    },
+    "app-lock-credential-warm-resume-disable": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-002",
+        "SEC-004",
+        "NAV-010"
+      ],
+      "postcondition": "app-lock-credential-warm-disabled",
+      "assertions": "After real PIN cancellation/retry, Home and warm foreground return with the generated host alive must demand another actual PIN and restore Chats. Disable through the production switch, require the unchecked state and absent Auto-lock, then Home and warm return with Chats visible and no app/system PIN cover. Native samples require exactly the second accepted retry, disabled state, real stopped/foreground lifecycle without a newer session, false persisted requirement, original accounts/messages, process-bound accepted cipher callbacks and owned-PIN OS restoration. No process-death, delay-boundary, notification or frame-by-frame claim."
+    },
+    "app-lock-credential-delay-picker-return": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-003",
+        "NAV-009"
+      ],
+      "postcondition": "app-lock-credential-delay",
+      "assertions": "After real PIN cancellation/retry, select Immediately and After1/5/15 minutes in the actual Auto-lock picker, reopen each selected radio, cancel and rotate the final picker landscape/portrait without mutation, then return to Chats. Independent native samples require all four explicit stored preference values in order and the final15m production state/store, alongside accepted cipher retry, accounts/original messages and owned-PIN OS restoration. This selects and persists every delay; it does not qualify elapsed delay boundaries, process recreation, routed notifications or full SEC003."
+    },
+    "keys-public-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden. Native proof requires the exact original SDK Alice npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "public-key-copy-owner"
+    },
+    "keys-public-copy-rotation-return": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "NAV-009"
+      ],
+      "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden before and after handled rotation. Native proof requires the exact original SDK Alice npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "public-key-copy-owner"
+    },
+    "keys-public-copy-warm-resume": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "NAV-010"
+      ],
+      "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden before and after same-process warm return. Native proof requires the exact original SDK Alice npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "public-key-copy-owner"
+    },
+    "keys-public-copy-account-switch": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "ACC-017"
+      ],
+      "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden, switch to Bob and copy his public key before returning to Alice. Native proof requires the exact original SDK Bob npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "public-key-copy-peer"
+    },
+    "search-library-empty-all": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Select the actual ANY_ATTACHMENT attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-photos": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Select the actual IMAGES_VIDEO attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-files": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Select the actual FILES_DOCUMENTS attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-audio": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Select the actual VOICE_AUDIO attachment mode; require selected-chip semantics, the browser’s explicit empty state, and absent loading/results. Select Messages and require the generated chat to return, then close search. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-rotation": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008",
+        "NAV-009"
+      ],
+      "assertions": "The actual empty attachment browser and selected all-attachment mode survive handled landscape and portrait, then Android Back restores the original chat list. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-warm-resume": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008",
+        "NAV-010"
+      ],
+      "assertions": "The actual empty attachment browser and selected all-attachment mode survive same-process Home/foreground return; Back restores the original chat list. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-query-clear": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-004",
+        "FIND-008"
+      ],
+      "assertions": "Enter and clear a nonexistent query in the actual photo/video library; both states explicitly remain empty and Back restores the original generated chat list. This empty fixture does not qualify populated-result restoration. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "search-library-empty-account-switch": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008",
+        "ACC-017"
+      ],
+      "assertions": "Open the actual empty library for Alice, Carol and restored Alice through real profile switching; Carol remains chatless and returning Alice retains the generated group. This empty fixture does not qualify cross-account populated caches or pending searches. Native proof requires both complete original SDK timelines to contain no media, plus three original accounts, restored active Alice and both original messages. These are partial empty-state assertions, not populated cards, source-message focus/viewport, attachment transfer, elapsed expiry, process recreation or complete FIND012/FIND013 acceptance.",
+      "postcondition": "global-library-empty"
+    },
+    "keys-private-copy-hidden": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Copy the actual locally signed raw key while its UI remains hidden. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-hide-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Deliberately reveal and explicitly hide the disposable private key, then copy while hidden. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-warm-resume-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "NAV-010"
+      ],
+      "assertions": "Deliberately reveal the disposable key, background/foreground the same process and require it hidden before copying. No process recreation or pending-export completion is inferred. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-departure-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Deliberately reveal the disposable key, depart through Settings/Chats and reopen Profile Keys; require hidden state before copying. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-rotation-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "NAV-009"
+      ],
+      "assertions": "Deliberately reveal the disposable key through handled landscape and portrait, then explicitly hide it before copying. This does not qualify Activity recreation or frame-by-frame cover security. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-private-reveal-expiry-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Require the actual 30-second reveal timer to hide the disposable key within a 35-second observation window, then copy while hidden. This is an upper-bound expiry observation, not precise lower-bound or clock-boundary qualification. Native proof requires exact original SDK nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-owner"
+    },
+    "keys-raw-export-cancel": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Open the actual raw Export confirmation and dismiss it through cancel. Require both destination controls and return to the hidden key screen and original chat without beginning export. No document/share transport, recipient delivery or file-write claim. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "accounts-retained"
+    },
+    "keys-raw-export-back": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Open the actual raw Export confirmation and dismiss it through back. Require both destination controls and return to the hidden key screen and original chat without beginning export. No document/share transport, recipient delivery or file-write claim. Three original identities, restored active Alice and both original messages must remain. Disposable loopback accounts only. No biometric-authentication, Recents/frame secrecy, external export/sharing, pending owner-loss, process-death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "accounts-retained"
+    },
+    "keys-private-copy-peer": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "ACC-017"
+      ],
+      "assertions": "Switch from Alice to Bob through the actual profile selector and copy Bob’s raw key while hidden. Native proof requires active Bob from the original peer baseline, exact SDK Bob nsec in one plain-text Android clipboard item with the private-key label and sensitive flag, no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; key contents never enter evidence. All three original identities and both original messages must remain. This deliberate active-account change does not require restored active Alice. Disposable loopback accounts only; no pending-result races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance claim.",
+      "postcondition": "private-key-copy-peer"
+    },
+    "keys-private-account-switch-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "ACC-017"
+      ],
+      "assertions": "Visit Bob’s actual Profile Keys and deliberately reveal/hide his disposable key, then restore Alice and copy Alice while hidden. Native proof requires restored active Alice and her exact original SDK nsec in one plain-text Android clipboard item with private-key label/sensitive flag and no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; no key contents enter evidence. Three original identities and both original messages must remain. This completed account-return route does not qualify pending-key callbacks/owner races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "private-key-copy-owner"
     }
   }
 }

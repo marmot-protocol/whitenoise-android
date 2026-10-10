@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-advanced-gestures-warm-resume
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Swipe actions
+- assertVisible:
+    id: gestures.MessageLeft
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible:
+    id: gestures.MessageLeft
+- back
+- assertVisible: Settings

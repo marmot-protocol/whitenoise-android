@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-library-empty-query-clear
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow:
+    file: ../fixtures/open-empty-library.yaml
+    env:
+      LIBRARY_KIND: IMAGES_VIDEO
+- tapOn:
+    id: chats.searchField
+- inputText: Maestro absent attachment 934867
+- hideKeyboard
+- runFlow: ../fixtures/assert-empty-library.yaml
+- tapOn:
+    id: chats.searchField
+- eraseText
+- hideKeyboard
+- runFlow: ../fixtures/assert-empty-library.yaml
+- runFlow: ../fixtures/return-from-empty-library.yaml

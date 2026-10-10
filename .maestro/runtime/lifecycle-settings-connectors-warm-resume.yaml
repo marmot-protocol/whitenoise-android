@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-connectors-warm-resume
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: AI Agents
+- assertVisible:
+    id: ai_agents.connectors
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible:
+    id: ai_agents.connectors
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

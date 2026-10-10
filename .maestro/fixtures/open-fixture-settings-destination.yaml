@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: ${SETTINGS_DESTINATION}
+    direction: DOWN
+- tapOn: ${SETTINGS_DESTINATION}

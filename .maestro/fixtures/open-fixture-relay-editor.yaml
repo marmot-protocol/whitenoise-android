@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Relays
+    direction: DOWN
+- tapOn: Relays
+- assertVisible:
+    id: relays.group
+- scrollUntilVisible:
+    element:
+      text: ^Add relay$
+    direction: DOWN
+- tapOn: Add relay
+- assertVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relay.add.submit
+    enabled: false

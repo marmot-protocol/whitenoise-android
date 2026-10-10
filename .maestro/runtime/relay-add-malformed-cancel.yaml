@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: relay-add-malformed-cancel
+---
+- runFlow: ../fixtures/open-fixture-empty-relay-draft.yaml
+- inputText: not-a-relay
+- assertVisible:
+    id: relay.add.url
+    text: ^not\-a\-relay$
+- hideKeyboard
+- assertVisible:
+    id: relay.add.submit
+    enabled: false
+- back
+- assertNotVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relays.group
+- back
+- assertVisible: Settings

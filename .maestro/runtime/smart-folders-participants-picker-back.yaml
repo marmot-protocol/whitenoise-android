@@ -32,8 +32,7 @@ name: smart-folders-participants-picker-back
     id: folder.conditionDone
     enabled: false
 - tapOn: Cancel
-- assertVisible:
-    id: folder.name
+- runFlow: ../fixtures/return-from-smart-folder-filter.yaml
 - back
 - assertVisible:
     id: chat-folders-content

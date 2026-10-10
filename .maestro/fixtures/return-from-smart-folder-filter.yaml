@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- assertVisible:
+    id: chat-folder-edit-content
+- assertNotVisible:
+    id: folder.addField.PARTICIPANTS
+- assertNotVisible:
+    id: folder.conditionDone
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP
+- assertVisible:
+    id: folder.name
+- assertNotVisible:
+    id: folder.name
+    text: ".+"
+- assertVisible:
+    id: folder.save
+    enabled: false

@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Chips occupy a horizontal fragment; swipe its actual tagged row, never the full screen.
+- assertVisible:
+    id: global.library.modes
+- repeat:
+    times: 6
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: global.library.mode.${LIBRARY_KIND}
+          commands:
+            - swipe:
+                from:
+                  id: global.library.modes
+                direction: LEFT
+- tapOn:
+    id: global.library.mode.${LIBRARY_KIND}
+- assertVisible:
+    id: global.library.mode.${LIBRARY_KIND}
+    checked: true

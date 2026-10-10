@@ -1,0 +1,43 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: relay-add-whitespace-correction-cancel
+---
+- runFlow: ../fixtures/open-fixture-empty-relay-draft.yaml
+- inputText: '   '
+- assertVisible:
+    id: relay.add.url
+    text: ^\ \ \ $
+- hideKeyboard
+- assertVisible:
+    id: relay.add.submit
+    enabled: false
+- tapOn:
+    id: relay.add.url
+- longPressOn:
+    id: relay.add.url
+- runFlow:
+    when:
+      visible: (?i)select all
+    commands:
+    - tapOn: (?i)select all
+- assertVisible:
+    id: relay.add.url
+    focused: true
+- eraseText: 100
+- assertNotVisible:
+    id: relay.add.url
+    text: .+
+- inputText: '  wss://relay.example.invalid  '
+- assertVisible:
+    id: relay.add.url
+    text: ^\ \ wss://relay\.example\.invalid\ \ $
+- hideKeyboard
+- assertVisible:
+    id: relay.add.submit
+    enabled: true
+- back
+- assertNotVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relays.group
+- back
+- assertVisible: Settings

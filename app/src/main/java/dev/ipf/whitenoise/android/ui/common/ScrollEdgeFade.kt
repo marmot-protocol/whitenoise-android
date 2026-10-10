@@ -47,9 +47,10 @@ internal fun Modifier.scrollEdgeFade(
     state: ScrollState,
     reverseScrolling: Boolean = false,
     fadeEnabled: Boolean = true,
+    stableRenderTarget: Boolean = false,
 ): Modifier {
     val source = remember(state) { ScrollEdgeSource(state, { state.canScrollBackward }, { state.canScrollForward }) }
-    return scrollEdgeFade(source, reverseScrolling, fadeEnabled, SCROLL_EDGE_FADE_HEIGHT)
+    return scrollEdgeFade(source, reverseScrolling, fadeEnabled, SCROLL_EDGE_FADE_HEIGHT, stableRenderTarget)
 }
 
 /** List callers keep their own state, restoration, keys and gestures. */
@@ -86,6 +87,7 @@ private fun Modifier.scrollEdgeFade(
     reverseScrolling: Boolean,
     fadeEnabled: Boolean,
     fadeHeight: Dp,
+    stableRenderTarget: Boolean = false,
 ): Modifier {
     // Keyboard forms keep ordinary painting and their caller-owned scroll state.
     // Remove the added layer immediately; hiding the IME restores the same viewport's cues.
@@ -118,6 +120,7 @@ private fun Modifier.scrollEdgeFade(
             }
         },
         maxBandFraction = MAX_VIEWPORT_FADE_FRACTION,
+        stableRenderTarget = stableRenderTarget,
     )
 }
 

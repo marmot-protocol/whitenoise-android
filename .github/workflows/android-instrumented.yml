@@ -30,7 +30,7 @@ on:
         description: Offline retained-APK coverage or opt-in generated-account runtime slice
         required: false
         type: choice
-        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-polls, runtime-folders, runtime-nested, runtime-reader, runtime-composer, runtime-developer, runtime-support, runtime-ballots, runtime-profiles, runtime-chats, runtime-chatstate, runtime-consent, runtime-keys, runtime-search, runtime-permissions, runtime-reports, runtime-acquisition, runtime-speech, runtime-speech-validation, runtime-dictation, runtime-reactions, runtime-alert-dialogs, runtime-smart-folders, runtime-account-guards, runtime-all]
+        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-polls, runtime-folders, runtime-nested, runtime-reader, runtime-composer, runtime-developer, runtime-support, runtime-ballots, runtime-profiles, runtime-chats, runtime-chatstate, runtime-consent, runtime-keys, runtime-search, runtime-permissions, runtime-reports, runtime-acquisition, runtime-speech, runtime-speech-validation, runtime-dictation, runtime-reactions, runtime-alert-dialogs, runtime-smart-folders, runtime-account-guards, runtime-account-actions, runtime-app-lock, runtime-settings-lifecycle, runtime-speech-persistence, runtime-profile-text, runtime-folder-rules, runtime-relay-validation, runtime-inbound-share, runtime-all]
         default: onboarding
       maestro_repetitions:
         description: Suite repetitions (onboarding 1–20, offline 1–3, focused suites 1)
@@ -410,8 +410,8 @@ jobs:
         run: |
           [[ "$REPEATS" == 1 && "$NEGATIVE" == false && "$DEMO" == false && "$DOCUMENTS" == false ]] || exit 2
           python3 scripts/maestro_environment.py validate --api "$ANDROID_API" --navigation "$NAVIGATION"
-          python3 -m scripts.maestro_runtime_selection "$SELECTED" >> "$GITHUB_OUTPUT"
-          python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_suite.py scripts/test_maestro_apk.py scripts/test_maestro_environment.py
+          python3 -m scripts.maestro_runtime_selection "$SELECTED" "$ANDROID_API" >> "$GITHUB_OUTPUT"
+          python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_suite.py scripts/test_maestro_apk.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -424,7 +424,7 @@ jobs:
       - name: Build app and test APK once for this source revision
         id: fixture
         run: |
-          ./gradlew --init-script scripts/maestro-runtime.init.gradle :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon
+          ./gradlew --init-script scripts/maestro-runtime.init.gradle -Pandroid.injected.testOnly=true :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon
           mkdir -p build/maestro-runtime-pair
           app_apks=(app/build/outputs/apk/devZapstore/debug/*-universal-debug.apk)
           test_apks=(app/build/outputs/apk/androidTest/devZapstore/debug/*.apk)
@@ -548,11 +548,11 @@ jobs:
           target: ${{ inputs.maestro_android_api == '37.0' && 'google_apis_ps16k' || 'google_apis' }}
           arch: x86_64
           profile: ${{ inputs.maestro_android_api == '37.0' && 'pixel_6' || '' }}
-          ram-size: ${{ inputs.maestro_android_api == '37.0' && '4096M' || '2048M' }}
+          ram-size: 4096M
           disk-size: 8G
           pre-emulator-launch-script: ${{ inputs.maestro_android_api == '37.0' && './scripts/stabilize-android17-emulator.sh' || 'true' }}
           disable-animations: true
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none ${{ inputs.maestro_android_api == '37.0' && '-feature GLDirectMem' || '' }}
+          emulator-options: -no-snapshot-save -no-window -gpu swangle -noaudio -no-boot-anim -camera-back none ${{ inputs.maestro_android_api == '37.0' && '-feature GLDirectMem' || '' }}
           script: |
             python3 scripts/maestro_environment.py configure --api "$MAESTRO_ANDROID_API" --navigation "$MAESTRO_NAVIGATION_MODE" --output build/maestro-runtime-environment.json
             python3 scripts/maestro_apk.py locale

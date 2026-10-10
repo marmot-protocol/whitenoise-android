@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: qr-permission-denied-warm-resume
+---
+- runFlow: ../fixtures/runtime-qr-denied-ready.yaml
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible:
+    text: ^Scan QR Code$
+- assertVisible:
+    text: ^Camera Access Needed$
+- assertVisible:
+    id: qr_scanner.recovery
+    enabled: true
+    containsChild:
+      text: ^(Allow Camera|Open settings)$
+- tapOn:
+    text: ^Close$
+- runFlow: ../fixtures/qr-return.yaml

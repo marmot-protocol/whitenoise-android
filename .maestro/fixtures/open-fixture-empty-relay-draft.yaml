@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: ../fixtures/open-fixture-relay-editor.yaml
+- tapOn:
+    id: relay.add.url
+- assertVisible:
+    id: relay.add.url
+    focused: true
+- eraseText: 100
+- assertNotVisible:
+    id: relay.add.url
+    text: .+

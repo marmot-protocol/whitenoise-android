@@ -89,7 +89,9 @@ class DestinationPickerImeScreenshotTest {
         dispatchIme(0)
         composeRule.onNode(hasSetTextAction()).assertIsFocused().performTextInput("e")
         val listTag = if (share) "share.destinations" else "forward.destinations"
-        composeRule.onNode(hasText("Alice") and hasAnyAncestor(hasTestTag(listTag))).assertIsDisplayed()
+        composeRule
+            .onNode(hasText("Alice") and !hasSetTextAction() and hasAnyAncestor(hasTestTag(listTag)))
+            .assertIsDisplayed()
     }
 
     /** Seeds a real folder and recipient while keeping the fixture independent of native/network state. */

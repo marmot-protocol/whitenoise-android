@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: ../fixtures/runtime-share-picker-ready.yaml
+- tapOn: Maestro group
+- assertVisible:
+    enabled: true
+    text: ^Share to 1 chat$
+- tapOn:
+    text: ^Share to 1 chat$
+- assertNotVisible:
+    id: performance.share_picker
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible:
+    id: conversation.composer.attachment.0

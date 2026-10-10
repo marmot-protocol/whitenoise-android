@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-appearance-rotation
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Appearance
+- assertVisible:
+    id: appearance.theme.group
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: appearance.theme.group
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: appearance.theme.group
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

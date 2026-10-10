@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-connectors-rotation
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: AI Agents
+- assertVisible:
+    id: ai_agents.connectors
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: ai_agents.connectors
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: ai_agents.connectors
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

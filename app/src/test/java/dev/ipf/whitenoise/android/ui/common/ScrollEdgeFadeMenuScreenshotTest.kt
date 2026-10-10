@@ -3,11 +3,18 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -16,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -79,28 +87,118 @@ class ScrollEdgeFadeMenuScreenshotTest {
         rule.onNodeWithTag(MENU).assertDoesNotExist()
     }
 
-    private fun render() {
+    /** Compact action anchors must retain painted rows throughout the actual opening animation. */
+    @Test
+    fun shortActionAnchorHasVisibleRows() {
+        rowCount.intValue = 3
+        openActionAnchor()
+        val node = rule.onNodeWithTag(MENU)
+        val pixels = node.captureToImage().toPixelMap()
+        assertEquals(Color.Cyan, pixels[8, 14])
+        node.captureRoboImage("src/test/snapshots/scroll_edges_native_menu_action_fitting.png")
+        rule.onNodeWithText("Choice 2").performClick()
+        rule.waitForIdle()
+        assertEquals(2, chosen.intValue)
+        rule.onNodeWithTag(MENU).assertDoesNotExist()
+    }
+
+    /** Opening a long menu from the same compact anchor must expose its first rows and continuation cue. */
+    @Test
+    fun longActionAnchorHasVisibleRows() {
+        openActionAnchor()
+        val node = rule.onNodeWithTag(MENU)
+        val pixels = node.captureToImage().toPixelMap()
+        assertEquals(Color.Cyan, pixels[8, 14])
+        assertTrue(pixels[8, pixels.height - 14] != Color.Cyan)
+        node.captureRoboImage("src/test/snapshots/scroll_edges_native_menu_action_start.png")
+    }
+
+    /** Dark popup colors retain readable painted actions while their fade render target stays stable. */
+    @Test
+    fun darkActionAnchorHasVisibleRows() {
+        rowCount.intValue = 3
+        openActionAnchor(MenuOptions(dark = true))
+        val node = rule.onNodeWithTag(MENU)
+        assertEquals(Color.Cyan, node.captureToImage().toPixelMap()[8, 14])
+        node.captureRoboImage("src/test/snapshots/scroll_edges_native_menu_action_dark.png")
+    }
+
+    /** Large RTL text and AMOLED outline must coexist with real popup opening and scroll ownership. */
+    @Test
+    fun amoledRtlLargeActionAnchorHasVisibleRows() {
+        openActionAnchor(MenuOptions(dark = true, amoled = true, rtl = true, fontScale = 2f))
+        val firstRowHeight =
+            rule
+                .onNodeWithText("Choice 0")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertTrue(firstRowHeight >= 32f)
+        val node = rule.onNodeWithTag(MENU)
+        assertEquals(Color.Cyan, node.captureToImage().toPixelMap()[8, 14])
+        node.captureRoboImage("src/test/snapshots/scroll_edges_native_menu_action_amoled_rtl_large.png")
+    }
+
+    private fun openActionAnchor(options: MenuOptions = MenuOptions()) {
+        expanded.value = false
+        render(actionSizedAnchor = true, options = options)
+        rule.onNodeWithText("Open menu").performClick()
+        rule.waitForIdle()
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    private fun render(
+        actionSizedAnchor: Boolean = false,
+        options: MenuOptions = MenuOptions(),
+    ) {
         rule.setContent {
-            WhiteNoiseTheme {
-                Box(Modifier.fillMaxSize()) {
-                    WhiteNoiseDropdownMenu(
-                        expanded = expanded.value,
-                        onDismissRequest = { expanded.value = false },
-                        items =
-                            List(rowCount.intValue) {
-                                WhiteNoiseMenuItem(
-                                    label = "Choice $it",
-                                    onClick = { chosen.intValue = it },
-                                    modifier = Modifier.background(Color.Cyan),
-                                )
-                            },
-                        modifier = Modifier.testTag(MENU),
-                    )
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (options.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = options.dark, amoled = options.amoled, fontScale = options.fontScale) {
+                    Box(Modifier.fillMaxSize()) {
+                        if (actionSizedAnchor) {
+                            Box {
+                                // The anchor is a fixture; its native ripple must not race popup goldens.
+                                // Keep the actual menu outside this provider so its rendering stays tested.
+                                CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                                    Button(onClick = { expanded.value = true }) { Text("Open menu") }
+                                }
+                                MenuContent()
+                            }
+                        } else {
+                            MenuContent()
+                        }
+                    }
                 }
             }
         }
         rule.waitForIdle()
     }
+
+    @Suppress("FunctionNaming")
+    @Composable
+    private fun MenuContent() {
+        WhiteNoiseDropdownMenu(
+            expanded = expanded.value,
+            onDismissRequest = { expanded.value = false },
+            items =
+                List(rowCount.intValue) {
+                    WhiteNoiseMenuItem(
+                        label = "Choice $it",
+                        onClick = { chosen.intValue = it },
+                        modifier = Modifier.background(Color.Cyan),
+                    )
+                },
+            modifier = Modifier.testTag(MENU),
+        )
+    }
+
+    private data class MenuOptions(
+        val dark: Boolean = false,
+        val amoled: Boolean = false,
+        val rtl: Boolean = false,
+        val fontScale: Float = 1f,
+    )
 
     private companion object {
         const val MENU = "scroll-edge-native-menu"

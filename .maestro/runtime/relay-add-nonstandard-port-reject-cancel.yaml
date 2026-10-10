@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: relay-add-nonstandard-port-reject-cancel
+---
+- runFlow: ../fixtures/open-fixture-empty-relay-draft.yaml
+- inputText: wss://relay.example.invalid:8443
+- assertVisible:
+    id: relay.add.url
+    text: ^wss://relay\.example\.invalid:8443$
+- hideKeyboard
+- assertVisible:
+    id: relay.add.submit
+    enabled: false
+- back
+- assertNotVisible:
+    id: relay.add.url
+- assertVisible:
+    id: relays.group
+- back
+- assertVisible: Settings

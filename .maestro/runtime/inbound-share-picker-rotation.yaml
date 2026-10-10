@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-picker-rotation
+---
+- runFlow: ../fixtures/runtime-share-picker-ready.yaml
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: performance.share_picker
+- runFlow: ../fixtures/share-recipient-visible.yaml
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: ^Share$
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: ^Share$
+- tapOn: Close
+- runFlow: ../fixtures/share-closed.yaml

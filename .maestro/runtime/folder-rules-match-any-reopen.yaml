@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-rules-match-any-reopen
+---
+- runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.match.
+    direction: UP
+- tapOn:
+    id: folder.match.
+- tapOn: Match any
+- assertVisible:
+    id: folder.match.
+    containsChild:
+      text: ^Match any$
+- runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.match.
+    direction: DOWN
+- assertVisible:
+    id: folder.match.
+    containsChild:
+      text: ^Match any$
+- back
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro rules folder

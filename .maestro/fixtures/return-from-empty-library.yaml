@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Android hideKeyboard sends Back even when no keyboard is visible.
+- runFlow:
+    when:
+      visible:
+        id: com\.google\.android\.inputmethod\.latin:id/.*
+    commands:
+      - hideKeyboard
+- assertVisible:
+    id: global.library
+- back
+- assertNotVisible:
+    id: global.library
+- assertNotVisible:
+    id: chats.searchField
+- assertVisible: Maestro group

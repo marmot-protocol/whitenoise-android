@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: runtime-ready.yaml
+- runFlow: open-settings.yaml
+- tapOn:
+    id: settings.active_profile
+- assertVisible:
+    id: share_connect.screen
+- tapOn:
+    id: share_connect.open_scanner
+- assertVisible:
+    id: com.android.permissioncontroller:id/permission_deny_button
+- tapOn:
+    id: com.android.permissioncontroller:id/permission_deny_button
+- assertVisible:
+    text: ^Scan QR Code$
+- assertVisible:
+    id: qr_scanner.close
+- assertVisible:
+    text: ^Camera Access Needed$
+- assertVisible:
+    id: qr_scanner.recovery
+    enabled: true
+    containsChild:
+      text: ^(Allow Camera|Open settings)$
+- assertVisible:
+    text: ^Allow Camera$

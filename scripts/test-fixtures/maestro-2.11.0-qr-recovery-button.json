@@ -1,0 +1,67 @@
+{
+  "source_sha": "a50e263925e74c39a3f1b5e9cda0e3a4fde8fd01",
+  "run_id": "37909377817",
+  "run_attempt": "1",
+  "maestro_version": "2.11.0",
+  "case": "qr-permission-deny-close",
+  "node": {
+    "attributes": {
+      "ignoreBoundsFiltering": "false",
+      "clickable": "true",
+      "bounds": "[91,383][229,431]",
+      "enabled": "true",
+      "focused": "false",
+      "checked": "false",
+      "scrollable": "false",
+      "selected": "false",
+      "class": "android.view.View",
+      "important-for-accessibility": "true"
+    },
+    "children": [
+      {
+        "attributes": {
+          "text": "Allow Camera",
+          "ignoreBoundsFiltering": "false",
+          "clickable": "false",
+          "bounds": "[115,397][205,417]",
+          "enabled": "true",
+          "focused": "false",
+          "checked": "false",
+          "scrollable": "false",
+          "selected": "false",
+          "class": "android.widget.TextView",
+          "important-for-accessibility": "true"
+        },
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "checked": false,
+        "selected": false
+      },
+      {
+        "attributes": {
+          "ignoreBoundsFiltering": "false",
+          "clickable": "false",
+          "bounds": "[91,383][229,431]",
+          "enabled": "true",
+          "focused": "false",
+          "checked": "false",
+          "scrollable": "false",
+          "selected": "false",
+          "class": "android.widget.Button",
+          "important-for-accessibility": "true"
+        },
+        "clickable": false,
+        "enabled": true,
+        "focused": false,
+        "checked": false,
+        "selected": false
+      }
+    ],
+    "clickable": true,
+    "enabled": true,
+    "focused": false,
+    "checked": false,
+    "selected": false
+  }
+}

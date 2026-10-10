@@ -1,0 +1,86 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: smart-folders-draft-rotation-discard
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Folders
+    direction: DOWN
+- tapOn: Folders
+- assertVisible:
+    id: chat-folders-content
+- tapOn: New Folder
+- assertVisible:
+    id: folder.name
+- tapOn:
+    id: folder.name
+- assertVisible:
+    id: folder.name
+    focused: true
+- inputText: Maestro rotation draft
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rotation draft$
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: folder.add.
+    direction: DOWN
+- tapOn:
+    id: folder.add.
+- assertVisible:
+    id: folder.addField.PARTICIPANTS
+- tapOn:
+    id: folder.addField.UNREAD
+- assertVisible:
+    id: folder.conditionDone
+    enabled: true
+- assertVisible:
+    id: folder.mode
+- assertNotVisible:
+    id: folder.addField.PARTICIPANTS
+- takeScreenshot: smart-folder-condition-before-rotation
+- setOrientation: LANDSCAPE_LEFT
+- takeScreenshot: smart-folder-condition-after-rotation
+- runFlow: ../fixtures/dismiss-restored-folder-condition.yaml
+- assertVisible:
+    id: chat-folder-edit-content
+- setOrientation: PORTRAIT
+- runFlow: ../fixtures/dismiss-restored-folder-condition.yaml
+- assertVisible:
+    id: chat-folder-edit-content
+- scrollUntilVisible:
+    element:
+      id: folder.add.
+    direction: DOWN
+- assertNotVisible:
+    id: folder.group.
+- assertVisible:
+    id: chat-folder-edit-content
+- assertNotVisible:
+    id: folder.addField.PARTICIPANTS
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rotation draft$
+- assertVisible:
+    id: folder.save
+    enabled: true
+- back
+- assertVisible: Discard changes?
+- tapOn: Keep Editing
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rotation draft$
+- back
+- assertVisible: Discard changes?
+- tapOn: Discard Changes
+- assertVisible:
+    id: chat-folders-content
+- assertNotVisible: Maestro rotation draft

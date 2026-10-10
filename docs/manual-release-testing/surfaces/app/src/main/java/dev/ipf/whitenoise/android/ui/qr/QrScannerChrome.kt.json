@@ -1,0 +1,194 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+  "legacy_sha256": "f0407e2dd310a84fe0bd2c5f49a03fb3531c163b20783985dfd77e2fe0f45acc",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "QrScannerSheetContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun QrScannerSheetContent(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "RoundedQrTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun RoundedQrTarget(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerErrorDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun ScannerErrorDialog(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun ScannerHeader(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerPermissionArea",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun ScannerPermissionArea(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "ScannerRecoveryCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "fun ScannerRecoveryCard(",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:allow_camera",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.allow_camera",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:camera_access_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.camera_access_required",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:camera_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.camera_unavailable",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:open_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.open_settings",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:qr_camera_access_needed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.qr_camera_access_needed",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:qr_turn_flashlight_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.qr_turn_flashlight_off",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:qr_turn_flashlight_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.qr_turn_flashlight_on",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      },
+      {
+        "surface": "string:scan_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": "R.string.scan_qr_code",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: QrScannerChrome",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "QR recovery button enabled state and isolated-window selector export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+        "anchor": ".testTag(\"qr_scanner.recovery\")",
+        "test_ids": [
+          "ACC-003",
+          "ONB-005",
+          "ONB-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-privacy-warm-resume
+---
+- runFlow:
+    file: ../fixtures/open-fixture-settings-destination.yaml
+    env:
+      SETTINGS_DESTINATION: Privacy & Security
+- assertVisible:
+    id: privacy.device_protection.group
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible:
+    id: privacy.device_protection.group
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group
