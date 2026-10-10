@@ -131,5 +131,44 @@ class BackgroundFixtureArtifactsTest(unittest.TestCase):
             verify(self.directory, SOURCE)
 
 
+class ResponsivenessApkSelectionTest(unittest.TestCase):
+    """Exercise the hosted selector against AGP output locations and artifact kinds."""
+
+    def test_intermediate_apk_wins_over_universal_and_non_apk_metadata(self):
+        """Select the ARM64 APK while ignoring merged manifests and linked resources."""
+        import textwrap
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/android-staging-apk.yml').read_text()
+        staging = workflow.split('name: Stage immutable fixture bytes and shared-certificate provenance', 1)[1]
+        selection = staging.split('                  matches = []', 1)[1].split('                  verification =', 1)[0]
+        selection = 'matches = []\n' + textwrap.dedent(selection)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for directory, artifact, name, abi in [
+                ('intermediates/apk/dev/debug', 'APK', 'arm.apk', 'arm64-v8a'),
+                ('outputs/apk/dev/debug', 'APK', 'universal.apk', None),
+                ('intermediates/merged_manifests/dev', 'MERGED_MANIFESTS', 'AndroidManifest.xml', None),
+                ('intermediates/linked_resources/dev', 'PROCESSED_RES', 'resources.ap_', None),
+            ]:
+                output = root / 'app/build' / directory
+                output.mkdir(parents=True)
+                (output / name).write_bytes(b'fixture')
+                (output / 'output-metadata.json').write_text(json.dumps({
+                    'artifactType': {'type': artifact}, 'applicationId': 'fixture.app', 'variantName': 'devDebug',
+                    'elements': [{'outputFile': name, 'filters': [] if abi is None else [
+                        {'filterType': 'ABI', 'value': abi}]}],
+                }))
+            scope = {'root': root, 'module': 'app', 'variant': 'devDebug', 'package': 'fixture.app',
+                     'role': 'before', 'json': json}
+            exec(selection, scope)
+            self.assertEqual([root / 'app/build/intermediates/apk/dev/debug/arm.apk'], scope['matches'])
+            duplicate = root / 'app/build/outputs/apk/duplicate'
+            duplicate.mkdir(parents=True)
+            original = root / 'app/build/intermediates/apk/dev/debug'
+            (duplicate / 'arm.apk').write_bytes(b'different fixture')
+            (duplicate / 'output-metadata.json').write_text((original / 'output-metadata.json').read_text())
+            with self.assertRaisesRegex(SystemExit, 'expected one APK'):
+                exec(selection, scope)
+
+
 if __name__ == "__main__":
     unittest.main()
