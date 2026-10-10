@@ -128,9 +128,10 @@ class ChatListProductionReorderTest {
     }
 
     /** Reads current physical bounds rather than a target index or a synthetic animation value. */
-    private fun top(id: String): Float =
-        composeRule.onNodeWithTag(chatListHeadReorderRowTag(id), useUnmergedTree = true)
-            .fetchSemanticsNode().layoutInfo.coordinates.boundsInRoot().top
+    private fun top(id: String): Float {
+        val node = composeRule.onNodeWithTag(chatListHeadReorderRowTag(id), useUnmergedTree = true).fetchSemanticsNode()
+        return node.layoutInfo.coordinates.boundsInRoot().top
+    }
 }
 
 /** Unique local identities and actual preview/unread states exercise normal row measurement. */

@@ -7956,6 +7956,7 @@ class ConversationController(
         timelineStream: ConversationTimelineSubscriptionHandle,
     ) {
         val timelineWindows = Channel<RecoveryStampedTimelineWindow>(capacity = Channel.BUFFERED)
+        var observedProducerEnd = false
         val pump =
             async {
                 // The seam absorbs MDK's window errors, so reaching this catch means an unexpected failure.
@@ -7982,9 +7983,11 @@ class ConversationController(
             }
         try {
             while (isActive) {
-                val first =
-                    timelineWindows.receiveCatching().getOrNull()
-                        ?: break
+                val first = timelineWindows.receiveCatching().getOrNull()
+                if (first == null) {
+                    observedProducerEnd = true
+                    break
+                }
                 // Drain any windows that arrived within roughly one
                 // 120Hz frame budget into a single batch. The runtime
                 // can emit several complete windows back-to-back during a
@@ -8052,7 +8055,9 @@ class ConversationController(
                 }
             }
         } finally {
-            if (pump.isActive) {
+            // Channel close precedes coroutine completion. Let an ended producer finish normally;
+            // cancelling in that gap makes await() throw and bypasses initial metadata settlement.
+            if (!observedProducerEnd && pump.isActive) {
                 pump.cancel()
             }
         }
