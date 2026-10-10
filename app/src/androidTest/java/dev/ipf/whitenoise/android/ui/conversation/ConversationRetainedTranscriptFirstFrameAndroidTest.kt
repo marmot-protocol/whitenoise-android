@@ -54,6 +54,7 @@ import org.junit.runner.RunWith
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -69,38 +70,45 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
 
     /** Already consumed background content must be in the first live draw with roster enrichment still held. */
     @Test
-    fun consumedStoppedWindowIsInFirstLiveTranscriptDraw() =
+    fun consumedStoppedWindowIsInFirstLiveTranscriptDraw() {
         assertFirstDraw(UpdateBoundary.Consumed)
+    }
 
     /** Preparation already received on IO cannot lose the first draw to a coherent geometry-only gate. */
     @Test
-    fun queuedLocalPreparationCommitsBeforeFirstLiveTranscriptDraw() =
+    fun queuedLocalPreparationCommitsBeforeFirstLiveTranscriptDraw() {
         assertFirstDraw(UpdateBoundary.Queued)
+    }
 
     /** A second foreground epoch cannot inherit the first epoch's permission to reveal held content. */
     @Test
-    fun supersededForegroundEpochStillWaitsForCurrentLocalWindow() =
+    fun supersededForegroundEpochStillWaitsForCurrentLocalWindow() {
         assertFirstDraw(UpdateBoundary.Queued, supersedeForeground = true)
+    }
 
     /** Reconnect's replacement snapshot is sufficient even when no later live update arrives. */
     @Test
-    fun replacementSnapshotNeedsNoFollowingEventToReachFirstLiveDraw() =
+    fun replacementSnapshotNeedsNoFollowingEventToReachFirstLiveDraw() {
         assertFirstDraw(UpdateBoundary.Replacement)
+    }
 
     /** A focused editor stays usable after the current local window reaches the resumed transcript. */
     @Test
-    fun queuedLocalPreparationWithFocusedComposerReachesFirstLiveDraw() =
+    fun queuedLocalPreparationWithFocusedComposerReachesFirstLiveDraw() {
         assertFirstDraw(UpdateBoundary.Queued, focusComposer = true)
+    }
 
     /** A real window that refuses IME visibility still draws current content and accepts editor input. */
     @Test
-    fun deniedImeVisibilityDoesNotHideCurrentLocalContentForever() =
+    fun deniedImeVisibilityDoesNotHideCurrentLocalContentForever() {
         assertFirstDraw(UpdateBoundary.Consumed, focusComposer = true, denyIme = true)
+    }
 
     /** Background content can update the bounded window without pulling an older reader to the tail. */
     @Test
-    fun olderReadingAnchorSurvivesFreshFirstLiveTranscriptDraw() =
+    fun olderReadingAnchorSurvivesFreshFirstLiveTranscriptDraw() {
         assertFirstDraw(UpdateBoundary.Consumed, olderReader = true)
+    }
 
     /** A disposed route cannot draw the old controller when delayed preparation finally completes. */
     @Test
@@ -140,7 +148,8 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             resumeRetainedActivity()
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
             assertTrue(fixture.hasB)
-            assertTrue(fixture.draws.first().visibleItemKeys.isNotEmpty())
+            val staleDraw = fixture.draws.first()
+            assertTrue(staleDraw.visibleItemKeys.isNotEmpty())
             assertFalse(
                 "new controller content cannot make stale painted A pass",
                 ConversationTimelineTestIds.MESSAGE_B in fixture.draws.first().messageIds,
@@ -165,7 +174,8 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             val olderAnchor =
                 if (olderReader) {
                     val key = checkNotNull(fixture.readingSnapshot?.anchorItemId)
-                    checkNotNull(fixture.lastDraw?.visibleItemOffsets?.entries?.firstOrNull { it.key == key }) {
+                    val paintedOffsets = fixture.lastDraw?.visibleItemOffsets
+                    checkNotNull(paintedOffsets?.entries?.firstOrNull { it.key == key }) {
                         "the intended older anchor must be painted before STOP"
                     }
                 } else {
@@ -321,24 +331,27 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             fixture.keyboard = LocalSoftwareKeyboardController.current
             DisposableEffect(view) {
                 val lifecycle = retainedActivity.lifecycle
-                val lifecycleObserver = LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_RESUME && fixture.recording.get()) {
-                        fixture.lastResumeAt = SystemClock.uptimeMillis()
-                        fixture.firstBlockedAt = null
-                        fixture.gateReleasedAt = null
+                val lifecycleObserver =
+                    LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME && fixture.recording.get()) {
+                            fixture.lastResumeAt = SystemClock.uptimeMillis()
+                            fixture.firstBlockedAt = null
+                            fixture.gateReleasedAt = null
+                        }
                     }
-                }
                 lifecycle.addObserver(lifecycleObserver)
                 val observer = view.viewTreeObserver
-                val listener = android.view.ViewTreeObserver.OnPreDrawListener {
-                    fixture.preDraws.incrementAndGet()
-                    true
-                }
-                val drawListener = android.view.ViewTreeObserver.OnDrawListener {
-                    val completed = ConversationTranscriptDrawProbe.beginRootDraw()
-                    val live = retainedActivity.lifecycle.currentState == Lifecycle.State.RESUMED
-                    view.post { if (live) completed?.invoke() }
-                }
+                val listener =
+                    android.view.ViewTreeObserver.OnPreDrawListener {
+                        fixture.preDraws.incrementAndGet()
+                        true
+                    }
+                val drawListener =
+                    android.view.ViewTreeObserver.OnDrawListener {
+                        val completed = ConversationTranscriptDrawProbe.beginRootDraw()
+                        val live = retainedActivity.lifecycle.currentState == Lifecycle.State.RESUMED
+                        view.post { if (live) completed?.invoke() }
+                    }
                 observer.addOnPreDrawListener(listener)
                 observer.addOnDrawListener(drawListener)
                 onDispose {
@@ -366,7 +379,10 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     }
 
     /** A setup timeout must release the controller before a caller can take ownership of the fixture. */
-    private fun awaitFixtureSetup(fixture: RetainedFixture, condition: () -> Boolean) {
+    private fun awaitFixtureSetup(
+        fixture: RetainedFixture,
+        condition: () -> Boolean,
+    ) {
         try {
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS, condition = condition)
         } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
@@ -376,17 +392,21 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     }
 
     /** Complete-window replacements are the only data source; no test edits controller timeline state. */
-    private class RetainedFixture(replacement: Boolean, olderReader: Boolean) {
+    private class RetainedFixture(
+        replacement: Boolean,
+        olderReader: Boolean,
+    ) {
         private val a = timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL, "fixture A")
         private val baseRows =
             if (olderReader) {
-                listOf(a) + (2..24).map { index ->
-                    timelineRecord(
-                        "e" + index.toString(16).padStart(63, '0'),
-                        index.toULong(),
-                        "fixture older row $index",
-                    )
-                }
+                listOf(a) +
+                    (2..24).map { index ->
+                        timelineRecord(
+                            "e" + index.toString(16).padStart(63, '0'),
+                            index.toULong(),
+                            "fixture older row $index",
+                        )
+                    }
             } else {
                 listOf(a)
             }
@@ -436,7 +456,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         var mounted by mutableStateOf(true)
         var paintStaleControl by mutableStateOf(false)
         var staleRows: List<TimelineMessage> = emptyList()
-        val preDraws = java.util.concurrent.atomic.AtomicInteger()
+        val preDraws = AtomicInteger()
         var keyboard: androidx.compose.ui.platform.SoftwareKeyboardController? = null
         val recording = AtomicBoolean()
         val initialDrawObserved = AtomicBoolean()
@@ -450,7 +470,10 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             get() = controller.timeline.any { it.record.messageIdHex == ConversationTimelineTestIds.MESSAGE_B }
 
         /** Times actual production pre-draw decisions, separate from lifecycle and first-content draw. */
-        fun observeGate(blocked: Boolean, atUptimeMs: Long) {
+        fun observeGate(
+            blocked: Boolean,
+            atUptimeMs: Long,
+        ) {
             if (!recording.get()) return
             if (blocked && firstBlockedAt == null) firstBlockedAt = atUptimeMs
             if (!blocked && firstBlockedAt != null && gateReleasedAt == null) gateReleasedAt = atUptimeMs
