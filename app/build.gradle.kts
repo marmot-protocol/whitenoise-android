@@ -1139,6 +1139,8 @@ dependencies {
             configuration = "devZapstoreReleaseBaselineProfile",
         ),
     )
+    // EXIF privacy fixtures retain this test-only dependency after ML Kit runtime removal.
+    testImplementation("androidx.exifinterface:exifinterface:1.4.2")
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp)
