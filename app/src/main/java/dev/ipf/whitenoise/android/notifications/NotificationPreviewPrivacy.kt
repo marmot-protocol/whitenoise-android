@@ -8,11 +8,18 @@ import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import dev.ipf.whitenoise.android.R
 
-/** Rebuilds generic OS cards from allowlisted routing fields, never from a recovered rich builder. */
+/**
+ * Rebuilds generic OS cards from allowlisted routing fields, never from a recovered rich builder.
+ *
+ * Alerting carries over from [original] as two separate facts. `FLAG_ONLY_ALERT_ONCE` is copied as it is, and
+ * [silent] defaults to whether the original was built silent, so a rewrite of a live card that kept its
+ * heads-up eligibility keeps it too. An explicit `silent = true` also silences the card's group alerting, which
+ * only a rewrite that must not alert at all, such as the preview-toggle scrub, should ask for.
+ */
 internal fun notificationWithoutPreview(
     context: Context,
     original: Notification,
-    silent: Boolean = original.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0,
+    silent: Boolean = original.wasBuiltSilent(),
     shortcut: ShortcutInfoCompat? = null,
 ): Notification {
     val builder =
@@ -34,7 +41,7 @@ internal fun notificationWithoutPreview(
             .setGroupAlertBehavior(original.groupAlertBehavior)
             .setSortKey(original.sortKey)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .setOnlyAlertOnce(silent)
+            .setOnlyAlertOnce(silent || original.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
             .setSilent(silent)
             .setAllowSystemGeneratedContextualActions(false)
             .addExtras(previewRoutingExtras(original))

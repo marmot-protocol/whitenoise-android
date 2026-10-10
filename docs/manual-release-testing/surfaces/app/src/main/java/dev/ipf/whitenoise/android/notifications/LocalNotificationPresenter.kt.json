@@ -62,6 +62,23 @@
           "NTF-008",
           "NTF-011"
         ]
+      },
+      {
+        "surface": "same-key quiet writes keep a live card's heads-up eligibility and rank",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private fun NotificationCompat.Builder.settledForWrite(",
+        "test_ids": [
+          "NTF-035"
+        ]
+      },
+      {
+        "surface": "expanded single-message text yields to the conversation template while previews are hidden",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "redactContent || !previewToken.allowed",
+        "test_ids": [
+          "NTF-030",
+          "NTF-036"
+        ]
       }
     ],
     "source_coverage": [
@@ -73,7 +90,9 @@
           "NTF-006",
           "NTF-007",
           "NTF-008",
-          "NTF-011"
+          "NTF-011",
+          "NTF-035",
+          "NTF-036"
         ]
       }
     ]

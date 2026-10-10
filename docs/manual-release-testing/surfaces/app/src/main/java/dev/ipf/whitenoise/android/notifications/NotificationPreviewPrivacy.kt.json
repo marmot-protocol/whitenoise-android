@@ -1,0 +1,42 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+  "legacy_sha256": "fd0864be3540eed3e1e14c10799014874b27273334abee10afaf0b8d9eaa4f3e",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "Generic notification preview title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Safe generic notification Mark as read action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Notification preview privacy payload",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "hidden-preview rewrite keeps a live card's heads-up eligibility and alerting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "internal fun notificationWithoutPreview(",
+        "test_ids": [
+          "NTF-030",
+          "NTF-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

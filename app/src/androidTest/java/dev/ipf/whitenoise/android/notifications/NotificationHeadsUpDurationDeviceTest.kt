@@ -14,15 +14,11 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.os.Trace
 import android.service.notification.NotificationListenerService
-import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
-import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -36,7 +32,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Records a synthetic initial-only/avatar-enrichment pair for external heads-up frame review.
+ * Records a synthetic first post and one same-key write for external heads-up frame review.
+ *
+ * Arms: `initial_only` makes no second write, `enrich_same_key` releases deferred avatar enrichment,
+ * `second_message` adds a message to the live card inside the burst window, `late_correction` replaces the
+ * message text silently, and `invite_refresh` rewrites an invite's sender identity. Every second write must
+ * reach the platform as an update that keeps the first card's group alert behavior and rank.
  *
  * The default target is a disposable API 30 emulator. Physical API 37 runs require
  * a separate explicit opt-in and the isolated local preview package. Listener
@@ -60,7 +61,7 @@ class NotificationHeadsUpDurationDeviceTest {
             arguments.getString(ARG_ALLOW_HEADS_UP_PROBE) == "true",
         )
         assumeTrue(
-            "Select initial_only or enrich_same_key",
+            "Select one of $CONTROLLED_ENRICHMENT_MODES",
             arguments.getString(ARG_CONTROLLED_ENRICHMENT) in CONTROLLED_ENRICHMENT_MODES,
         )
         requireSupportedTarget()
@@ -113,12 +114,12 @@ class NotificationHeadsUpDurationDeviceTest {
         }
     }
 
-    /** Records the same initial hold and observation window in both independently selected modes. */
+    /** Records the same initial hold and observation window in every independently selected arm. */
     @Test
     fun controlledEnrichmentTimelineForExternalCapture() {
         val mode = checkNotNull(arguments.getString(ARG_CONTROLLED_ENRICHMENT))
-        val update = update()
-        val target = LocalNotificationFormatter.conversationDismissalKey(update.accountRef, update.groupIdHex)
+        val update = if (mode == MODE_INVITE_REFRESH) inviteUpdate() else update()
+        val target = LocalNotificationFormatter.notificationDismissalKey(update)
         NotificationTimingDeviceEvents.arm(context.packageName, target.tag, target.id)
         val probe = HeadsUpProbeState()
         val presenter = presenter(probe)
@@ -133,15 +134,15 @@ class NotificationHeadsUpDurationDeviceTest {
             Thread.sleep(CONTROLLED_ENRICHMENT_DELAY_MS)
             instrumentation.sendStatus(0, controlledPhaseStatus("intervention", firstPost.key))
             val secondPost =
-                if (mode == "enrich_same_key") {
-                    runBlocking { checkNotNull(probe.pendingEnrichment).invoke() }
-                    requireFrameworkPost().also { assertDeliveryContract(probe, target, firstPost, it) }
-                } else {
+                if (mode == MODE_INITIAL_ONLY) {
                     null
+                } else {
+                    performSameKeyWrite(mode, presenter, probe, update)
+                    requireFrameworkPost().also { assertDeliveryContract(probe, target, firstPost, it) }
                 }
             val observationMs = observationWindowMillis()
             val naturalRemoval = NotificationTimingDeviceEvents.awaitRemoval(observationMs)
-            assertEquals(if (mode == "enrich_same_key") 2 else 1, probe.appPosts.size)
+            assertEquals(if (mode == MODE_INITIAL_ONLY) 1 else 2, probe.appPosts.size)
             assertTrue(
                 context.getSystemService(NotificationManager::class.java).activeNotifications.any {
                     it.key == firstPost.key
@@ -163,6 +164,48 @@ class NotificationHeadsUpDurationDeviceTest {
         } finally {
             NotificationManagerCompat.from(context).cancel(target.tag, target.id)
         }
+    }
+
+    /** Performs the one same-key write the selected arm exercises, after the initial banner has been held. */
+    private fun performSameKeyWrite(
+        mode: String,
+        presenter: LocalNotificationPresenter,
+        probe: HeadsUpProbeState,
+        update: NotificationUpdateFfi,
+    ) {
+        when (mode) {
+            MODE_ENRICH_SAME_KEY -> runBlocking { probe.postProbe.enrichment.releaseAll() }
+            MODE_SECOND_MESSAGE ->
+                show(presenter, update.copy(messageIdHex = "${update.messageIdHex}-second"), "Second probe message")
+            MODE_LATE_CORRECTION ->
+                show(presenter, update, "Corrected probe message", silentUpdate = true, replaceCurrentMessage = true)
+            MODE_INVITE_REFRESH ->
+                show(presenter, update, previewText = null, senderName = "Resolved probe sender", silentUpdate = true)
+            else -> error("Unknown heads-up arm $mode")
+        }
+    }
+
+    /** Shows one synthetic update and requires that a card was written. */
+    private fun show(
+        presenter: LocalNotificationPresenter,
+        update: NotificationUpdateFfi,
+        previewText: String?,
+        senderName: String? = null,
+        silentUpdate: Boolean = false,
+        replaceCurrentMessage: Boolean = false,
+    ) {
+        assertTrue(
+            runBlocking {
+                presenter.show(
+                    update = update,
+                    previewTextOverride = previewText,
+                    senderNameOverride = senderName,
+                    silentUpdate = silentUpdate,
+                    replaceCurrentMessage = replaceCurrentMessage,
+                    shortNpub = { "npub1timing" },
+                )
+            },
+        )
     }
 
     /** Posts identical synthetic content while keeping optional enrichment explicitly gated. */
@@ -192,7 +235,14 @@ class NotificationHeadsUpDurationDeviceTest {
             notificationPoster = { manager, tag, id, notification ->
                 Trace.beginSection("WN heads-up app notify")
                 try {
-                    probe.appPosts += AppNotificationPost(tag, id, notification, SystemClock.elapsedRealtimeNanos())
+                    probe.appPosts +=
+                        AppNotificationPost(
+                            tag,
+                            id,
+                            notification,
+                            SystemClock.elapsedRealtimeNanos(),
+                            probe.postProbe.record(tag, id, notification),
+                        )
                     manager.notify(tag, id, notification)
                 } finally {
                     Trace.endSection()
@@ -200,11 +250,14 @@ class NotificationHeadsUpDurationDeviceTest {
             },
             cachedAvatarBitmap = { null },
             avatarBitmapResolver = { url -> if (url == null) null else avatar },
-            enrichmentLauncher = { probe.pendingEnrichment = it },
+            enrichmentLauncher = probe.postProbe.enrichmentLauncher,
         )
     }
 
-    /** Requires one stable card and suppresses repeat alerts while preserving callback ordering. */
+    /**
+     * Requires one stable card that suppresses repeat alerts without leaving its alerting group or rank,
+     * since SystemUI withdraws a showing banner when an update stops being heads-up eligible.
+     */
     private fun assertDeliveryContract(
         probe: HeadsUpProbeState,
         target: NotificationDismissalKey,
@@ -218,6 +271,14 @@ class NotificationHeadsUpDurationDeviceTest {
         assertEquals(probe.appPosts[0].id, probe.appPosts[1].id)
         assertEquals(0, probe.appPosts[0].notification.flags and Notification.FLAG_ONLY_ALERT_ONCE)
         assertTrue(probe.appPosts[1].notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        val (initial, update) = probe.appPosts.map { it.recorded }
+        assertFalse("The first post must not be silenced", initial.silent)
+        assertFalse("A write over the live card must not be silenced", update.silent)
+        assertEquals(initial.groupAlertBehavior, update.groupAlertBehavior)
+        assertEquals(initial.sortKey, update.sortKey)
+        assertEquals(initial.group, update.group)
+        assertEquals(initial.channelId, update.channelId)
+        assertTrue(update.carriesNoPerPostSoundOrVibration)
         assertTrue(firstPost.elapsedRealtimeNanos >= probe.appPosts[0].elapsedRealtimeNanos)
         assertTrue(secondPost.elapsedRealtimeNanos >= probe.appPosts[1].elapsedRealtimeNanos)
         assertEquals(firstPost.key, secondPost.key)
@@ -254,25 +315,28 @@ class NotificationHeadsUpDurationDeviceTest {
     /** Builds an isolated synthetic group whose identifiers are safe to export as diagnostics. */
     private fun update(): NotificationUpdateFfi {
         val runToken = SystemClock.elapsedRealtimeNanos().toString(radix = 16)
-        return NotificationUpdateFfi(
+        return notificationUpdate(
             notificationKey = "heads-up-device-test-$runToken",
             conversationKey = "heads-up-conversation-$runToken",
-            trigger = NotificationTriggerFfi.NEW_MESSAGE,
-            trafficClass = NotificationTrafficClassFfi.STANDARD,
             accountRef = "heads-up-account",
-            accountIdHex = "heads-up-account",
             groupIdHex = runToken,
             groupName = "Heads-up group",
-            isDm = false,
-            isMention = false,
             messageIdHex = runToken,
-            sender = NotificationUserFfi("heads-up-sender", "Heads-up sender", null),
-            receiver = NotificationUserFfi("heads-up-receiver", "Heads-up receiver", null),
+            sender = notificationUser("heads-up-sender", "Heads-up sender"),
+            receiver = notificationUser("heads-up-receiver", "Heads-up receiver"),
             previewText = "Notification timing probe",
-            reactionEmoji = null,
-            reactedToPreview = null,
             timestampMs = System.currentTimeMillis(),
-            isFromSelf = false,
+        )
+    }
+
+    /** Builds an isolated synthetic group invite, keyed by the invite so its card has its own opaque tag. */
+    private fun inviteUpdate(): NotificationUpdateFfi {
+        val runToken = SystemClock.elapsedRealtimeNanos().toString(radix = 16)
+        return groupInviteUpdate(
+            accountRef = "heads-up-account",
+            groupIdHex = runToken,
+            notificationKey = "heads-up-invite-$runToken",
+            sender = notificationUser("heads-up-sender", null),
         )
     }
 
@@ -288,7 +352,19 @@ class NotificationHeadsUpDurationDeviceTest {
         const val ARG_OBSERVATION_WINDOW_MS = "headsUpObservationMs"
         const val ARG_CONTROLLED_ENRICHMENT = "headsUpControlledEnrichment"
         const val ISOLATED_PACKAGE = "dev.ipf.whitenoise.android.preview.prlocal"
-        val CONTROLLED_ENRICHMENT_MODES = setOf("initial_only", "enrich_same_key")
+        const val MODE_INITIAL_ONLY = "initial_only"
+        const val MODE_ENRICH_SAME_KEY = "enrich_same_key"
+        const val MODE_SECOND_MESSAGE = "second_message"
+        const val MODE_LATE_CORRECTION = "late_correction"
+        const val MODE_INVITE_REFRESH = "invite_refresh"
+        val CONTROLLED_ENRICHMENT_MODES =
+            setOf(
+                MODE_INITIAL_ONLY,
+                MODE_ENRICH_SAME_KEY,
+                MODE_SECOND_MESSAGE,
+                MODE_LATE_CORRECTION,
+                MODE_INVITE_REFRESH,
+            )
 
         /** Allows Android 11's ten-second rebind delay after instrumentation restarts a bound listener. */
         const val LISTENER_CONNECT_TIMEOUT_MS = 15_000L
@@ -338,10 +414,10 @@ private fun HeadsUpProbeState.controlledEvidenceStatus(
         putLong("second_app_notify_elapsed_ns", appPosts.getOrNull(1)?.elapsedRealtimeNanos ?: -1L)
         putLong("first_listener_post_elapsed_ns", firstPost.elapsedRealtimeNanos)
         putLong("second_listener_post_elapsed_ns", secondPost?.elapsedRealtimeNanos ?: -1L)
-        putBoolean(
-            "second_post_uses_silent_group",
-            appPosts.getOrNull(1)?.notification?.group == NotificationCompat.GROUP_KEY_SILENT,
-        )
+        putInt("first_post_group_alert_behavior", appPosts.first().recorded.groupAlertBehavior)
+        putInt("second_post_group_alert_behavior", appPosts.getOrNull(1)?.recorded?.groupAlertBehavior ?: -1)
+        putString("first_post_sort_key", appPosts.first().recorded.sortKey)
+        putString("second_post_sort_key", appPosts.getOrNull(1)?.recorded?.sortKey)
         putLong("controlled_initial_hold_ms", 1_500L)
         putLong("controlled_observation_ms", observationMs)
         putLong("app_cleanup_cancel_elapsed_ns", cleanup.appCancelNanos)
@@ -350,16 +426,19 @@ private fun HeadsUpProbeState.controlledEvidenceStatus(
         putString("measurement_scope", "Controlled app timeline; visible duration requires external frame review")
     }
 
+/** One observed app write with its monotonic time and the flags the platform will see. */
 private data class AppNotificationPost(
     val tag: String,
     val id: Int,
     val notification: Notification,
     val elapsedRealtimeNanos: Long,
+    val recorded: RecordedPost,
 )
 
+/** Observed app writes plus the shared probe that records their alert flags and gates enrichment. */
 private class HeadsUpProbeState {
     val appPosts = mutableListOf<AppNotificationPost>()
-    var pendingEnrichment: (suspend () -> Unit)? = null
+    val postProbe = PostProbe(deliver = false)
 }
 
 private data class CleanupObservation(

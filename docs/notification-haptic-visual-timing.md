@@ -82,18 +82,48 @@ fixture below with this production AppState behavior.
 ## Heads-up dwell evidence (#2412)
 
 `NotificationHeadsUpDurationDeviceTest#controlledEnrichmentTimelineForExternalCapture`
-records matched `initial_only` and `enrich_same_key` runs. Both use the same
-synthetic initial card and a 1,500 ms hold; only the latter releases deferred
-avatar enrichment. Each then leaves the card untouched for eight seconds,
-requires the shade card to remain active, and cancels only its exact synthetic
-target. App notify, exact package/tag/id listener callbacks, and explicit cleanup
-times are reported separately. `FLAG_ONLY_ALERT_ONCE` is asserted for enrichment.
+records one arm per run, selected with `headsUpControlledEnrichment`:
 
-An avatar update preserves the active card's channel and grouping while avoiding
-a repeat alert. AndroidX `setSilent(true)` can change an ungrouped notification
-into its silent group; this is distinct from updating the same notification
-with `setOnlyAlertOnce(true)`. The fixture reports the resulting group choice,
-but only actual SystemUI frames establish whether the banner stayed visible.
+| Arm | Second write |
+| --- | --- |
+| `initial_only` | none, the control |
+| `enrich_same_key` | deferred avatar enrichment released |
+| `second_message` | a second message to the live card inside the burst window |
+| `late_correction` | silent replacement of the message text |
+| `invite_refresh` | silent rewrite of an invite's sender identity |
+
+All arms use the same synthetic initial card and a 1,500 ms hold. Each then leaves
+the card untouched for eight seconds, requires the shade card to remain active, and
+cancels only its exact synthetic target. App notify, exact package/tag/id listener
+callbacks, and explicit cleanup times are reported separately. For every second
+write the test asserts `FLAG_ONLY_ALERT_ONCE`, that the write is not silenced, and
+that its channel, group, group alert behavior and sort key equal the first post's.
+The reported fields are `first_post_group_alert_behavior`,
+`second_post_group_alert_behavior`, `first_post_sort_key` and `second_post_sort_key`.
+
+### Why a same-key write must not use `setSilent`
+
+AndroidX applies `setSilent(true)` when a card builds. A card with no group key
+joins the `silent` group, and a non-summary child with a group key is moved to
+`GROUP_ALERT_SUMMARY`, so `Notification.suppressAlertingDueToGrouping()` becomes
+true for it. The platform treats that card as not alerting: SystemUI's heads-up
+coordinator evaluates an update that is no longer heads-up eligible by removing
+the banner still showing for the key, after the minimum display time. This was
+read from AndroidX 1.19.1 bytecode (`NotificationCompatBuilder`) and the AOSP
+`main` sources (`Notification`, `NotificationInterruptStateProviderImpl`,
+`HeadsUpCoordinator`, `NotificationAttentionHelper`); it has not been captured on a
+device, so only SystemUI frames establish that a banner stayed visible.
+
+`setOnlyAlertOnce(true)` alone already mutes sound, vibration and a repeat banner
+for an update of a posted card, and it leaves group alerting untouched. The
+presenter therefore reads the live same-key card at the final write, under the card
+lock, and sets only that flag, copying the live sort key. Without a live card the
+platform has nothing to treat as an update, so the write keeps `setSilent` and a
+card the user swiped away cannot ring a second time. A live card that was itself
+built silent never showed a banner, so a later quiet write keeps it silent. The
+preview-toggle scrub and legacy card adoption still request `silent = true`. A
+swipe that lands between the live read and the platform post can still let one
+`FLAG_ONLY_ALERT_ONCE` write ring, a window of milliseconds that no flag choice closes.
 
 ### Safe targets
 
@@ -145,7 +175,7 @@ Record the exact device/build, channel importance, DND, accessibility timeout,
 installed hashes, and prior permission/listener state. Start a bounded external
 recording before the first synthetic post; verify encoder readiness and coverage
 of the initial banner, intervention and complete observation window. For each
-mode, invoke only the selected method with:
+arm, invoke only the selected method with:
 
 ```text
 -e class dev.ipf.whitenoise.android.notifications.NotificationHeadsUpDurationDeviceTest#controlledEnrichmentTimelineForExternalCapture
@@ -154,7 +184,7 @@ mode, invoke only the selected method with:
 -e headsUpObservationMs 8000
 ```
 
-Repeat with `enrich_same_key` on the same APKs/settings. Add the physical opt-in
+Repeat with each other arm on the same APKs/settings. Add the physical opt-in
 only for the verified isolated physical target. The instrumentation runner is
 `<verified-test-package>/androidx.test.runner.AndroidJUnitRunner`. Use a unique
 artifact prefix for each arm; verify installed hashes and restored permissions
@@ -164,7 +194,7 @@ notification content from any shared evidence.
 The test deliberately ends with an assumption status after its real lifecycle
 assertions. This means **external pixel review required**, not an automated
 duration pass. An instrumentation exit code or listener callback alone is not
-pixel evidence. Inspect timestamped original frames in both arms. Report sampled
+pixel evidence. Inspect timestamped original frames in each arm and its `initial_only` control. Report sampled
 intervals and any missing coverage honestly; a screenrecord without audio does
 not establish sound or physical haptic suppression. Use an external recording
 and appropriate platform traces when assessing those boundaries.
@@ -191,6 +221,29 @@ ongoing notifications, full-screen intents, or app-owned vibration. Relevant
 primary contracts are [notification updates][android-updates],
 [AndroidX silent behavior][androidx-silent], and
 [notification-listener collection removal][listener-removal].
+
+## Long message expansion (#1901)
+
+A first message with no carried history posts as the standard expandable text block
+once its body reaches `MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS` Unicode code points.
+Shorter bodies, and every card that carries an earlier message, use the conversation
+template. The text block is a single block of text and cannot hold separate earlier
+messages, so a long newest message behind carried history shows as many lines as
+Android gives the conversation template. That is a platform limit that this change
+documents and does not work around: folding history into the text block would need new
+extras and edges toward a second copy of the message state, and the other standard
+inbox template ellipsizes each line. A body is still cut at 1,000 code points either way.
+
+The threshold is a conservative starting value and not a measured one. The text block
+carries no sender or conversation icon and Android classifies a conversation by its
+conversation template, so the value is kept well above zero. Hidden previews and app
+lock never use the text block, because their generic rewrite is a conversation card
+that keeps the conversation classification and its Do Not Disturb exceptions.
+
+Confirm or retune the threshold with before and after shade captures: one long DM, one
+long group message and a long newest message behind a carried message, each collapsed and
+expanded at default and large font, naming the Android version and device and counting the
+visible lines. Record any truncation Android applies as a platform limit.
 
 [android-updates]: https://developer.android.com/develop/ui/compose/notifications/create-notification#Updating
 [androidx-silent]: https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-main/core/core/src/main/java/androidx/core/app/NotificationCompat.java
