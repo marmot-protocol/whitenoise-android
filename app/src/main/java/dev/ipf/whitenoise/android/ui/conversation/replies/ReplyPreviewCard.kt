@@ -25,7 +25,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
@@ -90,6 +95,7 @@ internal fun ReplyPreviewCard(
     accentColor: Color? = null,
     secondaryColor: Color? = null,
     receivedEmoji: ReceivedEmoji = ReceivedEmoji.None,
+    appState: WhiteNoiseAppState? = null,
 ) {
     val title =
         when {
@@ -143,6 +149,17 @@ internal fun ReplyPreviewCard(
         remember(body, mediaLabel, mentionDisplayName) {
             mediaLabel ?: resolveMentionsInPlaintext(body, mentionDisplayName)
         }
+    var bodyDocument by remember(body, appState, appState?.activeAccount?.accountIdHex) {
+        mutableStateOf<dev.ipf.marmotkit.MarkdownDocumentFfi?>(null)
+    }
+    LaunchedEffect(body, mediaLabel, appState, appState?.activeAccount?.accountIdHex) {
+        bodyDocument = if (mediaLabel == null) appState?.parseMarkdownOrEmpty(body) else null
+    }
+    val projectedBody =
+        bodyDocument?.takeIf { it.blocks.isNotEmpty() }?.let {
+            dev.ipf.whitenoise.android.ui
+                .rememberMarkdownPreviewText(it, mentionDisplayName)
+        } ?: remember(bodyText) { EmojiShortcodes.annotate(AnnotatedString(bodyText)) }
     val resolvedAccentColor =
         accentColor
             ?: if (isOwn) {
@@ -204,11 +221,10 @@ internal fun ReplyPreviewCard(
                                 tint = resolvedContentColor,
                             )
                         }
-                        Text(
-                            remember(bodyText) { EmojiShortcodes.annotate(AnnotatedString(bodyText)) },
+                        dev.ipf.whitenoise.android.ui.MarkdownTimestampText(
+                            projectedBody,
                             inlineContent = EmojiShortcodes.content(receivedEmoji),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = resolvedContentColor,
+                            style = MaterialTheme.typography.bodySmall.copy(color = resolvedContentColor),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )

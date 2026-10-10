@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,7 +65,17 @@ internal fun focusedMessagePreviewText(
                     ?.style
                     ?.let { style -> AnnotatedString.Range(style, range.start, range.end) }
             }
-        EmojiShortcodes.annotate(AnnotatedString(styled.text, styled.spanStyles + inertLinkStyles))
+        EmojiShortcodes.annotate(
+            buildAnnotatedString {
+                append(styled.text)
+                (styled.spanStyles + inertLinkStyles).forEach { addStyle(it.item, it.start, it.end) }
+                styled
+                    .getStringAnnotations(
+                        0,
+                        styled.length,
+                    ).forEach { addStringAnnotation(it.tag, it.item, it.start, it.end) }
+            },
+        )
     } else {
         // Multi-block excerpts follow the prototype's plain-text projection, preserving block separation.
         val text =
@@ -116,8 +125,23 @@ internal fun FocusedTextMessagePreview(
     mentionedYouLabel: String = "",
     footerContent: (@Composable () -> Unit)? = null,
 ) {
+    val timestampRevision =
+        dev.ipf.whitenoise.android.ui.rememberTimestampRevision(
+            remember(document) {
+                document?.let {
+                    dev.ipf.whitenoise.android.ui
+                        .markdownDocumentHasTimestamp(it)
+                } == true
+            },
+            remember(document) {
+                document?.let {
+                    dev.ipf.whitenoise.android.ui
+                        .markdownDocumentHasTimestamp(it, relativeOnly = true)
+                } == true
+            },
+        )
     val excerpt =
-        remember(text, document, mentionDisplayName, isGroupMember) {
+        remember(text, document, mentionDisplayName, isGroupMember, timestampRevision) {
             focusedMessagePreviewText(text, document, mentionDisplayName, isGroupMember)
         }
     var lastLineWidth by remember(excerpt) { mutableStateOf<Int?>(null) }
@@ -142,9 +166,8 @@ internal fun FocusedTextMessagePreview(
             lastLineBaseline = lastLineBaseline.takeIf { warning == null },
         ) {
             Column {
-                Text(
+                dev.ipf.whitenoise.android.ui.MarkdownTimestampText(
                     text = excerpt,
-                    inlineContent = EmojiShortcodes.content(),
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
                     overflow = TextOverflow.Ellipsis,

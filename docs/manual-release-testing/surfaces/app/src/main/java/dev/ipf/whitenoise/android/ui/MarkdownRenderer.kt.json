@@ -96,7 +96,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "fun MarkdownMessageBody(",
         "test_ids": [
-          "RDR-001"
+          "RDR-001",
+          "MSG-002"
         ]
       },
       {
@@ -134,7 +135,7 @@
     ],
     "source_coverage": [
       {
-        "surface": "Markdown message body retains typed timestamp content during native snapshot adoption",
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "MarkdownMessageBody",
         "test_ids": [
