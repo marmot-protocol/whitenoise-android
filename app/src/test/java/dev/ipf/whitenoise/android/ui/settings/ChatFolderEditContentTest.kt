@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Surface
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -22,6 +23,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatFolderSort
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +38,29 @@ class ChatFolderEditContentTest {
     val composeRule = createComposeRule()
 
     private val app = ApplicationProvider.getApplicationContext<Context>()
+
+    /** Core configuration is visible before secondary display preferences. */
+    @Test fun membershipAndPreviewPrecedeDisplayPreferences() {
+        render(state = editState(name = "Work"))
+        composeRule.onNodeWithTag("folder.name").assertExists()
+        val content = composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+        val positions =
+            listOf("folder.includedChats", "folder.preview", "folder.showWhenEmpty").map { tag ->
+                content.performScrollToNode(hasTestTag(tag))
+                val scroll = content.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+                val top =
+                    composeRule
+                        .onNodeWithTag(tag)
+                        .fetchSemanticsNode()
+                        .boundsInRoot.top
+                scroll to top
+            }
+        assertTrue(
+            positions.zipWithNext().all { (earlier, later) ->
+                earlier.first < later.first || (earlier.first == later.first && earlier.second < later.second)
+            },
+        )
+    }
 
     /** Every sort mode is reachable and the default Chats all-active rule remains editable. */
     @Test fun sortingAndAllActiveControlsRouteEdits() {
