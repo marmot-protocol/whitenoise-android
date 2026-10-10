@@ -2,6 +2,15 @@
   "base_revision": "d2417ce5c7c6a3cb1512d3a1037487e931be83e7",
   "categories": {
     "composable_surfaces": [
+      {"surface": "Event body image discovery", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventBodyImages.kt", "anchor": "fun nostrEventImageCandidates(", "test_ids": ["RDR-004", "RDR-005"]},
+      {"surface": "Card body images from native parsed content", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventPreviewText.kt", "anchor": "boundedNostrImageBody(loaded.readerBody)", "test_ids": ["RDR-004", "RDR-005"]},
+      {"surface": "Reader image discovery from the existing native document", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrReaderPreparation.kt", "anchor": "nostrEventImageCandidates(card.imageUrls, document)", "test_ids": ["RDR-004"]},
+      {"surface": "NostrImageLayout", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt", "anchor": "fun NostrImageLayout(", "test_ids": ["RDR-004", "RDR-005"]},
+      {"surface": "NostrImageViewport", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt", "anchor": "fun NostrImageViewport(", "test_ids": ["RDR-004", "RDR-005"]},
+      {"surface": "NostrImageAction", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt", "anchor": "fun NostrImageAction(", "test_ids": ["RDR-004", "RDR-005"]},
+      {"surface": "Compact event image loading", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt", "anchor": "NostrEventImagePane(url = url, compact = true)", "test_ids": ["RDR-004", "RDR-005"]},
+      {"surface": "Stable referenced event envelope", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt", "anchor": "nostrEventPreviewHeight()", "test_ids": ["RDR-005"]},
+      {"surface": "Explicit image viewport and action", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt", "anchor": "fun NostrEventImagePane(", "test_ids": ["RDR-004", "RDR-005"]},
       {"surface": "Kept media label: attachment_type_audio", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt", "anchor": "R.string.attachment_type_audio", "test_ids": ["MSG-004"]},
       {"surface": "Kept media label: attachment_type_file", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt", "anchor": "R.string.attachment_type_file", "test_ids": ["MSG-004"]},
       {"surface": "Kept media label: attachment_type_image", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt", "anchor": "R.string.attachment_type_image", "test_ids": ["MSG-004"]},

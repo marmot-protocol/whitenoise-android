@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -35,6 +36,34 @@ import org.robolectric.annotation.Config
 class NostrEventReaderTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun readerDiscoversBodyImagesWithoutAnInitialPublicImageFetch() {
+        val downloads = java.util.concurrent.atomic.AtomicInteger()
+        AvatarImageLoader.attachProfileImageFetcher { _, _ -> downloads.incrementAndGet(); byteArrayOf() }
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    NostrEventReaderScreen(
+                        card = noteCard().copy(imageUrls = emptyList()),
+                        document = bodyImageDocument(),
+                        parsing = false,
+                        authorDisplayName = { "Alex" },
+                        mentionDisplayName = { null },
+                        onNostrProfileTap = {},
+                        onDismiss = {},
+                    )
+                }
+            }
+            composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(
+                hasText(string(R.string.nostr_event_view_image)),
+            )
+            composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).assertIsDisplayed()
+            composeRule.runOnIdle { assertEquals(0, downloads.get()) }
+        } finally {
+            AvatarImageLoader.resetProfileImageFetcherForTests()
+        }
+    }
 
     @Test
     fun parserFailureKeepsTheCompleteBodyInTheReader() {
@@ -278,6 +307,22 @@ class NostrEventReaderTest {
                     paragraph(MarkdownInlineFfi.Text(LONG_MIDDLE)),
                     paragraph(MarkdownInlineFfi.Text("The final paragraph is visible too.")),
                 ),
+            truncated = false,
+            blankLinesBefore = byteArrayOf(),
+        )
+
+    private fun bodyImageDocument() =
+        MarkdownDocumentFfi(
+            blocks = listOf(
+                paragraph(
+                    MarkdownInlineFfi.Image(
+                        dest = "https://images.example/reader-body",
+                        title = null,
+                        alt = listOf(MarkdownInlineFfi.Text("Photo caption")),
+                        classification = MarkdownLinkDestinationKindFfi.WEB,
+                    ),
+                ),
+            ),
             truncated = false,
             blankLinesBefore = byteArrayOf(),
         )

@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,11 +37,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
@@ -167,20 +170,24 @@ internal fun NostrEventCard(
         contentColor = contentColor,
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, contentColor.copy(alpha = 0.22f)),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag(NOSTR_EVENT_CARD_BOUNDS_TAG),
     ) {
-        EventCardBody(
-            state = state,
-            authorDisplayName = authorDisplayName,
-            referenceLabel = referenceLabel,
-            contentColor = contentColor,
-            copyDescription = copyDescription,
-            openDescription = openDescription,
-            onRetry = onRetry,
-            onCopy = onCopy,
-            onOpen = onOpen,
-            onReadNote = onReadNote,
-        )
+        // A reference's kind and image dimensions are unknown until resolution.
+        // Reserve the same bounded reading space for every state and enrichment.
+        Box(Modifier.fillMaxWidth().height(nostrEventPreviewHeight())) {
+            EventCardBody(
+                state = state,
+                authorDisplayName = authorDisplayName,
+                referenceLabel = referenceLabel,
+                contentColor = contentColor,
+                copyDescription = copyDescription,
+                openDescription = openDescription,
+                onRetry = onRetry,
+                onCopy = onCopy,
+                onOpen = onOpen,
+                onReadNote = onReadNote,
+            )
+        }
     }
 }
 
@@ -299,6 +306,22 @@ private fun LoadedEventCard(
         )
         LoadedEventMetadata(card.metadata, contentColor)
         EventReferenceLabel(referenceLabel, contentColor)
+        card.imageUrls.firstOrNull()?.let { url ->
+            NostrEventImagePane(url = url, compact = true)
+        }
+    }
+}
+
+/** Fixed typography and image slots; content and resolved kind never determine the envelope. */
+@Composable
+internal fun nostrEventPreviewHeight(): Dp {
+    val typography = MaterialTheme.typography
+    return with(LocalDensity.current) {
+        val header = maxOf(48.dp, typography.labelLarge.lineHeight.toDp() + typography.labelSmall.lineHeight.toDp() + 2.dp)
+        val title = typography.titleSmall.lineHeight.toDp() * 2
+        val summary = maxOf(48.dp, typography.bodyMedium.lineHeight.toDp() * 3)
+        val metadataAndReference = typography.labelSmall.lineHeight.toDp() * 3
+        header + title + summary + metadataAndReference + 96.dp + 26.dp + 16.dp * fontScale.coerceAtLeast(1f)
     }
 }
 
@@ -430,6 +453,7 @@ internal fun compactEventReference(authoredReference: String): String {
 }
 
 internal const val NOSTR_NOTE_PREVIEW_ACTION_TAG = "nostr-note-preview-action"
+internal const val NOSTR_EVENT_CARD_BOUNDS_TAG = "nostr-event-card-bounds"
 
 private const val MAX_CARDS_PER_MESSAGE = 3
 private const val COMPACT_REFERENCE_LENGTH = 28
