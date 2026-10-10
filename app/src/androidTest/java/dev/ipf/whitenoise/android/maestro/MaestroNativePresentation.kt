@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 internal fun MaestroNativePresentation(fixture: MaestroPresentationFixture) {
     when {
         fixture.scenario.startsWith("extra-native-viewer-") -> MaestroNativeViewerPresentation(fixture)
+        fixture.scenario == "extra-native-library-menu" -> MaestroLibraryPresentation(fixture)
         fixture.scenario == "extra-native-location-cancel" ->
             LocationPickerScreen(
                 hasFineGrant = false,

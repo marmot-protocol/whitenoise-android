@@ -774,6 +774,13 @@
             "text": "Delete for me"
           },
           "scope": "Actual system-summary overflow menu verifies dismissal and delete dispatch without deleting a native event."
+        },
+        {
+          "case": "presentation-extra-message-summary-reopen",
+          "selector": {
+            "text": "Delete for me"
+          },
+          "scope": "Actual group-system summary menu opens, dismisses, reopens and dispatches its delete callback once through a compact visibility-only anchor. No native deletion is performed."
         }
       ],
       "remaining": "Additional native operations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated actual UI state and dispatch boundary."

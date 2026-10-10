@@ -2,8 +2,16 @@ package dev.ipf.whitenoise.android.maestro
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.EditState
@@ -22,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MediaFooterOverlay
 internal fun MaestroMessagePresentation(fixture: MaestroPresentationFixture) {
     when {
         fixture.scenario.startsWith("extra-message-history-") -> HistoryPresentation(fixture)
+        fixture.scenario == "extra-message-summary-reopen" -> SummaryReopenPresentation(fixture)
         fixture.scenario.startsWith("extra-message-summary-") ->
             Box(Modifier.size(48.dp)) {
                 GroupSystemSummaryMenu(
@@ -43,6 +52,26 @@ internal fun MaestroMessagePresentation(fixture: MaestroPresentationFixture) {
             Box(Modifier.size(240.dp, 160.dp)) {
                 MediaFooterOverlay(timeText = "12:34", showStatus = true, status = MessageStatus.Sent)
             }
+    }
+}
+
+/** A compact fixture anchor controls only visibility; the actual menu owns dismissal and action dispatch. */
+@Composable
+@Suppress("FunctionNaming")
+private fun SummaryReopenPresentation(fixture: MaestroPresentationFixture) {
+    var expanded by remember(fixture) { mutableStateOf(true) }
+    Box(Modifier.size(48.dp)) {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Fixture summary menu")
+        }
+        GroupSystemSummaryMenu(
+            expanded = expanded,
+            onDismiss = {
+                expanded = false
+                fixture.record("menu-dismissed")
+            },
+            onDelete = { fixture.finish("delete-handoff") },
+        )
     }
 }
 

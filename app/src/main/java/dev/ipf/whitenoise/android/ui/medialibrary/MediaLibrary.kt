@@ -953,7 +953,7 @@ private fun FileLibraryTab(
 
 /** One file row with open and save actions. */
 @Composable
-private fun FileLibraryRow(
+internal fun FileLibraryRow(
     row: SharedMediaRow,
     controller: ConversationController,
     appState: WhiteNoiseAppState,

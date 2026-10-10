@@ -6640,6 +6640,37 @@
         "dismiss"
       ],
       "layer": "production-presentation-ui"
+    },
+    "presentation-extra-native-library-menu": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-018",
+        "MED-015",
+        "SCR-001"
+      ],
+      "assertions": "Actual populated production file row opens, dismisses and reopens its Save/Share popup using generated native conversation identity. No file-row click, download, export, share or protocol mutation is requested.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-native-library-menu",
+      "presentation_actions": [
+        "dismiss"
+      ],
+      "layer": "production-presentation-ui"
+    },
+    "presentation-extra-message-summary-reopen": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-028",
+        "SCR-001"
+      ],
+      "assertions": "Actual group-system summary menu opens, dismisses, reopens and dispatches its delete callback once through a compact visibility-only anchor. No native deletion is performed.",
+      "postcondition": "presentation-checked",
+      "presentation": "extra-message-summary-reopen",
+      "presentation_actions": [
+        "menu-dismissed",
+        "menu-dismissed",
+        "delete-handoff"
+      ],
+      "layer": "production-presentation-ui"
     }
   }
 }
