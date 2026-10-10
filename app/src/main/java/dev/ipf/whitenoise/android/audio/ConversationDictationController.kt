@@ -612,8 +612,7 @@ internal class ConversationDictationController internal constructor(
     internal fun hasParkedComposerAudio(
         accountRef: String,
         groupIdHex: String,
-    ): Boolean =
-        ConversationDictationKey.from(accountRef, groupIdHex) in parkedRecoveries
+    ): Boolean = ConversationDictationKey.from(accountRef, groupIdHex) in parkedRecoveries
 
     private data class ParkedRecovery(
         val failure: ConversationDictationState.Failed,
@@ -621,6 +620,7 @@ internal class ConversationDictationController internal constructor(
         val draft: ConversationDictationDraftRecovery,
         val actionGeneration: Long,
     )
+
     private var draftTargetRemoved = false
     private var durableSessionGeneration = 0L
     private var durableSessionReady by mutableStateOf(false)
@@ -828,8 +828,8 @@ internal class ConversationDictationController internal constructor(
     private fun parkedComposerAccess(
         accountRef: String,
         groupIdHex: String,
-    ): ConversationDictationComposerAccess? {
-        return parkedRecoveries[ConversationDictationKey.from(accountRef, groupIdHex)]?.let { parked ->
+    ): ConversationDictationComposerAccess? =
+        parkedRecoveries[ConversationDictationKey.from(accountRef, groupIdHex)]?.let { parked ->
             ConversationDictationComposerAccess(
                 parked.failure.sessionId,
                 parked.actionGeneration,
@@ -837,7 +837,6 @@ internal class ConversationDictationController internal constructor(
                 parked.failure.cause ?: parked.failure.reason,
             )
         }
-    }
 
     private fun failedComposerPhase(failed: ConversationDictationState.Failed): ConversationDictationComposerPhase =
         when {
@@ -882,7 +881,8 @@ internal class ConversationDictationController internal constructor(
         if (composerRecovery(access) != null) return canRetryRetainedAudio
         if (state !is ConversationDictationState.Idle || foregroundMicrophoneRequired) return false
         return parkedRecoveries.values.any {
-            it.failure.sessionId == access.sessionId && it.actionGeneration == access.actionGeneration &&
+            it.failure.sessionId == access.sessionId &&
+                it.actionGeneration == access.actionGeneration &&
                 runCatching { targetAvailable(it.failure.target) }.getOrDefault(false)
         }
     }
@@ -904,9 +904,10 @@ internal class ConversationDictationController internal constructor(
 
     /** Only a confirmed, current receipt can discard PCM; saved composer edits are never rewritten. */
     internal fun discardComposerAudio(access: ConversationDictationComposerAccess) {
-        val parked = parkedRecoveries.entries.firstOrNull {
-            it.value.failure.sessionId == access.sessionId && it.value.actionGeneration == access.actionGeneration
-        }
+        val parked =
+            parkedRecoveries.entries.firstOrNull {
+                it.value.failure.sessionId == access.sessionId && it.value.actionGeneration == access.actionGeneration
+            }
         if (parked != null) {
             parkedRecoveries.remove(parked.key)?.audio?.discard()
             return
@@ -922,7 +923,8 @@ internal class ConversationDictationController internal constructor(
             access.sessionId == failed.sessionId && access.actionGeneration == notificationActionGeneration
         val safeToKeep =
             !foregroundMicrophoneRequired &&
-                failed.reason != ConversationDictationFailure.DeliveryUnknown && !hasUnrecoveredTranscript
+                failed.reason != ConversationDictationFailure.DeliveryUnknown &&
+                !hasUnrecoveredTranscript
         if (!ownsFailure || !safeToKeep) return false
         val key = ConversationDictationKey.from(failed.target.accountRef, failed.target.groupIdHex)
         if (!runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
@@ -944,9 +946,10 @@ internal class ConversationDictationController internal constructor(
     @Suppress("ReturnCount") // A refused restore leaves the original recording in its slot.
     private fun restoreParkedRecovery(access: ConversationDictationComposerAccess): Boolean {
         if (state !is ConversationDictationState.Idle || foregroundMicrophoneRequired) return false
-        val entry = parkedRecoveries.entries.firstOrNull {
-            it.value.failure.sessionId == access.sessionId && it.value.actionGeneration == access.actionGeneration
-        } ?: return false
+        val entry =
+            parkedRecoveries.entries.firstOrNull {
+                it.value.failure.sessionId == access.sessionId && it.value.actionGeneration == access.actionGeneration
+            } ?: return false
         val parked = entry.value
         val restored =
             runCatching { targetAvailable(parked.failure.target) && parked.audio.restore() }.getOrDefault(false)

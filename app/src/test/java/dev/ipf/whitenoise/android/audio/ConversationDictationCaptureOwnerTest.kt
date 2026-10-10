@@ -32,9 +32,12 @@ class ConversationDictationCaptureOwnerTest {
         assertTrue(buffer.hasPending)
         assertTrue(owner.acquire() === replacement)
         assertFalse(kept.restore())
-        owner.discard {}
-        await { replacement.closed }
-        shadowOf(Looper.getMainLooper()).idle()
+        var replacementReleased = false
+        owner.discard { replacementReleased = true }
+        await {
+            shadowOf(Looper.getMainLooper()).idle()
+            replacementReleased
+        }
         assertTrue(kept.restore())
         assertTrue(owner.acquire() === capture)
         assertFalse(kept.restore())
