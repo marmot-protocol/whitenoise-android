@@ -73,13 +73,7 @@ class PopulatedProcessDeathStartupBenchmark {
                 journeys.run { resumeToChatList() }
                 journeys.requirePopulatedLocalList(groupName)
                 previousPid = requireNotNull(targetPid()) { "The prepared fixture process is absent." }
-                pressHome()
-                // MacrobenchmarkScope.killProcess() uses force-stop. am kill instead preserves the
-                // task and stopped-package state; the PID fence rejects a foreground-service refusal.
-                device.executeShellCommand("am kill --user $fixtureUser ${BenchmarkConfig.TARGET_PACKAGE}")
-                val deadline = SystemClock.elapsedRealtime() + PROCESS_EXIT_TIMEOUT_MS
-                while (targetPid() != null && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(50L)
-                check(targetPid() == null) { "Ordinary process death did not terminate the fixture." }
+                terminateOriginalBackgroundProcess(previousPid)
             },
             measureBlock = {
                 requireOfflineFixture()
@@ -96,6 +90,21 @@ class PopulatedProcessDeathStartupBenchmark {
                 requireOfflineFixture()
             },
         )
+    }
+
+    /** Retries ordinary background kills while the observed PID remains original as Home finishes backgrounding. */
+    private fun terminateOriginalBackgroundProcess(originalPid: Int) {
+        check(device.pressHome()) { "Home did not background the prepared fixture." }
+        // MacrobenchmarkScope.killProcess() uses force-stop. am kill preserves the task and
+        // stopped-package state, but can be refused until Android updates process importance.
+        val deadline = SystemClock.elapsedRealtime() + PROCESS_EXIT_TIMEOUT_MS
+        while (SystemClock.elapsedRealtime() < deadline) {
+            val currentPid = targetPid() ?: return
+            check(currentPid == originalPid) { "A background owner replaced the fixture during process death." }
+            device.executeShellCommand("am kill --user $fixtureUser ${BenchmarkConfig.TARGET_PACKAGE}")
+            SystemClock.sleep(50L)
+        }
+        check(targetPid() == null) { "Ordinary process death did not terminate the fixture." }
     }
 
     /** Requires the same pre-reviewed positive device budget supplied to the package-replacement reporter. */
