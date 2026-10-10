@@ -67,10 +67,54 @@ signer request first. This known public key is unsuitable for real accounts.
 
 The test uses a separate native store, rejects a real NIP-55 request, recreates
 the host Activity, reconnects the signer, explicitly retries, accepts the new
-request and checks exactly one publication attempt. It does not qualify Amber's
-Back gesture or full process death. Native preview cancellation and store reopen
-are covered separately; do not describe these as equivalent device journeys.
+request and checks exactly one publication attempt. With
+`-e amberBackBeforeReject true`, it also verifies that official Amber keeps its
+sheet pending after Back, then explicitly rejects before the retry. Back alone
+is not a cancellation result. Full external-signer process replacement is not
+qualified by this fixture. Native preview cancellation is covered separately.
 
 Verified fixture dependency: Amber v6.6.7 ARM64, APK SHA-256
 `99989a7ad06e60a6e6a9f0fe1751724ed11d7346acf8832ad758ae3a22e03c73`.
 Keep APK hashes, instrumentation logs and exact source commit with test evidence.
+
+## Isolated physical-device lifecycle check
+
+`RelaySetupLifecycleDeviceTest` runs only in the test-only `maestrolab` package
+built with `scripts/maestro-runtime.init.gradle`. It imports the public scalar-one
+identity through MainActivity with native traffic redirected to a loopback relay.
+It checks Activity recreation, Later/resume, cancellation, account replacement
+with a captured stale action, relay rejection and an explicit identical-event retry.
+Acknowledged publication followed by auth-required readback stays incomplete;
+restoring reads and choosing Retry must pass without publishing again.
+It does not access the user's normal Dev identity or use the personal Amber app.
+
+Install both matching fixture APKs **in place** with `adb install -r -t`, disable
+only the fixture package's `BackgroundConnectionBootReceiver`, and run:
+
+```sh
+adb shell am instrument -w -r -e relayLifecycleE2e true \
+  -e class dev.ipf.whitenoise.android.maestro.RelaySetupLifecycleDeviceTest \
+  dev.ipf.whitenoise.android.maestrolab.test/dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner
+```
+
+For real process termination, pass `-e relayProcessPhase prepare` and
+`-e relayProcessToken <fresh-lowercase-UUID>`. Wait for the fixture's private
+`files/relay-lifecycle-<UUID>/checkpoint.json` marker, then force-stop **only**
+`dev.ipf.whitenoise.android.maestrolab`. Rerun with `relayProcessPhase restore`
+and the same token. The restore phase compares the persisted proposal, mounts
+production setup, cancels it, and verifies zero publication. It binds port 44201;
+run phases sequentially. Preparation intentionally remains running until the host
+stops the process, so its interrupted instrumentation result is not a test pass.
+Never substitute the user's Dev package or uninstall/clear either package.
+
+For the mixed-health import and changed-source cases, append
+`export-relay-declarations.rs` to the same disposable pinned MDK test module and
+run `cargo test -p marmot-app --lib export_android_mixed_relay_declarations`
+with `ANDROID_RELAY_VECTOR_OUTPUT` set to a new output path. This produces signed
+NIP-65/inbox records for the public scalar-one key with retained roles, duplicate
+endpoints, extension tags and opaque content. Copy the file into the isolated
+package's `cache/pr3201-mixed-relays.json`. Add `-e relayMixedFixture true` for
+usable declarations imported through MainActivity, or `-e relayChangedSource true`
+to introduce the declarations after a missing-source preview. Both bind port
+44202 and must run sequentially. These switches are distinct from the process
+restart phase and must not be combined with it.

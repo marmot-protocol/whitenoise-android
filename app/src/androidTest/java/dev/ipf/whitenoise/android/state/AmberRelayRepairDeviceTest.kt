@@ -95,7 +95,8 @@ class AmberRelayRepairDeviceTest {
         val preview = client.previewRelayRepair(OnboardingStepFfi.RELAYS)
         val approval = request(preview, OnboardingActionFfi.APPROVE_REPAIR)
         assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
-        approveWithAmber(client, approval, "Reject")
+        val cancellation = InstrumentationRegistry.getArguments().getString("amberBackBeforeReject") == "true"
+        approveWithAmber(client, approval, if (cancellation) "BackThenReject" else "Reject")
         assertTrue(relay.publicationAttempts(RELAY_LIST).isEmpty())
         compose.activityRule.scenario.recreate()
         native.registerExternalSigner(PUBLIC_KEY, AmberSignerController(context).buildSigner(PUBLIC_KEY))
@@ -125,10 +126,20 @@ class AmberRelayRepairDeviceTest {
             }
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         device.waitForIdle()
-        val button = device.wait(Until.findObject(By.text(answer)), 30_000L)
+        val buttonText = if (answer == "BackThenReject") "Reject" else answer
+        val button = device.wait(Until.findObject(By.text(buttonText)), 30_000L)
         checkNotNull(button) { "Amber did not display $answer" }
-        button.click()
-        val outcome = result.await()
+        if (answer == "BackThenReject") {
+            device.pressBack()
+            device.waitForIdle()
+            assertTrue("Amber Back must not manufacture an approval", !result.isCompleted)
+            val reject = device.wait(Until.findObject(By.text("Reject")), 5_000L)
+            checkNotNull(reject) { "Amber did not retain its explicit rejection control" }
+            reject.click()
+        } else {
+            button.click()
+        }
+        val outcome = withTimeout(20_000L) { result.await() }
         if (answer == "Accept") outcome.getOrThrow()
     }
 

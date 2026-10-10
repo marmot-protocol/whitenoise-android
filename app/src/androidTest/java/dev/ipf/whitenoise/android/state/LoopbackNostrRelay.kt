@@ -37,6 +37,12 @@ internal class LoopbackNostrRelay(
     /** Models a relay requiring authentication instead of reporting package absence. */
     @Volatile var authRequiredKinds: Set<Int> = emptySet()
 
+    /** Rejects signing outputs at the relay boundary without storing or broadcasting them. */
+    @Volatile var rejectedPublicationKinds: Set<Int> = emptySet()
+
+    /** Makes subsequent readback require auth after acknowledging the selected publication kinds. */
+    @Volatile var authAfterPublicationKinds: Set<Int> = emptySet()
+
     /** Hides only the selected author's declarations while keeping other fixture accounts healthy. */
     @Volatile var hiddenAuthorsByKind: Map<Int, Set<String>> = emptyMap()
 
@@ -159,17 +165,23 @@ internal class LoopbackNostrRelay(
             when (message.getString(0)) {
                 "EVENT" -> {
                     val event = message.getJSONObject(1)
+                    val accepted = event.getInt("kind") !in rejectedPublicationKinds
                     synchronized(lock) {
                         publications += JSONObject(event.toString())
-                        events[event.getString("id")] = event
-                        clients.forEach { client -> runCatching { client.deliver(event) } }
+                        if (accepted) {
+                            if (event.getInt("kind") in authAfterPublicationKinds) {
+                                authRequiredKinds += event.getInt("kind")
+                            }
+                            events[event.getString("id")] = event
+                            clients.forEach { client -> runCatching { client.deliver(event) } }
+                        }
                     }
                     sendJson(
                         JSONArray()
                             .put("OK")
                             .put(event.getString("id"))
-                            .put(true)
-                            .put(""),
+                            .put(accepted)
+                            .put(if (accepted) "" else "blocked: controlled fixture rejection"),
                     )
                 }
                 "REQ" -> {
