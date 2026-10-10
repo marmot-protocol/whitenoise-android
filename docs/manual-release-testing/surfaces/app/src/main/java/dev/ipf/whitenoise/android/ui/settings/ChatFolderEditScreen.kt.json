@@ -109,6 +109,14 @@
           "ACC-017",
           "FLD-003"
         ]
+      },
+      {
+        "surface": "Folder content hierarchy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "\"folder.includedChats\"",
+        "test_ids": [
+          "FLD-004"
+        ]
       }
     ],
     "settings_controls": [
