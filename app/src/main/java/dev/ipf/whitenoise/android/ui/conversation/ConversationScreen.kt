@@ -31,9 +31,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -243,12 +240,16 @@ import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsShari
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
+import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -257,7 +258,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 
 private data class ConversationSearchScrollAnchor(
     val bookmark: ConversationScrollBookmark,

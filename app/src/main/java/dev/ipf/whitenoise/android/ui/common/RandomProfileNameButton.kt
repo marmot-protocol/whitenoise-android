@@ -1,13 +1,13 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Casino
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.outlined.Casino
 
 /** A draft-only pseudonym action beside a kind-zero display-name field. */
 @Composable

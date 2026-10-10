@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -71,10 +69,12 @@ import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
 import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHitFromRenderedHit
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Info
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 
 private const val READER_ACTIONS_MAXIMUM_HEIGHT_FRACTION = 0.55f
 

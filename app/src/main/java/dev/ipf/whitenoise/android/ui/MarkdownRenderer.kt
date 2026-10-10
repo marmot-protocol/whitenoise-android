@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -89,6 +87,8 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighligh
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchMatchRanges
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberTtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.ttsReadAloudHighlight
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import java.net.IDN
 import java.net.URI

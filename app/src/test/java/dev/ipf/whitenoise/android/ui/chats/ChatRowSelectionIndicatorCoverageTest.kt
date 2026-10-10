@@ -4,9 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.MutableState
@@ -26,6 +23,9 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.InvitationBadge
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
+import dev.ipf.whitenoise.android.ui.icons.filled.RadioButtonUnchecked
 import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test

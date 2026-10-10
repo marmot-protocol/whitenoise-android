@@ -27,8 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -91,11 +89,13 @@ import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
-import kotlin.math.roundToInt
 
 // One measured editor line, dedicated grip, bottom tools, and outer padding.
 private val ComposerManualChromeHeight = 72.dp

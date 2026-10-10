@@ -13,11 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -71,11 +66,16 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
+import dev.ipf.whitenoise.android.ui.icons.filled.Close
+import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
+import dev.ipf.whitenoise.android.ui.icons.filled.Schedule
 import dev.ipf.whitenoise.android.ui.theme.Dimens
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
 import java.util.Locale
 import java.util.UUID
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 
 /** Focused long-press presentation; all capabilities and dispatch remain native to the owning message. */
 @Composable

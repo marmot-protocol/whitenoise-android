@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -26,6 +24,8 @@ import androidx.compose.ui.semantics.stateDescription
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Check
 import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateEditor
 import dev.ipf.whitenoise.android.ui.settings.isTtsCustomRate
 import dev.ipf.whitenoise.android.ui.settings.ttsRateLabel

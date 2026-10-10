@@ -1,9 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -20,6 +17,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Keyboard
+import dev.ipf.whitenoise.android.ui.icons.outlined.EmojiEmotions
 
 /**
  * The shared leading action for text entry surfaces that can insert emoji.

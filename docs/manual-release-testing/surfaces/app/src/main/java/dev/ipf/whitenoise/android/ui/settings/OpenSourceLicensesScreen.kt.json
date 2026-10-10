@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "OpenSourceLicensesScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
+        "anchor": "fun OpenSourceLicensesScreen(",
+        "test_ids": [
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "OpenSourceLicensesContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
+        "anchor": "fun OpenSourceLicensesContent(",
+        "test_ids": [
+          "SET-019"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:open_source_licenses",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
+        "anchor": "R.string.open_source_licenses",
+        "test_ids": [
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:licenses_open_failed_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
+        "anchor": "R.string.licenses_open_failed_title",
+        "test_ids": [
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SET-019"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

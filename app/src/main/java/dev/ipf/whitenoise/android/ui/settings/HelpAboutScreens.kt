@@ -25,7 +25,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -159,6 +158,11 @@ internal fun AboutScreen(
     mdkShortSha: String,
     onBack: () -> Unit,
 ) {
+    var licensesOpen by rememberSaveable { mutableStateOf(false) }
+    if (licensesOpen) {
+        OpenSourceLicensesScreen(onBack = { licensesOpen = false })
+        return
+    }
     val context = LocalContext.current
     AboutContent(
         versionName = versionName,
@@ -174,7 +178,10 @@ internal fun AboutScreen(
             Toast.makeText(context, R.string.developer_tools_already_enabled, Toast.LENGTH_SHORT).show()
         },
         onOpenDeveloper = onOpenDeveloper,
-        onOpenLicenses = { openSourceLicenses(context) },
+        onOpenLicenses = {
+            licensesOpen = true
+            true
+        },
         onOpenPrivacy = { openHelpUrl(context, WhiteNoiseUrls.PRIVACY_POLICY) },
     )
 }
@@ -344,11 +351,6 @@ private fun openHelpUrl(
     return runCatching { context.startActivity(intent) }.isSuccess
 }
 
-/** Google's generated notice activity, titled as the row that opens it. */
-private fun openSourceLicenses(context: Context): Boolean {
-    OssLicensesMenuActivity.setActivityTitle(context.getString(R.string.open_source_licenses))
-    return runCatching { context.startActivity(Intent(context, OssLicensesMenuActivity::class.java)) }.isSuccess
-}
 
 private val HelpLeadingIconSize = 24.dp
 

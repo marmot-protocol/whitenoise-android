@@ -2,22 +2,22 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TextSnippet
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Slideshow
-import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.TextSnippet
+import dev.ipf.whitenoise.android.ui.icons.filled.Android
+import dev.ipf.whitenoise.android.ui.icons.filled.Archive
+import dev.ipf.whitenoise.android.ui.icons.filled.Audiotrack
+import dev.ipf.whitenoise.android.ui.icons.filled.Code
+import dev.ipf.whitenoise.android.ui.icons.filled.Description
+import dev.ipf.whitenoise.android.ui.icons.filled.Image
+import dev.ipf.whitenoise.android.ui.icons.filled.Movie
+import dev.ipf.whitenoise.android.ui.icons.filled.PictureAsPdf
+import dev.ipf.whitenoise.android.ui.icons.filled.Slideshow
+import dev.ipf.whitenoise.android.ui.icons.filled.TableChart
 
 /** Localizes category fallbacks while stable format abbreviations stay concise. */
 @Composable

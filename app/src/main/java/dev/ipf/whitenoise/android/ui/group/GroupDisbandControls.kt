@@ -5,8 +5,6 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +19,8 @@ import dev.ipf.marmotkit.DisbandRequestFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.DeleteForever
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
 import dev.ipf.whitenoise.android.ui.theme.Dimens

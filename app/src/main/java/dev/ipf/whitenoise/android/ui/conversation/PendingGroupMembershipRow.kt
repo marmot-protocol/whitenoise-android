@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -22,6 +20,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.OptimisticGroupRosterMutation
 import dev.ipf.whitenoise.android.state.PendingGroupMembershipActivity
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.outlined.Schedule
 
 /** Local request feedback, deliberately separate from MDK's authoritative group-system rows. */
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
