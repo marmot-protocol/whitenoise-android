@@ -41,6 +41,7 @@ internal class ChatListConnectionDiagnostics(
 ) {
     private var trace: PerformanceTrace? = null
     private var startedAtMs = 0L
+    private var lastRelaySample: Pair<ChatListConnectionPhase, PerformanceConnectivity>? = null
 
     /** Begins an observed episode only after a local diagnostic session was explicitly enabled. */
     fun begin(
@@ -48,6 +49,7 @@ internal class ChatListConnectionDiagnostics(
         state: ChatListConnectionState,
     ) {
         trace = beginTrace()
+        lastRelaySample = null
         if (trace == null) return
         startedAtMs = nowMs()
         val settings = configuration()
@@ -74,6 +76,11 @@ internal class ChatListConnectionDiagnostics(
     ) {
         val current = trace ?: return
         val connectivity = configuration().connectivity
+        if (phase == PerformancePhase.CONNECTION_RELAY_SAMPLE) {
+            val sample = state.phase to connectivity
+            if (sample == lastRelaySample) return
+            lastRelaySample = sample
+        }
         emit(current, phase, state, connectivity, durationMs)
         emit(
             current,
@@ -111,6 +118,7 @@ internal class ChatListConnectionDiagnostics(
     /** Releases the anonymous trace when its controller/runtime owner is replaced or disposed. */
     fun clear() {
         trace = null
+        lastRelaySample = null
     }
 }
 

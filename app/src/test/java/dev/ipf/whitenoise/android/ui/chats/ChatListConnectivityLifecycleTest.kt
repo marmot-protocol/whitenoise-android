@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -41,83 +42,30 @@ class ChatListConnectivityLifecycleTest {
     /** A STOP/START cycle with no relay sample still revalidates once on resume, with no visible banner. */
     @Test
     fun healthyStopStartWithZeroRelaySampleRevalidatesWithoutRenderingAConnectivityTransition() {
-        val lifecycleOwner = StartedLifecycleOwner()
-        val connectionState =
-            mutableStateOf(
-                ChatListConnectionState(
-                    accountRef = ACCOUNT,
-                    runtimeGeneration = RUNTIME_GENERATION,
-                    bindEpoch = 2L,
-                    sessionAttemptId = 3L,
-                    evidenceEpoch = 4L,
-                    phase = ChatListConnectionPhase.Ready,
-                ),
-            )
-        var revalidationCount = 0
-        var foregroundCount = 0
-        var relayCount = 0
-        val renderedStates = mutableListOf<ConnectivityBannerState>()
-
-        composeRule.setContent {
-            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
-                val foregroundEpoch = rememberConnectivityForegroundEpoch()
-                ConnectivityEdgeRefreshEffects(
-                    effectOwner = connectionState,
-                    activeAccountRef = ACCOUNT,
-                    runtimeGeneration = RUNTIME_GENERATION,
-                    hasValidatedInternet = true,
-                    relaysConnected = false,
-                    foregroundEpoch = foregroundEpoch,
-                    revalidateConnectionReadiness = {
-                        error("explicit foreground and relay sources must be used")
-                    },
-                    revalidateOnForeground = {
-                        foregroundCount += 1
-                        revalidationCount += 1
-                        connectionState.value = connectionState.value.beginReadinessRefresh(presentAttempt = false)
-                    },
-                    revalidateOnRelaySample = {
-                        relayCount += 1
-                        revalidationCount += 1
-                        connectionState.value = connectionState.value.beginReadinessRefresh(presentAttempt = false)
-                    },
-                )
-                val target =
-                    connectivityBannerTarget(
-                        hasValidatedInternet = true,
-                        activeAccountRef = ACCOUNT,
-                        runtimeGeneration = RUNTIME_GENERATION,
-                        connectionState = connectionState.value,
-                    )
-                val displayed = initialConnectivityBannerState(target).displayed
-                SideEffect { renderedStates.add(displayed) }
-                WhiteNoiseTheme {
-                    ChatListInlineConnectivityIndicator(displayed)
-                }
-            }
-        }
+        val fixture = HealthyResumeFixture()
+        composeRule.setContent { fixture.Content() }
         composeRule.waitForIdle()
-        val revalidationsBeforeResume = revalidationCount
-        val foregroundBeforeResume = foregroundCount
-        val relayBeforeResume = relayCount
+        val revalidationsBeforeResume = fixture.revalidationCount
+        val foregroundBeforeResume = fixture.foregroundCount
+        val relayBeforeResume = fixture.relayCount
 
         composeRule.runOnUiThread {
-            lifecycleOwner.handle(Lifecycle.Event.ON_PAUSE)
-            lifecycleOwner.handle(Lifecycle.Event.ON_STOP)
-            lifecycleOwner.handle(Lifecycle.Event.ON_START)
-            lifecycleOwner.handle(Lifecycle.Event.ON_RESUME)
+            fixture.lifecycleOwner.handle(Lifecycle.Event.ON_PAUSE)
+            fixture.lifecycleOwner.handle(Lifecycle.Event.ON_STOP)
+            fixture.lifecycleOwner.handle(Lifecycle.Event.ON_START)
+            fixture.lifecycleOwner.handle(Lifecycle.Event.ON_RESUME)
         }
         composeRule.waitForIdle()
 
-        assertEquals(revalidationsBeforeResume + 1, revalidationCount)
-        assertEquals(foregroundBeforeResume + 1, foregroundCount)
-        assertEquals("resume must not manufacture a relay edge", relayBeforeResume, relayCount)
-        assertTrue(renderedStates.isNotEmpty())
+        assertEquals(revalidationsBeforeResume + 1, fixture.revalidationCount)
+        assertEquals(foregroundBeforeResume + 1, fixture.foregroundCount)
+        assertEquals("resume must not manufacture a relay edge", relayBeforeResume, fixture.relayCount)
+        assertTrue(fixture.renderedStates.isNotEmpty())
         assertTrue(
             "no committed warm-resume state is Connecting or JustConnected",
-            renderedStates.all { it == ConnectivityBannerState.Hidden },
+            fixture.renderedStates.all { it == ConnectivityBannerState.Hidden },
         )
-        assertEquals(ChatListConnectionPhase.Validating, connectionState.value.phase)
+        assertEquals(ChatListConnectionPhase.Validating, fixture.connectionState.value.phase)
         composeRule.onNodeWithTag(CHAT_LIST_INLINE_CONNECTIVITY_TAG).assertIsNotDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.connectivity_connecting)).assertDoesNotExist()
         composeRule.onNodeWithText(context.getString(R.string.connectivity_connected)).assertDoesNotExist()
@@ -292,6 +240,64 @@ class ChatListConnectivityLifecycleTest {
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
         assertEquals("the new owner takes its own fresh sample on resume", countAtStop + 1, refreshCount)
+    }
+
+    /** Retained readiness and source counters around the production lifecycle effects. */
+    private class HealthyResumeFixture {
+        val lifecycleOwner = StartedLifecycleOwner()
+        val connectionState =
+            mutableStateOf(
+                ChatListConnectionState(
+                    accountRef = ACCOUNT,
+                    runtimeGeneration = RUNTIME_GENERATION,
+                    bindEpoch = 2L,
+                    sessionAttemptId = 3L,
+                    evidenceEpoch = 4L,
+                    phase = ChatListConnectionPhase.Ready,
+                ),
+            )
+        var foregroundCount = 0
+        var relayCount = 0
+        val revalidationCount: Int get() = foregroundCount + relayCount
+        val renderedStates = mutableListOf<ConnectivityBannerState>()
+
+        /** Mounts explicit foreground/relay callbacks and records every committed banner state. */
+        @Composable
+        @Suppress("FunctionNaming")
+        fun Content() {
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                val foregroundEpoch = rememberConnectivityForegroundEpoch()
+                ConnectivityEdgeRefreshEffects(
+                    effectOwner = connectionState,
+                    activeAccountRef = ACCOUNT,
+                    runtimeGeneration = RUNTIME_GENERATION,
+                    hasValidatedInternet = true,
+                    relaysConnected = false,
+                    foregroundEpoch = foregroundEpoch,
+                    revalidateConnectionReadiness = {
+                        error("explicit foreground and relay sources must be used")
+                    },
+                    revalidateOnForeground = {
+                        foregroundCount += 1
+                        connectionState.value = connectionState.value.beginReadinessRefresh(presentAttempt = false)
+                    },
+                    revalidateOnRelaySample = {
+                        relayCount += 1
+                        connectionState.value = connectionState.value.beginReadinessRefresh(presentAttempt = false)
+                    },
+                )
+                val target =
+                    connectivityBannerTarget(
+                        hasValidatedInternet = true,
+                        activeAccountRef = ACCOUNT,
+                        runtimeGeneration = RUNTIME_GENERATION,
+                        connectionState = connectionState.value,
+                    )
+                val displayed = initialConnectivityBannerState(target).displayed
+                SideEffect { renderedStates.add(displayed) }
+                WhiteNoiseTheme { ChatListInlineConnectivityIndicator(displayed) }
+            }
+        }
     }
 
     /** A [LifecycleOwner] test double that starts already resumed, so tests drive STOP/START directly. */

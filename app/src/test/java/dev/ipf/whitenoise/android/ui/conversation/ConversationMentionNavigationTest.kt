@@ -194,6 +194,7 @@ class ConversationMentionNavigationTest {
             assertEquals(listOf(Write(false, 190, 0), Write(true, 200, 300)), writer.writes)
         }
 
+    /** The re-resolved approach already lands correctly, so settlement must not write it a second time. */
     @Test
     fun farMentionTowardNewestReResolvesAfterHeaderChange() =
         runTest {
@@ -208,7 +209,7 @@ class ConversationMentionNavigationTest {
                     awaitLayout = {},
                 ),
             )
-            assertEquals(listOf(Write(false, 11, 0), Write(true, 2, 300), Write(false, 2, 300)), writer.writes)
+            assertEquals(listOf(Write(false, 11, 0), Write(true, 2, 300)), writer.writes)
         }
 
     @Test

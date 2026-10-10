@@ -48,6 +48,15 @@ import kotlinx.coroutines.flow.merge
 /** Banner states. Steady-state connected renders nothing — transient only. */
 internal enum class ConnectivityBannerState { Hidden, Offline, Connecting, JustConnected }
 
+/** Maps rendered status to a closed diagnostic label without user-controlled display text. */
+private fun ConnectivityBannerState.diagnosticPhase(): PerformancePhase =
+    when (this) {
+        ConnectivityBannerState.Hidden -> PerformancePhase.CONNECTION_BANNER_HIDDEN
+        ConnectivityBannerState.Offline -> PerformancePhase.CONNECTION_BANNER_OFFLINE
+        ConnectivityBannerState.Connecting -> PerformancePhase.CONNECTION_BANNER_CONNECTING
+        ConnectivityBannerState.JustConnected -> PerformancePhase.CONNECTION_BANNER_CONNECTED
+    }
+
 internal enum class ConnectivityBannerTarget { Offline, NoAttempt, Connecting, Connected }
 
 internal data class ConnectivityBannerPresentation(
@@ -246,15 +255,8 @@ internal fun rememberChatListConnectivityState(
         if (presentation != renderedPresentation) presentation = renderedPresentation
     }
     val foregroundEpoch = rememberConnectivityForegroundEpoch()
-    LaunchedEffect(controller, activeAccountRef, runtimeGeneration, renderedPresentation.displayed, foregroundEpoch) {
-        controller.noteConnectionPresentation(
-            when (renderedPresentation.displayed) {
-                ConnectivityBannerState.Hidden -> PerformancePhase.CONNECTION_BANNER_HIDDEN
-                ConnectivityBannerState.Offline -> PerformancePhase.CONNECTION_BANNER_OFFLINE
-                ConnectivityBannerState.Connecting -> PerformancePhase.CONNECTION_BANNER_CONNECTING
-                ConnectivityBannerState.JustConnected -> PerformancePhase.CONNECTION_BANNER_CONNECTED
-            },
-        )
+    LaunchedEffect(controller, target, renderedPresentation.displayed, foregroundEpoch) {
+        controller.noteConnectionPresentation(renderedPresentation.displayed.diagnosticPhase())
     }
     // Built once per appState rather than invoking map{} directly in the composable body, which
     // would construct a new Flow on every recomposition (FlowOperatorInvokedInComposition).
