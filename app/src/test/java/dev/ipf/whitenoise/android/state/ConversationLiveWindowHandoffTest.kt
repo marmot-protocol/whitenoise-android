@@ -2,8 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
 import dev.ipf.marmotkit.GroupRosterFfi
-import java.time.Duration
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,6 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 /** Locally projected replacements cannot wait behind independent roster enrichment. */
 @RunWith(RobolectricTestRunner::class)
@@ -141,9 +142,12 @@ class ConversationLiveWindowHandoffTest {
                     startOnConstruction = false,
                 )
             timeline.onClose = {
-                if (firstCloseLoading == null) {
-                    firstCloseLoading = controller.isLoading
-                    firstCloseVerified = controller.membersVerified
+                // Handles close on IO; sample Compose presentation state on its Main owner.
+                runBlocking(Dispatchers.Main.immediate) {
+                    if (firstCloseLoading == null) {
+                        firstCloseLoading = controller.isLoading
+                        firstCloseVerified = controller.membersVerified
+                    }
                 }
             }
             controller.start()
