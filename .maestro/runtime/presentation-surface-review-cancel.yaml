@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-review-cancel
+---
+- assertVisible:
+    text: Review selection
+- assertVisible:
+    text: Maestro Bob
+- assertVisible:
+    text: Fixture confirm
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

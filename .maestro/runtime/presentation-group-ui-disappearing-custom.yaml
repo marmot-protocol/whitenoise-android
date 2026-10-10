@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-disappearing-custom
+---
+- assertVisible:
+    text: Disappearing messages
+- tapOn: Custom time
+- assertVisible:
+    text: Set
+- tapOn: Cancel
+- assertVisible:
+    text: Disappearing messages
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

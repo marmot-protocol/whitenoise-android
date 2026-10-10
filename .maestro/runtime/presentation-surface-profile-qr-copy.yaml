@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-profile-qr-copy
+---
+- assertVisible:
+    text: Maestro Alice
+- assertVisible:
+    text: npub.*
+- tapOn: npub.*
+- assertVisible:
+    text: Copied
+- back
+- assertVisible:
+    id: presentation.complete

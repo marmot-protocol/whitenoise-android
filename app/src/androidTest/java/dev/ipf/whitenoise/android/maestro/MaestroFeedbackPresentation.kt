@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.maestro
 import androidx.compose.runtime.Composable
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ToastMessage
+import dev.ipf.whitenoise.android.ui.chats.ChatRelayFeedbackDialog
 import dev.ipf.whitenoise.android.ui.profile.AddProfileFeedbackDialog
 import dev.ipf.whitenoise.android.ui.profile.PersonProfileFeedbackDialog
 
@@ -18,9 +19,11 @@ internal fun MaestroFeedbackPresentation(fixture: MaestroPresentationFixture) {
             copyable = copyable,
             diagnosticReport = "Synthetic diagnostic report",
         )
-    if (fixture.scenario.startsWith("feedback-add")) {
-        AddProfileFeedbackDialog(feedback) { fixture.finish("dismiss") }
-    } else {
-        PersonProfileFeedbackDialog(feedback, onDismiss = { fixture.finish("dismiss") })
+    when {
+        fixture.scenario.startsWith("feedback-chat") ->
+            ChatRelayFeedbackDialog(feedback, onDismiss = { fixture.finish("dismiss") })
+        fixture.scenario.startsWith("feedback-add") ->
+            AddProfileFeedbackDialog(feedback) { fixture.finish("dismiss") }
+        else -> PersonProfileFeedbackDialog(feedback, onDismiss = { fixture.finish("dismiss") })
     }
 }

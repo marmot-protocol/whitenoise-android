@@ -143,6 +143,27 @@ class CampaignSummaryTest(unittest.TestCase):
             self.assertEqual(result['passed_count'], 6)
             self.assertFalse(result['full_release_coverage'])
 
+    def test_expanded_roster_requires_all_six_native_account_receipts(self):
+        """An expanded roster cannot pass with the ordinary three-account fixture receipt."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            leaf = leaves[0]
+            name = leaf.name
+            changed = {**runtime.CASES[name], 'fixture': 'large-roster'}
+            ready_path = leaf / 'ready.json'
+            ready = json.loads(ready_path.read_text())
+            ready['fixture'] = 'large-roster'
+            ready_path.write_text(json.dumps(ready))
+            with patch.dict(runtime.CASES, {name: changed}):
+                self.assertFalse(self.result(root)['evidence_complete'])
+                ready['accounts'] = 6
+                ready_path.write_text(json.dumps(ready))
+                self.assertTrue(self.result(root)['evidence_complete'])
+                ready['fixture'] = 'basic'
+                ready_path.write_text(json.dumps(ready))
+                self.assertFalse(self.result(root)['evidence_complete'])
+
     def test_ui_only_retry_reuses_matching_prior_successful_shards(self):
         """Failed-job retries can retain successful same-run shards and the unchanged build producer."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -2128,6 +2149,39 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn('applicationInfo.flags and ApplicationInfo.FLAG_TEST_ONLY != 0', application)
         for path in (runtime.ROOT / 'app/src/main').rglob('*MaestroFixture*'):
             self.fail(f'Fixture must remain outside app APK: {path}')
+
+class MotionControlTest(unittest.TestCase):
+    def exercise(self, baseline, restored, passed=True):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            name = 'presentation-surface-animated-avatar'
+            observed = [baseline, '', '1', '', restored]
+            result = {'case': name, 'generation': 'motion-generation', 'passed': passed, 'cleanup_safe': True}
+            with patch.object(runtime, 'command', side_effect=observed) as commands, \
+                    patch.object(runtime, 'run_fixture', return_value=result) as fixture:
+                outcome = runtime.run_motion_fixture(name, directory, 'motion-generation')
+            stored = json.loads((directory / 'result.json').read_text())
+            self.assertEqual(stored, outcome)
+            self.assertEqual(fixture.call_count, 1)
+            return outcome, commands.call_args_list
+
+    def test_motion_restores_disabled_baseline_after_ui_failure(self):
+        outcome, calls = self.exercise('0', '0', passed=False)
+        self.assertFalse(outcome['passed'])
+        self.assertTrue(outcome['motion_restored'])
+        self.assertEqual(calls[-2].args[0][-4:], ['put', 'global', 'animator_duration_scale', '0'])
+
+    def test_absent_motion_setting_is_removed_after_success(self):
+        outcome, calls = self.exercise('null', 'null')
+        self.assertTrue(outcome['passed'])
+        self.assertEqual(calls[-2].args[0][-3:], ['delete', 'global', 'animator_duration_scale'])
+
+    def test_unrestored_motion_cannot_certify_safe_success(self):
+        outcome, _ = self.exercise('0', '1')
+        self.assertFalse(outcome['passed'])
+        self.assertFalse(outcome['cleanup_safe'])
+        self.assertIn('motion_failure', outcome)
+
 
 class CredentialControlTest(unittest.TestCase):
     """Never certify mocked unlocks, stale OS probes or a credential left behind by failed setup."""

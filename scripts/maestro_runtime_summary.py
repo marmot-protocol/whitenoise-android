@@ -8,14 +8,14 @@ import re
 import xml.etree.ElementTree as ET
 
 try:
-    from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation
+    from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation, fixture_account_count
     from scripts.maestro_runtime_selection import matrix_selection
     from scripts.maestro_environment import qualify
     from scripts.maestro_credential import qualify_credential
     from scripts.maestro_screen_coverage import flow_assertions, executed_screens, screen_bindings
     from scripts.maestro_suite import CASES as OFFLINE
 except ModuleNotFoundError:
-    from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation
+    from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation, fixture_account_count
     from maestro_runtime_selection import matrix_selection
     from maestro_environment import qualify
     from maestro_credential import qualify_credential
@@ -148,7 +148,8 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'] == 'app-lock-unavailable'
                         and ready.get('appLockFixtureNoCredential') is not True):
                     raise ValueError('Actual no-credential app-lock prerequisite was not verified')
-                if (ready.get('accounts') != 3 or ready.get('fixture') != CASES[name].get('fixture', 'basic')
+                if (ready.get('accounts') != fixture_account_count(CASES[name].get('fixture', 'basic'))
+                        or ready.get('fixture') != CASES[name].get('fixture', 'basic')
                         or ready.get('uiObserver') != 'maestro'):
                     raise ValueError('Native fixture handoff mismatch')
                 if CASES[name]['postcondition'].startswith('app-lock-credential-'):

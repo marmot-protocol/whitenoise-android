@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-choice-select
+---
+- assertVisible:
+    text: Fixture choices
+- assertVisible:
+    text: Fixture first
+- assertVisible:
+    text: Fixture second
+- tapOn: Fixture second
+- assertVisible:
+    id: presentation.complete

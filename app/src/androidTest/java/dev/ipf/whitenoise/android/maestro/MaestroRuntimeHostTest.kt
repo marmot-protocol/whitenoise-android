@@ -144,8 +144,22 @@ class MaestroRuntimeHostTest {
             try {
                 withTimeout(90_000L) {
                     native.start()
+                    val fixture = InstrumentationRegistry.getArguments().getString("fixtureScenario", "basic")
+                    val profileNames =
+                        if (fixture == "large-roster") {
+                            listOf(
+                                "Maestro Alice",
+                                "Maestro Bob",
+                                "Maestro Carol",
+                                "Maestro Erin",
+                                "Maestro Frank",
+                                "Maestro Grace",
+                            )
+                        } else {
+                            listOf("Maestro Alice", "Maestro Bob", "Maestro Carol")
+                        }
                     val accounts =
-                        listOf("Maestro Alice", "Maestro Bob", "Maestro Carol").map { name ->
+                        profileNames.map { name ->
                             native.createIdentity(relays, relays).also {
                                 native.publishUserProfile(
                                     it.label,
@@ -164,12 +178,14 @@ class MaestroRuntimeHostTest {
                             }
                         }
                     val owner = accounts.first()
-                    val fixture = InstrumentationRegistry.getArguments().getString("fixtureScenario", "basic")
                     externalContact = createMaestroExternalContact(root, relays, owner.label, fixture)
                     externalContact?.prepare()
-                    val members = listOf(accounts[1].accountIdHex) + listOfNotNull(externalContact?.accountIdHex)
+                    val invited = if (fixture == "large-roster") accounts.drop(1) else listOf(accounts[1])
+                    val members = invited.map { it.accountIdHex } + listOfNotNull(externalContact?.accountIdHex)
                     val group = native.createGroup(owner.label, "Maestro group", members, null)
-                    while (runCatching { native.acceptGroupInvite(accounts[1].label, group) }.isFailure) delay(100L)
+                    for (member in invited) {
+                        while (runCatching { native.acceptGroupInvite(member.label, group) }.isFailure) delay(100L)
+                    }
                     externalContact?.acceptGroup(group)
                     seedMaestroFixtureMessages(native, owner.label, accounts[1].label, group, fixture)
                     if (fixture == "departed") prepareMaestroDepartedGroup(native, owner, accounts[1], group)
@@ -248,7 +264,8 @@ class MaestroRuntimeHostTest {
                     val presentationScenario = InstrumentationRegistry.getArguments().getString("presentationScenario")
                     if (presentationScenario != null) {
                         check(postcondition == "presentation-checked")
-                        val expected = checkNotNull(InstrumentationRegistry.getArguments().getString("presentationActions"))
+                        val expected =
+                            checkNotNull(InstrumentationRegistry.getArguments().getString("presentationActions"))
                         presentation = MaestroPresentationFixture(presentationScenario, expected.split(","))
                         checkNotNull(activity).onActivity { checkNotNull(presentation).install(it) }
                     }

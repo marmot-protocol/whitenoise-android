@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-edit-photo-menu-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible:
+    text: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Maestro group
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      text: Edit Group
+    direction: DOWN
+- tapOn: Edit Group
+- assertVisible:
+    id: group_edit.photoAction
+- tapOn:
+    id: group_edit.photoAction
+- assertVisible:
+    text: Choose from Photos
+- assertVisible:
+    text: Choose from Files
+- back
+- assertVisible:
+    id: group_edit.photoAction
+- back
+- assertVisible:
+    id: chat_info.list

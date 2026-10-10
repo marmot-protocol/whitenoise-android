@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-dialog-retry-failure
+---
+- assertVisible:
+    text: Fixture decoded.txt
+- assertVisible:
+    text: Couldn’t download this file.*
+- tapOn: Retry
+- assertVisible:
+    text: Couldn’t download this file.*
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

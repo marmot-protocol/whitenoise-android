@@ -18,6 +18,8 @@ name: nested-action-color
 - assertVisible:
     id: "action_color.controls"
 - assertVisible:
+    id: color.hex
+- assertVisible:
     id: "action_color.preview"
 - back
 - assertVisible:

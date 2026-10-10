@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-contact-selected
+---
+- assertVisible:
+    text: Fixture contacts
+- assertVisible:
+    text: Fixture next
+- assertVisible:
+    text: Maestro Bob
+- tapOn: Fixture next
+- assertVisible:
+    id: presentation.complete

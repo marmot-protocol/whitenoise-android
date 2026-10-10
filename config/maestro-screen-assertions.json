@@ -74,38 +74,100 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
       "symbol": "ChatContextMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatContextMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "chats-menu-back",
+          "selector": {
+            "text": "Pin"
+          },
+          "scope": "Actual chat long-press context menu reached from ChatsScreen; Pin and dismissal asserted."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
       "symbol": "ChatDeleteConfirmationDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatDeleteConfirmationDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "chats-delete-cancel",
+          "selector": {
+            "text": "Delete from this device"
+          },
+          "scope": "Actual chat context Delete callback creates PendingLocalChatDelete and renders the device-local confirmation; Cancel retains departed-group history."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
       "symbol": "ChatLeaveAndDeleteConfirmationDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatLeaveAndDeleteConfirmationDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-leave-cancel",
+          "selector": {
+            "text": "Leave and delete"
+          },
+          "scope": "Actual separate leave-and-delete confirmation verifies the selected dismissal/confirmation callback; no chat departure is performed."
+        },
+        {
+          "case": "presentation-group-ui-leave-confirm",
+          "selector": {
+            "text": "Leave and delete"
+          },
+          "scope": "Actual separate leave-and-delete confirmation verifies the selected dismissal/confirmation callback; no chat departure is performed."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
       "symbol": "ChatDepartureBatchDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatDepartureBatchDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "chats-bulk-delete-cancel",
+          "selector": {
+            "text": "Review 1 selected chats.*"
+          },
+          "scope": "Actual captured-selection departure confirmation reached from ChatsScreen; cancellation preserves the group."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
       "symbol": "ChatFolderPickerSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFolderPickerSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "chats-folder-cancel",
+          "selector": {
+            "text": "New folder"
+          },
+          "scope": "Actual chat folder chooser opened from context menu; New folder and cancellation asserted."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRelayFeedbackDialog.kt",
       "symbol": "ChatRelayFeedbackDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatRelayFeedbackDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-feedback-chat-copyable",
+          "selector": {
+            "text": "Maestro presentation feedback"
+          },
+          "scope": "Actual relay feedback dialog shows report/information; Copy verifies the synthetic report in the platform clipboard before dismissal."
+        },
+        {
+          "case": "presentation-feedback-chat-informational",
+          "selector": {
+            "text": "Maestro presentation feedback"
+          },
+          "scope": "Actual relay feedback dialog shows report/information; Copy verifies the synthetic report in the platform clipboard before dismissal."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
@@ -166,8 +228,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
       "symbol": "GlobalSearchDatePicker",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchDatePicker; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-custom-start-cancel",
+          "selector": {
+            "text": "Date"
+          },
+          "scope": "Actual date picker and custom-start-date cancellation."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
@@ -178,8 +248,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
       "symbol": "GlobalSearchFilterPicker",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchFilterPicker; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "search-date-cancel",
+          "selector": {
+            "text": "Date"
+          },
+          "scope": "Actual global-search date category popup mounted through ChatsScreen."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
@@ -196,8 +274,23 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
       "symbol": "ContactPickerScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ContactPickerScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-contact-empty",
+          "selector": {
+            "text": "Fixture contacts"
+          },
+          "scope": "Actual recipient picker guards empty submission or verifies the exact selected generated native identity; no membership mutation."
+        },
+        {
+          "case": "presentation-surface-contact-selected",
+          "selector": {
+            "text": "Fixture contacts"
+          },
+          "scope": "Actual recipient picker guards empty submission or verifies the exact selected generated native identity; no membership mutation."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
@@ -300,20 +393,58 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
       "symbol": "SelectedMembersReviewScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SelectedMembersReviewScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-review-cancel",
+          "selector": {
+            "text": "Review selection"
+          },
+          "scope": "Actual selected-member review renders a generated native identity and verifies cancel, confirm or exact removal dispatch."
+        },
+        {
+          "case": "presentation-surface-review-confirm",
+          "selector": {
+            "text": "Review selection"
+          },
+          "scope": "Actual selected-member review renders a generated native identity and verifies cancel, confirm or exact removal dispatch."
+        },
+        {
+          "case": "presentation-surface-review-remove",
+          "selector": {
+            "text": "Review selection"
+          },
+          "scope": "Actual selected-member review renders a generated native identity and verifies cancel, confirm or exact removal dispatch."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
       "symbol": "AnimatedProfileAvatarOverlay",
-      "bindings": [],
+      "bindings": [
+        {
+          "case": "presentation-surface-animated-avatar",
+          "selector": {
+            "id": "animated-profile-avatar"
+          },
+          "scope": "Actual cached animated avatar uses the platform GIF decoder and visible animation layer; no URL is fetched. Emulator motion setting and cache are restored at cleanup."
+        }
+      ],
       "remaining": "Audit direct navigation and exceptional-state assertions for AnimatedProfileAvatarOverlay; related manual IDs provide no screen execution proof."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
       "symbol": "AppLockScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AppLockScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "app-lock-credential-cover-rotation-retry",
+          "selector": {
+            "id": "app.lock"
+          },
+          "scope": "Actual cancelled credential challenge cover survives both orientations; generated emulator PIN is restored by native cleanup."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ConfirmDialog.kt",
@@ -388,20 +519,51 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseAnchoredMenu.kt",
       "symbol": "WhiteNoiseAnchoredMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseAnchoredMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "chats-menu-back",
+          "selector": {
+            "text": "Pin"
+          },
+          "scope": "Actual anchored menu child used by ChatContextMenu, retaining its production popup and Back path."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
       "symbol": "ChoiceDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChoiceDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-choice-cancel",
+          "selector": {
+            "text": "Fixture second"
+          },
+          "scope": "Actual radio choice dialog verifies Cancel or exact selected value."
+        },
+        {
+          "case": "presentation-group-ui-choice-select",
+          "selector": {
+            "text": "Fixture second"
+          },
+          "scope": "Actual radio choice dialog verifies Cancel or exact selected value."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
       "symbol": "SpeechChoiceDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SpeechChoiceDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "speech-rate-back",
+          "selector": {
+            "text": "Custom"
+          },
+          "scope": "Actual settings speech-rate choices and Back, including Custom."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
@@ -420,8 +582,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
       "symbol": "WhiteNoiseEntityPickerSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for WhiteNoiseEntityPickerSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-entity-empty",
+          "selector": {
+            "text": "Fixture entities"
+          },
+          "scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."
+        },
+        {
+          "case": "presentation-group-ui-entity-disabled",
+          "selector": {
+            "text": "Fixture entities"
+          },
+          "scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."
+        },
+        {
+          "case": "presentation-group-ui-entity-select",
+          "selector": {
+            "text": "Fixture entities"
+          },
+          "scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseMenus.kt",
@@ -474,14 +658,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
       "symbol": "ConversationScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "conversation-send",
+          "selector": {
+            "id": "composer-pill-surface"
+          },
+          "scope": "Actual native generated-group conversation, composer and sent-message postcondition."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
       "symbol": "GroupRejoinInvitationDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GroupRejoinInvitationDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-rejoin-cancel",
+          "selector": {
+            "text": "Rejoin group\\?"
+          },
+          "scope": "Actual invitation dialog is opened through the production recovery card; validates the exact reviewed invitation callback without native rejoin/decline."
+        },
+        {
+          "case": "presentation-surface-rejoin-confirm",
+          "selector": {
+            "text": "Rejoin group\\?"
+          },
+          "scope": "Actual invitation dialog is opened through the production recovery card; validates the exact reviewed invitation callback without native rejoin/decline."
+        },
+        {
+          "case": "presentation-surface-rejoin-decline",
+          "selector": {
+            "text": "Rejoin group\\?"
+          },
+          "scope": "Actual invitation dialog is opened through the production recovery card; validates the exact reviewed invitation callback without native rejoin/decline."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
@@ -492,20 +706,79 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackDialog.kt",
       "symbol": "PlaybackDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for PlaybackDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-text-dialog-ready",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual playback-aware dialog wrapper hosts the text attachment reader; no audio engine starts."
+        },
+        {
+          "case": "presentation-text-dialog-copy",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual playback-aware dialog wrapper hosts the text attachment reader; no audio engine starts."
+        },
+        {
+          "case": "presentation-text-dialog-save",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual playback-aware dialog wrapper hosts the text attachment reader; no audio engine starts."
+        },
+        {
+          "case": "presentation-text-dialog-failure",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual playback-aware dialog wrapper hosts the text attachment reader; no audio engine starts."
+        },
+        {
+          "case": "presentation-text-dialog-retry-failure",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual playback-aware dialog wrapper hosts the text attachment reader; no audio engine starts."
+        },
+        {
+          "case": "presentation-text-dialog-external",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual playback-aware dialog wrapper hosts the text attachment reader; no audio engine starts."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
       "symbol": "PollCreateDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for PollCreateDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "polls-cancel",
+          "selector": {
+            "text": "Question"
+          },
+          "scope": "Actual poll composer opens from attachments; draft question is cancelled without publication."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
       "symbol": "PollVotesSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for PollVotesSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "ballots-votes-sheet-back",
+          "selector": {
+            "text": "Polls are not anonymous[.] Every group member can see who chose each option[.]"
+          },
+          "scope": "Actual published native poll vote sheet asserts transparency copy, Alice and the selected option."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
@@ -524,8 +797,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
       "symbol": "ComposerAttachmentMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ComposerAttachmentMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "conversation-attachment-cancel",
+          "selector": {
+            "text": "Camera"
+          },
+          "scope": "Actual attachment menu shows Camera and dismisses back to the generated-group composer."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
@@ -534,7 +815,7 @@
         {
           "case": "presentation-dictation-closing",
           "selector": {
-            "text": "Finishing microphone…"
+            "text": "Finishing microphone\u2026"
           },
           "scope": "Actual recovery panel closing-microphone state; native capture and disposal remain separate."
         }
@@ -572,20 +853,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
       "symbol": "ComposerEmojiPickerPane",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ComposerEmojiPickerPane; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "conversation-emoji-cancel",
+          "selector": {
+            "id": "emoji.picker.grid"
+          },
+          "scope": "Actual inline composer pane shows the production emoji grid and closes with Back."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
       "symbol": "EmojiPickerSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for EmojiPickerSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "reactions-configure-slot-cancel",
+          "selector": {
+            "text": "Search emoji"
+          },
+          "scope": "Actual modal emoji chooser opened for a quick-reaction slot; cancellation retains conversation."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
       "symbol": "EmojiPickerContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for EmojiPickerContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "conversation-emoji-cancel",
+          "selector": {
+            "id": "emoji.picker.grid"
+          },
+          "scope": "Actual shared emoji content reached through the composer pane, rather than a sibling label."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
@@ -642,8 +947,51 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
       "symbol": "TextAttachmentReaderDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TextAttachmentReaderDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-text-dialog-ready",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual reader dialog owns decoding, retry and clipboard from bounded bytes; save/open ports verify dispatch without native attachment download or external launch."
+        },
+        {
+          "case": "presentation-text-dialog-copy",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual reader dialog owns decoding, retry and clipboard from bounded bytes; save/open ports verify dispatch without native attachment download or external launch."
+        },
+        {
+          "case": "presentation-text-dialog-save",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual reader dialog owns decoding, retry and clipboard from bounded bytes; save/open ports verify dispatch without native attachment download or external launch."
+        },
+        {
+          "case": "presentation-text-dialog-failure",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual reader dialog owns decoding, retry and clipboard from bounded bytes; save/open ports verify dispatch without native attachment download or external launch."
+        },
+        {
+          "case": "presentation-text-dialog-retry-failure",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual reader dialog owns decoding, retry and clipboard from bounded bytes; save/open ports verify dispatch without native attachment download or external launch."
+        },
+        {
+          "case": "presentation-text-dialog-external",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Actual reader dialog owns decoding, retry and clipboard from bounded bytes; save/open ports verify dispatch without native attachment download or external launch."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
@@ -710,20 +1058,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
       "symbol": "FocusedActionMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for FocusedActionMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-info-back",
+          "selector": {
+            "text": "Info"
+          },
+          "scope": "Actual MessageActionMenu/FocusedMessageActions action-grid child exposes Info before routing."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
       "symbol": "ForwardMessagePickerContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ForwardMessagePickerContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-forward-cancel",
+          "selector": {
+            "text": "1 message"
+          },
+          "scope": "Actual picker content states the captured message count and retains Back cancellation."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
       "symbol": "ForwardMessagePickerFullScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ForwardMessagePickerFullScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-forward-cancel",
+          "selector": {
+            "text": "No other chats to forward to[.]"
+          },
+          "scope": "Actual forward picker renders the generated-account empty target state."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
@@ -746,50 +1118,114 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
       "symbol": "ForwardMessageSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ForwardMessageSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-forward-cancel",
+          "selector": {
+            "text": "Forward to"
+          },
+          "scope": "Actual forward request opens the owning production picker; Back leaves the original conversation intact."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
       "symbol": "MessageActionMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for MessageActionMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-info-back",
+          "selector": {
+            "text": "Info"
+          },
+          "scope": "Actual generated-message long press mounts MessageActionMenu, asserts its Info action, and routes to message identifiers."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
       "symbol": "BatchMessageDeleteDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for BatchMessageDeleteDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-batch-delete-cancel",
+          "selector": {
+            "text": "Delete 1 message\\?"
+          },
+          "scope": "Actual selected-message bulk confirmation; Cancel retains the selection."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
       "symbol": "BatchMessageDeleteDialogContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for BatchMessageDeleteDialogContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-batch-delete-cancel",
+          "selector": {
+            "text": "Delete 1 message\\?"
+          },
+          "scope": "Actual bulk confirmation body rendered by its production dialog."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
       "symbol": "MessageDeleteDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for MessageDeleteDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-delete-cancel",
+          "selector": {
+            "text": "Delete for everyone"
+          },
+          "scope": "Actual unified delete dialog reached from generated-message long press; scopes and cancellation asserted."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
       "symbol": "MessageDeleteDialogContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for MessageDeleteDialogContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-delete-cancel",
+          "selector": {
+            "text": "Delete for me"
+          },
+          "scope": "Actual content rendered inside MessageDeleteDialog; device and everyone choices retain cancellation."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
       "symbol": "MessageDetailsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for MessageDetailsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "actions-info-back",
+          "selector": {
+            "text": "Message ID"
+          },
+          "scope": "Actual generated-message Info destination with message identifiers and Back dismissal."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
       "symbol": "MessageFullScreenView",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for MessageFullScreenView; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "reader-back",
+          "selector": {
+            "id": "message-full-screen"
+          },
+          "scope": "Actual generated long-message reader opens from Read More and returns to the timeline."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageInlineFooter.kt",
@@ -800,8 +1236,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
       "symbol": "ReportMessageSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ReportMessageSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "reports-back",
+          "selector": {
+            "text": "Report this message"
+          },
+          "scope": "Actual incoming-message report sheet and disclosure; cancelled without publication."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
@@ -810,7 +1254,7 @@
         {
           "case": "presentation-nostr-image-failure",
           "selector": {
-            "text": "Couldn’t load this image. Try again."
+            "text": "Couldn\u2019t load this image. Try again."
           },
           "scope": "Actual image-pane failure and retry against bounded null image loader."
         }
@@ -852,7 +1296,7 @@
         {
           "case": "presentation-nostr-video-failure",
           "selector": {
-            "text": "Couldn’t play this video\\."
+            "text": "Couldn\u2019t play this video\\."
           },
           "scope": "Actual ExoPlayer local missing-file failure and Close; no successful playback claim."
         }
@@ -862,20 +1306,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/CompleteReactionDetailsSheet.kt",
       "symbol": "CompleteReactionDetailsSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for CompleteReactionDetailsSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "reactions-details-back",
+          "selector": {
+            "text": "All \u00b7 2"
+          },
+          "scope": "Actual complete-reaction host resolves both native reactors and opens the All filter."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
       "symbol": "ConfigureReactionsSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConfigureReactionsSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "reactions-configure-back",
+          "selector": {
+            "text": "Tap an emoji to replace it\\."
+          },
+          "scope": "Actual quick-reaction configuration content opened through production reaction actions."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
       "symbol": "ReactionDetailsSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ReactionDetailsSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "reactions-details-back",
+          "selector": {
+            "text": "Maestro Bob"
+          },
+          "scope": "Actual reaction popup content contains the generated Bob reactor."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
@@ -900,20 +1368,51 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AppMenus.kt",
       "symbol": "KeyboardPreservingDropdownMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for KeyboardPreservingDropdownMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-keyboard-menu-cancel",
+          "selector": {
+            "text": "Fixture menu action"
+          },
+          "scope": "Actual keyboard-preserving popup receives Back or its action callback without editing a draft."
+        },
+        {
+          "case": "presentation-surface-keyboard-menu-select",
+          "selector": {
+            "text": "Fixture menu action"
+          },
+          "scope": "Actual keyboard-preserving popup receives Back or its action callback without editing a draft."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AppSheets.kt",
       "symbol": "KeyboardPreservingBottomSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for KeyboardPreservingBottomSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "ballots-votes-sheet-back",
+          "selector": {
+            "text": "Polls are not anonymous[.] Every group member can see who chose each option[.]"
+          },
+          "scope": "Actual votes sheet mounts the keyboard-preserving bottom sheet and visible disclosure."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt",
       "symbol": "KeyboardSafePopup",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for KeyboardSafePopup; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "reactions-details-back",
+          "selector": {
+            "text": "All \u00b7 2"
+          },
+          "scope": "Actual non-focus-stealing reaction popup retains its production Back interception."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
@@ -938,26 +1437,65 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
       "symbol": "NotifyForDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for NotifyForDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-notify-all",
+          "selector": {
+            "text": "All messages"
+          },
+          "scope": "Actual notification mode dialog verifies the selected ALL or MENTIONS_ONLY callback; no notification-channel or native preference mutation."
+        },
+        {
+          "case": "presentation-group-ui-notify-mentions",
+          "selector": {
+            "text": "Only mentions"
+          },
+          "scope": "Actual notification mode dialog verifies the selected ALL or MENTIONS_ONLY callback; no notification-channel or native preference mutation."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
       "symbol": "VibrationPatternDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for VibrationPatternDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "alerts-person-vibration-cancel",
+          "selector": {
+            "text": "System default"
+          },
+          "scope": "Actual person vibration pattern chooser; Back leaves defaults unchanged and performs no hardware preview."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
       "symbol": "ConversationSoundAppearanceSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ConversationSoundAppearanceSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "alerts-chat-sounds-back",
+          "selector": {
+            "id": "conversation-sound-appearance-content"
+          },
+          "scope": "Actual chat notification drawer content, production navigation and Back."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
       "symbol": "DisappearingCustomDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DisappearingCustomDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-disappearing-custom",
+          "selector": {
+            "text": "Set"
+          },
+          "scope": "Actual custom retention number/unit picker opens through its production parent; Cancel retains the original timer."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
@@ -1010,8 +1548,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
       "symbol": "GroupEditPhotoMenu",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GroupEditPhotoMenu; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-edit-photo-menu-cancel",
+          "selector": {
+            "text": "Choose from Photos"
+          },
+          "scope": "Actual group photo menu shows its platform-source options and Back leaves the original native group image untouched."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
@@ -1030,14 +1576,37 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEmojiImagePicker.kt",
       "symbol": "GroupEmojiImagePickerSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GroupEmojiImagePickerSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-emoji-empty",
+          "selector": {
+            "text": "No emoji selected"
+          },
+          "scope": "Actual emoji group-image sheet blocks Apply with no selection; renderer and publication callback must remain untouched."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt",
       "symbol": "ImageSearchSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ImageSearchSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-image-search-empty",
+          "selector": {
+            "text": "No images found"
+          },
+          "scope": "Actual image search sheet presents empty/error result from a bounded search port, checks the actual query, and cancels without fetching image bytes or public network."
+        },
+        {
+          "case": "presentation-group-ui-image-search-error",
+          "selector": {
+            "text": "Image search returned an unexpected response."
+          },
+          "scope": "Actual image search sheet presents empty/error result from a bounded search port, checks the actual query, and cancels without fetching image bytes or public network."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
@@ -1056,26 +1625,65 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
       "symbol": "GroupInfoScreen",
-      "bindings": [],
-      "remaining": "Add direct technical group identifiers screen navigation; group-details list assertions do not exercise this separate destination."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-info-populated",
+          "selector": {
+            "text": "MLS group ID"
+          },
+          "scope": "Actual technical group identifiers and empty/populated relay rows; synthetic values, no native identifier or relay mutation."
+        },
+        {
+          "case": "presentation-group-ui-info-empty",
+          "selector": {
+            "text": "MLS group ID"
+          },
+          "scope": "Actual technical group identifiers and empty/populated relay rows; synthetic values, no native identifier or relay mutation."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
       "symbol": "SoleAdminDeletePicker",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SoleAdminDeletePicker; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-successor-empty",
+          "selector": {
+            "text": "Transfer admin"
+          },
+          "scope": "Actual sole-admin handover picker with no successor rows, dismissed without selecting or deleting."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
       "symbol": "TransferAdminSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for TransferAdminSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-transfer-admin-cancel",
+          "selector": {
+            "text": "Transfer admin"
+          },
+          "scope": "Actual native owner/member group opens the administration handover sheet and cancels without changing administrators."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembersScreen.kt",
       "symbol": "GroupMembersScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GroupMembersScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "groups-members-expanded",
+          "selector": {
+            "id": "chat_info.members_screen"
+          },
+          "scope": "Actual six-account native group opens the expanded roster, sees the sixth member and returns without membership mutation."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
@@ -1094,14 +1702,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
       "symbol": "CustomMuteDateDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for CustomMuteDateDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-mute-date",
+          "selector": {
+            "text": "Next"
+          },
+          "scope": "Actual custom mute date/time stages cancel back to the parent, with a fixed clock and no applied mute."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
       "symbol": "CustomMuteTimeDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for CustomMuteTimeDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-mute-time",
+          "selector": {
+            "text": "Choose a time"
+          },
+          "scope": "Actual custom mute date/time stages cancel back to the parent, with a fixed clock and no applied mute."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
@@ -1204,20 +1828,52 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
       "symbol": "OnboardingScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for OnboardingScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-onboarding-welcome",
+          "selector": {
+            "id": "onboarding.welcome.mark"
+          },
+          "scope": "Actual offline onboarding routing, empty sign-in and dismissal; no account import, signer, identity creation or public network."
+        },
+        {
+          "case": "presentation-surface-onboarding-signin",
+          "selector": {
+            "id": "onboarding.sign_in.action",
+            "enabled": false
+          },
+          "scope": "Actual offline onboarding routing, empty sign-in and dismissal; no account import, signer, identity creation or public network."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
       "symbol": "SignUpScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SignUpScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-onboarding-signup",
+          "selector": {
+            "id": "onboarding.sign_up.action"
+          },
+          "scope": "Actual offline onboarding routing, empty sign-in and dismissal; no account import, signer, identity creation or public network."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
       "symbol": "WelcomeScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for WelcomeScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-onboarding-welcome",
+          "selector": {
+            "id": "onboarding.welcome.sign_up"
+          },
+          "scope": "Actual offline onboarding routing, empty sign-in and dismissal; no account import, signer, identity creation or public network."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
@@ -1236,14 +1892,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddAccountSheetContent.kt",
       "symbol": "AddAccountSheetContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AddAccountSheetContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-addprofile-welcome",
+          "selector": {
+            "text": "Sign Up"
+          },
+          "scope": "Actual shared Add Profile content shown inside the secure dialog."
+        },
+        {
+          "case": "presentation-surface-addprofile-signin",
+          "selector": {
+            "text": "Sign Up"
+          },
+          "scope": "Actual shared Add Profile content shown inside the secure dialog."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddIdentitySheet.kt",
       "symbol": "AddIdentitySheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AddIdentitySheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-addprofile-welcome",
+          "selector": {
+            "text": "Sign Up"
+          },
+          "scope": "Actual secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account."
+        },
+        {
+          "case": "presentation-surface-addprofile-signin",
+          "selector": {
+            "text": "Sign Up"
+          },
+          "scope": "Actual secure Add Profile wrapper and shared welcome/sign-in content cancel without creating or importing an account."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AddProfileFeedbackDialog.kt",
@@ -1290,20 +1976,52 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditScreen.kt",
       "symbol": "ProfileEditScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileEditScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "profile-text-save-reopen",
+          "selector": {
+            "id": "profile.save",
+            "enabled": true
+          },
+          "scope": "Actual generated Alice profile editor saves and reopens native-backed name and biography."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileNotificationOverrideScreen.kt",
       "symbol": "ProfileNotificationOverrideScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileNotificationOverrideScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "alerts-person-vibration-cancel",
+          "selector": {
+            "text": "Use defaults"
+          },
+          "scope": "Actual Bob notification override destination and defaults state."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
       "symbol": "ProfileQrSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileQrSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-profile-qr-cancel",
+          "selector": {
+            "text": "npub.*"
+          },
+          "scope": "Actual generated-account profile QR sheet; Copy validates the platform clipboard against that native account public identity. No share launch or camera."
+        },
+        {
+          "case": "presentation-surface-profile-qr-copy",
+          "selector": {
+            "text": "npub.*"
+          },
+          "scope": "Actual generated-account profile QR sheet; Copy validates the platform clipboard against that native account public identity. No share launch or camera."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
@@ -1323,8 +2041,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
       "symbol": "ProfileAddToGroupsSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ProfileAddToGroupsSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "profiles-add-group-back",
+          "selector": {
+            "text": "Add to a group"
+          },
+          "scope": "Actual Bob private profile group picker opens and cancels, without adding membership."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
@@ -1357,8 +2083,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
       "symbol": "QrScannerSheetContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for QrScannerSheetContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "qr-permission-deny-close",
+          "selector": {
+            "text": "^Camera Access Needed$"
+          },
+          "scope": "Actual scanner QrScannerSheetContent renders the denied-permission recovery state and closes; no QR decode or camera capture claim."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
@@ -1369,8 +2103,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerSheet.kt",
       "symbol": "QrScannerSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for QrScannerSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "qr-permission-deny-close",
+          "selector": {
+            "text": "^Camera Access Needed$"
+          },
+          "scope": "Actual scanner QrScannerSheet renders the denied-permission recovery state and closes; no QR decode or camera capture claim."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
@@ -1389,8 +2131,23 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
       "symbol": "GlobalSearchCustomRangeReviewDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GlobalSearchCustomRangeReviewDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-surface-date-review-valid",
+          "selector": {
+            "text": "Custom Range"
+          },
+          "scope": "Actual production date-filter review validates forward/reversed date ranges with a fixed UTC calendar and exact callback payload."
+        },
+        {
+          "case": "presentation-surface-date-review-reversed",
+          "selector": {
+            "text": "Custom Range"
+          },
+          "scope": "Actual production date-filter review validates forward/reversed date ranges with a fixed UTC calendar and exact callback payload."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
@@ -1457,14 +2214,31 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
       "symbol": "ExportPasswordDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ExportPasswordDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "keys-empty",
+          "selector": {
+            "id": "profile_keys.view_backup",
+            "enabled": false
+          },
+          "scope": "Actual encrypted-key export password dialog blocks empty-password export."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
       "symbol": "SignOutAndWipeSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SignOutAndWipeSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "accounts-wipe-sheet-back",
+          "selector": {
+            "text": "What gets destroyed"
+          },
+          "scope": "Actual account wipe disclosure is cancelled before confirmation or native destructive action."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
@@ -1475,8 +2249,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
       "symbol": "SignOutSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SignOutSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "accounts-signout-back",
+          "selector": {
+            "text": "Stays on this device"
+          },
+          "scope": "Actual sign-out disclosure owns Back cancellation and retains native generated-account history."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
@@ -1553,7 +2335,7 @@
         {
           "case": "nested-blocked-empty",
           "selector": {
-            "text": "You haven’t blocked anyone."
+            "text": "You haven\u2019t blocked anyone."
           },
           "scope": "Actual empty blocked list of disposable account and Back."
         }
@@ -1577,26 +2359,59 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
       "symbol": "ChatFolderEditScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFolderEditScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "folders-empty-name",
+          "selector": {
+            "id": "folder.save",
+            "enabled": false
+          },
+          "scope": "Actual new folder editor blocks Save for empty title."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
       "symbol": "ChatFolderDeleteDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFolderDeleteDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "folders-delete-cancel",
+          "selector": {
+            "id": "folder.delete_dialog"
+          },
+          "scope": "Actual generated-folder deletion confirmation, Cancel preserves it."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
       "symbol": "ChatFoldersAccountScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFoldersAccountScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "folders-create-reopen",
+          "selector": {
+            "id": "chat-folders-content"
+          },
+          "scope": "Actual keyed account child mounted by ChatFoldersScreen."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
       "symbol": "ChatFoldersScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ChatFoldersScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "folders-create-reopen",
+          "selector": {
+            "id": "chat-folders-content"
+          },
+          "scope": "Actual account-scoped folder management and persisted folder reopen."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
@@ -1619,8 +2434,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
       "symbol": "CustomEmojiScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for CustomEmojiScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "advanced-custom-emoji",
+          "selector": {
+            "id": "custom-emoji-content"
+          },
+          "scope": "Actual appearance custom-emoji destination and empty/add action."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
@@ -1639,8 +2462,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
       "symbol": "DeveloperScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DeveloperScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "developer-unlock",
+          "selector": {
+            "id": "developer.warning"
+          },
+          "scope": "Actual hidden developer destination enabled by seven version taps."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
@@ -1677,8 +2508,16 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
       "symbol": "DiagnosticsHealthSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DiagnosticsHealthSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "developer-diagnostics-health",
+          "selector": {
+            "id": "diagnostics.health"
+          },
+          "scope": "Actual diagnostics Health & Performance sheet opened through its actions menu."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
@@ -1697,14 +2536,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
       "symbol": "DictationProviderSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DictationProviderSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "dictation-provider-back",
+          "selector": {
+            "text": "Automatic"
+          },
+          "scope": "Actual dictation provider chooser; Back retains preferences."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
       "symbol": "DictationSettingsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for DictationSettingsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "advanced-dictation",
+          "selector": {
+            "id": "dictation.ostt_recommendation.group"
+          },
+          "scope": "Actual dictation settings destination including provider recommendation."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
@@ -1723,14 +2578,30 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
       "symbol": "FullSpectrumColorPicker",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for FullSpectrumColorPicker; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-action-color",
+          "selector": {
+            "id": "color.hex"
+          },
+          "scope": "Actual full-spectrum picker in the action-color controls exports its editable hex field."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
       "symbol": "GestureSettingsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for GestureSettingsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "advanced-gestures",
+          "selector": {
+            "id": "gestures.MessageLeft"
+          },
+          "scope": "Actual swipe-action settings destination with message-left control."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
@@ -1783,20 +2654,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
       "symbol": "KeyPackagesScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for KeyPackagesScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "developer-key-packages",
+          "selector": {
+            "id": "key-packages-content"
+          },
+          "scope": "Actual key-package destination through developer navigation."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
       "symbol": "KeyPackagesScreenForAccount",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for KeyPackagesScreenForAccount; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "developer-key-packages",
+          "selector": {
+            "id": "key-packages-content"
+          },
+          "scope": "Actual account-scoped key-package child under KeyPackagesScreen."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
       "symbol": "LanguageScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for LanguageScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "preferences-language-cancel",
+          "selector": {
+            "text": "English"
+          },
+          "scope": "Actual language settings screen renders English and returns without changing the current locale."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
@@ -1815,14 +2710,31 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
       "symbol": "QuarantinedGroupsScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for QuarantinedGroupsScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "developer-quarantine",
+          "selector": {
+            "id": "quarantine.list"
+          },
+          "scope": "Actual quarantined-group destination for the generated account."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
       "symbol": "AddRelaySheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AddRelaySheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "relay-add-secure-443-accept-cancel",
+          "selector": {
+            "id": "relay.add.submit",
+            "enabled": true
+          },
+          "scope": "Actual relay draft chooser accepts valid secure URL and cancels without contacting or persisting it."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
@@ -1833,20 +2745,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
       "symbol": "RelaysScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for RelaysScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "advanced-relays",
+          "selector": {
+            "id": "relays.group"
+          },
+          "scope": "Actual generated-account relay settings destination."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
       "symbol": "SettingsGroupPanel",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SettingsGroupPanel; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "nested-action-color",
+          "selector": {
+            "id": "action_color.controls"
+          },
+          "scope": "Actual group-panel child owns the action-color controls row and color picker."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
       "symbol": "SettingsPanel",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SettingsPanel; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "presentation-group-ui-info-populated",
+          "selector": {
+            "text": "MLS group ID"
+          },
+          "scope": "Actual technical group screen renders the settings panel containing MLS identifiers."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
@@ -1893,8 +2829,17 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
       "symbol": "SmartFolderConditionDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SmartFolderConditionDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "folder-rules-edit-read-status",
+          "selector": {
+            "id": "folder.conditionDone",
+            "enabled": true
+          },
+          "scope": "Actual condition editor changes read status and reloads the updated rule."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
@@ -1905,20 +2850,44 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
       "symbol": "SmartFolderRulePanel",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SmartFolderRulePanel; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "folder-rules-all-read-reopen",
+          "selector": {
+            "id": "folder.condition.2"
+          },
+          "scope": "Actual structured rules panel persists and reloads its read-status condition."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
       "symbol": "SupportScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SupportScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "support-entry-back",
+          "selector": {
+            "id": "support.start"
+          },
+          "scope": "Actual support-chat start destination; cancellation without network contact."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
       "symbol": "SpeechCustomRateDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for SpeechCustomRateDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "speech-custom-cancel",
+          "selector": {
+            "id": "speech.custom_rate"
+          },
+          "scope": "Actual settings speech custom-rate editor and Cancel."
+        }
+      ],
+      "remaining": "Additional state, lifecycle and platform dimensions retain separately qualified cases; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
@@ -1951,44 +2920,100 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
       "symbol": "AuditUploadConsentDialog",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for AuditUploadConsentDialog; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "consent-log-confirm-cancel",
+          "selector": {
+            "text": "Share group diagnostic logs with White Noise[?]"
+          },
+          "scope": "Actual diagnostics consent confirmation dismisses without enabling log upload."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
       "symbol": "ShareChatPickerAccountSheet",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerAccountSheet; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "inbound-share-account-sheet-back",
+          "selector": {
+            "text": "^Maestro Bob$"
+          },
+          "scope": "Actual shared-draft account chooser ShareChatPickerAccountSheet renders generated Bob and dismisses while retaining selected recipients."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
       "symbol": "ShareChatPickerAccountSheetContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerAccountSheetContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "inbound-share-account-sheet-back",
+          "selector": {
+            "text": "^Maestro Bob$"
+          },
+          "scope": "Actual shared-draft account chooser ShareChatPickerAccountSheetContent renders generated Bob and dismisses while retaining selected recipients."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerBack.kt",
       "symbol": "ShareChatPickerBackAwareScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerBackAwareScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "inbound-share-text-close",
+          "selector": {
+            "id": "performance.share_picker"
+          },
+          "scope": "Actual external text import mounts ShareChatPickerBackAwareScreen in its owning share activity and closes; source/grant/task receipts remain native."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerDialog.kt",
       "symbol": "ShareChatPickerFullScreen",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerFullScreen; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "inbound-share-text-close",
+          "selector": {
+            "id": "performance.share_picker"
+          },
+          "scope": "Actual external text import mounts ShareChatPickerFullScreen in its owning share activity and closes; source/grant/task receipts remain native."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
       "symbol": "ShareChatPickerContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "inbound-share-text-close",
+          "selector": {
+            "text": "Maestro group"
+          },
+          "scope": "Actual share picker destination content contains the generated native conversation."
+        }
+      ],
+      "remaining": "Additional native mutations, lifecycle and hardware dimensions retain separate proof; this case qualifies only the stated production UI and dispatch boundary."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
       "symbol": "ShareChatPickerFullScreenContent",
-      "bindings": [],
-      "remaining": "Audit direct navigation and exceptional-state assertions for ShareChatPickerFullScreenContent; related manual IDs provide no screen execution proof."
+      "bindings": [
+        {
+          "case": "inbound-share-text-close",
+          "selector": {
+            "id": "performance.share_picker"
+          },
+          "scope": "Actual external text import mounts ShareChatPickerFullScreenContent in its owning share activity and closes; source/grant/task receipts remain native."
+        }
+      ],
+      "remaining": "Additional native and lifecycle dimensions retain dedicated proof; this binding qualifies only its stated scope."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",

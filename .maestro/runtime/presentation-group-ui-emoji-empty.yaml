@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-emoji-empty
+---
+- assertVisible:
+    text: Emoji group image
+- assertVisible:
+    text: No emoji selected
+- scrollUntilVisible:
+    element:
+      text: Use emoji image
+    direction: DOWN
+- assertVisible:
+    text: Use emoji image
+    enabled: false
+- back
+- assertVisible:
+    id: presentation.complete

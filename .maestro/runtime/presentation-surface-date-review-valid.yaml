@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-date-review-valid
+---
+- assertVisible:
+    text: Custom Range
+- assertVisible:
+    text: OK
+    enabled: true
+- tapOn: OK
+- assertVisible:
+    id: presentation.complete

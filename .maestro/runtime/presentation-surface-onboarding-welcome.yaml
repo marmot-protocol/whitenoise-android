@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-onboarding-welcome
+---
+- assertVisible:
+    id: onboarding.welcome.mark
+- assertVisible:
+    id: onboarding.welcome.sign_in
+- assertVisible:
+    id: onboarding.welcome.sign_up
+- back
+- assertVisible:
+    id: presentation.complete

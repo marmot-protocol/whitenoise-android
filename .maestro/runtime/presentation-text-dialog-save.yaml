@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-dialog-save
+---
+- assertVisible:
+    text: Fixture decoded.txt
+- assertVisible:
+    text: Fixture decoded first line.*
+- tapOn: More options
+- tapOn: Save
+- assertVisible:
+    id: presentation.complete

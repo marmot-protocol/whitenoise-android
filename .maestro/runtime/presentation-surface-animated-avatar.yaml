@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-animated-avatar
+---
+- assertVisible:
+    id: animated-profile-avatar
+- back
+- assertVisible:
+    id: presentation.complete

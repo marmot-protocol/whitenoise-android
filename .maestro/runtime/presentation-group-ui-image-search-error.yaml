@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-image-search-error
+---
+- assertVisible:
+    text: Fixture image chooser
+- tapOn: Image search
+- inputText: fixture search
+- hideKeyboard
+- tapOn: Search
+- assertVisible:
+    text: Image search returned an unexpected response.
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

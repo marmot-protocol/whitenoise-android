@@ -63,6 +63,8 @@ def run_case(name, reports):
     generation = uuid.uuid4().hex
     directory = reports / name
     directory.mkdir()
+    if CASES[name].get('presentation') == 'surface-animated-avatar':
+        return run_motion_fixture(name, directory, generation)
     if not CASES[name]['postcondition'].startswith('app-lock-credential-'):
         return run_fixture(name, directory, generation)
     # Baseline and restoration probes instantiate the same guarded Application as the UI host.
@@ -84,6 +86,44 @@ def run_case(name, reports):
             result['cleanup_safe'] = False
         (directory / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
     return result
+
+
+def run_motion_fixture(name, directory, generation):
+    """Only this disposable emulator case enables motion, with checked restoration after native cleanup."""
+    adb = ['adb', '-s', 'emulator-5554', 'shell', 'settings']
+    key = 'animator_duration_scale'
+    baseline = None
+    result = {'case': name, 'generation': generation, **CASES[name], 'passed': False, 'cleanup_safe': False}
+    try:
+        observed = command(adb + ['get', 'global', key]).strip()
+        if observed != 'null' and not re.fullmatch(r'[0-9]+(?:[.][0-9]+)?', observed):
+            raise ValueError('Unqualified emulator motion baseline')
+        baseline = observed
+        command(adb + ['put', 'global', key, '1'])
+        if float(command(adb + ['get', 'global', key]).strip()) != 1:
+            raise ValueError('Emulator motion setting was not applied')
+        result = run_fixture(name, directory, generation)
+    except Exception as error:
+        result['failure'] = f'{type(error).__name__}: {error}'
+    finally:
+        if baseline is not None:
+            try:
+                restore = ['delete', 'global', key] if baseline == 'null' else ['put', 'global', key, baseline]
+                command(adb + restore)
+                if command(adb + ['get', 'global', key]).strip() != baseline:
+                    raise ValueError('Emulator motion baseline was not restored')
+                result['motion_restored'] = True
+            except Exception as error:
+                result['motion_failure'] = f'{type(error).__name__}: {error}'
+                result['passed'] = False
+                result['cleanup_safe'] = False
+        (directory / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
+    return result
+
+
+def fixture_account_count(fixture):
+    """Only the explicit six-member native roster scenario changes the account inventory."""
+    return 6 if fixture == 'large-roster' else 3
 
 
 def disable_fixture_boot_receiver():
@@ -159,7 +199,8 @@ def run_fixture(name, directory, generation):
                     raise ValueError('Fixture instrumentation ended before readiness')
                 try:
                     ready = receipt(read('ready'), generation, 'ready')
-                    if ready.get('accounts') != 3 or ready.get('fixture') != fixture or ready.get('uiObserver') != 'maestro':
+                    if (ready.get('accounts') != fixture_account_count(fixture)
+                            or ready.get('fixture') != fixture or ready.get('uiObserver') != 'maestro'):
                         raise ValueError('Fixture account inventory mismatch')
                     if (CASES[name]['postcondition'] == 'app-lock-unavailable'
                             and ready.get('appLockFixtureNoCredential') is not True):
