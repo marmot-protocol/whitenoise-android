@@ -31,8 +31,10 @@ import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.onboarding.setup.SetupRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -100,14 +102,34 @@ class RelaySetupLifecycleDeviceTest {
                     }
                 } finally {
                     activity?.close()
-                    withTimeout(10_000L) { state?.stopNotificationListenerForAccountTeardown() }
-                    state?.mutationsScope?.cancel()
-                    withTimeout(15_000L) { native.shutdownAndClose() }
-                    context.deleteSharedPreferences(root.name)
-                    check(root.deleteRecursively())
+                    closeFixture(context, root, state, native)
                 }
             }
         }
+
+    /** Drains native readers and commands before closing their runtime, even when the test fails. */
+    private suspend fun closeFixture(
+        context: Context,
+        root: File,
+        state: WhiteNoiseAppState?,
+        native: Marmot,
+    ) = withContext(NonCancellable) {
+        try {
+            withTimeout(15_000L) {
+                withContext(Dispatchers.Main.immediate) { state?.accountSetup?.close() }
+                state?.stopNotificationListenerForAccountTeardown()
+                state
+                    ?.mutationsScope
+                    ?.coroutineContext
+                    ?.get(Job)
+                    ?.cancelAndJoin()
+            }
+        } finally {
+            withTimeout(15_000L) { native.shutdownAndClose() }
+            context.deleteSharedPreferences(root.name)
+            check(root.deleteRecursively())
+        }
+    }
 
     /** Creates a disposable app state without scheduling production push recovery. */
     private suspend fun createState(
