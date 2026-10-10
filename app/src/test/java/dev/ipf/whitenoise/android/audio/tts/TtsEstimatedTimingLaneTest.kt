@@ -843,7 +843,7 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun anEngineErrorEndsTheScheduleWithTheSession() =
+    fun anEngineErrorStopsTheScheduleWhileRetainingThePausedSession() =
         runTest {
             val harness = LaneHarness(this)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -854,7 +854,8 @@ class TtsEstimatedTimingLaneTest {
             advanceTimeBy(5_000)
             runCurrent()
 
-            assertTrue(harness.controller.state.value is TtsState.Error)
+            assertTrue(harness.controller.state.value is TtsState.Paused)
+            assertEquals(null, harness.controller.state.value.passage)
         }
 
     @Test

@@ -157,6 +157,7 @@ internal fun ConversationTtsAutoReadEffects(
     // initially withheld for membership verification.
     LaunchedEffect(controller, chatId, transcriptReadyToReveal) {
         if (!transcriptReadyToReveal) return@LaunchedEffect
+        if (appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@LaunchedEffect
         val entries = autoReadBacklogEntries()
         if (entries.isNotEmpty()) {
             appState.speakAloudAutoRead(
@@ -168,31 +169,8 @@ internal fun ConversationTtsAutoReadEffects(
         }
     }
 
-    // Live continuation only extends the conversation-owned active session.
-    LaunchedEffect(controller, chatId, transcriptReadyToReveal) {
-        var seededLastId = false
-        snapshotFlow {
-            controller.timeline
-                .lastOrNull()
-                ?.record
-                ?.messageIdHex
-        }.distinctUntilChanged()
-            .collect { lastId ->
-                if (lastId == null) return@collect
-                if (!transcriptReadyToReveal) return@collect
-                if (!seededLastId) {
-                    seededLastId = true
-                    return@collect
-                }
-                if (!appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@collect
-                val ttsState = appState.ttsController.state.value
-                if (ttsState !is TtsState.Speaking && ttsState !is TtsState.Paused) return@collect
-                val record = controller.timeline.lastOrNull()?.record ?: return@collect
-                if (record.messageIdHex != lastId) return@collect
-                val entry = projectEntry(record) ?: return@collect
-                appState.appendSpeech(entry, Locale.getDefault())
-            }
-    }
+    // The process-owned continuation consumes complete native batches, including
+    // while this screen is disposed. A second UI observer would compete with it.
 
     // On a real foreground return, narrate rows materialized after the paused
     // timeline cursor without replacing a newer manual/active speech session.

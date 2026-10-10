@@ -115,6 +115,33 @@ class NotificationDelayedRosterOwnershipTest : NotificationDelayedRosterFixture(
     }
 }
 
+/** Keeps UI and each speech session on independent scripted native subscription handles. */
+private fun delayedRosterTimelineScripts(withSpeech: Boolean): List<ScriptedConversationTimelineSubscription> {
+    val visible = ScriptedConversationTimelineSubscription(delayedRosterTimelinePage(MESSAGE_ID to NOTIFIED_BODY))
+    val playback =
+        if (withSpeech) {
+            listOf(
+                ScriptedConversationTimelineSubscription(
+                    delayedRosterTimelinePage(
+                        MESSAGE_ID to NOTIFIED_BODY,
+                        HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
+                    ),
+                ),
+                ScriptedConversationTimelineSubscription(
+                    delayedRosterTimelinePage(
+                        MESSAGE_ID to NOTIFIED_BODY,
+                        HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
+                        LIVE_MESSAGE_ID to LIVE_BODY,
+                        RESUMED_MESSAGE_ID to RESUMED_BODY,
+                    ),
+                ),
+            )
+        } else {
+            emptyList()
+        }
+    return listOf(visible) + playback
+}
+
 /** Owns the production-shell fixture shared by the two independently ordered roster cases. */
 abstract class NotificationDelayedRosterFixture {
     @get:Rule
@@ -159,7 +186,7 @@ abstract class NotificationDelayedRosterFixture {
 
     /** Exercises withheld, live, and foreground-resume speech through the production shell and engine boundary. */
     protected fun verifyWithheldTranscriptAutoRead() {
-        val fixture = createFixture(preloadFinishesFirst = true, targetRosterFailures = 1)
+        val fixture = createFixture(preloadFinishesFirst = true, targetRosterFailures = 1, withSpeech = true)
         val engine = FakeSessionEngine()
         fixture.appState.forceUsableTtsResolutionForDelayedRosterTest()
         fixture.appState.setTtsAutoReadGlobalDefault(true)
@@ -200,7 +227,7 @@ abstract class NotificationDelayedRosterFixture {
         engine: FakeSessionEngine,
     ) {
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
-        fixture.subscriptions.timelineScripts.single().emitWindow(
+        fixture.subscriptions.timelineScripts.first().emitWindow(
             delayedRosterTimelinePage(
                 MESSAGE_ID to NOTIFIED_BODY,
                 HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
@@ -225,13 +252,16 @@ abstract class NotificationDelayedRosterFixture {
         assertEquals(1, engine.spoken.count { NOTIFIED_BODY in it.text })
         assertEquals(1, engine.spoken.count { HIDDEN_RESUME_BODY in it.text })
 
-        fixture.subscriptions.timelineScripts.single().emitWindow(
+        val livePage =
             delayedRosterTimelinePage(
                 MESSAGE_ID to NOTIFIED_BODY,
                 HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
                 LIVE_MESSAGE_ID to LIVE_BODY,
-            ),
-        )
+            )
+        // The UI and process-owned playback are independent native subscribers.
+        fixture.subscriptions.timelineScripts
+            .take(2)
+            .forEach { it.emitWindow(livePage) }
         awaitCondition {
             timelineMessageIds(controller) == listOf(MESSAGE_ID, HIDDEN_RESUME_MESSAGE_ID, LIVE_MESSAGE_ID)
         }
@@ -248,7 +278,7 @@ abstract class NotificationDelayedRosterFixture {
         awaitCondition { fixture.appState.ttsController.state.value is TtsState.Idle }
         val spokenBeforeResume = engine.spoken.size
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
-        fixture.subscriptions.timelineScripts.single().emitWindow(
+        fixture.subscriptions.timelineScripts.first().emitWindow(
             delayedRosterTimelinePage(
                 MESSAGE_ID to NOTIFIED_BODY,
                 HIDDEN_RESUME_MESSAGE_ID to HIDDEN_RESUME_BODY,
@@ -269,15 +299,11 @@ abstract class NotificationDelayedRosterFixture {
     private fun createFixture(
         preloadFinishesFirst: Boolean,
         targetRosterFailures: Int = 0,
+        withSpeech: Boolean = false,
     ): DelayedRosterFixture {
         val subscriptions =
             ScriptedConversationLiveSubscriptions(
-                timelineScripts =
-                    listOf(
-                        ScriptedConversationTimelineSubscription(
-                            delayedRosterTimelinePage(MESSAGE_ID to NOTIFIED_BODY),
-                        ),
-                    ),
+                timelineScripts = delayedRosterTimelineScripts(withSpeech),
                 group = group(),
             )
         val gate = RouteOrderGate(preloadFinishesFirst, targetRosterFailures)
@@ -428,6 +454,7 @@ abstract class NotificationDelayedRosterFixture {
 
     /** Releases every test gate, detaches fixture-owned controllers, and closes scripted subscriptions. */
     private fun releaseAndClose(fixture: DelayedRosterFixture) {
+        fixture.appState.stopSpeaking()
         fixture.gate.releasePreload.countDown()
         fixture.gate.releaseActivation.countDown()
         fixture.gate.releaseTargetRoster.countDown()

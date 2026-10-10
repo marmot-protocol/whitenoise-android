@@ -1,0 +1,543 @@
+package dev.ipf.whitenoise.android.state
+
+import dev.ipf.marmotkit.TimelineEditSummaryFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
+import dev.ipf.whitenoise.android.audio.tts.FakeSessionFocus
+import dev.ipf.whitenoise.android.audio.tts.TtsController
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.core.TimelineProjector
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.util.Locale
+import kotlin.coroutines.CoroutineContext
+
+class TtsAutoReadContinuationTest {
+    @Test
+    fun completeBatchesAreAppendedOnceInNativeOrderWithNoConversationScreen() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.windows.send(page("m1", "m2", "m3"))
+            runCurrent()
+            host.windows.send(page("m1", "m2", "m3"))
+            runCurrent()
+
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            assertEquals(3, host.engine.spoken.size)
+            host.controller.stop()
+            runCurrent()
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun pauseRetainsEveryArrivalWithoutSpeakingAndResumeUsesTheSameQueue() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.controller.pause()
+            host.windows.send(page("m1", "m2", "m3"))
+            runCurrent()
+
+            assertTrue(host.controller.state.value is TtsState.Paused)
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            assertEquals(1, host.engine.spoken.size)
+            host.controller.resume()
+            assertEquals(4, host.engine.spoken.size)
+            assertEquals(1, host.opens)
+            host.controller.stop()
+            runCurrent()
+        }
+
+    @Test
+    fun aTransientEdgeDeferralPreservesArrivalsUntilItsNativeSnapshotIsRevalidated() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.controller.pause()
+            host.deferred.value = true
+            host.initial = page("m1", "m2", "m3")
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            host.deferred.value = false
+            runCurrent()
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            assertEquals(1, host.engine.spoken.size)
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            host.controller.stop()
+            runCurrent()
+        }
+
+    @Test
+    fun aDeferralThatStartsDuringProjectionDoesNotConsumeTheArrival() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.beforeProject = { host.deferred.value = true }
+            host.initial = page("m1", "m2")
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            host.beforeProject = null
+            host.deferred.value = false
+            runCurrent()
+            assertEquals(listOf("m1", "m2"), host.controller.queuedMessageIds())
+            host.controller.stop()
+            runCurrent()
+        }
+
+    @Test
+    fun aDetachedArrivalIsReplayedOnReattachmentWithoutAnotherNativeUpdate() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.attached.value = false
+            host.initial = page("m1", "m2", "m3")
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            // History has already queued m2; only the native window knows about m3.
+            host.controller.appendSpeech(entry("m2"), Locale.US)
+            host.attached.value = true
+            runCurrent()
+            assertEquals(listOf("m1", "m2", "m3"), host.controller.queuedMessageIds())
+            assertEquals(3, host.engine.spoken.size)
+            assertEquals(2, host.reads)
+            host.controller.stop()
+            runCurrent()
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun nativeDeletionStillRevokesSpeechWhileTheLiveTailIsDetached() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.attached.value = false
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            val deleted = timelineRecord("m1", 0uL, "Text m1.").copy(deleted = true)
+            host.windows.send(timelinePage(deleted))
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun aDetachedFeedClosureRevokesSpeechAndCancelsTheReadinessWait() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.attached.value = false
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            host.windows.close()
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertEquals(1, host.closes)
+            host.attached.value = true
+            runCurrent()
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+        }
+
+    @Test
+    fun detachmentDuringProjectionDoesNotConsumeTheArrival() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.beforeProject = { host.attached.value = false }
+            host.initial = page("m1", "m2")
+            host.windows.send(host.initial)
+            runCurrent()
+            assertEquals(listOf("m1"), host.controller.queuedMessageIds())
+            host.beforeProject = null
+            host.attached.value = true
+            runCurrent()
+            assertEquals(listOf("m1", "m2"), host.controller.queuedMessageIds())
+            host.controller.stop()
+            runCurrent()
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun anEditDuringAnEdgeDeferralRevokesSpeechInsteadOfAppendingTheStaleSnapshot() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.deferred.value = true
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            host.initial = timelinePage(timelineRecord("m1", 0uL, "Changed while waiting."))
+            host.deferred.value = false
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.engine.spoken.size)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun aMissingTailUsesNativeJumpAndForwardPaginationRatherThanSkippingToTheNewestRow() =
+        runTest {
+            val host = Host(page("m4"))
+            host.jump = page("m1", "m2").copy(hasMoreAfter = true)
+            host.forward = page("m2", "m3", "m4")
+            host.start(this)
+            runCurrent()
+
+            assertEquals(listOf("m1", "m2", "m3", "m4"), host.controller.queuedMessageIds())
+            assertEquals(listOf("m1"), host.jumps)
+            assertEquals(1, host.pages)
+            host.controller.stop()
+            runCurrent()
+        }
+
+    @Test
+    fun anUnrecoverableGapRevokesSpeechBeforeResumeCanSubmitCapturedText() =
+        runTest {
+            val host = Host(page("m3"))
+            host.start(this)
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.opens)
+            assertEquals(1, host.closes)
+            runCurrent()
+            assertEquals(1, host.opens)
+
+            val submissions = host.engine.spoken.size
+            host.controller.resume()
+            runCurrent()
+            assertEquals(1, host.opens)
+            assertEquals(submissions, host.engine.spoken.size)
+        }
+
+    @Test
+    fun aJumpWindowWithoutItsRequestedAnchorAlsoRevokesCapturedSpeech() =
+        runTest {
+            val host = Host(page("m3"))
+            host.jump = page("m2", "m3")
+            host.start(this)
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.closes)
+            val submissions = host.engine.spoken.size
+            host.controller.resume()
+            assertEquals(submissions, host.engine.spoken.size)
+        }
+
+    @Test
+    fun aClosedNativeFeedCannotResumeCapturedText() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.controller.pause()
+            host.windows.close()
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            val submissions = host.engine.spoken.size
+            host.controller.resume()
+            assertEquals(submissions, host.engine.spoken.size)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun aNativeCloseFailureRechecksPlaybackOwnershipOnTheOwnerDispatcher() =
+        runTest {
+            val host = Host(page("m1"))
+            val nativeThread = ThreadLocal.withInitial { false }
+            val native =
+                object : CoroutineDispatcher() {
+                    val delegate = StandardTestDispatcher(testScheduler)
+
+                    override fun dispatch(
+                        context: CoroutineContext,
+                        block: Runnable,
+                    ) {
+                        delegate.dispatch(context) {
+                            nativeThread.set(true)
+                            try {
+                                block.run()
+                            } finally {
+                                nativeThread.set(false)
+                            }
+                        }
+                    }
+                }
+            host.beforeOwns = { assertTrue("ownership must remain on its owner dispatcher", !nativeThread.get()) }
+            host.failClose = true
+            host.start(this, nativeDispatcher = native)
+            runCurrent()
+            host.windows.close()
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun pausedDistinctArrivalsCannotExceedTheRetainedMessageBudget() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this, maxMessages = 2)
+            runCurrent()
+            host.controller.pause()
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            assertEquals(listOf("m1", "m2"), host.controller.queuedMessageIds())
+            assertTrue(host.controller.state.value is TtsState.Paused)
+            host.windows.send(page("m1", "m2", "m3"))
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.engine.spoken.size)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun pausedArrivalsCannotExceedTheCumulativeTextBudget() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this, maxChars = 15)
+            runCurrent()
+            host.controller.pause()
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.engine.spoken.size)
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun aNativeDeletionRevokesCapturedSpeechWhileTheScreenIsAbsent() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            val initial = page("m1")
+            host.windows.send(initial.copy(messages = initial.messages.map { it.copy(deleted = true) }))
+            runCurrent()
+
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun nativeAcceptedEditsRemainReadableWithoutAVisibleControllerOverlay() =
+        runTest {
+            val edited =
+                timelineRecord("m1", 1uL, "Already edited.").copy(
+                    edit = TimelineEditSummaryFfi(1uL, "edit-m1", 2uL),
+                )
+            val initial = timelinePage(edited)
+            val host = Host(initial)
+            host.controller.speak(listOf(entry("m1", edited.plaintext)), Locale.US)
+            host.start(this)
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Speaking)
+
+            val incoming =
+                timelineRecord("m2", 3uL, "New accepted edit.").copy(
+                    edit = TimelineEditSummaryFfi(1uL, "edit-m2", 4uL),
+                )
+            host.windows.send(timelinePage(edited, incoming))
+            runCurrent()
+            assertEquals(listOf("m1", "m2"), host.controller.queuedMessageIds())
+            assertTrue(
+                host.engine.spoken
+                    .last()
+                    .text
+                    .endsWith(incoming.plaintext),
+            )
+            host.controller.stop()
+            runCurrent()
+        }
+
+    @Test
+    fun aLaterAcceptedNativeEditRevokesThePreviouslyCapturedBody() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            val changed =
+                timelineRecord("m1", 0uL, "Changed after capture.").copy(
+                    edit = TimelineEditSummaryFfi(1uL, "edit-m1", 2uL),
+                )
+            host.windows.send(timelinePage(changed))
+            runCurrent()
+            assertTrue(host.controller.state.value is TtsState.Idle)
+            assertTrue(host.controller.queuedMessageIds().isEmpty())
+            assertEquals(1, host.closes)
+        }
+
+    @Test
+    fun aProjectionThatReturnsAfterAccountReplacementCannotAppendToTheNewOwner() =
+        runTest {
+            val host = Host(page("m1"))
+            host.start(this)
+            runCurrent()
+            host.beforeProject = {
+                host.owned = false
+                host.controller.speak(listOf(entry("other")), Locale.US)
+            }
+            host.windows.send(page("m1", "m2"))
+            runCurrent()
+
+            assertEquals(listOf("other"), host.controller.queuedMessageIds())
+            assertEquals(1, host.closes)
+            host.controller.stop()
+        }
+
+    private class Host(
+        var initial: TimelinePageFfi,
+    ) : TtsAutoReadContinuationHost {
+        val engine = FakeSessionEngine()
+        override val controller = TtsController(FakeSessionFocus(), maxChunkLength = 4_000)
+        val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
+        val deferred = MutableStateFlow(false)
+        val attached = MutableStateFlow(true)
+        var owned = true
+        var opens = 0
+        var reads = 0
+        var closes = 0
+        var pages = 0
+        val jumps = mutableListOf<String>()
+        var jump: TimelinePageFfi? = null
+        var forward: TimelinePageFfi? = null
+        var beforeProject: (() -> Unit)? = null
+        var beforeOwns: (() -> Unit)? = null
+        var failClose = false
+
+        init {
+            controller.attachEngine(engine)
+            check(controller.speak(listOf(entry("m1")), Locale.US))
+        }
+
+        fun start(
+            scope: TestScope,
+            maxMessages: Int = 200,
+            maxChars: Int = 1_048_576,
+            nativeDispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
+        ) {
+            val dispatcher = nativeDispatcher
+            TtsAutoReadContinuation(this, scope.backgroundScope, dispatcher, maxMessages, maxChars)
+                .start("account", "group", Locale.US)
+        }
+
+        override fun owns(
+            account: String,
+            group: String,
+            session: Long,
+        ): Boolean {
+            beforeOwns?.invoke()
+            return owned
+        }
+
+        override val appendDeferred: Boolean
+            get() = deferred.value
+
+        override suspend fun awaitAppendReadiness() {
+            deferred.first { !it }
+        }
+
+        override suspend fun awaitTailAttachment() {
+            kotlinx.coroutines.flow
+                .combine(deferred, attached) { waiting, live -> !waiting && live }
+                .first { it }
+        }
+
+        override fun allowsAppend(): Boolean = attached.value && !appendDeferred
+
+        override suspend fun project(record: TimelineMessageRecordFfi): TtsSpeakableEntry? {
+            beforeProject?.invoke()
+            return projectTtsSpeakableEntry(
+                message = TimelineProjector.toAppMessageRecord(record),
+                editedText = null,
+                senderDisplayName = "Alice",
+                parseMarkdown = { record.contentTokens },
+            )
+        }
+
+        override suspend fun open(
+            account: String,
+            group: String,
+        ): ConversationTimelineSubscriptionHandle {
+            opens++
+            return object : ConversationTimelineSubscriptionHandle {
+                override fun snapshot(): TimelinePageFfi = initial
+
+                override suspend fun nextWindow(): TimelinePageFfi? {
+                    reads++
+                    return windows.receiveCatching().getOrNull()
+                }
+
+                override suspend fun paginateBackwards(count: UInt): TimelinePageOutcome = unchanged()
+
+                override suspend fun paginateForwards(count: UInt): TimelinePageOutcome {
+                    pages++
+                    return forward?.let { TimelinePageOutcome.Advanced(it) } ?: unchanged()
+                }
+
+                override suspend fun jumpToMessage(messageIdHex: String): ConversationJumpOutcome {
+                    jumps += messageIdHex
+                    return jump?.let { ConversationJumpOutcome.Window(TimelinePageOutcome.Advanced(it)) }
+                        ?: ConversationJumpOutcome.Missing
+                }
+
+                override fun close() {
+                    closes++
+                    if (failClose) error("Synthetic native cleanup failure")
+                }
+
+                private fun unchanged() =
+                    TimelinePageOutcome.Unchanged(
+                        ConversationWindowUnchangedReason.TERMINAL,
+                        initial,
+                    )
+            }
+        }
+    }
+
+    companion object {
+        private fun entry(
+            id: String,
+            text: String = "Text $id.",
+        ) = TtsSpeakableEntry("alice", "Alice", text, messageIdHex = id, sourceText = text)
+
+        private fun page(vararg ids: String) =
+            TimelinePageFfi(
+                ids.mapIndexed { index, id -> timelineRecord(id, index.toULong(), "Text $id.") },
+                false,
+                false,
+            )
+    }
+}

@@ -174,6 +174,7 @@ class TtsController internal constructor(
                 } ?: TextToSpeech.ERROR
             },
             onTerminal = ::releaseTerminalAudioFocus,
+            onInterrupted = audioFocus::release,
         )
 
     /** Approximate seconds until the active message finishes at the current voice pace and rate. */

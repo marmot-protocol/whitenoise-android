@@ -279,7 +279,7 @@ class TtsPlaybackQueueProgressTest {
 
         assertEquals(
             progressBeforeError,
-            (queue.state.value as TtsState.Error).messageProgressFraction,
+            (queue.state.value as TtsState.Paused).messageProgressFraction,
             0.001f,
         )
     }

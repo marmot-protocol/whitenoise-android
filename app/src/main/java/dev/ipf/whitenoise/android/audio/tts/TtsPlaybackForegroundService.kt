@@ -87,8 +87,8 @@ internal class TtsPlaybackMediaSessionCallback(
  *
  * Lifecycle: the app state starts the service when a session starts;
  * the service stops itself when the controller goes terminal (natural
- * completion, explicit stop, error — the queue is already cleared in all
- * three). Pause keeps the service and its notification alive: a paused
+ * completion, explicit stop, or a pre-playback error). Synthesis failures
+ * pause and retain the unfinished queue for Resume. Pause keeps the service and its notification alive: a paused
  * session does not expire merely because time passed or the app was
  * backgrounded.
  */

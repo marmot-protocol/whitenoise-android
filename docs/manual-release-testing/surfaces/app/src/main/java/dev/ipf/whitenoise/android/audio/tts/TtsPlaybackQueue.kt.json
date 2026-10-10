@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackQueue.kt",
+  "legacy_sha256": "532796788dabb3eac28f2f471f1f15c8644129abf5ba3b12b07dc892c0ef0b6a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Document navigation reads body-first while chat messages announce their sender",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackQueue.kt",
+        "anchor": "private fun announceChunk(",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "Recoverable synthesis pause retains the unfinished queue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackQueue.kt",
+        "anchor": "fun onError(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

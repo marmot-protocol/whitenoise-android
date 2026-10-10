@@ -38,8 +38,10 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSpokenTextSpan
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsTextRange
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.observePlaybackConversationDestination
@@ -256,6 +258,13 @@ class PlaybackTransportOwnershipTest {
     /** A current speech queue may advance naturally while the user decides whether to discard an editor draft. */
     @Test fun deferredSourceReturnFollowsTheCurrentPassageOfTheSameSpeechSession() {
         val appState = appState()
+        // Navigation requires a live native owner; feed loss is verified separately.
+        val timeline = ScriptedConversationTimelineSubscription(snapshotPage = null)
+        appState.liveSubscriptionOverrides.conversation =
+            ConversationLiveSubscriptions(
+                openTimeline = { _, _, _ -> timeline },
+                openGroupState = { _, _ -> error("This navigation fixture must not open group state") },
+            )
         appState.ttsController.attachEngine(FakeSessionEngine())
         assertTrue(
             appState.speakAloudAutoRead(
@@ -284,6 +293,10 @@ class PlaybackTransportOwnershipTest {
         var confirm: (() -> Unit)? = null
         val host = ShellPlaybackHost(appState) { opened++ }
         host.registerLeaveGuard(this) { confirm = it }
+        rule.waitUntil(timeoutMillis = 5_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            timeline.nextWindowCallCount == 1
+        }
         assertEquals("first", appState.currentPlaybackConversationDestination()?.messageIdHex)
         host.requestOpenSource()
         assertEquals(TtsNavigationOutcome.Moved, appState.ttsController.skipNextMessage())

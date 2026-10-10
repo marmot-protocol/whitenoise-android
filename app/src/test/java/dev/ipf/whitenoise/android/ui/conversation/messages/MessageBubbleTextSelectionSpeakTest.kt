@@ -59,6 +59,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
+import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -548,6 +550,7 @@ class MessageBubbleTextSelectionSpeakTest {
         }
         assertEquals(state, appState.ttsController.state.value)
         assertEquals(spoken, engine.spoken.size)
+        appState.stopSpeaking()
     }
 
     @Test
@@ -1006,6 +1009,12 @@ class MessageBubbleTextSelectionSpeakTest {
                     ),
                 activeAccountRef = ACCOUNT_REF,
             )
+        // Gesture tests require a healthy native feed; feed loss is covered separately.
+        appState.liveSubscriptionOverrides.conversation =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = listOf(ScriptedConversationTimelineSubscription(snapshotPage = null)),
+                group = group(),
+            ).subscriptions
         appState.forceUsableTtsResolutionForTests()
         appState.ttsController.attachEngine(engine)
         return appState
