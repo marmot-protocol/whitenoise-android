@@ -7,8 +7,11 @@ import re
 import subprocess
 
 
-# A Kotlin compatibility test reads this fixture; prose edits need that test.
-BUILD_INPUT_DOCS = {'docs/composer-dictation-device-matrix.md'}
+# Kotlin tests read these documents; their edits require the validating suites.
+BUILD_INPUT_DOCS = {
+    'docs/composer-dictation-device-matrix.md',
+    'docs/invariant-gates.md',
+}
 
 ROOT_DOCS = {'README.md', 'AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md',
              'SECURITY.md', 'CODE_OF_CONDUCT.md', 'CHANGELOG.md'}

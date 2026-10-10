@@ -58,8 +58,9 @@ contracts; it does not delay Android job startup.
 Only ordinary non-executable Markdown blobs in the named root guides or `docs/`
 qualify. JSON inventories, source-tree Markdown, build/workflow inputs,
 executables, symlinks, deleted code and unknown paths require full Android CI.
-`docs/composer-dictation-device-matrix.md` is a Kotlin-test fixture and also
-requires the full suite; document any future build/test input in the classifier.
+`docs/composer-dictation-device-matrix.md` and `docs/invariant-gates.md` are
+Kotlin-test inputs and require the full suite even when changed alone; document
+any future build/test input in the classifier.
 An unavailable/empty diff, missing refs or any non-PR event also requires full CI.
 
 The aggregate accepts skipped Android jobs only when classification succeeded
