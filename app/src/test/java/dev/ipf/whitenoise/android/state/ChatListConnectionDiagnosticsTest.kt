@@ -152,10 +152,51 @@ class ChatListConnectionDiagnosticsTest {
             owner.noteSubscriptionBoundary(current, PerformancePhase.CONNECTION_CHATS_OPEN)
             assertTrue(output.any { "phase=connection_chats_open" in it })
             assertEquals(ChatListConnectionPhase.Validating, owner.state.phase)
+            owner.invalidate()
+            assertTrue(output.any { "phase=connection_invalidated" in it })
+            assertFalse(
+                "healthy account teardown is not a network-loss event",
+                output.any { "phase=connection_network_lost" in it },
+            )
             assertFalse(output.any { "private-account" in it })
         } finally {
             owner.clear()
         }
+    }
+
+    /** Unchanged fast polls cannot consume the session budget needed for later recovery boundaries. */
+    @Test
+    fun repeatedRelaySamplesAreSuppressedButConnectivityAndReadinessEdgesRemain() {
+        val output = mutableListOf<String>()
+        var connectivity = PerformanceConnectivity.ONLINE_NO_RELAY
+        val emitter =
+            PerformanceDiagnosticEmitter(
+                available = true,
+                appRevision = "candidate",
+                mdkRevision = "7692e266",
+                nowMs = { 0L },
+                sink = output::add,
+            )
+        emitter.start()
+        val diagnostics =
+            diagnostics(
+                emitter,
+                configuration = { testConfiguration().copy(connectivity = connectivity) },
+                nowMs = { 0L },
+            )
+        val validating = testState().copy(phase = ChatListConnectionPhase.Validating)
+        diagnostics.begin(PerformancePhase.CONNECTION_RELAY_SAMPLE, validating)
+        val initialCount = output.size
+        repeat(1_000) { diagnostics.event(PerformancePhase.CONNECTION_RELAY_SAMPLE, validating) }
+        assertEquals(initialCount, output.size)
+        connectivity = PerformanceConnectivity.ONLINE_WITH_RELAY
+        diagnostics.event(PerformancePhase.CONNECTION_RELAY_SAMPLE, validating)
+        assertEquals(initialCount + 2, output.size)
+        val ready = validating.copy(phase = ChatListConnectionPhase.Ready)
+        diagnostics.event(PerformancePhase.CONNECTION_RELAY_SAMPLE, ready)
+        assertEquals(initialCount + 4, output.size)
+        diagnostics.event(PerformancePhase.CONNECTION_CATCH_UP_SUCCEEDED, ready)
+        assertTrue(output.any { "phase=connection_catch_up_succeeded" in it })
     }
 
     /** Uses the production serializer rather than a second test-only diagnostic format. */
@@ -185,7 +226,12 @@ class ChatListConnectionDiagnosticsTest {
 
     /** Anonymous numeric runtime data; the account key deliberately must not reach serialized output. */
     private fun testState(): ChatListConnectionState =
-        ChatListConnectionState(accountRef = "private-account", runtimeGeneration = 7, bindEpoch = 9, sessionAttemptId = 2)
+        ChatListConnectionState(
+            accountRef = "private-account",
+            runtimeGeneration = 7,
+            bindEpoch = 9,
+            sessionAttemptId = 2,
+        )
 
     /** Existing local/persistent delivery is expressed only as flags and a coarse connectivity enum. */
     private fun testConfiguration(): ChatListConnectionDiagnosticConfiguration =

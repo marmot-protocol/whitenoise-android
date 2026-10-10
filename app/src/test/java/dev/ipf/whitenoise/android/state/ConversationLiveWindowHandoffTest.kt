@@ -5,6 +5,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -101,6 +102,61 @@ class ConversationLiveWindowHandoffTest {
 
                 rosterReply.complete(conversationTimelineGroupRoster())
                 awaitConversationCondition { controller.membersVerified }
+            } finally {
+                rosterReply.complete(conversationTimelineGroupRoster())
+                controller.onCleared()
+                awaitOpenedTimelineSubscriptionsClosed(scripts)
+            }
+        }
+
+    /** Normal EOF cannot close the attempt while its initial loading/disclosure metadata is unsettled. */
+    @Test
+    fun normalTimelineEndWaitsForTheHeldInitialRosterToSettle() =
+        runBlocking {
+            val rosterStarted = CompletableDeferred<Unit>()
+            val rosterReply = CompletableDeferred<GroupRosterFfi>()
+            val timeline =
+                ScriptedConversationTimelineSubscription(
+                    timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL)),
+                ).apply { endWindows() }
+            val scripts =
+                ScriptedConversationLiveSubscriptions(
+                    timelineScripts = listOf(timeline),
+                    group = conversationTimelineTestGroup(),
+                )
+            var firstCloseLoading: Boolean? = null
+            var firstCloseVerified: Boolean? = null
+            val controller =
+                ConversationController(
+                    appState = conversationTimelineTestAppState(scripts.subscriptions),
+                    initialGroup = conversationTimelineTestGroup(),
+                    initialChatListRow = notificationChatListRow(),
+                    groupRosterReader = { _, _ ->
+                        rosterStarted.complete(Unit)
+                        rosterReply.await()
+                    },
+                    startOnConstruction = false,
+                )
+            timeline.onClose = {
+                if (firstCloseLoading == null) {
+                    firstCloseLoading = controller.isLoading
+                    firstCloseVerified = controller.membersVerified
+                }
+            }
+            controller.start()
+            try {
+                awaitConversationCondition { rosterStarted.isCompleted && timeline.windowEndObserved.isCompleted }
+                assertEquals(
+                    "normal EOF must not reopen while initialization is held",
+                    1,
+                    scripts.timelineSubscriptionOpenCount,
+                )
+                assertEquals(0, timeline.closeCallCount)
+                rosterReply.complete(conversationTimelineGroupRoster())
+                awaitConversationCondition { timeline.closeCallCount > 0 }
+                assertEquals(false, firstCloseLoading)
+                assertEquals(true, firstCloseVerified)
+                assertTrue(ConversationTimelineTestIds.MESSAGE_A in timelineMessageIds(controller))
             } finally {
                 rosterReply.complete(conversationTimelineGroupRoster())
                 controller.onCleared()

@@ -61,6 +61,12 @@ internal class ScriptedConversationTimelineSubscription(
     /** Optional command outcomes, including a null native timeout/not-ready reply. */
     val anchorReplies = mutableListOf<TimelinePageFfi?>()
 
+    /** Signals normal EOF without relying on a fixed sleep in lifecycle regressions. */
+    val windowEndObserved = CompletableDeferred<Unit>()
+
+    /** Observes controller settlement at the exact handle-close boundary. */
+    var onClose: () -> Unit = {}
+
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
 
@@ -82,7 +88,9 @@ internal class ScriptedConversationTimelineSubscription(
     /** Suspends until a scripted complete window arrives or the stream ends. */
     override suspend fun nextWindow(): TimelinePageFfi? {
         lifecycleEvents += "nextWindow"
-        return windows.receiveCatching().getOrNull()
+        return windows.receiveCatching().getOrNull().also { window ->
+            if (window == null) windowEndObserved.complete(Unit)
+        }
     }
 
     /** Ends live delivery so controller retry paths can be exercised. */
@@ -137,6 +145,7 @@ internal class ScriptedConversationTimelineSubscription(
 
     /** Records closure and unblocks any pending live-window read. */
     override fun close() {
+        onClose()
         lifecycleEvents += "close"
         windows.close()
     }

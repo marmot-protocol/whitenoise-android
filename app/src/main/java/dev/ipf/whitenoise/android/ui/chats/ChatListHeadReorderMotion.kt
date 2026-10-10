@@ -17,6 +17,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.state.tracedPagingSection
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -248,7 +249,8 @@ internal fun rememberChatListHeadReorderGate(
  * Active on-list head promotion: pairs [chatListRowMotion] with
  * animated scroll correction when [shouldSnapChatListForHeadReorder] fires.
  */
-@Suppress("FunctionNaming", "LongParameterList") // Dataset, gesture and demotion fences belong to this single viewport owner.
+// Dataset, gesture and demotion fences belong to this single viewport owner.
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun ChatListActiveHeadScrollEffect(
     listState: LazyListState,
@@ -310,17 +312,12 @@ internal fun ChatListActiveHeadScrollEffect(
                     correctionGestureGeneration = liveHeadMotionState.userGestureGeneration
                     correctionJob?.cancel()
                     liveProgressCallback(true)
-                    correctionJob = launch {
-                        try {
-                            tracedPagingSection("WhiteNoise.chatList.head.correction") {
-                                listState.animateScrollToItem(0)
-                            }
-                        } finally {
-                            // A superseded correction must not release its successor's gate.
-                            // The composition-owned gate retains the minimum input window.
-                            if (serial == correctionSerial) liveProgressCallback(false)
-                        }
-                    }
+                    correctionJob =
+                        launchHeadScrollCorrection(
+                            listState,
+                            isCurrent = { serial == correctionSerial },
+                            onProgress = { liveProgressCallback(it) },
+                        )
                 }
                 previous = current
             }
@@ -330,6 +327,23 @@ internal fun ChatListActiveHeadScrollEffect(
         }
     }
 }
+
+/** Runs one traced correction; superseded cleanup cannot release its successor's input gate. */
+private fun CoroutineScope.launchHeadScrollCorrection(
+    listState: LazyListState,
+    isCurrent: () -> Boolean,
+    onProgress: (Boolean) -> Unit,
+): Job =
+    launch {
+        try {
+            tracedPagingSection("WhiteNoise.chatList.head.correction") {
+                listState.animateScrollToItem(0)
+            }
+        } finally {
+            // The composition-owned gate retains the minimum input window.
+            if (isCurrent()) onProgress(false)
+        }
+    }
 
 private const val CHAT_LIST_MEMBERSHIP_FADE_MILLIS = 120
 internal const val CHAT_LIST_ROW_PLACEMENT_MILLIS = 240
