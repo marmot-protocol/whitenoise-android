@@ -17,6 +17,50 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], manifest = Config.NONE)
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationMentionNavigationTest {
+    /** Native tail clamping must report unreached while preserving command-settlement cleanup. */
+    @Test
+    fun clampedNewestPositionDoesNotReportReached() =
+        runTest {
+            val writer = RecordingWriter()
+            var completions = 0
+            val reached =
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "clamped-mention",
+                    resolveTargetIndex = { 0 },
+                    readLayout = { ConversationMentionJumpLayout(500, 80, itemOffsetPx = 0) },
+                    awaitLayout = {},
+                    onCompleted = { completions++ },
+                )
+            assertFalse(reached)
+            assertEquals(1, completions)
+            assertTrue(writer.writes.size <= 4)
+        }
+
+    /** A new window may shift the target while native room is remeasured; never correct the obsolete index. */
+    @Test
+    fun newestMentionReResolvesIndexAfterItsReadingRoomIsMeasured() =
+        runTest {
+            val writer = RecordingWriter()
+            var index = 0
+            var height = 80
+            var layoutPass = 0
+            val reached =
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "newest-mention",
+                    resolveTargetIndex = { index },
+                    readLayout = { current ->
+                        ConversationMentionJumpLayout(500, height, isNewest = current == 0)
+                    },
+                    awaitLayout = {
+                        layoutPass++
+                        if (layoutPass == 2) height = 160
+                        if (layoutPass == 3) index = 1
+                    },
+                )
+            assertTrue(reached)
+            assertEquals(listOf(Write(true, 0, -420), Write(false, 1, -340)), writer.writes)
+        }
+
     @Test
     fun measuredShortMentionUsesNegativeReadingStartOffset() =
         runTest {

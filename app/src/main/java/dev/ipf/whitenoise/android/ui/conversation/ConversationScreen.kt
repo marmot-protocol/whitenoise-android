@@ -2442,7 +2442,13 @@ internal fun ConversationScreen(
                                     viewportEndOffsetPx = layout.viewportEndOffset,
                                     itemHeightPx =
                                         layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-                                    estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
+                                    estimatedItemHeightPx =
+                                        navigationState.timelineItemHeightsPx[targetMessageId]
+                                            ?: ReplyNavigation.estimateItemHeightPx(
+                                                layout.visibleItemsInfo.map { it.size },
+                                            ),
+                                    isNewest = index == controller.conversationTrailingRowCount(renderedTimeline.size),
+                                    itemOffsetPx = layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset,
                                 )
                             },
                             onCompleted = {
@@ -4001,6 +4007,24 @@ internal fun ConversationScreen(
                     ?.let { ConversationSearchMarking(it, effectiveSearchMatchIds.toSet()) },
         ) {
             val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
+            val mentionReadingReserve by
+                remember(timelineViewport, density, scrollCoordinator, snackbarContentInset) {
+                    derivedStateOf {
+                        val rowHeight = scrollCoordinator.mentionReadingRowHeightPx
+                        if (rowHeight == null) {
+                            0.dp
+                        } else {
+                            with(density) {
+                                conversationMentionReadingReservePx(
+                                    readingHeightPx = timelineViewport.readingHeightPx(),
+                                    basePaddingPx =
+                                        (CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value).roundToPx(),
+                                    rowHeightPx = rowHeight,
+                                ).toDp()
+                            }
+                        }
+                    }
+                }
             ConversationTransientNoticeLayout(
                 notice = appState.transientNotice,
                 accountRef = conversationAccountRef,
@@ -4123,7 +4147,8 @@ internal fun ConversationScreen(
                                         .fillMaxSize()
                                         .measureConversationTimelinePadding(
                                             timelineViewport,
-                                            CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value,
+                                            CONVERSATION_TIMELINE_TAIL_GAP +
+                                                snackbarContentInset.value + mentionReadingReserve,
                                             overlayPadding,
                                         ).trackWhiteNoiseHeader(listState)
                                         .padding(horizontal = 12.dp)
@@ -4161,7 +4186,11 @@ internal fun ConversationScreen(
                                 // out of a lazy sentinel leaves the real last row as
                                 // the stable tail anchor.
                                 contentPadding =
-                                    conversationTimelineContentPadding(snackbarContentInset.value, overlayPadding),
+                                    conversationTimelineContentPadding(
+                                        snackbarContentInset.value,
+                                        overlayPadding,
+                                        mentionReadingReserve,
+                                    ),
                             ) {
                                 // The list is reversed, so the first item emitted
                                 // is laid out against the composer. Emit the newest

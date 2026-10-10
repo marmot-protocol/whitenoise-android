@@ -29,7 +29,18 @@ internal val CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT =
 internal fun conversationTimelineContentPadding(
     snackbarContentInset: Dp,
     foregroundOverlap: Dp = 0.dp,
-): PaddingValues = PaddingValues(bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap)
+    mentionReadingReserve: Dp = 0.dp,
+): PaddingValues =
+    PaddingValues(
+        bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap + mentionReadingReserve,
+    )
+
+/** Gives a newest-row mention room to reach the physical reading top without adding timeline rows. */
+internal fun conversationMentionReadingReservePx(
+    readingHeightPx: Int,
+    basePaddingPx: Int,
+    rowHeightPx: Int?,
+): Int = rowHeightPx?.let { (readingHeightPx - basePaddingPx - it).coerceAtLeast(0) } ?: 0
 
 /**
  * Whether the transcript emits its group-recovery card as a list row.

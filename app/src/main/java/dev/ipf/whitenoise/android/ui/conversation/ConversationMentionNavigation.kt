@@ -11,9 +11,20 @@ internal data class ConversationMentionJumpLayout(
     val viewportEndOffsetPx: Int,
     val itemHeightPx: Int?,
     val estimatedItemHeightPx: Int? = null,
+    val isNewest: Boolean = false,
+    val itemOffsetPx: Int? = null,
 ) {
     val isMeasured: Boolean
         get() = viewportEndOffsetPx > 0 && itemHeightPx != null && itemHeightPx > 0
+
+    /** A requested offset alone cannot prove success when the native list clamps at its tail. */
+    val isAtReadingStart: Boolean
+        get() =
+            itemOffsetPx == null ||
+                (
+                    isMeasured &&
+                        kotlin.math.abs(itemOffsetPx + requireNotNull(itemHeightPx) - viewportEndOffsetPx) <= 1
+                )
 
     val readingStartOffset: Int
         get() = ReplyNavigation.readingStartScrollOffset(viewportEndOffsetPx, itemHeightPx ?: estimatedItemHeightPx)
@@ -30,7 +41,15 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
     var reached = false
     val completed =
         programmaticJump(targetMessageId, ConversationScrollReason.Mention) {
-            val initialIndex = resolveTargetIndex() ?: return@programmaticJump
+            var initialIndex = resolveTargetIndex() ?: return@programmaticJump
+            val initialLayout = readLayout(initialIndex)
+            if (initialLayout.isNewest) {
+                reserveMentionReadingStart(
+                    initialLayout.itemHeightPx ?: initialLayout.estimatedItemHeightPx ?: 1,
+                    awaitLayout,
+                )
+                initialIndex = resolveTargetIndex() ?: return@programmaticJump
+            }
             val initialOffset = readLayout(initialIndex).readingStartOffset
             var placedIndex = initialIndex
             var placedOffset = initialOffset
@@ -92,10 +111,16 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     var attempt = 0
     var reached = false
     while (attempt <= MAX_MENTION_LAYOUT_CORRECTIONS && !reached) {
-        val index = resolveTargetIndex()
-        val layout = index?.let(readLayout)
-        if (index == null || layout == null || !layout.isMeasured) break
-        if (index == placedIndex && layout.readingStartOffset == placedOffset) {
+        var index = resolveTargetIndex() ?: break
+        var layout = readLayout(index)
+        if (!layout.isMeasured) break
+        if (layout.isNewest) {
+            reserveMentionReadingStart(requireNotNull(layout.itemHeightPx), awaitLayout)
+            index = resolveTargetIndex() ?: break
+            layout = readLayout(index)
+            if (!layout.isMeasured) break
+        }
+        if (index == placedIndex && layout.readingStartOffset == placedOffset && layout.isAtReadingStart) {
             reached = true
         } else if (attempt < MAX_MENTION_LAYOUT_CORRECTIONS) {
             tracedPagingSection(ConversationMentionJumpTrace.CORRECTION) {
