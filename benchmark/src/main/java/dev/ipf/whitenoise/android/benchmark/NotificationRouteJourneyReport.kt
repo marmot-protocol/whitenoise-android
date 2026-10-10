@@ -4,26 +4,25 @@ import kotlin.math.ceil
 
 /**
  * The four lifecycle journeys of the notification-route contract (#586). Budgets are the issue's
- * externally measured limits for a tap on a message card; [measured] records whether this change shipped
- * a device run for the journey, so an unmeasured one cannot be mistaken for a passing one.
+ * externally measured limits for a tap on a message card. No device run of any journey is recorded in the
+ * change that added them, so none of these budgets is evidence until a run is reported against them.
  */
 internal enum class NotificationRouteJourney(
     val label: String,
     val p95BudgetMs: Long,
     val maxBudgetMs: Long,
-    val measured: Boolean,
 ) {
     /** An existing task and runtime, restored to a different account before each sample. */
-    WARM_TASK("warmTask", p95BudgetMs = 1_000L, maxBudgetMs = 1_500L, measured = true),
+    WARM_TASK("warmTask", p95BudgetMs = 1_000L, maxBudgetMs = 1_500L),
 
     /** The process is killed before each tap, so process creation is part of the route. */
-    COLD_PROCESS("coldProcess", p95BudgetMs = 3_000L, maxBudgetMs = 5_000L, measured = false),
+    COLD_PROCESS("coldProcess", p95BudgetMs = 3_000L, maxBudgetMs = 5_000L),
 
     /** A live process whose target-account runtime is suspended, so activation is part of the route. */
-    RUNTIME_NOT_READY("runtimeNotReady", p95BudgetMs = 2_000L, maxBudgetMs = 3_000L, measured = false),
+    RUNTIME_NOT_READY("runtimeNotReady", p95BudgetMs = 2_000L, maxBudgetMs = 3_000L),
 
     /** App lock is active: the unlock surface and the post-unlock route have separate budgets. */
-    APP_LOCK_DEFERRED("appLockDeferred", p95BudgetMs = 1_000L, maxBudgetMs = 1_500L, measured = false),
+    APP_LOCK_DEFERRED("appLockDeferred", p95BudgetMs = 1_000L, maxBudgetMs = 1_500L),
 }
 
 /** Post-unlock and combined active-processing budgets for [NotificationRouteJourney.APP_LOCK_DEFERRED]. */
@@ -45,14 +44,16 @@ internal data class RouteLatencyStats(
     fun report(): String = "samples=$samples median=${medianMs}ms p95=${p95Ms}ms max=${maxMs}ms"
 }
 
-/** Nearest-rank percentile over [durationsMs], which must not be empty. */
+/** Median (the mean of the two middle samples when the count is even), nearest-rank P95 and maximum of [durationsMs]. */
 internal fun routeLatencyStats(durationsMs: List<Long>): RouteLatencyStats {
     require(durationsMs.isNotEmpty()) { "A journey needs at least one measured sample." }
     val sorted = durationsMs.sorted()
 
     /** Nearest-rank value at [fraction] of the sorted samples. */
     fun at(fraction: Double): Long = sorted[ceil(fraction * sorted.size).toInt().coerceIn(1, sorted.size) - 1]
-    return RouteLatencyStats(sorted.size, at(MEDIAN_FRACTION), at(P95_FRACTION), sorted.last())
+    val upperMiddle = sorted.size / 2
+    val median = if (sorted.size % 2 == 0) (sorted[upperMiddle - 1] + sorted[upperMiddle]) / 2 else sorted[upperMiddle]
+    return RouteLatencyStats(sorted.size, median, at(P95_FRACTION), sorted.last())
 }
 
 /**
@@ -111,5 +112,4 @@ internal object RenderedSurfaceLog {
     fun intermediateBeforeConversation(logcat: String): List<String> = surfaces(logcat).takeWhile { it != "conversation" }.filter { it in intermediate }
 }
 
-private const val MEDIAN_FRACTION = 0.50
 private const val P95_FRACTION = 0.95

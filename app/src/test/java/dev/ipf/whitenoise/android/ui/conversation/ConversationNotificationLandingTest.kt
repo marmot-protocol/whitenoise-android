@@ -76,6 +76,24 @@ class ConversationNotificationLandingTest {
         harnesses.forEach { it.controller.onCleared() }
     }
 
+    /** A reply already sent after the backlog retires the stale divider, exactly as the ordinary entry does. */
+    @Test
+    fun aLandingRetiresTheUnreadDividerWhenTheUserAlreadyRepliedAfterTheBacklog() {
+        val harness = Harness(targetHeightDp = 80, sentAfterOldestUnread = true)
+        harness.mount()
+        harness.awaitAnchored()
+        assertEquals(1, harness.dividerRetirements)
+    }
+
+    /** With nothing sent after the backlog the divider is left alone. */
+    @Test
+    fun aLandingKeepsTheUnreadDividerWhenNothingWasSentAfterTheBacklog() {
+        val harness = Harness(targetHeightDp = 80)
+        harness.mount()
+        harness.awaitAnchored()
+        assertEquals(0, harness.dividerRetirements)
+    }
+
     /** A short notified message in the middle of the backlog starts at the physical top, above the newer rows. */
     @Test
     fun shortNotifiedMessageStartsAtThePhysicalTop() {
@@ -285,6 +303,7 @@ class ConversationNotificationLandingTest {
         private val requestIsCurrent: Boolean = true,
         private val disposeOwnerOnBegin: Boolean = false,
         private val jump: JumpScript = JumpScript.NONE,
+        private val sentAfterOldestUnread: Boolean = false,
     ) {
         private val timelineScript =
             ScriptedConversationTimelineSubscription(
@@ -301,6 +320,8 @@ class ConversationNotificationLandingTest {
             )
         val anchored = mutableStateOf(false)
         val landedBacklogs = mutableListOf<String?>()
+        var dividerRetirements = 0
+            private set
         val unavailable = mutableListOf<MessageAvailability>()
         private val targetMessageId = mutableStateOf(notified)
         private val requestId = mutableLongStateOf(1L)
@@ -328,7 +349,12 @@ class ConversationNotificationLandingTest {
                 *(from until MESSAGE_COUNT)
                     .map { index ->
                         val record = timelineRecord(messageId(index), (index + 1).toULong())
-                        if (messageId(index) == notified) record.copy(kind = targetKind) else record
+                        when {
+                            messageId(index) == notified -> record.copy(kind = targetKind)
+                            sentAfterOldestUnread && messageId(index) == messageId(OLDEST_UNREAD_INDEX + 1) ->
+                                record.copy(direction = "sent")
+                            else -> record
+                        }
                     }.toTypedArray(),
             ).copy(hasMoreBefore = from > 0)
 
@@ -404,7 +430,7 @@ class ConversationNotificationLandingTest {
             ConversationViewportRestorationCallbacks(
                 navigation = ConversationViewportNavigation(this::listIndexOf) { 0 },
                 onAnchored = { anchored.value = true },
-                retireUnreadDivider = {},
+                retireUnreadDivider = { dividerRetirements += 1 },
                 notification =
                     ConversationNotificationLandingCallbacks(
                         beginNavigation = this::beginRequest,
@@ -491,7 +517,8 @@ class ConversationNotificationLandingTest {
 
         val ABSENT = "ee".repeat(32)
         val OLDER_RETAINED = messageId(3)
-        val OLDEST_UNREAD = messageId(2)
+        const val OLDEST_UNREAD_INDEX = 2
+        val OLDEST_UNREAD = messageId(OLDEST_UNREAD_INDEX)
         val NOTIFIED = messageId(6)
     }
 }

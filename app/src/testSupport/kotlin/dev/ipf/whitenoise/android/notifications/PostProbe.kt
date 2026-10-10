@@ -109,6 +109,10 @@ class PostProbe(
     val posts: List<RecordedPost>
         get() = recorded.toList()
 
+    /** How many of the next writes fail after being recorded, as a platform refusal would. Counts down as it fails. */
+    @Volatile
+    var failNextWrites: Int = 0
+
     /** The presenter clock seam. */
     val nowMillis: () -> Long = { clock.nowMillis }
 
@@ -160,6 +164,10 @@ class PostProbe(
         notification: Notification,
     ) {
         record(tag, id, notification)
+        if (failNextWrites > 0) {
+            failNextWrites -= 1
+            error("Simulated platform write failure")
+        }
         if (deliver) manager.notify(tag, id, notification)
     }
 }

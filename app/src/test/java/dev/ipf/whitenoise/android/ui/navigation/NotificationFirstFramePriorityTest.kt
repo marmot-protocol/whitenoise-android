@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import dev.ipf.whitenoise.android.notifications.NotificationRouteFirstFrameGate
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -86,8 +87,10 @@ class NotificationFirstFramePriorityTest {
         val gate = NotificationRouteFirstFrameGate(requestId = 1L, accountRef = "account-b")
         priority.begin(gate)
 
+        assertEquals(1L, priority.heldRequestId)
         generation += 1
 
+        assertNull("the watchdog must stop timing a gate whose runtime is gone", priority.heldRequestId)
         assertNull(priority.gate)
         assertTrue(gate.isReleased)
     }

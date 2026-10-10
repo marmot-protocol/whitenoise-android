@@ -121,6 +121,10 @@ internal object NotificationRouteTrace {
     /**
      * Ends the total slice while the route waits on a person, so a budget measured over it excludes
      * unlock time, and opens the wait as its own slice. A request that is not current is left alone.
+     *
+     * Phase slices stay wall-clock durations and are not split here. A tap that arrives under app lock stays
+     * staged, so its route phases begin only after the unlock, and a phase already open when a lock appears
+     * mid-route would include the wait. Only the total and the wait slice carry the unlock boundary.
      */
     fun pauseForAppLock(requestId: Long) {
         synchronized(lock) {

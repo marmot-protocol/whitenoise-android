@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapGate
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapState
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
+import dev.ipf.whitenoise.android.notifications.notificationTapLifecycle
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.notifications.startNotificationRouteTrace
 import dev.ipf.whitenoise.android.share.ShareRequest
@@ -386,6 +387,7 @@ class MainActivity : AppCompatActivity() {
     private fun consumeIntent(
         intent: Intent?,
         retainPendingShareOnRecreation: Boolean = false,
+        lifecycleClass: WarmResumeLifecycleClass = warmResumeLifecycleClass,
     ) {
         if (AppUpdateNavigation.isUpdateTap(intent)) {
             pinTapGate.supersede()
@@ -438,7 +440,7 @@ class MainActivity : AppCompatActivity() {
         pinTapGate.supersedeForRoute(parsedTarget != null, parsedShare != null, profileData)
         if (parsedTarget != null) {
             foregroundConversationDismissal.onNotificationRouteObserved()
-            appState.startNotificationRouteTrace(routing.notificationRequestId, warmResumeLifecycleClass, parsedTarget)
+            appState.startNotificationRouteTrace(routing.notificationRequestId, lifecycleClass, parsedTarget)
         }
         inboundNotificationTarget = routing.notificationTarget
         inboundNotificationRequestId = routing.notificationRequestId
@@ -543,7 +545,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
         setIntent(intent)
-        consumeIntent(intent)
+        consumeIntent(
+            intent,
+            lifecycleClass = notificationTapLifecycle(warmResumeLifecycleClass, deliveredToRunningActivity = true),
+        )
     }
 
     private fun requestAppUnlock() {

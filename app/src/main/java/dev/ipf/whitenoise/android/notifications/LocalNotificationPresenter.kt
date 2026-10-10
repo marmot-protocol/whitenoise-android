@@ -942,7 +942,7 @@ class LocalNotificationPresenter(
                     }
 
                     // Builds under the card lock, so the quiet flags see the card the platform will update.
-                    val buildSettled = {
+                    val buildSettled = { afterOwnCancel: Boolean ->
                         builder
                             .settledForWrite(
                                 heldAlert,
@@ -950,6 +950,7 @@ class LocalNotificationPresenter(
                                 replaceCurrentMessage,
                                 notificationContent.notificationTag,
                                 notificationContent.notificationId,
+                                liveCardIsBeingCancelled = afterOwnCancel,
                             ).build()
                     }
                     // Reserve a write slot before the serialized write so a burst of updates for one busy
@@ -1046,7 +1047,7 @@ class LocalNotificationPresenter(
                                             ),
                                         )
                                     }
-                                    val notification = buildSettled()
+                                    val notification = buildSettled(false)
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -1110,7 +1111,7 @@ class LocalNotificationPresenter(
                                                     emojiArtwork = null,
                                                 ),
                                             )
-                                            val cleanNotification = buildSettled()
+                                            val cleanNotification = buildSettled(true)
                                             val retryResult =
                                                 postNotificationSafely(
                                                     notificationManager,
@@ -1170,7 +1171,7 @@ class LocalNotificationPresenter(
                                     }
                                     val presentationTimestampMs = nowMillis()
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                                    val notification = buildSettled()
+                                    val notification = buildSettled(false)
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
                                         ConversationCardBarrier.BEFORE_WRITE,
@@ -1549,7 +1550,9 @@ class LocalNotificationPresenter(
      * Applies the quiet flags at write time for a post that already decided to stay quiet, or whose ring a later
      * alert took while it waited for its pacer slot or card lock, and hands that claim back so the account may
      * ring later. The live same-key card is read here, under the card lock, so [quietWrite] sees the card the
-     * platform is about to update.
+     * platform is about to update. A retry that follows the presenter's own cancel of that card sets
+     * [liveCardIsBeingCancelled], because the platform applies the cancel asynchronously and the card it still
+     * lists is about to go, so the write is treated as a new post and keeps `setSilent`.
      */
     private fun NotificationCompat.Builder.settledForWrite(
         heldAlert: NotificationAlertReservation?,
@@ -1557,6 +1560,7 @@ class LocalNotificationPresenter(
         replaceCurrentMessage: Boolean,
         notificationTag: String,
         notificationId: Int,
+        liveCardIsBeingCancelled: Boolean = false,
     ): NotificationCompat.Builder {
         var superseded = false
         if (heldAlert != null && !heldAlert.stillHoldsTheRing()) {
@@ -1566,8 +1570,12 @@ class LocalNotificationPresenter(
         }
         if (!quiet && !superseded) return this
         val liveCard =
-            synchronized(UserEventNotificationGroup.mutationLock) {
-                activeConversationCard(notificationTag, notificationId)
+            if (liveCardIsBeingCancelled) {
+                null
+            } else {
+                synchronized(UserEventNotificationGroup.mutationLock) {
+                    activeConversationCard(notificationTag, notificationId)
+                }
             }
         return quietWrite(replaceCurrentMessage, notificationId, liveCard)
     }

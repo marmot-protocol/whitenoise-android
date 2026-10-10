@@ -224,6 +224,25 @@ class ConversationReadingStartNavigationTest {
             assertTrue("the intent keeps owning the position it just corrected", intent.isCurrent(coordinator))
         }
 
+    /** A row scrolled out of the viewport has no measured height, so leaving it can never rerun the settle. */
+    @Test
+    fun aRowOutsideTheViewportReportsNoGeometryAndSoNeverPullsTheListBack() =
+        runTest {
+            val coordinator = ConversationScrollCoordinator(RecordingWriter())
+            val anchor = ConversationScrollAnchor(5, 300, "item-5", TARGET)
+            coordinator.settleReadingAt(anchor)
+            val intent =
+                ConversationReadingStartIntent(
+                    anchor = anchor,
+                    probe = probe(index = { 5 }, layout = { ConversationMentionJumpLayout(500, null) }),
+                    placement = ConversationReadingStartPlacement(5, 300),
+                    intentRevision = coordinator.intentToken.revision,
+                )
+
+            assertTrue(intent.isCurrent(coordinator))
+            assertNull(intent.geometry())
+        }
+
     /** A drag changes the scroll intent, so the recorded landing can no longer claim the viewport. */
     @Test
     fun aGestureRetiresTheIntentAndAStaleResettleWritesNothingToIt() =

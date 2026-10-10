@@ -32,7 +32,11 @@ class NotificationRouteLifecycleBenchmark {
         runJourney(NotificationRouteJourney.COLD_PROCESS) { journeys -> journeys.killAppAndGoHome() }
     }
 
-    /** Needs a fixture that leaves the target account's runtime suspended before each sample. */
+    /**
+     * Needs a fixture that leaves the target account's runtime suspended before each sample. The journey
+     * cannot observe that state itself, so its classification is asserted by the operator's flag and its
+     * result describes a not-ready runtime only as far as that fixture really produced one.
+     */
     @Test
     fun targetRuntimeNotReadyFirstConversationFrame() {
         assumeTrue(
@@ -109,7 +113,7 @@ class NotificationRouteLifecycleBenchmark {
         val intermediateFailures = samples.count { it.intermediateSurfaces.isNotEmpty() }
         val budgetFailure = stats.p95Ms > journey.p95BudgetMs || stats.maxMs > journey.maxBudgetMs
         val report =
-            "journey=${journey.label} measured=${journey.measured} ${stats.report()} " +
+            "journey=${journey.label} ${stats.report()} " +
                 "p95Budget=${journey.p95BudgetMs}ms maxBudget=${journey.maxBudgetMs}ms " +
                 "identityFailures=$identityFailures intermediateSurfaceFailures=$intermediateFailures " +
                 setup.report()
@@ -138,7 +142,7 @@ class NotificationRouteLifecycleBenchmark {
                 combined.p95Ms > AppLockRouteBudgets.COMBINED_P95_MS ||
                 combined.maxMs > AppLockRouteBudgets.COMBINED_MAX_MS
         val report =
-            "journey=${journey.label} measured=${journey.measured} toLockSurface[${first.report()}] " +
+            "journey=${journey.label} toLockSurface[${first.report()}] " +
                 "afterUnlock[${second.report()}] combined[${combined.report()}] ${setup.report()}"
         Log.i(BENCHMARK_LOG_TAG, report)
         check(!failed) { "App-lock notification route failed: $report" }

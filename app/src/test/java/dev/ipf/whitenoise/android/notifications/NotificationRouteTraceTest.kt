@@ -165,6 +165,21 @@ class NotificationRouteTraceTest {
         }
     }
 
+    /** A tap handed to a running Activity is a same-Activity resume, whatever launch created that Activity. */
+    @Test
+    fun aTapDeliveredToARunningActivityIsWarmEvenWhenItsActivityStartedCold() {
+        val cold = WarmResumeLifecycleClass.ColdProcessStart
+        val resumed = notificationTapLifecycle(cold, deliveredToRunningActivity = true)
+        val created = notificationTapLifecycle(cold, deliveredToRunningActivity = false)
+
+        assertEquals(WarmResumeLifecycleClass.SameActivity, resumed)
+        assertEquals(WarmResumeLifecycleClass.ColdProcessStart, created)
+        assertEquals(
+            NotificationRouteLaunchClass.WARM_TASK,
+            classifyNotificationRouteLaunch(resumed, runtimeReady = true, appLockPending = false),
+        )
+    }
+
     /** A lock outranks everything, then a new process, then an unready runtime, else the tap is warm. */
     @Test
     fun launchClassificationPrefersLockThenColdProcessThenUnreadyRuntime() {

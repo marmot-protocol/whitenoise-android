@@ -43,9 +43,12 @@ internal class NotificationFirstFramePriority(
             return null
         }
 
-    /** Request id of the gate now held, or null. Read in composition so a watchdog restarts for each request. */
+    /**
+     * Request id of the gate now held, or null, including when its runtime generation is gone. Read in
+     * composition so a watchdog restarts for each request and stops timing a gate that can no longer matter.
+     */
     val heldRequestId: Long?
-        get() = held?.gate?.requestId
+        get() = held?.takeIf { it.runtimeGeneration == runtimeGeneration() }?.gate?.requestId
 
     /** Holds [gate] for the current runtime, releasing any predecessor that a newer request replaced. */
     fun begin(gate: NotificationRouteFirstFrameGate) {

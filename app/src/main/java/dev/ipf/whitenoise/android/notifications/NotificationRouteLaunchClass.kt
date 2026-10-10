@@ -38,6 +38,15 @@ internal fun classifyNotificationRouteLaunch(
         else -> NotificationRouteLaunchClass.WARM_TASK
     }
 
+/**
+ * The lifecycle a tap arrived in. The Activity's own class is fixed when it is created, so a tap that a running
+ * Activity receives through `onNewIntent` is a same-Activity resume whatever launch created that Activity.
+ */
+internal fun notificationTapLifecycle(
+    activityClass: WarmResumeLifecycleClass,
+    deliveredToRunningActivity: Boolean,
+): WarmResumeLifecycleClass = if (deliveredToRunningActivity) WarmResumeLifecycleClass.SameActivity else activityClass
+
 /** Starts the route's trace for one tap, labelled with the lifecycle it arrived in. */
 internal fun WhiteNoiseAppState.startNotificationRouteTrace(
     requestId: Long,

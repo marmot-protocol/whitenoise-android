@@ -10,6 +10,7 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -55,6 +56,16 @@ class LocalNotificationHeadsUpFlagsTest {
         probe = PostProbe()
         presenter = newPresenter()
         presenter.ensureChannels()
+    }
+
+    /**
+     * Stops the shared group reconciler and clears the tray. A cancel schedules a delayed summary reconcile on a
+     * background thread, and without this it can post its summary into whichever later test is running.
+     */
+    @After
+    fun tearDown() {
+        NotificationGroupReconciler.shared(context).close()
+        manager.cancelAll()
     }
 
     /** A second message inside the burst window joins the live card without leaving the alerting group. */
@@ -129,6 +140,49 @@ class LocalNotificationHeadsUpFlagsTest {
         assertSilenced(silentJoin)
         assertSilenced(laterWrite)
         assertEquals(silentJoin.sortKey, laterWrite.sortKey)
+    }
+
+    /** A late correction over a card that was built silent never makes it newly eligible to alert. */
+    @Test
+    @Config(sdk = [30, 36])
+    fun lateCorrectionOverACardThatJoinedSilentlyStaysSilent() {
+        assertTrue(show(notificationUpdate(messageIdHex = "first")))
+        probe.clock.advanceBy(BURST_STEP_MS)
+        val joined = notificationUpdate(groupIdHex = "group-b", messageIdHex = "b-first")
+        assertTrue(show(joined, body = "b-first"))
+        assertTrue(
+            show(
+                joined,
+                body = "corrected",
+                senderName = "Alice Corrected",
+                silentUpdate = true,
+                replaceCurrentMessage = true,
+            ),
+        )
+
+        val (_, silentJoin, correction) = probe.posts
+        assertSilenced(silentJoin)
+        assertSilenced(correction)
+        assertEquals(silentJoin.sortKey, correction.sortKey)
+        val liveCard = manager.activeNotifications.first { it.tag == silentJoin.tag }.notification
+        assertEquals(listOf("corrected"), carriedTexts(liveCard))
+    }
+
+    /** A rewrite after the presenter cancelled its own failed write is a new post, so it keeps `setSilent`. */
+    @Test
+    @Config(sdk = [30, 36])
+    fun retryAfterAFailedQuietWriteTreatsTheCancelledCardAsGone() {
+        assertTrue(show(notificationUpdate(messageIdHex = "first")))
+        probe.clock.advanceBy(BURST_STEP_MS)
+        probe.failNextWrites = 1
+        assertTrue(show(notificationUpdate(messageIdHex = "second"), body = "second"))
+
+        val (first, failedAttempt, retry) = probe.posts
+        assertAlerting(first)
+        assertQuietOverLiveCard(first, failedAttempt)
+        assertSilenced(retry)
+        assertEquals(first.tag, retry.tag)
+        assertEquals(first.id, retry.id)
     }
 
     /** The late text correction replaces the message on the live card without re-ranking it or silencing its group. */

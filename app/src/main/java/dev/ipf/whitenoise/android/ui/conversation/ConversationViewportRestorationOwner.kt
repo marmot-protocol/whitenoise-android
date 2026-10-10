@@ -110,7 +110,7 @@ internal class ConversationViewportRestorationOwner(
     }
 
     /** Fresh geometry of the landing's target while it still owns the viewport, null once nothing does. */
-    fun readingStartGeometry(): Pair<Int, Int?>? = readingStart?.takeIf { it.isCurrent(coordinator) }?.geometry()
+    fun readingStartGeometry(): Pair<Int, Int>? = readingStart?.takeIf { it.isCurrent(coordinator) }?.geometry()
 
     /** Re-settles a landing after its row or viewport changed size, unless a gesture already took over. */
     suspend fun onReadingStartGeometry() {

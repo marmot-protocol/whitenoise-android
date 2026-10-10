@@ -8,7 +8,8 @@ import androidx.core.app.NotificationCompat
  *
  * AndroidX applies `setSilent` at build time by moving a non-summary card to GROUP_ALERT_SUMMARY and clearing
  * its sound and vibration, so that group behavior on a child is the only trace left on the built card.
- * Presenter cards always carry GROUP_ALERT_CHILDREN unless they were silenced, which keeps this unambiguous.
+ * A presenter child card otherwise carries GROUP_ALERT_CHILDREN, or GROUP_ALERT_ALL when a contact rewrite
+ * rebuilt it from a recovered builder, so SUMMARY on a child is unambiguous.
  */
 internal fun Notification.wasBuiltSilent(): Boolean =
     groupAlertBehavior == Notification.GROUP_ALERT_SUMMARY &&
@@ -26,19 +27,23 @@ internal fun Notification.wasBuiltSilent(): Boolean =
  *
  * With no live card nothing would honour `FLAG_ONLY_ALERT_ONCE`, since the platform only mutes updates, so the
  * write keeps `setSilent` and a card the user already swiped away cannot ring a second time. A write that
- * replaces the current message has never set it, and that stays as it was. The decision belongs at the final
- * write, where [liveCard] is read under the card lock. A swipe landing between that read and the platform post
- * can still let one write ring, a window of milliseconds that no flag choice closes.
+ * replaces the current message has never set it when there is no live card. Over a live card that was built
+ * silent, the write stays silent whether or not it replaces the message, because that card never alerted and
+ * a late correction must not make it newly eligible to. The decision belongs at the final write, where
+ * [liveCard] is read under the card lock. A swipe landing between that read and the platform post can still
+ * let one write ring, a window of milliseconds that no flag choice closes. A caller that has just cancelled
+ * the card itself passes no [liveCard], since the platform applies a cancel asynchronously and the listed card
+ * is about to disappear.
  */
 internal fun NotificationCompat.Builder.quietWrite(
     replaceCurrentMessage: Boolean,
     notificationId: Int,
     liveCard: Notification?,
 ): NotificationCompat.Builder {
-    val keepsHeadsUp = liveCard != null && !liveCard.wasBuiltSilent()
+    val silent = if (liveCard != null) liveCard.wasBuiltSilent() else !replaceCurrentMessage
     return setOnlyAlertOnce(true)
         .setSortKey(
             liveCard?.sortKey?.takeIf(String::isNotEmpty)
                 ?: UserEventNotificationGroup.attentionSortKey(notificationId, silent = true),
-        ).setSilent(!keepsHeadsUp && !replaceCurrentMessage)
+        ).setSilent(silent)
 }
