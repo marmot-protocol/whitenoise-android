@@ -369,6 +369,72 @@ class ConversationViewportRestorationOwnerTest {
             assertEquals(listOf(7 to 300, 7 to 400), fixture.writer.writes)
         }
 
+    /**
+     * A wheel, key or accessibility scroll raises no drag, so the landed row leaves the screen while the landing is
+     * still current. A new message then changes the structure, and neither the landing nor the ordinary reanchor may
+     * drag the reader back to the notified message. The reader's own position becomes the reading position instead.
+     */
+    @Test
+    fun aStructureChangeAfterANonDragScrollAwayKeepsTheReadersPosition() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            geometry.rowHeight = null
+            val reader = ConversationScrollAnchor(3, 40, "item-1", "message-1")
+
+            fixture.owner.onStructure(
+                structure().copy(olderHeaderCount = 1),
+                true,
+                currentAnchor = { reader },
+            ) { error("stale anchor reapplied") }
+            geometry.rowHeight = 1000
+            fixture.owner.onReadingStartGeometry()
+
+            assertEquals("nothing may be written back to the landed row", listOf(7 to 300), fixture.writer.writes)
+            assertNull(fixture.owner.readingStartGeometry())
+            assertEquals(ConversationScrollMode.ReadingHistory("message-1", 40), fixture.coordinator.mode)
+        }
+
+    /** A viewport resize after the same scroll away is also left alone, and it adopts where the reader is. */
+    @Test
+    fun aViewportChangeAfterANonDragScrollAwayKeepsTheReadersPosition() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            geometry.rowHeight = null
+            val reader = ConversationScrollAnchor(3, 40, "item-1", "message-1")
+
+            fixture.owner.onViewportHeight(800, presentation(), navigation(currentAnchor = { reader }))
+
+            assertEquals(listOf(7 to 300), fixture.writer.writes)
+            assertNull(fixture.owner.readingStartGeometry())
+            assertEquals(ConversationScrollMode.ReadingHistory("message-1", 40), fixture.coordinator.mode)
+        }
+
+    /** With nothing anchorable on screen the landing is still retired, and the reading position is left untouched. */
+    @Test
+    fun aLandingWhoseRowLeftAndWhoseReaderHasNoAnchorIsRetiredWithoutMovingTheList() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry()
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            geometry.rowHeight = null
+
+            fixture.owner.onStructure(structure().copy(olderHeaderCount = 1), true) { error("stale anchor reapplied") }
+
+            assertEquals(listOf(7 to 300), fixture.writer.writes)
+            assertNull(fixture.owner.readingStartGeometry())
+            assertEquals(ConversationScrollMode.ReadingHistory("message-4", 300), fixture.coordinator.mode)
+        }
+
     /** Late media growth of the row alone, with no viewport or structure change, still re-settles. */
     @Test
     fun rowHeightChangeAloneRerunsTheLandingSettle() =
@@ -487,11 +553,15 @@ class ConversationViewportRestorationOwnerTest {
 
     private fun presentation() = ConversationViewportPresentation(true, false)
 
-    private fun navigation(resolve: (ConversationScrollAnchor) -> Int? = { 7 }) =
-        ConversationViewportNavigation(
-            resolveAnchor = resolve,
-            tailIndex = { 9 },
-        )
+    /** Navigation over a scripted reader anchor and anchor resolution, with the tail fixed at the last row. */
+    private fun navigation(
+        currentAnchor: () -> ConversationScrollAnchor? = { null },
+        resolve: (ConversationScrollAnchor) -> Int? = { 7 },
+    ) = ConversationViewportNavigation(
+        resolveAnchor = resolve,
+        currentAnchor = currentAnchor,
+        tailIndex = { 9 },
+    )
 
     private class Fixture {
         val writer = RecordingWriter()
