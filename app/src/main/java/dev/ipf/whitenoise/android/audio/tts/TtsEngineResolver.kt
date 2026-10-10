@@ -5,6 +5,8 @@ import android.media.AudioAttributes
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -138,7 +140,10 @@ class TtsEngineResolver(
             EngineTrust.Unknown
         }
 
-    /** Initializes one engine and returns its verified package, trust, and offline voices. */
+    /**
+     * Initializes one engine and returns its verified package, trust, and offline voices.
+     * Only the initialization deadline becomes an unusable result; caller cancellation propagates.
+     */
     suspend fun resolve(enginePackage: String? = null): TtsResolutionResult =
         resolutionMutex.withLock {
             try {
@@ -229,6 +234,7 @@ class TtsEngineResolver(
                     }
                 }
             } catch (_: TimeoutCancellationException) {
+                currentCoroutineContext().ensureActive()
                 unusableResolution(TextToSpeech.ERROR)
             }
         }
