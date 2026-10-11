@@ -256,11 +256,14 @@ internal fun conversationTimelineTestAppState(
     liveSubscriptions: ConversationLiveSubscriptions,
     recoveryDiagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
     accountRef: String = ConversationTimelineTestIds.ACCOUNT_REF,
+    additionalAccounts: List<AccountSummaryFfi> = emptyList(),
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext<Context>(),
         draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
-        accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
+        accountIdHexResolver = { ref ->
+            additionalAccounts.firstOrNull { it.label == ref }?.accountIdHex ?: ConversationTimelineTestIds.ACCOUNT_ID
+        },
         accounts =
             listOf(
                 AccountSummaryFfi(
@@ -271,7 +274,7 @@ internal fun conversationTimelineTestAppState(
                     signedOut = false,
                     running = true,
                 ),
-            ),
+            ) + additionalAccounts,
         activeAccountRef = accountRef,
         notificationNetworkRecoveryDiagnostics = recoveryDiagnostics,
     ).also { state ->
