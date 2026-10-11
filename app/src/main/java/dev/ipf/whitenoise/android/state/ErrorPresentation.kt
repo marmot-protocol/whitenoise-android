@@ -61,7 +61,7 @@ private fun startupReportFields(detail: String?): String {
                     "stage", "failed_stage" -> value in stages
                     "stage_elapsed_ms", "attempt", "attempt_elapsed_ms", "active_count" ->
                         value.toLongOrNull()?.let { it >= 0 } == true
-                    "mdk_sha" -> value.matches(Regex("[0-9a-f]{7}"))
+                    "mdk_sha" -> value.matches(Regex("[0-9a-f]{8}"))
                     else -> false
                 }
             }

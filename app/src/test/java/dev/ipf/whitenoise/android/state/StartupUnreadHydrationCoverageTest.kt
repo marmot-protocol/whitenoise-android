@@ -8,10 +8,12 @@ import java.io.File
 
 /** Regression coverage for cold-start contention with MDK's deferred group hydration. */
 class StartupUnreadHydrationCoverageTest {
+    /** Follows the restoration helper while retaining the deferred unread critical-path contract. */
     @Test
     fun bootstrapDefersUnreadRosterWorkUntilAfterTheLocalSnapshot() {
         val source = appStateSource().readText()
         val bootstrap = source.functionBody("bootstrapLocked")
+        val restoration = source.functionBody("restoreStartupLocalState")
 
         assertTrue(
             "bootstrap must load only the account snapshot on its critical path",
@@ -19,11 +21,12 @@ class StartupUnreadHydrationCoverageTest {
         )
         assertTrue(
             "bootstrap must retain the snapshot for the post-frame unread pass",
-            "prepareStartupUnreadRefresh(refreshedAccounts)" in bootstrap,
+            "restoreStartupLocalState(refreshedAccounts)" in bootstrap &&
+                "prepareStartupUnreadRefresh(accounts)" in restoration,
         )
         assertFalse(
             "bootstrap must not run the suppression-aware bulk refresh",
-            "refreshAccountUnreadCounts" in bootstrap,
+            "refreshAccountUnreadCounts" in bootstrap || "refreshAccountUnreadCounts" in restoration,
         )
     }
 

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.diagnostics
 
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -31,16 +32,17 @@ class StartupDiagnosticRecorderTest {
                 occurredAtUtc = "test",
                 startupDetail = detail,
             ).report
-        val timeout = report(recorder.timeoutDetail() + " mdk_sha=d4e91c8")
+        val mdkSha = BuildConfig.MDK_SHORT_SHA
+        val timeout = report(recorder.timeoutDetail() + " mdk_sha=$mdkSha")
         assertTrue(timeout.contains("startup_stage=PRIVACY_RUNTIME_CONFIGURATION"))
         assertTrue(timeout.contains("startup_attempt_elapsed_ms=15000"))
         assertTrue(timeout.contains("startup_active_count=1"))
-        assertTrue(timeout.contains("startup_mdk_sha=d4e91c8"))
+        assertTrue(timeout.contains("startup_mdk_sha=$mdkSha"))
         recorder.exit(token, PerformanceResult.FAILURE)
-        val failure = report(recorder.failureDetail() + " mdk_sha=d4e91c8")
+        val failure = report(recorder.failureDetail() + " mdk_sha=$mdkSha")
         assertTrue(failure.contains("startup_failed_stage=PRIVACY_RUNTIME_CONFIGURATION"))
         assertTrue(failure.contains("startup_stage=BETWEEN_STAGES"))
-        assertTrue(failure.contains("startup_mdk_sha=d4e91c8"))
+        assertTrue(failure.contains("startup_mdk_sha=$mdkSha"))
         assertFalse(report("stage=private-account").contains("private-account"))
         assertFalse(timeout.contains("private exception"))
     }
