@@ -72,11 +72,56 @@ class MentionTraceReportTest(unittest.TestCase):
         ])
         values = self.report.mention_phase_metrics(self.query, "ts>=100 and ts<=2000000000")
         self.assertEqual(400, values["mention_tap_to_landing_ms"])
+        self.assertEqual(100, values["mention_motion_start_ns"])
+        self.assertEqual(400_000_100, values["mention_motion_end_ns"])
         self.assertTrue(values["mention_qualified"])
         self.assertEqual(1500, values["mention_highlight_ms"])
         self.db.execute("update process_slice set upid=2 where name='WhiteNoise.conversation.mention.landed'")
         replaced = self.report.mention_phase_metrics(self.query, "ts>=100 and ts<=2000000000")
         self.assertIsNone(replaced["mention_tap_to_landing_ms"])
+        self.assertIsNone(replaced["mention_motion_start_ns"])
+        self.assertIsNone(replaced["mention_motion_end_ns"])
+
+    def test_collection_tail_and_other_process_frames_do_not_dilute_motion_metrics(self):
+        self.db.executescript("""
+            create table slice(name text, ts integer, dur integer, track_id integer, depth integer);
+            create table thread_track(id integer, utid integer);
+            create table thread(utid integer, tid integer, upid integer);
+            create table process(upid integer, pid integer, name text);
+            create table thread_state(ts integer, dur integer, utid integer, state text);
+            create table counter(ts integer, track_id integer);
+            create table process_counter_track(id integer, name text);
+        """)
+        self.db.executemany("insert into process values(?,?,?)", [(1, 10, self.report.PKG), (2, 20, self.report.PKG)])
+        self.db.executemany("insert into thread values(?,?,?)", [(1, 10, 1), (2, 20, 2)])
+        self.db.executemany("insert into thread_track values(?,?)", [(1, 1), (2, 2)])
+        self.db.executemany("insert into slice values(?,?,?,?,?)", [
+            ("benchmark:paging-jump-to-mention", 0, 1000, 1, 0),
+            ("Choreographer#doFrame 1", 90, 40, 1, 0),
+            ("Choreographer#doFrame 2", 200, 50, 1, 0),
+            ("Choreographer#doFrame 3", 450, 90, 1, 0),
+            ("Choreographer#doFrame 4", 200, 800, 2, 0),
+        ])
+        self.db.executemany("insert into process_slice values(?,?,?,?,?)", [
+            ("WhiteNoise.conversation.mention.total", 100, 800, self.report.PKG, 1),
+            ("WhiteNoise.conversation.mention.landed", 400, 0, self.report.PKG, 1),
+        ])
+        self.db.executemany("insert into thread_state values(?,?,?,?)", [
+            (80, 60, 1, "Running"), (350, 100, 1, "Running"), (100, 500, 2, "Running"),
+        ])
+        processor = types.SimpleNamespace(
+            query=lambda sql: [] if sql.startswith("INCLUDE") else self.query(sql),
+            close=lambda: None,
+        )
+        with patch.object(self.report, "TraceProcessor", return_value=processor), patch.object(
+            self.report, "TraceProcessorConfig", return_value=None,
+        ):
+            row = self.report.analyse("ConversationPagingBenchmark_jumpToUnreadMentionFromHistory_iter000_fixture.perfetto-trace")
+        self.assertTrue(row["mention_qualified"])
+        self.assertEqual(2, row["frames"])
+        self.assertAlmostEqual(300 / 1e6, row["frame_window_ms"])
+        self.assertAlmostEqual(50 / 1e6, row["f_max"])
+        self.assertAlmostEqual(90 / 1e6, row["main_running_ms"])
 
     def test_visible_read_without_landing_is_unqualified(self):
         self.db.execute("insert into process_slice values(?,?,?,?,?)", (
