@@ -625,7 +625,10 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     }
 
     /** Supplies the production context-owner lookup with deterministic epochs while the Activity stays real. */
-    private class ControlledConversationOwner(context: Context) : ContextWrapper(context), LifecycleOwner {
+    private class ControlledConversationOwner(
+        context: Context,
+    ) : ContextWrapper(context),
+        LifecycleOwner {
         private val registry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.RESUMED }
         override val lifecycle: Lifecycle
             get() = registry
