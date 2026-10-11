@@ -957,7 +957,7 @@ internal fun sweepStaleSharedMedia(
 
 /** Files in `shared_media` older than this are considered safe to delete —
  *  any external reader has had ample time to finish loading the bytes. */
-internal const val SHARED_MEDIA_MAX_AGE_MS: Long = 10L * 60L * 1000L
+internal const val SHARED_MEDIA_MAX_AGE_MS: Long = AttachmentPlaintextCache.SHARED_READER_WINDOW_MILLIS
 
 /** Read the user-visible filename a content Uri exposes via OpenableColumns,
  *  falling back to the Uri's path segment. Null when neither is available.

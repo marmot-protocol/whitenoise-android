@@ -66,6 +66,14 @@
           "MED-001",
           "MED-030"
         ]
+      },
+      {
+        "surface": "HoldCacheFileWhileComposed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "fun HoldCacheFileWhileComposed(",
+        "test_ids": [
+          "MED-030"
+        ]
       }
     ],
     "settings_controls": [

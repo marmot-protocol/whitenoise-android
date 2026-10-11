@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
+import dev.ipf.whitenoise.android.media.dropKeptOversizedCacheEntries
 import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -97,7 +98,13 @@ internal class ConversationAttachmentReader(
     fun fileBackedBudget(staging: FileBackedSendStaging = FileBackedSendStaging()): FileBackedPickBudget? =
         fileBackedLimits()?.let { limits ->
             val directory = uploadSourcesDirectory(context.cacheDir)
-            FileBackedPickBudget(directory, limits, usableBytes = { usableSpace(directory) }, staging = staging)
+            FileBackedPickBudget(
+                directory,
+                limits,
+                usableBytes = { usableSpace(directory) },
+                staging = staging,
+                reclaimCache = { dropKeptOversizedCacheEntries(context.cacheDir) },
+            )
         }
 
     fun readImageAttachment(

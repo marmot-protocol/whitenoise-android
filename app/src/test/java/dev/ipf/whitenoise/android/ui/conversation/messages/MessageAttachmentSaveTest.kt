@@ -44,7 +44,10 @@ class MessageAttachmentSaveTest {
         composeRule.onNodeWithText(string(R.string.save_attachments)).assertDoesNotExist()
     }
 
-    /** Video saves stream the materialized file into the gallery instead of resolving another array. */
+    /**
+     * Video saves stream the materialized file into the gallery, held in the cache while they read it, instead of
+     * resolving another array.
+     */
     @Test
     fun videoSaveReusesTheMaterializedFile() {
         val saveBody = saveMediaBody()
@@ -52,7 +55,7 @@ class MessageAttachmentSaveTest {
         assertTrue(
             "video saves must stream the materialized file instead of resolving another ByteArray",
             "MediaReferenceSupport.isVideoMedia(resolvedReference)" in saveBody &&
-                "materializeVideoAttachment(" in saveBody &&
+                "withMaterializedVideoFile(" in saveBody &&
                 "saveVideoToGallery(" in saveBody,
         )
     }

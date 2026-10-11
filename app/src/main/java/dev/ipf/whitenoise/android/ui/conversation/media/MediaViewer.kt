@@ -620,17 +620,10 @@ internal fun FullScreenMediaViewer(
                         runCatchingCancellable {
                             val saved =
                                 if (MediaReferenceSupport.isVideoMedia(ref)) {
-                                    val file =
-                                        materializeVideoAttachment(
-                                            context,
-                                            controller,
-                                            msgId,
-                                            attachmentIndex,
-                                            ref,
-                                            owned,
-                                        )
-                                    withContext(Dispatchers.IO) {
-                                        saveVideoToGallery(context, file, ref.fileName, ref.mediaType)
+                                    withMaterializedVideoFile(context, controller, msgId, attachmentIndex, ref, owned) {
+                                        withContext(Dispatchers.IO) {
+                                            saveVideoToGallery(context, it, ref.fileName, ref.mediaType)
+                                        }
                                     }
                                 } else {
                                     // An explicit Save hands the whole verified image to MediaStore, so it is not
@@ -673,23 +666,22 @@ internal fun FullScreenMediaViewer(
                     runCatchingCancellable {
                         when {
                             onShareRequest != null -> onShareRequest(request).getOrThrow()
-                            MediaReferenceSupport.isVideoMedia(request.reference) -> {
-                                val file =
-                                    materializeVideoAttachment(
-                                        context,
-                                        controller,
-                                        request.messageIdHex,
-                                        request.attachmentIndex,
-                                        request.reference,
-                                        request.mine,
-                                    )
-                                shareVideo(
+                            MediaReferenceSupport.isVideoMedia(request.reference) ->
+                                withMaterializedVideoFile(
                                     context,
-                                    file,
-                                    request.reference.fileName,
-                                    request.reference.mediaType,
-                                ).getOrThrow()
-                            }
+                                    controller,
+                                    request.messageIdHex,
+                                    request.attachmentIndex,
+                                    request.reference,
+                                    request.mine,
+                                ) { file ->
+                                    shareVideo(
+                                        context,
+                                        file,
+                                        request.reference.fileName,
+                                        request.reference.mediaType,
+                                    ).getOrThrow()
+                                }
                             else -> {
                                 // An explicit Share stages the whole verified image for the chooser, so it is not
                                 // bounded by the preview budget that gates decoding.

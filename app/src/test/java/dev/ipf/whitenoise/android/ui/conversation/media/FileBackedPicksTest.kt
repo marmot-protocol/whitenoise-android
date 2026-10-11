@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -87,6 +88,34 @@ class FileBackedPicksTest {
 
         assertEquals(FileBackedPickFailure.STORAGE, pick.failure)
         assertFalse(opened)
+    }
+
+    /**
+     * Short of room, a budget first lets the playback caches give up the large files they keep, and stages the pick
+     * when that frees enough. It asks only when the room is short.
+     */
+    @Test
+    fun aPickShortOfRoomReclaimsTheCachesBeforeItIsRefused() {
+        var free = 64L * 1024L * 1024L
+        var reclaims = 0
+        val roomy =
+            FileBackedPickBudget(
+                directory = File(temporary.root, "upload_sources"),
+                limits = FileBackedSendLimits(1_000, 10_000),
+                usableBytes = { free },
+                reclaimCache = {
+                    reclaims++
+                    free = Long.MAX_VALUE / 4
+                },
+            )
+
+        val pick = roomy.stage(declaredSize = 10) { ByteArrayInputStream(ByteArray(10)) }
+
+        assertNotNull(pick.source)
+        assertEquals(1, reclaims)
+        pick.source?.close()
+        roomy.stage(declaredSize = 10) { ByteArrayInputStream(ByteArray(10)) }.source?.close()
+        assertEquals(1, reclaims)
     }
 
     /** An unknown size is rechecked after the copy; a snapshot that leaves no room for MDK's copies is deleted. */

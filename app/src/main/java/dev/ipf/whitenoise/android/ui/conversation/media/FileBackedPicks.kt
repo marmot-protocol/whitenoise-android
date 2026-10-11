@@ -131,6 +131,7 @@ internal class FileBackedPickBudget(
     private val limits: FileBackedSendLimits,
     private val usableBytes: () -> Long = { usableSpaceFor(directory) },
     private val staging: FileBackedSendStaging = FileBackedSendStaging(),
+    private val reclaimCache: () -> Unit = {},
 ) {
     private var remainingCiphertextBytes = limits.batchCiphertextBytes
 
@@ -236,14 +237,18 @@ internal class FileBackedPickBudget(
 
     /**
      * Whether [snapshotBytes] still to be copied fit on disk together with the largest upload of the send,
-     * counting this message's upload as [uploadWriteAfter], while leaving the app its reserve.
+     * counting this message's upload as [uploadWriteAfter], while leaving the app its reserve. When they do not,
+     * the playback caches first give up the large files they keep beyond their budgets, through [reclaimCache].
      */
     private fun hasStorageFor(
         snapshotBytes: Long,
         uploadWriteAfter: Long,
     ): Boolean {
         val largestUpload = maxOf(staging.largestUploadWriteBytes, uploadWriteAfter)
-        return usableBytes() >= snapshotBytes + largestUpload + FILE_BACKED_DISK_RESERVE_BYTES
+        val required = snapshotBytes + largestUpload + FILE_BACKED_DISK_RESERVE_BYTES
+        if (usableBytes() >= required) return true
+        reclaimCache()
+        return usableBytes() >= required
     }
 
     /** A pick that was not staged, carrying only the reason. */

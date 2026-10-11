@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
+import dev.ipf.whitenoise.android.media.DiskByteCacheLease
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.ui.conversation.media.VoicePresentationAttachmentKey
 import dev.ipf.whitenoise.android.ui.conversation.media.cachedVoiceAttachmentFile
@@ -32,6 +34,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.File
+import java.io.RandomAccessFile
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -40,6 +43,31 @@ class VoiceAttachmentCacheStateTest {
         private const val TEST_HANG_GUARD_MS = 30_000L
         private const val PATH_SERIALIZATION_PROBE_MS = 1_000L
     }
+
+    /**
+     * An audio file larger than the voice directory's budget, as a large send through Files is, still materializes
+     * for playback from its lease, complete.
+     */
+    @Test
+    fun audioLargerThanTheVoiceBudgetMaterializesForPlayback() =
+        runBlocking<Unit> {
+            val context = RuntimeEnvironment.getApplication()
+            val leaseDirectory = File(context.cacheDir, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+            val source = File(leaseDirectory, "large-audio.lease")
+            val audioBytes = AttachmentPlaintextCache.VOICE_MAX_DIRECTORY_BYTES + 1L
+            RandomAccessFile(source, "rw").use { it.setLength(audioBytes) }
+            try {
+                val file =
+                    materializeVoiceAttachmentSource(context, "voice-large", 0, mediaReference("audio/mpeg")) {
+                        AttachmentPlaintext.Lease(DiskByteCacheLease(source))
+                    }
+
+                assertEquals(audioBytes, file.length())
+                file.delete()
+            } finally {
+                source.delete()
+            }
+        }
 
     @Test
     fun cachedVoiceFileIsFoundOnEntry() {

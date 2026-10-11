@@ -94,23 +94,25 @@ private suspend fun saveMessageVideoAttachment(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
 ): Boolean {
-    val file =
-        materializeVideoAttachment(
+    val saved =
+        withMaterializedVideoFile(
             context = context.androidContext,
             controller = context.controller,
             messageIdHex = context.messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
             mine = context.mine,
-        )
-    return withContext(Dispatchers.IO) {
-        saveVideoToGallery(
-            context = context.androidContext,
-            source = file,
-            fileName = reference.fileName,
-            mediaType = reference.mediaType,
-        )
-    }
+        ) { file ->
+            withContext(Dispatchers.IO) {
+                saveVideoToGallery(
+                    context = context.androidContext,
+                    source = file,
+                    fileName = reference.fileName,
+                    mediaType = reference.mediaType,
+                )
+            }
+        }
+    return saved
 }
 
 /** Saves one image's whole verified bytes to the gallery; explicit saves are not bound by the preview budget. */

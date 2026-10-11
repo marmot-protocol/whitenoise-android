@@ -53,7 +53,9 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.holdCacheFileInUse
 import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
+import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.FileUploadProgress
@@ -393,6 +395,8 @@ internal fun MediaVideoGridTile(
         val (frame, duration) =
             withContext(Dispatchers.IO) {
                 val mmr = android.media.MediaMetadataRetriever()
+                // Held so a publication elsewhere in the directory cannot delete the file mid-read.
+                holdCacheFileInUse(f)
                 try {
                     mmr.setDataSource(f.absolutePath)
                     val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
@@ -417,6 +421,7 @@ internal fun MediaVideoGridTile(
                     null to 0L
                 } finally {
                     runCatching { mmr.release() }
+                    releaseCacheFileInUse(f)
                 }
             }
         if (duration > 0L) tileDurationMs = duration
@@ -858,6 +863,8 @@ internal fun MediaVideoBubble(
         val (bm, dur) =
             withContext(Dispatchers.IO) {
                 val mmr = android.media.MediaMetadataRetriever()
+                // Held so a publication elsewhere in the directory cannot delete the file mid-read.
+                holdCacheFileInUse(f)
                 try {
                     mmr.setDataSource(f.absolutePath)
                     val frame =
@@ -884,6 +891,7 @@ internal fun MediaVideoBubble(
                     null to 0L
                 } finally {
                     runCatching { mmr.release() }
+                    releaseCacheFileInUse(f)
                 }
             }
         if (dur > 0L) durationMs = dur
@@ -1049,6 +1057,66 @@ internal suspend fun materializeVideoAttachment(
 
     return videoMaterializations.run(file.absolutePath) {
         materializeVideoAttachmentOnce(attachmentKey, file, resolveBytes)
+    }
+}
+
+/**
+ * Materializes the video and runs [use] on its file while the cache holds it, so a publication elsewhere in the
+ * video directory cannot delete it between materialization and [use]. A file evicted before the hold took it is
+ * published again under the hold, which covers its stable path.
+ */
+internal suspend fun <T> withMaterializedVideoFile(
+    context: android.content.Context,
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+    use: suspend (java.io.File) -> T,
+): T =
+    withHeldMaterializedFile(
+        materialize = {
+            materializeVideoAttachment(context, controller, messageIdHex, attachmentIndex, reference, mine)
+        },
+        use = use,
+    )
+
+/**
+ * Runs [use] on the file [materialize] returns while the cache holds it. A file evicted before the hold took it is
+ * materialized again, under the hold that already covers its stable path.
+ */
+internal suspend fun <T> withHeldMaterializedFile(
+    materialize: suspend () -> java.io.File,
+    use: suspend (java.io.File) -> T,
+): T {
+    var file = materialize()
+    holdCacheFileInUse(file)
+    try {
+        if (!withContext(Dispatchers.IO) { AttachmentPlaintextCache.isHeldFilePresent(file) }) {
+            val again = materialize()
+            // The path is stable today, and should it ever move, the hold moves with it before the old one ends.
+            if (again != file) {
+                holdCacheFileInUse(again)
+                releaseCacheFileInUse(file)
+                file = again
+                if (!withContext(Dispatchers.IO) { AttachmentPlaintextCache.isHeldFilePresent(file) }) {
+                    throw java.io.IOException("materialized video was evicted before it could be held")
+                }
+            }
+        }
+        return use(file)
+    } finally {
+        releaseCacheFileInUse(file)
+    }
+}
+
+/** Holds [file] in the attachment cache for as long as the calling composition shows or plays it. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun HoldCacheFileWhileComposed(file: java.io.File) {
+    DisposableEffect(file) {
+        holdCacheFileInUse(file)
+        onDispose { releaseCacheFileInUse(file) }
     }
 }
 
@@ -1293,10 +1361,11 @@ internal fun shouldStartVideoAttachmentDownload(
         )
 
 /**
- * Whether [attachmentIndex] of the pending message [messageIdHex] is this device's own video, still being sent from
- * its staged file. Once MDK confirms the message it carries its published id, which has no pending attachments.
+ * Whether [attachmentIndex] of the pending message [messageIdHex] is this device's own attachment, still being sent
+ * from its staged file. Only documents, audio and videos are ever staged. Once MDK confirms the message it carries its
+ * published id, which has no pending attachments.
  */
-internal fun ConversationController.isVideoSendingFromStagedFile(
+internal fun ConversationController.isSendingFromStagedFile(
     messageIdHex: String,
     attachmentIndex: Int,
     mine: Boolean,
@@ -1502,6 +1571,8 @@ internal fun VideoViewerPage(
             exo.release()
         }
     }
+    // The player reopens its file to seek or replay, so the cache holds it for as long as this page plays it.
+    HoldCacheFileWhileComposed(file)
     // Only the current page owns a decoder or audio focus. HorizontalPager
     // pre-composes neighbours, so preparing in remember would hold multiple
     // MediaCodec instances and could invalidate healthy cache entries when a

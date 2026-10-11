@@ -570,7 +570,7 @@ internal fun MediaVisualGridBubble(
      */
     fun dispatchViewerOpen(attachmentIndex: Int) {
         val openable =
-            attachments.filterNot { controller.isVideoSendingFromStagedFile(record.messageIdHex, it.index, mine) }
+            attachments.filterNot { controller.isSendingFromStagedFile(record.messageIdHex, it.index, mine) }
         val opening =
             openable.firstOrNull { it.index >= attachmentIndex } ?: openable.lastOrNull() ?: return
         onOpenConversationMedia(

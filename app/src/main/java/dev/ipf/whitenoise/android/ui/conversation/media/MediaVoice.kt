@@ -66,6 +66,8 @@ import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.holdCacheFileInUse
+import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.KeyedMutexPool
@@ -388,23 +390,30 @@ internal fun MediaVoiceBubble(
 
     /** Plays a materialized voice file after validating the cache entry. */
     suspend fun playReadyVoice(file: java.io.File) {
-        val playableFile =
-            withContext(Dispatchers.IO) {
-                validatedAttachmentCacheFile(file)
+        // Held until the player has opened the file, so another publication in the voice cache cannot delete it
+        // between this check and the player's open.
+        holdCacheFileInUse(file)
+        try {
+            val playableFile =
+                withContext(Dispatchers.IO) {
+                    if (AttachmentPlaintextCache.isHeldFilePresent(file)) validatedAttachmentCacheFile(file) else null
+                }
+            if (playableFile == null) {
+                localFile = null
+                totalDurationMs = 0
+                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                return
             }
-        if (playableFile == null) {
-            localFile = null
-            totalDurationMs = 0
-            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-            return
-        }
-        localFile = playableFile
-        val source =
-            controller.voicePlaybackSource(appState, messageIdHex, playbackTitleCopy, focusPlaybackMessage)
-                ?: return
-        val playbackResult = presentationRuntime.play(pillKey, playableFile, controller.group.groupIdHex, source)
-        if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
-            clearBadVoiceCache("playback start failed")
+            localFile = playableFile
+            val source =
+                controller.voicePlaybackSource(appState, messageIdHex, playbackTitleCopy, focusPlaybackMessage)
+                    ?: return
+            val playbackResult = presentationRuntime.play(pillKey, playableFile, controller.group.groupIdHex, source)
+            if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
+                clearBadVoiceCache("playback start failed")
+            }
+        } finally {
+            releaseCacheFileInUse(file)
         }
     }
 

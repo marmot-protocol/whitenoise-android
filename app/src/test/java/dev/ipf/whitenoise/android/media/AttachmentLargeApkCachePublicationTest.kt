@@ -10,6 +10,31 @@ import java.io.RandomAccessFile
 import java.nio.file.Files
 
 class AttachmentLargeApkCachePublicationTest {
+    /** A video larger than the video directory's budget, as a large send is, publishes complete for playback. */
+    @Test
+    fun videoLargerThanTheVideoBudgetPublishesForPlayback() =
+        runBlocking {
+            val root = Files.createTempDirectory("large-video-source").toFile()
+            try {
+                val leaseDirectory = File(root, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+                val source = File(leaseDirectory, "video.lease")
+                val videoBytes = AttachmentPlaintextCache.VIDEO_MAX_DIRECTORY_BYTES + 1L
+                RandomAccessFile(source, "rw").use { it.setLength(videoBytes) }
+                val finalFile = File(File(root, MediaCacheDirs.VIDEO), "large.mp4")
+                val key = AttachmentCachePublication.attachmentKey("large-video", 0, 1uL)
+
+                val published =
+                    AttachmentCachePublication.publishSourceAfterLoad(key, finalFile) {
+                        AttachmentPlaintext.Lease(DiskByteCacheLease(source))
+                    }
+
+                assertTrue(published)
+                assertEquals(videoBytes, finalFile.length())
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
     /** A native-retained APK larger than the former 128 MiB cap reaches a complete FileProvider source. */
     @Test
     fun largeApkLeasePublishesWithoutTruncation() =
