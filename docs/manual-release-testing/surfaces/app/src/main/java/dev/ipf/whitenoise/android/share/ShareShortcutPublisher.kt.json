@@ -28,6 +28,15 @@
         "test_ids": [
           "NTF-041"
         ]
+      },
+      {
+        "surface": "Retained card shortcut title fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "NTF-041",
+          "NTF-030"
+        ]
       }
     ]
   },
