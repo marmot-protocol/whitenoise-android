@@ -84,6 +84,8 @@ Smart-folder cases dismiss the filter picker, open/cancel Unread and Chat type c
 
 `composer-expanded-locale-recreation` applies German and restores System around an expanded draft. Require a different resumed MainActivity, unchanged account/group draft, FullScreen preference, empty application locale and `activityRecreated: true`. Rerun the exact path; neither generic success nor rotation proves recreation/process death elsewhere.
 
+Presentation clipboard journeys clear and verify an empty baseline before handoff, compare the actual foreground Android clipboard payload, then clear and read it back before reporting success. Failed journeys attempt owned-payload cleanup before Activity teardown; uncertain cleanup refuses safe continuation. Host qualification rejects absent or false baseline, copy or cleanup fields, so a preceding synthetic report cannot qualify a failed Copy.
+
 ## Required edge-case matrix
 
 ### Android Back and keyboard qualification

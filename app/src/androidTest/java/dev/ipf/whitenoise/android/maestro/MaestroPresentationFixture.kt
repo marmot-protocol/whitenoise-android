@@ -45,7 +45,7 @@ internal class MaestroPresentationFixture(
     lateinit var imageUri: Uri
         private set
     private var imageFile: File? = null
-    private lateinit var clipboard: android.content.ClipboardManager
+    private var clipboard: MaestroPresentationClipboard? = null
     var nativeController: ConversationController? = null
         private set
     val imagePagesLoaded = mutableSetOf<Int>()
@@ -61,7 +61,7 @@ internal class MaestroPresentationFixture(
 
     fun install(activity: MainActivity) {
         appState = (activity.application as MaestroFixtureApplication).fixtureState
-        clipboard = activity.getSystemService(android.content.ClipboardManager::class.java)
+        clipboard = maestroPresentationClipboard(scenario, activity, appState)
         nativeChat?.let { chat ->
             nativeController =
                 ConversationController(
@@ -147,34 +147,7 @@ internal class MaestroPresentationFixture(
         } else {
             check(complete && calls == expected) { "Production presentation callback mismatch: $scenario $calls" }
         }
-        if (scenario.startsWith("feedback-") && scenario.endsWith("copyable")) {
-            check(
-                clipboard.primaryClip
-                    ?.getItemAt(0)
-                    ?.text
-                    ?.toString() == "Synthetic diagnostic report",
-            ) {
-                "Production report Copy did not write the expected synthetic payload"
-            }
-        }
-        if (scenario == "text-dialog-copy") {
-            check(
-                clipboard.primaryClip
-                    ?.getItemAt(0)
-                    ?.text
-                    ?.toString() ==
-                    "Fixture decoded first line\nFixture decoded last line",
-            )
-        }
-        if (scenario == "surface-profile-qr-copy") {
-            val account = checkNotNull(appState.activeAccount)
-            check(
-                clipboard.primaryClip
-                    ?.getItemAt(0)
-                    ?.text
-                    ?.toString() == appState.npubForDisplay(account.accountIdHex),
-            )
-        }
+        clipboard?.verifyAndClear()
         if (scenario.startsWith("extra-native-viewer-")) {
             val expectedPages = if (scenario.endsWith("gallery")) setOf(0, 1) else setOf(0)
             check(imagePagesLoaded == expectedPages) { "Viewer did not request the selected image pages" }
@@ -183,8 +156,15 @@ internal class MaestroPresentationFixture(
             .put("scenario", scenario)
             .put("callbacks", JSONArray(calls))
             .put("observationOnly", observing)
+            .put("clipboardBaselineCleared", clipboard != null)
+            .put("clipboardVerified", clipboard?.verified == true)
+            .put("clipboardCleared", clipboard?.cleared == true)
             .put("imagePagesLoaded", JSONArray(imagePagesLoaded.sorted()))
             .put("verified", true)
+    }
+
+    fun closeClipboard() {
+        clipboard?.close()
     }
 
     override fun close() {

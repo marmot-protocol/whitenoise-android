@@ -170,6 +170,12 @@ def qualify_presentation(case, verified):
             or (observing and observed.get('observationOnly') is not True)
             or (not observing and observed.get('observationOnly') is True)):
         raise ValueError('Production presentation dispatch was not verified')
+    scenario = case['presentation']
+    copies = (scenario.startswith('feedback-') and scenario.endswith('copyable')) or scenario in {
+        'text-dialog-copy', 'surface-profile-qr-copy'}
+    if copies and any(observed.get(field) is not True for field in (
+            'clipboardBaselineCleared', 'clipboardVerified', 'clipboardCleared')):
+        raise ValueError('Actual fresh presentation clipboard copy and cleanup were not verified')
 
 
 def run_fixture(name, directory, generation):

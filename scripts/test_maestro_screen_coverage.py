@@ -133,6 +133,25 @@ class ScreenProofTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     qualify_presentation(case, {'presentation': {**proof, 'callbacks': callbacks}})
 
+    def test_copy_presentations_reject_stale_or_uncleared_clipboard_receipts(self):
+        root = Path(__file__).resolve().parents[1]
+        cases = json.loads((root / 'config/maestro-runtime-cases.json').read_text())['cases']
+        names = ['feedback-add-copyable', 'feedback-chat-copyable', 'feedback-person-copyable',
+                 'text-dialog-copy', 'surface-profile-qr-copy']
+        fields = ['clipboardBaselineCleared', 'clipboardVerified', 'clipboardCleared']
+        for scenario in names:
+            case = cases[f'presentation-{scenario}']
+            proof = {'scenario': scenario, 'callbacks': case['presentation_actions'], 'verified': True,
+                     **dict.fromkeys(fields, True)}
+            qualify_presentation(case, {'presentation': proof})
+            for field in fields:
+                for value in [False, None, 1, 'true']:
+                    with self.assertRaisesRegex(ValueError, 'fresh presentation clipboard'):
+                        qualify_presentation(case, {'presentation': {**proof, field: value}})
+                missing = {k: v for k, v in proof.items() if k != field}
+                with self.assertRaises(ValueError):
+                    qualify_presentation(case, {'presentation': missing})
+
     def test_only_non_cancellable_overlays_admit_observation_without_dispatch(self):
         case = {'postcondition': 'presentation-observed', 'presentation': 'extra-wait-signout',
                 'presentation_actions': []}
