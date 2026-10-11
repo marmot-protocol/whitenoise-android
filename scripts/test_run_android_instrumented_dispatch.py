@@ -15,6 +15,10 @@ class InstrumentedDispatchTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             (root / "scripts").mkdir()
+            (root / "config").mkdir()
+            (root / "config/instrumented-required-cases.txt").write_text(
+                (ROOT / "config/instrumented-required-cases.txt").read_text()
+            )
             gradle = root / "gradlew"
             failure = 'case "$*" in *:app:connected*) exit 23;; esac\n' if fail_app else ''
             gradle.write_text('#!/bin/sh\n' + failure + 'printf "%s\\n" "$*"\n')
@@ -98,3 +102,16 @@ class InstrumentedDispatchTest(unittest.TestCase):
             self.run_dispatch("push", fail_required=True)
         self.assertEqual(caught.exception.returncode, 29)
         self.assertNotIn(":cryptoBenchmark:connectedReleaseAndroidTest", caught.exception.stdout)
+
+    def test_responsiveness_dispatch_is_scoped_and_checks_required_cases(self):
+        """Focused device acceptance excludes native benchmarks but cannot omit required cases."""
+        output = self.run_dispatch("workflow_dispatch", "false", "false", "true")
+        self.assertIn("ResponsivenessDeviceAcceptance", output)
+        self.assertIn("timeout_msec=120000", output)
+        self.assertIn("timeout --signal=INT --kill-after=30s 25m", (ROOT / "scripts/run-android-instrumented-tests.sh").read_text())
+        self.assertIn("required-cases", output)
+        self.assertNotIn(":cryptoBenchmark:", output)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.run_dispatch("workflow_dispatch", "false", "false", "true", fail_required=True)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.run_dispatch("workflow_dispatch", "true", "false", "true")

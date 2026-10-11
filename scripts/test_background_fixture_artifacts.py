@@ -131,5 +131,74 @@ class BackgroundFixtureArtifactsTest(unittest.TestCase):
             verify(self.directory, SOURCE)
 
 
+class ResponsivenessApkSelectionTest(unittest.TestCase):
+    """Exercise the hosted selector against AGP output locations and artifact kinds."""
+
+    def test_intermediate_apk_wins_over_universal_and_non_apk_metadata(self):
+        """Select the ARM64 APK while ignoring merged manifests and linked resources."""
+        import textwrap
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/android-staging-apk.yml').read_text()
+        staging = workflow.split('name: Stage immutable fixture bytes and shared-certificate provenance', 1)[1]
+        selection = staging.split('                  matches = []', 1)[1].split('                  verification =', 1)[0]
+        selection = 'matches = []\n' + textwrap.dedent(selection)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for directory, artifact, name, abi in [
+                ('intermediates/apk/dev/debug', 'APK', 'arm.apk', 'arm64-v8a'),
+                ('outputs/apk/dev/debug', 'APK', 'universal.apk', None),
+                ('intermediates/merged_manifests/dev', 'MERGED_MANIFESTS', 'AndroidManifest.xml', None),
+                ('intermediates/linked_resources/dev', 'PROCESSED_RES', 'resources.ap_', None),
+            ]:
+                output = root / 'app/build' / directory
+                output.mkdir(parents=True)
+                (output / name).write_bytes(b'fixture')
+                (output / 'output-metadata.json').write_text(json.dumps({
+                    'artifactType': {'type': artifact}, 'applicationId': 'fixture.app', 'variantName': 'devDebug',
+                    'elements': [{'outputFile': name, 'filters': [] if abi is None else [
+                        {'filterType': 'ABI', 'value': abi}]}],
+                }))
+            scope = {'root': root, 'module': 'app', 'variant': 'devDebug', 'package': 'fixture.app',
+                     'role': 'before', 'json': json}
+            exec(selection, scope)
+            self.assertEqual([root / 'app/build/intermediates/apk/dev/debug/arm.apk'], scope['matches'])
+            duplicate = root / 'app/build/outputs/apk/duplicate'
+            duplicate.mkdir(parents=True)
+            original = root / 'app/build/intermediates/apk/dev/debug'
+            (duplicate / 'arm.apk').write_bytes(b'different fixture')
+            (duplicate / 'output-metadata.json').write_text((original / 'output-metadata.json').read_text())
+            with self.assertRaisesRegex(SystemExit, 'expected one APK'):
+                exec(selection, scope)
+
+
+class ResponsivenessSignerOutputTest(unittest.TestCase):
+    """Accept verified SDK signer labels without accepting multiple signing identities."""
+
+    def test_numbered_range_and_scheme_certificates_require_one_identity(self):
+        """Cover the actual V2 staging failure, repeated scheme output and different signing keys."""
+        import re
+        import textwrap
+        workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/android-staging-apk.yml').read_text()
+        body = workflow.split('                  signer_label = ', 1)[1].split('                  certificate =', 1)[0]
+        first, rest = body.split('\n', 1)
+        parser = 'signer_label = ' + first + '\n' + textwrap.dedent(rest)
+        fingerprint = 'a' * 64
+        numbered = f'Signer #1 certificate SHA-256 digest: {fingerprint}\n'
+        ranged = f'Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: {fingerprint}\n'
+        schemes = [f'{scheme} Signer: certificate SHA-256 digest: {fingerprint}\n'
+                   for scheme in ('V2', 'V3', 'V3.1', 'V3.2', 'V4')]
+        for output in (numbered, ranged, ranged + numbered, *schemes, ''.join(schemes)):
+            scope = {'verification': 'Number of signers: 1\n' + output, 're': re, 'role': 'before', 'variant': 'debug'}
+            exec(parser, scope)
+            self.assertEqual([fingerprint], scope['certificates'])
+        for output in ('Number of signers: 2\n' + numbered,
+                       'Number of signers: 1\n' + numbered + ranged.replace(fingerprint, 'b' * 64),
+                       'Number of signers: 1\n' + schemes[0] + schemes[1].replace(fingerprint, 'b' * 64),
+                       'Number of signers: 2\n' + schemes[0],
+                       'Number of signers: 1\nV2 Signer: public key SHA-256 digest: ' + fingerprint,
+                       'Number of signers: 1\nSource Stamp Signer certificate SHA-256 digest: ' + fingerprint):
+            with self.assertRaisesRegex(SystemExit, 'expected one fixture signer'):
+                exec(parser, {'verification': output, 're': re, 'role': 'after', 'variant': 'debug'})
+
+
 if __name__ == "__main__":
     unittest.main()

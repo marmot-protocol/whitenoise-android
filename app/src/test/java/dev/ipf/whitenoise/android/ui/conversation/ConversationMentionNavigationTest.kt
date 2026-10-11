@@ -17,6 +17,50 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], manifest = Config.NONE)
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationMentionNavigationTest {
+    /** Native tail clamping must report unreached while preserving command-settlement cleanup. */
+    @Test
+    fun clampedNewestPositionDoesNotReportReached() =
+        runTest {
+            val writer = RecordingWriter()
+            var completions = 0
+            val reached =
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "clamped-mention",
+                    resolveTargetIndex = { 0 },
+                    readLayout = { ConversationMentionJumpLayout(500, 80, itemOffsetPx = 0) },
+                    awaitLayout = {},
+                    onCompleted = { completions++ },
+                )
+            assertFalse(reached)
+            assertEquals(1, completions)
+            assertTrue(writer.writes.size <= 4)
+        }
+
+    /** A new window may shift the target while native room is remeasured; never correct the obsolete index. */
+    @Test
+    fun newestMentionReResolvesIndexAfterItsReadingRoomIsMeasured() =
+        runTest {
+            val writer = RecordingWriter()
+            var index = 0
+            var height = 80
+            var layoutPass = 0
+            val reached =
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "newest-mention",
+                    resolveTargetIndex = { index },
+                    readLayout = { current ->
+                        ConversationMentionJumpLayout(500, height, isNewest = current == 0)
+                    },
+                    awaitLayout = {
+                        layoutPass++
+                        if (layoutPass == 2) height = 160
+                        if (layoutPass == 3) index = 1
+                    },
+                )
+            assertTrue(reached)
+            assertEquals(listOf(Write(true, 0, -420), Write(false, 1, -340)), writer.writes)
+        }
+
     @Test
     fun measuredShortMentionUsesNegativeReadingStartOffset() =
         runTest {
@@ -53,6 +97,32 @@ class ConversationMentionNavigationTest {
                 )
             assertTrue(reached)
             assertEquals(listOf(Write(true, 5, 0), Write(false, 6, 300)), writer.writes)
+        }
+
+    /** A distant approach must use geometry measured after its bounded preposition, without a stale bounce. */
+    @Test
+    fun distantMentionUsesFreshViewportAndHeightBeforeTheFinalAnimation() =
+        runTest {
+            val writer = RecordingWriter()
+            var viewport = 500
+            var height = 80
+            writer.afterSnap = {
+                viewport = 280
+                height = 700
+            }
+            val reached =
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "mention-at-end-of-unread-window",
+                    resolveTargetIndex = { 60 },
+                    readLayout = { ConversationMentionJumpLayout(viewport, height) },
+                    awaitLayout = {},
+                )
+            assertTrue(reached)
+            assertEquals(
+                "one bounded preposition and a final animation; no stale-offset correction",
+                listOf(Write(false, 50, 0), Write(true, 60, 420)),
+                writer.writes,
+            )
         }
 
     @Test
@@ -168,6 +238,7 @@ class ConversationMentionNavigationTest {
             assertEquals(listOf(Write(false, 190, 0), Write(true, 200, 300)), writer.writes)
         }
 
+    /** The re-resolved approach already lands correctly, so settlement must not write it a second time. */
     @Test
     fun farMentionTowardNewestReResolvesAfterHeaderChange() =
         runTest {
@@ -182,7 +253,7 @@ class ConversationMentionNavigationTest {
                     awaitLayout = {},
                 ),
             )
-            assertEquals(listOf(Write(false, 11, 0), Write(true, 2, 300), Write(false, 2, 300)), writer.writes)
+            assertEquals(listOf(Write(false, 11, 0), Write(true, 2, 300)), writer.writes)
         }
 
     @Test

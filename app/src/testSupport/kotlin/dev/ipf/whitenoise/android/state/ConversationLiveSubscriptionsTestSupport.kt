@@ -1,7 +1,8 @@
+@file:Suppress("MagicNumber", "TooManyFunctions") // One shared FFI fixture family; fixed schema/example values.
+
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
-import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -28,12 +29,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.robolectric.Shadows.shadowOf
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Scriptable bounded-window subscription with observable lifecycle calls. */
+@Suppress("LongParameterList") // Each optional input scripts a distinct native operation boundary.
 internal class ScriptedConversationTimelineSubscription(
     private val snapshotPage: TimelinePageFfi?,
     private val backwardsPage: TimelinePageFfi = emptyTimelinePage(),
@@ -61,6 +61,12 @@ internal class ScriptedConversationTimelineSubscription(
     /** Optional command outcomes, including a null native timeout/not-ready reply. */
     val anchorReplies = mutableListOf<TimelinePageFfi?>()
 
+    /** Signals normal EOF without relying on a fixed sleep in lifecycle regressions. */
+    val windowEndObserved = CompletableDeferred<Unit>()
+
+    /** Observes controller settlement at the exact handle-close boundary. */
+    var onClose: () -> Unit = {}
+
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
 
@@ -82,7 +88,9 @@ internal class ScriptedConversationTimelineSubscription(
     /** Suspends until a scripted complete window arrives or the stream ends. */
     override suspend fun nextWindow(): TimelinePageFfi? {
         lifecycleEvents += "nextWindow"
-        return windows.receiveCatching().getOrNull()
+        return windows.receiveCatching().getOrNull().also { window ->
+            if (window == null) windowEndObserved.complete(Unit)
+        }
     }
 
     /** Ends live delivery so controller retry paths can be exercised. */
@@ -137,28 +145,34 @@ internal class ScriptedConversationTimelineSubscription(
 
     /** Records closure and unblocks any pending live-window read. */
     override fun close() {
+        onClose()
         lifecycleEvents += "close"
         windows.close()
     }
 }
 
+/** Holds independent group-state delivery until its paired controller retires the handle. */
 internal class ScriptedConversationGroupStateSubscription(
     private val group: AppGroupRecordFfi,
 ) : ConversationGroupStateSubscriptionHandle {
     private val closed = CompletableDeferred<Unit>()
 
+    /** Exposes the fixed group snapshot before the independently held group stream. */
     override fun snapshot(): AppGroupRecordFfi = group
 
+    /** Holds enrichment independently until the test or controller closes this handle. */
     override suspend fun next(): AppGroupRecordFfi? {
         closed.await()
         return null
     }
 
+    /** Releases the pending group reader without producing an additional update. */
     override fun close() {
         closed.complete(Unit)
     }
 }
 
+/** Opens only the supplied timeline attempts and exposes accidental extra reopens. */
 internal class ScriptedConversationLiveSubscriptions(
     timelineScripts: List<ScriptedConversationTimelineSubscription>,
     group: AppGroupRecordFfi,
@@ -183,6 +197,7 @@ internal class ScriptedConversationLiveSubscriptions(
         get() = timelineOpenIndex.get()
 }
 
+/** Builds an authoritative empty window with neither pagination direction available. */
 internal fun emptyTimelinePage(): TimelinePageFfi =
     TimelinePageFfi(
         messages = emptyList(),
@@ -190,6 +205,7 @@ internal fun emptyTimelinePage(): TimelinePageFfi =
         hasMoreAfter = false,
     )
 
+/** Builds one complete bounded replacement from explicitly ordered fixture rows. */
 internal fun timelinePage(vararg messages: TimelineMessageRecordFfi): TimelinePageFfi =
     TimelinePageFfi(
         messages = messages.toList(),
@@ -197,6 +213,7 @@ internal fun timelinePage(vararg messages: TimelineMessageRecordFfi): TimelinePa
         hasMoreAfter = false,
     )
 
+/** Builds a received protocol row with stable ownership and no media or enrichment dependency. */
 internal fun timelineRecord(
     messageId: String,
     timelineAt: ULong,
@@ -239,11 +256,14 @@ internal fun conversationTimelineTestAppState(
     liveSubscriptions: ConversationLiveSubscriptions,
     recoveryDiagnostics: NotificationNetworkRecoveryDiagnostics = NotificationNetworkRecoveryDiagnostics(),
     accountRef: String = ConversationTimelineTestIds.ACCOUNT_REF,
+    additionalAccounts: List<AccountSummaryFfi> = emptyList(),
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext<Context>(),
         draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
-        accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
+        accountIdHexResolver = { ref ->
+            additionalAccounts.firstOrNull { it.label == ref }?.accountIdHex ?: ConversationTimelineTestIds.ACCOUNT_ID
+        },
         accounts =
             listOf(
                 AccountSummaryFfi(
@@ -254,13 +274,14 @@ internal fun conversationTimelineTestAppState(
                     signedOut = false,
                     running = true,
                 ),
-            ),
+            ) + additionalAccounts,
         activeAccountRef = accountRef,
         notificationNetworkRecoveryDiagnostics = recoveryDiagnostics,
     ).also { state ->
         state.liveSubscriptionOverrides.conversation = liveSubscriptions
     }
 
+/** Builds a stable consented conversation matching the disposable fixture account and group. */
 internal fun conversationTimelineTestGroup(): AppGroupRecordFfi =
     AppGroupRecordFfi(
         groupIdHex = ConversationTimelineTestIds.GROUP_ID,
@@ -306,6 +327,7 @@ internal fun conversationTimelineTestGroup(): AppGroupRecordFfi =
         viaWelcomeMessageIdHex = null,
     )
 
+/** Provides known membership so roster enrichment cannot become a transcript disclosure prerequisite. */
 internal fun conversationTimelineMemberSnapshot(): GroupMemberSnapshot =
     GroupMemberSnapshot(
         listOf(
@@ -317,6 +339,7 @@ internal fun conversationTimelineMemberSnapshot(): GroupMemberSnapshot =
         ),
     )
 
+/** Returns the independently releasable roster reply for the same known fixture members. */
 internal fun conversationTimelineGroupRoster(): GroupRosterFfi =
     GroupRosterFfi(
         groupIdHex = ConversationTimelineTestIds.GROUP_ID,
@@ -339,6 +362,7 @@ internal fun conversationTimelineGroupRoster(): GroupRosterFfi =
         lifecycleState = GroupLifecycleStateFfi.STABLE,
     )
 
+/** Builds the native preview for the background B message without changing its authoritative row. */
 internal fun notifiedMessagePreview(): ChatListMessagePreviewFfi =
     ChatListMessagePreviewFfi(
         retentionSeconds = null,
@@ -358,6 +382,7 @@ internal fun notifiedMessagePreview(): ChatListMessagePreviewFfi =
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
     )
 
+/** Builds the unread native chat-list projection used to correlate a notification with bounded content. */
 internal fun notificationChatListRow(): ChatListRowFfi =
     ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
@@ -392,30 +417,13 @@ internal fun notificationChatListRow(): ChatListRowFfi =
         disbandRequest = null,
     )
 
-@Suppress("MaxLineLength")
-internal fun timelineMessageIds(controller: ConversationController): List<String> = controller.timeline.map { it.record.messageIdHex }
-
-internal fun awaitConversationCondition(
-    timeoutMs: Long = 5_000,
-    condition: () -> Boolean,
-) {
-    val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
-    while (System.nanoTime() <= deadlineNanos) {
-        shadowOf(Looper.getMainLooper()).idle()
-        if (condition()) return
-        Thread.sleep(10)
+/** Returns the bounded authoritative message keys without confusing them with presentation keys. */
+internal fun timelineMessageIds(controller: ConversationController): List<String> =
+    controller.timeline.map {
+        it.record.messageIdHex
     }
-    throw AssertionError("Condition not met within ${timeoutMs}ms")
-}
 
-internal fun awaitOpenedTimelineSubscriptionsClosed(subscriptions: ScriptedConversationLiveSubscriptions) {
-    awaitConversationCondition {
-        subscriptions.timelineScripts
-            .take(subscriptions.timelineSubscriptionOpenCount)
-            .all { it.closeCallCount >= 1 }
-    }
-}
-
+/** Keeps markdown enrichment absent while timeline ownership and ordering are exercised. */
 private fun emptyMarkdown(): MarkdownDocumentFfi =
     MarkdownDocumentFfi(
         truncated = false,
@@ -423,9 +431,12 @@ private fun emptyMarkdown(): MarkdownDocumentFfi =
         blankLinesBefore = ByteArray(0),
     )
 
+/** Keeps fixture draft writes disposable and independent of the device app database. */
 internal class ConversationTimelineTestDraftPersistence : DraftPersistence {
+    /** Starts each fixture without a retained draft from another test. */
     override fun read(): Map<String, String> = emptyMap()
 
+    /** Accepts editor writes without storing synthetic draft text on the device. */
     override fun write(
         key: String,
         value: String?,
@@ -438,6 +449,7 @@ internal data class ConversationTimelineReconnectFixtures(
     val scriptedSubscriptions: ScriptedConversationLiveSubscriptions,
 )
 
+/** Creates an initial A window and an A+B replacement with no subsequent live event required. */
 internal fun conversationTimelineReconnectFixtures(): ConversationTimelineReconnectFixtures {
     val firstSubscription =
         ScriptedConversationTimelineSubscription(

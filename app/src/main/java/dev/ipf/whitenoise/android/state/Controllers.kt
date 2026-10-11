@@ -110,6 +110,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimi
 import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -2709,7 +2710,25 @@ class ChatsController private constructor(
 
     fun revalidateConnectionReadiness() = connectionOwner.refresh(presentAttempt = false)
 
+    /** Revalidates retained subscriptions silently and attributes the foreground source. */
+    internal fun revalidateConnectionReadinessOnForeground() {
+        connectionOwner.refresh(presentAttempt = false, source = PerformancePhase.CONNECTION_FOREGROUND)
+    }
+
+    /** Keeps a disconnected aggregate relay sample distinct from a foreground lifecycle edge. */
+    internal fun revalidateConnectionReadinessOnRelaySample() =
+        connectionOwner.refresh(presentAttempt = false, source = PerformancePhase.CONNECTION_RELAY_SAMPLE)
+
+    /** Records a closed rendered banner state in the active opt-in readiness episode. */
+    internal fun noteConnectionPresentation(phase: PerformancePhase) = connectionOwner.notePresentation(phase)
+
+    /** Invalidates an account-owned attempt without attributing teardown to transport failure. */
     fun invalidateConnectionReadiness() = connectionOwner.invalidate()
+
+    /** Records network loss only at a confirmed validated-internet boundary. */
+    internal fun invalidateConnectionReadinessOnNetworkLoss() {
+        connectionOwner.invalidate(PerformancePhase.CONNECTION_NETWORK_LOST)
+    }
 
     /** Ends account-owned streams and invalidates roster results before closing their handles. */
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
@@ -2832,9 +2851,14 @@ class ChatsController private constructor(
                         liveSubscriptions.openFolderSource(accountRef, completeChatList)
                     chatListSubscription = chatListStream
                     if (!isActiveBindEpoch(epoch) || !coroutineContext.isActive) break
+                    connectionOwner.noteSubscriptionBoundary(
+                        connectionAttempt,
+                        PerformancePhase.CONNECTION_CHAT_LIST_OPEN,
+                    )
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
                     if (!isActiveBindEpoch(epoch) || !coroutineContext.isActive) break
+                    connectionOwner.noteSubscriptionBoundary(connectionAttempt, PerformancePhase.CONNECTION_CHATS_OPEN)
                     synchronized(liveSubscriptionLock) {
                         if (isActiveBindEpoch(epoch)) {
                             chatListWindows = chatListStream
@@ -2907,6 +2931,10 @@ class ChatsController private constructor(
                                             connectionOwner.noteLiveUpdate(connectionAttempt)
                                             appState.schedulePendingLocalGroupDeleteCleanup()
                                         }
+                                        connectionOwner.noteSubscriptionBoundary(
+                                            connectionAttempt,
+                                            PerformancePhase.CONNECTION_CHAT_LIST_COMPLETED,
+                                        )
                                     },
                                     second = {
                                         while (isActive) {
@@ -2922,14 +2950,32 @@ class ChatsController private constructor(
                                             }
                                             foldGroup(update)
                                         }
+                                        connectionOwner.noteSubscriptionBoundary(
+                                            connectionAttempt,
+                                            PerformancePhase.CONNECTION_CHATS_COMPLETED,
+                                        )
                                     },
                                 )
                             }
                         }
+                    if (folderSourceChanged) {
+                        connectionOwner.noteSubscriptionBoundary(
+                            connectionAttempt,
+                            PerformancePhase.CONNECTION_SOURCE_CHANGED,
+                        )
+                    }
                 } catch (cancel: CancellationException) {
+                    connectionOwner.noteSubscriptionBoundary(
+                        connectionAttempt,
+                        PerformancePhase.CONNECTION_SUBSCRIPTION_CANCELLED,
+                    )
                     throw cancel
                 } catch (throwable: Throwable) {
                     if (!isActiveBindEpoch(epoch)) break
+                    connectionOwner.noteSubscriptionBoundary(
+                        connectionAttempt,
+                        PerformancePhase.CONNECTION_SUBSCRIPTION_FAILED,
+                    )
                     chatListLoad.failure()
                     archivedChatListLoad.failure()
                     chatsDebug(throwable) {
@@ -2986,7 +3032,9 @@ class ChatsController private constructor(
                 // finishes, so poll them briskly instead of letting the connectivity backoff stretch.
                 if (lastFailureNotReady) retryDelayMs = minOf(retryDelayMs, NOT_READY_RETRY_DELAY_MS)
                 chatsDebug { "chat subscriptions ended; retrying in ${retryDelayMs}ms account=${accountRef.take(8)}" }
+                connectionOwner.notePresentation(PerformancePhase.CONNECTION_RETRY_WAIT, durationMs = retryDelayMs)
                 val userRequestedRetry = withTimeoutOrNull(retryDelayMs) { retryLoadSignal.receive() } != null
+                if (userRequestedRetry) connectionOwner.notePresentation(PerformancePhase.CONNECTION_RETRY_REQUESTED)
                 retryDelayMs =
                     if (userRequestedRetry) {
                         LIVE_SUBSCRIPTION_INITIAL_RETRY_DELAY_MS
@@ -6723,6 +6771,7 @@ class ConversationController(
     internal val timelineSubscriptionActiveCallMutex = Mutex()
     private var groupStateSubscription: ConversationGroupStateSubscriptionHandle? = null
     private var startJob: Job? = null
+    private var timelineHandoff: ConversationTimelineHandoff? = null
 
     // staleness-exempt: captured subscription-start token, not a counter owner.
     private var lastStartedGeneration: Long? = null
@@ -7416,28 +7465,8 @@ class ConversationController(
             // layer now drives mark-read as the user scrolls so partial-read
             // sessions retain accurate unread counts on the chat list.
 
-            val groupStream = liveSubscriptions.openGroupState(account, group.groupIdHex)
-            groupSubscription = groupStream
-            val stopAfterGroupOpen =
-                synchronized(liveSubscriptionLock) {
-                    if (accountTeardownRequested) {
-                        true
-                    } else {
-                        groupStateSubscription = groupStream
-                        false
-                    }
-                }
-            if (stopAfterGroupOpen) return true to false
-            val groupSnapshot =
-                withContext(Dispatchers.IO) {
-                    groupStream.snapshot()
-                }
-            groupSnapshot?.let(::applyGroupState)
-            refreshGroupRecoveryStatus()
-            refreshMembers(prefetchedRoster = rosterPrefetch)
-            isLoading = false
-            subscriptionError = null
             var connected = false
+            val initialMetadataReady = CompletableDeferred<Unit>()
 
             coroutineScope {
                 runUntilFirstLiveSubscriptionEndsWithAttemptJobs(
@@ -7451,12 +7480,42 @@ class ConversationController(
                                 launch { watchAgentTextStream(account, streamId) }
                             }
                         }
-                        connected = true
                     },
                     first = {
                         runTimelineSubscriptionPipeline(account, timelineStream)
+                        // Normal EOF must not cancel the initial roster before it can settle
+                        // loading/disclosure. Failures still unwind the paired attempt immediately.
+                        initialMetadataReady.await()
                     },
                     second = {
+                        // The authoritative timeline is already installed. Keep consuming its
+                        // bounded replacements while independent group/roster reads settle;
+                        // transcript consent and membership presentation retain their own gates.
+                        // Otherwise a slow roster can leave background messages queued until
+                        // well after the retained conversation's first foreground frame (#3178).
+                        val groupStream = liveSubscriptions.openGroupState(account, group.groupIdHex)
+                        groupSubscription = groupStream
+                        val stopAfterGroupOpen =
+                            synchronized(liveSubscriptionLock) {
+                                if (accountTeardownRequested) {
+                                    true
+                                } else {
+                                    groupStateSubscription = groupStream
+                                    false
+                                }
+                            }
+                        if (stopAfterGroupOpen) return@runUntilFirstLiveSubscriptionEndsWithAttemptJobs
+                        val groupSnapshot =
+                            withContext(Dispatchers.IO) {
+                                groupStream.snapshot()
+                            }
+                        groupSnapshot?.let(::applyGroupState)
+                        refreshGroupRecoveryStatus()
+                        refreshMembers(prefetchedRoster = rosterPrefetch)
+                        isLoading = false
+                        subscriptionError = null
+                        connected = true
+                        initialMetadataReady.complete(Unit)
                         runGroupStateSubscriptionLoop(groupStream)
                     },
                 )
@@ -7809,6 +7868,7 @@ class ConversationController(
             controllerCleared = true
             memberRosterRefreshGeneration.advance()
             timelineWindowGeneration.advance()
+            timelineHandoff?.close()
         }
         windowPresentationTiming.cancel()
         inboundVisibleHostAttempt.cancel()
@@ -7833,6 +7893,12 @@ class ConversationController(
         accountRef: String?,
         groupIdHex: String,
     ): Boolean = !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
+
+    /** Captures only pages already received by the current local subscription attempt. */
+    internal fun pendingTimelineAtForeground(): CompletableDeferred<Boolean>? =
+        synchronized(liveSubscriptionLock) {
+            timelineHandoff?.pendingAtForeground()
+        }
 
     /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
@@ -7898,6 +7964,9 @@ class ConversationController(
         timelineStream: ConversationTimelineSubscriptionHandle,
     ) {
         val timelineWindows = Channel<RecoveryStampedTimelineWindow>(capacity = Channel.BUFFERED)
+        val handoff = ConversationTimelineHandoff()
+        synchronized(liveSubscriptionLock) { timelineHandoff = handoff }
+        var observedProducerEnd = false
         val pump =
             async {
                 // The seam absorbs MDK's window errors, so reaching this catch means an unexpected failure.
@@ -7905,16 +7974,19 @@ class ConversationController(
                 // loop reconnect, where a crash would take the whole app down (#2616 device reports).
                 try {
                     while (isActive) {
-                        val page =
+                        val received =
                             runCatchingCancellable {
-                                withContext(Dispatchers.IO) { timelineStream.nextWindow() }
+                                withContext(Dispatchers.IO) {
+                                    timelineStream.nextWindow()?.let { page -> page to handoff.received() }
+                                }
                             }.getOrNull() ?: break
                         timelineWindows.send(
                             RecoveryStampedTimelineWindow(
-                                page = page,
+                                page = received.first,
                                 recoveryGeneration = appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(),
                                 receivedAtElapsedMs = SystemClock.elapsedRealtime(),
                                 productObservationTicket = appState.productObservationTicket(),
+                                foregroundHandoff = received.second,
                             ),
                         )
                     }
@@ -7924,9 +7996,11 @@ class ConversationController(
             }
         try {
             while (isActive) {
-                val first =
-                    timelineWindows.receiveCatching().getOrNull()
-                        ?: break
+                val first = timelineWindows.receiveCatching().getOrNull()
+                if (first == null) {
+                    observedProducerEnd = true
+                    break
+                }
                 // Drain any windows that arrived within roughly one
                 // 120Hz frame budget into a single batch. The runtime
                 // can emit several complete windows back-to-back during a
@@ -7938,11 +8012,17 @@ class ConversationController(
                 // drop a Rust subscription window.
                 val batch = mutableListOf(first)
                 while (batch.size < TIMELINE_BATCH_CAP) {
-                    val more =
-                        timelineWindows.tryReceive().getOrNull()
-                            ?: withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
-                                timelineWindows.receiveCatching().getOrNull()
-                            } ?: break
+                    val available = timelineWindows.tryReceive()
+                    val received =
+                        if (available.isSuccess || available.isClosed) {
+                            available
+                        } else {
+                            withTimeoutOrNull(TIMELINE_BATCH_DRAIN_MS) {
+                                timelineWindows.receiveCatching()
+                            }
+                        }
+                    if (received?.isClosed == true) observedProducerEnd = true
+                    val more = received?.getOrNull() ?: break
                     batch += more
                 }
                 val newest = batch.last()
@@ -7971,6 +8051,7 @@ class ConversationController(
                     receivedAtElapsedMs = batch.first().receivedAtElapsedMs,
                     ticket = batch.first().productObservationTicket,
                 )
+                var batchCommitted = false
                 val streamIdsLaunched =
                     appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
                         applyTimelinePage(
@@ -7978,6 +8059,10 @@ class ConversationController(
                             replaceWindow = false,
                             updatePagination = true,
                             reconcileNewExtendedRecords = true,
+                            onCommitted = {
+                                batchCommitted = true
+                                handoff.settled(batch.map { it.foregroundHandoff }, applied = true)
+                            },
                         )
                     }
                 publishReadyTimelineSubscription(timelineStream)
@@ -7985,6 +8070,7 @@ class ConversationController(
                 // not release its own failed attempt. Preserve forward prefetch's arrival budget.
                 automaticPaging.newer.reset()
                 publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
+                if (!batchCommitted) handoff.settled(batch.map { it.foregroundHandoff }, applied = false)
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
                 streamIdsLaunched.forEach { streamId ->
@@ -7994,7 +8080,13 @@ class ConversationController(
                 }
             }
         } finally {
-            if (pump.isActive) {
+            handoff.close()
+            synchronized(liveSubscriptionLock) {
+                if (timelineHandoff === handoff) timelineHandoff = null
+            }
+            // Channel close precedes coroutine completion. Let an ended producer finish normally;
+            // cancelling in that gap makes await() throw and bypasses initial metadata settlement.
+            if (!observedProducerEnd && pump.isActive) {
                 pump.cancel()
             }
         }

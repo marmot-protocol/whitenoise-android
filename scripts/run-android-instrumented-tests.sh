@@ -6,10 +6,32 @@ set -euo pipefail
 event_name="${1:-}"
 review_demo_e2e="${2:-false}"
 document_provider_matrix="${3:-false}"
+responsiveness_only="${4:-false}"
 
 if [[ "$event_name" == "workflow_dispatch" && "$review_demo_e2e" == "true" && "$document_provider_matrix" == "true" ]]; then
   echo "Select one opt-in instrumented suite per dispatch" >&2
   exit 2
+fi
+
+if [[ "$event_name" == "workflow_dispatch" && "$responsiveness_only" == "true" ]]; then
+  if [[ "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" ]]; then
+    echo "Select one opt-in instrumented suite per dispatch" >&2
+    exit 2
+  fi
+  # Bound stalled Compose setup/cleanup too; JUnit only times the test body.
+  # A timeout fails this hosted-only campaign and the workflow retains its reports.
+  timeout --signal=INT --kill-after=30s 25m ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+    -Pandroid.testInstrumentationRunnerArguments.annotation=dev.ipf.whitenoise.android.ResponsivenessDeviceAcceptance \
+    -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000 \
+    -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+    --no-daemon --stacktrace
+  required_file="$(mktemp)"
+  trap 'rm -f "$required_file"' EXIT
+  grep -E '\.(ConversationRetainedTranscriptFirstFrameAndroidTest|ConversationNativeForegroundMeasureAndroidTest|ChatListConnectionResumeDeviceTest)#' \
+    config/instrumented-required-cases.txt > "$required_file"
+  python3 scripts/check_instrumented_required_cases.py \
+    app/build/outputs/androidTest-results/connected --required "$required_file"
+  exit 0
 fi
 
 if [[ "$event_name" == "workflow_dispatch" && "$review_demo_e2e" == "true" ]]; then

@@ -3,19 +3,29 @@ package dev.ipf.whitenoise.android.ui.conversation
 import android.view.ViewTreeObserver
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalView
+import dev.ipf.whitenoise.android.state.TimelineMessage
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.withTimeoutOrNull
 
 private typealias ForegroundSettlePredicate = (ConversationForegroundSettleState) -> Boolean
+
+/** A retired or superseded receipt cannot count as a commit; the shared presentation deadline owns fallback. */
+internal suspend fun awaitCommittedConversationTimeline(receipt: Deferred<Boolean>?) {
+    if (receipt?.await() == false) awaitCancellation()
+}
 
 /** Layout and IME animation state required before the foreground frame can be exposed. */
 internal data class ConversationForegroundSettleState(
     val geometry: ConversationForegroundGeometry,
     val imeTargetBottomPx: Int,
     val bottomChromeMeasured: Boolean,
+    val timelineMeasured: Boolean = true,
 ) {
     /** Whether every measured surface agrees on one coherent viewport geometry. */
     fun isGeometrySettled(): Boolean =
@@ -23,9 +33,10 @@ internal data class ConversationForegroundSettleState(
             bottomChromeMeasured &&
             geometry.imeBottomPx == imeTargetBottomPx
 
-    /** Whether coherent geometry also matches the IME visibility requested at resume. */
+    /** Whether measured current content and coherent geometry match the IME visibility requested at resume. */
     fun isSettled(expectedImeVisible: Boolean): Boolean =
         isGeometrySettled() &&
+            timelineMeasured &&
             (geometry.imeBottomPx > 0) == expectedImeVisible
 }
 
@@ -36,12 +47,14 @@ internal data class ConversationForegroundSettleState(
  * otherwise the captured snapshot remains armed until later settled geometry
  * arrives to apply the one deferred correction without blocking presentation.
  */
+@Suppress("LongParameterList") // Independent local handoff, geometry and IME inputs share one liveness deadline.
 internal suspend fun awaitConversationForegroundPresentation(
     preDrawSignals: ReceiveChannel<Unit>,
     currentState: () -> ConversationForegroundSettleState,
     expectedImeVisible: Boolean,
     expectedVisibilityTimeoutMillis: Long,
     onSettleDeadlineExpired: () -> Unit = {},
+    awaitLocalTimeline: suspend () -> Unit = {},
 ): ConversationForegroundSettleState {
     /** Returns the first pre-draw state accepted by [predicate]. */
     suspend fun awaitState(predicate: ForegroundSettlePredicate): ConversationForegroundSettleState {
@@ -54,6 +67,7 @@ internal suspend fun awaitConversationForegroundPresentation(
 
     val requestedPresentation =
         withTimeoutOrNull(expectedVisibilityTimeoutMillis) {
+            awaitLocalTimeline()
             awaitState { it.isSettled(expectedImeVisible) }
         }
     if (requestedPresentation != null) return requestedPresentation
@@ -76,7 +90,9 @@ internal class ConversationForegroundDrawGate(
     /** Signals each frame attempt and exposes it only after the live gate opens. */
     override fun onPreDraw(): Boolean {
         onPreDrawSignal()
-        return !isBlocked()
+        val blocked = isBlocked()
+        ConversationTranscriptDrawProbe.foregroundGateObserved(blocked)
+        return !blocked
     }
 }
 
@@ -108,4 +124,22 @@ internal fun ConversationForegroundDrawGateEffect(
 /** Schedules the first root draw after the foreground gate opens. */
 internal fun requestConversationForegroundFrame(view: android.view.View) {
     view.postInvalidateOnAnimation()
+}
+
+/** Requests native measurement when a closed draw gate would otherwise starve fixed-size Compose remeasure. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ConversationForegroundTimelineMeasureEffect(
+    viewport: ConversationTimelineViewport?,
+    publication: List<TimelineMessage>,
+    presentationBlocked: Boolean,
+) {
+    val view = LocalView.current
+    SideEffect {
+        // Compose may defer descendant remeasure until dispatchDraw. Force a native layout pass
+        // only for the unmeasured publication; the existing freshness fence still owns drawing.
+        if (presentationBlocked && viewport?.hasMeasuredTimeline(publication) == false) {
+            view.requestLayout()
+        }
+    }
 }

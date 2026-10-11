@@ -699,8 +699,11 @@ Opening or attempting a jump consumes the fixture even if the run fails. Re-prov
 equivalent fixture through normal message/read flows for every additional sample; do not
 reset native caches or read state. The supplied unread count/final-only condition is a
 fixture declaration, not an automatic audit of the history. A missing start row, @ control
-or target fails the journey. The target text and disappearing sole-mention control verify
-landing/read completion, not smoothness or physical top alignment.
+or target fails the journey. Target text and a disappearing sole-mention control alone
+can also result from ordinary visible-row reading. Run the paging trace report gate:
+only a completed journey with one ordered, same-process landing qualifies as a reached
+sample. Keep unqualified raw results, but exclude them from successful-sample medians.
+Neither reached landing nor these UI observations establishes frame smoothness.
 
 Compare independent samples before/after on matched builds and conditions, including mixed
 tall text/media, cold measurement, keyboard/composer-reduced viewport, window/header changes
@@ -886,3 +889,5 @@ the benchmark JSON artifact, and link the relevant traces.
 | --- | ---: | ---: | ---: |
 | Cold startup → initial display | _ms_ | _ms_ | _%_ |
 | Open group → members visible | _ms_ | _ms_ | _%_ |
+
+The mention benchmark retains a three-second collection tail after visible read completion so Compose animation and highlight spans can finish. This is not a completion assertion or a latency budget: the report still rejects missing, unfinished, ambiguous or stale landings. Qualified mention frame metrics use tap-to-landing, excluding the highlight and collection tail; `journey_ms` includes collection time.

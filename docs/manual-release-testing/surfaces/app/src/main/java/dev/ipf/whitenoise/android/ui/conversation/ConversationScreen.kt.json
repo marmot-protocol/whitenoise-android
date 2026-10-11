@@ -171,6 +171,30 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Native content padding for a short final mention",
+        "anchor": "val mentionReadingReserve by",
+        "test_ids": [
+          "CON-032"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Actual first painted transcript composition evidence",
+        "anchor": "ConversationTranscriptDrawProbe.drawn(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Reached mention landing precedes the intentional highlight hold",
+        "anchor": "ConversationMentionJumpTrace.LANDED",
+        "test_ids": [
+          "CON-032"
+        ]
       }
     ]
   },

@@ -121,6 +121,7 @@ internal data class ConversationScrollBookmark(
     val anchor: ConversationScrollAnchor,
     val settledMode: ConversationScrollMode,
     internal val intentRevision: Long,
+    internal val mentionReadingRowHeightPx: Int? = null,
 )
 
 /** Stable layout inputs that determine the transcript's visible viewport. */
@@ -258,6 +259,7 @@ internal class ConversationScrollIntentToken internal constructor(
 internal class ConversationScrollCoordinator(
     private val writer: ConversationScrollWriter,
     initialMode: ConversationScrollMode = ConversationScrollMode.FollowingTail,
+    initialMentionReadingRowHeightPx: Int? = null,
     private val onExplicitNavigation: () -> Unit = {},
 ) {
     private var settledMode = initialMode.requireSettled()
@@ -270,6 +272,10 @@ internal class ConversationScrollCoordinator(
     private var foregroundSnapshot: ConversationForegroundSnapshot? = null
 
     var mode by mutableStateOf(settledMode)
+        private set
+
+    /** Measured layout room retained while a newest mention owns the reading position. */
+    var mentionReadingRowHeightPx by mutableStateOf(initialMentionReadingRowHeightPx)
         private set
 
     var foregroundRestoreInProgress by mutableStateOf(false)
@@ -294,6 +300,7 @@ internal class ConversationScrollCoordinator(
             anchor = stableAnchor,
             settledMode = settledMode,
             intentRevision = intentLifetime.capture(),
+            mentionReadingRowHeightPx = mentionReadingRowHeightPx,
         )
     }
 
@@ -494,6 +501,7 @@ internal class ConversationScrollCoordinator(
     ): Boolean {
         if (!intentLifetime.isCurrent(expectedIntent.revision)) return false
         val anchor = bookmark.anchor
+        mentionReadingRowHeightPx = bookmark.mentionReadingRowHeightPx
         readingAnchor = anchor.takeIf { bookmark.settledMode is ConversationScrollMode.ReadingHistory }
         return runCommand(
             transientMode = ConversationScrollMode.Restoring(anchor.messageId, anchor.pixelOffset),
@@ -677,7 +685,11 @@ internal class ConversationScrollCoordinator(
             val serial = commandLifetime.advance()
             val command =
                 async(start = CoroutineStart.LAZY) {
-                    ConversationScrollCommandScope(serial).operation()
+                    val commandScope = ConversationScrollCommandScope(serial)
+                    commandScope.prepareReadingSpace(
+                        (transientMode as? ConversationScrollMode.ProgrammaticJump)?.reason,
+                    )
+                    commandScope.operation()
                 }
             previous?.cancel()
             activeCommand = command
@@ -728,6 +740,29 @@ internal class ConversationScrollCoordinator(
     internal inner class ConversationScrollCommandScope internal constructor(
         private val serial: Long,
     ) {
+        /** Restores resting padding before an explicit command supersedes the mention's reading intent. */
+        suspend fun prepareReadingSpace(reason: ConversationScrollReason?) {
+            ensureCurrent()
+            if (reason == null || mentionReadingRowHeightPx == null) return
+            if (reason == ConversationScrollReason.Mention || reason == ConversationScrollReason.SavedRestore) return
+            mentionReadingRowHeightPx = null
+            withFrameNanos { }
+            ensureCurrent()
+        }
+
+        /** Reserves native padding for the target plus its measured newer/trailing content. */
+        suspend fun reserveMentionReadingStart(
+            rowHeightPx: Int,
+            awaitLayout: suspend () -> Unit,
+        ) {
+            ensureCurrent()
+            val height = rowHeightPx.coerceAtLeast(1)
+            if (mentionReadingRowHeightPx == height) return
+            mentionReadingRowHeightPx = height
+            awaitLayout()
+            ensureCurrent()
+        }
+
         suspend fun scrollToItem(
             index: Int,
             scrollOffset: Int = 0,
@@ -752,11 +787,14 @@ internal class ConversationScrollCoordinator(
          * Keeps distance-independent navigation responsive: snap near a far target, then animate only
          * the final few rows. Message-backed callers can re-resolve after each snap because paging may
          * insert or remove list headers while the command is suspended.
+         * [resolveScrollOffset] reads geometry after prepositioning so a later settle pass can use
+         * the actual approach coordinate instead of an obsolete measurement.
          */
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
             traceMentionJump: Boolean = false,
+            resolveScrollOffset: (Int) -> Int = { scrollOffset },
             resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
@@ -772,15 +810,19 @@ internal class ConversationScrollCoordinator(
                 targetIndex = resolveIndex()?.coerceAtLeast(0)
             }
             val resolvedTargetIndex = targetIndex ?: return false
+            // Prepositioning can suspend through a keyboard/header/row measurement change.
+            // Use the geometry now available, not an offset captured before that handoff.
+            val resolvedScrollOffset = resolveScrollOffset(resolvedTargetIndex)
             if (isFar(resolvedTargetIndex)) {
                 traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.POSITION) {
-                    writer.scrollToItem(resolvedTargetIndex, scrollOffset)
+                    writer.scrollToItem(resolvedTargetIndex, resolvedScrollOffset)
                 }
             } else {
                 traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.ANIMATION) {
-                    writer.animateScrollToItem(resolvedTargetIndex, scrollOffset)
+                    writer.animateScrollToItem(resolvedTargetIndex, resolvedScrollOffset)
                 }
             }
+            ensureCurrent()
             return true
         }
 
@@ -916,9 +958,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToUnreadOrNewest(
             resultingMode = ConversationScrollMode.ReadingHistory(targetMessageId, 0),
         ) {
             targetResolved =
-                animateScrollToItem(initialTargetIndex, 0) {
-                    resolveUnreadIndex()
-                }
+                animateScrollToItem(initialTargetIndex, 0, resolveIndex = resolveUnreadIndex)
             // The reversed transcript reaches a row by its newest edge, so an
             // unread message taller than the viewport would open at its end.
             if (targetResolved) alignReadingStart(resolveUnreadIndex() ?: initialTargetIndex)

@@ -793,6 +793,7 @@ internal fun ConversationScreen(
                     } else {
                         ConversationScrollMode.FollowingTail
                     },
+                initialMentionReadingRowHeightPx = scrollRestore?.mentionReadingRowHeightPx,
                 onExplicitNavigation = {
                     unreadJumpState = unreadJumpState.suppressCurrentStack()
                 },
@@ -870,10 +871,17 @@ internal fun ConversationScreen(
         }
     // Edits mutate their original message and must not occupy a lazy-list slot.
     // Keep every reveal and scroll decision on the same filtered projection.
+    val timelinePublication = controller.timeline
     val renderedTimeline =
-        remember(controller.timeline) {
-            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        }
+        ConversationTranscriptDrawProbe.rowsForComposition(
+            controller,
+            remember(timelinePublication) {
+                timelinePublication.filterNot { MessageProjector.isEdit(it.record) }
+            },
+        )
+    DisposableEffect(controller) {
+        onDispose { ConversationTranscriptDrawProbe.retire(controller) }
+    }
 
     // The transcript renders as a reversed lazy column so the newest message is
     // the list's own layout origin. That keeps the bottom edge pinned while the
@@ -951,6 +959,9 @@ internal fun ConversationScreen(
         )
     val transcriptPresentationNeedsRetry =
         notificationOpenRequestId != 0L && controller.transcriptPresentationNeedsRetry
+    SideEffect {
+        if (!transcriptReadyToReveal) ConversationTranscriptDrawProbe.retire(controller)
+    }
 
     // Notification suppression follows only the transcript the user can
     // actually read. A routed conversation can already be selected while its
@@ -1461,6 +1472,7 @@ internal fun ConversationScreen(
             timelineViewport = timelineViewport,
             renderedTimelineSize = renderedSize,
             trailingRowCount = trailingRowCount,
+            mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
         )
 
     /** Resolves a saved logical anchor after current header and error rows. */
@@ -1511,6 +1523,7 @@ internal fun ConversationScreen(
                         timelineViewport = timelineViewport,
                         timelineSize = liveRenderedSize,
                         trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
+                        mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
                     ),
                 )
             },
@@ -1550,6 +1563,7 @@ internal fun ConversationScreen(
                     nearBottom = scrollCoordinator.isFollowingTail,
                     anchorItemId = anchor?.id,
                     anchorMessageIdHex = anchor?.record?.messageIdHex,
+                    mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
                 ),
             )
         }
@@ -2404,6 +2418,27 @@ internal fun ConversationScreen(
             }
     }
 
+    /** Captures current mention geometry after each suspended positioning step. */
+    fun mentionJumpLayout(
+        targetMessageId: String,
+        index: Int,
+    ): ConversationMentionJumpLayout {
+        val layout = timelineViewport.readingLayoutInfo()
+        return ConversationMentionJumpLayout(
+            viewportEndOffsetPx = layout.viewportEndOffset,
+            itemHeightPx =
+                layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+            estimatedItemHeightPx =
+                navigationState.timelineItemHeightsPx[targetMessageId]
+                    ?: ReplyNavigation.estimateItemHeightPx(
+                        layout.visibleItemsInfo.map { it.size },
+                    ),
+            isNewest = index == controller.conversationTrailingRowCount(renderedTimeline.size),
+            itemOffsetPx = layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset,
+            tailContentHeightPx = listState.layoutInfo.mentionTailContentHeightPx(index),
+        )
+    }
+
     fun jumpToNextUnreadMention() {
         val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
         navigationState.searchJob?.cancel()
@@ -2436,15 +2471,7 @@ internal fun ConversationScreen(
                         scrollCoordinator.jumpToMentionReadingStart(
                             targetMessageId = targetMessageId,
                             resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
-                            readLayout = { index ->
-                                val layout = timelineViewport.readingLayoutInfo()
-                                ConversationMentionJumpLayout(
-                                    viewportEndOffsetPx = layout.viewportEndOffset,
-                                    itemHeightPx =
-                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-                                    estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
-                                )
-                            },
+                            readLayout = { index -> mentionJumpLayout(targetMessageId, index) },
                             onCompleted = {
                                 if (navigationRequest.isCurrent()) {
                                     scrollCoordinator.settleReadingAt(currentScrollAnchor())
@@ -2452,12 +2479,16 @@ internal fun ConversationScreen(
                             },
                         )
                     if (!reached || !navigationRequest.isCurrent()) return@launch
+                    // Keep the landing point on the same process-track family as the async approach.
+                    tracedPagingSection(ConversationMentionJumpTrace.LANDED) { Unit }
                     // Mark read up to the visited mention so the count — and the
                     // chat-list @-badge — decrement in step; advance the local read
                     // anchor so the chip's derived count updates immediately.
                     readAnchorMessageId = targetMessageId
                     controller.markReadUpTo(targetMessageId)
-                    showTransientMessageHighlight(targetMessageId)
+                    tracedPagingSection(ConversationMentionJumpTrace.HIGHLIGHT) {
+                        showTransientMessageHighlight(targetMessageId)
+                    }
                 }
             }
     }
@@ -4001,6 +4032,24 @@ internal fun ConversationScreen(
                     ?.let { ConversationSearchMarking(it, effectiveSearchMatchIds.toSet()) },
         ) {
             val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
+            val mentionReadingReserve by
+                remember(timelineViewport, density, scrollCoordinator, snackbarContentInset) {
+                    derivedStateOf {
+                        val rowHeight = scrollCoordinator.mentionReadingRowHeightPx
+                        if (rowHeight == null) {
+                            0.dp
+                        } else {
+                            with(density) {
+                                conversationMentionReadingReservePx(
+                                    readingHeightPx = timelineViewport.readingHeightPx(),
+                                    basePaddingPx =
+                                        (CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value).roundToPx(),
+                                    rowHeightPx = rowHeight,
+                                ).toDp()
+                            }
+                        }
+                    }
+                }
             ConversationTransientNoticeLayout(
                 notice = appState.transientNotice,
                 accountRef = conversationAccountRef,
@@ -4116,6 +4165,7 @@ internal fun ConversationScreen(
                                                 openActionMenuId == null,
                                     ),
                         ) {
+                            val composedTranscriptRows = ConversationTranscriptDrawProbe.composedRows(renderedTimeline)
                             LazyColumn(
                                 state = listState,
                                 modifier =
@@ -4123,8 +4173,10 @@ internal fun ConversationScreen(
                                         .fillMaxSize()
                                         .measureConversationTimelinePadding(
                                             timelineViewport,
-                                            CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value,
+                                            CONVERSATION_TIMELINE_TAIL_GAP +
+                                                snackbarContentInset.value + mentionReadingReserve,
                                             overlayPadding,
+                                            timelinePublication,
                                         ).trackWhiteNoiseHeader(listState)
                                         .padding(horizontal = 12.dp)
                                         // Paint, TalkBack exposure, and first-useful-frame
@@ -4132,7 +4184,16 @@ internal fun ConversationScreen(
                                         // final row or unknown notification roster therefore
                                         // cannot become observable before both owners commit.
                                         .drawWithContent {
-                                            if (transcriptReadyToReveal) drawContent()
+                                            if (transcriptReadyToReveal) {
+                                                drawContent()
+                                                ConversationTranscriptDrawProbe.drawn(
+                                                    controller,
+                                                    composedTranscriptRows,
+                                                    listState.layoutInfo,
+                                                )
+                                            } else {
+                                                ConversationTranscriptDrawProbe.retire(controller)
+                                            }
                                         }.graphicsLayer {
                                             alpha = if (transcriptReadyToReveal) 1f else 0f
                                         }.semantics {
@@ -4161,7 +4222,11 @@ internal fun ConversationScreen(
                                 // out of a lazy sentinel leaves the real last row as
                                 // the stable tail anchor.
                                 contentPadding =
-                                    conversationTimelineContentPadding(snackbarContentInset.value, overlayPadding),
+                                    conversationTimelineContentPadding(
+                                        snackbarContentInset.value,
+                                        overlayPadding,
+                                        mentionReadingReserve,
+                                    ),
                             ) {
                                 // The list is reversed, so the first item emitted
                                 // is laid out against the composer. Emit the newest

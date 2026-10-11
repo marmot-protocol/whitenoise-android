@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -16,6 +17,131 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationForegroundPresentationTest {
+    /** A consumed local publication still waits for its actual layout, even without an outstanding receipt. */
+    @Test
+    fun consumedTimelineWaitsForMatchingMeasuredPublication() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            var state = ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true, false)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(signals, { state }, false, 1_500)
+                }
+            signals.trySend(Unit)
+            runCurrent()
+            assertFalse(result.isCompleted)
+            state = state.copy(timelineMeasured = true)
+            signals.trySend(Unit)
+            runCurrent()
+            assertEquals(state, result.await())
+        }
+
+    /** Missing layout acknowledgement shares the original bounded liveness fallback. */
+    @Test
+    fun unmeasuredTimelineDoesNotExtendPresentationDeadline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val state = ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true, false)
+            var released = false
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(signals, { state }, false, 1_500, { released = true })
+                }
+            signals.trySend(Unit)
+            advanceTimeBy(1_499)
+            runCurrent()
+            assertFalse(released)
+            assertFalse(result.isCompleted)
+            advanceTimeBy(1)
+            runCurrent()
+            assertTrue(released)
+            assertEquals(state, result.await())
+        }
+
+    /** Superseded preparation remains blocked until the same deadline instead of treating false as readiness. */
+    @Test
+    fun nonCommittedReceiptCannotReleasePresentationBeforeItsDeadline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val receipt = CompletableDeferred(false)
+            var released = false
+            val settled = ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = signals,
+                        currentState = { settled },
+                        expectedImeVisible = false,
+                        expectedVisibilityTimeoutMillis = 1_500,
+                        onSettleDeadlineExpired = { released = true },
+                        awaitLocalTimeline = { awaitCommittedConversationTimeline(receipt) },
+                    )
+                }
+            signals.trySend(Unit)
+            advanceTimeBy(1_499)
+            runCurrent()
+            assertFalse(result.isCompleted)
+            assertFalse(released)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(settled, result.await())
+            assertTrue(released)
+        }
+
+    /** Coherent geometry cannot expose a locally received replacement before it has committed. */
+    @Test
+    fun coherentPreDrawStillWaitsForTheCapturedLocalTimeline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val commit = CompletableDeferred<Unit>()
+            val settled =
+                ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = signals,
+                        currentState = { settled },
+                        expectedImeVisible = false,
+                        expectedVisibilityTimeoutMillis = 1_500,
+                        awaitLocalTimeline = { commit.await() },
+                    )
+                }
+            runCurrent()
+            signals.trySend(Unit)
+            runCurrent()
+            assertFalse(result.isCompleted)
+            commit.complete(Unit)
+            runCurrent()
+            assertEquals(settled, result.await())
+        }
+
+    /** Local handoff failure cannot widen the existing IME/presentation liveness window. */
+    @Test
+    fun stalledLocalTimelineSharesTheExistingPresentationDeadline() =
+        runTest {
+            val signals = Channel<Unit>(Channel.CONFLATED)
+            val neverCommitted = CompletableDeferred<Unit>()
+            var released = false
+            val settled =
+                ConversationForegroundSettleState(ConversationForegroundGeometry(720, 0, 96), 0, true)
+            val result =
+                async {
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = signals,
+                        currentState = { settled },
+                        expectedImeVisible = false,
+                        expectedVisibilityTimeoutMillis = 1_500,
+                        onSettleDeadlineExpired = { released = true },
+                        awaitLocalTimeline = { neverCommitted.await() },
+                    )
+                }
+            advanceTimeBy(1_501)
+            runCurrent()
+            assertTrue(released)
+            assertEquals(settled, result.await())
+            assertFalse(neverCommitted.isCancelled)
+        }
+
     @Test
     fun drawGateBlocksOnlyWhileTheForegroundTransactionOwnsPresentation() {
         var blocked = false

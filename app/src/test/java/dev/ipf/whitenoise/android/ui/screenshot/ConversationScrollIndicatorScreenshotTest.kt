@@ -193,6 +193,7 @@ class ConversationScrollIndicatorScreenshotTest {
                         viewport,
                         CONVERSATION_TIMELINE_TAIL_GAP,
                         chrome.dp,
+                        timelinePublication = emptyList(),
                     ).padding(horizontal = 12.dp)
                     .onGloballyPositioned(viewport::onPaintViewportMeasured),
         ) {

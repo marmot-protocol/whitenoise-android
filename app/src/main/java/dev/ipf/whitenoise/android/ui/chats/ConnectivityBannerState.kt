@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.state.ChatListConnectionPhase
 import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -46,6 +47,15 @@ import kotlinx.coroutines.flow.merge
 
 /** Banner states. Steady-state connected renders nothing — transient only. */
 internal enum class ConnectivityBannerState { Hidden, Offline, Connecting, JustConnected }
+
+/** Maps rendered status to a closed diagnostic label without user-controlled display text. */
+private fun ConnectivityBannerState.diagnosticPhase(): PerformancePhase =
+    when (this) {
+        ConnectivityBannerState.Hidden -> PerformancePhase.CONNECTION_BANNER_HIDDEN
+        ConnectivityBannerState.Offline -> PerformancePhase.CONNECTION_BANNER_OFFLINE
+        ConnectivityBannerState.Connecting -> PerformancePhase.CONNECTION_BANNER_CONNECTING
+        ConnectivityBannerState.JustConnected -> PerformancePhase.CONNECTION_BANNER_CONNECTED
+    }
 
 internal enum class ConnectivityBannerTarget { Offline, NoAttempt, Connecting, Connected }
 
@@ -235,16 +245,17 @@ internal fun rememberChatListConnectivityState(
             runtimeGeneration = runtimeGeneration,
             connectionState = controller.connectionState,
         )
-    var presentation by
-        remember(controller, activeAccountRef, runtimeGeneration) {
-            mutableStateOf(initialConnectivityBannerState(target))
-        }
-    val renderedPresentation =
-        if (presentation.target == target) presentation else connectivityBannerNext(presentation, target)
-    SideEffect {
-        if (presentation != renderedPresentation) presentation = renderedPresentation
-    }
     val foregroundEpoch = rememberConnectivityForegroundEpoch()
+    val renderedPresentation =
+        rememberConnectivityBannerPresentation(
+            owner = controller,
+            accountRef = activeAccountRef,
+            runtimeGeneration = runtimeGeneration,
+            target = target,
+        )
+    LaunchedEffect(controller, target, renderedPresentation.displayed, foregroundEpoch) {
+        controller.noteConnectionPresentation(renderedPresentation.displayed.diagnosticPhase())
+    }
     // Built once per appState rather than invoking map{} directly in the composable body, which
     // would construct a new Flow on every recomposition (FlowOperatorInvokedInComposition).
     val relaysConnectedFlow = remember(appState) { appState.connectivitySignals.map { it.relaysConnected } }
@@ -255,7 +266,7 @@ internal fun rememberChatListConnectivityState(
         connectivitySignals = { appState.connectivitySignals.value },
         relaysConnectedFlow = relaysConnectedFlow,
         refreshRelayConnectivity = appState::refreshRelayConnectivity,
-        revalidateConnectionReadiness = controller::revalidateConnectionReadiness,
+        revalidateConnectionReadiness = controller::revalidateConnectionReadinessOnRelaySample,
     )
     ValidatedInternetRefreshEffect(appState, controller, activeAccountRef, runtimeGeneration)
     ConnectivityEdgeRefreshEffects(
@@ -266,8 +277,30 @@ internal fun rememberChatListConnectivityState(
         relaysConnected = signals.relaysConnected,
         foregroundEpoch = foregroundEpoch,
         revalidateConnectionReadiness = controller::revalidateConnectionReadiness,
+        revalidateOnForeground = controller::revalidateConnectionReadinessOnForeground,
+        revalidateOnRelaySample = controller::revalidateConnectionReadinessOnRelaySample,
     )
-    LaunchedEffect(controller, activeAccountRef, runtimeGeneration, renderedPresentation) {
+    return renderedPresentation.displayed
+}
+
+/** Retains the production banner transition and success-flash owner across ordinary foreground edges. */
+@Composable
+internal fun rememberConnectivityBannerPresentation(
+    owner: Any,
+    accountRef: String?,
+    runtimeGeneration: Int,
+    target: ConnectivityBannerTarget,
+): ConnectivityBannerPresentation {
+    var presentation by
+        remember(owner, accountRef, runtimeGeneration) {
+            mutableStateOf(initialConnectivityBannerState(target))
+        }
+    val renderedPresentation =
+        if (presentation.target == target) presentation else connectivityBannerNext(presentation, target)
+    SideEffect {
+        if (presentation != renderedPresentation) presentation = renderedPresentation
+    }
+    LaunchedEffect(owner, accountRef, runtimeGeneration, renderedPresentation) {
         if (renderedPresentation.displayed == ConnectivityBannerState.JustConnected) {
             delay(CONNECTIVITY_BANNER_FLASH_MILLIS)
             if (presentation == renderedPresentation) {
@@ -275,7 +308,7 @@ internal fun rememberChatListConnectivityState(
             }
         }
     }
-    return renderedPresentation.displayed
+    return renderedPresentation
 }
 
 /**

@@ -47,16 +47,45 @@ def pct(values, p):
 
 
 def mention_phase_metrics(query, window):
-    """Missing trace labels stay unmeasured, rather than becoming false zero-duration phases."""
+    """Scope async phases to the receiver; separate reached landing from the later highlight hold."""
     phases = {}
-    for phase in ("total", "availability", "approach", "position", "animation", "layout", "correction"):
+    scoped_window = re.sub(r"\bts\b", "s.ts", window)
+    for phase in ("total", "availability", "approach", "position", "animation", "layout", "correction", "landed", "highlight"):
         rows = query(
-            f"select count(*) n, sum(dur)/1e6 ms from slice "
-            f"where name='WhiteNoise.conversation.mention.{phase}' and dur>=0 and {window}"
+            f"select count(*) n, sum(s.dur)/1e6 ms from process_slice s "
+            f"where s.process_name='{PKG}' and s.name='WhiteNoise.conversation.mention.{phase}' "
+            f"and s.dur>=0 and {scoped_window}"
         )
         phases[f"mention_{phase}_n"] = rows[0].n if rows else 0
         phases[f"mention_{phase}_ms"] = rows[0].ms if rows else None
+    starts = query(
+        f"select s.ts, s.dur, s.upid from process_slice s where s.process_name='{PKG}' "
+        f"and s.name='WhiteNoise.conversation.mention.total' and {scoped_window}"
+    )
+    landings = query(
+        f"select s.ts, s.upid from process_slice s where s.process_name='{PKG}' "
+        f"and s.name='WhiteNoise.conversation.mention.landed' and s.dur>=0 and {scoped_window}"
+    )
+    phases['mention_tap_to_landing_ms'] = None
+    phases['mention_motion_start_ns'] = None
+    phases['mention_motion_end_ns'] = None
+    phases['mention_motion_upid'] = None
+    if len(starts) == len(landings) == 1 and starts[0].upid == landings[0].upid:
+        delta = landings[0].ts - starts[0].ts
+        if starts[0].dur >= 0 and 0 <= delta <= starts[0].dur:
+            phases['mention_tap_to_landing_ms'] = delta / 1e6
+            phases['mention_motion_start_ns'] = starts[0].ts
+            phases['mention_motion_end_ns'] = landings[0].ts
+            phases['mention_motion_upid'] = starts[0].upid
+    phases["mention_qualified"] = phases["mention_tap_to_landing_ms"] is not None
     return phases
+
+
+def qualified_row(row):
+    """Admit only completed journeys with one same-receiver reached mention visit."""
+    if row.get("journey_ms") is None:
+        return False
+    return row["test"] != "jumpToUnreadMentionFromHistory" or row.get("mention_qualified") is True
 
 
 def analyse(path):
@@ -77,11 +106,34 @@ def analyse(path):
         return list(tp.query(sql))
 
     j = q(f"select ts,dur from slice where name='{JOURNEYS[test]}' limit 1")
-    if not j:
+    if not j or j[0].dur < 0:
         tp.close()
         return dict(test=test, it=it, journey_ms=None)
     ts, dur = j[0].ts, j[0].dur
     win = f"ts>={ts} and ts<={ts + dur}"
+    if test == "jumpToUnreadMentionFromHistory":
+        q("INCLUDE PERFETTO MODULE slices.with_context;")
+        mention = mention_phase_metrics(q, win)
+    else:
+        mention = {}
+    motion_start = mention.get("mention_motion_start_ns")
+    motion_end = mention.get("mention_motion_end_ns")
+    frame_start = ts if motion_start is None else motion_start
+    frame_end = ts + dur if motion_end is None else motion_end
+    frame_win = (
+        f"s.ts<{frame_end} and s.ts+s.dur>{frame_start} and s.dur>0"
+        if motion_start is not None else f"s.ts>={ts} and s.ts<={ts + dur}"
+    )
+    running_sum = (
+        f"sum(min(x.ts+x.dur, {frame_end})-max(x.ts, {frame_start}))"
+        if motion_start is not None else "sum(x.dur)"
+    )
+    running_window = (
+        f"x.ts<{frame_end} and x.ts+x.dur>{frame_start} and x.dur>=0"
+        if motion_start is not None else f"x.ts>={ts} and x.ts<={ts + dur}"
+    )
+    motion_upid = mention.get("mention_motion_upid")
+    process_scope = f"p.upid={motion_upid}" if motion_upid is not None else f"p.name like '{PKG}%'"
 
     def sec(name, agg):
         """Aggregate `agg` over the paging slice `name` inside the journey window, 0 when absent."""
@@ -93,13 +145,13 @@ def analyse(path):
         for r in q(
             f"""select s.dur/1e6 ms from slice s join thread_track tt on s.track_id=tt.id
                 join thread t using(utid) join process p using(upid)
-                where p.name like '{PKG}%' and t.tid=p.pid and s.depth=0
-                and s.name like 'Choreographer#doFrame %' and s.{win}"""
+                where {process_scope} and t.tid=p.pid and s.depth=0
+                and s.name like 'Choreographer#doFrame %' and {frame_win}"""
         )
     ]
     running = q(
-        f"""select sum(x.dur)/1e6 ms from thread_state x join thread t using(utid) join process p using(upid)
-            where p.name like '{PKG}%' and t.tid=p.pid and x.state='Running' and x.ts>={ts} and x.ts<={ts + dur}"""
+        f"""select {running_sum}/1e6 ms from thread_state x join thread t using(utid) join process p using(upid)
+            where {process_scope} and t.tid=p.pid and x.state='Running' and {running_window}"""
     )
     gpu = q(f"select count(*) n from counter c join process_counter_track k on c.track_id=k.id where k.name like '%gpu%' and c.{win}")
     # Every window command emits `page.window` — older and newer pages, but also return-to-latest and
@@ -117,7 +169,6 @@ def analyse(path):
         runway_kept=int(sec("runwayKept", "count(*)")),
         edge_reached=int(sec("edgeReached", "count(*)")),
     )
-    mention = mention_phase_metrics(q, win) if test == "jumpToUnreadMentionFromHistory" else {}
     tp.close()
     return dict(
         test=test,
@@ -125,6 +176,7 @@ def analyse(path):
         journey_ms=dur / 1e6,
         **pages,
         **mention,
+        frame_window_ms=(frame_end - frame_start) / 1e6,
         frames=len(frames),
         f_p50=pct(frames, 0.5),
         f_p90=pct(frames, 0.9),
@@ -155,6 +207,9 @@ def main(argv):
             if r["journey_ms"] is None:
                 print(f"{r['test']:30s}{r['it']:3d}  (no journey slice)")
                 continue
+            if not qualified_row(r):
+                print(f"{r['test']:30s}{r['it']:3d}  UNQUALIFIED: missing or ambiguous receiver landing")
+                continue
             print(
                 f"{r['test']:30s}{r['it']:3d} {r['journey_ms']:8.0f} {r['windows']:6d} {r['window_sum']:6.0f}/{r['window_max']:<4.0f} "
                 f"{r['apply_n']:6d} {r['apply_sum']:4.0f}/{r['apply_max']:<4.0f} {r['prepare_sum']:6.0f} "
@@ -162,13 +217,14 @@ def main(argv):
                 f"{r['frames']:5d} {ms(r['f_p50'], 4)}/{ms(r['f_p90'], 4)}/{ms(r['f_p99'], 5)}/{ms(r['f_max'], 5)} {r['jank32']:4d} {r['main_running_ms']:8.0f} {r['gpu_samples']:5d}"
             )
             if r["test"] == "jumpToUnreadMentionFromHistory":
-                print("  mention phases (ms; dash means unmeasured): " + ", ".join(
+                print("  mention phases (ms; total includes highlight; dash means unmeasured): " + ", ".join(
                     f"{phase}={ms(r.get(f'mention_{phase}_ms'), 0)}"
-                    for phase in ("total", "availability", "position", "animation", "layout", "correction")
+                    for phase in ("tap_to_landing", "total", "availability", "approach", "position",
+                                  "animation", "layout", "correction", "highlight")
                 ) + f"; corrections={r.get('mention_correction_n', 0)}")
         print()
         for test in order:
-            rs = [r for r in rows if r["test"] == test and r["journey_ms"] is not None]
+            rs = [r for r in rows if r["test"] == test and qualified_row(r)]
             if not rs:
                 continue
             med = lambda k: statistics.median(r[k] for r in rs)  # noqa: E731
@@ -183,9 +239,11 @@ def main(argv):
                 f"frame P99 med={ms(statistics.median(p99) if p99 else None, 0)}ms "
                 f"worst frame={ms(max(worst) if worst else None, 0, 0)}ms >32ms Σ={sum(r['jank32'] for r in rs)}"
             )
-        return
-    print(json.dumps(analyse(argv[0])))
+        return 0 if rows and all(qualified_row(row) for row in rows) else 1
+    row = analyse(argv[0])
+    print(json.dumps(row))
+    return 0 if qualified_row(row) else 1
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))

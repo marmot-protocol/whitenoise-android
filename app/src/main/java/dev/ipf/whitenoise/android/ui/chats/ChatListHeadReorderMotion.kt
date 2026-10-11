@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import android.os.SystemClock
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyItemScope
@@ -17,10 +16,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
-import kotlinx.coroutines.NonCancellable
+import dev.ipf.whitenoise.android.state.tracedPagingSection
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Keyed chat-row motion for head reorders and folder membership changes.
@@ -90,6 +90,7 @@ internal data class ChatListHeadDemotion(
 private data class ChatListHeadMotionState(
     val activeHeadId: String?,
     val pinnedOrder: List<String>,
+    val userGestureGeneration: Long,
 )
 
 private data class ChatListHeadScrollSnapshot(
@@ -97,6 +98,7 @@ private data class ChatListHeadScrollSnapshot(
     val pinnedOrder: List<String>,
     val firstVisibleItemIndex: Int,
     val isScrollInProgress: Boolean,
+    val correctionOwnsViewport: Boolean,
 )
 
 internal fun LazyListState.chatListViewportAnchor(visibleChatIds: Set<String>): ChatListViewportAnchor? =
@@ -189,6 +191,7 @@ private fun chatListViewportAnchorEffect(
     }
 }
 
+/** Retargets only the top viewport still owned by this promotion, respecting pinned and gesture boundaries. */
 private fun shouldCorrectHeadScroll(
     previous: ChatListHeadScrollSnapshot?,
     current: ChatListHeadScrollSnapshot,
@@ -199,25 +202,11 @@ private fun shouldCorrectHeadScroll(
         shouldSnapChatListForHeadReorder(
             previousHeadId = previous.headId,
             currentHeadId = current.headId,
-            preReorderFirstVisibleItemIndex = previous.firstVisibleItemIndex,
+            preReorderFirstVisibleItemIndex =
+                if (current.correctionOwnsViewport) 0 else previous.firstVisibleItemIndex,
             isScrollInProgress = previous.isScrollInProgress || current.isScrollInProgress,
             isActiveList = isActiveList,
         )
-
-private suspend fun LazyListState.animateHeadScrollCorrection() {
-    val gateStartedAtMs = SystemClock.uptimeMillis()
-    try {
-        animateScrollToItem(0)
-    } finally {
-        // Preserve the minimum head-reorder input gate even if a newer scroll
-        // mutation cancels this animation.
-        withContext(NonCancellable) {
-            val elapsedMs = SystemClock.uptimeMillis() - gateStartedAtMs
-            val remainingMs = CHAT_LIST_HEAD_INPUT_GATE_MILLIS - elapsedMs
-            if (remainingMs > 0L) delay(remainingMs)
-        }
-    }
-}
 
 /**
  * Closes row input in the first composition that publishes a new active head.
@@ -259,8 +248,9 @@ internal fun rememberChatListHeadReorderGate(
 /**
  * Active on-list head promotion: pairs [chatListRowMotion] with
  * animated scroll correction when [shouldSnapChatListForHeadReorder] fires.
+ * Dataset, gesture and demotion fences belong to this single viewport owner.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 @Composable
 internal fun ChatListActiveHeadScrollEffect(
     listState: LazyListState,
@@ -272,6 +262,7 @@ internal fun ChatListActiveHeadScrollEffect(
     userHeadDemotionSettled: Boolean = false,
     userHeadDemotionTargetIndex: Int? = null,
     viewportGeneration: Long = 0L,
+    userGestureGeneration: Long = viewportGeneration,
     onUserHeadDemotionConsumed: (ChatListHeadDemotion) -> Unit = {},
     onHeadReorderInProgressChange: (Boolean) -> Unit = {},
 ) {
@@ -289,6 +280,7 @@ internal fun ChatListActiveHeadScrollEffect(
             ChatListHeadMotionState(
                 activeHeadId = activeHeadId,
                 pinnedOrder = pinnedOrder,
+                userGestureGeneration = userGestureGeneration,
             ),
         )
     val liveProgressCallback by rememberUpdatedState(onHeadReorderInProgressChange)
@@ -296,39 +288,62 @@ internal fun ChatListActiveHeadScrollEffect(
     // snapshot. LazyColumn keeps any still-valid keyed scroll anchor; unlike an
     // incoming-message promotion, the replacement never launches scroll motion.
     LaunchedEffect(listState, datasetKey, isActiveList) {
-        var activeCorrections = 0
+        var correctionJob: Job? = null
+        var correctionSerial = 0L
+        var correctionGestureGeneration: Long? = null
         try {
             var previous: ChatListHeadScrollSnapshot? = null
             snapshotFlow {
                 val headMotionState = liveHeadMotionState
+                val correctionOwnsViewport =
+                    correctionJob?.isActive == true &&
+                        correctionGestureGeneration == headMotionState.userGestureGeneration
                 ChatListHeadScrollSnapshot(
                     headId = headMotionState.activeHeadId,
                     pinnedOrder = headMotionState.pinnedOrder,
                     firstVisibleItemIndex = listState.firstVisibleItemIndex,
-                    isScrollInProgress = listState.isScrollInProgress,
+                    isScrollInProgress = listState.isScrollInProgress && !correctionOwnsViewport,
+                    correctionOwnsViewport = correctionOwnsViewport,
                 )
             }.collect { current ->
                 if (shouldCorrectHeadScroll(previous, current, isActiveList)) {
-                    launch {
-                        activeCorrections += 1
-                        liveProgressCallback(true)
-                        try {
-                            listState.animateHeadScrollCorrection()
-                        } finally {
-                            // Cleanup itself must never suspend: otherwise a
-                            // cancellation can strand all row actions off.
-                            activeCorrections -= 1
-                            if (activeCorrections == 0) liveProgressCallback(false)
-                        }
-                    }
+                    correctionSerial += 1L
+                    val serial = correctionSerial
+                    correctionGestureGeneration = liveHeadMotionState.userGestureGeneration
+                    correctionJob?.cancel()
+                    liveProgressCallback(true)
+                    correctionJob =
+                        launchHeadScrollCorrection(
+                            listState,
+                            isCurrent = { serial == correctionSerial },
+                            onProgress = { liveProgressCallback(it) },
+                        )
                 }
                 previous = current
             }
         } finally {
+            correctionJob?.cancel()
             liveProgressCallback(false)
         }
     }
 }
+
+/** Runs one traced correction; superseded cleanup cannot release its successor's input gate. */
+private fun CoroutineScope.launchHeadScrollCorrection(
+    listState: LazyListState,
+    isCurrent: () -> Boolean,
+    onProgress: (Boolean) -> Unit,
+): Job =
+    launch {
+        try {
+            tracedPagingSection("WhiteNoise.chatList.head.correction") {
+                listState.animateScrollToItem(0)
+            }
+        } finally {
+            // The composition-owned gate retains the minimum input window.
+            if (isCurrent()) onProgress(false)
+        }
+    }
 
 private const val CHAT_LIST_MEMBERSHIP_FADE_MILLIS = 120
 internal const val CHAT_LIST_ROW_PLACEMENT_MILLIS = 240

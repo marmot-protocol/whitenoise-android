@@ -131,6 +131,11 @@ internal fun ConversationForegroundRestoreEffects(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val rootView = LocalView.current
+    ConversationForegroundTimelineMeasureEffect(
+        timelineViewport,
+        controller.timeline,
+        scrollCoordinator.foregroundRestoreInProgress,
+    )
     val density = LocalDensity.current
     val imeInsets = WindowInsets.ime
     val imeAnimationTargetInsets = WindowInsets.imeAnimationTarget
@@ -159,6 +164,7 @@ internal fun ConversationForegroundRestoreEffects(
                     geometry = currentForegroundGeometryProvider(),
                     imeTargetBottomPx = imeAnimationTargetInsets.getBottom(density),
                     bottomChromeMeasured = bottomChromeHeightObserver.hasMeasurement,
+                    timelineMeasured = timelineViewport?.hasMeasuredTimeline(controller.timeline) ?: true,
                 )
             },
         )
@@ -193,6 +199,7 @@ internal fun ConversationForegroundRestoreEffects(
             foregroundPreDrawSignals.tryReceive()
             val restoreToken = foregroundRestoreToken
             foregroundRestoreToken = null
+            val pendingLocalTimeline = controller.pendingTimelineAtForeground()
             resumeScrollRestoreCoordinator.launchResumeWork(scope) {
                 when {
                     restoreFocus -> {
@@ -212,6 +219,14 @@ internal fun ConversationForegroundRestoreEffects(
                             currentState = currentForegroundSettleStateProvider,
                             expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
                             expectedVisibilityTimeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
+                            awaitLocalTimeline = {
+                                if (pendingLocalTimeline != null) {
+                                    awaitCommittedConversationTimeline(pendingLocalTimeline)
+                                    // Discard a pre-draw from the old composition while local apply was held.
+                                    // The next signal measures the post-handoff transcript/chrome together.
+                                    foregroundPreDrawSignals.tryReceive()
+                                }
+                            },
                             // Past the deadline the snapshot stays armed, so the
                             // wait below still applies one correction when
                             // geometry finally settles — only user intent,

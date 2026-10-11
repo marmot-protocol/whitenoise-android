@@ -146,7 +146,7 @@ class ConversationVisibleReadObserverTest {
             assertTrue(subscription.anchorReports.isEmpty())
             subscription.emitWindow(page)
             awaitTimeline(controller, subscription)
-            awaitAnchor(subscription)
+            awaitAnchor(controller, subscription)
             assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_B), subscription.anchorReports)
         } finally {
             composeRule.runOnIdle { observing = false }
@@ -182,7 +182,7 @@ class ConversationVisibleReadObserverTest {
             installObserver(state, controller, lifecycleOwner) { observing }
             activate(state, row.groupIdHex)
             awaitReads(fixture, controller, 1)
-            awaitAnchor(first)
+            awaitAnchor(controller, first)
             first.endWindows()
             composeRule.waitUntil(timeoutMillis = 5_000) {
                 advanceAndroidWork()
@@ -194,7 +194,7 @@ class ConversationVisibleReadObserverTest {
             awaitTimeline(controller, second)
             // Replacing the native window alone must wake the retained observer,
             // even with an unchanged row and no reminder or viewport mutation.
-            awaitAnchor(second)
+            awaitAnchor(controller, second)
             assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_B), second.anchorReports)
         } finally {
             composeRule.runOnIdle { observing = false }
@@ -233,7 +233,7 @@ class ConversationVisibleReadObserverTest {
             assertEquals(0, fixture.markReadCalls.get())
             activate(state, row.groupIdHex)
             awaitReads(fixture, controller, 1)
-            awaitAnchor(subscription)
+            awaitAnchor(controller, subscription)
             assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_B), subscription.anchorReports)
 
             composeRule.runOnIdle { state.clearActiveConversation() }
@@ -314,12 +314,17 @@ class ConversationVisibleReadObserverTest {
         }
     }
 
-    /** Pumps Android work until the production observer reports its first native visible anchor. */
-    private fun awaitAnchor(subscription: ScriptedConversationTimelineSubscription) {
+    /** Waits for the anchor reply to be applied before exercising the next observer transition. */
+    private fun awaitAnchor(
+        controller: ConversationController,
+        subscription: ScriptedConversationTimelineSubscription,
+    ) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             advanceAndroidWork()
-            subscription.anchorReports.isNotEmpty()
+            subscription.anchorReports.isNotEmpty() && !controller.timelineSubscriptionActiveCallMutex.isLocked
         }
+        Snapshot.sendApplyNotifications()
+        composeRule.waitForIdle()
     }
 
     /** Transfers visible ownership on the Compose thread and publishes its snapshot transition. */

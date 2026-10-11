@@ -1,0 +1,41 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+  "legacy_sha256": "2b41db420b3e3099b74541cfcefc1bc265ccd5995ac0acc19ba61235d2aad8b7",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "A flick settles only once its fling rests, so a page landing mid-fling cannot snap the transcript back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "anchor": "fun Flow<Interaction>.collectConversationDragInteractions(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Far jump-to-newest lands in one snap instead of animating through history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "anchor": "suspend fun animateScrollToTail(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "surface": "Distance-bounded fresh target placement",
+        "anchor": "val resolvedScrollOffset = resolveScrollOffset(resolvedTargetIndex)",
+        "test_ids": [
+          "CON-032"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
+        "surface": "Latest-owned temporary room and explicit navigation cleanup",
+        "anchor": "suspend fun reserveMentionReadingStart(",
+        "test_ids": [
+          "CON-032"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

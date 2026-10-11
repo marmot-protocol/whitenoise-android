@@ -152,10 +152,10 @@ internal fun ValidatedInternetRefreshEffect(
                 when {
                     firstSignal -> {
                         firstSignal = false
-                        if (!hasValidatedInternet) controller.invalidateConnectionReadiness()
+                        if (!hasValidatedInternet) controller.invalidateConnectionReadinessOnNetworkLoss()
                     }
                     hasValidatedInternet -> controller.refreshConnectionReadiness()
-                    else -> controller.invalidateConnectionReadiness()
+                    else -> controller.invalidateConnectionReadinessOnNetworkLoss()
                 }
             }
     }
@@ -167,7 +167,7 @@ internal fun ValidatedInternetRefreshEffect(
  * is validated.
  */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList") // Explicit lifecycle/relay dependencies keep the effect testable.
 internal fun ConnectivityEdgeRefreshEffects(
     effectOwner: Any,
     activeAccountRef: String?,
@@ -176,11 +176,13 @@ internal fun ConnectivityEdgeRefreshEffects(
     relaysConnected: Boolean,
     foregroundEpoch: Int,
     revalidateConnectionReadiness: () -> Unit,
+    revalidateOnForeground: () -> Unit = revalidateConnectionReadiness,
+    revalidateOnRelaySample: () -> Unit = revalidateConnectionReadiness,
 ) {
     LaunchedEffect(effectOwner, activeAccountRef, runtimeGeneration, foregroundEpoch) {
-        if (foregroundEpoch > 0 && hasValidatedInternet) revalidateConnectionReadiness()
+        if (foregroundEpoch > 0 && hasValidatedInternet) revalidateOnForeground()
     }
     LaunchedEffect(effectOwner, activeAccountRef, runtimeGeneration, relaysConnected) {
-        if (hasValidatedInternet && !relaysConnected) revalidateConnectionReadiness()
+        if (hasValidatedInternet && !relaysConnected) revalidateOnRelaySample()
     }
 }
