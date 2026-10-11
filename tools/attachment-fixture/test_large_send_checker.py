@@ -44,7 +44,25 @@ class LargeSendCheckerTest(unittest.TestCase):
 
     def test_a_complete_run_passes(self):
         """All scenario facts true and one completed upload each for the large and retried files."""
-        self.assertEqual([], check_large_send(passing_metrics(), PASSING_LEDGER)["violations"])
+        result = check_large_send(passing_metrics(), PASSING_LEDGER)
+        self.assertEqual([], result["violations"])
+        self.assertTrue(result["at_ceiling"])
+
+    def test_an_unmeasured_heap_or_a_repeated_row_fails(self):
+        """A sampler that never ran, or a scenario reported twice, does not qualify."""
+        metrics = passing_metrics()
+        metrics[0]["java_baseline_bytes"] = metrics[0]["java_peak_bytes"] = 0
+        self.assertFalse(check_large_send(metrics, PASSING_LEDGER)["passed"])
+        self.assertFalse(check_large_send(passing_metrics() + passing_metrics()[:1], PASSING_LEDGER)["passed"])
+
+    def test_a_lowered_run_is_not_at_the_ceiling(self):
+        """A run lowered for a small emulator may pass, but it is reported as below the ceiling."""
+        metrics = passing_metrics()
+        metrics[0]["bytes"] = 300 * MIB
+        ledger_rows = ledger((300 * MIB + TAG_BYTES, True), (RETRY + TAG_BYTES, True))
+        result = check_large_send(metrics, ledger_rows)
+        self.assertTrue(result["passed"])
+        self.assertFalse(result["at_ceiling"])
 
     def test_heap_growth_beyond_the_limits_fails(self):
         """Java growth past 32 MiB, or native growth past 64 MiB, means the file reached the heap."""

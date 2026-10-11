@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -162,7 +163,7 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
             )
         composeRule.setContent {
             WhiteNoiseTheme {
-                MediaPendingPlaceholder(documents, failed = false, uploadProgress = progressAt(4 * MIB))
+                MediaPendingPlaceholder(documents, failed = false, uploadProgress = { progressAt(4 * MIB) })
             }
         }
 
@@ -188,7 +189,8 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
         composeRule.onNodeWithText("Encrypting").assertExists()
         composeRule.onNodeWithContentDescription("Encrypting 6.0 MB of 8.0 MB").assertExists()
         composeRule.onNodeWithText("4.0 MB of 8.0 MB").assertExists()
-        composeRule.onNodeWithContentDescription("Uploading 4.0 MB of 8.0 MB").assertExists()
+        // The card's control and the video's play disc both speak the same step and bytes.
+        composeRule.onAllNodesWithContentDescription("Uploading 4.0 MB of 8.0 MB").assertCountEquals(2)
         composeRule.onNodeWithText("Sending").assertExists()
         composeRule.onAllNodesWithText("Uploading…").assertCountEquals(0)
         composeRule.onNodeWithText("Upload failed").assertExists()
@@ -244,7 +246,7 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
             modifier = Modifier.size(48.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                VideoUploadIndicator(progress.ringFraction, if (progress.ringFraction != null) "video upload" else null)
+                VideoUploadIndicator { progress }
             }
         }
     }

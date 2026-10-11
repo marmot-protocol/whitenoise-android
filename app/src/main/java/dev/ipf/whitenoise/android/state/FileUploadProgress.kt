@@ -35,8 +35,10 @@ internal data class FileUploadProgress(
  * then the upload of the N + 16 byte ciphertext (twice the ciphertext length plus the bytes sent). Once
  * every ciphertext byte is sent, the rest of the native call admits and publishes the message.
  *
- * The counter is per item, so it only describes a send of a single file — an album's items would hide
- * behind its largest one. Returns null when there is nothing meaningful to show.
+ * Each item writes its own pass values into that one maximum, so the counter only describes a send of a
+ * single file — an album's items would hide behind its largest one. The maximum also hides a fallback to
+ * another media server after one accepted the whole body and then refused it, so that send reads as
+ * Sending while the next server receives the file again. Returns null when there is nothing to show.
  */
 internal fun fileUploadProgress(
     processed: Long,
@@ -48,9 +50,11 @@ internal fun fileUploadProgress(
     val uploadEnd = uploadStart + ciphertextBytes
     val fraction = (processed.toDouble() / uploadEnd.toDouble()).coerceIn(0.0, 1.0).toFloat()
     return when {
-        processed <= plaintextBytes ->
+        // A finished pass already belongs to the next step: after encryption MDK connects and signs before
+        // the first byte leaves, which is Uploading with nothing sent rather than Encrypting at full.
+        processed < plaintextBytes ->
             FileUploadProgress(FileUploadPhase.PREPARING, processed, plaintextBytes, fraction)
-        processed <= 2 * plaintextBytes ->
+        processed < 2 * plaintextBytes ->
             FileUploadProgress(FileUploadPhase.ENCRYPTING, processed - plaintextBytes, plaintextBytes, fraction)
         processed < uploadEnd -> {
             // The file's own size is what a person recognises, so the trailing tag is not shown as bytes.

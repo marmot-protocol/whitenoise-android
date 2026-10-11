@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.ui.conversation.media.ringFraction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -9,19 +10,22 @@ class FileUploadProgressTest {
     private val file = 1_000L
     private val ciphertext = file + 16L
 
-    /** MDK's private copy counts the file's own bytes, from nothing to the whole file. */
+    /** MDK's private copy counts the file's own bytes, and a finished copy already reads as encrypting. */
     @Test
     fun theCopyPassIsPreparing() {
         assertEquals(progress(FileUploadPhase.PREPARING, 0L), fileUploadProgress(0L, file)?.withoutFraction())
         assertEquals(progress(FileUploadPhase.PREPARING, 400L), fileUploadProgress(400L, file)?.withoutFraction())
-        assertEquals(progress(FileUploadPhase.PREPARING, file), fileUploadProgress(file, file)?.withoutFraction())
+        assertEquals(progress(FileUploadPhase.ENCRYPTING, 0L), fileUploadProgress(file, file)?.withoutFraction())
     }
 
-    /** Encryption resumes the counter at the file's size and counts its own bytes from there. */
+    /**
+     * Encryption resumes the counter at the file's size and counts its own bytes from there. A finished
+     * encryption is the upload starting: MDK connects and signs before the first byte leaves.
+     */
     @Test
     fun theEncryptionPassCountsFromTheFileSize() {
         assertEquals(progress(FileUploadPhase.ENCRYPTING, 1L), fileUploadProgress(file + 1L, file)?.withoutFraction())
-        assertEquals(progress(FileUploadPhase.ENCRYPTING, file), fileUploadProgress(2 * file, file)?.withoutFraction())
+        assertEquals(progress(FileUploadPhase.UPLOADING, 0L), fileUploadProgress(2 * file, file)?.withoutFraction())
     }
 
     /**
@@ -61,6 +65,14 @@ class FileUploadProgressTest {
 
         assertTrue(fractions.zipWithNext().all { (earlier, later) -> later >= earlier })
         assertEquals(0f, fractions.first())
+    }
+
+    /** The ring keeps spinning until the first byte is counted, and again once only the message is left. */
+    @Test
+    fun theRingSpinsWithoutAShareOfWork() {
+        assertNull(requireNotNull(fileUploadProgress(0L, file)).ringFraction)
+        assertNull(requireNotNull(fileUploadProgress(3 * ciphertext, file)).ringFraction)
+        assertTrue(requireNotNull(requireNotNull(fileUploadProgress(1L, file)).ringFraction) > 0f)
     }
 
     /** An empty or unknown file, or a counter that makes no sense, shows no progress at all. */

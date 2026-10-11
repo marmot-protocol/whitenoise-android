@@ -61,7 +61,7 @@ internal const val PENDING_VIDEO_BADGE_TAG = "conversation.pending.video.badge"
 internal const val PENDING_VIDEO_FALLBACK_TAG = "conversation.pending.video.fallback"
 
 /**
- * Placeholder for attachments still uploading, with retry on failure. [uploadProgress] is the byte
+ * Placeholder for attachments still uploading, with retry on failure. [uploadProgress] reads the byte
  * progress of a send of one large file, shown on its card while the send is not failed.
  */
 @Composable
@@ -72,7 +72,7 @@ internal fun MediaPendingPlaceholder(
     timestampText: String? = null,
     showStatus: Boolean = false,
     status: MessageStatus = MessageStatus.Pending,
-    uploadProgress: FileUploadProgress? = null,
+    uploadProgress: () -> FileUploadProgress? = { null },
 ) {
     val statusLabel = stringResource(if (failed) R.string.media_upload_failed else R.string.media_uploading)
     val statusColor = if (failed) MaterialTheme.colorScheme.error else Color.White
@@ -95,7 +95,7 @@ internal fun MediaPendingPlaceholder(
             showStatus = showStatus,
             status = status,
             // Byte progress describes one file, so only a lone document shows it.
-            uploadProgress = uploadProgress.takeIf { documents.size == 1 && !failed },
+            uploadProgress = uploadProgress.takeIf { documents.size == 1 && !failed } ?: { null },
         )
         return
     }
@@ -118,8 +118,8 @@ internal fun MediaPendingPlaceholder(
 }
 
 /**
- * Queued documents as the same stacked pills the confirmed bubble ends with; the last owns the footer.
- * [uploadProgress] is drawn on the single pill of a one-file send.
+ * Queued documents as the same stacked pills the confirmed bubble ends with, and the last owns the footer.
+ * [uploadProgress] is read and drawn on the single pill of a one-file send.
  */
 @Composable
 @Suppress("LongParameterList", "FunctionNaming")
@@ -131,7 +131,7 @@ private fun PendingFilePills(
     timestampText: String?,
     showStatus: Boolean,
     status: MessageStatus,
-    uploadProgress: FileUploadProgress? = null,
+    uploadProgress: () -> FileUploadProgress? = { null },
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         attachments.forEachIndexed { index, attachment ->
@@ -146,7 +146,7 @@ private fun PendingFilePills(
                 timestampText = timestampText.takeIf { ownsFooter },
                 showStatus = ownsFooter && showStatus,
                 status = status,
-                uploadProgress = uploadProgress,
+                uploadProgress = uploadProgress(),
             )
         }
     }

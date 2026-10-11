@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.media.SenderHarness
 import dev.ipf.whitenoise.android.media.awaitAndroidFixtureReferences
 import dev.ipf.whitenoise.android.media.openSenderHarness
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.FileUploadPhase
 import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -25,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -117,7 +119,7 @@ class FileBackedLargeSendDeviceTest {
         val sampler = HeapSampler()
         val started = SystemClock.elapsedRealtime()
         val queued = queue(harness.controller, staged.attachment)
-        val progress = ProgressRecorder(harness.controller, queued.optimistic.messageIdHex)
+        val progress = ProgressRecorder(progressOf(harness.controller, queued))
         withContext(Dispatchers.Main.immediate) { harness.controller.uploadQueued(queued) }
         val sent = awaitAndroidFixtureReferences(session.marmot, peers.sender.label, peers.group, listOf("large.bin"))
         val elapsed = SystemClock.elapsedRealtime() - started
@@ -148,17 +150,16 @@ class FileBackedLargeSendDeviceTest {
     ) {
         val staged = stage(session, CANCEL_BYTES, "cancelled.bin")
         val queued = queue(harness.controller, staged.attachment)
-        val progress = ProgressRecorder(harness.controller, queued.optimistic.messageIdHex)
+        val progressFlow = progressOf(harness.controller, queued)
+        val progress = ProgressRecorder(progressFlow)
         val upload =
             CoroutineScope(Dispatchers.Main.immediate).async {
                 runCatching { harness.controller.uploadQueued(queued) }
             }
-        // Cancel only once MDK has copied part of the file, so the stop reaches a running transfer.
+        // Cancel only once bytes are on the wire, so the stop interrupts a running upload rather than the copy.
         val seenWorking =
-            withTimeout(60_000L) {
-                harness.controller
-                    .pendingUploadProgress(queued.optimistic.messageIdHex)
-                    ?.first { it != null && it.fraction > 0.05f }
+            withTimeout(120_000L) {
+                progressFlow?.first { it != null && it.phase == FileUploadPhase.UPLOADING && it.phaseBytes > 0L }
             }
         val cancelled =
             withContext(Dispatchers.Main.immediate) {
@@ -324,15 +325,29 @@ class FileBackedLargeSendDeviceTest {
         }
     }
 
-    /** Records every progress value the controller publishes for one pending send. */
-    private class ProgressRecorder(
+    /**
+     * The controller's progress for [queued]. The retained uploads live in an access-ordered cache that
+     * only Main touches, so the lookup runs there, and the flow itself may be collected anywhere.
+     */
+    private suspend fun progressOf(
         controller: ConversationController,
-        messageIdHex: String,
+        queued: ConversationController.QueuedAttachmentSend,
+    ): StateFlow<FileUploadProgress?>? {
+        val messageIdHex = queued.optimistic.messageIdHex
+        return withContext(Dispatchers.Main.immediate) { controller.pendingUploadProgress(messageIdHex) }
+    }
+
+    /**
+     * Records every progress value shown for one pending send. The shown values never move back by design,
+     * so the recorded order is what a person watching the bubble saw.
+     */
+    private class ProgressRecorder(
+        progress: StateFlow<FileUploadProgress?>?,
     ) {
         private val samples = CopyOnWriteArrayList<FileUploadProgress>()
         private val job =
             CoroutineScope(Dispatchers.Default).launch {
-                controller.pendingUploadProgress(messageIdHex)?.collect { value -> value?.let(samples::add) }
+                progress?.collect { value -> value?.let(samples::add) }
             }
 
         /** Stops recording and returns the values seen, in order. */

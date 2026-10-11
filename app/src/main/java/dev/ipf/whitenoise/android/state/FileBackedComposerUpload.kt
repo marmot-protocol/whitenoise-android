@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.whitenoise.android.ui.conversation.media.FileUploadSources
 import dev.ipf.whitenoise.android.ui.conversation.media.stageFileUploadSources
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
@@ -101,7 +102,11 @@ internal suspend fun <T> withNativeTransferControl(
         return coroutineScope {
             // Reading the counter is a binding call, so it stays off Main. The scope waits for the reader
             // to stop before the control is released below.
-            val reader = launch(Dispatchers.Default) { reportTransferProgress(control, onProgress) }
+            // ATOMIC: a reader cancelled before it is dispatched still runs, so its final read is never skipped.
+            val reader =
+                launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
+                    reportTransferProgress(control, onProgress)
+                }
             try {
                 upload(control)
             } finally {
@@ -117,17 +122,25 @@ internal suspend fun <T> withNativeTransferControl(
     }
 }
 
-/** Reports [control]'s byte counter to [onProgress] until cancelled, then once more with its final value. */
+/**
+ * Reports [control]'s byte counter to [onProgress] until cancelled, then once more with its final value.
+ * Progress is display only, so a failed read stops the reports and never fails the transfer itself.
+ */
 private suspend fun reportTransferProgress(
     control: MediaFileTransferControlFfi,
     onProgress: (Long) -> Unit,
 ) {
+    var readable = true
+    val report = {
+        // A read that fails once is not retried, so a broken counter cannot flood the log or the screen.
+        readable = readable && runCatching { onProgress(control.processedBytes().toLong()) }.isSuccess
+    }
     try {
-        while (true) {
-            onProgress(control.processedBytes().toLong())
+        while (readable) {
+            report()
             delay(TRANSFER_PROGRESS_POLL_MILLIS)
         }
     } finally {
-        onProgress(control.processedBytes().toLong())
+        if (readable) report()
     }
 }

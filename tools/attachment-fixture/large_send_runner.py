@@ -1,4 +1,8 @@
-"""Run the large file-backed send fixture on a disposable emulator; failed attempts stay in the report."""
+"""Run the large file-backed send fixture on a disposable emulator. Failed attempts stay in the report.
+
+The fixture server keeps every completed upload under the run root, so each run leaves about 576 MiB there.
+Use a fresh private root per run and remove it afterwards.
+"""
 
 import argparse
 import json
@@ -17,12 +21,12 @@ from media_lifecycle_runner import metrics_of, passed
 TEST = ("dev.ipf.whitenoise.android.ui.conversation.media.FileBackedLargeSendDeviceTest"
         "#largeSendStaysBoundedAndRecoversThroughCancelAndRetry")
 INSTRUMENT_TIMEOUT_SECONDS = 1500
-# The ledger records every 16 KiB of an upload; the report keeps totals rather than half a million rows.
+# The ledger records every 16 KiB of an upload, so the report keeps totals rather than tens of thousands of rows.
 REPORTED_KINDS = ("upload", "upload_complete", "upload_disconnect")
 
 
 def instrument(adb, serial, ports, large_send_bytes=None):
-    """Run the one fixture process; its timeout covers a 512 MiB send, a cancelled send and a retried one."""
+    """Run the one fixture process. Its timeout covers a 512 MiB send, a cancelled send and a retried one."""
     command = [
         adb, "-s", serial, "shell", "am", "instrument", "-w", "-r",
         "-e", "class", TEST, "-e", "allowControlledAttachmentProbe", "true",
@@ -67,7 +71,7 @@ def run(adb, serial, root, output, budget_profile="reference-api36-arm64", large
         failure = error
         report["failure_class"] = type(error).__name__
     finally:
-        # Failed and partial attempts stay in the ledger; nothing is reset.
+        # Failed and partial attempts stay in the ledger, and nothing is reset.
         time.sleep(0.5)
         events = server.ledger.snapshot()[start:]
         report["ledger"] = [event for event in events if event["kind"] in REPORTED_KINDS]
@@ -95,7 +99,7 @@ def run(adb, serial, root, output, budget_profile="reference-api36-arm64", large
 
 
 def main():
-    """Require explicit device and report paths; never install, uninstall or clear an app."""
+    """Require explicit device and report paths. Never install, uninstall or clear an app."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--adb", default="adb")
     parser.add_argument("--serial", required=True)
