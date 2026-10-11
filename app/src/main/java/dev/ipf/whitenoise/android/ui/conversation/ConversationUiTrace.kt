@@ -5,7 +5,9 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 
 /** Closed, operation-only labels for attributing the CPU cost of an explicitly captured transcript. */
-internal enum class ConversationUiTrace(val label: String) {
+internal enum class ConversationUiTrace(
+    val label: String,
+) {
     TRANSCRIPT_MEASURE("WhiteNoise.conversation.measure.transcript"),
     ROW("WhiteNoise.conversation.compose.row"),
     BUBBLE("WhiteNoise.conversation.compose.bubble"),
