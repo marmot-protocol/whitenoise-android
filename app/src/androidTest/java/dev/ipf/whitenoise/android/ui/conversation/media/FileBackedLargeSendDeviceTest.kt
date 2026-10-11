@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -142,18 +143,21 @@ class FileBackedLargeSendDeviceTest {
         )
     }
 
-    /** Cancels a large send while MDK is working on it and reports that nothing was published. */
+    /**
+     * Cancels a large send while MDK is uploading it and reports that nothing was published. The upload runs
+     * as a child of this scenario, so a timeout or teardown cancels it rather than leaving it running.
+     */
     private suspend fun cancelledSend(
         session: FixtureSession,
         peers: FixturePeers,
         harness: SenderHarness,
-    ) {
+    ) = coroutineScope {
         val staged = stage(session, CANCEL_BYTES, "cancelled.bin")
         val queued = queue(harness.controller, staged.attachment)
         val progressFlow = progressOf(harness.controller, queued)
         val progress = ProgressRecorder(progressFlow)
         val upload =
-            CoroutineScope(Dispatchers.Main.immediate).async {
+            async(Dispatchers.Main.immediate) {
                 runCatching { harness.controller.uploadQueued(queued) }
             }
         // Cancel only once bytes are on the wire, so the stop interrupts a running upload rather than the copy.
@@ -255,13 +259,24 @@ class FileBackedLargeSendDeviceTest {
         session.marmot.replaceEncryptedMediaBlobEndpoints(peers.sender.label, peers.group, listOf(endpoint))
     }
 
-    /** The file names of every attachment the sender's group has published so far. */
+    /**
+     * The file names of every attachment the sender's group has published so far. An empty set means a page
+     * was read and held nothing: a history that cannot be read fails the fixture rather than passing as
+     * "nothing published".
+     */
     private suspend fun publishedFileNames(
         session: FixtureSession,
         peers: FixturePeers,
     ): Set<String> {
-        val read = session.marmot.attachmentHistoryPage(peers.sender.label, peers.group, 100u, null)
-        if (read !is AttachmentPageReadFfi.Page) return emptySet()
+        val read =
+            withTimeout(30_000L) {
+                var read = session.marmot.attachmentHistoryPage(peers.sender.label, peers.group, 100u, null)
+                while (read !is AttachmentPageReadFfi.Page) {
+                    delay(250L)
+                    read = session.marmot.attachmentHistoryPage(peers.sender.label, peers.group, 100u, null)
+                }
+                read
+            }
         val page = read.page
         return try {
             page.entries

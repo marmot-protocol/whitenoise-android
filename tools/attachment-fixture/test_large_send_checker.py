@@ -25,18 +25,20 @@ def passing_metrics():
     ]
 
 
-def ledger(*uploads, after=0):
-    """Ledger rows for uploads given as (ciphertext size, completed), numbered after the first [after] rows."""
+def ledger(*uploads, after=0, sent=MIB):
+    """Ledger rows for uploads given as (ciphertext size, completed), numbered after the first [after] rows.
+    Each upload received [sent] body bytes, or its whole size when it completed."""
     events = []
     for size, completed in uploads:
         seq = after + len(events) + 1
         events.append({"seq": seq, "request": None, "kind": "upload", "value": size})
-        events.append({"seq": seq + 1, "request": seq, "kind": "upload_complete" if completed else "upload_disconnect",
+        events.append({"seq": seq + 1, "request": seq, "kind": "upload_bytes", "value": size if completed else sent})
+        events.append({"seq": seq + 2, "request": seq, "kind": "upload_complete" if completed else "upload_disconnect",
                        "value": 0})
     return events
 
 
-PASSING_LEDGER = ledger((LARGE + TAG_BYTES, True), (RETRY + TAG_BYTES, True))
+PASSING_LEDGER = ledger((LARGE + TAG_BYTES, True), (CANCEL + TAG_BYTES, False), (RETRY + TAG_BYTES, True))
 
 
 class LargeSendCheckerTest(unittest.TestCase):
@@ -59,7 +61,7 @@ class LargeSendCheckerTest(unittest.TestCase):
         """A run lowered for a small emulator may pass, but it is reported as below the ceiling."""
         metrics = passing_metrics()
         metrics[0]["bytes"] = 300 * MIB
-        ledger_rows = ledger((300 * MIB + TAG_BYTES, True), (RETRY + TAG_BYTES, True))
+        ledger_rows = ledger((300 * MIB + TAG_BYTES, True), (CANCEL + TAG_BYTES, False), (RETRY + TAG_BYTES, True))
         result = check_large_send(metrics, ledger_rows)
         self.assertTrue(result["passed"])
         self.assertFalse(result["at_ceiling"])
@@ -107,8 +109,21 @@ class LargeSendCheckerTest(unittest.TestCase):
         ]
         for events in bad_ledgers:
             self.assertFalse(check_large_send(passing_metrics(), copy.deepcopy(events))["passed"])
-        interrupted = PASSING_LEDGER + ledger((CANCEL + TAG_BYTES, False), after=len(PASSING_LEDGER))
-        self.assertTrue(check_large_send(passing_metrics(), interrupted)["passed"], "a disconnected cancel is fine")
+        self.assertTrue(check_large_send(passing_metrics(), PASSING_LEDGER)["passed"], "a disconnected cancel is fine")
+
+    def test_a_cancel_that_never_sent_a_byte_fails(self):
+        """Progress alone does not show the cancel cut off a real upload, so the ledger must hold its bytes."""
+        no_cancel_upload = ledger((LARGE + TAG_BYTES, True), (RETRY + TAG_BYTES, True))
+        empty_cancel_upload = ledger((LARGE + TAG_BYTES, True), (CANCEL + TAG_BYTES, False), (RETRY + TAG_BYTES, True),
+                                     sent=0)
+        for events in (no_cancel_upload, empty_cancel_upload):
+            self.assertFalse(check_large_send(passing_metrics(), events)["passed"])
+
+    def test_steps_shown_out_of_order_fail(self):
+        """Every step present but in the wrong order does not qualify."""
+        metrics = passing_metrics()
+        metrics[0]["phases"] = ["UPLOADING", "ENCRYPTING", "PREPARING", "SENDING"]
+        self.assertFalse(check_large_send(metrics, PASSING_LEDGER)["passed"])
 
 
 if __name__ == "__main__":

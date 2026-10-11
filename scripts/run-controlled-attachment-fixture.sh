@@ -52,6 +52,8 @@ if [[ "$sender_mode" == controller-matrix ]]; then
   exit
 fi
 if [[ "$sender_mode" == controller-large-send ]]; then
+  # The large send is qualified on API 36, so that profile applies unless the caller names another.
+  [[ -n "${3:-}" ]] || budget_profile=reference-api36-arm64
   python3 tools/attachment-fixture/large_send_runner.py --serial "$serial" --root "$report_root" \
     --output "app/build/reports/attachment-fixture/${report_name}.json" --budget-profile "$budget_profile"
   exit

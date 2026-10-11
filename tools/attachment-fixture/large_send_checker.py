@@ -9,6 +9,8 @@ TAG_BYTES = 16
 JAVA_GROWTH_LIMIT = 32 * MIB
 NATIVE_GROWTH_LIMIT = 64 * MIB
 REQUIRED_PHASES = ("PREPARING", "ENCRYPTING", "UPLOADING")
+# The order a send moves through its steps, which the shown progress must follow.
+PHASE_ORDER = REQUIRED_PHASES + ("SENDING",)
 # The per-file ceiling: 512 MiB of ciphertext less its 16-byte tag.
 CEILING_BYTES = 512 * MIB - TAG_BYTES
 FACTS = {
@@ -30,6 +32,13 @@ def _completed_upload_sizes(events):
     return [event["value"] for event in events if event.get("kind") == "upload" and event.get("seq") in completed]
 
 
+def _received_upload_bytes(events, size):
+    """Body bytes the fixture received for uploads that declared [size], completed or not."""
+    requests = {event.get("seq") for event in events if event.get("kind") == "upload" and event.get("value") == size}
+    return sum(event.get("value") or 0 for event in events
+               if event.get("kind") == "upload_bytes" and event.get("request") in requests)
+
+
 def _check_large_send(row, violations):
     """Heap growth stays bounded, progress names every step and the message ends sending."""
     for side, limit in (("java", JAVA_GROWTH_LIMIT), ("native", NATIVE_GROWTH_LIMIT)):
@@ -42,6 +51,10 @@ def _check_large_send(row, violations):
     phases = row.get("phases")
     if not isinstance(phases, list) or any(phase not in phases for phase in REQUIRED_PHASES):
         violations.append("large-send: progress did not show every step")
+    elif [phase for phase in phases if phase in PHASE_ORDER] != sorted(
+        (phase for phase in phases if phase in PHASE_ORDER), key=PHASE_ORDER.index
+    ):
+        violations.append("large-send: progress showed its steps out of order")
     if row.get("final_phase") != "SENDING":
         violations.append("large-send: progress did not reach sending")
 
@@ -67,11 +80,17 @@ def check_large_send(metrics, events):
         _check_large_send(rows["large-send"], violations)
     if rows.get("cancel", {}).get("published") is not False:
         violations.append("cancel: the cancelled send was published")
-    sizes = _completed_upload_sizes(events if isinstance(events, list) else [])
+    events = events if isinstance(events, list) else []
+    sizes = _completed_upload_sizes(events)
     for scenario, expected in (("large-send", 1), ("retry", 1), ("cancel", 0)):
         size = rows.get(scenario, {}).get("bytes")
         if _measurement(size) and sizes.count(size + TAG_BYTES) != expected:
             violations.append(f"{scenario}: expected {expected} completed upload(s) of its ciphertext")
+    # The device reports progress, but only the fixture's own ledger shows that the cancel cut off an upload
+    # that was really sending bytes, rather than stopping before any byte left.
+    cancel_size = rows.get("cancel", {}).get("bytes")
+    if _measurement(cancel_size) and _received_upload_bytes(events, cancel_size + TAG_BYTES) <= 0:
+        violations.append("cancel: the fixture received no bytes of the cancelled upload")
     # A run lowered for a small emulator can pass, but it does not qualify the ceiling itself.
     at_ceiling = rows.get("large-send", {}).get("bytes") == CEILING_BYTES
     return {"scope": SCOPE, "passed": not violations, "violations": violations, "at_ceiling": at_ceiling}

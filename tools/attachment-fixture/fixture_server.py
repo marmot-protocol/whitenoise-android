@@ -18,7 +18,8 @@ CHUNK = 16 * 1024
 PACED_INTERVAL_SECONDS = 0.002
 MAX_BYTES = 128 * 1024 * 1024
 # A genuine upload may be as large as one file-backed send: 512 MiB - 16 bytes of plaintext plus its 16-byte tag.
-# Generated, registered and served bodies keep the smaller MAX_BYTES bound.
+# Generated and host-registered bodies keep the smaller MAX_BYTES bound. An uploaded blob is served back at its
+# stored size, so a receive-side fixture can read what a large send uploaded.
 UPLOAD_MAX_BYTES = 512 * 1024 * 1024
 TOKEN = re.compile(r"[a-z0-9-]{1,64}\Z")
 HASH = re.compile(r"[0-9a-f]{64}\Z")
