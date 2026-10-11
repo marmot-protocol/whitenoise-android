@@ -79,7 +79,10 @@ internal object ConversationTranscriptDrawProbe {
     }
 
     /** No records, keys, allocations or callbacks are produced without an admitted test observer. */
-    private fun isObserving(): Boolean = (BuildConfig.DEBUG || BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) && observer != null
+    private fun isObserving(): Boolean {
+        val testBuild = BuildConfig.DEBUG || BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS
+        return testBuild && observer != null
+    }
 
     /** One traversal owns its evidence even if its posted completion runs after a subsequent traversal. */
     private class RootFrame(
