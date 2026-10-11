@@ -750,7 +750,7 @@ internal class ConversationScrollCoordinator(
             ensureCurrent()
         }
 
-        /** Reserves native trailing padding before positioning a short newest-row mention. */
+        /** Reserves native padding for the target plus its measured newer/trailing content. */
         suspend fun reserveMentionReadingStart(
             rowHeightPx: Int,
             awaitLayout: suspend () -> Unit,

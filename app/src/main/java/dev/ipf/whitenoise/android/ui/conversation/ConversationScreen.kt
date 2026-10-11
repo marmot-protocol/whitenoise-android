@@ -2432,6 +2432,7 @@ internal fun ConversationScreen(
                     ),
             isNewest = index == controller.conversationTrailingRowCount(renderedTimeline.size),
             itemOffsetPx = layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset,
+            tailContentHeightPx = listState.layoutInfo.mentionTailContentHeightPx(index),
         )
     }
 

@@ -35,7 +35,7 @@ internal fun conversationTimelineContentPadding(
         bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap + mentionReadingReserve,
     )
 
-/** Gives a newest-row mention room to reach the physical reading top without adding timeline rows. */
+/** Subtracts the target's occupied tail extent, adding only missing runway without timeline rows. */
 internal fun conversationMentionReadingReservePx(
     readingHeightPx: Int,
     basePaddingPx: Int,

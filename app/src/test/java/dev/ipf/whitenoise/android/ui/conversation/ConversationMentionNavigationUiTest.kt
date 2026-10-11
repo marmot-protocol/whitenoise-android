@@ -55,6 +55,34 @@ class ConversationMentionNavigationUiTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** One short newer row still leaves insufficient native runway for a near-tail mention. */
+    @Test
+    fun shortSecondNewestMentionStartsAtThePhysicalTop() {
+        assertMentionTop(MentionFixture(Target(80, 1), viewportHeight = 420, padding = 12, initialIndex = 90))
+    }
+
+    /** Keyboard and composer reduction retain the measured newer-row runway in the native list. */
+    @Test
+    fun shortSecondNewestMentionWithComposerOverlapStartsAtThePhysicalTop() {
+        assertMentionTop(
+            MentionFixture(Target(80, 1), viewportHeight = 260, padding = 64, overlap = 32, initialIndex = 90),
+        )
+    }
+
+    /** A fresh near-tail command must remeasure newer content after an incoming row and header shift. */
+    @Test
+    fun secondNewestMentionWindowChangeUsesCurrentTailExtent() {
+        assertMentionTop(
+            MentionFixture(
+                Target(80, 1),
+                viewportHeight = 420,
+                padding = 12,
+                initialIndex = 90,
+                suspendedAction = SuspendedMentionAction.Window,
+            ),
+        )
+    }
+
     /** A genuine end mention has no newer rows supplying scroll room below it. */
     @Test
     fun shortNewestMentionWithNoNewerRowsStartsAtThePhysicalTop() {
@@ -435,7 +463,7 @@ class ConversationMentionNavigationUiTest {
             assertTrue(state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
         }
         if (fixture.suspendedAction == SuspendedMentionAction.Window) {
-            assertTrue("original message-0 was newest", state.newestEvaluations.first())
+            assertEquals("initial newest classification", targetIndex == 0, state.newestEvaluations.first())
             assertFalse("the new message--1 supersedes it as newest", state.newestEvaluations.last())
         }
         assertMentionFollowUps(fixture, state, listTop)
@@ -471,6 +499,7 @@ class ConversationMentionNavigationUiTest {
             estimatedItemHeightPx = state.targetHeight,
             isNewest = isNewest,
             itemOffsetPx = item?.offset,
+            tailContentHeightPx = layoutInfo.mentionTailContentHeightPx(index),
         )
     }
 
