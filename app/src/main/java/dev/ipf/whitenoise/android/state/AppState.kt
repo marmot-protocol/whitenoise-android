@@ -4780,7 +4780,7 @@ class WhiteNoiseAppState private constructor(
                                 operationCode = "APP_BOOTSTRAP_TIMEOUT",
                                 throwable = IllegalStateException("bootstrap stage exceeded deadline"),
                                 message = AppText.Resource(R.string.startup_taking_too_long),
-                                technicalDetail = StartupDiagnostics.timeoutDetail(),
+                                startupDetail = StartupDiagnostics.timeoutDetail(),
                             ),
                         )
                 }
@@ -4887,7 +4887,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Adds host stage attribution after an exception has unwound without retaining its sensitive text. */
     private fun bootstrapFailure(error: Throwable): ErrorPresentation =
-        privacySafeErrorPresentation("APP_BOOTSTRAP", error, technicalDetail = StartupDiagnostics.failureDetail())
+        privacySafeErrorPresentation("APP_BOOTSTRAP", error, startupDetail = StartupDiagnostics.failureDetail())
 
     private fun startupAccount(): AccountSummaryFfi = configuredAccount() ?: accounts.first()
 

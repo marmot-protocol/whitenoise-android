@@ -7,7 +7,10 @@ works without successful MDK initialization, audit consent, or a remote collecto
 
 Build the existing staging release variant with `-PstartupDiagnostics=true`, or
 manually dispatch **Android Staging APK** on the reviewed branch with the
-`startup_diagnostics` input enabled. The workflow uses the existing staging key.
+`startup_diagnostics` input enabled. The existing audit-attestation policy allows
+manual dispatch only by `Datawav` from a `datawav/` branch. Keep that policy; do
+not disable audit requirements or substitute a different signer to obtain an APK.
+The workflow uses the existing staging key.
 The version name ends in `-startup-diagnostics`; package and versionCode stay on
 the staging update track. Do not substitute a dev/preview APK for an update to
 an affected staging installation.

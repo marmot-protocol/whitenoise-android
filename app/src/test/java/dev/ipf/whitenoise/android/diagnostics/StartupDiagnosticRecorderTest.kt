@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.diagnostics
 
+import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -13,6 +14,37 @@ import org.junit.Test
 /** Stalled native work remains observable independently of timeout, retries and persistence failures. */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class StartupDiagnosticRecorderTest {
+    /** The actual Copy formatter preserves long stage attribution and every numeric/native field. */
+    @Test fun copiedReportRetainsCompleteStartupFieldsAndRejectsFreeText() {
+        var clock = 0L
+        val recorder = StartupDiagnosticRecorder({ clock })
+        recorder.beginAttempt()
+        val token = recorder.enter(StartupDiagnosticStage.PRIVACY_RUNTIME_CONFIGURATION)
+        clock = 15_000L
+
+        fun report(detail: String) =
+            privacySafeErrorPresentation(
+                operationCode = "APP_BOOTSTRAP_TIMEOUT",
+                throwable = IllegalStateException("private exception"),
+                appVersion = "test",
+                androidVersion = "test",
+                occurredAtUtc = "test",
+                startupDetail = detail,
+            ).report
+        val timeout = report(recorder.timeoutDetail() + " mdk_sha=d4e91c8")
+        assertTrue(timeout.contains("startup_stage=PRIVACY_RUNTIME_CONFIGURATION"))
+        assertTrue(timeout.contains("startup_attempt_elapsed_ms=15000"))
+        assertTrue(timeout.contains("startup_active_count=1"))
+        assertTrue(timeout.contains("startup_mdk_sha=d4e91c8"))
+        recorder.exit(token, PerformanceResult.FAILURE)
+        val failure = report(recorder.failureDetail() + " mdk_sha=d4e91c8")
+        assertTrue(failure.contains("startup_failed_stage=PRIVACY_RUNTIME_CONFIGURATION"))
+        assertTrue(failure.contains("startup_stage=BETWEEN_STAGES"))
+        assertTrue(failure.contains("startup_mdk_sha=d4e91c8"))
+        assertFalse(report("stage=private-account").contains("private-account"))
+        assertFalse(timeout.contains("private exception"))
+    }
+
     /** A native call that never returns still has an entry and remains the same operation after Retry. */
     @Test fun heldConstructionReportsItsInnermostStageWithoutCancellingOrDuplicatingWork() =
         runTest {
