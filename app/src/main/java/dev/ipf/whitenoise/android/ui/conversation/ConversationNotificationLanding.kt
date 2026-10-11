@@ -58,6 +58,12 @@ internal enum class NotificationLandingOutcome {
 
     /** The owning screen left while the landing waited, so nothing may be written. */
     ABANDONED,
+
+    /**
+     * A drag or a newer navigation took the scroll while the landing committed. The landing stops writing, so it
+     * neither retries nor falls back to the unread entry, and the transcript is revealed where that owner left it.
+     */
+    SUPERSEDED,
 }
 
 /** What the screen does with a landing's result, kept out of the entry effect so it stays presentation-only. */
@@ -189,7 +195,7 @@ internal class ConversationEntryPositioning(
         return when {
             !owner.isActive -> NotificationLandingOutcome.ABANDONED
             !request.isCurrent() -> NotificationLandingOutcome.FALLBACK
-            resolution is NotificationLandingResolution.Resolved -> landOn(resolution.messageIdHex)
+            resolution is NotificationLandingResolution.Resolved -> landOn(resolution.messageIdHex, request)
             else -> {
                 if (resolution is NotificationLandingResolution.Unavailable) {
                     callbacks.notification.onUnavailable(resolution.availability)
@@ -200,7 +206,10 @@ internal class ConversationEntryPositioning(
     }
 
     /** Commits the reading start of [targetId], then seeds the unread-jump button with the older backlog. */
-    private suspend fun landOn(targetId: String): NotificationLandingOutcome {
+    private suspend fun landOn(
+        targetId: String,
+        request: MessageTargetNavigationOwner.Request,
+    ): NotificationLandingOutcome {
         val rendered = renderedTimeline()
         val position =
             conversationViewportNotificationLandingPosition(
@@ -211,12 +220,26 @@ internal class ConversationEntryPositioning(
         val structure = controller.conversationTimelineStructure()
         val firstUnreadId = inputs.entryUnread.firstUnreadMessageId
         if (hasSentMessageAfterUnreadBoundary(rendered, firstUnreadId)) callbacks.retireUnreadDivider()
-        val committed = commitLanding(position)
-        return if (committed == NotificationLandingOutcome.LANDED) {
-            finishLanding(position, structure, rendered)
-        } else {
-            committed
+        return when (val committed = commitLanding(position, request)) {
+            NotificationLandingOutcome.LANDED -> finishLanding(position, structure, rendered)
+            NotificationLandingOutcome.SUPERSEDED -> yieldLanding(structure, rendered)
+            else -> committed
         }
+    }
+
+    /**
+     * Reveals the transcript where the superseding drag or navigation left it. Nothing is written and the unread
+     * backlog is not seeded, because the landing never happened, but the transcript must not stay hidden.
+     */
+    private fun yieldLanding(
+        structure: ConversationTimelineStructure,
+        rendered: List<TimelineMessage>,
+    ): NotificationLandingOutcome {
+        if (!owner.completeSupersededPosition(committedStructure(structure), viewport.height())) {
+            return NotificationLandingOutcome.ABANDONED
+        }
+        callbacks.onAnchored(rendered.lastOrNull()?.id)
+        return NotificationLandingOutcome.SUPERSEDED
     }
 
     /** Settles a committed landing, then points the unread-jump button back at the older backlog it left above. */
@@ -235,8 +258,16 @@ internal class ConversationEntryPositioning(
         return NotificationLandingOutcome.LANDED
     }
 
-    /** Retries across frames while the row is unmeasurable, within a bound so the reveal can never hang. */
-    private suspend fun commitLanding(position: ConversationViewportInitialPosition): NotificationLandingOutcome {
+    /**
+     * Retries across frames while the row is unmeasurable, within a bound so the reveal can never hang. A commit
+     * that a drag or a newer navigation superseded, or whose request is no longer current, ends the landing as
+     * [NotificationLandingOutcome.SUPERSEDED]: it never starts another landing command or an unread fallback
+     * that would take the scroll back from the reader.
+     */
+    private suspend fun commitLanding(
+        position: ConversationViewportInitialPosition,
+        request: MessageTargetNavigationOwner.Request,
+    ): NotificationLandingOutcome {
         val probe =
             ConversationReadingStartProbe(
                 resolveTargetIndex = { callbacks.navigation.resolveAnchor(position.anchor) },
@@ -250,6 +281,8 @@ internal class ConversationEntryPositioning(
             stopped =
                 when {
                     !owner.isActive -> NotificationLandingOutcome.ABANDONED
+                    owner.readingStartCommitSuperseded || !request.isCurrent() ->
+                        NotificationLandingOutcome.SUPERSEDED
                     ++attempts >= MAX_LANDING_COMMIT_ATTEMPTS -> NotificationLandingOutcome.FALLBACK
                     else -> null
                 }
@@ -290,12 +323,14 @@ internal class ConversationEntryPositioning(
         structure: ConversationTimelineStructure,
         rendered: List<TimelineMessage>,
     ): Boolean {
-        val committedStructure =
-            structure.copy(groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0)
-        val completed = owner.completeInitialPosition(position, committedStructure, viewport.height())
+        val completed = owner.completeInitialPosition(position, committedStructure(structure), viewport.height())
         if (completed) callbacks.onAnchored(rendered.lastOrNull()?.id)
         return completed
     }
+
+    /** The structure the post-initial reanchor gate baselines, with the live group-recovery row counted. */
+    private fun committedStructure(structure: ConversationTimelineStructure) =
+        structure.copy(groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0)
 
     /** The edit-filtered rows the transcript actually renders, the same projection every scroll decision uses. */
     private fun renderedTimeline() = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }

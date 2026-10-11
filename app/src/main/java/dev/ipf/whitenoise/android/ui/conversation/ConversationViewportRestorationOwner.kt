@@ -22,6 +22,13 @@ internal class ConversationViewportRestorationOwner(
     // The landing that still owns the viewport's reading start. State, so the row-height effect
     // observes it appearing, and always replaced by the next initial position this owner completes.
     private var readingStart by mutableStateOf<ConversationReadingStartIntent?>(null)
+
+    /**
+     * True when the latest reading-start commit failed because a drag or a newer navigation superseded its scroll
+     * command, false when it succeeded or only found the row unmeasurable. Only the second case is worth retrying.
+     */
+    var readingStartCommitSuperseded: Boolean = false
+        private set
     private var committedReadingStart: Pair<ConversationReadingStartProbe, ConversationReadingStartPlacement>? = null
 
     fun dispose() {
@@ -68,18 +75,24 @@ internal class ConversationViewportRestorationOwner(
         return committed && isActive
     }
 
-    /** Remembers the placed offset, not the planned one, because the settle may have corrected it. */
+    /**
+     * Remembers the placed offset, not the planned one, because the settle may have corrected it. It also records
+     * whether a failed commit was superseded, so a caller retries an unmeasurable row but never a command that a
+     * drag or a newer navigation already took over.
+     */
     private suspend fun commitReadingStart(
         position: ConversationViewportInitialPosition,
         probe: ConversationReadingStartProbe,
     ): Boolean {
-        val placement =
+        val result =
             coordinator.commitInitialReadingStartAnchor(
                 targetMessageId = requireNotNull(position.targetMessageId),
                 resultingMode = position.mode,
                 probe = probe,
                 reason = position.reason,
             )
+        readingStartCommitSuperseded = !result.commandCompleted
+        val placement = result.placement.takeIf { result.reached }
         committedReadingStart = placement?.let { probe to it }
         return placement != null
     }
@@ -105,6 +118,20 @@ internal class ConversationViewportRestorationOwner(
                 }
         }
         // The seeded-tail path shares this gate; it remains the single baseline.
+        reanchorGate.commit(structure, viewportHeight)
+        return true
+    }
+
+    /**
+     * Baselines the post-initial reanchor gate for a landing that a drag or a newer navigation superseded. The
+     * scroll mode stays whatever that owner set, so this settles no reading anchor and no landing ownership.
+     */
+    fun completeSupersededPosition(
+        structure: ConversationTimelineStructure,
+        viewportHeight: Int,
+    ): Boolean {
+        if (!isActive) return false
+        readingStart = null
         reanchorGate.commit(structure, viewportHeight)
         return true
     }

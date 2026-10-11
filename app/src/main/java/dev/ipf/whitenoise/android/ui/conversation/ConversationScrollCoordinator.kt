@@ -1036,22 +1036,23 @@ internal suspend fun ConversationScrollCoordinator.commitInitialAnchor(
 /**
  * Positions a notified message's reading start while the transcript is hidden: one non-animated
  * write, one layout frame, then the shared measured settle, so the first reveal is already on
- * target and no visible corrective snap follows. Returns the placement the reveal may rely on, or
- * null when the command was superseded or the geometry never became measurable.
+ * target and no visible corrective snap follows. The result keeps why a commit failed, because a
+ * retrying caller must restart a row that was only unmeasurable but never a command that a drag or
+ * a newer navigation superseded.
  */
 internal suspend fun ConversationScrollCoordinator.commitInitialReadingStartAnchor(
     targetMessageId: String,
     resultingMode: ConversationScrollMode,
     probe: ConversationReadingStartProbe,
     reason: ConversationScrollReason = ConversationScrollReason.NotificationTarget,
-): ConversationReadingStartPlacement? =
+): ConversationReadingStartResult =
     settleReadingStart(
         targetMessageId = targetMessageId,
         reason = reason,
         probe = probe,
         approach = ConversationReadingStartApproach.Instant,
         resultingMode = resultingMode,
-    ).takeIf { it.reached }?.placement
+    )
 
 /**
  * Tail opens do not need the history path's two equal layout samples. Commit

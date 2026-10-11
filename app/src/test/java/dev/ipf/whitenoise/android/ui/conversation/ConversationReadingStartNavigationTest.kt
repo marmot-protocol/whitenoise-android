@@ -46,7 +46,7 @@ class ConversationReadingStartNavigationTest {
             val writer = RecordingWriter()
             var index = 5
             var measured = false
-            val placement =
+            val result =
                 ConversationScrollCoordinator(writer).commitInitialReadingStartAnchor(
                     targetMessageId = TARGET,
                     resultingMode = ConversationScrollMode.ReadingHistory(TARGET, 0),
@@ -60,7 +60,7 @@ class ConversationReadingStartNavigationTest {
                             },
                         ),
                 )
-            assertEquals(ConversationReadingStartPlacement(6, 300), placement)
+            assertEquals(ConversationReadingStartPlacement(6, 300), result.placement)
             assertEquals(listOf(Write(false, 5, 0), Write(false, 6, 300)), writer.writes)
         }
 
@@ -82,13 +82,14 @@ class ConversationReadingStartNavigationTest {
     fun anUnmeasurableRowNeverReportsAPlacement() =
         runTest {
             val writer = RecordingWriter()
-            val placement =
+            val result =
                 ConversationScrollCoordinator(writer).commitInitialReadingStartAnchor(
                     targetMessageId = TARGET,
                     resultingMode = ConversationScrollMode.ReadingHistory(TARGET, 0),
                     probe = probe(index = { 5 }, layout = { ConversationMentionJumpLayout(500, null) }),
                 )
-            assertNull(placement)
+            assertNull(result.placement)
+            assertTrue(result.commandCompleted)
             assertEquals(listOf(Write(false, 5, 0)), writer.writes)
         }
 
@@ -117,10 +118,10 @@ class ConversationReadingStartNavigationTest {
             val coordinator = ConversationScrollCoordinator(writer)
             val waiting = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
-            var placement: ConversationReadingStartPlacement? = ConversationReadingStartPlacement(-1, -1)
+            var result: ConversationReadingStartResult? = null
             val landing =
                 launch(start = CoroutineStart.UNDISPATCHED) {
-                    placement =
+                    result =
                         coordinator.commitInitialReadingStartAnchor(
                             targetMessageId = TARGET,
                             resultingMode = ConversationScrollMode.ReadingHistory(TARGET, 0),
@@ -139,7 +140,8 @@ class ConversationReadingStartNavigationTest {
             coordinator.programmaticJump("reply", ConversationScrollReason.Reply) { scrollToItem(12) }
             release.complete(Unit)
             landing.join()
-            assertNull(placement)
+            assertFalse(requireNotNull(result).reached)
+            assertFalse(requireNotNull(result).commandCompleted)
             assertEquals(listOf(Write(false, 5, 300), Write(false, 12, 0)), writer.writes)
         }
 
