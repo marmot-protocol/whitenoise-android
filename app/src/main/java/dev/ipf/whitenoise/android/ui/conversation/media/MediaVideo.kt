@@ -270,10 +270,15 @@ internal fun MediaVideoGridTile(
     /**
      * Promotes the tap to interactive priority and delegates ownership before this tile can dispose. While the reader's
      * Cancel awaits acknowledgement a tap anywhere on the tile does nothing, so it cannot restart that transfer. A
-     * video still being sent from its staged file has nothing to open yet, so a tap on it does nothing either.
+     * video still being sent from its staged file has nothing to open yet, so a tap on it is not promoted. Only its
+     * "+N" overflow still opens the album, at the next item that can be shown.
      */
     fun dispatchViewerOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
-        if (transfer.cancelling || sendingFromStagedFile) return
+        if (transfer.cancelling) return
+        if (sendingFromStagedFile) {
+            if (overflowCount > 0) onTap()
+            return
+        }
         val open = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
             if (retry) {
@@ -353,11 +358,14 @@ internal fun MediaVideoGridTile(
         appState = appState,
         isReady = { localFile != null },
         ensureMaterialization = {
-            if (failed) {
-                failed = false
-                reloadToken++
+            // A video still being sent from its staged file has nothing to materialize until MDK publishes it.
+            if (!sendingFromStagedFile) {
+                if (failed) {
+                    failed = false
+                    reloadToken++
+                }
+                materializationIntent = materializationIntent.afterInteractiveRequest()
             }
-            materializationIntent = materializationIntent.afterInteractiveRequest()
         },
         dispatchOpen = { dispatchReadyVideo() },
     )
@@ -756,9 +764,12 @@ internal fun MediaVideoBubble(
         loading = false
     }
 
-    /** Opens the logical video immediately so materialization can continue after bubble disposal. */
+    /**
+     * Opens the logical video immediately so materialization can continue after bubble disposal. A video still being
+     * sent from its staged file has nothing to open yet, so it never opens.
+     */
     fun dispatchViewerOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
-        if (transfer.cancelling) return
+        if (transfer.cancelling || sendingFromStagedFile) return
         val open = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
             if (retry) {
@@ -810,11 +821,14 @@ internal fun MediaVideoBubble(
         appState = appState,
         isReady = { localFile != null },
         ensureMaterialization = {
-            if (failed) {
-                failed = false
-                reloadToken++
+            // A video still being sent from its staged file has nothing to materialize until MDK publishes it.
+            if (!sendingFromStagedFile) {
+                if (failed) {
+                    failed = false
+                    reloadToken++
+                }
+                materializationIntent = materializationIntent.afterInteractiveRequest()
             }
-            materializationIntent = materializationIntent.afterInteractiveRequest()
         },
         dispatchOpen = { dispatchReadyVideo() },
     )

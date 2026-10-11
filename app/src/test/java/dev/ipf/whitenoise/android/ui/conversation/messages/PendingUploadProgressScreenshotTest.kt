@@ -245,6 +245,50 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
         assertEquals(0, resolved.get())
         assertEquals(0, taps.get())
         composeRule.onAllNodesWithContentDescription("Open").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Video").assertExists()
+    }
+
+    /** The "+N" tile of a pending album still opens it when its frame is a video sent from its staged file. */
+    @Test
+    fun overflowTileOverAStagedFileVideoOpensTheNextItem() {
+        val leading = Array(4) { smallVideo() }
+        val pending = queueFileBacked(*leading, stagedVideo(), smallVideo())
+        val pendingAttachments = controller.pendingAttachmentsList(pending.record.messageIdHex)
+        val visuals = bubbleMedia(emptyList(), pendingAttachments).pendingVisuals
+        val opened = mutableListOf<ConversationMediaViewerOpenRequest>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MediaVisualGridBubble(
+                    item = pending,
+                    attachments = visuals,
+                    controller = controller,
+                    appState = appState,
+                    onOpenConversationMedia = { opened += it },
+                    mine = true,
+                    uploading = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, 4)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(5, opened.single().tappedAttachmentIndex)
+        assertEquals(listOf(0, 1, 2, 3, 5), opened.single().attachments.map { it.index })
+    }
+
+    /**
+     * A large audio file sent from its staged file shows the pending file card with the bytes its upload reports,
+     * not an audio player that could only fail to load it.
+     */
+    @Test
+    fun stagedFileAudioShowsTheFileCardWithItsBytes() {
+        val pending = queueFileBacked(stagedFile("audio/mpeg", "song.mp3", dim = null))
+        val retained =
+            requireNotNull(appState.retainedMediaUploads(appState.activeAccountRef, group().groupIdHex).get(pending.id))
+        retained.reportTransferProgress(2 * (FILE_BYTES + 16) + 4 * MIB)
+        composeRule.setContent { WhiteNoiseTheme { Box(Modifier.fillMaxSize()) { FileMessage(pending) } } }
+
+        composeRule.onNodeWithText("4.0 MB of 8.0 MB").assertExists()
     }
 
     /** The album tile of a pending small video held in memory still resolves its file, so the count above is real. */
@@ -393,12 +437,19 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
     }
 
     /** One large video staged to a private file, as a gallery pick above the in-memory budget is. */
-    private fun stagedVideo(): PendingAttachment {
+    private fun stagedVideo(): PendingAttachment = stagedFile("video/mp4", "large.mp4", dim = "1280x720")
+
+    /** One large [mediaType] file named [name] staged to a private file, as a pick above the in-memory budget is. */
+    private fun stagedFile(
+        mediaType: String,
+        name: String,
+        dim: String?,
+    ): PendingAttachment {
         val content = ByteArray(FILE_BYTES.toInt())
         val read = readStagedDocument(temporary.root, FILE_BYTES) { ByteArrayInputStream(content) }
         val source = (read as StagedDocumentRead.Success).source
         stagedSources += source
-        return PendingAttachment(ByteArray(0), "video/mp4", "large.mp4", "1280x720", sourceFile = source)
+        return PendingAttachment(ByteArray(0), mediaType, name, dim, sourceFile = source)
     }
 
     /** One small video held in memory, as a pick within the in-memory budget is. */

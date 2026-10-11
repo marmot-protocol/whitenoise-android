@@ -16,7 +16,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
         "anchor": "R.string.reply_media_video",
         "test_ids": [
-          "MED-025"
+          "MED-025",
+          "MED-030"
         ]
       },
       {
@@ -25,7 +26,8 @@
         "anchor": "fun MediaVideoBubble(",
         "test_ids": [
           "MED-001",
-          "MED-025"
+          "MED-025",
+          "MED-030"
         ]
       },
       {
@@ -34,7 +36,8 @@
         "anchor": "fun MediaVideoGridTile(",
         "test_ids": [
           "MED-001",
-          "MED-025"
+          "MED-025",
+          "MED-030"
         ]
       },
       {

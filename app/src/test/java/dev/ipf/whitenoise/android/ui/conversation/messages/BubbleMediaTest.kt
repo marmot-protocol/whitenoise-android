@@ -6,10 +6,12 @@ import dev.ipf.marmotkit.MediaAttachmentRejectionFfi
 import dev.ipf.marmotkit.MediaAttachmentRejectionKindFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class BubbleMediaTest {
     @Test
@@ -61,6 +63,42 @@ class BubbleMediaTest {
                 .value.kind,
         )
         assertTrue(media.hasConfirmedMedia)
+    }
+
+    /**
+     * A large audio file sent from its staged file has nothing to play until it is published, so it is left to the
+     * pending file card, while a small one held in memory stays pending audio.
+     */
+    @Test
+    fun stagedFileAudioIsLeftToThePendingFileCard() {
+        val file = File.createTempFile("staged-audio", ".part")
+        try {
+            val staged =
+                PendingAttachment(ByteArray(0), "audio/mpeg", "song.mp3", sourceFile = StagedUploadSource(file, 8L))
+            val media = bubbleMedia(emptyList(), listOf(staged, pending("voice.ogg", "audio/ogg")))
+
+            assertEquals(listOf(1), media.pendingAudio.map { it.index })
+        } finally {
+            file.delete()
+        }
+    }
+
+    /** A document and a large audio file sent from its staged file are general file cards, other media are not. */
+    @Test
+    fun stagedFileAudioCountsAsAGeneralFileCard() {
+        val file = File.createTempFile("staged-audio", ".part")
+        try {
+            val staged =
+                PendingAttachment(ByteArray(0), "audio/mpeg", "song.mp3", sourceFile = StagedUploadSource(file, 8L))
+
+            assertTrue(isPendingGeneralFile(staged))
+            assertTrue(isPendingGeneralFile(pending("notes.pdf", "application/pdf")))
+            assertFalse(isPendingGeneralFile(pending("voice.ogg", "audio/ogg")))
+            assertFalse(isPendingGeneralFile(pending("clip.mp4", "video/mp4")))
+            assertFalse(isPendingGeneralFile(pending("photo.jpg", "image/jpeg")))
+        } finally {
+            file.delete()
+        }
     }
 
     @Test

@@ -114,9 +114,11 @@ internal fun bubbleMedia(
                 !MediaReferenceSupport.isVideoMedia(reference)
         }
     val indexedPending = pendingAttachments.withIndex().toList()
+    // A large audio file sent from its staged file has nothing to play until MDK publishes it, so it stays out of
+    // the audio renderer and shows as a pending file card with its upload progress, like any large document.
     val pendingAudio =
         indexedPending.filter { (_, attachment) ->
-            attachment.mediaType.startsWith("audio/", ignoreCase = true)
+            attachment.mediaType.startsWith("audio/", ignoreCase = true) && attachment.sourceFile == null
         }
     val pendingVisuals =
         indexedPending
@@ -152,6 +154,15 @@ internal fun bubbleMedia(
         rejected = attachments.rejected,
     )
 }
+
+/**
+ * Whether [pending] shows as a general pending file card: a document, or a large audio file sent from its staged
+ * file, which [bubbleMedia] leaves out of the pending audio renderer.
+ */
+internal fun isPendingGeneralFile(pending: PendingAttachment): Boolean =
+    !pending.mediaType.startsWith("image/", ignoreCase = true) &&
+        !pending.mediaType.startsWith("video/", ignoreCase = true) &&
+        (!pending.mediaType.startsWith("audio/", ignoreCase = true) || pending.sourceFile != null)
 
 /** Keeps optimistic file chrome exclusive with confirmed, audio, and visual media renderers. */
 internal fun shouldShowPendingFilePlaceholder(

@@ -1512,12 +1512,7 @@ internal fun MessageBubble(
             (
                 bubbleMedia.files.isNotEmpty() ||
                     (
-                        showPendingPlaceholder &&
-                            pendingAttachmentsForRecord.any { pending ->
-                                !pending.mediaType.startsWith("image/", ignoreCase = true) &&
-                                    !pending.mediaType.startsWith("video/", ignoreCase = true) &&
-                                    !pending.mediaType.startsWith("audio/", ignoreCase = true)
-                            }
+                        showPendingPlaceholder && pendingAttachmentsForRecord.any(::isPendingGeneralFile)
                     )
             )
     val messageTextDoubleTap: (Offset) -> Unit = { position ->
