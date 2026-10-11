@@ -714,6 +714,14 @@ operation names only. The report adds phase sums and correction counts to frame 
 worst-frame and >32 ms evidence. A missing phase is unmeasured, never proof of zero cost.
 Successful placement or elapsed time alone does not establish smoothness.
 
+For CPU attribution, an active local performance-diagnostics session plus system tracing
+emits synchronous `WhiteNoise.conversation.measure.transcript` and
+`WhiteNoise.conversation.compose.{row,bubble,text}` sections. They contain only closed
+operation labels, emit no per-row WNPerf events, and stop admitting work when the session
+expires. Nested durations are inclusive; measure child-only recompositions at the executed
+text body rather than assuming every row or bubble parent recomposed. Pair these sections
+with scheduling and CPU-frequency counters before attributing a slow frame to source work.
+
 On the shared Hermes fixture, the guarded installer permits audited staging or exact-head
 signed stable-preview artifacts, not unsigned dev/benchmark app APKs. Do not run this host
 script there to bypass remote-first builds or the install gate. Use the approved signed

@@ -82,7 +82,7 @@ internal fun TimelineRow(
     onTtsSentenceSeek: (TtsState) -> Unit = {},
     onWave: (suspend (String, () -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
-) {
+) = traceConversationUiSection(ConversationUiTrace.ROW) {
     Column(modifier.fillMaxWidth()) {
         val daySeparatorLabel =
             remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {

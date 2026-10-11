@@ -133,6 +133,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
+import dev.ipf.whitenoise.android.ui.conversation.ConversationUiTrace
 import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
 import dev.ipf.whitenoise.android.ui.conversation.LocalPollVotesHost
@@ -170,6 +171,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromTe
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.rememberLocalVCardContact
+import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
@@ -380,7 +382,7 @@ internal fun MessageBubble(
     onTtsSentenceSeek: (TtsState) -> Unit = {},
     ttsRowInstance: Any? = null,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
-) {
+) = traceConversationUiSection(ConversationUiTrace.BUBBLE) {
     val record = item.record
     val isPollRecord = MessageProjector.isPollKind(record.kind)
     val pollOwner =

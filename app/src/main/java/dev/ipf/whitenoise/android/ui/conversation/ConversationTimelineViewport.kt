@@ -171,7 +171,8 @@ internal fun Modifier.measureConversationTimelinePadding(
     timelinePublication: List<TimelineMessage>,
 ): Modifier =
     layout { measurable, constraints ->
-        val placeable = measurable.measure(constraints)
+        val placeable =
+            traceConversationUiSection(ConversationUiTrace.TRANSCRIPT_MEASURE) { measurable.measure(constraints) }
         viewport.onPaddingMeasured(basePadding.roundToPx(), foregroundOverlap.roundToPx())
         viewport.onTimelineMeasured(timelinePublication)
         layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
