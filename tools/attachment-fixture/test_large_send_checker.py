@@ -13,15 +13,16 @@ RETRY = 64 * MIB
 def passing_metrics():
     """Rows a fully qualified run reports."""
     return [
-        {"scenario": "large-send", "bytes": LARGE, "ms": 60_000, "sha256_matches": True,
+        {"scenario": "large-send", "bytes": LARGE, "ms": 60_000, "picked_from_content_uri": True,
+         "sha256_matches": True,
          "java_baseline_bytes": 10 * MIB, "java_peak_bytes": 16 * MIB,
          "native_baseline_bytes": 70 * MIB, "native_peak_bytes": 90 * MIB,
          "phases": ["PREPARING", "ENCRYPTING", "UPLOADING", "SENDING"], "monotonic": True,
          "final_phase": "SENDING", "snapshot_deleted": True},
-        {"scenario": "cancel", "bytes": CANCEL, "cancelled_while_working": True, "published": False,
-         "snapshot_deleted": True},
-        {"scenario": "retry", "bytes": RETRY, "first_attempt_unpublished": True, "kept_for_retry": True,
-         "sha256_matches": True, "snapshot_deleted": True},
+        {"scenario": "cancel", "bytes": CANCEL, "picked_from_content_uri": True, "cancelled_while_working": True,
+         "published": False, "snapshot_deleted": True},
+        {"scenario": "retry", "bytes": RETRY, "picked_from_content_uri": True, "first_attempt_unpublished": True,
+         "kept_for_retry": True, "sha256_matches": True, "snapshot_deleted": True},
     ]
 
 
@@ -85,6 +86,13 @@ class LargeSendCheckerTest(unittest.TestCase):
         metrics = passing_metrics()
         metrics[0]["java_peak_bytes"] = True
         self.assertFalse(check_large_send(metrics, PASSING_LEDGER)["passed"])
+
+    def test_a_stale_test_apk_that_staged_directly_fails(self):
+        """A row without the content pick fact, as an older test APK reports, does not qualify."""
+        for index in range(3):
+            metrics = passing_metrics()
+            del metrics[index]["picked_from_content_uri"]
+            self.assertFalse(check_large_send(metrics, PASSING_LEDGER)["passed"])
 
     def test_progress_must_show_every_step_and_end_sending(self):
         """A run that skipped a step, or never reached sending, does not qualify."""

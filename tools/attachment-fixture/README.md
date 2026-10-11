@@ -259,6 +259,22 @@ Nothing installs it. The exact preconditions, owner authorizations, command orde
 the [physical gate plan](../../docs/performance-data/attachment-apk-physical-gate-plan.md), which also states that
 the Pixel results recorded so far and which criteria the gate still does not cover.
 
+#### Large file-backed send
+
+`large_send_runner.py` runs `FileBackedLargeSendDeviceTest`, the `controller-large-send` mode of
+`run-controlled-attachment-fixture.sh`. Each file is a generated `content://` document from the test APK's
+`GeneratedDocumentProvider`, picked through the composer's own document reader. A file at the per-file ceiling sends
+with bounded heap and progress through every step, a 256 MiB send is cancelled while it uploads, and a 64 MiB send
+fails against a closed port and then succeeds on Retry. `large_send_checker.py` judges the facts against the
+fixture's upload ledger.
+
+The run needs three times the large file plus 2 GiB free on the device, and refuses to start without it. It
+records the free storage before and after, so anything left behind shows in the report. On a physical device it
+takes the same opt-in as the received-APK gate: `--serial SERIAL --physical-fixture-serial SERIAL` and
+`--budget-profile pixel-api37-arm64`. Update the isolated identity first with `apk_physical_runner.py install`.
+The runner itself never installs, uninstalls or clears anything. Only a qualified physical run stops deferring
+`physical-device`.
+
 ### Unknown-length native control
 
 Run `bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-unknown-length`

@@ -12,6 +12,7 @@ import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.media.FixturePeers
 import dev.ipf.whitenoise.android.media.FixtureSession
+import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.RestartAttachmentRetentionProbe
 import dev.ipf.whitenoise.android.media.SenderHarness
 import dev.ipf.whitenoise.android.media.awaitAndroidFixtureReferences
@@ -22,6 +23,7 @@ import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.ui.conversation.ConversationAttachmentReader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -40,9 +42,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.io.InputStream
 import java.net.ServerSocket
-import java.security.MessageDigest
 import java.util.concurrent.CopyOnWriteArrayList
 
 private const val MIB = 1024L * 1024L
@@ -51,10 +51,11 @@ private const val RETRY_BYTES = 64L * MIB
 private const val TIMEOUT_MILLIS = 20L * 60L * 1000L
 
 /**
- * Qualifies the large-send path of #2284 on a disposable emulator against the loopback Blossom fixture and
- * relay, through the shipping controller and MDK's file upload. Every fact reported is closed: sizes,
- * booleans, phases and times, never names, keys or identifiers. The host checker judges the run, including
- * the fixture's own upload ledger.
+ * Qualifies the large-send path of #2284 on a disposable emulator, or on one explicitly authorized physical
+ * device, against the loopback Blossom fixture and relay, through the shipping controller and MDK's file
+ * upload. Every file is a generated `content://` document picked through the composer's own document reader.
+ * Every fact reported is closed: sizes, booleans, phases and times, never names, keys or identifiers. The
+ * host checker judges the run, including the fixture's own upload ledger.
  *
  * - A file at the per-file ceiling (512 MiB less the 16-byte tag, or `fixtureLargeSendBytes`) sends with
  *   bounded heap, exact plaintext, monotonic progress through every step, and its staged copy deleted.
@@ -104,7 +105,14 @@ class FileBackedLargeSendDeviceTest {
                     }
                 }
             } finally {
-                session.close(preserve = false)
+                try {
+                    session.close(preserve = false)
+                } finally {
+                    // Nothing in this isolated package sweeps its upload directory, so a run that stopped before
+                    // a send released its staged copy, or whose session failed to close, must not leave hundreds
+                    // of MiB behind on the device.
+                    File(context.cacheDir, MediaCacheDirs.UPLOAD_SOURCES).deleteRecursively()
+                }
             }
         }
 
@@ -115,7 +123,7 @@ class FileBackedLargeSendDeviceTest {
         harness: SenderHarness,
         bytes: Long,
     ) {
-        val staged = stage(session, bytes, "large.bin")
+        val staged = stage(session, harness, bytes, "large.bin")
         val baseline = heapNow()
         val sampler = HeapSampler()
         val started = SystemClock.elapsedRealtime()
@@ -129,6 +137,7 @@ class FileBackedLargeSendDeviceTest {
         report(
             JSONObject()
                 .put("scenario", "large-send")
+                .put("picked_from_content_uri", staged.pickedFromContentUri)
                 .put("bytes", bytes)
                 .put("ms", elapsed)
                 .put("sha256_matches", sent.references.single().plaintextSha256 == staged.sha256)
@@ -152,7 +161,7 @@ class FileBackedLargeSendDeviceTest {
         peers: FixturePeers,
         harness: SenderHarness,
     ) = coroutineScope {
-        val staged = stage(session, CANCEL_BYTES, "cancelled.bin")
+        val staged = stage(session, harness, CANCEL_BYTES, "cancelled.bin")
         val queued = queue(harness.controller, staged.attachment)
         val progressFlow = progressOf(harness.controller, queued)
         val progress = ProgressRecorder(progressFlow)
@@ -176,6 +185,7 @@ class FileBackedLargeSendDeviceTest {
         report(
             JSONObject()
                 .put("scenario", "cancel")
+                .put("picked_from_content_uri", staged.pickedFromContentUri)
                 .put("bytes", CANCEL_BYTES)
                 .put("cancelled_while_working", seenWorking != null && cancelled)
                 .put("published", "cancelled.bin" in publishedFileNames(session, peers))
@@ -190,7 +200,7 @@ class FileBackedLargeSendDeviceTest {
         harness: SenderHarness,
         blobPort: Int,
     ) {
-        val staged = stage(session, RETRY_BYTES, "retried.bin")
+        val staged = stage(session, harness, RETRY_BYTES, "retried.bin")
         val closedPort = ServerSocket(0).use { it.localPort }
         setEndpoint(session, peers, closedPort)
         val queued = queue(harness.controller, staged.attachment)
@@ -205,6 +215,7 @@ class FileBackedLargeSendDeviceTest {
         report(
             JSONObject()
                 .put("scenario", "retry")
+                .put("picked_from_content_uri", staged.pickedFromContentUri)
                 .put("bytes", RETRY_BYTES)
                 .put("first_attempt_unpublished", failedUnpublished)
                 .put("kept_for_retry", keptForRetry)
@@ -213,40 +224,63 @@ class FileBackedLargeSendDeviceTest {
         )
     }
 
-    /** One generated file staged the way the composer stages a large pick, with its SHA-256. */
+    /**
+     * One generated document picked and staged the way the composer stages a large pick, with its SHA-256.
+     * [pickedFromContentUri] marks a report from this version of the fixture, so the host checker rejects an
+     * older test APK that staged directly. The provider path itself is witnessed by the size check and the
+     * SHA-256 match, not by this flag.
+     */
     private class Staged(
         val attachment: PendingAttachment,
         val file: File,
         val sha256: String,
+        val pickedFromContentUri: Boolean,
     )
 
-    /** Stages [bytes] of generated content into this process's private upload directory as [name]. */
+    /**
+     * Picks [bytes] of generated content as the `content://` document [name] through the composer's own
+     * document reader, which stages it into this process's private upload directory. The expected SHA-256 is
+     * computed from the generator, apart from the bytes the reader staged. A pick that fails a check releases
+     * whatever the reader staged before the failure is thrown.
+     */
     private suspend fun stage(
         session: FixtureSession,
+        harness: SenderHarness,
         bytes: Long,
         name: String,
     ): Staged =
         withContext(Dispatchers.IO) {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val directory = uploadSourcesDirectory(session.context.cacheDir)
+            val testPackage = InstrumentationRegistry.getInstrumentation().context.packageName
+            val uri = GeneratedDocumentProvider.uri(testPackage, bytes, name)
             val read =
-                readStagedDocument(directory, FILE_BACKED_ATTACHMENT_MAX_BYTES) { GeneratedStream(bytes, digest) }
-            val source = (read as StagedDocumentRead.Success).source
-            check(source.byteCount == bytes)
-            Staged(
-                PendingAttachment(ByteArray(0), "application/octet-stream", name, sourceFile = source),
-                source.file,
-                digest.digest().joinToString("") { "%02x".format(it) },
-            )
+                ConversationAttachmentReader(harness.state, session.context)
+                    .readPickedDocuments(listOf(uri), allowFileBacked = true)
+            var kept = false
+            try {
+                check(read.failures.isEmpty()) { "generated pick was refused: ${read.failures}" }
+                val attachment = read.attachments.single()
+                val source = requireNotNull(attachment.sourceFile) { "generated pick was not staged to a file" }
+                check(source.byteCount == bytes) { "staged ${source.byteCount} of $bytes bytes" }
+                check(attachment.fileName == name) { "the staged pick lost its display name" }
+                val sha256 = GeneratedDocumentProvider.sha256(bytes)
+                Staged(attachment, source.file, sha256, uri.scheme == "content").also { kept = true }
+            } finally {
+                if (!kept) read.attachments.forEach { it.sourceFile?.closeQuietly() }
+            }
         }
 
-    /** Queues [attachment] as one optimistic send, the way the composer does. */
+    /**
+     * Queues [attachment] as one optimistic send, the way the composer does. A send the controller does not
+     * admit releases its staged copy, as the composer does for an unadopted pick.
+     */
     private suspend fun queue(
         controller: ConversationController,
         attachment: PendingAttachment,
     ): ConversationController.QueuedAttachmentSend =
         withContext(Dispatchers.Main.immediate) {
-            requireNotNull(controller.queueAttachments(listOf(attachment), caption = null)) { "send not admitted" }
+            val queued = controller.queueAttachments(listOf(attachment), caption = null)
+            if (queued == null) attachment.sourceFile?.closeQuietly()
+            requireNotNull(queued) { "send not admitted" }
         }
 
     /** Points the generated group at a media server on [port]. */
@@ -370,40 +404,6 @@ class FileBackedLargeSendDeviceTest {
             job.cancel()
             job.join()
             return samples.toList()
-        }
-    }
-
-    /** Deterministic pseudo-random bytes of a fixed length, hashed as they are read. */
-    private class GeneratedStream(
-        private val length: Long,
-        private val digest: MessageDigest,
-    ) : InputStream() {
-        private var produced = 0L
-        private var state = -0x61c8864680b583ebL
-
-        /** Produces one byte. */
-        override fun read(): Int {
-            val one = ByteArray(1)
-            return if (read(one, 0, 1) < 0) -1 else one[0].toInt() and 0xFF
-        }
-
-        /** Fills [buffer] with the next bytes of the sequence. */
-        override fun read(
-            buffer: ByteArray,
-            offset: Int,
-            count: Int,
-        ): Int {
-            if (produced >= length) return -1
-            val n = minOf(count.toLong(), length - produced).toInt()
-            for (index in 0 until n) {
-                state = state xor (state shl 13)
-                state = state xor (state ushr 7)
-                state = state xor (state shl 17)
-                buffer[offset + index] = state.toByte()
-            }
-            digest.update(buffer, offset, n)
-            produced += n
-            return n
         }
     }
 }

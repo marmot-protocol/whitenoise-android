@@ -13,10 +13,13 @@ REQUIRED_PHASES = ("PREPARING", "ENCRYPTING", "UPLOADING")
 PHASE_ORDER = REQUIRED_PHASES + ("SENDING",)
 # The per-file ceiling: 512 MiB of ciphertext less its 16-byte tag.
 CEILING_BYTES = 512 * MIB - TAG_BYTES
+# Every scenario must say its file was picked from a `content://` source, so a stale test APK that staged its
+# files directly cannot pass.
 FACTS = {
-    "large-send": ("sha256_matches", "monotonic", "snapshot_deleted"),
-    "cancel": ("cancelled_while_working", "snapshot_deleted"),
-    "retry": ("first_attempt_unpublished", "kept_for_retry", "sha256_matches", "snapshot_deleted"),
+    "large-send": ("picked_from_content_uri", "sha256_matches", "monotonic", "snapshot_deleted"),
+    "cancel": ("picked_from_content_uri", "cancelled_while_working", "snapshot_deleted"),
+    "retry": ("picked_from_content_uri", "first_attempt_unpublished", "kept_for_retry", "sha256_matches",
+              "snapshot_deleted"),
 }
 
 
