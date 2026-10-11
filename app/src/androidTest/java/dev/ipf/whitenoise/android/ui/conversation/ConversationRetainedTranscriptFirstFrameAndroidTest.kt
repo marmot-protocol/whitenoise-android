@@ -30,6 +30,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -40,9 +41,11 @@ import dev.ipf.whitenoise.android.ResponsivenessDeviceAcceptance
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
+import dev.ipf.whitenoise.android.state.DestructiveAccountWipeRuntimeState
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineGroupRoster
 import dev.ipf.whitenoise.android.state.conversationTimelineMemberSnapshot
 import dev.ipf.whitenoise.android.state.conversationTimelineTestAppState
@@ -182,6 +185,103 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             stallWatchdog.phase("fixture cleanup")
             fixture.close()
         }
+    }
+
+    /** A new chat cannot inherit a delayed page or cached painted layer from the previous chat. */
+    @Test
+    fun chatReplacementRejectsHeldOldRoutePreparation() {
+        assertOwnerReplacement(RouteReplacement.Chat)
+    }
+
+    /** Switching the active account retires held work even when both accounts use the same group key. */
+    @Test
+    fun accountReplacementRejectsHeldOldRoutePreparation() {
+        assertOwnerReplacement(RouteReplacement.Account)
+    }
+
+    /** A rebuilt runtime for the same account and chat must reject its predecessor's held page. */
+    @Test
+    fun runtimeReplacementRejectsHeldOldRoutePreparation() {
+        assertOwnerReplacement(RouteReplacement.Runtime)
+    }
+
+    /** Keeps one root probe through replacement so the test cannot clear stale painted evidence itself. */
+    private fun assertOwnerReplacement(kind: RouteReplacement) {
+        val fixture = mountFixture(includeSecondAccount = true)
+        try {
+            fixture.dispatcher.hold.set(true)
+            fixture.first.emitWindow(fixture.pageWithB)
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.dispatcher.hasPending }
+            lateinit var next: RetainedFixture
+            composeRule.runOnUiThread {
+                val route = replacementRoute(kind)
+                publishFixtureOwner(fixture.appState, route.accountRef, kind == RouteReplacement.Runtime)
+                next = RetainedFixture(false, false, route, fixture.appState)
+                fixture.ownedReplacement = next
+            }
+            awaitFixtureSetup(fixture) { next.controller.hasPublishedAuthoritativeTimeline }
+            composeRule.runOnUiThread {
+                fixture.collectEveryDraw.set(true)
+                fixture.activeRoute = next
+            }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { next.initialDrawObserved.get() }
+            fixture.dispatcher.release()
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+                fixture.dispatcher.releasedWorkCompleted.get() > 0
+            }
+            var drawsAfterRelease = 0
+            composeRule.runOnUiThread {
+                drawsAfterRelease = fixture.everyDraw.count { it.expectedOwner === next.controller }
+                checkNotNull(next.composition).invalidate()
+            }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+                fixture.everyDraw.count { it.expectedOwner === next.controller } > drawsAfterRelease
+            }
+            val newOwnerFrames = fixture.everyDraw.filter { it.expectedOwner === next.controller }
+            assertTrue("replacement must produce a real root draw", newOwnerFrames.isNotEmpty())
+            newOwnerFrames.forEach { evidence ->
+                val frame = evidence.frame
+                assertSame(next.controller, frame.controller)
+                assertTrue(next.route.messageA in frame.messageIds)
+                assertTrue("msg:${next.route.messageA}" in frame.visibleItemKeys)
+                assertFalse(ConversationTimelineTestIds.MESSAGE_B in frame.messageIds)
+            }
+            assertFalse(next.rosterReply.isCompleted)
+        } finally {
+            stallWatchdog.phase("fixture cleanup")
+            fixture.close()
+        }
+    }
+
+    /** Varies exactly one route owner while using distinct new transcript keys as the draw oracle. */
+    private fun replacementRoute(kind: RouteReplacement): FixtureRoute =
+        FixtureRoute(
+            accountRef =
+                if (kind == RouteReplacement.Account) "fixture-other" else ConversationTimelineTestIds.ACCOUNT_REF,
+            accountId =
+                if (kind == RouteReplacement.Account) "ab".repeat(32) else ConversationTimelineTestIds.ACCOUNT_ID,
+            groupId = if (kind == RouteReplacement.Chat) "bc".repeat(32) else ConversationTimelineTestIds.GROUP_ID,
+            messageA = "d3".repeat(32),
+            messageB = "d4".repeat(32),
+        )
+
+    /** Replays owner-field publication only; this existing seam does not invoke an engine wipe. */
+    private fun publishFixtureOwner(
+        appState: WhiteNoiseAppState,
+        accountRef: String,
+        replaceRuntime: Boolean,
+    ) {
+        val state =
+            DestructiveAccountWipeRuntimeState(
+                activeAccountRef = accountRef,
+                activeConversationAccountRef = null,
+                activeConversationGroupIdHex = null,
+                runtimeGeneration = appState.runtimeGeneration + if (replaceRuntime) 1 else 0,
+            )
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("applyDestructiveWipeRuntimeState", DestructiveAccountWipeRuntimeState::class.java)
+            .apply { isAccessible = true }
+            .invoke(appState, state)
     }
 
     /** The oracle captures painted composition rows, not a newer controller value sampled at the root draw. */
@@ -407,13 +507,14 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         replacement: Boolean = false,
         olderReader: Boolean = false,
         controlledOwner: Boolean = false,
+        includeSecondAccount: Boolean = false,
     ): RetainedFixture {
         stallWatchdog.phase("mount activity lookup")
         retainedActivity = composeRule.activity
         lateinit var fixture: RetainedFixture
         stallWatchdog.phase("mount fixture main hop")
         composeRule.runOnUiThread {
-            fixture = RetainedFixture(replacement, olderReader)
+            fixture = RetainedFixture(replacement, olderReader, includeSecondAccount = includeSecondAccount)
             if (controlledOwner) fixture.owner = ControlledConversationOwner(retainedActivity)
         }
         // This suite starts from a retained, authoritative transcript, not a cold route whose
@@ -422,23 +523,30 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         awaitFixtureSetup(fixture) {
             fixture.controller.hasPublishedAuthoritativeTimeline && fixture.controller.timeline.isNotEmpty()
         }
-        ConversationTranscriptDrawProbe.observer = fixture::observe
+        ConversationTranscriptDrawProbe.observer = { frame ->
+            if (fixture.collectEveryDraw.get()) {
+                fixture.everyDraw.add(ExpectedOwnerDraw(fixture.rootOwnerAtCompletion, frame))
+            }
+            fixture.observe(frame)
+            fixture.activeRoute?.observe(frame)
+        }
         ConversationTranscriptDrawProbe.foregroundGateObserver = fixture::observeGate
         ConversationTranscriptDrawProbe.compositionRowsOverride = { controller, rows ->
             if (controller === fixture.controller && fixture.paintStaleControl) fixture.staleRows else rows
         }
         stallWatchdog.phase("mount setContent")
         composeRule.setContent {
-            ObserveFixtureDraws(fixture)
-            if (fixture.mounted) {
-                CompositionLocalProvider(LocalContext provides (fixture.owner ?: LocalContext.current)) {
+            val active = fixture.activeRoute ?: fixture
+            ObserveFixtureDraws(active, fixture)
+            if (active.mounted) {
+                CompositionLocalProvider(LocalContext provides (active.owner ?: LocalContext.current)) {
                     WhiteNoiseTheme {
                         ConversationScreen(
-                            appState = fixture.appState,
-                            chat = fixture.chat,
-                            controller = fixture.controller,
+                            appState = active.appState,
+                            chat = active.chat,
+                            controller = active.controller,
                             onBack = {},
-                            restoredScrollSnapshot = fixture.readingSnapshot,
+                            restoredScrollSnapshot = active.readingSnapshot,
                         )
                     }
                 }
@@ -452,10 +560,13 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     /** Observes actual lifecycle and root draws without changing the production conversation composition. */
     @Suppress("FunctionNaming")
     @Composable
-    private fun ObserveFixtureDraws(fixture: RetainedFixture) {
+    private fun ObserveFixtureDraws(
+        fixture: RetainedFixture,
+        rootFixture: RetainedFixture,
+    ) {
         val view = LocalView.current
         fixture.keyboard = LocalSoftwareKeyboardController.current
-        DisposableEffect(view) {
+        DisposableEffect(view, fixture) {
             fixture.composition = checkNotNull(view.parent as? AbstractComposeView)
             val lifecycle = fixture.owner?.lifecycle ?: retainedActivity.lifecycle
             val lifecycleObserver =
@@ -477,7 +588,13 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 android.view.ViewTreeObserver.OnDrawListener {
                     val completed = ConversationTranscriptDrawProbe.beginRootDraw()
                     val live = lifecycle.currentState == Lifecycle.State.RESUMED
-                    view.post { if (live) completed?.invoke() }
+                    val expectedOwner = fixture.controller
+                    view.post {
+                        if (live) {
+                            rootFixture.rootOwnerAtCompletion = expectedOwner
+                            completed?.invoke()
+                        }
+                    }
                 }
             observer.addOnPreDrawListener(listener)
             observer.addOnDrawListener(drawListener)
@@ -509,8 +626,27 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     private class RetainedFixture(
         replacement: Boolean,
         olderReader: Boolean,
+        val route: FixtureRoute = FixtureRoute(),
+        appStateOverride: WhiteNoiseAppState? = null,
+        includeSecondAccount: Boolean = false,
     ) {
-        private val a = timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL, "fixture A")
+        private val group =
+            conversationTimelineTestGroup().copy(groupIdHex = route.groupId, admins = listOf(route.accountId))
+        private val members =
+            conversationTimelineMemberSnapshot().let { snapshot ->
+                snapshot.copy(
+                    members =
+                        snapshot.members.map { it.copy(account = route.accountRef, memberIdHex = route.accountId) },
+                )
+            }
+        private val roster =
+            conversationTimelineGroupRoster().let { value ->
+                value.copy(
+                    groupIdHex = route.groupId,
+                    members = value.members.map { it.copy(account = route.accountRef, memberIdHex = route.accountId) },
+                )
+            }
+        private val a = timelineRecord(route.messageA, 1uL, "fixture A").copy(groupIdHex = route.groupId)
         private val baseRows =
             if (olderReader) {
                 listOf(a) +
@@ -524,7 +660,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             } else {
                 listOf(a)
             }
-        private val b = timelineRecord(ConversationTimelineTestIds.MESSAGE_B, 25uL, "fixture B")
+        private val b = timelineRecord(route.messageB, 25uL, "fixture B").copy(groupIdHex = route.groupId)
         val pageWithB = timelinePage(*(baseRows + b).toTypedArray())
         val first = ScriptedConversationTimelineSubscription(timelinePage(*baseRows.toTypedArray()))
         val readingSnapshot =
@@ -537,9 +673,12 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         val scripts =
             ScriptedConversationLiveSubscriptions(
                 if (replacement) listOf(first, ScriptedConversationTimelineSubscription(pageWithB)) else listOf(first),
-                conversationTimelineTestGroup(),
+                group,
             )
-        val appState = conversationTimelineTestAppState(scripts.subscriptions)
+        val appState =
+            (appStateOverride ?: createFixtureAppState(includeSecondAccount)).also {
+                it.liveSubscriptionOverrides.conversation = scripts.subscriptions
+            }
         val rosterReply = CompletableDeferred<dev.ipf.marmotkit.GroupRosterFfi>()
         val dispatcher = HeldPreparationDispatcher()
         val expectedOpenCount = if (replacement) 2 else 1
@@ -548,11 +687,11 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         val controller =
             ConversationController(
                 appState = appState,
-                initialGroup = conversationTimelineTestGroup(),
-                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+                initialGroup = group,
+                initialMemberSnapshot = members,
                 groupRosterReader = { _, _ ->
                     rosterReads += 1
-                    if (replacement && rosterReads == 1) conversationTimelineGroupRoster() else rosterReply.await()
+                    if (replacement && rosterReads == 1) roster else rosterReply.await()
                 },
                 windowPreparationDispatcher = dispatcher,
                 onWindowApplyMeasured = { applicationTimes.add(SystemClock.uptimeMillis()) },
@@ -560,13 +699,18 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             )
         val chat =
             ChatListItem(
-                group = conversationTimelineTestGroup(),
+                group = group,
                 latest = null,
                 otherMemberAccount = null,
                 memberCount = 1,
-                memberSnapshot = conversationTimelineMemberSnapshot(),
-                projection = retainedChatRow(baseRows.last()),
+                memberSnapshot = members,
+                projection = retainedChatRow(baseRows.last()).copy(groupIdHex = route.groupId),
             )
+        var ownedReplacement: RetainedFixture? = null
+        var activeRoute by mutableStateOf<RetainedFixture?>(null)
+        val collectEveryDraw = AtomicBoolean()
+        var rootOwnerAtCompletion: ConversationController? = null
+        val everyDraw = CopyOnWriteArrayList<ExpectedOwnerDraw>()
         var owner: ControlledConversationOwner? = null
         var composition: AbstractComposeView? = null
         var mounted by mutableStateOf(true)
@@ -616,11 +760,30 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                     (host?.parent as? ViewGroup)?.removeView(host)
                     host?.disposeComposition()
                 } finally {
-                    rosterReply.complete(conversationTimelineGroupRoster())
-                    dispatcher.release()
-                    controller.onCleared()
+                    releaseController()
+                    ownedReplacement?.releaseController()
                 }
             }
+        }
+
+        /** Supplies two real fixture account summaries only for cross-account ownership cases. */
+        private fun createFixtureAppState(includeSecondAccount: Boolean): WhiteNoiseAppState =
+            conversationTimelineTestAppState(
+                scripts.subscriptions,
+                accountRef = route.accountRef,
+                additionalAccounts =
+                    if (includeSecondAccount) {
+                        listOf(AccountSummaryFfi("fixture-other", "ab".repeat(32), true, false, false, true))
+                    } else {
+                        emptyList()
+                    },
+            )
+
+        /** Releases one controller without detaching the shared replacement composition or resetting the probe. */
+        private fun releaseController() {
+            rosterReply.complete(roster)
+            dispatcher.release()
+            controller.onCleared()
         }
     }
 
@@ -642,6 +805,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     /** Holds only the production off-main page preparation; the receiver and main thread continue normally. */
     private class HeldPreparationDispatcher : CoroutineDispatcher() {
         val hold = AtomicBoolean()
+        val releasedWorkCompleted = AtomicInteger()
         private val pending = ConcurrentLinkedQueue<Runnable>()
         val hasPending: Boolean get() = pending.isNotEmpty()
 
@@ -658,10 +822,33 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             hold.set(false)
             while (true) {
                 val task = pending.poll() ?: return
-                Dispatchers.Default.dispatch(EmptyCoroutineContext, task)
+                Dispatchers.Default.dispatch(EmptyCoroutineContext) {
+                    try {
+                        task.run()
+                    } finally {
+                        releasedWorkCompleted.incrementAndGet()
+                    }
+                }
             }
         }
     }
+
+    /** Correlates the committed listener owner with painted evidence from that exact root traversal. */
+    private data class ExpectedOwnerDraw(
+        val expectedOwner: ConversationController?,
+        val frame: ConversationTranscriptDraw,
+    )
+
+    /** Owner tuple and distinct bounded rows for one mounted fixture route. */
+    private data class FixtureRoute(
+        val accountRef: String = ConversationTimelineTestIds.ACCOUNT_REF,
+        val accountId: String = ConversationTimelineTestIds.ACCOUNT_ID,
+        val groupId: String = ConversationTimelineTestIds.GROUP_ID,
+        val messageA: String = ConversationTimelineTestIds.MESSAGE_A,
+        val messageB: String = ConversationTimelineTestIds.MESSAGE_B,
+    )
+
+    private enum class RouteReplacement { Chat, Account, Runtime }
 
     private enum class UpdateBoundary { Consumed, Queued, Replacement }
 }
