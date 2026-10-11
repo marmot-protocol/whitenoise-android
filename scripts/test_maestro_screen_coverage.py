@@ -121,6 +121,18 @@ class ScreenProofTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 qualify_presentation(case, {'presentation': invalid})
 
+    def test_search_menu_requires_dismissal_before_the_selected_action(self):
+        """The production dropdown closes before dispatch; UI success alone missed this order."""
+        root = Path(__file__).resolve().parents[1]
+        cases = json.loads((root / 'config/maestro-runtime-cases.json').read_text())['cases']
+        for name, action in [('category', 'category-selected'), ('clear', 'clear-handoff')]:
+            case = cases[f'presentation-extra-search-menu-{name}']
+            proof = {'scenario': case['presentation'], 'callbacks': ['dismiss', action], 'verified': True}
+            qualify_presentation(case, {'presentation': proof})
+            for callbacks in [[action], [action, 'dismiss'], ['dismiss', 'dismiss', action], ['dismiss']]:
+                with self.assertRaises(ValueError):
+                    qualify_presentation(case, {'presentation': {**proof, 'callbacks': callbacks}})
+
     def test_only_non_cancellable_overlays_admit_observation_without_dispatch(self):
         case = {'postcondition': 'presentation-observed', 'presentation': 'extra-wait-signout',
                 'presentation_actions': []}

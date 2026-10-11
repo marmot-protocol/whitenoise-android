@@ -218,4 +218,6 @@ Fresh production leases require exact ordered owner shelf, empty peer shelves an
 
 `runtime-presentation` uses the same isolated APK pair and native cleanup contract. Each case mounts production composables after disposable account setup, asserts their actual controls with Maestro, and verifies the observed callback sequence in the native receipt. Synthetic update, startup, reader, image-editor, dictation, setup, and feedback states exercise presentation and dispatch. Installer completion, native onboarding decisions, microphone capture, recognition, public event resolution, and hardware engines need their own campaigns.
 
+The global search menu qualifies dismissal followed by the selected category or Clear All callback, in production order. A passing UI JUnit cannot replace that native receipt; missing, reordered or duplicate callbacks fail.
+
 The screen assertion inventory records exact production source symbols and unconditional flow selectors. Planned bindings and successful executions are separate. Shared manual IDs remain discovery links; they never prove that an individual child screen appeared.

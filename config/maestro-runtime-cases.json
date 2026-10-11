@@ -4865,7 +4865,7 @@
       "assertions": "Actual global filter menu renders its category/clear controls and verifies the exact dispatch; no search query is executed.",
       "postcondition": "presentation-checked",
       "presentation": "extra-search-menu-category",
-      "presentation_actions": ["category-selected"],
+      "presentation_actions": ["dismiss","category-selected"],
       "layer": "production-presentation-ui"
     },
     "presentation-extra-search-menu-clear": {
@@ -4874,7 +4874,7 @@
       "assertions": "Actual global filter menu renders its category/clear controls and verifies the exact dispatch; no search query is executed.",
       "postcondition": "presentation-checked",
       "presentation": "extra-search-menu-clear",
-      "presentation_actions": ["clear-handoff"],
+      "presentation_actions": ["dismiss","clear-handoff"],
       "layer": "production-presentation-ui"
     },
     "presentation-extra-message-history-populated": {
