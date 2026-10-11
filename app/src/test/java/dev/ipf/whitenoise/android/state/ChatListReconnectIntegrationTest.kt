@@ -45,6 +45,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /** End-to-end JVM coverage for recovery attribution through the chat-list projection. */
@@ -956,8 +957,9 @@ private class RestartingChatListSubscriptions {
     val activeOpenCount: Int get() = chatListStreams.size
 
     /** Reports paired retirement before the controlled retry deadline is advanced. */
-    fun retired(index: Int): Boolean = chatListStreams.getOrNull(index)?.wasClosed == true &&
-        chatStreams.getOrNull(index)?.wasClosed == true
+    fun retired(index: Int): Boolean =
+        chatListStreams.getOrNull(index)?.wasClosed == true &&
+            chatStreams.getOrNull(index)?.wasClosed == true
 
     /** Releases every stream created by this factory. */
     fun closeAll() {
@@ -1145,8 +1147,7 @@ private fun awaitControlledChatList(
     scheduler: TestCoroutineScheduler,
     condition: () -> Boolean,
 ) {
-    val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS
-        .toNanos(5)
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
     while (System.nanoTime() < deadline) {
         scheduler.runCurrent()
         shadowOf(Looper.getMainLooper()).idle()
