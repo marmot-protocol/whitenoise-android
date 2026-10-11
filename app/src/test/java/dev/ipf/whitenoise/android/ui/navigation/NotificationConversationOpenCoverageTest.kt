@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -80,6 +81,45 @@ class NotificationConversationOpenCoverageTest {
 
         assertEquals(null, opened.focusMessageId)
         assertTrue(opened.notificationOpenRequestId > 0L)
+    }
+
+    /** The tapped card's message travels beside focus, never in it, and a later open cannot inherit it. */
+    @Test
+    fun notificationOpenCarriesTheCapturedTargetSeparatelyFromSearchFocus() {
+        val target = NotificationLandingTarget("account-a", "group-1", "notified")
+        val opened =
+            nextNotificationConversationOpenContext(
+                current = ConversationOpenContext(focusMessageId = "search-hit"),
+                notificationTarget = target,
+            )
+
+        assertEquals(null, opened.focusMessageId)
+        assertEquals(target, opened.notificationTarget)
+        assertEquals(null, nextNotificationConversationOpenContext(opened).notificationTarget)
+        assertEquals(null, ConversationOpenContext().notificationTarget)
+    }
+
+    /** The route captures the card's message when it commits, and the screen is handed exactly that pairing. */
+    @Test
+    fun routeCommitCapturesTheTappedMessageAndHandsItToTheConversationScreen() {
+        val source = mainShellSource().replace(Regex("\\s+"), " ")
+        val commit =
+            source
+                .substringAfter("suspend fun commitNotificationConversationOpen(")
+                .substringBefore("when (step)")
+
+        assertTrue(
+            "the commit must capture the card's message",
+            "notificationTarget = target.toLandingTarget()" in commit,
+        )
+        assertTrue(
+            "the screen must receive the captured pairing, not the read-through cursor",
+            "notificationLandingTarget = content.openContext.notificationTarget" in source,
+        )
+        assertTrue(
+            "the read-through cursor stays a separate argument",
+            "notificationReadThroughMessageId = target.messageIdHex" in commit,
+        )
     }
 
     @Test
@@ -177,6 +217,7 @@ class NotificationConversationOpenCoverageTest {
         assertEquals("message-1", opened.notificationReadThroughMessageId)
     }
 
+    /** The inactive-account route holds its priority window from activation until the first conversation frame. */
     @Test
     fun inactiveAccountProductionRoutePrioritizesTargetUntilFirstFrame() {
         val source = mainShellSource()
@@ -240,6 +281,57 @@ class NotificationConversationOpenCoverageTest {
         )
     }
 
+    /** The shell's priority window is process-owned: a shell unmount cannot be what releases it (#586). */
+    @Test
+    fun theFirstFrameGateIsProcessOwnedAndNotReleasedByShellUnmount() {
+        val source = mainShellSource().replace(Regex("\\s+"), " ")
+
+        assertTrue(
+            "the gate must be read from the hoisted owner",
+            "val notificationFirstFrameGate = shellStateHolder.notificationFirstFrame.gate" in source,
+        )
+        assertTrue(
+            "release must go through the hoisted owner, scoped by request",
+            "shellStateHolder.notificationFirstFrame.release(requestId)" in source,
+        )
+        assertFalse("unmounting the shell must not release the gate", "onDispose { ownedGate?.release() }" in source)
+        assertFalse(
+            "the gate must not be composition-local state",
+            "var notificationFirstFrameGate by remember" in source,
+        )
+    }
+
+    /** The shell-ready bind stays ungated: gating it behind a conversation frame deadlocked the app on device. */
+    @Test
+    fun prepareMainShellFirstFrameStaysUngatedByTheNotificationWindow() {
+        val holder = sourceFile("MainShellStateHolder.kt").readText()
+        val prepare = holder.substringAfter("internal fun PrepareMainShellFirstFrame(")
+
+        assertTrue("it must still bind the chat list", "controller.bind(" in prepare)
+        assertFalse("it must never wait on the first-frame gate", "notificationFirstFrame" in prepare)
+        assertFalse("it must never wait on the first-frame gate", "NotificationRouteFirstFrameGate" in prepare)
+    }
+
+    /** The root keeps the shell composed for the retained route, and only outside the lock branch. */
+    @Test
+    fun theRootKeepsTheShellComposedForTheRetainedRouteButNeverUnderLock() {
+        val root = rootSource().replace(Regex("\\s+"), " ")
+        val locked = root.substringAfter("if (appState.appLockScreenVisible) {").substringBefore("} else {")
+
+        assertTrue(
+            "the retained route must count like a pending inbound route when choosing the surface",
+            "inboundRoutePending = inboundRoutePending || notificationRouteOwnsShell" in root,
+        )
+        val ownerCall = root.substringAfter("val notificationRouteOwnsShell =")
+        assertTrue(
+            "the owner must be told whether the lock is up",
+            "appLockScreenVisible = appState.appLockScreenVisible" in ownerCall,
+        )
+        assertFalse("the locked branch composes no shell", "MainShell(" in locked)
+        assertFalse("the locked branch must not consult the route", "notificationRouteOwnsShell" in locked)
+    }
+
+    /** A failed exact preload keeps broad work deferred until its one retry settles. */
     @Test
     fun failedPreloadDefersBroadWorkUntilExactRetrySettles() {
         val source = mainShellSource()
@@ -288,6 +380,21 @@ class NotificationConversationOpenCoverageTest {
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"),
+        ).first(File::exists)
+            .readText()
+
+    /** Reads one navigation source file, from either the module or the repository working directory. */
+    private fun sourceFile(name: String): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/$name"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/$name"),
+        ).first(File::exists)
+
+    /** Reads the app root's source, from either the module or the repository working directory. */
+    private fun rootSource(): String =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt"),
         ).first(File::exists)
             .readText()
 

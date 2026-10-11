@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNotificationLanding.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "string:toast_original_message_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNotificationLanding.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "NTF-040",
+          "NTF-037"
+        ]
+      },
+      {
+        "surface": "string:error_loaded_content_kept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNotificationLanding.kt",
+        "anchor": "R.string.error_loaded_content_kept",
+        "test_ids": [
+          "NTF-040"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

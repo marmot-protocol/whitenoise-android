@@ -19,8 +19,6 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
-import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
@@ -1224,6 +1222,173 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** A long newest message behind history keeps the conversation template, every earlier line and its actions. */
+    @Test
+    fun longNewestMessageAfterHistoryKeepsConversationStyleHistoryActionsAndPublicVersion() {
+        presenter.ensureChannels()
+        val newest = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 3)
+
+        runBlocking {
+            presenter.show(
+                update(isMention = false, messageIdHex = "first"),
+                previewTextOverride = "earlier",
+                shortNpub = { "npub1test" },
+            )
+            presenter.show(
+                update(isMention = false, messageIdHex = "second"),
+                previewTextOverride = newest,
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val notification = manager.activeNotifications.single().notification
+        val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+        assertNull(notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        assertEquals(listOf("earlier", newest), style.messages.map { it.text.toString() })
+        assertEquals(newest, notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString())
+        assertEquals("General", style.conversationTitle)
+        assertEquals(
+            listOf(context.getString(R.string.reply), context.getString(R.string.chat_row_action_mark_read)),
+            notification.actions.map { it.title.toString() },
+        )
+        val shortcutId = checkNotNull(conversationShortcutId("account-a", "group-a"))
+        assertEquals(shortcutId, notification.shortcutId)
+        val parentChannelId = NotificationChannelSpec.GROUP_MESSAGES.id
+        val conversationChannelId = ConversationNotificationChannels.conversationChannelId(parentChannelId, shortcutId)
+        assertEquals(conversationChannelId, notification.channelId)
+        assertGenericPublicVersion(notification, newest)
+    }
+
+    /** The 1,000 code point bound still cuts a long newest message that follows carried history. */
+    @Test
+    fun longNewestMessageAfterHistoryStaysWithinTheSafetyBound() {
+        presenter.ensureChannels()
+
+        runBlocking {
+            presenter.show(
+                update(isMention = false, messageIdHex = "first"),
+                previewTextOverride = "earlier",
+                shortNpub = { "npub1test" },
+            )
+            presenter.show(
+                update(isMention = false, messageIdHex = "second"),
+                previewTextOverride = LongBodies.pastSafetyBound(),
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val style =
+            checkNotNull(
+                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+                    manager.activeNotifications.single().notification,
+                ),
+            )
+        val messageTexts = style.messages.map { it.text.toString() }
+        assertEquals("earlier", messageTexts.first())
+        assertEquals(MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS, LongBodies.codePoints(messageTexts.last()))
+    }
+
+    /** Bodies just below, at and above the threshold pick the conversation template, then the text block. */
+    @Test
+    @Config(sdk = [30, 36])
+    fun bodiesAroundTheThresholdChooseTheConversationTemplateThenTheTextBlock() {
+        val threshold = MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS
+
+        val cases =
+            listOf(
+                threshold - 1 to PostedStyle.MESSAGING,
+                threshold to PostedStyle.BIG_TEXT,
+                threshold + 1 to PostedStyle.BIG_TEXT,
+            )
+        cases.forEach { (codePoints, expectedStyle) ->
+            manager.cancelAll()
+            val probe = PostProbe()
+            val body = LongBodies.plain(codePoints)
+            val probed = probedPresenter(probe)
+            probed.ensureChannels()
+
+            runBlocking {
+                probed.show(update(isMention = false), previewTextOverride = body, shortNpub = { "npub1test" })
+            }
+
+            assertEquals("style for $codePoints code points", expectedStyle, probe.posts.single().style)
+            val notification = manager.activeNotifications.single().notification
+            assertEquals(
+                if (expectedStyle == PostedStyle.BIG_TEXT) body else null,
+                notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
+            )
+            assertEquals(2, notification.actions.size)
+            assertEquals(conversationShortcutId("account-a", "group-a"), notification.shortcutId)
+        }
+    }
+
+    /** Right-to-left and zero-width-joiner bodies of threshold length take the text block with their text intact. */
+    @Test
+    fun rtlAndZwjBodiesAtTheThresholdTakeTheTextBlockWithTheirTextIntact() {
+        listOf(LongBodies::rtl, LongBodies::zwj).forEach { body ->
+            manager.cancelAll()
+            val text = body(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS)
+            val probe = PostProbe()
+            val probed = probedPresenter(probe)
+            probed.ensureChannels()
+
+            runBlocking {
+                probed.show(update(isMention = false), previewTextOverride = text, shortNpub = { "npub1test" })
+            }
+
+            assertEquals(PostedStyle.BIG_TEXT, probe.posts.single().style)
+            assertEquals(
+                text,
+                manager.activeNotifications
+                    .single()
+                    .notification.extras
+                    .getCharSequence(Notification.EXTRA_BIG_TEXT)
+                    ?.toString(),
+            )
+        }
+    }
+
+    /** With previews hidden a long first message stays a generic conversation, so Android still classifies it. */
+    @Test
+    fun longFirstMessageWithPreviewsHiddenStaysAGenericConversationNotATextBlock() {
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(NotificationPreviewPreferences.KEY, false)
+            .commit()
+        presenter.ensureChannels()
+        val body = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+
+        assertTrue(
+            runBlocking {
+                presenter.show(update(isMention = false), previewTextOverride = body, shortNpub = { "npub1test" })
+            },
+        )
+
+        val notification = manager.activeNotifications.single().notification
+        assertGenericConversation(notification, body, expectsShortcut = true)
+    }
+
+    /** App lock redacts a long first message into the same generic conversation, never the text block. */
+    @Test
+    fun longFirstMessageUnderAppLockStaysAGenericConversationNotATextBlock() {
+        presenter.ensureChannels()
+        val body = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+
+        assertTrue(
+            runBlocking {
+                presenter.show(
+                    update(isMention = false),
+                    previewTextOverride = body,
+                    redactContent = true,
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+
+        assertGenericConversation(manager.activeNotifications.single().notification, body, expectsShortcut = false)
+    }
+
     /** Keeps same-message text correction on the original alert channel and grouping. */
     @Test
     fun silentEnrichmentReplacesCurrentMessageWithoutDuplicatingHistory() {
@@ -1258,6 +1423,7 @@ class LocalNotificationPresenterConversationTest {
         assertTrue(notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         assertEquals(initial.group, notification.group)
         assertEquals(initial.groupAlertBehavior, notification.groupAlertBehavior)
+        assertEquals(initial.sortKey, notification.sortKey)
         assertEquals(initial.channelId, notification.channelId)
         assertTrue(presenter.isNotificationUpdateCurrentForEnrichment(incoming))
     }
@@ -1566,6 +1732,63 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** Builds a presenter whose poster, clock and enrichment launcher are the probe's. */
+    private fun probedPresenter(probe: PostProbe): LocalNotificationPresenter =
+        LocalNotificationPresenter(
+            context = context,
+            groupReconciliation = {},
+            shortcutPublisher = {},
+            nowMillis = probe.nowMillis,
+            notificationPoster = probe.notificationPoster,
+            enrichmentLauncher = probe.enrichmentLauncher,
+        )
+
+    /** The lock-screen version carries only the app name and the hidden-content line, never the message. */
+    private fun assertGenericPublicVersion(
+        notification: Notification,
+        privateBody: String,
+    ) {
+        val public = checkNotNull(notification.publicVersion)
+        assertEquals(Notification.VISIBILITY_PUBLIC, public.visibility)
+        assertEquals(context.getString(R.string.app_name), public.extras.getCharSequence(Notification.EXTRA_TITLE))
+        assertEquals(
+            context.getString(R.string.notification_hidden_content),
+            public.extras.getCharSequence(Notification.EXTRA_TEXT),
+        )
+        assertNull(public.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        assertFalse(public.extras.keySet().any { public.extras.getCharSequence(it)?.contains(privateBody) == true })
+    }
+
+    /**
+     * A hidden or redacted long message is a generic conversation card with no text block and no body. Hidden
+     * previews keep an opaque conversation shortcut, while app lock carries no shortcut at all.
+     */
+    private fun assertGenericConversation(
+        notification: Notification,
+        privateBody: String,
+        expectsShortcut: Boolean,
+    ) {
+        assertNull(notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+        assertEquals(
+            listOf(context.getString(R.string.notification_hidden_content)),
+            style.messages.map { it.text.toString() },
+        )
+        val extras = notification.extras
+        assertEquals(context.getString(R.string.app_name), extras.getCharSequence(Notification.EXTRA_TITLE))
+        assertEquals(
+            context.getString(R.string.notification_hidden_content),
+            extras.getCharSequence(Notification.EXTRA_TEXT),
+        )
+        if (expectsShortcut) {
+            assertTrue(isConversationShortcutId(checkNotNull(notification.shortcutId)))
+        } else {
+            assertNull(notification.shortcutId)
+        }
+        assertFalse(extras.keySet().any { extras.getCharSequence(it)?.contains(privateBody) == true })
+        assertGenericPublicVersion(notification, privateBody)
+    }
+
     private fun carriedMessagingNotification(vararg lines: Pair<String, Long>): Notification {
         val style = NotificationCompat.MessagingStyle(Person.Builder().setName("Me").build())
         lines.forEach { (text, timestampMs) ->
@@ -1635,6 +1858,7 @@ class LocalNotificationPresenterConversationTest {
                 ),
         )
 
+    /** Builds the shared group message update, keeping the keys these scenarios have always used. */
     private fun update(
         isMention: Boolean,
         timestampMs: Long = 1234,
@@ -1643,33 +1867,15 @@ class LocalNotificationPresenterConversationTest {
         trafficClass: NotificationTrafficClassFfi = NotificationTrafficClassFfi.STANDARD,
         accountRef: String = "account-a",
         trigger: NotificationTriggerFfi = NotificationTriggerFfi.NEW_MESSAGE,
-    ) = NotificationUpdateFfi(
-        notificationKey = "key",
-        conversationKey = "conversation",
+    ) = notificationUpdate(
         trigger = trigger,
         trafficClass = trafficClass,
         accountRef = accountRef,
-        accountIdHex = accountRef,
-        groupIdHex = "group-a",
-        groupName = "General",
-        isDm = false,
         isMention = isMention,
         messageIdHex = messageIdHex,
-        sender = user(displayName = "Alice"),
-        receiver = user(accountIdHex = "self", displayName = "Me"),
-        previewText = "hi",
+        notificationKey = "key",
+        conversationKey = "conversation",
         reactionEmoji = reactionEmoji,
-        reactedToPreview = null,
         timestampMs = timestampMs,
-        isFromSelf = false,
-    )
-
-    private fun user(
-        accountIdHex: String = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        displayName: String? = null,
-    ) = NotificationUserFfi(
-        accountIdHex = accountIdHex,
-        displayName = displayName,
-        pictureUrl = null,
     )
 }

@@ -610,6 +610,10 @@ internal fun ConversationScreen(
     // freezes the pre-read projection. This keeps the entry divider stable
     // without giving up the durable notification-tap read behavior (#1016).
     notificationReadThroughMessageId: String? = null,
+    // The tapped card's captured message, paired with its account and group. The screen lands on that
+    // message's beginning only when the pairing matches this controller, and it never feeds the landing
+    // back into the read-through cursor above.
+    notificationLandingTarget: NotificationLandingTarget? = null,
     onNotificationUnreadBoundaryCaptured: (String) -> Unit = {},
     onNotificationTimelineVisibilityChanged: (Boolean) -> Unit = {},
     onFirstFrameCommitted: () -> Unit = {},
@@ -3062,15 +3066,32 @@ internal fun ConversationScreen(
                 entryProjectionAvailable = entryProjectionAvailable,
                 notificationOpenRequestId = notificationOpenRequestId,
                 seedTailAwaitingAuthoritative = navigationState.seedTailAwaitingAuthoritative,
+                notificationTargetMessageId =
+                    notificationLandingTarget?.messageIdFor(controller.boundAccountRef, controller.group.groupIdHex),
             ),
         callbacks =
             ConversationViewportRestorationCallbacks(
-                navigation = ConversationViewportNavigation(::resolveScrollAnchorIndex) { currentTailIndex },
+                navigation =
+                    ConversationViewportNavigation(
+                        resolveAnchor = ::resolveScrollAnchorIndex,
+                        currentAnchor = { currentScrollAnchor() },
+                        tailIndex = { currentTailIndex },
+                    ),
                 onAnchored = { latestId ->
                     initialTimelineAnchored = true
                     navigationState.lastFollowedLatestId = latestId
                 },
                 retireUnreadDivider = { entryUnreadDividerRetired = true },
+                notification =
+                    ConversationNotificationLandingCallbacks(
+                        beginNavigation = navigationState.targetNavigation::begin,
+                        onLanded = { backlogId ->
+                            unreadJumpState = unreadJumpState.seedBacklogAfterLanding(backlogId)
+                        },
+                        onUnavailable = { availability ->
+                            appState.present(notificationLandingFeedback(availability))
+                        },
+                    ),
             ),
     )
     // Resolved in composition so the row-inserting frame already knows which
@@ -3131,6 +3152,7 @@ internal fun ConversationScreen(
             ),
         anchored = initialTimelineAnchored,
         resolveAnchor = ::resolveScrollAnchorIndex,
+        currentAnchor = { currentScrollAnchor() },
     )
 
     // Reacting to the last message grows its bubble height (a reaction chip) but

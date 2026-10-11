@@ -1,31 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import kotlinx.coroutines.launch
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import dev.ipf.whitenoise.android.notifications.ReversedListSpec
+import dev.ipf.whitenoise.android.notifications.ReversedListTarget
+import dev.ipf.whitenoise.android.notifications.ReversedReadingListFixture
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -86,7 +64,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    @Suppress("LongMethod") // One real-list fixture shares measurement and the production command.
+    /** Runs the production mention command against the shared reversed list and asserts the physical top edge. */
     private fun assertMentionTop(
         target: Target,
         viewportHeight: Int,
@@ -96,87 +74,26 @@ class ConversationMentionNavigationUiTest {
         initialIndex: Int = 0,
         mixedRows: Boolean = false,
     ) {
-        var completed = false
-        val targetIndex = target.index
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                CompositionLocalProvider(
-                    LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
-                ) {
-                    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
-                    val scope = rememberCoroutineScope()
-                    val coordinator =
-                        remember(listState) {
-                            ConversationScrollCoordinator(LazyListConversationScrollWriter(listState))
-                        }
-                    Box(modifier = Modifier.fillMaxWidth().height(viewportHeight.dp)) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize().testTag("mention-list"),
-                            reverseLayout = true,
-                            contentPadding = PaddingValues(bottom = padding.dp),
-                        ) {
-                            items(
-                                (0..maxOf(targetIndex, initialIndex) + 12).toList(),
-                                key = { "message-$it" },
-                            ) { index ->
-                                val height =
-                                    when {
-                                        index == targetIndex -> target.height
-                                        mixedRows && index % 9 == 0 -> 480
-                                        else -> 72
-                                    }
-                                Text(
-                                    "Message $index",
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .height(height.dp)
-                                            .testTag("message-$index"),
-                                )
-                            }
-                        }
-                        TextButton(
-                            onClick = {
-                                scope.launch {
-                                    completed =
-                                        coordinator.jumpToMentionReadingStart(
-                                            targetMessageId = "message-$targetIndex",
-                                            resolveTargetIndex = { targetIndex },
-                                            readLayout = { index ->
-                                                val layout =
-                                                    conversationReadingLayoutInfo(listState.layoutInfo, overlap)
-                                                ConversationMentionJumpLayout(
-                                                    viewportEndOffsetPx = layout.viewportEndOffset,
-                                                    itemHeightPx =
-                                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-                                                )
-                                            },
-                                        )
-                                }
-                            },
-                            modifier = Modifier.testTag("mention-jump"),
-                        ) {
-                            Text("@")
-                        }
-                    }
-                }
-            }
+        val spec =
+            ReversedListSpec(
+                target = ReversedListTarget(heightDp = target.height, index = target.index),
+                viewportHeightDp = viewportHeight,
+                paddingDp = padding,
+                overlapDp = overlap,
+                rtl = rtl,
+                initialIndex = initialIndex,
+                mixedRows = mixedRows,
+            )
+        val fixture = ReversedReadingListFixture(composeRule)
+        fixture.mount(spec) {
+            coordinator.jumpToMentionReadingStart(
+                targetMessageId = targetMessageId,
+                resolveTargetIndex = { targetIndex },
+                readLayout = this::readLayout,
+            )
         }
-        composeRule.onNodeWithTag("mention-jump").performClick()
-        composeRule.waitForIdle()
-        val listTop =
-            composeRule
-                .onNodeWithTag("mention-list")
-                .getUnclippedBoundsInRoot()
-                .top.value
-        val messageTop =
-            composeRule
-                .onNodeWithTag("message-$targetIndex")
-                .getUnclippedBoundsInRoot()
-                .top.value
-        assertEquals(listTop, messageTop, 1f)
-        composeRule.runOnIdle { assertTrue(completed) }
+        fixture.trigger()
+        fixture.assertTargetAtPhysicalTop(spec)
     }
 
     private data class Target(

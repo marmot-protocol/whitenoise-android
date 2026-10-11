@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -15,6 +16,7 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.notifications.NotificationScenario
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
@@ -22,9 +24,12 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.notifiedMessagePreview
+import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -65,6 +70,35 @@ class NotificationMessageRouteExactReadNavigationTest {
         assertNull("no unavailable message may be shown", fixture.appState.toast)
     }
 
+    /**
+     * The card's message reaches the conversation open as its own captured target, paired with the account
+     * and group it was issued for. It is neither the oldest unread row nor the newest message, so a landing
+     * on either of those could not be mistaken for it, and the durable read-through cursor stays separate.
+     */
+    @Test
+    fun theCapturedMessageIsNeitherTheOldestUnreadNorTheNewestAndCarriesItsAccountAndGroup() {
+        val fixture = render(RowAnswer.FOUND, withHolder = true)
+        val holder = requireNotNull(fixture.holder)
+
+        try {
+            awaitCondition("the tap was never consumed") { fixture.handled.get() }
+
+            val chat = requireNotNull(holder.selectedChat.value)
+            assertEquals(OLDEST_UNREAD_ID, chat.projection?.firstUnreadMessageIdHex)
+            assertEquals(NEWEST_ID, chat.projection?.lastMessage?.messageIdHex)
+            assertNotEquals(OLDEST_UNREAD_ID, MESSAGE_ID)
+            assertNotEquals(NEWEST_ID, MESSAGE_ID)
+            val context = holder.selectedChatOpenContext.value
+            assertEquals(NotificationLandingTarget(ACCOUNT_REF, GROUP_ID, MESSAGE_ID), context.notificationTarget)
+            assertEquals(MESSAGE_ID, context.notificationReadThroughMessageId)
+            assertNull("search focus is a different owner", context.focusMessageId)
+        } finally {
+            // MainShell releases only a holder it created, so this injected one would keep its controllers
+            // and their coroutines alive into later tests on the same JVM.
+            composeRule.runOnIdle { holder.release() }
+        }
+    }
+
     /** A missing row is inconclusive: the tap stays pending with no toast and no handled callback. */
     @Test
     fun aMissingRowKeepsTheTapPendingWithoutClaimingTheConversationIsGone() {
@@ -89,13 +123,20 @@ class NotificationMessageRouteExactReadNavigationTest {
         assertNull("a storage failure must not claim the conversation is gone", fixture.appState.toast)
     }
 
-    /** Renders MainShell over a ready, empty chat list with one pending message notification. */
-    private fun render(answer: RowAnswer): Fixture {
+    /**
+     * Renders MainShell over a ready, empty chat list with one pending message notification. With
+     * [withHolder] the shell shares a state holder the test can read the committed open context from.
+     */
+    private fun render(
+        answer: RowAnswer,
+        withHolder: Boolean = false,
+    ): Fixture {
         val exactReads = AtomicInteger(0)
         val appState = appState(fakeMarmot(answer, exactReads))
         val handled = AtomicBoolean(false)
         val handledCount = AtomicInteger(0)
         val fixture = Fixture(appState, exactReads, handled, handledCount)
+        fixture.holder = if (withHolder) MainShellStateHolder(appState, SavedStateHandle()) else null
 
         appState.setAppInForeground(true)
         composeRule.setContent {
@@ -103,6 +144,7 @@ class NotificationMessageRouteExactReadNavigationTest {
             WhiteNoiseTheme {
                 MainShell(
                     appState = appState,
+                    stateHolder = fixture.holder,
                     inboundNotificationTarget = inboundTarget,
                     inboundNotificationRequestId = REQUEST_ID,
                     onNotificationTargetHandled = { target, _ ->
@@ -125,6 +167,7 @@ class NotificationMessageRouteExactReadNavigationTest {
         val handledCount: AtomicInteger,
     ) {
         var handledMessageId: String? = null
+        var holder: MainShellStateHolder? = null
     }
 
     /** The notification under test: a message in a group the broad list does not carry. */
@@ -224,10 +267,10 @@ class NotificationMessageRouteExactReadNavigationTest {
             groupName = "Still here",
             avatarUrl = null,
             avatar = null,
-            lastMessage = null,
-            unreadCount = 1uL,
+            lastMessage = notifiedMessagePreview().copy(messageIdHex = NEWEST_ID),
+            unreadCount = 3uL,
             hasUnread = true,
-            firstUnreadMessageIdHex = MESSAGE_ID,
+            firstUnreadMessageIdHex = OLDEST_UNREAD_ID,
             lastReadMessageIdHex = null,
             lastReadTimelineAt = null,
             conversationCreatedAt = 1uL,
@@ -267,6 +310,8 @@ class NotificationMessageRouteExactReadNavigationTest {
         const val POLL_MILLIS = 20L
         val ACCOUNT_ID = "aa".repeat(32)
         val GROUP_ID = "bb".repeat(32)
-        val MESSAGE_ID = "cc".repeat(32)
+        val MESSAGE_ID = NotificationScenario.NOTIFIED_ID
+        val OLDEST_UNREAD_ID = NotificationScenario.OLDEST_UNREAD_ID
+        val NEWEST_ID = NotificationScenario.NEWEST_ID
     }
 }

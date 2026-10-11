@@ -57,6 +57,17 @@ private val notificationRoutePhaseSections =
     )
 
 /**
+ * Route slices that appear only on some journeys: the awaited card dismissal, the loading-surface swap that
+ * must not happen (#586) and the human wait under app lock. `Mode.Sum`, so a journey without one reports zero.
+ */
+private val notificationRouteOptionalSections =
+    listOf(
+        "WhiteNoise.notificationRoute.commitDismiss",
+        "WhiteNoise.notificationRoute.startupSwap",
+        "WhiteNoise.notificationRoute.appLockWait",
+    )
+
+/**
  * Cold-start stages, mirroring `StartupStageTraceSection` in the app module.
  * Repeated here by convention for the same reason the notification-route
  * sections above are: the benchmark module does not depend on app sources.
@@ -105,6 +116,7 @@ internal fun journeyMetrics(sectionName: String): List<Metric> =
         ),
     )
 
+/** Frame timing, the journey slice and every notification-route phase, including the optional ones. */
 @OptIn(ExperimentalMetricApi::class)
 internal fun secondaryAccountNotificationMetrics(): List<Metric> =
     journeyMetrics(SECONDARY_ACCOUNT_NOTIFICATION_TRACE) +
@@ -112,6 +124,14 @@ internal fun secondaryAccountNotificationMetrics(): List<Metric> =
             TraceSectionMetric(
                 sectionName = sectionName,
                 mode = TraceSectionMetric.Mode.First,
+                label = sectionName.substringAfterLast('.'),
+                targetPackageOnly = false,
+            )
+        } +
+        notificationRouteOptionalSections.map { sectionName ->
+            TraceSectionMetric(
+                sectionName = sectionName,
+                mode = TraceSectionMetric.Mode.Sum,
                 label = sectionName.substringAfterLast('.'),
                 targetPackageOnly = false,
             )

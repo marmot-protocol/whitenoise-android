@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
+import dev.ipf.whitenoise.android.ui.conversation.toLandingTarget
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -182,6 +184,36 @@ class NotificationTargetTest {
                 update(trigger = NotificationTriggerFfi.MADE_ADMIN, messageId = null),
             ),
         )
+    }
+
+    /** A plain message card captures its destination with the account and group it was issued for. */
+    @Test
+    fun toLandingTarget_messageCardCapturesTheNotifiedMessageWithItsAccountAndGroup() {
+        val target = NotificationNavigation.fromUpdate(update(messageId = "m-notified"))
+
+        assertEquals(NotificationLandingTarget("acct-a", "group-1", "m-notified"), target?.toLandingTarget())
+    }
+
+    /** Invites, removals and cards without a concrete message keep the ordinary conversation entry. */
+    @Test
+    fun toLandingTarget_nonMessageKindsAndMissingIdsKeepTheOrdinaryEntry() {
+        assertNull(NotificationTarget("acct-a", "group-1", "m1", NotificationTargetKind.INVITE).toLandingTarget())
+        assertNull(NotificationTarget("acct-a", "group-1", "m1", NotificationTargetKind.CHAT_LIST).toLandingTarget())
+        assertNull(NotificationTarget("acct-a", "group-1", null, NotificationTargetKind.MESSAGE).toLandingTarget())
+        assertNull(NotificationTarget("acct-a", "group-1", " ", NotificationTargetKind.MESSAGE).toLandingTarget())
+    }
+
+    /** A reply-draft handoff and a pinned shortcut open a conversation, not a particular message. */
+    @Test
+    fun toLandingTarget_replyDraftAndPinnedShortcutKeepTheOrdinaryEntry() {
+        val message = NotificationTarget("acct-a", "group-1", "m1", NotificationTargetKind.MESSAGE)
+        val draft = message.copy(replyDraft = NotificationReplyDraft("reply-token", "partial reply"))
+        val capability = PinnedConversationCapability("acct-a", "ab".repeat(16), "account", "group")
+        val pinned = message.copy(shortcutCapability = capability)
+
+        assertNull(draft.toLandingTarget())
+        assertNull(pinned.toLandingTarget())
+        assertEquals(NotificationLandingTarget("acct-a", "group-1", "m1"), message.toLandingTarget())
     }
 
     @Test

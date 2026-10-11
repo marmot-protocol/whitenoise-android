@@ -58,6 +58,7 @@ internal enum class ConversationScrollReason {
     BottomInput,
     Reply,
     Mention,
+    NotificationTarget,
     Search,
     FocusMessage,
     ReadAloudFollow,
@@ -947,6 +948,7 @@ private val ConversationScrollReason.supersedesUnreadJump: Boolean
             ConversationScrollReason.Send,
             -> true
             ConversationScrollReason.InitialAnchor,
+            ConversationScrollReason.NotificationTarget,
             ConversationScrollReason.SavedRestore,
             ConversationScrollReason.LifecycleResume,
             ConversationScrollReason.ImeTransition,
@@ -1030,6 +1032,27 @@ internal suspend fun ConversationScrollCoordinator.commitInitialAnchor(
         }
     return commandCompleted && layoutStabilized
 }
+
+/**
+ * Positions a notified message's reading start while the transcript is hidden: one non-animated
+ * write, one layout frame, then the shared measured settle, so the first reveal is already on
+ * target and no visible corrective snap follows. The result keeps why a commit failed, because a
+ * retrying caller must restart a row that was only unmeasurable but never a command that a drag or
+ * a newer navigation superseded.
+ */
+internal suspend fun ConversationScrollCoordinator.commitInitialReadingStartAnchor(
+    targetMessageId: String,
+    resultingMode: ConversationScrollMode,
+    probe: ConversationReadingStartProbe,
+    reason: ConversationScrollReason = ConversationScrollReason.NotificationTarget,
+): ConversationReadingStartResult =
+    settleReadingStart(
+        targetMessageId = targetMessageId,
+        reason = reason,
+        probe = probe,
+        approach = ConversationReadingStartApproach.Instant,
+        resultingMode = resultingMode,
+    )
 
 /**
  * Tail opens do not need the history path's two equal layout samples. Commit

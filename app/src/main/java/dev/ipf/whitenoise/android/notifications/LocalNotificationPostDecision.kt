@@ -8,7 +8,18 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 internal const val MAX_NOTIFICATION_MESSAGE_HISTORY = 25
 internal const val CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP = MAX_NOTIFICATION_MESSAGE_HISTORY - 1
 internal const val MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS = 1_000
-internal const val MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS = 160
+
+/**
+ * Fewest code points that move a single message from the conversation template to the standard expandable text
+ * block, which exists to expose more of a long body. The value is not zero, because that block carries no sender
+ * icon and the platform classifies a card as a conversation by its conversation template.
+ *
+ * This is a conservative starting point and not a measured result. The rendered line budget belongs to the
+ * platform and varies by version, font scale and OEM, so confirm it with before and after shade captures at
+ * default and large font before changing it.
+ */
+internal const val MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS = 120
+
 internal const val CONVERSATION_SHORTCUT_PREFIX = "conversation-"
 
 internal data class NotificationPostDecision(
@@ -83,6 +94,14 @@ internal fun boundedNotificationMessageText(text: CharSequence): String {
     return value.substring(0, endIndex)
 }
 
+/**
+ * Whether a message posts as the expandable text block rather than the conversation template.
+ *
+ * Only a message with no carried history qualifies: the text block is one block of text, so any earlier message
+ * still on the card keeps the conversation template, which is the only standard template that holds each
+ * message separately. A long newest message behind carried history therefore shows as many lines as the platform
+ * gives that template, and the history stays intact. A redacted card never qualifies, since it carries no text.
+ */
 internal fun shouldUseExpandedSingleMessageStyle(
     body: CharSequence,
     carriedMessageCount: Int,
