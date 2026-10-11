@@ -7895,8 +7895,9 @@ class ConversationController(
     ): Boolean = !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
 
     /** Captures only pages already received by the current local subscription attempt. */
-    internal fun pendingTimelineAtForeground(): CompletableDeferred<Boolean>? =
-        synchronized(liveSubscriptionLock) { timelineHandoff?.pendingAtForeground() }
+    internal fun pendingTimelineAtForeground(): CompletableDeferred<Boolean>? = synchronized(liveSubscriptionLock) {
+        timelineHandoff?.pendingAtForeground()
+    }
 
     /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
