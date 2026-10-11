@@ -427,23 +427,67 @@ class ShareShortcutPublisherTest {
         assertEquals(listOf(conversationShortcutId("acct", "g1")), published.map { it.id })
     }
 
-    /** A retained shortcut published under another preview policy is redacted like any other entry. */
+    /** A card's own shortcut is unstamped, and it keeps its conversation title while previews are on. */
     @Test
-    fun publish_redactsARetainedShortcutPublishedUnderAnotherPreviewPolicy() {
+    fun publish_keepsTheTitleOfAnUnstampedRetainedShortcutWhilePreviewsAreOn() {
         val context = RuntimeEnvironment.getApplication()
         val unstamped =
             checkNotNull(
-                buildShareShortcut(context, ShareShortcutTarget("other", "pending-group", "Private title")),
+                buildShareShortcut(context, ShareShortcutTarget("other", "pending-group", "Pending title")),
             )
         var published = emptyList<ShortcutInfoCompat>()
 
         publisherWithCards(maxShortcuts = 8, cards = listOf(unstamped)) { published = it }
             .publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
 
-        val kept = published.single { it.id == unstamped.id }
-        assertEquals(context.getString(R.string.app_name), kept.longLabel)
-        assertTrue(kept.extras!!.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
+        assertEquals("Pending title", published.single { it.id == unstamped.id }.longLabel)
     }
+
+    /** A retained shortcut is redacted to the generic label like any other entry once previews are off. */
+    @Test
+    fun publish_redactsARetainedShortcutWhilePreviewsAreOff() =
+        runBlocking {
+            val context = RuntimeEnvironment.getApplication()
+            val card = cardShortcut("other", "pending-group", "Private title")
+            assertTrue(NotificationPreviewPreferences.setEnabled(context, false, scrub = { true }))
+            var published = emptyList<ShortcutInfoCompat>()
+
+            publisherWithCards(maxShortcuts = 8, cards = listOf(card)) { published = it }
+                .publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
+
+            val kept = published.single { it.id == card.id }
+            assertEquals(context.getString(R.string.app_name), kept.longLabel)
+            assertTrue(kept.extras!!.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
+        }
+
+    /** A retained shortcut captured before previews were turned off and on again must still end up generic. */
+    @Test
+    fun publish_retainedShortcutCapturedBeforeOffThenOnStaysGeneric() =
+        runBlocking {
+            val context = RuntimeEnvironment.getApplication()
+            assertTrue(NotificationPreviewPreferences.setEnabled(context, true, scrub = { true }))
+            val card = cardShortcut("other", "pending-group", "Private title")
+            var published = emptyList<ShortcutInfoCompat>()
+            val publisher =
+                ShareShortcutPublisher(
+                    context = context,
+                    maxShortcutCount = { 8 },
+                    setDynamicShortcuts = { published = it },
+                    existingShortcuts = {
+                        runBlocking {
+                            assertTrue(NotificationPreviewPreferences.setEnabled(context, false, scrub = { true }))
+                            assertTrue(NotificationPreviewPreferences.setEnabled(context, true, scrub = { true }))
+                        }
+                        emptyList()
+                    },
+                    dynamicShortcuts = { listOf(card) },
+                    cardShortcutIds = { setOf(card.id) },
+                )
+
+            publisher.publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
+
+            assertEquals(context.getString(R.string.app_name), published.single { it.id == card.id }.longLabel)
+        }
 
     /** Only conversation shortcut ids of posted cards count, so unrelated cards and cards without one are ignored. */
     @Test

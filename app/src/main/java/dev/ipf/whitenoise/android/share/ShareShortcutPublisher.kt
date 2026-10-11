@@ -160,16 +160,22 @@ private fun rebuildRichShareShortcut(
 
 /**
  * Re-expresses a dynamic shortcut that still backs a live card so replacing the dynamic set cannot delete its
- * conversation. Ownership, preview stamp and routing carry over unchanged, so the privacy gate that follows still
- * judges it by the policy it was published under, and the share-target category is dropped because a retained
- * entry is not a recent chat of the active account.
+ * conversation. Ownership and routing carry over unchanged. A card's own shortcut is never stamped, so a label that
+ * is not already hidden is stamped with [previewToken] and the privacy gate that follows keeps it only while the
+ * policy still allows previews, as it does for every other entry. The share-target category is dropped because a
+ * retained entry is not a recent chat of the active account.
  */
 private fun rebuildCardBackedShortcut(
     context: Context,
     existing: ShortcutInfoCompat,
     rank: Int,
+    previewToken: NotificationPreviewToken,
 ): ShortcutInfoCompat {
     val label = existing.longLabel?.toString()
+    val extras = existing.extras?.let { PersistableBundle(it) }
+    if (extras != null && !extras.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN)) {
+        stampShortcutPreview(previewToken, extras)
+    }
     return rebuildShortcut(
         context = context,
         existing = existing,
@@ -177,7 +183,7 @@ private fun rebuildCardBackedShortcut(
         avatarBitmap = null,
         rank = rank,
         categories = existing.categories.orEmpty() - CONVERSATION_SHARE_TARGET_CATEGORY,
-        extras = existing.extras?.let { PersistableBundle(it) },
+        extras = extras,
     )
 }
 
@@ -303,7 +309,7 @@ class ShareShortcutPublisher(
             val targetShortcuts = targetShortcuts(accountRef, plan.targets, existingById, previewToken)
             val retainedShortcuts =
                 plan.retained.mapIndexed { index, shortcut ->
-                    rebuildCardBackedShortcut(context, shortcut, targetShortcuts.size + index)
+                    rebuildCardBackedShortcut(context, shortcut, targetShortcuts.size + index, previewToken)
                 }
             setDynamicShortcuts(currentPublicationShortcuts(accountRef, chats, targetShortcuts + retainedShortcuts))
         }
