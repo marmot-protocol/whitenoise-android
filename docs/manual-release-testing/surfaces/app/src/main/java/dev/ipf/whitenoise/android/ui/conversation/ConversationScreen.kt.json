@@ -175,7 +175,7 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "surface": "Native content padding for a short final mention",
-        "anchor": "val mentionReadingReserve by",
+        "anchor": "val readMentionReadingReserve =",
         "test_ids": [
           "CON-032"
         ]

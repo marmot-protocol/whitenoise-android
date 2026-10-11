@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlin.math.abs
@@ -246,6 +247,35 @@ internal fun rememberConversationNearBottom(
                     trailingRowCount,
                     timelineViewport,
                     mentionReadingRowHeightPx,
+                )
+            }
+        }
+    return nearBottom
+}
+
+/**
+ * Near-bottom flag that reads the mention reading reserve inside its derived state. A mention jump
+ * writes that reserve before its first frame, so reading it here, not in the caller's composition,
+ * re-evaluates only this flag instead of recomposing the whole screen (#3150).
+ */
+@Composable
+internal fun rememberConversationNearBottom(
+    listState: LazyListState,
+    renderedTimelineSize: Int,
+    trailingRowCount: Int,
+    timelineViewport: ConversationTimelineViewport?,
+    mentionReadingRowHeightPx: () -> Int?,
+): Boolean {
+    val readMentionReadingRowHeightPx by rememberUpdatedState(mentionReadingRowHeightPx)
+    val nearBottom by
+        remember(listState, renderedTimelineSize, trailingRowCount, timelineViewport) {
+            derivedStateOf {
+                isNearBottom(
+                    listState,
+                    renderedTimelineSize,
+                    trailingRowCount,
+                    timelineViewport,
+                    readMentionReadingRowHeightPx(),
                 )
             }
         }

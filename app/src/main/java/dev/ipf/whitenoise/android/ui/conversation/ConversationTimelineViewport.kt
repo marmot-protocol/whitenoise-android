@@ -170,17 +170,21 @@ internal fun LazyListLayoutInfo.newestReadRow(timelineListIndices: IntRange): La
         it.index in timelineListIndices && (it.offset >= viewportStartOffset || it.size >= viewportSize.height)
     }
 
-/** Records the publication and padding consumed by this native list measure, including unchanged-total transitions. */
+/**
+ * Records the publication and padding consumed by this native list measure, including unchanged-total transitions.
+ * [mentionReadingReserve] is read here, in measurement, so a reserve change relays the list out without recomposing.
+ */
 internal fun Modifier.measureConversationTimelinePadding(
     viewport: ConversationTimelineViewport,
     basePadding: Dp,
     foregroundOverlap: Dp,
     timelinePublication: List<TimelineMessage>,
+    mentionReadingReserve: () -> Dp = { 0.dp },
 ): Modifier =
     layout { measurable, constraints ->
         val placeable =
             traceConversationUiSection(ConversationUiTrace.TRANSCRIPT_MEASURE) { measurable.measure(constraints) }
-        viewport.onPaddingMeasured(basePadding.roundToPx(), foregroundOverlap.roundToPx())
+        viewport.onPaddingMeasured((basePadding + mentionReadingReserve()).roundToPx(), foregroundOverlap.roundToPx())
         viewport.onTimelineMeasured(timelinePublication)
         layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
     }

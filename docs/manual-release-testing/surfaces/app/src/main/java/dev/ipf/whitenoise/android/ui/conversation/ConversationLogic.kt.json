@@ -10,6 +10,14 @@
         "test_ids": [
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationLogic.kt",
+        "surface": "Near-bottom flag reads the mention reserve inside its derived state",
+        "anchor": "mentionReadingRowHeightPx: () -> Int?",
+        "test_ids": [
+          "CON-032"
+        ]
       }
     ]
   },
