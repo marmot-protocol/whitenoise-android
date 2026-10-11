@@ -58,6 +58,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -206,20 +207,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             }
             fixture.recording.set(true)
             val resumedAt = SystemClock.uptimeMillis()
-            val preDrawCheckpoint = fixture.preDraws.get()
-            stallWatchdog.phase("resume task")
-            resumeRetainedActivity()
-            if (boundary == UpdateBoundary.Queued) {
-                stallWatchdog.phase("await blocked pre-draw")
-                composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
-                    fixture.preDraws.get() > preDrawCheckpoint
-                }
-                assertTrue("known local preparation must still hold the first draw", fixture.draws.isEmpty())
-                if (supersedeForeground) assertSupersedingResumeStillHeld(fixture)
-                assertTrue("queued preparation produced a blocked pre-draw", fixture.firstBlockedAt != null)
-                stallWatchdog.phase("release queued preparation")
-                fixture.dispatcher.release()
-            }
+            resumeForFirstDraw(fixture, boundary, supersedeForeground)
             stallWatchdog.phase("await first live draw")
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
             stallWatchdog.phase("post-draw activity lookup")
@@ -246,7 +234,9 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             listOf<() -> Unit>(
                 {
                     stallWatchdog.phase("cleanup window flags main hop")
-                    composeRule.runOnUiThread { original.window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM) }
+                    composeRule.runOnUiThread {
+                        original.window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+                    }
                 },
                 {
                     stallWatchdog.phase("fixture cleanup")
@@ -262,6 +252,28 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             }
         }
         if (bodyFailure == null) primaryFailure?.let { throw it }
+    }
+
+    /** Keeps local preparation held across the requested real foreground transitions. */
+    private fun resumeForFirstDraw(
+        fixture: RetainedFixture,
+        boundary: UpdateBoundary,
+        supersedeForeground: Boolean,
+    ) {
+        val checkpoint = fixture.preDraws.get()
+        if (supersedeForeground) {
+            supersedeWhileFirstFrameIsHeld(fixture)
+        } else {
+            stallWatchdog.phase("resume task")
+            resumeRetainedActivity()
+        }
+        if (boundary != UpdateBoundary.Queued) return
+        stallWatchdog.phase("await blocked pre-draw")
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.preDraws.get() > checkpoint }
+        assertTrue("known local preparation must still hold the first draw", fixture.draws.isEmpty())
+        assertTrue("queued preparation produced a blocked pre-draw", fixture.firstBlockedAt != null)
+        stallWatchdog.phase("release queued preparation")
+        fixture.dispatcher.release()
     }
 
     /** Requires the exact saved older anchor to have been painted before backgrounding. */
@@ -285,28 +297,59 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     }
 
     /** Reorders the existing task Activity to the front and keeps the retained-instance assertion explicit. */
-    private fun resumeRetainedActivity() {
+    private fun resumeRetainedActivity(waitForResumed: Boolean = true) {
         val original = retainedActivity
         stallWatchdog.phase("reorder task main hop")
         composeRule.runOnUiThread {
             original.startActivity(Intent(original, original.javaClass).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         }
+        if (!waitForResumed) return
         stallWatchdog.phase("await resumed lifecycle")
         composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
             original.lifecycle.currentState == Lifecycle.State.RESUMED
         }
     }
 
-    /** Attempts a second foreground frame before releasing the same locally queued update. */
-    private fun assertSupersedingResumeStillHeld(fixture: RetainedFixture) {
-        stopRetainedActivity()
-        val nextPreDrawCheckpoint = fixture.preDraws.get()
-        resumeRetainedActivity()
-        stallWatchdog.phase("await second blocked pre-draw")
-        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
-            fixture.preDraws.get() > nextPreDrawCheckpoint
+    /** Supersedes a genuinely pending foreground restore before its unchanged liveness deadline. */
+    private fun supersedeWhileFirstFrameIsHeld(fixture: RetainedFixture) {
+        val original = retainedActivity
+        val backgroundResult = AtomicReference<Result<Boolean>?>(null)
+        val pausedWhileHeld = AtomicBoolean()
+        val backgroundAction = Runnable { backgroundResult.set(runCatching { original.moveTaskToBack(true) }) }
+        composeRule.runOnUiThread {
+            fixture.onRecordedPause = {
+                pausedWhileHeld.set(
+                    fixture.firstBlockedAt != null && fixture.gateReleasedAt == null &&
+                        SystemClock.uptimeMillis() - fixture.lastResumeAt < 1_500L &&
+                        fixture.controller.pendingTimelineAtForeground()?.isCompleted == false,
+                )
+            }
+            fixture.onFirstBlocked = {
+                if (fixture.lastResumeAt > 0 && original.lifecycle.currentState == Lifecycle.State.RESUMED) {
+                    original.window.decorView.post(backgroundAction)
+                } else {
+                    false
+                }
+            }
         }
-        assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
+        try {
+            resumeRetainedActivity(waitForResumed = false)
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+                backgroundResult.get() != null && original.lifecycle.currentState == Lifecycle.State.CREATED
+            }
+            assertTrue(checkNotNull(backgroundResult.get()).getOrThrow())
+            assertTrue("second pause must supersede a still-pending first restore", pausedWhileHeld.get())
+            val checkpoint = fixture.preDraws.get()
+            resumeRetainedActivity()
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.preDraws.get() > checkpoint }
+            assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
+        } finally {
+            composeRule.runOnUiThread {
+                original.window.decorView.removeCallbacks(backgroundAction)
+                fixture.onFirstBlocked = null
+                fixture.onRecordedPause = null
+            }
+        }
     }
 
     /** Establishes actual focused IME geometry before capturing the retained foreground state. */
@@ -416,6 +459,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             val lifecycle = retainedActivity.lifecycle
             val lifecycleObserver =
                 LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_PAUSE && fixture.recording.get()) fixture.onRecordedPause?.invoke()
                     if (event == Lifecycle.Event.ON_RESUME && fixture.recording.get()) {
                         fixture.lastResumeAt = SystemClock.uptimeMillis()
                         fixture.firstBlockedAt = null
@@ -523,6 +567,8 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 memberSnapshot = conversationTimelineMemberSnapshot(),
                 projection = retainedChatRow(baseRows.last()),
             )
+        var onFirstBlocked: (() -> Boolean)? = null
+        var onRecordedPause: (() -> Unit)? = null
         var composition: AbstractComposeView? = null
         var mounted by mutableStateOf(true)
         var paintStaleControl by mutableStateOf(false)
@@ -547,6 +593,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         ) {
             if (!recording.get()) return
             if (blocked && firstBlockedAt == null) firstBlockedAt = atUptimeMs
+            if (blocked && onFirstBlocked?.invoke() == true) onFirstBlocked = null
             if (!blocked && firstBlockedAt != null && gateReleasedAt == null) gateReleasedAt = atUptimeMs
         }
 
