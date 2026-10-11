@@ -563,12 +563,17 @@ internal fun MediaVisualGridBubble(
     // Five frames at most; the last one carries the "+N" overflow chip.
     val visible = attachments.take(MAX_VISIBLE_GALLERY_FRAMES)
 
-    /** Opens one grid attachment through the row-independent mixed-media session owner. */
+    /**
+     * Opens one grid attachment through the row-independent mixed-media session owner. A video still being sent from
+     * its staged file has nothing to show yet, so the viewer leaves it out.
+     */
     fun dispatchViewerOpen(attachmentIndex: Int) {
+        val openable =
+            attachments.filterNot { controller.isVideoSendingFromStagedFile(record.messageIdHex, it.index, mine) }
         onOpenConversationMedia(
             ConversationMediaViewerOpenRequest(
                 messageIdHex = record.messageIdHex,
-                attachments = attachments,
+                attachments = openable,
                 tappedAttachmentIndex = attachmentIndex,
                 sender = record.sender,
                 recordedAt = record.recordedAt,

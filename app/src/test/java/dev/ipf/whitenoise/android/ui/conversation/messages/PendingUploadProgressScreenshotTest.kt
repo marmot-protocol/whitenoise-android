@@ -26,13 +26,16 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -41,17 +44,26 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.fileUploadProgress
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPendingPlaceholder
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoBubble
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoGridTile
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaVisualGridBubble
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingFilePill
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedDocumentRead
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.VideoUploadIndicator
+import dev.ipf.whitenoise.android.ui.conversation.media.VideoViewerFileResolver
 import dev.ipf.whitenoise.android.ui.conversation.media.readStagedDocument
 import dev.ipf.whitenoise.android.ui.conversation.media.ringFraction
+import dev.ipf.whitenoise.android.ui.conversation.media.videoAttachmentOpenTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -60,6 +72,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 
 private const val MIB = 1024L * 1024L
 private const val FILE_BYTES = 8 * MIB
@@ -85,10 +99,13 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
             groupRosterReader = { _, _ -> authoritativeRoster() },
         )
 
-    /** Releases the controller's work after each case. */
+    private val stagedSources = mutableListOf<StagedUploadSource>()
+
+    /** Releases the controller's work and any staged video after each case. */
     @After
     fun tearDownController() {
         controller.onCleared()
+        stagedSources.forEach { it.close() }
     }
 
     /** Each upload step names its bytes on a light card, and a failed card drops them for Retry. */
@@ -151,6 +168,124 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
 
         composeRule.onNodeWithContentDescription("Uploading 4.0 MB of 8.0 MB").assertExists()
         source.close()
+    }
+
+    /**
+     * A pending large video is sent from its staged file, so its bubble never resolves a file for it, and a tap on
+     * its play disc opens nothing.
+     */
+    @Test
+    fun stagedFileVideoBubbleNeverResolvesAFileAndATapOpensNothing() {
+        val pending = queueFileBacked(stagedVideo())
+        val entry = pendingVisual(pending)
+        val resolved = AtomicInteger()
+        val opened = AtomicInteger()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MediaVideoBubble(
+                    item = pending,
+                    attachmentIndex = entry.index,
+                    reference = entry.value,
+                    controller = controller,
+                    appState = appState,
+                    onOpenConversationMedia = { opened.incrementAndGet() },
+                    mine = true,
+                    videoFileResolver = countingResolver(resolved),
+                    uploading = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, entry.index)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(0, resolved.get())
+        assertEquals(0, opened.get())
+    }
+
+    /** A pending small video held in memory still resolves its file from those bytes, so the count above is real. */
+    @Test
+    fun inMemoryPendingVideoBubbleResolvesItsFile() {
+        val pending = queueFileBacked(smallVideo())
+        val entry = pendingVisual(pending)
+        val resolved = AtomicInteger()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MediaVideoBubble(
+                    item = pending,
+                    attachmentIndex = entry.index,
+                    reference = entry.value,
+                    controller = controller,
+                    appState = appState,
+                    onOpenConversationMedia = {},
+                    mine = true,
+                    videoFileResolver = countingResolver(resolved),
+                    uploading = true,
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        assertTrue(resolved.get() > 0)
+    }
+
+    /**
+     * In a pending album, the tile of a large video sent from its staged file never resolves a file, never shows the
+     * Download glyph, and a tap on it opens nothing.
+     */
+    @Test
+    fun stagedFileAlbumTileNeverResolvesShowsNoDownloadAndATapOpensNothing() {
+        val pending = queueFileBacked(stagedVideo(), smallVideo())
+        val entry = pendingVisual(pending)
+        val resolved = AtomicInteger()
+        val taps = AtomicInteger()
+        composeRule.setContent { WhiteNoiseTheme { AlbumTile(pending, entry, resolved, taps) } }
+
+        composeRule.onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, entry.index)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(0, resolved.get())
+        assertEquals(0, taps.get())
+        composeRule.onAllNodesWithContentDescription("Open").assertCountEquals(0)
+    }
+
+    /** The album tile of a pending small video held in memory still resolves its file, so the count above is real. */
+    @Test
+    fun inMemoryPendingAlbumTileResolvesItsFile() {
+        val pending = queueFileBacked(stagedVideo(), smallVideo())
+        val entry = pendingVisual(pending, position = 1)
+        val resolved = AtomicInteger()
+        composeRule.setContent { WhiteNoiseTheme { AlbumTile(pending, entry, resolved, AtomicInteger()) } }
+
+        composeRule.waitForIdle()
+        assertTrue(resolved.get() > 0)
+    }
+
+    /**
+     * Opening another item of a pending album leaves out the large video still being sent from its staged file,
+     * since the viewer could only fail to load it.
+     */
+    @Test
+    fun albumViewerLeavesOutAVideoSentFromItsStagedFile() {
+        val pending = queueFileBacked(stagedVideo(), smallVideo())
+        val pendingAttachments = controller.pendingAttachmentsList(pending.record.messageIdHex)
+        val visuals = bubbleMedia(emptyList(), pendingAttachments).pendingVisuals
+        val opened = mutableListOf<ConversationMediaViewerOpenRequest>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MediaVisualGridBubble(
+                    item = pending,
+                    attachments = visuals,
+                    controller = controller,
+                    appState = appState,
+                    onOpenConversationMedia = { opened += it },
+                    mine = true,
+                    uploading = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(videoAttachmentOpenTestTag(pending.record.messageIdHex, 1)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf(1), opened.single().attachments.map { it.index })
     }
 
     /** Byte progress describes one file, so two pending documents keep their spinning rings without bytes. */
@@ -257,11 +392,65 @@ class PendingUploadProgressScreenshotTest : MessageBubbleFileAttachmentFixtures(
         return requireNotNull(progress)
     }
 
-    /** Queues [attachment] as an optimistic pending send through the real controller. */
-    private fun queueFileBacked(attachment: PendingAttachment): TimelineMessage =
+    /** One large video staged to a private file, as a gallery pick above the in-memory budget is. */
+    private fun stagedVideo(): PendingAttachment {
+        val content = ByteArray(FILE_BYTES.toInt())
+        val read = readStagedDocument(temporary.root, FILE_BYTES) { ByteArrayInputStream(content) }
+        val source = (read as StagedDocumentRead.Success).source
+        stagedSources += source
+        return PendingAttachment(ByteArray(0), "video/mp4", "large.mp4", "1280x720", sourceFile = source)
+    }
+
+    /** One small video held in memory, as a pick within the in-memory budget is. */
+    private fun smallVideo(): PendingAttachment {
+        val bytes = ByteArray(16) { 1 }
+        return PendingAttachment(bytes, "video/mp4", "small.mp4", "1280x720")
+    }
+
+    /** The pending visual of [message] at [position] among its bubble's visuals. */
+    private fun pendingVisual(
+        message: TimelineMessage,
+        position: Int = 0,
+    ): IndexedValue<MediaAttachmentReferenceFfi> {
+        val pendingAttachments = controller.pendingAttachmentsList(message.record.messageIdHex)
+        return bubbleMedia(emptyList(), pendingAttachments).pendingVisuals[position]
+    }
+
+    /** A video file resolver that counts its calls and then fails, as resolving a send that is not published does. */
+    private fun countingResolver(calls: AtomicInteger): VideoViewerFileResolver =
+        { _, _, _, _, _, _, _ ->
+            calls.incrementAndGet()
+            throw IOException("not published")
+        }
+
+    /** Composes the album tile of [entry] in [message], counting resolver calls in [resolved] and taps in [taps]. */
+    @Composable
+    private fun AlbumTile(
+        message: TimelineMessage,
+        entry: IndexedValue<MediaAttachmentReferenceFfi>,
+        resolved: AtomicInteger,
+        taps: AtomicInteger,
+    ) {
+        MediaVideoGridTile(
+            messageIdHex = message.record.messageIdHex,
+            attachmentIndex = entry.index,
+            reference = entry.value,
+            controller = controller,
+            appState = appState,
+            mine = true,
+            onTap = { taps.incrementAndGet() },
+            overflowCount = 0,
+            modifier = Modifier.size(160.dp),
+            uploading = true,
+            videoFileResolver = countingResolver(resolved),
+        )
+    }
+
+    /** Queues [attachments] as one optimistic pending send through the real controller. */
+    private fun queueFileBacked(vararg attachments: PendingAttachment): TimelineMessage =
         runBlocking {
             controller.retryMembers()
-            val queued = requireNotNull(controller.queueAttachments(attachments = listOf(attachment), caption = null))
+            val queued = requireNotNull(controller.queueAttachments(attachments = attachments.toList(), caption = null))
             TimelineMessage(
                 id = queued.key,
                 record = queued.optimistic,

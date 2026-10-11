@@ -181,7 +181,8 @@ internal suspend fun resolveVideoViewerFile(
  * Single video tile in an album grid. Auto-materialises on first
  * composition (mine + cached short-circuit; otherwise FFI download honoring
  * the auto-download policy), decodes a scaled poster, overlays a centered
- * play affordance. Tap delegates the logical attachment immediately so a
+ * play affordance. An own video still being sent from its staged file is
+ * neither materialized nor opened until MDK confirms it. Tap delegates the logical attachment immediately so a
  * conversation-owned viewer can continue materialization after this lazy tile is disposed.
  */
 @Composable
@@ -212,16 +213,14 @@ internal fun MediaVideoGridTile(
         remember(messageIdHex, attachmentIndex) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    val pendingAttachment =
+        if (mine) controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) else null
     // A message still queued for upload has no materialized file to seek in, so
     // its poster comes from the bytes the retry path already retains (#2732).
-    val retainedPendingVideoBytes =
-        controller
-            .pendingAttachmentsList(messageIdHex)
-            .getOrNull(attachmentIndex)
-            ?.takeIf { mine && it.isPendingVideo }
-            ?.inMemoryBytes
-    val retainedPlaintextOnEntry =
-        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.inMemoryBytes != null
+    val retainedPendingVideoBytes = pendingAttachment?.takeIf { it.isPendingVideo }?.inMemoryBytes
+    val retainedPlaintextOnEntry = pendingAttachment?.inMemoryBytes != null
+    // A large own video is sent from its staged file, with nothing in memory or published to fetch until it lands.
+    val sendingFromStagedFile = pendingAttachment?.sourceFile != null
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageGridTile). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -244,6 +243,7 @@ internal fun MediaVideoGridTile(
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasCachedFile = localFile != null,
             hasRetainedPlaintext = retainedPlaintextOnEntry,
+            sendingFromStagedFile = sendingFromStagedFile,
         )
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
@@ -269,10 +269,11 @@ internal fun MediaVideoGridTile(
 
     /**
      * Promotes the tap to interactive priority and delegates ownership before this tile can dispose. While the reader's
-     * Cancel awaits acknowledgement a tap anywhere on the tile does nothing, so it cannot restart that transfer.
+     * Cancel awaits acknowledgement a tap anywhere on the tile does nothing, so it cannot restart that transfer. A
+     * video still being sent from its staged file has nothing to open yet, so a tap on it does nothing either.
      */
     fun dispatchViewerOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
-        if (transfer.cancelling) return
+        if (transfer.cancelling || sendingFromStagedFile) return
         val open = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
             if (retry) {
@@ -466,6 +467,13 @@ internal fun MediaVideoGridTile(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     when {
+                        // Never fetched while it sends, so it shows the play glyph of a pending video held in memory.
+                        sendingFromStagedFile ->
+                            Icon(
+                                painter = painterResource(R.drawable.ic_play_arrow),
+                                contentDescription = stringResource(R.string.reply_media_video),
+                                modifier = Modifier.size(24.dp),
+                            )
                         failed ->
                             Icon(
                                 Icons.Default.Refresh,
@@ -614,16 +622,14 @@ internal fun MediaVideoBubble(
         remember(pillKey) {
             controller.hasCachedAttachment(messageIdHex, attachmentIndex)
         }
+    val pendingAttachment =
+        if (mine) controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) else null
     // A message still queued for upload has no materialized file to seek in, so
     // its poster comes from the bytes the retry path already retains (#2732).
-    val retainedPendingVideoBytes =
-        controller
-            .pendingAttachmentsList(messageIdHex)
-            .getOrNull(attachmentIndex)
-            ?.takeIf { mine && it.isPendingVideo }
-            ?.inMemoryBytes
-    val retainedPlaintextOnEntry =
-        mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.inMemoryBytes != null
+    val retainedPendingVideoBytes = pendingAttachment?.takeIf { it.isPendingVideo }?.inMemoryBytes
+    val retainedPlaintextOnEntry = pendingAttachment?.inMemoryBytes != null
+    // A large own video is sent from its staged file, with nothing in memory or published to fetch until it lands.
+    val sendingFromStagedFile = pendingAttachment?.sourceFile != null
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
@@ -653,6 +659,7 @@ internal fun MediaVideoBubble(
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasCachedFile = localFile != null,
             hasRetainedPlaintext = retainedPlaintextOnEntry,
+            sendingFromStagedFile = sendingFromStagedFile,
         )
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
@@ -927,6 +934,8 @@ internal fun MediaVideoBubble(
                                     when {
                                         uploadFailed -> onRetryUpload?.invoke()
                                         localFile != null -> scope.launch { dispatchReadyVideo() }
+                                        // Nothing is playable until the staged file is sent, and the ring shows it.
+                                        sendingFromStagedFile -> Unit
                                         else -> dispatchViewerOpen()
                                     }
                                 },
@@ -1244,6 +1253,11 @@ private fun rememberCachedVideoAttachmentFileState(
     return cachedFile
 }
 
+/**
+ * Whether a video tile materializes its file on its own. A video this device is still sending from its staged
+ * file never does: it has no bytes in memory and nothing published, so a fetch could only fail and replace the
+ * upload ring with a failed transfer.
+ */
 @VisibleForTesting
 internal fun shouldStartVideoAttachmentDownload(
     mine: Boolean,
@@ -1252,15 +1266,27 @@ internal fun shouldStartVideoAttachmentDownload(
     hasCachedAttachment: Boolean,
     hasCachedFile: Boolean,
     hasRetainedPlaintext: Boolean = false,
+    sendingFromStagedFile: Boolean = false,
 ): Boolean =
-    shouldMaterializeAttachmentAutomatically(
-        mine = mine,
-        mediaAutoDownloadAllowed = videoAutoDownload,
-        automaticDownloadsPaused = automaticDownloadsPaused,
-        hasCachedAttachment = hasCachedAttachment,
-        hasMaterializedFile = hasCachedFile,
-        hasRetainedPlaintext = hasRetainedPlaintext,
-    )
+    !sendingFromStagedFile &&
+        shouldMaterializeAttachmentAutomatically(
+            mine = mine,
+            mediaAutoDownloadAllowed = videoAutoDownload,
+            automaticDownloadsPaused = automaticDownloadsPaused,
+            hasCachedAttachment = hasCachedAttachment,
+            hasMaterializedFile = hasCachedFile,
+            hasRetainedPlaintext = hasRetainedPlaintext,
+        )
+
+/**
+ * Whether [attachmentIndex] of the pending message [messageIdHex] is this device's own video, still being sent from
+ * its staged file. Once MDK confirms the message it carries its published id, which has no pending attachments.
+ */
+internal fun ConversationController.isVideoSendingFromStagedFile(
+    messageIdHex: String,
+    attachmentIndex: Int,
+    mine: Boolean,
+): Boolean = mine && pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.sourceFile != null
 
 private fun videoAttachmentCacheFile(
     context: android.content.Context,

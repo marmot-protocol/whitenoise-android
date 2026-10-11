@@ -55,6 +55,28 @@ class VideoAttachmentCacheStateTest {
         )
     }
 
+    /** An own video still being sent from its staged file never fetches itself, whatever else would allow it. */
+    @Test
+    fun ownVideoSendingFromItsStagedFileNeverMaterializes() {
+        assertTrue(
+            shouldStartVideoAttachmentDownload(
+                mine = true,
+                videoAutoDownload = true,
+                hasCachedAttachment = false,
+                hasCachedFile = false,
+            ),
+        )
+        assertFalse(
+            shouldStartVideoAttachmentDownload(
+                mine = true,
+                videoAutoDownload = true,
+                hasCachedAttachment = false,
+                hasCachedFile = false,
+                sendingFromStagedFile = true,
+            ),
+        )
+    }
+
     @Test
     fun emptyVideoFileIsNotTreatedAsCached() {
         val context = RuntimeEnvironment.getApplication()
