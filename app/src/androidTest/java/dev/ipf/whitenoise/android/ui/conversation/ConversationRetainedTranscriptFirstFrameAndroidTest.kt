@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
@@ -7,11 +9,13 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.AbstractComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.hasSetTextAction
@@ -22,6 +26,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.ChatConversationKindFfi
@@ -58,7 +64,6 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -90,10 +95,47 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         assertFirstDraw(UpdateBoundary.Queued)
     }
 
-    /** A second foreground epoch cannot inherit the first epoch's permission to reveal held content. */
+    /** Controlled owner epochs supersede pending work without Android task-transition scheduling delays. */
     @Test
-    fun supersededForegroundEpochStillWaitsForCurrentLocalWindow() {
-        assertFirstDraw(UpdateBoundary.Queued, supersedeForeground = true)
+    fun controlledOwnerSupersessionWaitsForCurrentLocalWindow() {
+        val fixture = mountFixture(controlledOwner = true)
+        val owner = checkNotNull(fixture.owner)
+        var bodyFailure: Throwable? = null
+        try {
+            composeRule.runOnUiThread {
+                assertEquals(Lifecycle.State.RESUMED, retainedActivity.lifecycle.currentState)
+                owner.moveTo(Lifecycle.State.CREATED)
+            }
+            fixture.dispatcher.hold.set(true)
+            fixture.first.emitWindow(fixture.pageWithB)
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.dispatcher.hasPending }
+            assertFalse(fixture.hasB)
+            fixture.recording.set(true)
+            val resumedAt = SystemClock.uptimeMillis()
+            composeRule.runOnUiThread { owner.moveTo(Lifecycle.State.RESUMED) }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.firstBlockedAt != null }
+            composeRule.runOnUiThread {
+                assertTrue("supersede before fallback", SystemClock.uptimeMillis() - fixture.lastResumeAt < 1_500L)
+                assertTrue(fixture.controller.pendingTimelineAtForeground()?.isCompleted == false)
+                assertTrue(fixture.draws.isEmpty())
+                assertTrue(fixture.gateReleasedAt == null)
+                owner.moveTo(Lifecycle.State.CREATED)
+                owner.moveTo(Lifecycle.State.RESUMED)
+            }
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.firstBlockedAt != null }
+            assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
+            fixture.dispatcher.release()
+            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
+            assertSame(retainedActivity, composeRule.activity)
+            assertEquals(Lifecycle.State.RESUMED, retainedActivity.lifecycle.currentState)
+            assertResumedTranscript(fixture, null, resumedAt, false)
+            composeRule.onNode(hasSetTextAction()).performTextInput(" editable")
+        } catch (failure: Throwable) {
+            bodyFailure = failure
+            throw failure
+        } finally {
+            closeFirstDrawFixture(fixture, retainedActivity, bodyFailure)
+        }
     }
 
     /** Reconnect's replacement snapshot is sufficient even when no later live update arrives. */
@@ -179,7 +221,6 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         focusComposer: Boolean = false,
         denyIme: Boolean = false,
         olderReader: Boolean = false,
-        supersedeForeground: Boolean = false,
     ) {
         val fixture = mountFixture(replacement = boundary == UpdateBoundary.Replacement, olderReader = olderReader)
         val original = retainedActivity
@@ -207,7 +248,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             }
             fixture.recording.set(true)
             val resumedAt = SystemClock.uptimeMillis()
-            resumeForFirstDraw(fixture, boundary, supersedeForeground)
+            resumeForFirstDraw(fixture, boundary)
             stallWatchdog.phase("await first live draw")
             composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.draws.isNotEmpty() }
             stallWatchdog.phase("post-draw activity lookup")
@@ -258,15 +299,10 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     private fun resumeForFirstDraw(
         fixture: RetainedFixture,
         boundary: UpdateBoundary,
-        supersedeForeground: Boolean,
     ) {
         val checkpoint = fixture.preDraws.get()
-        if (supersedeForeground) {
-            supersedeWhileFirstFrameIsHeld(fixture)
-        } else {
-            stallWatchdog.phase("resume task")
-            resumeRetainedActivity()
-        }
+        stallWatchdog.phase("resume task")
+        resumeRetainedActivity()
         if (boundary != UpdateBoundary.Queued) return
         stallWatchdog.phase("await blocked pre-draw")
         composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.preDraws.get() > checkpoint }
@@ -297,58 +333,15 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     }
 
     /** Reorders the existing task Activity to the front and keeps the retained-instance assertion explicit. */
-    private fun resumeRetainedActivity(waitForResumed: Boolean = true) {
+    private fun resumeRetainedActivity() {
         val original = retainedActivity
         stallWatchdog.phase("reorder task main hop")
         composeRule.runOnUiThread {
             original.startActivity(Intent(original, original.javaClass).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         }
-        if (!waitForResumed) return
         stallWatchdog.phase("await resumed lifecycle")
         composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
             original.lifecycle.currentState == Lifecycle.State.RESUMED
-        }
-    }
-
-    /** Supersedes a genuinely pending foreground restore before its unchanged liveness deadline. */
-    private fun supersedeWhileFirstFrameIsHeld(fixture: RetainedFixture) {
-        val original = retainedActivity
-        val backgroundResult = AtomicReference<Result<Boolean>?>(null)
-        val pausedWhileHeld = AtomicBoolean()
-        val backgroundAction = Runnable { backgroundResult.set(runCatching { original.moveTaskToBack(true) }) }
-        composeRule.runOnUiThread {
-            fixture.onRecordedPause = {
-                pausedWhileHeld.set(
-                    fixture.firstBlockedAt != null && fixture.gateReleasedAt == null &&
-                        SystemClock.uptimeMillis() - fixture.lastResumeAt < 1_500L &&
-                        fixture.controller.pendingTimelineAtForeground()?.isCompleted == false,
-                )
-            }
-            fixture.onFirstBlocked = {
-                if (fixture.lastResumeAt > 0 && original.lifecycle.currentState == Lifecycle.State.RESUMED) {
-                    original.window.decorView.post(backgroundAction)
-                } else {
-                    false
-                }
-            }
-        }
-        try {
-            resumeRetainedActivity(waitForResumed = false)
-            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
-                backgroundResult.get() != null && original.lifecycle.currentState == Lifecycle.State.CREATED
-            }
-            assertTrue(checkNotNull(backgroundResult.get()).getOrThrow())
-            assertTrue("second pause must supersede a still-pending first restore", pausedWhileHeld.get())
-            val checkpoint = fixture.preDraws.get()
-            resumeRetainedActivity()
-            composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.preDraws.get() > checkpoint }
-            assertTrue("retired foreground work cannot reveal held content", fixture.draws.isEmpty())
-        } finally {
-            composeRule.runOnUiThread {
-                original.window.decorView.removeCallbacks(backgroundAction)
-                fixture.onFirstBlocked = null
-                fixture.onRecordedPause = null
-            }
         }
     }
 
@@ -400,9 +393,11 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 assertTrue(releasedAt >= blockedAt && releasedAt <= fixture.firstDrawAt)
                 releasedAt - blockedAt
             }
+        val ownerKind = if (fixture.owner == null) "activity" else "controlled"
         Log.i(
             "WNFirstFrameTest",
-            "ime_denied=$denyIme on_resume_to_draw_ms=${fixture.firstDrawAt - fixture.lastResumeAt} " +
+            "owner_kind=$ownerKind ime_denied=$denyIme " +
+                "on_resume_to_draw_ms=${fixture.firstDrawAt - fixture.lastResumeAt} " +
                 "gate_held_ms=${gateHeldMs ?: "not_observed"}",
         )
     }
@@ -411,12 +406,16 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     private fun mountFixture(
         replacement: Boolean = false,
         olderReader: Boolean = false,
+        controlledOwner: Boolean = false,
     ): RetainedFixture {
         stallWatchdog.phase("mount activity lookup")
         retainedActivity = composeRule.activity
         lateinit var fixture: RetainedFixture
         stallWatchdog.phase("mount fixture main hop")
-        composeRule.runOnUiThread { fixture = RetainedFixture(replacement, olderReader) }
+        composeRule.runOnUiThread {
+            fixture = RetainedFixture(replacement, olderReader)
+            if (controlledOwner) fixture.owner = ControlledConversationOwner(retainedActivity)
+        }
         // This suite starts from a retained, authoritative transcript, not a cold route whose
         // unread boundary still depends on the native read-state initialization fixture.
         stallWatchdog.phase("await authoritative setup page")
@@ -432,14 +431,16 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         composeRule.setContent {
             ObserveFixtureDraws(fixture)
             if (fixture.mounted) {
-                WhiteNoiseTheme {
-                    ConversationScreen(
-                        appState = fixture.appState,
-                        chat = fixture.chat,
-                        controller = fixture.controller,
-                        onBack = {},
-                        restoredScrollSnapshot = fixture.readingSnapshot,
-                    )
+                CompositionLocalProvider(LocalContext provides (fixture.owner ?: LocalContext.current)) {
+                    WhiteNoiseTheme {
+                        ConversationScreen(
+                            appState = fixture.appState,
+                            chat = fixture.chat,
+                            controller = fixture.controller,
+                            onBack = {},
+                            restoredScrollSnapshot = fixture.readingSnapshot,
+                        )
+                    }
                 }
             }
         }
@@ -456,10 +457,9 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         fixture.keyboard = LocalSoftwareKeyboardController.current
         DisposableEffect(view) {
             fixture.composition = checkNotNull(view.parent as? AbstractComposeView)
-            val lifecycle = retainedActivity.lifecycle
+            val lifecycle = fixture.owner?.lifecycle ?: retainedActivity.lifecycle
             val lifecycleObserver =
                 LifecycleEventObserver { _, event ->
-                    if (event == Lifecycle.Event.ON_PAUSE && fixture.recording.get()) fixture.onRecordedPause?.invoke()
                     if (event == Lifecycle.Event.ON_RESUME && fixture.recording.get()) {
                         fixture.lastResumeAt = SystemClock.uptimeMillis()
                         fixture.firstBlockedAt = null
@@ -476,7 +476,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
             val drawListener =
                 android.view.ViewTreeObserver.OnDrawListener {
                     val completed = ConversationTranscriptDrawProbe.beginRootDraw()
-                    val live = retainedActivity.lifecycle.currentState == Lifecycle.State.RESUMED
+                    val live = lifecycle.currentState == Lifecycle.State.RESUMED
                     view.post { if (live) completed?.invoke() }
                 }
             observer.addOnPreDrawListener(listener)
@@ -567,8 +567,7 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                 memberSnapshot = conversationTimelineMemberSnapshot(),
                 projection = retainedChatRow(baseRows.last()),
             )
-        var onFirstBlocked: (() -> Boolean)? = null
-        var onRecordedPause: (() -> Unit)? = null
+        var owner: ControlledConversationOwner? = null
         var composition: AbstractComposeView? = null
         var mounted by mutableStateOf(true)
         var paintStaleControl by mutableStateOf(false)
@@ -593,7 +592,6 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         ) {
             if (!recording.get()) return
             if (blocked && firstBlockedAt == null) firstBlockedAt = atUptimeMs
-            if (blocked && onFirstBlocked?.invoke() == true) onFirstBlocked = null
             if (!blocked && firstBlockedAt != null && gateReleasedAt == null) gateReleasedAt = atUptimeMs
         }
 
@@ -623,6 +621,18 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
                     controller.onCleared()
                 }
             }
+        }
+    }
+
+    /** Supplies the production context-owner lookup with deterministic epochs while the Activity stays real. */
+    private class ControlledConversationOwner(context: Context) : ContextWrapper(context), LifecycleOwner {
+        private val registry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.RESUMED }
+        override val lifecycle: Lifecycle
+            get() = registry
+
+        /** Emits the same ordered owner events consumed by production foreground effects. */
+        fun moveTo(state: Lifecycle.State) {
+            registry.currentState = state
         }
     }
 

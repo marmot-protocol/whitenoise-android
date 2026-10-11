@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.state.tracedPagingSection
@@ -13,6 +14,7 @@ internal data class ConversationMentionJumpLayout(
     val estimatedItemHeightPx: Int? = null,
     val isNewest: Boolean = false,
     val itemOffsetPx: Int? = null,
+    val tailContentHeightPx: Int? = null,
 ) {
     val isMeasured: Boolean
         get() = viewportEndOffsetPx > 0 && itemHeightPx != null && itemHeightPx > 0
@@ -30,6 +32,13 @@ internal data class ConversationMentionJumpLayout(
         get() = ReplyNavigation.readingStartScrollOffset(viewportEndOffsetPx, itemHeightPx ?: estimatedItemHeightPx)
 }
 
+/** Includes measured newer rows, structural rows and spacing, even beneath composer occlusion. */
+internal fun LazyListLayoutInfo.mentionTailContentHeightPx(index: Int): Int? {
+    val origin = visibleItemsInfo.firstOrNull { it.index == 0 } ?: return null
+    val target = visibleItemsInfo.firstOrNull { it.index == index } ?: return null
+    return (target.offset + target.size - origin.offset).coerceAtLeast(1)
+}
+
 /** Keeps the approach and measured correction in one latest-wins, distance-bounded command. */
 internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
     targetMessageId: String,
@@ -42,7 +51,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
     val completed =
         programmaticJump(targetMessageId, ConversationScrollReason.Mention) {
             var initialIndex = resolveTargetIndex() ?: return@programmaticJump
-            reserveNewestMentionReadingSpace(initialIndex, readLayout, awaitLayout)
+            reserveMentionReadingSpace(initialIndex, readLayout, awaitLayout)
             initialIndex = resolveTargetIndex() ?: return@programmaticJump
             val initialOffset = readLayout(initialIndex).readingStartOffset
             var placedIndex = initialIndex
@@ -122,16 +131,17 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     return reached
 }
 
-/** Uses the current row estimate to provide native room before the first newest-row approach. */
-private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.reserveNewestMentionReadingSpace(
+/** Reserves only the missing native runway; unknown near-tail geometry waits for the measured approach. */
+private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.reserveMentionReadingSpace(
     index: Int,
     readLayout: (Int) -> ConversationMentionJumpLayout,
     awaitLayout: suspend () -> Unit,
 ) {
     val layout = readLayout(index)
-    if (layout.isNewest) {
-        reserveMentionReadingStart(layout.itemHeightPx ?: layout.estimatedItemHeightPx ?: 1, awaitLayout)
-    }
+    val height =
+        layout.tailContentHeightPx
+            ?: if (layout.isNewest) layout.itemHeightPx ?: layout.estimatedItemHeightPx ?: 1 else null
+    if (height != null) reserveMentionReadingStart(height, awaitLayout)
 }
 
 /** Re-resolves the logical target after a reserved-padding layout pass before validating its coordinate. */
@@ -142,8 +152,9 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
 ): Pair<Int, ConversationMentionJumpLayout>? {
     val measured = resolveMeasuredMentionLayout(resolveTargetIndex, readLayout) ?: return null
     val layout = measured.second
-    return if (layout.isNewest) {
-        reserveMentionReadingStart(requireNotNull(layout.itemHeightPx), awaitLayout)
+    val height = layout.tailContentHeightPx ?: layout.itemHeightPx.takeIf { layout.isNewest }
+    return if (height != null) {
+        reserveMentionReadingStart(height, awaitLayout)
         resolveMeasuredMentionLayout(resolveTargetIndex, readLayout)
     } else {
         measured
