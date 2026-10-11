@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -77,6 +78,7 @@ class ConversationTimelineUnderlayTest {
     private val observedReadingHeights = mutableListOf<Int>()
     private val mountedRows = mutableMapOf<Int, Any>()
     private val clickedRows = mutableListOf<Int>()
+    private val rowCompositions = mutableMapOf<Int, Int>()
     private val sentenceLayouts = ConversationTtsSentenceLayoutRegistry()
     private val speechTarget = ConversationTtsFollowTarget(7L, "19", 0, 1, "review-sentence", 42uL)
 
@@ -116,6 +118,31 @@ class ConversationTimelineUnderlayTest {
             assertEquals(settledScrollPosition, list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset)
             assertEquals(480, list.layoutInfo.viewportSize.height)
             assertEquals(360, viewport.readingLayoutInfo().viewportSize.height)
+            scope.launch { list.scrollToItem(0, 0) }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithTag("row-$COVERED_ROW_VALUE").assertExists()
+    }
+
+    /** A clear native row can move without recomposing solely to reassert unchanged accessibility exposure. */
+    @Test
+    fun scrollingWithinClearViewportDoesNotRecomposeUnchangedExposure() {
+        render()
+        rule.waitForIdle()
+        val row = rule.onNodeWithTag("row-16")
+        val beforeTop = row.fetchSemanticsNode().boundsInRoot.top
+        val beforeCompositions = rule.runOnIdle { checkNotNull(rowCompositions[16]) }
+        repeat(8) {
+            rule.runOnIdle { scope.launch { list.scrollBy(1f) } }
+            rule.waitForIdle()
+        }
+        assertTrue(row.fetchSemanticsNode().boundsInRoot.top != beforeTop)
+        rule.runOnIdle {
+            val clear = viewport.readingLayoutInfo()
+            val movedRow = clear.visibleItemsInfo.single { it.key == 16 }
+            assertTrue(movedRow.offset >= clear.viewportStartOffset)
+            assertTrue(movedRow.offset + movedRow.size <= clear.viewportEndOffset)
+            assertEquals(beforeCompositions, rowCompositions[16])
         }
     }
 
@@ -434,7 +461,9 @@ class ConversationTimelineUnderlayTest {
                                             onDispose { sentenceLayouts.unmountRow("19", rowInstance) }
                                         }
                                     }
-                                    Box(Modifier.timelineReadingExposure(viewport)) {
+                                    val exposure = Modifier.timelineReadingExposure(viewport)
+                                    SideEffect { rowCompositions[index] = (rowCompositions[index] ?: 0) + 1 }
+                                    Box(exposure) {
                                         Text(
                                             "Message $index",
                                             Modifier

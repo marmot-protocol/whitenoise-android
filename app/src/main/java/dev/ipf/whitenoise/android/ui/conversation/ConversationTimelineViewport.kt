@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -192,8 +193,14 @@ internal fun conversationUnderlayScaffoldPadding(
 @Composable
 internal fun Modifier.timelineReadingExposure(viewport: ConversationTimelineViewport): Modifier {
     var bounds by remember { mutableStateOf<Rect?>(null) }
-    val clear = viewport.readingBoundsInWindow
-    val hidden = bounds?.let { row -> clear != null && (row.top >= clear.bottom || row.bottom <= clear.top) } == true
+    // Native scroll changes both row coordinates and layoutInfo every frame. Composition only
+    // needs the exposure transition; pointer hit testing below still reads the current geometry.
+    val hidden by remember(viewport) {
+        derivedStateOf {
+            val clear = viewport.readingBoundsInWindow
+            bounds?.let { row -> clear != null && (row.top >= clear.bottom || row.bottom <= clear.top) } == true
+        }
+    }
     return this
         .onGloballyPositioned {
             val position = it.positionInWindow()
