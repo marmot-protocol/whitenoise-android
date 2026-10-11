@@ -72,10 +72,94 @@ class MentionTraceReportTest(unittest.TestCase):
         ])
         values = self.report.mention_phase_metrics(self.query, "ts>=100 and ts<=2000000000")
         self.assertEqual(400, values["mention_tap_to_landing_ms"])
+        self.assertTrue(values["mention_qualified"])
         self.assertEqual(1500, values["mention_highlight_ms"])
         self.db.execute("update process_slice set upid=2 where name='WhiteNoise.conversation.mention.landed'")
         replaced = self.report.mention_phase_metrics(self.query, "ts>=100 and ts<=2000000000")
         self.assertIsNone(replaced["mention_tap_to_landing_ms"])
+
+    def test_visible_read_without_landing_is_unqualified(self):
+        self.db.execute("insert into process_slice values(?,?,?,?,?)", (
+            "WhiteNoise.conversation.mention.total", 100, 900, self.report.PKG, 1,
+        ))
+        phases = self.report.mention_phase_metrics(self.query, "ts>=100 and ts<=1000")
+        row = dict(test="jumpToUnreadMentionFromHistory", journey_ms=1, **phases)
+        self.assertFalse(self.report.qualified_row(row))
+
+    def test_ambiguous_landings_are_unqualified(self):
+        self.db.executemany("insert into process_slice values(?,?,?,?,?)", [
+            ("WhiteNoise.conversation.mention.total", 100, 900, self.report.PKG, 1),
+            ("WhiteNoise.conversation.mention.landed", 400, 0, self.report.PKG, 1),
+            ("WhiteNoise.conversation.mention.landed", 500, 0, self.report.PKG, 1),
+        ])
+        phases = self.report.mention_phase_metrics(self.query, "ts>=100 and ts<=1000")
+        self.assertFalse(phases["mention_qualified"])
+
+    def test_unfinished_or_out_of_total_landing_is_unqualified(self):
+        for total_duration, landing_ts in [(-1, 400), (200, 400), (900, 50)]:
+            with self.subTest(total_duration=total_duration, landing_ts=landing_ts):
+                self.db.execute("delete from process_slice")
+                self.db.executemany("insert into process_slice values(?,?,?,?,?)", [
+                    ("WhiteNoise.conversation.mention.total", 100, total_duration, self.report.PKG, 1),
+                    ("WhiteNoise.conversation.mention.landed", landing_ts, 0, self.report.PKG, 1),
+                ])
+                phases = self.report.mention_phase_metrics(self.query, "ts>=0 and ts<=1000")
+                self.assertFalse(phases["mention_qualified"])
+
+    def test_unqualified_visits_fail_summary_and_do_not_contribute_medians(self):
+        import contextlib
+        import io
+        import json
+        import tempfile
+
+        row = dict(test="jumpToUnreadMentionFromHistory", it=0, journey_ms=99,
+                   mention_qualified=False, frames=90, f_p99=22.7)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl") as data:
+            data.write(json.dumps(row) + "\n")
+            data.flush()
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = self.report.main(["--summarize", data.name])
+        self.assertEqual(1, status)
+        self.assertIn("UNQUALIFIED", output.getvalue())
+        self.assertNotIn("frame P99 med=", output.getvalue())
+
+    def test_single_trace_preserves_unqualified_json_but_returns_failure(self):
+        import contextlib
+        import io
+        import json
+
+        row = dict(test="jumpToUnreadMentionFromHistory", it=0, journey_ms=99,
+                   mention_qualified=False)
+        output = io.StringIO()
+        with patch.object(self.report, "analyse", return_value=row), contextlib.redirect_stdout(output):
+            status = self.report.main(["fixture.perfetto-trace"])
+        self.assertEqual(1, status)
+        self.assertEqual(row, json.loads(output.getvalue()))
+
+    def test_mixed_summary_fails_and_excludes_unsuccessful_frame_distribution(self):
+        import contextlib
+        import io
+        import json
+        import tempfile
+
+        good = dict(test="jumpToUnreadMentionFromHistory", it=0, journey_ms=99,
+                    mention_qualified=True, windows=0, window_sum=0, window_max=0,
+                    apply_n=0, apply_sum=0, apply_max=0, prepare_sum=0,
+                    edge_stop=0, runway_kept=0, edge_reached=0, frames=5,
+                    f_p50=1, f_p90=1, f_p99=1, f_max=1, jank32=0,
+                    main_running_ms=1, gpu_samples=0)
+        bad = dict(good, it=1, mention_qualified=False, f_p99=1000, f_max=1000)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl") as data:
+            data.write(json.dumps(good) + "\n" + json.dumps(bad) + "\n")
+            data.flush()
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = self.report.main(["--summarize", data.name])
+        self.assertEqual(1, status)
+        self.assertIn("UNQUALIFIED", output.getvalue())
+        self.assertIn("frame P99 med=1.0ms", output.getvalue())
+        self.assertNotIn("1000", output.getvalue())
 
 
 if __name__ == "__main__":

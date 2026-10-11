@@ -338,7 +338,10 @@ internal class WhiteNoiseJourneys {
         waitForVisibleTag(PerformanceTags.JUMP_TO_MENTION)
     }
 
-    /** Taps the production @ control once and waits for the sole mention's successful read completion. */
+    /**
+     * Taps @ and waits for visible read completion. This is not a reached-landing oracle:
+     * the trace report must separately require one same-receiver landing before qualifying metrics.
+     */
     fun jumpToUnreadMention(targetText: String) {
         waitForVisibleTag(PerformanceTags.JUMP_TO_MENTION).click()
         waitForText(targetText, NETWORK_STATE_TIMEOUT_MS)

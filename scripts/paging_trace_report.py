@@ -59,7 +59,7 @@ def mention_phase_metrics(query, window):
         phases[f"mention_{phase}_n"] = rows[0].n if rows else 0
         phases[f"mention_{phase}_ms"] = rows[0].ms if rows else None
     starts = query(
-        f"select s.ts, s.upid from process_slice s where s.process_name='{PKG}' "
+        f"select s.ts, s.dur, s.upid from process_slice s where s.process_name='{PKG}' "
         f"and s.name='WhiteNoise.conversation.mention.total' and {scoped_window}"
     )
     landings = query(
@@ -69,9 +69,17 @@ def mention_phase_metrics(query, window):
     phases['mention_tap_to_landing_ms'] = None
     if len(starts) == len(landings) == 1 and starts[0].upid == landings[0].upid:
         delta = landings[0].ts - starts[0].ts
-        if delta >= 0:
+        if starts[0].dur >= 0 and 0 <= delta <= starts[0].dur:
             phases['mention_tap_to_landing_ms'] = delta / 1e6
+    phases["mention_qualified"] = phases["mention_tap_to_landing_ms"] is not None
     return phases
+
+
+def qualified_row(row):
+    """Admit only completed journeys with one same-receiver reached mention visit."""
+    if row.get("journey_ms") is None:
+        return False
+    return row["test"] != "jumpToUnreadMentionFromHistory" or row.get("mention_qualified") is True
 
 
 def analyse(path):
@@ -92,7 +100,7 @@ def analyse(path):
         return list(tp.query(sql))
 
     j = q(f"select ts,dur from slice where name='{JOURNEYS[test]}' limit 1")
-    if not j:
+    if not j or j[0].dur < 0:
         tp.close()
         return dict(test=test, it=it, journey_ms=None)
     ts, dur = j[0].ts, j[0].dur
@@ -174,6 +182,9 @@ def main(argv):
             if r["journey_ms"] is None:
                 print(f"{r['test']:30s}{r['it']:3d}  (no journey slice)")
                 continue
+            if not qualified_row(r):
+                print(f"{r['test']:30s}{r['it']:3d}  UNQUALIFIED: missing or ambiguous receiver landing")
+                continue
             print(
                 f"{r['test']:30s}{r['it']:3d} {r['journey_ms']:8.0f} {r['windows']:6d} {r['window_sum']:6.0f}/{r['window_max']:<4.0f} "
                 f"{r['apply_n']:6d} {r['apply_sum']:4.0f}/{r['apply_max']:<4.0f} {r['prepare_sum']:6.0f} "
@@ -188,7 +199,7 @@ def main(argv):
                 ) + f"; corrections={r.get('mention_correction_n', 0)}")
         print()
         for test in order:
-            rs = [r for r in rows if r["test"] == test and r["journey_ms"] is not None]
+            rs = [r for r in rows if r["test"] == test and qualified_row(r)]
             if not rs:
                 continue
             med = lambda k: statistics.median(r[k] for r in rs)  # noqa: E731
@@ -203,9 +214,11 @@ def main(argv):
                 f"frame P99 med={ms(statistics.median(p99) if p99 else None, 0)}ms "
                 f"worst frame={ms(max(worst) if worst else None, 0, 0)}ms >32ms Σ={sum(r['jank32'] for r in rs)}"
             )
-        return
-    print(json.dumps(analyse(argv[0])))
+        return 0 if rows and all(qualified_row(row) for row in rows) else 1
+    row = analyse(argv[0])
+    print(json.dumps(row))
+    return 0 if qualified_row(row) else 1
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))
