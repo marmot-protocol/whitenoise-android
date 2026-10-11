@@ -109,16 +109,7 @@ private fun maestroFolderRuleMatches(
     val folder = added.singleOrNull()
     val rule = folder?.let { actual.rules[it.id] }
     return if (folder != null && (details != null || rule != null)) {
-        val expectedFolder =
-            ChatFolder(
-                id = folder.id,
-                name = if (details != null) "Maestro saved folder" else "Maestro rules folder",
-                description = details?.description ?: "Maestro rules description",
-                order = (before.folders.maxOfOrNull { it.order } ?: -1) + 1,
-                systemKind = null,
-                showWhenEmpty = details?.showWhenEmpty ?: false,
-                sort = details?.sort ?: ChatFolderSort.RECENT,
-            )
+        val expectedFolder = expectedMaestroFolder(folder.id, before, details)
         val expectedState =
             before.copy(
                 folders = before.folders + expectedFolder,
@@ -142,6 +133,27 @@ private fun maestroFolderRuleMatches(
         false
     }
 }
+
+private fun expectedMaestroFolder(
+    id: String,
+    before: ChatFolderAccountState,
+    details: ExpectedMaestroFolderDetails?,
+): ChatFolder =
+    ChatFolder(
+        id = id,
+        name = if (details != null) "Maestro saved folder" else "Maestro rules folder",
+        description = details?.description ?: "Maestro rules description",
+        order = (before.folders.maxOfOrNull { it.order } ?: -1) + 1,
+        systemKind = null,
+        showWhenEmpty = details?.showWhenEmpty ?: false,
+        sort = details?.sort ?: ChatFolderSort.RECENT,
+    )
+
+internal fun maestroFolderReceiptFlag(
+    postcondition: String?,
+    prefix: String,
+    storeVerified: Boolean,
+): Boolean = postcondition?.startsWith(prefix) == true && storeVerified
 
 private data class ExpectedMaestroFolderDetails(
     val description: String,
