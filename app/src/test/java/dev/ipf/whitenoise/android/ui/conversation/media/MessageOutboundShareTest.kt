@@ -6,14 +6,22 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.DiskByteCacheLease
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +29,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
+import java.io.RandomAccessFile
+import java.nio.file.Files
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -90,6 +101,7 @@ class MessageOutboundShareTest {
         assertEquals(listOf("one.txt", "two.pdf"), sources.map(MessageShareAttachmentSource::fileName))
     }
 
+    /** Staging sanitizes each name and publishes a readable FileProvider stream for every source. */
     @Test
     fun stagingSanitizesNamesAndPublishesEveryReadableFileProviderStream() =
         runTest {
@@ -105,7 +117,7 @@ class MessageOutboundShareTest {
                 )
             val expected = mapOf(0 to "pdf bytes".encodeToByteArray(), 1 to "notes".encodeToByteArray())
 
-            val staged = stageMessageShareStreams(context, sources) { expected.getValue(it.attachmentIndex) }
+            val staged = stageMessageShareStreams(context, sources) { plaintext(expected.getValue(it.attachmentIndex)) }
             val streams = staged.streams
 
             assertEquals(2, streams.size)
@@ -145,9 +157,10 @@ class MessageOutboundShareTest {
 
             val confirmedStreams =
                 stageMessageShareStreams(context, confirmed) { source ->
-                    "bytes ${source.attachmentIndex}".encodeToByteArray()
+                    plaintext("bytes ${source.attachmentIndex}".encodeToByteArray())
                 }.streams
-            val retainedStreams = stageMessageShareStreams(context, retained) { "voice".encodeToByteArray() }.streams
+            val retainedStreams =
+                stageMessageShareStreams(context, retained) { plaintext("voice".encodeToByteArray()) }.streams
 
             assertEquals(listOf("story.pdf", "story.pdf"), confirmedStreams.map { displayName(it.uri) })
             assertEquals(listOf("voice note.m4a"), retainedStreams.map { displayName(it.uri) })
@@ -160,6 +173,7 @@ class MessageOutboundShareTest {
             }
         }
 
+    /** A source that fails to resolve deletes everything already staged for the set. */
     @Test
     fun materializationFailureDeletesPartialPlaintextSet() =
         runTest {
@@ -174,7 +188,7 @@ class MessageOutboundShareTest {
                 runCatching {
                     stageMessageShareStreams(context, sources) {
                         if (it.attachmentIndex == 0) {
-                            "one".encodeToByteArray()
+                            plaintext("one".encodeToByteArray())
                         } else {
                             throw IOException("stale attachment")
                         }
@@ -185,6 +199,7 @@ class MessageOutboundShareTest {
             assertTrue(sharedFiles().isEmpty())
         }
 
+    /** Cancellation while resolving propagates and deletes everything already staged for the set. */
     @Test
     fun cancellationPropagatesAndDeletesPartialPlaintextSet() =
         runTest {
@@ -199,7 +214,7 @@ class MessageOutboundShareTest {
             val observed =
                 runCatching {
                     stageMessageShareStreams(context, sources) {
-                        if (it.attachmentIndex == 0) "one".encodeToByteArray() else throw cancellation
+                        if (it.attachmentIndex == 0) plaintext("one".encodeToByteArray()) else throw cancellation
                     }
                 }.exceptionOrNull()
 
@@ -207,6 +222,7 @@ class MessageOutboundShareTest {
             assertTrue(sharedFiles().isEmpty())
         }
 
+    /** A chooser that fails to launch deletes the completed staged set. */
     @Test
     fun launchFailureDeletesCompletedPlaintextSet() =
         runTest {
@@ -218,7 +234,7 @@ class MessageOutboundShareTest {
                         references = listOf(reference("one.txt", "text/plain")),
                         retained = emptyList(),
                     ),
-                ) { "one".encodeToByteArray() }
+                ) { plaintext("one".encodeToByteArray()) }
 
             val failure =
                 runCatching {
@@ -229,6 +245,7 @@ class MessageOutboundShareTest {
             assertTrue(sharedFiles().isEmpty())
         }
 
+    /** Cancellation while launching the chooser deletes the completed staged set. */
     @Test
     fun launchCancellationDeletesCompletedPlaintextSet() =
         runTest {
@@ -240,7 +257,7 @@ class MessageOutboundShareTest {
                         references = listOf(reference("one.txt", "text/plain")),
                         retained = emptyList(),
                     ),
-                ) { "one".encodeToByteArray() }
+                ) { plaintext("one".encodeToByteArray()) }
             val cancellation = CancellationException("screen closed")
 
             val observed =
@@ -252,12 +269,136 @@ class MessageOutboundShareTest {
             assertTrue(sharedFiles().isEmpty())
         }
 
+    /**
+     * A large attachment's private file lease stages complete under the raised share ceiling, streamed or moved
+     * rather than read into memory, and the lease is released.
+     */
+    @Test
+    fun aLargeLeaseStagesCompleteAndIsReleased() =
+        runTest {
+            clearSharedFiles()
+            val leaseDirectory = File(context.cacheDir, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+            val lease = File(leaseDirectory, "video.lease")
+            val videoBytes = 129L * 1024L * 1024L
+            RandomAccessFile(lease, "rw").use { it.setLength(videoBytes) }
+            val sources =
+                messageShareAttachmentSources(
+                    references = listOf(reference("clip.mp4", "video/mp4")),
+                    retained = emptyList(),
+                )
+
+            val staged =
+                stageMessageShareStreams(context, sources) { AttachmentPlaintext.Lease(DiskByteCacheLease(lease)) }
+
+            assertEquals(videoBytes, sharedFiles().single().length())
+            assertEquals("clip.mp4", displayName(staged.streams.single().uri))
+            assertFalse(lease.exists())
+            staged.deletePlaintext()
+        }
+
+    /** A lease on the shared cache's volume is moved into the share, not copied, so a large file is written once. */
+    @Test
+    fun aLeaseIsMovedIntoTheShareRatherThanCopied() =
+        runTest {
+            clearSharedFiles()
+            val leaseDirectory = File(context.cacheDir, MediaCacheDirs.NATIVE_ATTACHMENT_LEASES).apply { mkdirs() }
+            val lease = File(leaseDirectory, "document.lease").apply { writeBytes("pdf".encodeToByteArray()) }
+            val inode = runCatching { Files.getAttribute(lease.toPath(), "unix:ino") }.getOrNull()
+            assumeTrue(inode != null)
+            val sources =
+                messageShareAttachmentSources(
+                    references = listOf(reference("report.pdf", "application/pdf")),
+                    retained = emptyList(),
+                )
+
+            val staged =
+                stageMessageShareStreams(context, sources) { AttachmentPlaintext.Lease(DiskByteCacheLease(lease)) }
+
+            assertEquals(inode, Files.getAttribute(sharedFiles().single().toPath(), "unix:ino"))
+            staged.deletePlaintext()
+        }
+
+    /** A cancelled Share stops copying a large source at its next chunk and leaves nothing staged. */
+    @Test
+    fun aCancelledShareStopsCopyingAndLeavesNothingStaged() =
+        runBlocking {
+            clearSharedFiles()
+            val sources =
+                messageShareAttachmentSources(
+                    references = listOf(reference("clip.mp4", "video/mp4")),
+                    retained = emptyList(),
+                )
+            val firstChunk = CompletableDeferred<Unit>()
+            var chunks = 0
+            val chunk = ByteArray(64 * 1024)
+            val endless =
+                object : AttachmentPlaintext {
+                    override val size: Long = 64L * 1024L * 1024L
+
+                    override fun copyTo(output: OutputStream) {
+                        repeat((size / chunk.size).toInt()) {
+                            output.write(chunk)
+                            chunks++
+                            firstChunk.complete(Unit)
+                            Thread.sleep(1L)
+                        }
+                    }
+
+                    override fun close() = Unit
+                }
+
+            val share = launch(Dispatchers.Default) { stageMessageShareStreams(context, sources) { endless } }
+            firstChunk.await()
+            share.cancelAndJoin()
+
+            assertTrue(chunks < 1024)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
+    /** Every resolved source is closed, including those staged before a later one fails. */
+    @Test
+    fun everyResolvedSourceIsClosedWhenALaterOneFails() =
+        runTest {
+            clearSharedFiles()
+            val sources =
+                messageShareAttachmentSources(
+                    references = listOf(reference("one.txt", "text/plain"), reference("two.txt", "text/plain")),
+                    retained = emptyList(),
+                )
+            val closed = mutableListOf<Int>()
+
+            val failure =
+                runCatching {
+                    stageMessageShareStreams(context, sources) { source ->
+                        object : AttachmentPlaintext {
+                            override val size: Long = if (source.attachmentIndex == 0) 3L else 4L
+
+                            override fun copyTo(output: OutputStream) {
+                                if (source.attachmentIndex == 1) throw IOException("provider closed")
+                                output.write("one".encodeToByteArray())
+                            }
+
+                            override fun close() {
+                                closed += source.attachmentIndex
+                            }
+                        }
+                    }
+                }.exceptionOrNull()
+
+            assertTrue(failure is IOException)
+            assertEquals(listOf(0, 1), closed)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
     @Test
     fun aggregateShareSizeIsBoundedBeforePublication() {
         val almostFull = OUTBOUND_SHARE_MAX_BYTES - 8L
         assertEquals(OUTBOUND_SHARE_MAX_BYTES, boundedShareTotal(almostFull, 8L))
         assertTrue(runCatching { boundedShareTotal(almostFull, 9L) }.exceptionOrNull() is IOException)
     }
+
+    /** A share source held in memory, as a small attachment's is. */
+    private fun plaintext(bytes: ByteArray): AttachmentPlaintext = AttachmentPlaintext.Bytes(bytes)
 
     private fun reference(
         fileName: String,

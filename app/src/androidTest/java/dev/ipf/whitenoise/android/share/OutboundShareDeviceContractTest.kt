@@ -16,6 +16,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedMessageShareStreams
@@ -120,9 +121,12 @@ class OutboundShareDeviceContractTest {
             try {
                 staged +=
                     stageMessageShareStreams(context, confirmed) { source ->
-                        "sent ${source.attachmentIndex}".encodeToByteArray()
+                        AttachmentPlaintext.Bytes("sent ${source.attachmentIndex}".encodeToByteArray())
                     }
-                staged += stageMessageShareStreams(context, retained) { "voice".encodeToByteArray() }
+                staged +=
+                    stageMessageShareStreams(context, retained) {
+                        AttachmentPlaintext.Bytes("voice".encodeToByteArray())
+                    }
                 val streams = staged.flatMap { it.streams }
 
                 assertEquals(
