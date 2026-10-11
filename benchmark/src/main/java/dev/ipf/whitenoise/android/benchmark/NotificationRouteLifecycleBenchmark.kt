@@ -26,10 +26,17 @@ class NotificationRouteLifecycleBenchmark {
     @get:Rule
     val benchmarkRule = MacrobenchmarkRule()
 
-    /** Process creation is part of the route: the process is killed before every tap. */
+    /**
+     * Process creation is part of the route: the process is killed before every tap. The non-target source
+     * account is restored first on every iteration, because a sample that activated the target account would
+     * otherwise leave the next one measuring an already-active-account route instead of an inactive-account one.
+     */
     @Test
     fun coldProcessFirstConversationFrame() {
-        runJourney(NotificationRouteJourney.COLD_PROCESS) { journeys -> journeys.killAppAndGoHome() }
+        runJourney(NotificationRouteJourney.COLD_PROCESS) { journeys ->
+            journeys.prepareSourceAccountAtHome()
+            journeys.killAppAndGoHome()
+        }
     }
 
     /**
