@@ -29,9 +29,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -222,6 +225,12 @@ internal fun SoleAdminDeletePicker(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = amoledSheetContainerColor(),
+        modifier =
+            if (candidates.isEmpty()) {
+                Modifier.testTag("sole-admin-delete-picker-empty").semantics { testTagsAsResourceId = true }
+            } else {
+                Modifier
+            },
     ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),

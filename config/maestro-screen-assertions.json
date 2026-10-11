@@ -244,7 +244,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
       "symbol": "WhiteNoiseEntityPickerSheet",
-      "bindings": [{"case": "presentation-group-ui-entity-empty","selector": {"text": "Fixture entities"},"scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."},{"case": "presentation-group-ui-entity-disabled","selector": {"text": "Fixture entities"},"scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."},{"case": "presentation-group-ui-entity-select","selector": {"text": "Fixture entities"},"scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."}],
+      "bindings": [{"case": "presentation-group-ui-entity-empty","selector": {"text": "No results"},"scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."},{"case": "presentation-group-ui-entity-disabled","selector": {"text": "Fixture entities"},"scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."},{"case": "presentation-group-ui-entity-select","selector": {"text": "Fixture entities"},"scope": "Actual entity picker renders empty, disabled or selectable state and verifies the selected stable identity; no group membership mutation."}],
       "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {
@@ -694,7 +694,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
       "symbol": "SoleAdminDeletePicker",
-      "bindings": [{"case": "presentation-group-ui-successor-empty","selector": {"text": "Transfer administration"},"scope": "Actual sole-admin handover picker with no successor rows, dismissed without selecting or deleting."}],
+      "bindings": [{"case": "presentation-group-ui-successor-empty","selector": {"id": "sole-admin-delete-picker-empty"},"scope": "Actual sole-admin handover picker with no successor rows, dismissed without selecting or deleting."}],
       "remaining": "Additional native mutations, lifecycle and platform dimensions retain separate proof; this case qualifies only the stated UI and callback boundary."
     },
     {

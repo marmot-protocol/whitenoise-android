@@ -3,6 +3,8 @@ name: presentation-group-ui-successor-empty
 ---
 - assertVisible:
     text: Transfer administration
+- assertVisible:
+    id: sole-admin-delete-picker-empty
 - back
 - assertVisible:
     id: presentation.complete
