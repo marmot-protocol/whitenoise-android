@@ -74,7 +74,9 @@ hold does not prevent revocation or dequeue maintenance; those effects keep
 their own finite budgets and uncertain-write reconciliation guards. Exhausted
 maintenance holds the same operation and exact identity at that generation
 across proof changes and journal reloads. Other operations and identities remain
-eligible for freshly validated cleanup. A new
+eligible for freshly validated cleanup. Confirmed maintenance recovery must match
+the exhausted full identity, including its queue entry; cleanup of another entry
+for the same PR cannot release that exhaustion. A new
 generation only admits recovery of the same PR identity; it never silently
 advances another candidate. After the matching recovery effect is confirmed,
 the historical exhaustion remains as evidence and releases its hold. An attempted,

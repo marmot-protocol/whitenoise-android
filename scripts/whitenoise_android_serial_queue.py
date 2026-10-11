@@ -240,6 +240,8 @@ def exhaustion_unresolved(journal, record):
         and newer['payload']['kind'] == previous['kind']
         and newer['payload']['identity']['number'] == identity['number']
         and newer['payload']['identity']['pull_request_id'] == identity['pull_request_id']
+        and (previous['kind'] not in {'revoke-integration', 'dequeue'}
+             or newer['payload']['identity'] == identity)
         and newer['payload']['generation'] > previous['generation']
         for newer in journal['effects'].values())
 
