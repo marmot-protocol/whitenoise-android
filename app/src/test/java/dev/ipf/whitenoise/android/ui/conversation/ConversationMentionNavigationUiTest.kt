@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -512,10 +512,11 @@ class ConversationMentionNavigationUiTest {
         composeRule.waitUntil { state.awaitingLayout }
         when (action) {
             SuspendedMentionAction.Height -> composeRule.runOnIdle { state.targetHeight = 720 }
-            SuspendedMentionAction.Window -> composeRule.runOnIdle {
-                state.incomingCount++
-                state.headerCount++
-            }
+            SuspendedMentionAction.Window ->
+                composeRule.runOnIdle {
+                    state.incomingCount++
+                    state.headerCount++
+                }
             SuspendedMentionAction.RepeatedTap -> composeRule.onNodeWithTag("mention-jump").performClick()
             SuspendedMentionAction.Drag -> composeRule.onNodeWithTag("mention-list").performTouchInput { swipeUp() }
         }
@@ -591,7 +592,9 @@ class ConversationMentionNavigationUiTest {
     }
 
     /** Mutable controls belong to this one test's composition and never escape to the app. */
-    private class MentionHarnessState(initialHeight: Int) {
+    private class MentionHarnessState(
+        initialHeight: Int,
+    ) {
         /** Holds exactly one layout continuation when a mutation or cancellation case requests it. */
         suspend fun awaitSuspendedLayout(action: SuspendedMentionAction?) {
             if (action != null && !suspensionUsed) {

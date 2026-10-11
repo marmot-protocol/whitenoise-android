@@ -938,20 +938,26 @@ private class RestartingChatListSubscriptions {
     fun hasStarted(index: Int): Boolean = chatListStreams.getOrNull(index)?.nextUpdateStarted?.isCompleted == true
 
     /** Ends the numbered chat-list stream to force a controller reopen. */
-    fun terminate(index: Int, failed: Boolean = false) {
+    fun terminate(
+        index: Int,
+        failed: Boolean = false,
+    ) {
         checkNotNull(chatListStreams.getOrNull(index)).terminate(failed)
     }
 
     /** Ends the paired group stream independently of its chat-list window. */
-    fun terminateChats(index: Int, failed: Boolean = false) {
+    fun terminateChats(
+        index: Int,
+        failed: Boolean = false,
+    ) {
         checkNotNull(chatStreams.getOrNull(index)).terminate(failed)
     }
 
     val activeOpenCount: Int get() = chatListStreams.size
 
     /** Reports paired retirement before the controlled retry deadline is advanced. */
-    fun retired(index: Int): Boolean =
-        chatListStreams.getOrNull(index)?.wasClosed == true && chatStreams.getOrNull(index)?.wasClosed == true
+    fun retired(index: Int): Boolean = chatListStreams.getOrNull(index)?.wasClosed == true &&
+        chatStreams.getOrNull(index)?.wasClosed == true
 
     /** Releases every stream created by this factory. */
     fun closeAll() {
@@ -1139,7 +1145,8 @@ private fun awaitControlledChatList(
     scheduler: TestCoroutineScheduler,
     condition: () -> Boolean,
 ) {
-    val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+    val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS
+        .toNanos(5)
     while (System.nanoTime() < deadline) {
         scheduler.runCurrent()
         shadowOf(Looper.getMainLooper()).idle()

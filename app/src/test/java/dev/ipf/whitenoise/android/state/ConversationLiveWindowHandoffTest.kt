@@ -157,7 +157,8 @@ class ConversationLiveWindowHandoffTest {
             controller.start()
             try {
                 awaitAdvancingTimelineClock {
-                    rosterStarted.isCompleted && timeline.windowEndObserved.isCompleted &&
+                    rosterStarted.isCompleted &&
+                        timeline.windowEndObserved.isCompleted &&
                         (!finalWindow || ConversationTimelineTestIds.MESSAGE_B in timelineMessageIds(controller))
                 }
                 assertEquals(
