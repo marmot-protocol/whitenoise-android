@@ -54,6 +54,10 @@ private val MAESTRO_POSTCONDITIONS =
         "language-system",
         "folder-saved",
         "folder-absent",
+        "folder-details-absent",
+        "folder-details-saved",
+        "folder-details-cleared",
+        "folder-details-unread",
         "poll-no-vote",
         "poll-single-vote",
         "poll-change-vote",
@@ -329,6 +333,13 @@ class MaestroRuntimeHostTest {
                     )
                 val presentationVerification =
                     withContext(Dispatchers.Main) { presentation?.verify() ?: JSONObject.NULL }
+                val folderStoreVerified =
+                    verifyMaestroFolderRules(
+                        context,
+                        checkNotNull(state),
+                        checkNotNull(editorBaselines).folderRules,
+                        postcondition,
+                    )
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
@@ -362,12 +373,10 @@ class MaestroRuntimeHostTest {
                             verifyMaestroSpeechRate(context, checkNotNull(state), postcondition),
                         ).put(
                             "smartFolderRuleVerified",
-                            verifyMaestroFolderRules(
-                                context,
-                                checkNotNull(state),
-                                checkNotNull(editorBaselines).folderRules,
-                                postcondition,
-                            ),
+                            postcondition.startsWith("smart-rule-") && folderStoreVerified,
+                        ).put(
+                            "folderDetailsVerified",
+                            postcondition.startsWith("folder-details-") && folderStoreVerified,
                         ).put(
                             "shareImportVerified",
                             verifyMaestroInboundShare(
@@ -456,7 +465,9 @@ class MaestroRuntimeHostTest {
         if (postcondition.startsWith("consent-")) {
             verifyMaestroConsent(native, checkNotNull(state), postcondition)
         }
-        if (postcondition.startsWith("folder-")) verifyMaestroFolder(checkNotNull(state), postcondition)
+        if (postcondition == "folder-saved" || postcondition == "folder-absent") {
+            verifyMaestroFolder(checkNotNull(state), postcondition)
+        }
         if (postcondition.startsWith("message-")) {
             verifyMaestroMessageMutation(native, checkNotNull(state), postcondition, checkNotNull(messageBaseline))
         }

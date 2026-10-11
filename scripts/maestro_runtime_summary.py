@@ -123,6 +123,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'].startswith('smart-rule-')
                         and read_json(leaf / 'verified.json').get('smartFolderRuleVerified') is not True):
                     raise ValueError('Persisted smart-folder rules were not verified')
+                if (CASES[name]['postcondition'].startswith('folder-details-')
+                        and read_json(leaf / 'verified.json').get('folderDetailsVerified') is not True):
+                    raise ValueError('Persisted folder metadata and account isolation were not verified')
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and read_json(leaf / 'verified.json').get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')

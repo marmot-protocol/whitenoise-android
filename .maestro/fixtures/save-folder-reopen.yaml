@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: save-folder-reopen
+---
+- tapOn:
+    id: folder.save
+- assertVisible:
+    id: chat-folders-content
+- assertVisible: Maestro saved folder
+- tapOn: Maestro saved folder
+- assertVisible:
+    id: folder.name
+    text: Maestro saved folder

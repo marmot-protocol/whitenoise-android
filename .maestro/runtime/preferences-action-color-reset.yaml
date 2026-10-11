@@ -13,7 +13,7 @@ name: preferences-action-color-reset
 - eraseText: 100
 - assertNotVisible:
     id: color.hex
-    text: .+
+    text: '^\#171717$'
 - inputText: '#12ab34'
 - assertVisible:
     id: color.hex

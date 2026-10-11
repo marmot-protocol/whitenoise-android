@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-included-chat-discard
+---
+- runFlow: ../fixtures/new-folder-editor.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.includedChats
+    direction: DOWN
+- tapOn:
+    id: folder.includedChats
+- assertVisible: Included Chats
+- tapOn: Maestro group
+- assertVisible:
+    checked: true
+    containsChild:
+      text: Maestro group
+- back
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP
+- assertVisible:
+    id: folder.name
+- back
+- assertVisible: Discard changes[?]
+- tapOn: Discard Changes
+- assertVisible:
+    id: chat-folders-content

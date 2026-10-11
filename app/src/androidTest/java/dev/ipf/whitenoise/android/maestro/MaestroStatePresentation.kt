@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.state.WipeFailureItem
 import dev.ipf.whitenoise.android.state.WipeReport
 import dev.ipf.whitenoise.android.state.WipeStage
 import dev.ipf.whitenoise.android.state.WipeStageReport
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerLoadFailed
 import dev.ipf.whitenoise.android.ui.group.ConversationNotificationCategoriesList
 import dev.ipf.whitenoise.android.ui.settings.BugReportContent
 import dev.ipf.whitenoise.android.ui.settings.ConversationFixtureSeedDialog
@@ -21,6 +22,7 @@ import dev.ipf.whitenoise.android.ui.settings.WipeProgressSheet
 @Suppress("FunctionNaming")
 internal fun MaestroStatePresentation(fixture: MaestroPresentationFixture) {
     when {
+        fixture.scenario == "extra-viewer-retry" -> MediaViewerLoadFailed(onRetry = { fixture.finish("retry") })
         fixture.scenario == "extra-wait-signout" -> SignOutProgressDialog()
         fixture.scenario == "extra-wait-wipe" -> WipeProgressSheet()
         fixture.scenario.startsWith("extra-help-") ->

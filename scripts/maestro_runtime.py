@@ -261,6 +261,9 @@ def run_fixture(name, directory, generation):
                 if (CASES[name]['postcondition'].startswith('smart-rule-')
                         and verified.get('smartFolderRuleVerified') is not True):
                     raise ValueError('Persisted smart-folder rules were not verified')
+                if (CASES[name]['postcondition'].startswith('folder-details-')
+                        and verified.get('folderDetailsVerified') is not True):
+                    raise ValueError('Persisted folder metadata and account isolation were not verified')
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and verified.get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')

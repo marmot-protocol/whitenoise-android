@@ -13,7 +13,7 @@ name: preferences-action-color-invalid
 - eraseText: 100
 - assertNotVisible:
     id: color.hex
-    text: .+
+    text: '^\#171717$'
 - inputText: '12'
 - assertVisible:
     id: color.hex
@@ -32,7 +32,7 @@ name: preferences-action-color-invalid
 - eraseText: 100
 - assertNotVisible:
     id: color.hex
-    text: .+
+    text: '^12$'
 - inputText: '1234567'
 - assertVisible:
     id: color.hex
@@ -51,7 +51,7 @@ name: preferences-action-color-invalid
 - eraseText: 100
 - assertNotVisible:
     id: color.hex
-    text: .+
+    text: '^1234567$'
 - inputText: GGGGGG
 - assertVisible:
     id: color.hex
@@ -74,7 +74,7 @@ name: preferences-action-color-invalid
 - eraseText: 100
 - assertNotVisible:
     id: color.hex
-    text: .+
+    text: '^GGGGGG$'
 - inputText: '#12ab34'
 - assertVisible:
     id: color.hex

@@ -312,6 +312,29 @@ class CampaignSummaryTest(unittest.TestCase):
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
 
+    def test_folder_metadata_requires_typed_full_store_and_account_isolation_proof(self):
+        """Visible metadata/reopen success must not qualify a missing or generic native receipt."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            name = runtime.case_selection('navigation', 1)[0]
+            path = leaves[0] / 'verified.json'
+            original = json.loads(path.read_text())
+            for post in ('folder-details-absent', 'folder-details-saved',
+                         'folder-details-cleared', 'folder-details-unread'):
+                with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': post}}):
+                    for proof in (None, False, 1, 'true', True):
+                        with self.subTest(postcondition=post, proof=proof):
+                            record = {**original}
+                            if proof is not None:
+                                record['folderDetailsVerified'] = proof
+                            path.write_text(json.dumps(record))
+                            result = self.result(root)
+                            self.assertEqual(result['evidence_complete'], proof is True)
+                            if proof is not True:
+                                self.assertIn('folder metadata', result['results'][0]['failure'])
+                                self.assertEqual(result['passed_count'], self.case_count() - 1)
+
     def test_generic_native_success_cannot_certify_unchanged_relay_lists(self):
         """Relay cancellation must compare all native account projections before it qualifies."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -710,6 +733,34 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     if selector.get('containsChild') == {'text': '^Share$'}:
                         checked += 1
         self.assertGreater(checked, 30)
+
+    def test_color_clear_checks_do_not_match_the_persistent_input_label(self):
+        """Regress the captured empty hex field: its child label matches a broad nonempty regex."""
+        capture = json.loads((runtime.ROOT / 'scripts/test-fixtures/'
+                              'maestro-2.11.0-empty-color-field.json').read_text())
+        node = capture['node']
+        self.assertEqual(node['attributes']['resource-id'], 'color.hex')
+        self.assertNotIn('text', node['attributes'])
+        label = node['children'][0]['attributes']['text']
+        self.assertEqual(label, 'Hex color')
+        self.assertIsNotNone(re.fullmatch('.+', label))
+        checked = 0
+        for path in (runtime.ROOT / '.maestro/runtime').glob('preferences-action-color-*.yaml'):
+            commands = list(yaml.safe_load_all(path.read_text()))[1]
+            for i, command in enumerate(commands):
+                selector = command.get('assertNotVisible', {}) if isinstance(command, dict) else {}
+                if isinstance(selector, dict) and selector.get('id') == 'color.hex':
+                    pattern = selector['text']
+                    self.assertIsNone(re.fullmatch(pattern, label))
+                    self.assertTrue(pattern.startswith('^') and pattern.endswith('$'))
+                    self.assertIn('inputText', commands[i + 1])
+                    entered = commands[i + 1]['inputText']
+                    replacement = commands[i + 2]['assertVisible']
+                    self.assertEqual(replacement['id'], 'color.hex')
+                    self.assertIsNotNone(re.fullmatch(replacement['text'], entered))
+                    self.assertIsNone(re.fullmatch(replacement['text'], entered + 'suffix'))
+                    checked += 1
+        self.assertEqual(checked, 8)
 
     def test_editor_controls_are_scrolled_into_view_before_tapping(self):
         """A tag or label elsewhere in a scrollable screen is not proof its control can be tapped."""
@@ -1743,6 +1794,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
                             self.assertIn((path.name, node['id']), {
                                 ('select-library-mode.yaml', 'global.library.mode.${LIBRARY_KIND}'),
                                 ('select-library-messages.yaml', 'global.library.mode.Messages'),
+                                ('folder-details-draft.yaml', 'folder.showWhenEmpty'),
                             })
                         else:
                             self.assertTrue(node.get('containsChild', {}).get('text'), path.name)
@@ -1750,6 +1802,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertGreaterEqual(checked, 10)
         source = (runtime.ROOT / 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt').read_text()
         self.assertIn('modifier = Modifier.testTag("privacy.device_authentication"),', source)
+        folder_source = (runtime.ROOT / 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt').read_text()
+        self.assertRegex(folder_source, r'SettingsSwitch\([\s\S]*?checked = state.showWhenEmpty,[\s\S]*?modifier = Modifier.testTag\("folder.showWhenEmpty"\)')
 
     def test_public_key_copy_flows_use_acknowledged_real_controls_and_keep_private_key_hidden(self):
         """Regress copy/account/lifecycle routes without crediting the raw-key or external-share criteria."""

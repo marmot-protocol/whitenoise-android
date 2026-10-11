@@ -1,0 +1,31 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folder-details-draft
+---
+- runFlow: new-folder-editor.yaml
+- tapOn:
+    id: folder.name
+- inputText: Maestro saved folder
+- hideKeyboard
+- runFlow: reveal-folder-description.yaml
+- tapOn:
+    id: folder.description
+- inputText: Maestro folder note
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: folder.showWhenEmpty
+    direction: DOWN
+- assertVisible:
+    id: folder.showWhenEmpty
+    checked: false
+- tapOn:
+    id: folder.showWhenEmpty
+- assertVisible:
+    id: folder.showWhenEmpty
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: folder.sort.NAME
+    direction: DOWN
+- tapOn:
+    id: folder.sort.NAME

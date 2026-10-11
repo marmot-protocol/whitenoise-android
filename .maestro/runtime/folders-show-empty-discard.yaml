@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-show-empty-discard
+---
+- runFlow: ../fixtures/new-folder-editor.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.showWhenEmpty
+    direction: DOWN
+- assertVisible:
+    id: folder.showWhenEmpty
+    checked: false
+- tapOn:
+    id: folder.showWhenEmpty
+- assertVisible:
+    id: folder.showWhenEmpty
+    checked: true
+- back
+- assertVisible: Discard changes[?]
+- tapOn: Discard Changes
+- assertVisible:
+    id: chat-folders-content

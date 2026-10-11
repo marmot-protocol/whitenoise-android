@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: new-folder-editor
+---
+- runFlow: runtime-ready.yaml
+- runFlow: open-settings.yaml
+- scrollUntilVisible:
+    element:
+      text: Folders
+    direction: DOWN
+- tapOn: Folders
+- assertVisible:
+    id: chat-folders-content
+- tapOn: New Folder
+- assertVisible:
+    id: folder.name

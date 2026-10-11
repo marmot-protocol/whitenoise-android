@@ -13,7 +13,7 @@ name: preferences-action-color-cancel
 - eraseText: 100
 - assertNotVisible:
     id: color.hex
-    text: .+
+    text: '^\#171717$'
 - inputText: '#12ab34'
 - assertVisible:
     id: color.hex
@@ -48,7 +48,7 @@ name: preferences-action-color-cancel
 - eraseText: 100
 - assertNotVisible:
     id: color.hex
-    text: .+
+    text: '^\#12AB34$'
 - inputText: '#ab1234'
 - assertVisible:
     id: color.hex
