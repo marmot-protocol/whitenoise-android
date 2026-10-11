@@ -117,5 +117,8 @@ class ConversationUiTraceTest {
     }
 
     /** Excludes framework tracing so assertions concern only this closed transcript vocabulary. */
-    private fun uiSections(): List<String> = ShadowTrace.getPreviousSections().filter { it.startsWith("WhiteNoise.conversation.") }
+    private fun uiSections(): List<String> =
+        ShadowTrace.getPreviousSections().filter {
+            it.startsWith("WhiteNoise.conversation.")
+        }
 }
