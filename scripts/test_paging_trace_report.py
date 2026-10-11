@@ -101,6 +101,9 @@ class MentionTraceReportTest(unittest.TestCase):
             ("Choreographer#doFrame 2", 200, 50, 1, 0),
             ("Choreographer#doFrame 3", 450, 90, 1, 0),
             ("Choreographer#doFrame 4", 200, 800, 2, 0),
+            ("Choreographer#doFrame endsAtTap", 60, 40, 1, 0),
+            ("Choreographer#doFrame startsAtLanding", 400, 100, 1, 0),
+            ("Choreographer#doFrame zeroDuration", 200, 0, 1, 0),
         ])
         self.db.executemany("insert into process_slice values(?,?,?,?,?)", [
             ("WhiteNoise.conversation.mention.total", 100, 800, self.report.PKG, 1),

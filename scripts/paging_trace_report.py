@@ -121,7 +121,7 @@ def analyse(path):
     frame_start = ts if motion_start is None else motion_start
     frame_end = ts + dur if motion_end is None else motion_end
     frame_win = (
-        f"s.ts<={frame_end} and s.ts+s.dur>={frame_start} and s.dur>=0"
+        f"s.ts<{frame_end} and s.ts+s.dur>{frame_start} and s.dur>0"
         if motion_start is not None else f"s.ts>={ts} and s.ts<={ts + dur}"
     )
     running_sum = (
