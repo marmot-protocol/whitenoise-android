@@ -71,6 +71,8 @@ internal data class ConversationNotificationLandingCallbacks(
     val beginNavigation: () -> MessageTargetNavigationOwner.Request = { MessageTargetNavigationOwner().begin() },
     val onLanded: (backlogMessageId: String?) -> Unit = {},
     val onUnavailable: (MessageAvailability) -> Unit = {},
+    /** A height the screen measured earlier for a message that is not laid out yet, which sizes the first write. */
+    val cachedItemHeightPx: (messageId: String) -> Int? = { null },
 )
 
 /** The message a notification tap resolves to, or why the ordinary entry must keep the position. */
@@ -159,15 +161,6 @@ internal fun ConversationUnreadJumpState.seedBacklogAfterLanding(backlogId: Stri
     } else {
         ConversationUnreadJumpState(pendingMessageId = backlogId, unreadStackActive = true, initialized = true)
     }
-
-/** The signed reverse-list geometry a reading-start settle reads: the clear viewport end and the row's height. */
-internal fun ConversationTimelineViewport.readingStartLayout(index: Int): ConversationMentionJumpLayout {
-    val layout = readingLayoutInfo()
-    return ConversationMentionJumpLayout(
-        viewportEndOffsetPx = layout.viewportEndOffset,
-        itemHeightPx = layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-    )
-}
 
 /**
  * One entry's initial positioning: the notified message's beginning when a verified card target is
@@ -275,7 +268,13 @@ internal class ConversationEntryPositioning(
         val probe =
             ConversationReadingStartProbe(
                 resolveTargetIndex = { callbacks.navigation.resolveAnchor(position.anchor) },
-                readLayout = viewport::readingStartLayout,
+                readLayout = { index ->
+                    viewport.readingStartLayout(
+                        index = index,
+                        isNewest = index == controller.conversationTrailingRowCount(renderedTimeline().size),
+                        cachedItemHeightPx = position.anchor.messageId?.let(callbacks.notification.cachedItemHeightPx),
+                    )
+                },
                 traceSections = false,
             )
         val captureLayout = { viewport.initialAnchorLayout(position.index) }

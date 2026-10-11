@@ -34,6 +34,30 @@ internal data class ConversationMentionJumpLayout(
         get() = ReplyNavigation.readingStartScrollOffset(viewportEndOffsetPx, itemHeightPx ?: estimatedItemHeightPx)
 }
 
+/**
+ * The complete measured geometry a reading-start settle needs for [index]: the clear viewport end, the row's size
+ * and offset, and the tail extent that decides how much scroll runway to reserve. The mention button and the
+ * notification landing both read it here, so a short newest row is reserved and validated against its physical
+ * coordinate the same way for both. [cachedItemHeightPx] is a height seen earlier for an unmeasured row.
+ */
+internal fun ConversationTimelineViewport.readingStartLayout(
+    index: Int,
+    isNewest: Boolean,
+    cachedItemHeightPx: Int? = null,
+): ConversationMentionJumpLayout {
+    val layout = readingLayoutInfo()
+    val row = layout.visibleItemsInfo.firstOrNull { it.index == index }
+    return ConversationMentionJumpLayout(
+        viewportEndOffsetPx = layout.viewportEndOffset,
+        itemHeightPx = row?.size,
+        estimatedItemHeightPx =
+            cachedItemHeightPx ?: ReplyNavigation.estimateItemHeightPx(layout.visibleItemsInfo.map { it.size }),
+        isNewest = isNewest,
+        itemOffsetPx = row?.offset,
+        tailContentHeightPx = tailContentHeightPx(index),
+    )
+}
+
 /** The reversed-list write that put one message's reading start at the top of the clear viewport. */
 internal data class ConversationReadingStartPlacement(
     val index: Int,

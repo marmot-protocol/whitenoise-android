@@ -2426,22 +2426,12 @@ internal fun ConversationScreen(
     fun mentionJumpLayout(
         targetMessageId: String,
         index: Int,
-    ): ConversationMentionJumpLayout {
-        val layout = timelineViewport.readingLayoutInfo()
-        return ConversationMentionJumpLayout(
-            viewportEndOffsetPx = layout.viewportEndOffset,
-            itemHeightPx =
-                layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-            estimatedItemHeightPx =
-                navigationState.timelineItemHeightsPx[targetMessageId]
-                    ?: ReplyNavigation.estimateItemHeightPx(
-                        layout.visibleItemsInfo.map { it.size },
-                    ),
+    ): ConversationMentionJumpLayout =
+        timelineViewport.readingStartLayout(
+            index = index,
             isNewest = index == controller.conversationTrailingRowCount(renderedTimeline.size),
-            itemOffsetPx = layout.visibleItemsInfo.firstOrNull { it.index == index }?.offset,
-            tailContentHeightPx = listState.layoutInfo.mentionTailContentHeightPx(index),
+            cachedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
         )
-    }
 
     fun jumpToNextUnreadMention() {
         val targetMessageId = unreadMentionMessageIds.firstOrNull() ?: return
@@ -3122,6 +3112,7 @@ internal fun ConversationScreen(
                         onUnavailable = { availability ->
                             appState.present(notificationLandingFeedback(availability))
                         },
+                        cachedItemHeightPx = { messageId -> navigationState.timelineItemHeightsPx[messageId] },
                     ),
             ),
     )

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -11,6 +12,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -101,6 +105,31 @@ class ConversationNotificationLandingTest {
         harness.mount()
         harness.awaitAnchored()
         harness.assertLandedAtTop(NOTIFIED)
+    }
+
+    /**
+     * The newest message has no rows below it, so a short one cannot scroll to the top on its own. The landing
+     * reserves the missing runway the way the mention button does, instead of accepting the clamped position
+     * beside the composer.
+     */
+    @Test
+    fun aShortNewestNotifiedMessageStartsAtThePhysicalTop() {
+        val newest = messageId(MESSAGE_COUNT - 1)
+        val harness = Harness(targetHeightDp = 80, notified = newest)
+        harness.mount()
+        harness.awaitAnchored()
+        harness.assertLandedAtTop(newest)
+        assertNotNull(harness.coordinator.mentionReadingRowHeightPx)
+    }
+
+    /** A short message with only one short row below it still lacks the runway to reach the top unaided. */
+    @Test
+    fun aShortSecondNewestNotifiedMessageStartsAtThePhysicalTop() {
+        val secondNewest = messageId(MESSAGE_COUNT - 2)
+        val harness = Harness(targetHeightDp = 80, notified = secondNewest)
+        harness.mount()
+        harness.awaitAnchored()
+        harness.assertLandedAtTop(secondNewest)
     }
 
     /** A message taller than the viewport lands at its beginning, where offset zero would show its end. */
@@ -408,11 +437,26 @@ class ConversationNotificationLandingTest {
                         val gate = remember(listState) { ConversationPostInitialReanchorGate() }
                         owner = rememberConversationViewportRestorationOwner(controller, coordinator, gate)
                         val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+                        val density = LocalDensity.current
+                        val reserve by remember(coordinator, viewport, density) {
+                            derivedStateOf {
+                                coordinator.mentionReadingRowHeightPx?.let { rowHeightPx ->
+                                    with(density) {
+                                        conversationMentionReadingReservePx(
+                                            readingHeightPx = viewport.readingHeightPx(),
+                                            basePaddingPx = 0,
+                                            rowHeightPx = rowHeightPx,
+                                        ).toDp()
+                                    }
+                                } ?: 0.dp
+                            }
+                        }
                         Box(Modifier.fillMaxWidth().height(viewportHeightDp.dp)) {
                             LazyColumn(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize().testTag(LIST_TAG),
                                 reverseLayout = true,
+                                contentPadding = PaddingValues(bottom = reserve),
                             ) {
                                 items(rendered.asReversed(), key = { it.presentationId }) { item ->
                                     Row(item.record.messageIdHex)

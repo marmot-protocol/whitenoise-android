@@ -100,6 +100,12 @@ internal class ConversationTimelineViewport(
     /** Returns the clear measured height consumed by native centering, tail, selection and speech owners. */
     fun readingHeightPx(): Int = readingLayoutInfo().viewportSize.height
 
+    /**
+     * The measured extent from the newest row through [index], counting structural rows and spacing even beneath
+     * composer occlusion, so it reads the native layout rather than the reading layout.
+     */
+    fun tailContentHeightPx(index: Int): Int? = listState.layoutInfo.mentionTailContentHeightPx(index)
+
     /** Stores actual list coordinates; this never modifies or substitutes the native list's physical bounds. */
     fun onPaintViewportMeasured(coordinates: LayoutCoordinates) {
         val position = coordinates.positionInWindow()
