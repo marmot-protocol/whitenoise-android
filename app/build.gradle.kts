@@ -273,6 +273,8 @@ val previewProviderMatrixBuild =
 // A fixed preview-only code therefore lets a tester move between any two PR
 // builds without uninstalling and losing the preview app's data.
 val prPreviewVersionCode = 2_000_000_000
+val startupDiagnosticsRequested = providers.gradleProperty("startupDiagnostics").orNull == "true"
+
 val buildShortSha =
     System.getenv("PREVIEW_HEAD_SHA")?.take(7)
         ?: System.getenv("GITHUB_SHA")?.take(7)
@@ -306,6 +308,8 @@ android {
         // override this below; runtime collection still requires explicit opt-in.
         buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "false")
         buildConfigField("String", "APP_SHORT_SHA", buildShortSha.asBuildConfigString())
+        buildConfigField("boolean", "STARTUP_DIAGNOSTICS_ENABLED", "false")
+        buildConfigField("String", "MARMOT_SOURCE_SHA", requiredMarmotKitProperty("mdk-sha").asBuildConfigString())
         buildConfigField(
             "String",
             "MDK_SHORT_SHA",
@@ -340,6 +344,7 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
+            buildConfigField("boolean", "STARTUP_DIAGNOSTICS_ENABLED", startupDiagnosticsRequested.toString())
             manifestPlaceholders["appName"] = "White Noise Dev"
             manifestPlaceholders["deepLinkScheme"] = "whitenoise-dev"
             buildConfigField("String", "WHITENOISE_DEEP_LINK_SCHEME", "whitenoise-dev".asBuildConfigString())
@@ -490,7 +495,8 @@ android {
             // Every master merge produces a staging APK. Keep the production
             // release version stable while making the installed staging build
             // identifiable from Settings and Android package metadata.
-            versionNameSuffix = "-staging-$buildShortSha"
+            versionNameSuffix = "-staging-$buildShortSha" + if (startupDiagnosticsRequested) "-startup-diagnostics" else ""
+            buildConfigField("boolean", "STARTUP_DIAGNOSTICS_ENABLED", startupDiagnosticsRequested.toString())
             if (hasStagingReleaseSigning) {
                 signingConfig = signingConfigs.getByName("stagingRelease")
             }

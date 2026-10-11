@@ -98,6 +98,36 @@ class StartupRecoveryPresentationTest {
         composeRule.onNodeWithText("Starting White Noise…").assertExists()
     }
 
+    /** Sharing is a separate explicit action and cannot retry or alter the supplied error. */
+    @Test fun diagnosticShareRequiresATapAndDoesNotRetryBootstrap() {
+        var shares = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                StartupFailureScreen(
+                    title = "White Noise couldn't start",
+                    error =
+                        ErrorPresentation(
+                            AppText.Plain("Startup is taking longer than expected."),
+                            "operation=APP_BOOTSTRAP_TIMEOUT",
+                        ),
+                    onShareDiagnostics = { shares++ },
+                    onRetry = { retries++ },
+                )
+            }
+        }
+        assertEquals(0, shares)
+        composeRule.onNodeWithTag(STARTUP_SHARE_TEST_TAG).performClick()
+        assertEquals(1, shares)
+        assertEquals(0, retries)
+        composeRule.onNodeWithTag(STARTUP_FAILURE_TEST_TAG).assertExists()
+    }
+
+    /** Normal builds retain their existing Retry/Copy geometry without an unavailable export action. */
+    @Test fun ordinaryRecoveryDoesNotOfferStartupDiagnostics() {
+        show(ErrorPresentation(AppText.Plain("Safe failure"), "operation=APP_BOOTSTRAP"))
+        composeRule.onNodeWithTag(STARTUP_SHARE_TEST_TAG).assertDoesNotExist()
+    }
+
     /** Uses only native error presentation input; choosing a profile is intentionally not invented here. */
     private fun show(
         error: ErrorPresentation,

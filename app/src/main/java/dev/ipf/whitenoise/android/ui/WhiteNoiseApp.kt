@@ -45,9 +45,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
+import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.shareStartupDiagnostics
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -255,6 +259,7 @@ internal fun WhiteNoiseApp(
     val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val shareImport =
         dev.ipf.whitenoise.android.share.rememberInboundShareImport(
             context,
@@ -717,6 +722,23 @@ internal fun WhiteNoiseApp(
                                             StartupFailureScreen(
                                                 title = stringResource(R.string.white_noise_couldnt_start),
                                                 error = phase.error,
+                                                onShareDiagnostics =
+                                                    if (StartupDiagnostics.enabled) {
+                                                        {
+                                                            scope.launch {
+                                                                shareStartupDiagnostics(context) {
+                                                                    val resumed =
+                                                                        lifecycleOwner.lifecycle.currentState
+                                                                            .isAtLeast(Lifecycle.State.RESUMED)
+                                                                    resumed &&
+                                                                        appState.phase == phase &&
+                                                                        !appState.appLockScreenVisible
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        null
+                                                    },
                                                 onRetry = { scope.launch { appState.retryBootstrap() } },
                                             )
                                         }

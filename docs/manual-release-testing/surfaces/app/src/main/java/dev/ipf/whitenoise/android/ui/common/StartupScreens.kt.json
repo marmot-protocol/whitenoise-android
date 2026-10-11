@@ -9,7 +9,8 @@
         "anchor": "fun StartupFailureScreen(",
         "test_ids": [
           "INT-003",
-          "INT-004"
+          "INT-004",
+          "INT-012"
         ]
       },
       {
@@ -82,6 +83,22 @@
         "surface": "R.string.white_noise_couldnt_start",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
         "anchor": "R.string.white_noise_couldnt_start",
+        "test_ids": [
+          "INT-012"
+        ]
+      },
+      {
+        "surface": "R.string.startup_diagnostics_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.startup_diagnostics_share",
+        "test_ids": [
+          "INT-012"
+        ]
+      },
+      {
+        "surface": "R.string.startup_diagnostics_share_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+        "anchor": "R.string.startup_diagnostics_share_notice",
         "test_ids": [
           "INT-012"
         ]

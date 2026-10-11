@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="startup_diagnostics_share">Condividi diagnostica di avvio</string>
+    <string name="startup_diagnostics_share_failed">Impossibile condividere la diagnostica. Usa Copia per inviare il rapporto di errore.</string>
+    <string name="startup_diagnostics_share_notice">Include fasi di avvio, tempi e informazioni sulla build. Nessun messaggio o dettaglio dell’account.</string>
+</resources>

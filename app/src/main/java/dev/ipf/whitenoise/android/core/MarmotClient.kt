@@ -6,6 +6,8 @@ import dev.ipf.marmotkit.CursorPersistenceFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
+import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
+import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
@@ -23,7 +25,9 @@ class MarmotClient(
     relayUrls: List<String> = bootstrapRelays,
 ) {
     init {
-        MarmotAndroid.initialize(context.applicationContext)
+        StartupDiagnostics.measure(StartupDiagnosticStage.NATIVE_INITIALIZE) {
+            MarmotAndroid.initialize(context.applicationContext)
+        }
     }
 
     val rootPath: String =
@@ -32,16 +36,18 @@ class MarmotClient(
             .absolutePath
 
     val marmot: Marmot =
-        Marmot.newWithConfiguration(
-            rootPath = rootPath,
-            relayUrls = relayUrls,
-            options =
-                MarmotOptions(
-                    clientName = CLIENT_NAME,
-                    cursorPersistence = CursorPersistenceFfi.ADVANCE,
-                    attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
-                ),
-        )
+        StartupDiagnostics.measure(StartupDiagnosticStage.NATIVE_CONSTRUCT) {
+            Marmot.newWithConfiguration(
+                rootPath = rootPath,
+                relayUrls = relayUrls,
+                options =
+                    MarmotOptions(
+                        clientName = CLIENT_NAME,
+                        cursorPersistence = CursorPersistenceFfi.ADVANCE,
+                        attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
+                    ),
+            )
+        }
 
     companion object {
         private const val CLIENT_NAME = "White Noise Android"

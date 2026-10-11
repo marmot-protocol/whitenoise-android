@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="startup_diagnostics_share">Compartir diagnóstico de inicio</string>
+    <string name="startup_diagnostics_share_failed">No se pudo compartir el diagnóstico. Usa Copiar para enviar el informe de error.</string>
+    <string name="startup_diagnostics_share_notice">Incluye etapas de inicio, tiempos e información de la compilación. Sin mensajes ni detalles de la cuenta.</string>
+</resources>

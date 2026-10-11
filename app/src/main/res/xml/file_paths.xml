@@ -8,6 +8,7 @@
     <cache-path name="notification_emoji" path="notification_emoji/" />
     <!-- User-initiated, read-only forensic audit exports. -->
     <cache-path name="audit_logs" path="audit_logs/" />
+    <cache-path name="startup_diagnostics" path="startup_diagnostics/" />
     <cache-path name="transcripts" path="transcripts/" />
     <cache-path name="video_attachments" path="video_attachments/" />
     <!-- Signed APKs downloaded for in-app self-update (Zapstore flavor only). -->

@@ -106,6 +106,8 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
+import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
+import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
 import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
@@ -4778,6 +4780,7 @@ class WhiteNoiseAppState private constructor(
                                 operationCode = "APP_BOOTSTRAP_TIMEOUT",
                                 throwable = IllegalStateException("bootstrap stage exceeded deadline"),
                                 message = AppText.Resource(R.string.startup_taking_too_long),
+                                technicalDetail = StartupDiagnostics.timeoutDetail(),
                             ),
                         )
                 }
@@ -4799,9 +4802,11 @@ class WhiteNoiseAppState private constructor(
         bootstrap()
     }
 
+    /** Owns one bootstrap through native start and local activation; diagnostic observations never retry it. */
     private suspend fun bootstrapLocked() {
         try {
             if (resumeCompletedBootstrap()) return
+            StartupDiagnostics.beginAttempt()
             startupPerformance.stage(PerformancePhase.NOTIFICATION_PLATFORM_SETUP) {
                 // Tray readiness must precede Marmot.start(): the passive MDK
                 // broadcast has no replay once the startup receiver attaches.
@@ -4812,10 +4817,7 @@ class WhiteNoiseAppState private constructor(
             }
             startBootstrapRuntime()
             val refreshedAccounts = startupPerformance.stage(PerformancePhase.ACCOUNT_REFRESH, ::refreshAccountSnapshot)
-            schedulePendingLocalGroupDeleteCleanup()
-            prepareStartupUnreadRefresh(refreshedAccounts)
-            migrateLegacyDrafts()
-            migrateLegacyMutePreferences()
+            restoreStartupLocalState(refreshedAccounts)
             // Resolve interrupted editor commits against MDK before any draft
             // is reopened, and reclaim encrypted sources with no live session.
             startupPerformance.stage(PerformancePhase.DRAFT_RECONCILIATION) {
@@ -4866,13 +4868,26 @@ class WhiteNoiseAppState private constructor(
             if (error is CancellationException) {
                 // The process-owned listener keeps retrying independently, but
                 // a cancelled UI bootstrap must not strand the splash forever.
-                phase = AppPhase.Failed(privacySafeErrorPresentation("APP_BOOTSTRAP", error))
+                phase = AppPhase.Failed(bootstrapFailure(error))
                 throw error
             }
             appStateDebug(error) { "bootstrap failed: ${error.readableMessage()}" }
-            phase = AppPhase.Failed(privacySafeErrorPresentation("APP_BOOTSTRAP", error))
+            phase = AppPhase.Failed(bootstrapFailure(error))
         }
     }
+
+    /** Observes existing local preference restoration without placing native queries in the diagnostic recorder. */
+    private suspend fun restoreStartupLocalState(accounts: List<AccountSummaryFfi>) =
+        StartupDiagnostics.stage(StartupDiagnosticStage.LOCAL_RESTORATION) {
+            schedulePendingLocalGroupDeleteCleanup()
+            prepareStartupUnreadRefresh(accounts)
+            migrateLegacyDrafts()
+            migrateLegacyMutePreferences()
+        }
+
+    /** Adds host stage attribution after an exception has unwound without retaining its sensitive text. */
+    private fun bootstrapFailure(error: Throwable): ErrorPresentation =
+        privacySafeErrorPresentation("APP_BOOTSTRAP", error, technicalDetail = StartupDiagnostics.failureDetail())
 
     private fun startupAccount(): AccountSummaryFfi = configuredAccount() ?: accounts.first()
 
@@ -4883,7 +4898,10 @@ class WhiteNoiseAppState private constructor(
      * local shell can render. Notification-sensitive reads remain behind that barrier and signer restoration.
      */
     private suspend fun completeReceiverGatedStartup() {
-        val receiverReady = awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
+        val receiverReady =
+            StartupDiagnostics.stage(StartupDiagnosticStage.NOTIFICATION_RECEIVER) {
+                awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())
+            }
         appStateDebug { "marmot started; notification receiver active=$receiverReady" }
         startupPerformance.stage(PerformancePhase.NOTIFICATION_PRIVACY_SETUP) { refreshSecurityPrivacySettings() }
     }
@@ -4898,14 +4916,16 @@ class WhiteNoiseAppState private constructor(
                     construct = {
                         startupPerformance.stage(PerformancePhase.CLIENT_CONSTRUCTION) {
                             withContext(Dispatchers.IO) {
-                                MarmotClientRootGate.withLease {
-                                    marmotRuntimeFactory(appContext).also { runtime ->
-                                        // Publish before start so lifecycle consumers
-                                        // and later listener retries can resolve Marmot.
-                                        publishMarmotRuntime(runtime)
-                                        diagnostics.bind(runtime.marmot)
-                                        AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
-                                            runtime.marmot.downloadProfileImage(url, maxBytes)
+                                StartupDiagnostics.stage(StartupDiagnosticStage.ROOT_LEASE) {
+                                    MarmotClientRootGate.withLease {
+                                        marmotRuntimeFactory(appContext).also { runtime ->
+                                            // Publish before start so lifecycle consumers
+                                            // and later listener retries can resolve Marmot.
+                                            publishMarmotRuntime(runtime)
+                                            diagnostics.bind(runtime.marmot)
+                                            AvatarImageLoader.attachProfileImageFetcher { url, maxBytes ->
+                                                runtime.marmot.downloadProfileImage(url, maxBytes)
+                                            }
                                         }
                                     }
                                 }
@@ -4989,8 +5009,10 @@ class WhiteNoiseAppState private constructor(
             "notification listener unavailable before Marmot startup"
         }
         runtimeStartResult.await().getOrThrowAtStartupStage(BootstrapStage.RUNTIME_START)
-        runtime.marmot.emitAuditRuntimeReadinessAfterStart(auditUploadConsent.readyForStartupMarker)
-        runtimeMirrors.attention.start(this, runtime.marmot)
+        StartupDiagnostics.stage(StartupDiagnosticStage.POST_START_READINESS) {
+            runtime.marmot.emitAuditRuntimeReadinessAfterStart(auditUploadConsent.readyForStartupMarker)
+            runtimeMirrors.attention.start(this, runtime.marmot)
+        }
     }
 
     private suspend fun resumeCompletedBootstrap(): Boolean {

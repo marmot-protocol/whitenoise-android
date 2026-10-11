@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="startup_diagnostics_share">Başlangıç tanılamasını paylaş</string>
+    <string name="startup_diagnostics_share_failed">Başlangıç tanılaması paylaşılamadı. Hata raporunu göndermek için Kopyala seçeneğini kullanın.</string>
+    <string name="startup_diagnostics_share_notice">Başlangıç aşamalarını, süreleri ve derleme bilgilerini içerir. Mesaj veya hesap bilgisi içermez.</string>
+</resources>

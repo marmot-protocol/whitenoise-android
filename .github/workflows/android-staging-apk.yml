@@ -9,6 +9,11 @@ on:
     branches: [master]
   workflow_dispatch:
     inputs:
+      startup_diagnostics:
+        description: Enable bounded local startup stage logging and the Retry-screen share action
+        type: boolean
+        required: false
+        default: false
       background_fixture:
         description: Build configured Dev benchmark APKs for an explicitly authorized disposable Android profile
         type: boolean
@@ -200,6 +205,7 @@ jobs:
 
       - name: Build staging APK
         env:
+          ORG_GRADLE_PROJECT_startupDiagnostics: ${{ github.event_name == 'workflow_dispatch' && inputs.startup_diagnostics || false }}
           WHITENOISE_STAGING_KEYSTORE_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEYSTORE_PASSWORD }}
           WHITENOISE_STAGING_KEY_ALIAS: ${{ secrets.WHITENOISE_STAGING_KEY_ALIAS }}
           WHITENOISE_STAGING_KEY_PASSWORD: ${{ secrets.WHITENOISE_STAGING_KEY_PASSWORD }}

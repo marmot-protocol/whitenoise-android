@@ -51,6 +51,15 @@ class StartupRecoveryScreenshotTest {
     @Config(qualifiers = "en-w780dp-h360dp-mdpi")
     fun shortWindow() = capture("short_200", scale = 2f)
 
+    /** Diagnostic builds explain the local payload beside the explicit share action. */
+    @Test fun diagnosticLight() = capture("diagnostic_light", diagnostics = true)
+
+    /** Diagnostic sharing remains legible in the dark palette. */
+    @Test fun diagnosticDark() = capture("diagnostic_dark", dark = true, diagnostics = true)
+
+    /** RTL diagnostic recovery remains scrollable with doubled text. */
+    @Test fun diagnosticRtlLarge() = capture("diagnostic_rtl_200", rtl = true, scale = 2f, diagnostics = true)
+
     /** Captures visuals only; no bootstrap or profile selection is simulated by this renderer. */
     @Suppress("LongParameterList")
     private fun capture(
@@ -61,6 +70,7 @@ class StartupRecoveryScreenshotTest {
         rtl: Boolean = false,
         scale: Float = 1f,
         retryable: Boolean = true,
+        diagnostics: Boolean = false,
     ) {
         composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
@@ -79,6 +89,12 @@ class StartupRecoveryScreenshotTest {
                                     "operation=APP_BOOTSTRAP_TIMEOUT",
                                     retryable,
                                 ),
+                            onShareDiagnostics =
+                                if (diagnostics) {
+                                    {}
+                                } else {
+                                    null
+                                },
                             onRetry = {},
                         )
                     }

@@ -11,6 +11,7 @@ internal class StartupPerformanceDiagnostics(
     private val startedAtMs = nowMs()
     private val trace = PerformanceDiagnostics.begin(PerformanceOperation.APP_START)
 
+    /** Records entry immediately in diagnostic builds and preserves the existing Perfetto timing span. */
     suspend fun <T> stage(
         phase: PerformancePhase,
         block: suspend () -> T,
@@ -20,17 +21,20 @@ internal class StartupPerformanceDiagnostics(
                 "No reserved startup trace section for ${phase.wireName}"
             }
         var result = PerformanceResult.SUCCESS
-        return StartupStageTrace.trace(
-            stage = stageName,
-            block = {
-                val outcome = runCatching { block() }
-                result = if (outcome.isSuccess) PerformanceResult.SUCCESS else PerformanceResult.FAILURE
-                outcome.getOrThrow()
-            },
-            onFinished = { durationMs -> record(phase, durationMs, result) },
-        )
+        return StartupDiagnostics.stage(StartupDiagnosticStage.valueOf(phase.name)) {
+            StartupStageTrace.trace(
+                stage = stageName,
+                block = {
+                    val outcome = runCatching { block() }
+                    result = if (outcome.isSuccess) PerformanceResult.SUCCESS else PerformanceResult.FAILURE
+                    outcome.getOrThrow()
+                },
+                onFinished = { durationMs -> record(phase, durationMs, result) },
+            )
+        }
     }
 
+    /** Emits a completed startup milestone through the existing opt-in performance facility. */
     fun record(
         phase: PerformancePhase,
         durationMs: Long = 0L,

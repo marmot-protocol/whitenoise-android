@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="startup_diagnostics_share">Поделиться диагностикой запуска</string>
+    <string name="startup_diagnostics_share_failed">Не удалось поделиться диагностикой запуска. Отправьте отчёт об ошибке с помощью кнопки Копировать.</string>
+    <string name="startup_diagnostics_share_notice">Содержит этапы запуска, время выполнения и сведения о сборке. Без сообщений и данных аккаунта.</string>
+</resources>

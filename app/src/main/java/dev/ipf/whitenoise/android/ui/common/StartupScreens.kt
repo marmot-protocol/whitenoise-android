@@ -77,6 +77,7 @@ internal const val STARTUP_MARK_TEST_TAG = "startup-mark"
 internal fun StartupFailureScreen(
     title: String,
     error: ErrorPresentation,
+    onShareDiagnostics: (() -> Unit)? = null,
     onRetry: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -95,12 +96,19 @@ internal fun StartupFailureScreen(
             onClick = { clipboard.setText(AnnotatedString(error.report)) },
             modifier = Modifier.testTag(STARTUP_COPY_TEST_TAG),
         ) { Text(stringResource(R.string.copy)) }
+        if (onShareDiagnostics != null) {
+            Text(stringResource(R.string.startup_diagnostics_share_notice), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = onShareDiagnostics, modifier = Modifier.testTag(STARTUP_SHARE_TEST_TAG)) {
+                Text(stringResource(R.string.startup_diagnostics_share))
+            }
+        }
     }
 }
 
 internal const val STARTUP_FAILURE_TEST_TAG = "startup-failure"
 internal const val STARTUP_RETRY_TEST_TAG = "startup-retry"
 internal const val STARTUP_COPY_TEST_TAG = "startup-copy-report"
+internal const val STARTUP_SHARE_TEST_TAG = "startup-share-diagnostics"
 
 /** Keeps no-snapshot recovery in the preparation branch so Retry cannot remount the shell's bind. */
 @Composable
@@ -111,7 +119,7 @@ internal fun StartupLocalProjectionScreen(
     if (error == null) {
         StartupLoadingScreen()
     } else {
-        StartupFailureScreen(stringResource(R.string.white_noise_couldnt_start), error, onRetry)
+        StartupFailureScreen(stringResource(R.string.white_noise_couldnt_start), error, onRetry = onRetry)
     }
 }
 

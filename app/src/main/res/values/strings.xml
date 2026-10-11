@@ -62,6 +62,9 @@
          "White Noise Dev" for the launcher label, but the in-app brand stays
          "White Noise". Kept identical across locales (see LocalizationResourceTest). -->
     <string name="white_noise">White Noise</string>
+    <string name="startup_diagnostics_share">Share startup diagnostics</string>
+    <string name="startup_diagnostics_share_failed">Couldn\'t share startup diagnostics. Use Copy to send the error report.</string>
+    <string name="startup_diagnostics_share_notice">Includes startup stages, timings and build information. No messages or account details.</string>
     <string name="white_noise_couldnt_start">White Noise couldn\'t start</string>
     <string name="startup_taking_too_long">Startup is taking longer than expected. Please try again.</string>
     <string name="refresh">Refresh</string>

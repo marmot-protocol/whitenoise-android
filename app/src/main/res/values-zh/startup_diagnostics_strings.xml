@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="startup_diagnostics_share">分享启动诊断</string>
+    <string name="startup_diagnostics_share_failed">无法分享启动诊断。请使用复制按钮发送错误报告。</string>
+    <string name="startup_diagnostics_share_notice">包含启动阶段、耗时和构建信息。不含消息或账户详情。</string>
+</resources>

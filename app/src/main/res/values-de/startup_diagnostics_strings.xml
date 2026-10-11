@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="startup_diagnostics_share">Startdiagnose teilen</string>
+    <string name="startup_diagnostics_share_failed">Die Startdiagnose konnte nicht geteilt werden. Sende den Fehlerbericht mit Kopieren.</string>
+    <string name="startup_diagnostics_share_notice">Enthält Startphasen, Zeitangaben und Build-Informationen. Keine Nachrichten oder Kontodetails.</string>
+</resources>

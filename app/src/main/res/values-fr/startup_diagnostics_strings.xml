@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="startup_diagnostics_share">Partager le diagnostic de démarrage</string>
+    <string name="startup_diagnostics_share_failed">Impossible de partager le diagnostic. Utilisez Copier pour envoyer le rapport d’erreur.</string>
+    <string name="startup_diagnostics_share_notice">Contient les étapes du démarrage, les durées et les informations de version. Aucun message ni détail de compte.</string>
+</resources>

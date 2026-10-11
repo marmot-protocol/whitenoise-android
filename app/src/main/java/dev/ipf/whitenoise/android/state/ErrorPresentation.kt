@@ -18,6 +18,7 @@ data class ErrorPresentation(
     val retryable: Boolean = true,
 )
 
+/** Builds a bounded copyable report; technicalDetail must come from a privacy-safe fixed schema. */
 internal fun privacySafeErrorPresentation(
     operationCode: String,
     throwable: Throwable,
@@ -28,6 +29,7 @@ internal fun privacySafeErrorPresentation(
             .getOrDefault("unknown"),
     occurredAtUtc: String = Instant.now().toString(),
     retryable: Boolean = true,
+    technicalDetail: String? = null,
 ): ErrorPresentation =
     ErrorPresentation(
         message = message,
@@ -36,6 +38,7 @@ internal fun privacySafeErrorPresentation(
             DiagnosticFormatter.errorReport(
                 operationCode = operationCode,
                 throwable = throwable,
+                technicalDetail = technicalDetail,
                 context =
                     DiagnosticFormatter.ErrorReportContext(
                         appVersion = appVersion,
