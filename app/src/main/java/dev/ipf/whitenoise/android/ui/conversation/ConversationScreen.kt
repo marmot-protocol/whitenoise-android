@@ -2419,7 +2419,10 @@ internal fun ConversationScreen(
     }
 
     /** Captures current mention geometry after each suspended positioning step. */
-    fun mentionJumpLayout(targetMessageId: String, index: Int): ConversationMentionJumpLayout {
+    fun mentionJumpLayout(
+        targetMessageId: String,
+        index: Int,
+    ): ConversationMentionJumpLayout {
         val layout = timelineViewport.readingLayoutInfo()
         return ConversationMentionJumpLayout(
             viewportEndOffsetPx = layout.viewportEndOffset,

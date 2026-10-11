@@ -33,7 +33,8 @@ internal data class ConversationForegroundSettleState(
 
     /** Whether measured current content and coherent geometry match the IME visibility requested at resume. */
     fun isSettled(expectedImeVisible: Boolean): Boolean =
-        isGeometrySettled() && timelineMeasured &&
+        isGeometrySettled() &&
+            timelineMeasured &&
             (geometry.imeBottomPx > 0) == expectedImeVisible
 }
 

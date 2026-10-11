@@ -38,8 +38,10 @@ internal object ConversationTranscriptDrawProbe {
     }
 
     /** Leaves ordinary builds unchanged; an explicitly installed test can paint an older bounded composition. */
-    fun rowsForComposition(controller: ConversationController, rows: List<TimelineMessage>): List<TimelineMessage> =
-        if (isObserving()) compositionRowsOverride?.invoke(controller, rows) ?: rows else rows
+    fun rowsForComposition(
+        controller: ConversationController,
+        rows: List<TimelineMessage>,
+    ): List<TimelineMessage> = if (isObserving()) compositionRowsOverride?.invoke(controller, rows) ?: rows else rows
 
     /** Freezes composed rows so newer controller publications cannot alter painted-layer evidence. */
     fun composedRows(rows: List<TimelineMessage>): List<TimelineMessage> = if (isObserving()) rows.toList() else rows
@@ -77,11 +79,13 @@ internal object ConversationTranscriptDrawProbe {
     }
 
     /** No records, keys, allocations or callbacks are produced without an admitted test observer. */
-    private fun isObserving(): Boolean =
-        (BuildConfig.DEBUG || BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) && observer != null
+    private fun isObserving(): Boolean = (BuildConfig.DEBUG || BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) && observer != null
 
     /** One traversal owns its evidence even if its posted completion runs after a subsequent traversal. */
-    private class RootFrame(var painted: ConversationTranscriptDraw?, val atUptimeMs: Long)
+    private class RootFrame(
+        var painted: ConversationTranscriptDraw?,
+        val atUptimeMs: Long,
+    )
 }
 
 /** In-memory fixture content; keys never enter diagnostics, traces or public reports. */
