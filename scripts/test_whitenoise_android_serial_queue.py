@@ -1,5 +1,6 @@
 """Failure-boundary tests for the actual serial queue state machine."""
 import copy
+import json
 from dataclasses import asdict
 import unittest
 
@@ -444,7 +445,7 @@ class QueueTest(unittest.TestCase):
                 for index in range(q.MAX_NOT_SENT_ATTEMPTS):
                     with patch.object(q.time, 'time', return_value=1000 + index * 1000):
                         q.execute(self.journal, original, never_sent, self.readback, self.save)
-                    self.journal = copy.deepcopy(self.saved[-1])
+                    self.journal = json.loads(json.dumps(self.saved[-1]))
                 exhausted = copy.deepcopy(self.journal)
                 for proof in ('f' * 64, 'a' * 64):
                     changed = q.Effect(kind, identity, proof)
@@ -455,8 +456,50 @@ class QueueTest(unittest.TestCase):
                     self.assertEqual(self.journal, exhausted)
                     self.assertEqual(q.exhausted_selection_result(self.journal, changed),
                                      'not-sent-exhausted-held')
-                    self.journal = copy.deepcopy(self.saved[-1])
+                    self.journal = json.loads(json.dumps(self.saved[-1]))
                 self.assertEqual(len(attempts), q.MAX_NOT_SENT_ATTEMPTS)
+                changed = q.Effect(kind, identity, 'f' * 64)
+                for state in ('attempted', 'unknown'):
+                    self.journal = copy.deepcopy(exhausted)
+                    self.journal['effects'][original.key()]['state'] = state
+                    self.assertEqual(q.execute(self.journal, changed, self.write,
+                                              lambda *_: False, self.save), 'unknown-held')
+                    self.assertFalse(self.writes)
+                self.journal = copy.deepcopy(exhausted)
+                with self.assertRaises(q.Held):
+                    q.execute(self.journal, q.Effect(kind, identity, 'bad'),
+                              self.write, self.readback, self.save)
+                for field, value in (('number', 12), ('pull_request_id', 'another_PR'),
+                                     ('source', 'a' * 40), ('base', 'e' * 40),
+                                     ('integration', 'a' * 40), ('entry_id', 'ANOTHER_ENTRY')):
+                    self.journal = copy.deepcopy(exhausted)
+                    unrelated = q.Identity(**{**asdict(identity), field: value})
+                    effect = q.Effect(kind, unrelated, 'f' * 64)
+                    self.assertEqual(q.execute(self.journal, effect, self.write,
+                                              self.readback, self.save), kind + '-confirmed')
+                    self.assertEqual(self.journal['effects'][original.key()],
+                                     exhausted['effects'][original.key()])
+                self.journal = copy.deepcopy(exhausted)
+                other_kind = 'dequeue' if kind == 'revoke-integration' else 'revoke-integration'
+                self.assertEqual(q.execute(self.journal, q.Effect(other_kind, identity, 'f' * 64),
+                                          self.write, self.readback, self.save),
+                                 other_kind + '-confirmed')
+                self.journal = copy.deepcopy(exhausted)
+                recovered = q.Effect(kind, identity, 'f' * 64, generation=1)
+                self.assertEqual(q.execute(self.journal, recovered, self.write,
+                                          self.readback, self.save), kind + '-confirmed')
+                self.assertFalse(q.exhaustion_unresolved(self.journal,
+                                                       self.journal['effects'][original.key()]))
+                self.assertEqual(self.journal['effects'][original.key()],
+                                 exhausted['effects'][original.key()])
+                self.journal = copy.deepcopy(exhausted)
+                self.journal['effects'][original.key()]['exhaustion_withdrawal'] = {
+                    'proof_sha256': 'a' * 64, 'owner': {'run_id': 1}}
+                self.assertEqual(q.execute(self.journal, changed, self.write,
+                                          self.readback, self.save), kind + '-confirmed')
+                self.assertEqual(self.journal['effects'][original.key()]['not_sent_attempts'],
+                                 q.MAX_NOT_SENT_ATTEMPTS)
+                self.writes.clear()
 
     def test_uncertain_maintenance_cannot_be_replayed_or_bypassed(self):
         self.exhaust_never_sent_budget()

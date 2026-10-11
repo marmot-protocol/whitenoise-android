@@ -246,9 +246,16 @@ def exhaustion_unresolved(journal, record):
 
 def exhausted_selection_result(journal, effect):
     """An exhausted selection cannot silently become another PR or proof key."""
-    # A held admission must not prevent revoking its authorization or draining
-    # a different known entry. Per-effect retry budgets still apply below.
+    # Cleanup bypasses admission holds, not its own exhausted retry budget.
+    # A changed proof is fresh validation rather than explicit recovery.
     if effect is not None and effect.kind in {'revoke-integration', 'dequeue'}:
+        for record in journal['effects'].values():
+            previous = record['payload']
+            if (exhaustion_unresolved(journal, record)
+                    and previous['kind'] == effect.kind
+                    and previous['identity'] == asdict(effect.identity)
+                    and previous['generation'] >= effect.generation):
+                return 'not-sent-exhausted-held'
         return None
     for record in journal['effects'].values():
         if not exhaustion_unresolved(journal, record):
