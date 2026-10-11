@@ -41,8 +41,10 @@ import dev.ipf.whitenoise.android.ui.common.STARTUP_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -249,8 +251,10 @@ class NotificationWholeAppRouteTest {
         private val conversations =
             ConversationLiveSubscriptions(
                 openTimeline = { _, _, _ ->
-                    check(timelineGate.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                        "timeline was never released"
+                    withContext(Dispatchers.IO) {
+                        check(timelineGate.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                            "timeline was never released"
+                        }
                     }
                     timeline
                 },
@@ -389,14 +393,21 @@ class NotificationWholeAppRouteTest {
             )
         }
 
-        /** The engine's chat-list seam: the target account's broad bind answers only once the test releases it. */
+        /**
+         * The engine's chat-list seam: the target account's broad bind answers only once the test releases it.
+         * The wait runs on a worker thread, as the production seam's engine calls do through `marmotIo`. A bind
+         * that the shell launches from the main thread would otherwise block the test's own frame pump for the
+         * whole timeout, and the held bind is never released in some tests.
+         */
         private fun chatListSeam() =
             ChatListLiveSubscriptions(
                 openChatListWindow = { account, view ->
                     if (account == NotificationScenario.TARGET_ACCOUNT_REF) {
-                        gate.broadBindStarted.countDown()
-                        check(gate.releaseActivation.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-                            "the broad bind was never released"
+                        withContext(Dispatchers.IO) {
+                            gate.broadBindStarted.countDown()
+                            check(gate.releaseActivation.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                                "the broad bind was never released"
+                            }
                         }
                     }
                     EmptyWindow(view)
