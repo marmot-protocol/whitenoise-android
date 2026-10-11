@@ -181,6 +181,23 @@ class ChatFolderEditScreenScreenshotTest {
                 }
             }
         }
+        scrollToCaptureState(name, context, attention, rules, deleteAction)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** Positions secondary controls without changing the draft being captured. */
+    private fun scrollToCaptureState(
+        name: String,
+        context: Context,
+        attention: Boolean,
+        rules: Boolean,
+        deleteAction: Boolean,
+    ) {
+        if (name == "chat_folder_empty_visible_light") {
+            composeRule
+                .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+                .performScrollToNode(hasTestTag("folder.showWhenEmpty"))
+        }
         if (attention) {
             composeRule
                 .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
@@ -199,7 +216,6 @@ class ChatFolderEditScreenScreenshotTest {
                 .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
                 .performScrollToNode(hasTestTag("folder.delete"))
         }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
     /** Builds a preview state fixture. */

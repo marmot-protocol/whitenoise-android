@@ -4,6 +4,16 @@ import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaFileTransferControlFfi
+import dev.ipf.marmotkit.MediaFileUploadAttachmentRequestFfi
+import dev.ipf.marmotkit.MediaFileUploadRequestFfi
+import dev.ipf.marmotkit.MediaUploadResultFfi
+import dev.ipf.marmotkit.MediaUploadSubmissionFfi
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
+import dev.ipf.marmotkit.NoPointer
+import dev.ipf.marmotkit.SelectedMessageDraftAttachmentFfi
+import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
+import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -208,4 +218,100 @@ class DurableLocalSendsTest {
             assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, send.await().acceptDisposition)
             assertEquals(listOf("same-token", "same-token"), admittedTokens)
         }
+
+    /**
+     * File-backed composer media follows the byte path's admission rule: a matching non-reply draft keeps
+     * the upload upload-only, and otherwise the same native call admits the send under the caller's token.
+     */
+    @Test
+    fun fileBackedComposerMediaKeepsTheDraftAndTokenAdmissionRule() =
+        runTest {
+            for (draftBacked in listOf(false, true)) {
+                val sends = mutableListOf<Boolean>()
+                val control = MediaFileTransferControlFfi(NoPointer)
+                val engine =
+                    nativeBoundary { method, args ->
+                        when (method) {
+                            "localSendStatus" -> null
+                            "selectedMessageDraft" -> selectedDraft(withLargeDocument = draftBacked)
+                            "uploadMediaFilesWithClientToken" -> {
+                                val request = args[2] as MediaFileUploadRequestFfi
+                                assertTrue("the caller's control reaches the native call", args[3] === control)
+                                assertEquals("logical-token", args[4])
+                                sends += request.send
+                                val acceptance =
+                                    if (request.send) LocalSendAcceptanceFfi("logical-token", "33".repeat(32)) else null
+                                MediaUploadSubmissionFfi(MediaUploadResultFfi(emptyList(), null), acceptance)
+                            }
+                            else -> error(method)
+                        }
+                    }
+
+                val result =
+                    engine.uploadOrAdmitComposerMediaFilesWithToken(
+                        "account",
+                        "group",
+                        largeDocumentRequest(),
+                        control,
+                        "logical-token",
+                    )
+
+                assertEquals(listOf(!draftBacked), sends)
+                assertEquals(!draftBacked, result.acceptance != null)
+                assertEquals(false, result.recoveredWithoutUpload)
+            }
+        }
+
+    /** One large document staged at a private path, as the composer hands it to the file upload. */
+    private fun largeDocumentRequest() =
+        MediaFileUploadRequestFfi(
+            attachments =
+                listOf(
+                    MediaFileUploadAttachmentRequestFfi(
+                        sourcePath = "/private/upload-source",
+                        expectedSize = 40uL * 1024uL * 1024uL,
+                        fileName = "large.pdf",
+                        mediaType = "application/pdf",
+                        dim = null,
+                        thumbhash = null,
+                    ),
+                ),
+            caption = null,
+            send = false,
+            blossomServer = null,
+        )
+
+    /** The selected native draft, holding the same document descriptor when [withLargeDocument]. */
+    private fun selectedDraft(withLargeDocument: Boolean): SelectedMessageDraftFfi {
+        val attachments =
+            if (withLargeDocument) {
+                listOf(
+                    SelectedMessageDraftAttachmentFfi(
+                        "large.pdf",
+                        "large.pdf",
+                        "application/pdf",
+                        1uL,
+                        null,
+                        null,
+                        null,
+                        emptyList(),
+                    ),
+                )
+            } else {
+                emptyList()
+            }
+        return SelectedMessageDraftFfi(
+            draftRevisionStub(),
+            SelectedMessageDraftContentFfi("group", "", null, attachments, 1L, 1L),
+        )
+    }
+
+    /** An opaque native revision handle; the admission rule never dereferences it. */
+    private fun draftRevisionStub(): MessageDraftRevisionFfi {
+        val unsafeClass = Class.forName("sun.misc.Unsafe")
+        val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
+        return unsafeClass
+            .getMethod("allocateInstance", Class::class.java)
+            .invoke(unsafe, MessageDraftRevisionFfi::class.java) as MessageDraftRevisionFfi
+    }
 }

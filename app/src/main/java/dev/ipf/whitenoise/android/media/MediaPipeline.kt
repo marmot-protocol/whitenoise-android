@@ -1342,48 +1342,63 @@ object MediaPipeline {
                 null -> return VideoReadResult.Failed
             }
 
-            val mmr = android.media.MediaMetadataRetriever()
-            try {
-                mmr.setDataSource(tmp.absolutePath)
-                val width =
-                    mmr
-                        .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-                        ?.toIntOrNull() ?: 0
-                val height =
-                    mmr
-                        .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-                        ?.toIntOrNull() ?: 0
-                // Thumbhash output is tiny (~25 bytes), so we just need a
-                // representative downscaled frame — don't pull a 4K bitmap
-                // through to encode it.
-                val poster =
-                    mmr.getScaledFrameAtTime(
-                        0L,
-                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                        THUMBNAIL_MAX_EDGE_PX,
-                        THUMBNAIL_MAX_EDGE_PX,
-                    )
-                val thumbhash = posterThumbhash(poster)
-                val bytes = runCatching { readFileBytesExact(tmp) }.getOrElse { return VideoReadResult.Failed }
-                return VideoReadResult.Success(
-                    VideoForUpload(
-                        bytes = bytes,
-                        mediaType = mime,
-                        fileName = displayName,
-                        width = width,
-                        height = height,
-                        thumbhash = thumbhash,
-                    ),
-                )
-            } catch (_: RuntimeException) {
-                return VideoReadResult.Failed
-            } catch (_: OutOfMemoryError) {
-                return VideoReadResult.Failed
-            } finally {
-                runCatching { mmr.release() }
-            }
+            val metadata = readVideoFileMetadata(tmp) ?: return VideoReadResult.Failed
+            val bytes = runCatching { readFileBytesExact(tmp) }.getOrElse { return VideoReadResult.Failed }
+            return VideoReadResult.Success(
+                VideoForUpload(
+                    bytes = bytes,
+                    mediaType = mime,
+                    fileName = displayName,
+                    width = metadata.width,
+                    height = metadata.height,
+                    thumbhash = metadata.thumbhash,
+                ),
+            )
         } finally {
             releaseVideoMetadataTempFile(tmp)
+        }
+    }
+
+    /** Dimensions and poster thumbhash of a local video file. */
+    data class VideoFileMetadata(
+        val width: Int,
+        val height: Int,
+        val thumbhash: String?,
+    )
+
+    /**
+     * Reads dimensions and a poster thumbhash from a seekable local video, the same metadata
+     * [readVideoForUpload] attaches. Null when the platform retriever cannot open the file.
+     */
+    fun readVideoFileMetadata(file: java.io.File): VideoFileMetadata? {
+        val mmr = android.media.MediaMetadataRetriever()
+        return try {
+            mmr.setDataSource(file.absolutePath)
+            val width =
+                mmr
+                    .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                    ?.toIntOrNull() ?: 0
+            val height =
+                mmr
+                    .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                    ?.toIntOrNull() ?: 0
+            // Thumbhash output is tiny (~25 bytes), so we just need a
+            // representative downscaled frame — don't pull a 4K bitmap
+            // through to encode it.
+            val poster =
+                mmr.getScaledFrameAtTime(
+                    0L,
+                    android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    THUMBNAIL_MAX_EDGE_PX,
+                    THUMBNAIL_MAX_EDGE_PX,
+                )
+            VideoFileMetadata(width, height, posterThumbhash(poster))
+        } catch (_: RuntimeException) {
+            null
+        } catch (_: OutOfMemoryError) {
+            null
+        } finally {
+            runCatching { mmr.release() }
         }
     }
 

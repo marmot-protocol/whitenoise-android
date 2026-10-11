@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.share_import_storage",
         "test_ids": [
-          "SYS-005"
+          "SYS-005",
+          "MED-030"
         ]
       },
       {
@@ -32,7 +33,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.media_file_too_large",
         "test_ids": [
-          "MED-009"
+          "MED-009",
+          "MED-030"
         ]
       },
       {
@@ -51,6 +53,15 @@
           "MSG-021",
           "MED-008",
           "MED-009"
+        ]
+      },
+      {
+        "surface": "Large pick album budget feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_album_too_large",
+        "test_ids": [
+          "MED-003",
+          "MED-030"
         ]
       }
     ]

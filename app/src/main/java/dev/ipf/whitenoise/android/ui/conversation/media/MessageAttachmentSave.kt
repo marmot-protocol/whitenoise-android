@@ -88,6 +88,7 @@ private suspend fun saveMessageMediaAttachment(
     }
 }
 
+/** Saves one video to the gallery from a materialized file, never a whole-array read. */
 private suspend fun saveMessageVideoAttachment(
     context: MessageAttachmentSaveContext,
     attachmentIndex: Int,
@@ -112,6 +113,7 @@ private suspend fun saveMessageVideoAttachment(
     }
 }
 
+/** Saves one image's whole verified bytes to the gallery; explicit saves are not bound by the preview budget. */
 private suspend fun saveMessageImageAttachment(
     context: MessageAttachmentSaveContext,
     attachmentIndex: Int,
@@ -137,6 +139,10 @@ private suspend fun saveMessageImageAttachment(
     }
 }
 
+/**
+ * Saves one document to Downloads from a materialized file, preferring the sender's in-memory retry bytes
+ * and otherwise streaming the native source, so a document larger than the preview budget still saves.
+ */
 private suspend fun saveMessageDocumentAttachment(
     context: MessageAttachmentSaveContext,
     attachmentIndex: Int,
@@ -147,25 +153,18 @@ private suspend fun saveMessageDocumentAttachment(
             context.controller
                 .pendingAttachmentsList(context.messageIdHex)
                 .getOrNull(attachmentIndex)
-                ?.plaintextBytes
+                ?.inMemoryBytes
         } else {
             null
         }
     val file =
-        materializeDocumentAttachment(
+        materializeDocumentFile(
             context = context.androidContext,
+            controller = context.controller,
             messageIdHex = context.messageIdHex,
             attachmentIndex = attachmentIndex,
             reference = reference,
-            resolveBytes = {
-                context.controller
-                    .requestAttachmentTransfer(
-                        messageIdHex = context.messageIdHex,
-                        attachmentIndex = attachmentIndex,
-                        reference = reference,
-                        retainedPlaintext = retained,
-                    ).await()
-            },
+            retained = retained,
         )
     return saveDocumentWithFallback(
         context = context.androidContext,

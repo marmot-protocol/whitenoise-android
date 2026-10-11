@@ -60,6 +60,10 @@ internal fun messageShareAttachmentSources(
         retained.mapIndexed { index, attachment -> MessageShareAttachmentSource.Retained(index, attachment) }
     }
 
+/**
+ * Whether Share can stage this message: a complete attachment set and some content, where a pending
+ * attachment counts only while its bytes are in memory (a file-backed one becomes shareable once confirmed).
+ */
 internal fun messageHasShareablePayload(
     text: String?,
     references: List<MediaAttachmentReferenceFfi>,
@@ -67,13 +71,16 @@ internal fun messageHasShareablePayload(
     protocolAttachmentCount: Int = references.size,
 ): Boolean =
     messageShareAttachmentSetIsComplete(protocolAttachmentCount, references.size) &&
+        (references.isNotEmpty() || retained.all { it.inMemoryBytes != null }) &&
         (!text.isNullOrBlank() || references.isNotEmpty() || retained.isNotEmpty())
 
+/** Whether every protocol attachment of the message has a projected reference, or it has none at all. */
 internal fun messageShareAttachmentSetIsComplete(
     protocolAttachmentCount: Int,
     projectedAttachmentCount: Int,
 ): Boolean = protocolAttachmentCount == 0 || protocolAttachmentCount == projectedAttachmentCount
 
+/** Stages a message's text and attachments for Android's share sheet, re-reading retained state at tap time. */
 internal suspend fun shareMessageExternally(
     context: Context,
     controller: ConversationController,
@@ -117,7 +124,9 @@ internal suspend fun shareMessageExternally(
                         mine = mine,
                         maxBytes = ATTACHMENT_EXPLICIT_READ_MAX_BYTES,
                     )
-                is MessageShareAttachmentSource.Retained -> source.attachment.plaintextBytes
+                // A file-backed item has no in-memory copy; its message becomes shareable once confirmed.
+                is MessageShareAttachmentSource.Retained ->
+                    checkNotNull(source.attachment.inMemoryBytes) { "Attachment is still uploading" }
             }
         }
     launchStagedMessageShare(staged) { streams ->

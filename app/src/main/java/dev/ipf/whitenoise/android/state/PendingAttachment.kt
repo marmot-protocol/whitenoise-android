@@ -21,6 +21,13 @@ data class PendingAttachment(
     val byteCount: Long get() = sourceFile?.byteCount ?: plaintextBytes.size.toLong()
     val hasContent: Boolean get() = byteCount > 0
 
+    /**
+     * Content held in memory, or null when it lives in a private staged file (or is empty).
+     * Readers of a retained attachment fall back to native retention or download on null and
+     * never treat a file-backed attachment's empty array as its content.
+     */
+    val inMemoryBytes: ByteArray? get() = plaintextBytes.takeIf { sourceFile == null && it.isNotEmpty() }
+
     /** Diagnostics must not include plaintext, document names or private snapshot paths. */
     override fun toString(): String = "PendingAttachment(byteCount=$byteCount, fileBacked=${sourceFile != null})"
 

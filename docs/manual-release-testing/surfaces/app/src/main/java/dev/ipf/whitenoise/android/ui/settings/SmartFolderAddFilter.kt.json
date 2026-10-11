@@ -1,0 +1,54 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+  "legacy_sha256": "d495ab8be1ee1ede82566b2fb968de2fc49f20a7793e609e4e7d51fd654c17aa",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "FilterChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "private fun FilterChoice(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.smart_folder_add",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "SmartFolderAddFilter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "internal fun SmartFolderAddFilter(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "Compact filter choices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "\"folder.filterChoices\"",
+        "test_ids": [
+          "FLD-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: SmartFolderAddFilter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
