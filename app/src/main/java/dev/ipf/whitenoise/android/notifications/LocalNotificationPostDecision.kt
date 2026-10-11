@@ -11,14 +11,14 @@ internal const val MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS = 1_000
 
 /**
  * Fewest code points that move a single message from the conversation template to the standard expandable text
- * block, which exists to expose more of a long body. The value is not zero, because that block carries no sender
- * icon and the platform classifies a card as a conversation by its conversation template.
+ * block, which exists to expose more of a long body. The block carries no sender icon and the platform
+ * classifies a card as a conversation by its conversation template, so every message below this value that the
+ * block would take loses that classification and its Do Not Disturb exception.
  *
- * This is a conservative starting point and not a measured result. The rendered line budget belongs to the
- * platform and varies by version, font scale and OEM, so confirm it with before and after shade captures at
- * default and large font before changing it.
+ * Lowering it to 120 was tried and not adopted: a Pixel comparison showed no extra visible text in return for
+ * that loss. Lower it only with before and after shade captures at default and large font that show the benefit.
  */
-internal const val MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS = 120
+internal const val MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS = 160
 
 internal const val CONVERSATION_SHORTCUT_PREFIX = "conversation-"
 

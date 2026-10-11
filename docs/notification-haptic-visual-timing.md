@@ -234,14 +234,18 @@ documents and does not work around: folding history into the text block would ne
 extras and edges toward a second copy of the message state, and the other standard
 inbox template ellipsizes each line. A body is still cut at 1,000 code points either way.
 
-The threshold is a conservative starting value and not a measured one. The text block
+The threshold is 160 code points, the value this feature already had. The text block
 carries no sender or conversation icon and Android classifies a conversation by its
-conversation template, so the value is kept well above zero. The text block is not a
-conversation card, so a single message that now reaches it, from 120 code points where it
-used to be 160, loses the conversation classification, and with it the important
-conversation Do Not Disturb exception and the conversation section of the shade. That is
-the cost of showing more text and it applies to a message only while it is the sole
-message on its card. Cards that carry earlier messages keep the conversation template.
+conversation template, so a single message that reaches it loses the conversation
+classification, and with it the important conversation Do Not Disturb exception and the
+conversation section of the shade. That only applies while the message is the sole
+message on its card, since cards that carry earlier messages keep the conversation template.
+
+Lowering it to 120 code points was tried and not adopted. A Pixel comparison of the
+collapsed and expanded cards showed no extra visible text, so the lower value would have
+taken the classification away from messages of 120 to 159 code points for no benefit.
+Lower it only with before and after shade captures that show a benefit on the devices that
+matter.
 
 Hidden previews and app lock never use the text block. Hidden previews rewrite the card
 as a generic conversation card that keeps its shortcut, so it keeps the conversation

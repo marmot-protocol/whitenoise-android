@@ -212,15 +212,20 @@ class ConversationNotificationLandingTest {
         assertEquals(ConversationScrollMode.ReadingHistory(OLDEST_UNREAD, 0), harness.coordinator.mode)
     }
 
-    /** A request that a newer navigation already replaced never positions, so the ordinary entry owns the reveal. */
+    /**
+     * A request that a newer navigation replaced while the target loaded neither lands nor falls back to the unread
+     * entry, because either would write over that navigation. The transcript is revealed where it already is.
+     */
     @Test
-    fun aSupersededRequestNeverLands() {
+    fun aSupersededRequestWritesNothingAndStillRevealsTheTranscript() {
         val harness = Harness(targetHeightDp = 80, requestIsCurrent = false)
         harness.mount()
         harness.awaitAnchored()
+        composeRule.waitForIdle()
+        assertTrue(harness.writes.isEmpty())
         assertTrue(harness.landedBacklogs.isEmpty())
         assertTrue(harness.unavailable.isEmpty())
-        assertEquals(ConversationScrollMode.ReadingHistory(OLDEST_UNREAD, 0), harness.coordinator.mode)
+        assertEquals(ConversationScrollMode.FollowingTail, harness.coordinator.mode)
     }
 
     /** An owner disposed while the target resolved abandons the landing without writing anywhere. */

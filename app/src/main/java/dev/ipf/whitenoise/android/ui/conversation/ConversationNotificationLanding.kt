@@ -188,13 +188,17 @@ internal class ConversationEntryPositioning(
         enterAtUnreadBoundary()
     }
 
-    /** Resolves the card's message under a latest-wins navigation request and lands on it if still current. */
+    /**
+     * Resolves the card's message under a latest-wins navigation request and lands on it if still current. A
+     * request that a newer navigation replaced while the target loaded yields without a write, because the unread
+     * entry would position over whatever that navigation is doing.
+     */
     private suspend fun land(sourceId: String): NotificationLandingOutcome {
         val request = callbacks.notification.beginNavigation()
         val resolution = controller.resolveLandingTarget(sourceId)
         return when {
             !owner.isActive -> NotificationLandingOutcome.ABANDONED
-            !request.isCurrent() -> NotificationLandingOutcome.FALLBACK
+            !request.isCurrent() -> yieldLanding(controller.conversationTimelineStructure(), renderedTimeline())
             resolution is NotificationLandingResolution.Resolved -> landOn(resolution.messageIdHex, request)
             else -> {
                 if (resolution is NotificationLandingResolution.Unavailable) {
