@@ -13,6 +13,7 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@Suppress("LargeClass") // Landing and reader-ownership cases share one owner, coordinator and writer harness.
 class ConversationViewportRestorationOwnerTest {
     @Test
     fun emptyWindowCannotChooseAnEntryOrSavedPosition() {
@@ -495,6 +496,45 @@ class ConversationViewportRestorationOwnerTest {
             assertEquals("nothing may be written back to the landed row", listOf(7 to 300), fixture.writer.writes)
             assertNull(fixture.owner.readingStartGeometry())
             assertEquals(ConversationScrollMode.ReadingHistory("message-4", 240), fixture.coordinator.mode)
+        }
+
+    /**
+     * An animated navigation that starts after the landing moves the original row itself, so a changed offset is not
+     * the reader's scroll. With a non-null reader anchor available, the movement check still must not adopt it,
+     * because adopting would cancel the newer command mid-flight.
+     */
+    @Test
+    fun aNewerAnimatedJumpIsNotCancelledByTheLandingMovementCheck() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry(itemOffset = -300)
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            val release = CompletableDeferred<Unit>()
+            var completed: Boolean? = null
+            val jump =
+                launch {
+                    completed =
+                        fixture.coordinator.programmaticJump("reply-target", ConversationScrollReason.Reply) {
+                            scrollToItem(2)
+                            release.await()
+                            scrollToItem(3)
+                        }
+                }
+            runCurrent()
+            geometry.itemOffset = -240
+            geometry.rowHeight = 1000
+            val reader = ConversationScrollAnchor(7, 240, "item-4", "message-4")
+
+            fixture.owner.onReadingStartGeometry { reader }
+            fixture.owner.onViewportHeight(800, presentation(), navigation(currentAnchor = { reader }))
+            fixture.owner.onStructure(structure().copy(olderHeaderCount = 1), true, currentAnchor = { reader }) { 7 }
+            release.complete(Unit)
+            jump.join()
+
+            assertEquals("the newer jump ran to completion", true, completed)
+            assertEquals(listOf(7 to 300, 2 to 0, 3 to 0), fixture.writer.writes)
         }
 
     /** A viewport resize after the same partial scroll is also left alone, and it adopts where the reader is. */

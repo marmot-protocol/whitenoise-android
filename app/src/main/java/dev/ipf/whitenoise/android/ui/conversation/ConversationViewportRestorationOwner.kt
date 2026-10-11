@@ -217,11 +217,17 @@ internal class ConversationViewportRestorationOwner(
      * accessibility scrolling raise no drag, so nothing else told the coordinator, and its anchor still names the
      * landed message. A landing whose row is no longer laid out, or whose row sits somewhere other than where the
      * landing settled it, is retired and the reader's own anchor becomes the reading position, so neither the
-     * measured settle nor the ordinary reanchor drags the list back. True when the landing was released.
+     * measured settle nor the ordinary reanchor drags the list back. While another command owns the list, such as an
+     * animated mention, reply or search jump, its own movement of the landed row is not the reader's, so nothing is
+     * adopted and that command is never cancelled. True when the landing was released.
      */
     private fun adoptReaderPositionWhenLandingMoved(currentAnchor: () -> ConversationScrollAnchor?): Boolean {
-        val intent = readingStart
-        val left = intent != null && intent.isCurrent(coordinator) && intent.readerLeft()
+        // Reading mode means the list rests, so no animated jump or restore is moving it right now.
+        val intent =
+            readingStart?.takeIf {
+                it.isCurrent(coordinator) && coordinator.mode is ConversationScrollMode.ReadingHistory
+            }
+        val left = intent?.readerLeft() == true
         if (left) {
             readingStart = null
             currentAnchor()?.let(coordinator::settleReadingAt)
