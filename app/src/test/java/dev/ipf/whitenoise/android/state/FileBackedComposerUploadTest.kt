@@ -150,6 +150,25 @@ class FileBackedComposerUploadTest {
             assertEquals(listOf("close"), control.events)
         }
 
+    /** Progress is display only: a counter that cannot be read stops the reports and the upload still returns. */
+    @Test
+    fun anUnreadableCounterNeverFailsTheUpload() =
+        runBlocking {
+            val control = RecordingControl().apply { readable = false }
+            val heard = mutableListOf<Long>()
+
+            val result =
+                withNativeTransferControl(register = {}, onProgress = { heard += it }, newControl = { control }) {
+                    delay(300)
+                    "sent"
+                }
+
+            assertEquals("sent", result)
+            assertTrue(heard.isEmpty())
+            assertEquals("one failed read, never retried", 1, control.failedReads)
+            assertEquals(listOf("close"), control.events)
+        }
+
     /** Without a listener the counter is never read, so sends that show no progress pay nothing for it. */
     @Test
     fun withoutAListenerTheCounterIsNeverRead() =
@@ -171,9 +190,20 @@ private class RecordingControl : MediaFileTransferControlFfi(NoPointer) {
 
     @Volatile private var closed = false
 
-    /** Returns the scripted counter, and fails a read made after release as the native handle would. */
+    @Volatile var readable = true
+
+    @Volatile var failedReads = 0
+
+    /**
+     * Returns the scripted counter, fails a read made after release as the native handle would, and fails
+     * every read while the counter is made unreadable.
+     */
     override fun processedBytes(): ULong {
         check(!closed) { "counter read after the control was released" }
+        if (!readable) {
+            failedReads += 1
+            error("counter unavailable")
+        }
         reads += counter
         return counter.toULong()
     }

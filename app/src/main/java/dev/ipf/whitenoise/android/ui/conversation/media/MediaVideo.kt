@@ -561,7 +561,7 @@ internal fun MediaVideoGridTile(
 
 /**
  * Materializes one inline video and delegates its open request to the conversation host. While a large
- * video is being sent, [uploadProgress] fills the play disc's ring with the send's progress.
+ * video is being sent, [uploadProgress] is read by the play disc's ring, which fills with the send's progress.
  */
 @Composable
 internal fun MediaVideoBubble(
@@ -578,11 +578,9 @@ internal fun MediaVideoBubble(
     uploading: Boolean = false,
     uploadFailed: Boolean = false,
     onRetryUpload: (() -> Unit)? = null,
-    uploadProgress: FileUploadProgress? = null,
+    uploadProgress: () -> FileUploadProgress? = { null },
 ) {
     val record = item.record
-    val uploadRing = uploadProgress?.takeIf { uploading && !uploadFailed }
-    val uploadText = uploadRing?.let { uploadProgressDescription(it) }
     val messageIdHex = record.messageIdHex
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -945,7 +943,7 @@ internal fun MediaVideoBubble(
                                             .size(28.dp)
                                             .clickable { onRetryUpload?.invoke() },
                                 )
-                            uploading -> VideoUploadIndicator(uploadRing?.ringFraction, uploadText)
+                            uploading -> VideoUploadIndicator(uploadProgress)
                             !startDownload && localFile == null ->
                                 Icon(
                                     Icons.Default.Download,
@@ -1535,15 +1533,16 @@ private const val VIDEO_UNAVAILABLE_SCRIM_ALPHA = 0.28f
 private val VIDEO_UNAVAILABLE_GLYPH = 28.dp
 
 /**
- * The play disc's upload ring: determinate while [fraction] is known, otherwise spinning. [description]
- * names the step and its bytes for TalkBack, as the download ring on a video tile does.
+ * The play disc's upload ring, reading [progress] here so only the ring recomposes as bytes move. It is
+ * determinate while a share of work is known and spins otherwise, and it names the step and its bytes for
+ * TalkBack, as the download ring on a video tile does.
  */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
-internal fun VideoUploadIndicator(
-    fraction: Float?,
-    description: String?,
-) {
+internal fun VideoUploadIndicator(progress: () -> FileUploadProgress?) {
+    val current = progress()
+    val fraction = current?.ringFraction
+    val description = current?.let { uploadProgressDescription(it) }
     val spoken =
         if (description != null) {
             Modifier.semantics { contentDescription = description }

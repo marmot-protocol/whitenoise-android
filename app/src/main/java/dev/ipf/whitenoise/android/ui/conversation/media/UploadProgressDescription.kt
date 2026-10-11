@@ -46,24 +46,28 @@ internal fun uploadProgressLabel(progress: FileUploadProgress): String =
         FileUploadPhase.SENDING -> stringResource(R.string.sending)
     }
 
-/** The ring's share of work done, or null once only the message is left to send and no byte count applies. */
+/**
+ * The ring's share of work done, or null while it should keep spinning: before the first byte is counted,
+ * and once only the message is left to send and no byte count applies.
+ */
 internal val FileUploadProgress.ringFraction: Float?
-    get() = fraction.takeIf { phase != FileUploadPhase.SENDING }
+    get() = fraction.takeIf { phase != FileUploadPhase.SENDING && it > 0f }
 
 /**
- * Follows the byte progress of [messageIdHex]'s pending single-file send while [active], and is null
- * otherwise: for albums, for sends held in memory, and once the message is no longer pending.
+ * Follows the byte progress of [messageIdHex]'s pending single-file send while [active]. The returned
+ * reader is read by the ring and label that draw it, so only they recompose as bytes move. It reads null
+ * for albums, for sends held in memory, and once the message is no longer pending.
  */
 @Composable
 internal fun rememberPendingUploadProgress(
     controller: ConversationController,
     messageIdHex: String,
     active: Boolean,
-): FileUploadProgress? {
+): () -> FileUploadProgress? {
     val progress =
         remember(controller, messageIdHex, active) {
             if (active) controller.pendingUploadProgress(messageIdHex) else null
         }
     val state: State<FileUploadProgress?>? = progress?.collectAsStateWithLifecycle()
-    return state?.value
+    return remember(state) { { state?.value } }
 }

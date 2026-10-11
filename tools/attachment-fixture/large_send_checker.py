@@ -9,6 +9,8 @@ TAG_BYTES = 16
 JAVA_GROWTH_LIMIT = 32 * MIB
 NATIVE_GROWTH_LIMIT = 64 * MIB
 REQUIRED_PHASES = ("PREPARING", "ENCRYPTING", "UPLOADING")
+# The per-file ceiling: 512 MiB of ciphertext less its 16-byte tag.
+CEILING_BYTES = 512 * MIB - TAG_BYTES
 FACTS = {
     "large-send": ("sha256_matches", "monotonic", "snapshot_deleted"),
     "cancel": ("cancelled_while_working", "snapshot_deleted"),
@@ -17,7 +19,7 @@ FACTS = {
 
 
 def _measurement(value):
-    """A measured, non-negative, finite integer; booleans are never measurements."""
+    """A measured, non-negative, finite number. Booleans are never measurements."""
     return (not isinstance(value, bool) and isinstance(value, (int, float))
             and not (isinstance(value, float) and not math.isfinite(value)) and value >= 0)
 
@@ -29,10 +31,11 @@ def _completed_upload_sizes(events):
 
 
 def _check_large_send(row, violations):
-    """Heap growth stays bounded, progress names every step in order and the message ends sending."""
+    """Heap growth stays bounded, progress names every step and the message ends sending."""
     for side, limit in (("java", JAVA_GROWTH_LIMIT), ("native", NATIVE_GROWTH_LIMIT)):
         baseline, peak = row.get(f"{side}_baseline_bytes"), row.get(f"{side}_peak_bytes")
-        if not (_measurement(baseline) and _measurement(peak)):
+        # A sampler that never ran reports nothing above the baseline, which must not pass as bounded growth.
+        if not (_measurement(baseline) and _measurement(peak) and 0 < baseline <= peak):
             violations.append(f"large-send: {side} heap was not measured")
         elif peak - baseline > limit:
             violations.append(f"large-send: {side} heap grew by more than {limit // MIB} MiB")
@@ -44,11 +47,13 @@ def _check_large_send(row, violations):
 
 
 def check_large_send(metrics, events):
-    """Judge every scenario row and the fixture ledger; any missing or contrary fact fails the run."""
+    """Judge every scenario row and the fixture ledger. Any missing or contrary fact fails the run."""
     violations = []
     rows = {}
     for row in metrics if isinstance(metrics, list) else []:
         if isinstance(row, dict) and row.get("scenario") in FACTS:
+            if row["scenario"] in rows:
+                violations.append(f"{row['scenario']}: reported more than once")
             rows[row["scenario"]] = row
     for scenario, facts in FACTS.items():
         row = rows.get(scenario)
@@ -67,4 +72,6 @@ def check_large_send(metrics, events):
         size = rows.get(scenario, {}).get("bytes")
         if _measurement(size) and sizes.count(size + TAG_BYTES) != expected:
             violations.append(f"{scenario}: expected {expected} completed upload(s) of its ciphertext")
-    return {"scope": SCOPE, "passed": not violations, "violations": violations}
+    # A run lowered for a small emulator can pass, but it does not qualify the ceiling itself.
+    at_ceiling = rows.get("large-send", {}).get("bytes") == CEILING_BYTES
+    return {"scope": SCOPE, "passed": not violations, "violations": violations, "at_ceiling": at_ceiling}

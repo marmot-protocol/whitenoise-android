@@ -34,7 +34,8 @@ internal class RetainedMediaUpload(
     private var transferCancelRequested = false
     private val transferProgress = MutableStateFlow<FileUploadProgress?>(null)
 
-    // MDK's transfer counter describes a send of one file only, so an album or an in-memory send shows none.
+    // MDK keeps one maximum across a send's items, so its counter describes a single file. An album or a send
+    // held in memory shows none.
     private val singleFileBytes: Long? =
         attachments
             .singleOrNull()

@@ -1039,10 +1039,10 @@
     <string name="media_download_body_known">%1$s di %2$s</string>
     <string name="media_download_body_unknown">%1$s ricevuti</string>
     <string name="media_upload_preparing_body">Preparazione: %1$s di %2$s</string>
-    <string name="media_upload_encrypting_body">Crittografia: %1$s di %2$s</string>
+    <string name="media_upload_encrypting_body">Cifratura: %1$s di %2$s</string>
     <string name="media_upload_body_known">Caricamento: %1$s di %2$s</string>
     <string name="media_upload_preparing">Preparazione</string>
-    <string name="media_upload_encrypting">Crittografia</string>
+    <string name="media_upload_encrypting">Cifratura</string>
     <string name="media_upload_bytes">%1$s di %2$s</string>
     <string name="media_verifying_download">Verifica del download</string>
     <string name="media_decrypting_download">Decrittazione del download</string>
