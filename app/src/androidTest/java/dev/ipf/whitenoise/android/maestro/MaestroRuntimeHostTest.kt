@@ -373,10 +373,10 @@ class MaestroRuntimeHostTest {
                             verifyMaestroSpeechRate(context, checkNotNull(state), postcondition),
                         ).put(
                             "smartFolderRuleVerified",
-                            postcondition.startsWith("smart-rule-") && folderStoreVerified,
+                            postcondition?.startsWith("smart-rule-") == true && folderStoreVerified,
                         ).put(
                             "folderDetailsVerified",
-                            postcondition.startsWith("folder-details-") && folderStoreVerified,
+                            postcondition?.startsWith("folder-details-") == true && folderStoreVerified,
                         ).put(
                             "shareImportVerified",
                             verifyMaestroInboundShare(
