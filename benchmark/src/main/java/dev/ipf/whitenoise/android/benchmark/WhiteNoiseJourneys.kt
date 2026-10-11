@@ -346,6 +346,9 @@ internal class WhiteNoiseJourneys {
         waitForVisibleTag(PerformanceTags.JUMP_TO_MENTION).click()
         waitForText(targetText, NETWORK_STATE_TIMEOUT_MS)
         waitForVisibleTagAbsent(PerformanceTags.JUMP_TO_MENTION, NETWORK_STATE_TIMEOUT_MS)
+        // Read visibility can finish before Compose animation; retain the remaining trace tail.
+        // This is collection time, not a success oracle or a navigation latency budget.
+        SystemClock.sleep(MENTION_CAPTURE_TAIL_MS)
         device.waitForIdle()
     }
 
@@ -863,6 +866,7 @@ internal class WhiteNoiseJourneys {
             "dev.ipf.whitenoise.android.extra.BENCHMARK_RECREATE_ACTIVITY"
         const val PERFORMANCE_TAG_PREFIX = "performance."
         const val EDIT_TEXT_CLASS = "android.widget.EditText"
+        const val MENTION_CAPTURE_TAIL_MS = 3_000L
         const val DEFAULT_TIMEOUT_MS = 15_000L
         const val STARTUP_TIMEOUT_MS = 30_000L
         const val NETWORK_STATE_TIMEOUT_MS = 45_000L

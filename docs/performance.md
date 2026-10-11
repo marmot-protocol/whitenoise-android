@@ -889,3 +889,5 @@ the benchmark JSON artifact, and link the relevant traces.
 | --- | ---: | ---: | ---: |
 | Cold startup → initial display | _ms_ | _ms_ | _%_ |
 | Open group → members visible | _ms_ | _ms_ | _%_ |
+
+The mention benchmark retains a three-second collection tail after visible read completion so Compose animation and highlight spans can finish. This is not a completion assertion or a latency budget: the report still rejects missing, unfinished, ambiguous or stale landings. Qualified mention frame metrics use tap-to-landing, excluding the highlight and collection tail; `journey_ms` includes collection time.
