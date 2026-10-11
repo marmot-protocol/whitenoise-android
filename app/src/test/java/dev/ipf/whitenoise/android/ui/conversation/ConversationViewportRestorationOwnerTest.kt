@@ -473,6 +473,49 @@ class ConversationViewportRestorationOwnerTest {
             assertEquals(ConversationScrollMode.ReadingHistory("message-1", 40), fixture.coordinator.mode)
         }
 
+    /**
+     * A wheel, key or accessibility scroll that leaves the landed row partly visible moves its offset without any
+     * drag. When the row's height then changes, the reader keeps the position they scrolled to and the landing is
+     * retired, instead of the settle returning the list to the row's beginning.
+     */
+    @Test
+    fun aPartialNonDragScrollThenRowGrowthKeepsTheReadersPosition() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry(itemOffset = -300)
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            geometry.itemOffset = -240
+            geometry.rowHeight = 1000
+            val reader = ConversationScrollAnchor(7, 240, "item-4", "message-4")
+
+            fixture.owner.onReadingStartGeometry { reader }
+
+            assertEquals("nothing may be written back to the landed row", listOf(7 to 300), fixture.writer.writes)
+            assertNull(fixture.owner.readingStartGeometry())
+            assertEquals(ConversationScrollMode.ReadingHistory("message-4", 240), fixture.coordinator.mode)
+        }
+
+    /** A viewport resize after the same partial scroll is also left alone, and it adopts where the reader is. */
+    @Test
+    fun aViewportChangeAfterAPartialNonDragScrollKeepsTheReadersPosition() =
+        runTest {
+            val fixture = Fixture()
+            val geometry = LandingGeometry(itemOffset = -300)
+            val position = landingPosition()
+            fixture.owner.commitInitialPosition(position, { measured() }, {}, geometry.probe())
+            fixture.owner.completeInitialPosition(position, structure(), 720)
+            geometry.itemOffset = -240
+            val reader = ConversationScrollAnchor(7, 240, "item-4", "message-4")
+
+            fixture.owner.onViewportHeight(800, presentation(), navigation(currentAnchor = { reader }))
+
+            assertEquals(listOf(7 to 300), fixture.writer.writes)
+            assertNull(fixture.owner.readingStartGeometry())
+            assertEquals(ConversationScrollMode.ReadingHistory("message-4", 240), fixture.coordinator.mode)
+        }
+
     /** A viewport resize after the same scroll away is also left alone, and it adopts where the reader is. */
     @Test
     fun aViewportChangeAfterANonDragScrollAwayKeepsTheReadersPosition() =
@@ -610,12 +653,13 @@ class ConversationViewportRestorationOwnerTest {
     private class LandingGeometry(
         var viewportEnd: Int = 500,
         var rowHeight: Int? = 800,
+        var itemOffset: Int? = null,
     ) {
         /** A probe resolving the landing row by identity at its planned index. */
         fun probe() =
             ConversationReadingStartProbe(
                 resolveTargetIndex = { 7 },
-                readLayout = { ConversationMentionJumpLayout(viewportEnd, rowHeight) },
+                readLayout = { ConversationMentionJumpLayout(viewportEnd, rowHeight, itemOffsetPx = itemOffset) },
                 traceSections = false,
             )
     }

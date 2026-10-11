@@ -55,7 +55,7 @@ internal fun ConversationViewportRestorationEffects(
         snapshotFlow { owner.readingStartGeometry().takeUnless { currentInputs.presentation.imeIsOpen } }
             .filterNotNull()
             .distinctUntilChanged()
-            .collect { owner.onReadingStartGeometry() }
+            .collect { owner.onReadingStartGeometry(currentCallbacks.navigation.currentAnchor) }
     }
     ConversationSavedViewportEffect(controller, viewport, owner, inputs, callbacks.onAnchored)
     ConversationEntryViewportEffect(controller, viewport, owner, inputs, callbacks)

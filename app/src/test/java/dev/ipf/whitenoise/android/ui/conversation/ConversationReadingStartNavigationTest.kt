@@ -264,6 +264,67 @@ class ConversationReadingStartNavigationTest {
             assertNull(intent.geometry())
         }
 
+    /** A reader's scroll shows as a changed row offset, which a growing row or a resize alone never causes. */
+    @Test
+    fun theIntentSeesAScrollAsAChangedRowOffsetOnly() {
+        var offset: Int? = -300
+        var height = 800
+        val intent =
+            ConversationReadingStartIntent(
+                anchor = ConversationScrollAnchor(5, -300, "item", TARGET),
+                probe =
+                    probe(
+                        index = { 5 },
+                        layout = { ConversationMentionJumpLayout(500, height, itemOffsetPx = offset) },
+                    ),
+                placement = ConversationReadingStartPlacement(5, 300),
+                intentRevision = 0,
+            )
+        height = 1000
+        assertFalse("growth alone keeps the row's offset", intent.readerMoved())
+        offset = -299
+        assertFalse("rounding is not a scroll", intent.readerMoved())
+        offset = -240
+        assertTrue("a scroll moves the offset", intent.readerMoved())
+        assertTrue(intent.readerLeft())
+    }
+
+    /** Without a baseline offset there is nothing to compare, so the first reading becomes the baseline. */
+    @Test
+    fun theIntentAdoptsItsFirstReadingAsTheBaselineWhenItHadNone() {
+        var offset: Int? = null
+        val intent =
+            ConversationReadingStartIntent(
+                anchor = ConversationScrollAnchor(5, 0, "item", TARGET),
+                probe =
+                    probe(
+                        index = { 5 },
+                        layout = { ConversationMentionJumpLayout(500, 800, itemOffsetPx = offset) },
+                    ),
+                placement = ConversationReadingStartPlacement(5, 300),
+                intentRevision = 0,
+            )
+        assertFalse("an unmeasured offset cannot show a move", intent.readerMoved())
+        offset = -300
+        assertFalse("the first measured offset is the baseline", intent.readerMoved())
+        offset = -200
+        assertTrue(intent.readerMoved())
+    }
+
+    /** A row that is not laid out has no offset to compare, and the landing reads it as left, not moved. */
+    @Test
+    fun anUnlaidRowIsLeftAndNeverMoved() {
+        val intent =
+            ConversationReadingStartIntent(
+                anchor = ConversationScrollAnchor(5, 0, "item", TARGET),
+                probe = probe(index = { null }, layout = { ConversationMentionJumpLayout(500, null) }),
+                placement = ConversationReadingStartPlacement(5, 300),
+                intentRevision = 0,
+            )
+        assertFalse(intent.readerMoved())
+        assertTrue(intent.readerLeft())
+    }
+
     /** A probe over scripted geometry, with tracing off. */
     private fun probe(
         index: () -> Int?,

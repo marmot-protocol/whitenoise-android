@@ -139,9 +139,13 @@ internal class ConversationViewportRestorationOwner(
     /** Fresh geometry of the landing's target while it still owns the viewport, null once nothing does. */
     fun readingStartGeometry(): Pair<Int, Int>? = readingStart?.takeIf { it.isCurrent(coordinator) }?.geometry()
 
-    /** Re-settles a landing after its row or viewport changed size, unless a gesture already took over. */
-    suspend fun onReadingStartGeometry() {
-        if (isActive) resettleReadingStart()
+    /**
+     * Re-settles a landing after its row or viewport changed size, unless a gesture already took over. A reader who
+     * scrolled partway through the landed row by an input that raises no drag keeps the position they are at, which
+     * [currentAnchor] supplies, instead of being returned to the row's beginning.
+     */
+    suspend fun onReadingStartGeometry(currentAnchor: () -> ConversationScrollAnchor? = { null }) {
+        if (isActive && !adoptReaderPositionWhenLandingMoved(currentAnchor)) resettleReadingStart()
     }
 
     /**
@@ -182,7 +186,7 @@ internal class ConversationViewportRestorationOwner(
                     resultingMode = ConversationScrollMode.FollowingTail,
                 ) { scrollToTail(navigation.tailIndex()) }
             is ConversationScrollMode.ReadingHistory ->
-                if (!adoptReaderPositionWhenLandingLeft(navigation.currentAnchor) && !resettleReadingStart()) {
+                if (!adoptReaderPositionWhenLandingMoved(navigation.currentAnchor) && !resettleReadingStart()) {
                     coordinator.reanchorReadingHistory(navigation.resolveAnchor)
                 }
             else -> Unit
@@ -203,20 +207,21 @@ internal class ConversationViewportRestorationOwner(
         if (!isActive) return
         val changed = reanchorGate.onStructure(structure)
         val needsReanchor = anchored && changed
-        if (needsReanchor && !adoptReaderPositionWhenLandingLeft(currentAnchor) && !resettleReadingStart()) {
+        if (needsReanchor && !adoptReaderPositionWhenLandingMoved(currentAnchor) && !resettleReadingStart()) {
             coordinator.reanchorReadingHistory(resolveAnchor)
         }
     }
 
     /**
-     * Hands the viewport to a reader who scrolled the landed message out of view. Wheel, keyboard and accessibility
-     * scrolling raise no drag, so nothing else told the coordinator, and its anchor still names the landed message.
-     * A landing whose row is no longer laid out is retired and the reader's own anchor becomes the reading position,
-     * so neither the measured settle nor the ordinary reanchor drags the list back. True when the landing was released.
+     * Hands the viewport to a reader who scrolled the landed message, away or only partway. Wheel, keyboard and
+     * accessibility scrolling raise no drag, so nothing else told the coordinator, and its anchor still names the
+     * landed message. A landing whose row is no longer laid out, or whose row sits somewhere other than where the
+     * landing settled it, is retired and the reader's own anchor becomes the reading position, so neither the
+     * measured settle nor the ordinary reanchor drags the list back. True when the landing was released.
      */
-    private fun adoptReaderPositionWhenLandingLeft(currentAnchor: () -> ConversationScrollAnchor?): Boolean {
+    private fun adoptReaderPositionWhenLandingMoved(currentAnchor: () -> ConversationScrollAnchor?): Boolean {
         val intent = readingStart
-        val left = intent != null && intent.isCurrent(coordinator) && intent.geometry() == null
+        val left = intent != null && intent.isCurrent(coordinator) && intent.readerLeft()
         if (left) {
             readingStart = null
             currentAnchor()?.let(coordinator::settleReadingAt)

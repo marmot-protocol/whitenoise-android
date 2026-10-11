@@ -6,6 +6,9 @@ import dev.ipf.whitenoise.android.state.tracedPagingSection
 
 private const val MAX_READING_START_LAYOUT_CORRECTIONS = 3
 
+/** Offsets within this many pixels of the settled one are measurement rounding, not a reader's scroll. */
+private const val MOVED_OFFSET_TOLERANCE_PX = 1
+
 /**
  * Measured reverse-list coordinates, not a second timeline or protocol-state cache. Shared by the mention
  * button and notification landing through the reading-start settle.
@@ -261,6 +264,12 @@ internal class ConversationReadingStartIntent(
     val targetMessageId: String?
         get() = anchor.messageId
 
+    /** Where the target row sat in the list when the landing last settled, the baseline for [readerMoved]. */
+    private var settledItemOffsetPx: Int? = readItemOffsetPx()
+
+    /** The target row's current list offset, or null while it is not laid out. */
+    private fun readItemOffsetPx(): Int? = probe.resolveTargetIndex()?.let(probe.readLayout)?.itemOffsetPx
+
     /** True while no gesture, command or restore has replaced the intent this landing settled. */
     fun isCurrent(coordinator: ConversationScrollCoordinator) = coordinator.intentToken.revision == intentRevision
 
@@ -279,6 +288,22 @@ internal class ConversationReadingStartIntent(
         return layout.viewportEndOffsetPx to itemHeight
     }
 
+    /** True when the reader scrolled the landed row out of view or only partway, by any input. */
+    fun readerLeft(): Boolean = geometry() == null || readerMoved()
+
+    /**
+     * Whether the reader moved the list since the landing last settled, by an input that raises no drag, such as a
+     * wheel, a key or an accessibility scroll action. A row that merely grows or a viewport that resizes keeps its
+     * offset from the list's start edge, so only a scroll changes it while the intent is still current. Without a
+     * baseline there is nothing to compare, so the first reading becomes the baseline.
+     */
+    fun readerMoved(): Boolean {
+        val now = readItemOffsetPx() ?: return false
+        val before = settledItemOffsetPx
+        if (before == null) settledItemOffsetPx = now
+        return before != null && kotlin.math.abs(now - before) > MOVED_OFFSET_TOLERANCE_PX
+    }
+
     /**
      * Reruns the shared settle against current geometry and records the new placement as the durable
      * reading anchor. A gesture or newer command that wins the race leaves its own intent untouched.
@@ -293,10 +318,13 @@ internal class ConversationReadingStartIntent(
                 approach = ConversationReadingStartApproach.InPlace(placement),
             )
         val placed = result.placement
-        if (placed != null && placed != placement && coordinator.intentToken.revision == before) {
-            placement = placed
-            coordinator.settleReadingAt(anchor.copy(listIndex = placed.index, pixelOffset = placed.offsetPx))
-            intentRevision = coordinator.intentToken.revision
+        if (placed != null && coordinator.intentToken.revision == before) {
+            if (placed != placement) {
+                placement = placed
+                coordinator.settleReadingAt(anchor.copy(listIndex = placed.index, pixelOffset = placed.offsetPx))
+                intentRevision = coordinator.intentToken.revision
+            }
+            settledItemOffsetPx = readItemOffsetPx()
         }
         return result.commandCompleted
     }

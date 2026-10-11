@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
@@ -14,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -293,6 +295,29 @@ class ConversationNotificationLandingTest {
     }
 
     /**
+     * A wheel, key or accessibility scroll raises no drag. When it leaves the landed message partly visible and the
+     * message's media then grows, the reader keeps the position they scrolled to: the landing is retired, so
+     * neither the late-media settle nor the reanchor returns the list to the message's beginning.
+     */
+    @Test
+    fun aPartialNonDragScrollThenRowGrowthKeepsTheReadersPosition() {
+        val harness = Harness(targetHeightDp = 300)
+        harness.mount()
+        harness.awaitAnchored()
+        harness.assertLandedAtTop(NOTIFIED)
+        harness.scrollReaderBy(PARTIAL_SCROLL_PX)
+        val scrolledTop = harness.topRelativeToList(NOTIFIED)
+        assertTrue("the scroll must move the row but leave it partly visible: $scrolledTop", scrolledTop < -1f)
+        harness.growTarget(by = 200)
+        harness.awaitSettled()
+        assertTrue(
+            "late growth must not return the reader to the row's beginning: ${harness.topRelativeToList(NOTIFIED)}",
+            harness.topRelativeToList(NOTIFIED) < -1f,
+        )
+        assertNull(harness.owner.readingStartGeometry())
+    }
+
+    /**
      * A drag that takes the scroll during the landing's first layout wait ends the landing: it writes nothing more,
      * neither retries nor falls back to the unread entry, and still reveals the transcript where the reader is.
      */
@@ -380,6 +405,8 @@ class ConversationNotificationLandingTest {
         private val requestId = mutableLongStateOf(1L)
         lateinit var coordinator: ConversationScrollCoordinator
         lateinit var owner: ConversationViewportRestorationOwner
+        private lateinit var list: LazyListState
+        private val targetHeight = mutableIntStateOf(targetHeightDp)
 
         /** Every list write the production writer performed, in order. */
         val writes = mutableListOf<Pair<Int, Int>>()
@@ -428,6 +455,7 @@ class ConversationNotificationLandingTest {
                         LocalDensity provides Density(LocalDensity.current.density, fontScale),
                     ) {
                         val listState = rememberLazyListState()
+                        list = listState
                         val viewport = remember(listState) { ConversationTimelineViewport(listState) }
                         coordinator =
                             remember(listState) {
@@ -484,7 +512,7 @@ class ConversationNotificationLandingTest {
                     repeat(targetBodyLines) { Text("Notified line $it") }
                 }
             } else {
-                val rowHeightDp = if (isTarget) targetHeightDp else ROW_HEIGHT_DP
+                val rowHeightDp = if (isTarget) targetHeight.intValue else ROW_HEIGHT_DP
                 Text("Message", Modifier.fillMaxWidth().height(rowHeightDp.dp).testTag(messageId))
             }
         }
@@ -505,7 +533,8 @@ class ConversationNotificationLandingTest {
         /** Recording callbacks for anchoring, backlog seeding and unavailable-target feedback. */
         private fun callbacks() =
             ConversationViewportRestorationCallbacks(
-                navigation = ConversationViewportNavigation(this::resolveLandingRow) { 0 },
+                navigation =
+                    ConversationViewportNavigation(this::resolveLandingRow, currentAnchor = ::readerAnchor) { 0 },
                 onAnchored = { anchored.value = true },
                 retireUnreadDivider = { dividerRetirements += 1 },
                 notification =
@@ -557,6 +586,54 @@ class ConversationNotificationLandingTest {
                 Thread.sleep(POLL_MILLIS)
             }
             assertTrue("the entry never anchored the transcript", anchored.value)
+            composeRule.waitForIdle()
+        }
+
+        /** Where the reader actually is now, the way the screen captures it from the live list. */
+        private fun readerAnchor(): ConversationScrollAnchor {
+            val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
+            return conversationScrollAnchor(
+                list,
+                rendered.map { it.id },
+                rendered.map { it.record.messageIdHex },
+                controller.conversationTrailingRowCount(rendered.size),
+            )
+        }
+
+        /** Scrolls the list by raw delta, as a wheel, a key or an accessibility action does, with no drag. */
+        fun scrollReaderBy(px: Float) {
+            composeRule.runOnIdle { list.dispatchRawDelta(px) }
+            composeRule.waitForIdle()
+        }
+
+        /** Grows the notified row, as late media measurement does. */
+        fun growTarget(by: Int) {
+            composeRule.runOnIdle { targetHeight.intValue += by }
+            composeRule.waitForIdle()
+        }
+
+        /** The row's top edge relative to the list's top, negative once it is scrolled above it. */
+        fun topRelativeToList(messageId: String): Float {
+            val listTop =
+                composeRule
+                    .onNodeWithTag(LIST_TAG)
+                    .getUnclippedBoundsInRoot()
+                    .top.value
+            val rowTop =
+                composeRule
+                    .onNodeWithTag(messageId)
+                    .getUnclippedBoundsInRoot()
+                    .top.value
+            return rowTop - listTop
+        }
+
+        /** Lets the geometry and structure effects run to rest after a layout change. */
+        fun awaitSettled() {
+            repeat(SETTLE_PUMPS) {
+                composeRule.waitForIdle()
+                ShadowLooper.idleMainLooper()
+                Thread.sleep(POLL_MILLIS)
+            }
             composeRule.waitForIdle()
         }
 
@@ -617,6 +694,8 @@ class ConversationNotificationLandingTest {
         const val AWAIT_MILLIS = 10_000L
         const val LIST_TAG = "landing-list"
         const val DRAG_ON_RESOLUTION = 2
+        const val PARTIAL_SCROLL_PX = -80f
+        const val SETTLE_PUMPS = 20
         const val DRAG_ANCHOR_ID = "dragged-row"
 
         /** A deterministic 64-hex message id for one list position. */
