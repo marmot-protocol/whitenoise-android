@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.share
 
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -21,12 +22,12 @@ import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountExtra
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.conversationShortcutIsRich
 import dev.ipf.whitenoise.android.notifications.genericNotificationShortcut
+import dev.ipf.whitenoise.android.notifications.isConversationShortcutId
 import dev.ipf.whitenoise.android.notifications.notificationConversationIcon
 import dev.ipf.whitenoise.android.notifications.preferredConversationShortcutTitle
 import dev.ipf.whitenoise.android.notifications.shortcutPreviewAllowed
 import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
-import kotlin.math.min
 
 internal const val MAX_SHARE_SHORTCUTS = 8
 private const val SHARE_SHORTCUT_SHORT_LABEL_MAX = 24
@@ -61,6 +62,45 @@ internal fun selectShareShortcutTargets(
                 avatarBitmap = item.firstFrameAvatar?.image?.asAndroidBitmap(),
             )
         }
+
+/** The ranked targets to publish and the card-backed dynamic shortcuts that must stay published beside them. */
+internal data class ShareShortcutPlan(
+    val targets: List<ShareShortcutTarget>,
+    val retained: List<ShortcutInfoCompat>,
+)
+
+/**
+ * Fits the ranked [candidates] beside the [cardBacked] shortcuts under the platform's [maxShortcuts] cap.
+ * Replacing the dynamic set deletes any dynamic shortcut it omits, and Android removes a deleted shortcut's
+ * conversation channel together with the live cards posted into it, so a shortcut that still backs a card is
+ * retained and the lowest-ranked targets give up their slots first. A card-backed shortcut that is also a
+ * target is published once, as the target.
+ */
+internal fun planShareShortcuts(
+    candidates: List<ShareShortcutTarget>,
+    cardBacked: List<ShortcutInfoCompat>,
+    maxShortcuts: Int,
+): ShareShortcutPlan {
+    val cards = cardBacked.distinctBy { it.id }.sortedBy { it.rank }
+    for (count in candidates.size downTo 0) {
+        val targets = candidates.take(count)
+        val targetIds = targets.mapNotNull { conversationShortcutId(it.accountRef, it.groupIdHex) }.toSet()
+        val retained = cards.filterNot { it.id in targetIds }
+        if (targets.size + retained.size <= maxShortcuts) return ShareShortcutPlan(targets, retained)
+    }
+    return ShareShortcutPlan(emptyList(), cards.take(maxShortcuts.coerceAtLeast(0)))
+}
+
+/** Shortcut ids of this app's live conversation cards, read from the platform so no card state is duplicated here. */
+internal fun liveCardShortcutIds(context: Context): Set<String> =
+    runCatching {
+        context
+            .getSystemService(NotificationManager::class.java)
+            .activeNotifications
+            .mapNotNull { it.notification.shortcutId }
+            .filter(::isConversationShortcutId)
+            .toSet()
+    }.getOrDefault(emptySet())
 
 internal fun buildShareShortcutIntent(context: Context): Intent =
     Intent(context, MainActivity::class.java).apply {
@@ -107,13 +147,55 @@ private fun rebuildRichShareShortcut(
     existing: ShortcutInfoCompat,
     rank: Int,
     previewToken: NotificationPreviewToken,
+): ShortcutInfoCompat =
+    rebuildShortcut(
+        context = context,
+        existing = existing,
+        title = preferredConversationShortcutTitle(target.title, existing.longLabel?.toString()),
+        avatarBitmap = target.avatarBitmap ?: AvatarImageLoader.peekBitmap(target.avatarUrl),
+        rank = rank,
+        categories = existing.categories.orEmpty() + CONVERSATION_SHARE_TARGET_CATEGORY,
+        extras = shareShortcutExtras(target.accountRef, existing.extras, previewToken),
+    )
+
+/**
+ * Re-expresses a dynamic shortcut that still backs a live card so replacing the dynamic set cannot delete its
+ * conversation. Ownership, preview stamp and routing carry over unchanged, so the privacy gate that follows still
+ * judges it by the policy it was published under, and the share-target category is dropped because a retained
+ * entry is not a recent chat of the active account.
+ */
+private fun rebuildCardBackedShortcut(
+    context: Context,
+    existing: ShortcutInfoCompat,
+    rank: Int,
 ): ShortcutInfoCompat {
-    val title = preferredConversationShortcutTitle(target.title, existing.longLabel?.toString())
+    val label = existing.longLabel?.toString()
+    return rebuildShortcut(
+        context = context,
+        existing = existing,
+        title = if (label.isNullOrBlank()) context.getString(R.string.app_name) else label,
+        avatarBitmap = null,
+        rank = rank,
+        categories = existing.categories.orEmpty() - CONVERSATION_SHARE_TARGET_CATEGORY,
+        extras = existing.extras?.let { PersistableBundle(it) },
+    )
+}
+
+/** Copies the routing fields of a platform readback onto a fresh long-lived shortcut with a rebuilt icon and person. */
+private fun rebuildShortcut(
+    context: Context,
+    existing: ShortcutInfoCompat,
+    title: String,
+    avatarBitmap: Bitmap?,
+    rank: Int,
+    categories: Set<String>,
+    extras: PersistableBundle?,
+): ShortcutInfoCompat {
     val icon =
         notificationConversationIcon(
             title = title,
             seed = existing.id,
-            avatarBitmap = target.avatarBitmap ?: AvatarImageLoader.peekBitmap(target.avatarUrl),
+            avatarBitmap = avatarBitmap,
         )
     val person =
         Person
@@ -132,10 +214,8 @@ private fun rebuildRichShareShortcut(
             .setPerson(person)
             .setRank(rank)
             .setLongLived(true)
-            .setCategories(existing.categories.orEmpty() + CONVERSATION_SHARE_TARGET_CATEGORY)
-            .setExtras(
-                shareShortcutExtras(target.accountRef, existing.extras, previewToken),
-            )
+            .setCategories(categories)
+    extras?.let(builder::setExtras)
     existing.activity?.let(builder::setActivity)
     existing.disabledMessage?.let(builder::setDisabledMessage)
     existing.locusId?.let(builder::setLocusId)
@@ -158,6 +238,10 @@ private fun shareShortcutExtras(
     return extras
 }
 
+/**
+ * Publishes the active account's recent chats as Direct Share targets. [dynamicShortcuts] and [cardShortcutIds]
+ * identify the dynamic shortcuts that still back live cards, which every publication keeps.
+ */
 class ShareShortcutPublisher(
     private val context: Context,
     private val maxShortcutCount: () -> Int = {
@@ -173,6 +257,10 @@ class ShareShortcutPublisher(
             ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or ShortcutManagerCompat.FLAG_MATCH_CACHED,
         )
     },
+    private val dynamicShortcuts: () -> List<ShortcutInfoCompat> = {
+        ShortcutManagerCompat.getDynamicShortcuts(context)
+    },
+    private val cardShortcutIds: () -> Set<String> = { liveCardShortcutIds(context) },
 ) {
     /**
      * Publish recent-chat Direct Share targets for the active account only.
@@ -199,44 +287,59 @@ class ShareShortcutPublisher(
         if (!PinnedConversationTokens.isPublicationCurrent(publicationGeneration)) return
         val previewToken = NotificationPreviewPreferences.capture(context)
         val maxShortcuts = maxShortcutCount().coerceAtLeast(0)
-        val limit = min(MAX_SHARE_SHORTCUTS, maxShortcuts)
         val chatsByGroup = chats.associateBy { it.group.groupIdHex }
-        val targets =
-            selectShareShortcutTargets(accountRef, chats, limit, displayTitle).map { target ->
+        val candidates =
+            selectShareShortcutTargets(accountRef, chats, MAX_SHARE_SHORTCUTS, displayTitle).map { target ->
                 val item = chatsByGroup[target.groupIdHex] ?: return@map target
                 val (changed, bitmap) = avatarOverride(accountRef, item)
                 if (changed) target.copy(avatarBitmap = bitmap, avatarUrl = null, localContactAvatar = true) else target
             }
-        val existing = existingShortcuts()
-        val existingById = existing.associateBy { it.id }
-        val shortcuts =
-            if (targets.isEmpty()) {
-                emptyList()
-            } else {
-                targets.mapIndexedNotNull { rank, target ->
-                    val shortcutId =
-                        conversationShortcutId(accountRef, target.groupIdHex)
-                            ?: return@mapIndexedNotNull null
-                    val existing = existingById[shortcutId]
-                    if (existing != null && conversationShortcutIsRich(existing)) {
-                        rebuildRichShareShortcut(context, target, existing, rank, previewToken)
-                    } else {
-                        buildShareShortcut(
-                            context,
-                            target,
-                            existing?.longLabel?.toString(),
-                            rank,
-                            previewToken,
-                        )
-                    }
-                }
-            }
+        val existingById = existingShortcuts().associateBy { it.id }
         synchronized(UserEventNotificationGroup.mutationLock) {
             if (!isCurrent()) return@synchronized
             if (!PinnedConversationTokens.isPublicationCurrent(publicationGeneration)) return@synchronized
-            setDynamicShortcuts(currentPublicationShortcuts(accountRef, chats, shortcuts))
+            // Card posts hold this lock while they publish a shortcut, so the live-card read cannot miss one.
+            val plan = planShareShortcuts(candidates, cardBackedShortcuts(), maxShortcuts)
+            val targetShortcuts = targetShortcuts(accountRef, plan.targets, existingById, previewToken)
+            val retainedShortcuts =
+                plan.retained.mapIndexed { index, shortcut ->
+                    rebuildCardBackedShortcut(context, shortcut, targetShortcuts.size + index)
+                }
+            setDynamicShortcuts(currentPublicationShortcuts(accountRef, chats, targetShortcuts + retainedShortcuts))
         }
     }
+
+    /** Dynamic conversation shortcuts that still back a live card, which replacing the dynamic set must not delete. */
+    private fun cardBackedShortcuts(): List<ShortcutInfoCompat> {
+        val cards = cardShortcutIds()
+        if (cards.isEmpty()) return emptyList()
+        return dynamicShortcuts().filter { it.id in cards && isConversationShortcutId(it.id) }
+    }
+
+    /** Builds the ranked recent-chat shortcuts, upgrading rich notification shortcuts instead of downgrading them. */
+    private fun targetShortcuts(
+        accountRef: String,
+        targets: List<ShareShortcutTarget>,
+        existingById: Map<String, ShortcutInfoCompat>,
+        previewToken: NotificationPreviewToken,
+    ): List<ShortcutInfoCompat> =
+        targets.mapIndexedNotNull { rank, target ->
+            val shortcutId =
+                conversationShortcutId(accountRef, target.groupIdHex)
+                    ?: return@mapIndexedNotNull null
+            val existing = existingById[shortcutId]
+            if (existing != null && conversationShortcutIsRich(existing)) {
+                rebuildRichShareShortcut(context, target, existing, rank, previewToken)
+            } else {
+                buildShareShortcut(
+                    context,
+                    target,
+                    existing?.longLabel?.toString(),
+                    rank,
+                    previewToken,
+                )
+            }
+        }
 
     /** Resolves final privacy and private-contact pixels only inside the caller's publication lock. */
     private fun currentPublicationShortcuts(

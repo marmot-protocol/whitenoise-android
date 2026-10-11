@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+  "legacy_sha256": "a9b3c8ea4ac3589ed180c39357f4465526d8048c47c6e55cc726e42950b8c437",
+  "categories": {
+    "android_entry_points": [
+      {
+        "surface": "android-direct-share:conversation-shortcuts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+        "anchor": "class ShareShortcutPublisher",
+        "test_ids": [
+          "SYS-011"
+        ]
+      }
+    ],
+    "notification_content_contracts": [
+      {
+        "surface": "Direct Share preview privacy fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+        "anchor": "genericNotificationShortcut(context, shortcut)",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Live-card shortcut retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+        "anchor": "fun planShareShortcuts(",
+        "test_ids": [
+          "NTF-041"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.share
 
+import android.Manifest
+import android.app.NotificationManager
+import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -25,6 +28,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -337,6 +341,163 @@ class ShareShortcutPublisherTest {
             assertEquals(context.getString(R.string.app_name), result.single().longLabel)
             assertTrue(result.single().extras!!.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
         }
+
+    /** A shortcut that still backs a live card is kept beside the recent chats, so its channel and card survive. */
+    @Test
+    fun publish_retainsADynamicShortcutThatStillBacksALiveCard() {
+        val card = cardShortcut("other", "pending-group", "Pending title")
+        var published = emptyList<ShortcutInfoCompat>()
+
+        publisherWithCards(maxShortcuts = 8, cards = listOf(card)) { published = it }
+            .publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
+
+        assertEquals(listOf(conversationShortcutId("acct", "g1"), card.id), published.map { it.id })
+        val kept = published.last()
+        assertEquals("Pending title", kept.longLabel)
+        assertEquals(1, kept.rank)
+        assertEquals(
+            conversationShortcutAccountScope("other"),
+            kept.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
+        )
+        assertTrue(kept.categories.isNullOrEmpty())
+    }
+
+    /** Card-backed shortcuts take their slots first, so the lowest-ranked recent chats give theirs up. */
+    @Test
+    fun publish_cardBackedShortcutsTakeSlotsFromTheLowestRankedTargets() {
+        val cards = listOf(cardShortcut("other", "c1", "One", rank = 0), cardShortcut("other", "c2", "Two", rank = 1))
+        var published = emptyList<ShortcutInfoCompat>()
+
+        publisherWithCards(maxShortcuts = 3, cards = cards) { published = it }
+            .publish(
+                "acct",
+                listOf(chat("g1", pending = false), chat("g2", pending = false), chat("g3", pending = false)),
+            ) { it.group.name }
+
+        assertEquals(
+            listOf(conversationShortcutId("acct", "g1"), cards[0].id, cards[1].id),
+            published.map { it.id },
+        )
+    }
+
+    /** A card-backed conversation that is also a recent chat is published once, as the share target. */
+    @Test
+    fun publish_publishesACardBackedShortcutOnceWhenItIsAlsoARecentChat() {
+        val card = cardShortcut("acct", "g2", "Group two")
+        var published = emptyList<ShortcutInfoCompat>()
+
+        publisherWithCards(maxShortcuts = 8, cards = listOf(card)) { published = it }
+            .publish("acct", listOf(chat("g1", pending = false), chat("g2", pending = false))) { it.group.name }
+
+        assertEquals(
+            listOf(conversationShortcutId("acct", "g1"), conversationShortcutId("acct", "g2")),
+            published.map { it.id },
+        )
+        assertTrue(published.all { it.categories?.contains(CONVERSATION_SHARE_TARGET_CATEGORY) == true })
+    }
+
+    /** More card-backed shortcuts than the platform allows are capped, never passed over the limit. */
+    @Test
+    fun publish_neverExceedsThePlatformLimitWithCardBackedShortcuts() {
+        val cards = (0..2).map { cardShortcut("other", "c$it", "Card $it", rank = it) }
+        var published = emptyList<ShortcutInfoCompat>()
+
+        publisherWithCards(maxShortcuts = 2, cards = cards) { published = it }
+            .publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
+
+        assertEquals(cards.take(2).map { it.id }, published.map { it.id })
+    }
+
+    /** Without a live card the dynamic inventory is never read and the publication is unchanged. */
+    @Test
+    fun publish_withoutLiveCardsDoesNotReadTheDynamicInventory() {
+        var published = emptyList<ShortcutInfoCompat>()
+        val publisher =
+            ShareShortcutPublisher(
+                context = RuntimeEnvironment.getApplication(),
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = { published = it },
+                existingShortcuts = { emptyList() },
+                dynamicShortcuts = { error("the dynamic inventory is only needed when a card is live") },
+                cardShortcutIds = { emptySet() },
+            )
+
+        publisher.publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
+
+        assertEquals(listOf(conversationShortcutId("acct", "g1")), published.map { it.id })
+    }
+
+    /** A retained shortcut published under another preview policy is redacted like any other entry. */
+    @Test
+    fun publish_redactsARetainedShortcutPublishedUnderAnotherPreviewPolicy() {
+        val context = RuntimeEnvironment.getApplication()
+        val unstamped =
+            checkNotNull(
+                buildShareShortcut(context, ShareShortcutTarget("other", "pending-group", "Private title")),
+            )
+        var published = emptyList<ShortcutInfoCompat>()
+
+        publisherWithCards(maxShortcuts = 8, cards = listOf(unstamped)) { published = it }
+            .publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
+
+        val kept = published.single { it.id == unstamped.id }
+        assertEquals(context.getString(R.string.app_name), kept.longLabel)
+        assertTrue(kept.extras!!.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
+    }
+
+    /** Only conversation shortcut ids of posted cards count, so unrelated cards and cards without one are ignored. */
+    @Test
+    fun liveCardShortcutIds_readsTheShortcutIdsOfConversationCards() {
+        val context = RuntimeEnvironment.getApplication()
+        Shadows.shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val conversationId = checkNotNull(conversationShortcutId("acct", "g1"))
+        listOf(1 to conversationId, 2 to "unrelated", 3 to null).forEach { (id, shortcutId) ->
+            manager.notify(
+                id,
+                NotificationCompat
+                    .Builder(context, "channel")
+                    .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                    .apply { shortcutId?.let(::setShortcutId) }
+                    .build(),
+            )
+        }
+
+        assertEquals(setOf(conversationId), liveCardShortcutIds(context))
+        manager.cancelAll()
+    }
+
+    /** Builds a publisher whose platform inventory holds [cards], each backing a live card. */
+    private fun publisherWithCards(
+        maxShortcuts: Int,
+        cards: List<ShortcutInfoCompat>,
+        setDynamicShortcuts: (List<ShortcutInfoCompat>) -> Unit,
+    ) = ShareShortcutPublisher(
+        context = RuntimeEnvironment.getApplication(),
+        maxShortcutCount = { maxShortcuts },
+        setDynamicShortcuts = setDynamicShortcuts,
+        existingShortcuts = { emptyList() },
+        dynamicShortcuts = { cards },
+        cardShortcutIds = { cards.map { it.id }.toSet() },
+    )
+
+    /** Builds a conversation shortcut as the card presenter publishes it, stamped for the current preview policy. */
+    private fun cardShortcut(
+        accountRef: String,
+        groupId: String,
+        title: String,
+        rank: Int = 0,
+    ): ShortcutInfoCompat {
+        val context = RuntimeEnvironment.getApplication()
+        return checkNotNull(
+            buildShareShortcut(
+                context,
+                ShareShortcutTarget(accountRef, groupId, title),
+                rank = rank,
+                previewToken = NotificationPreviewPreferences.capture(context),
+            ),
+        )
+    }
 }
 
 private fun chat(
