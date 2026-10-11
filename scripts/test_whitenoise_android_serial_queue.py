@@ -428,6 +428,36 @@ class QueueTest(unittest.TestCase):
             self.assertEqual(len(attempts), 3)
         self.assertFalse(self.writes)
 
+    def test_changed_proof_cannot_reset_exhausted_maintenance_budget(self):
+        from unittest.mock import patch
+        identity = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base, 'd' * 40, 'ENTRY')
+        for kind in ('revoke-integration', 'dequeue'):
+            with self.subTest(kind=kind):
+                self.journal = {'schema': 1, 'effects': {}}
+                attempts = []
+
+                def never_sent(effect, key):
+                    attempts.append(key)
+                    raise q.NotSent('e' * 64)
+
+                original = q.Effect(kind, identity, 'c' * 64)
+                for index in range(q.MAX_NOT_SENT_ATTEMPTS):
+                    with patch.object(q.time, 'time', return_value=1000 + index * 1000):
+                        q.execute(self.journal, original, never_sent, self.readback, self.save)
+                    self.journal = copy.deepcopy(self.saved[-1])
+                exhausted = copy.deepcopy(self.journal)
+                for proof in ('f' * 64, 'a' * 64):
+                    changed = q.Effect(kind, identity, proof)
+                    with patch.object(q.time, 'time', return_value=1000000):
+                        self.assertEqual(q.execute(self.journal, changed, never_sent,
+                                                  self.readback, self.save),
+                                         'not-sent-exhausted-held')
+                    self.assertEqual(self.journal, exhausted)
+                    self.assertEqual(q.exhausted_selection_result(self.journal, changed),
+                                     'not-sent-exhausted-held')
+                    self.journal = copy.deepcopy(self.saved[-1])
+                self.assertEqual(len(attempts), q.MAX_NOT_SENT_ATTEMPTS)
+
     def test_uncertain_maintenance_cannot_be_replayed_or_bypassed(self):
         self.exhaust_never_sent_budget()
         identity = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base, 'd' * 40, 'ENTRY')
