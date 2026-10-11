@@ -7,10 +7,14 @@ import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.whitenoise.android.ui.conversation.media.FileUploadSources
 import dev.ipf.whitenoise.android.ui.conversation.media.stageFileUploadSources
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
@@ -73,15 +77,20 @@ internal suspend fun <T> withFileUploadRequest(
     }
 }
 
+// How often a running native transfer's byte counter is read for display.
+private const val TRANSFER_PROGRESS_POLL_MILLIS = 200L
+
 /**
  * Runs [upload] with a fresh native transfer control. [register] exposes its cancel to the user's
  * Cancel action while the call runs, and may apply a Cancel recorded earlier at once; it is cleared
  * before the control is released. Cancelling the calling coroutine (an account switch) also cancels
  * the control, so MDK stops at its next check unless admission has already started, which is not
- * interruptible.
+ * interruptible. When [onProgress] is given, it hears the control's byte counter every 200 ms while
+ * the call runs and once more as it ends, and never after the control is released.
  */
 internal suspend fun <T> withNativeTransferControl(
     register: ((() -> Unit)?) -> Unit,
+    onProgress: ((Long) -> Unit)? = null,
     newControl: () -> MediaFileTransferControlFfi = ::MediaFileTransferControlFfi,
     upload: suspend (MediaFileTransferControlFfi) -> T,
 ): T {
@@ -89,12 +98,49 @@ internal suspend fun <T> withNativeTransferControl(
     try {
         // Registering can cancel at once (a Cancel recorded earlier), so it sits inside the release scope.
         register(control::cancel)
-        return upload(control)
+        if (onProgress == null) return upload(control)
+        return coroutineScope {
+            // Reading the counter is a binding call, so it stays off Main. The scope waits for the reader
+            // to stop before the control is released below.
+            // ATOMIC: a reader cancelled before it is dispatched still runs, so its final read is never skipped.
+            val reader =
+                launch(Dispatchers.Default, start = CoroutineStart.ATOMIC) {
+                    reportTransferProgress(control, onProgress)
+                }
+            try {
+                upload(control)
+            } finally {
+                reader.cancel()
+            }
+        }
     } catch (cancelled: CancellationException) {
         control.cancel()
         throw cancelled
     } finally {
         register(null)
         control.close()
+    }
+}
+
+/**
+ * Reports [control]'s byte counter to [onProgress] until cancelled, then once more with its final value.
+ * Progress is display only, so a failed read stops the reports and never fails the transfer itself.
+ */
+private suspend fun reportTransferProgress(
+    control: MediaFileTransferControlFfi,
+    onProgress: (Long) -> Unit,
+) {
+    var readable = true
+    val report = {
+        // A read that fails once is not retried, so a broken counter cannot flood the log or the screen.
+        readable = readable && runCatching { onProgress(control.processedBytes().toLong()) }.isSuccess
+    }
+    try {
+        while (readable) {
+            report()
+            delay(TRANSFER_PROGRESS_POLL_MILLIS)
+        }
+    } finally {
+        if (readable) report()
     }
 }

@@ -46,6 +46,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -59,6 +60,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -557,7 +559,10 @@ internal fun MediaVideoGridTile(
     }
 }
 
-/** Materializes one inline video and delegates its open request to the conversation host. */
+/**
+ * Materializes one inline video and delegates its open request to the conversation host. While a large
+ * video is being sent, [uploadProgress] is read by the play disc's ring, which fills with the send's progress.
+ */
 @Composable
 internal fun MediaVideoBubble(
     item: TimelineMessage,
@@ -573,6 +578,7 @@ internal fun MediaVideoBubble(
     uploading: Boolean = false,
     uploadFailed: Boolean = false,
     onRetryUpload: (() -> Unit)? = null,
+    uploadProgress: () -> FileUploadProgress? = { null },
 ) {
     val record = item.record
     val messageIdHex = record.messageIdHex
@@ -937,12 +943,7 @@ internal fun MediaVideoBubble(
                                             .size(28.dp)
                                             .clickable { onRetryUpload?.invoke() },
                                 )
-                            uploading ->
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.5.dp,
-                                    color = LocalContentColor.current,
-                                )
+                            uploading -> VideoUploadIndicator(uploadProgress)
                             !startDownload && localFile == null ->
                                 Icon(
                                     Icons.Default.Download,
@@ -1530,3 +1531,36 @@ private const val ALBUM_OVERFLOW_SCRIM_ALPHA = 0.58f
 /** An unavailable clip keeps its poster readable under a light dim and a warning glyph. */
 private const val VIDEO_UNAVAILABLE_SCRIM_ALPHA = 0.28f
 private val VIDEO_UNAVAILABLE_GLYPH = 28.dp
+
+/**
+ * The play disc's upload ring, reading [progress] here so only the ring recomposes as bytes move. It is
+ * determinate while a share of work is known and spins otherwise, and it names the step and its bytes for
+ * TalkBack, as the download ring on a video tile does.
+ */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+internal fun VideoUploadIndicator(progress: () -> FileUploadProgress?) {
+    val current = progress()
+    val fraction = current?.ringFraction
+    val description = current?.let { uploadProgressDescription(it) }
+    val spoken =
+        if (description != null) {
+            Modifier.semantics { contentDescription = description }
+        } else {
+            Modifier
+        }
+    if (fraction != null) {
+        CircularProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.size(24.dp).then(spoken),
+            strokeWidth = 2.5.dp,
+            color = LocalContentColor.current,
+        )
+    } else {
+        CircularProgressIndicator(
+            modifier = Modifier.size(24.dp).then(spoken),
+            strokeWidth = 2.5.dp,
+            color = LocalContentColor.current,
+        )
+    }
+}

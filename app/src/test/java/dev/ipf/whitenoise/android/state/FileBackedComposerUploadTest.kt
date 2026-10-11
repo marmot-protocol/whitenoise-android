@@ -7,12 +7,15 @@ import dev.ipf.whitenoise.android.ui.conversation.media.readStagedDocument
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -108,11 +111,102 @@ class FileBackedComposerUploadTest {
 
             assertEquals(listOf("cancel", "close"), control.events)
         }
+
+    /** While the call runs the counter is read every 200 ms, and once more as it ends, before release. */
+    @Test
+    fun progressIsReadWhileTheCallRunsAndOnceMoreAtTheEnd() =
+        runBlocking {
+            val control = RecordingControl()
+            val heard = mutableListOf<Long>()
+
+            withNativeTransferControl(register = {}, onProgress = { heard += it }, newControl = { control }) {
+                control.counter = 10L
+                delay(500)
+                control.counter = 30L
+            }
+
+            assertTrue("the running counter was reported", 10L in heard)
+            assertEquals("the final value is reported last", 30L, heard.last())
+            assertEquals(listOf("close"), control.events)
+        }
+
+    /** A failing call still reports its final counter before the control is released, and never after. */
+    @Test
+    fun aFailedCallReportsItsLastCounterBeforeRelease() =
+        runBlocking {
+            val control = RecordingControl()
+            val heard = mutableListOf<Long>()
+
+            val failure =
+                runCatching {
+                    withNativeTransferControl(register = {}, onProgress = { heard += it }, newControl = { control }) {
+                        control.counter = 7L
+                        error("upload refused")
+                    }
+                }.exceptionOrNull()
+
+            assertEquals("upload refused", failure?.message)
+            assertEquals(7L, heard.last())
+            assertEquals(listOf("close"), control.events)
+        }
+
+    /** Progress is display only: a counter that cannot be read stops the reports and the upload still returns. */
+    @Test
+    fun anUnreadableCounterNeverFailsTheUpload() =
+        runBlocking {
+            val control = RecordingControl().apply { readable = false }
+            val heard = mutableListOf<Long>()
+
+            val result =
+                withNativeTransferControl(register = {}, onProgress = { heard += it }, newControl = { control }) {
+                    delay(300)
+                    "sent"
+                }
+
+            assertEquals("sent", result)
+            assertTrue(heard.isEmpty())
+            assertEquals("one failed read, never retried", 1, control.failedReads)
+            assertEquals(listOf("close"), control.events)
+        }
+
+    /** Without a listener the counter is never read, so sends that show no progress pay nothing for it. */
+    @Test
+    fun withoutAListenerTheCounterIsNeverRead() =
+        runTest {
+            val control = RecordingControl()
+
+            withNativeTransferControl(register = {}, newControl = { control }) { control.counter = 5L }
+
+            assertTrue(control.reads.isEmpty())
+        }
 }
 
-/** A native control stand-in that records cancel and release instead of reaching Rust. */
+/** A native control stand-in that records cancel, release and counter reads instead of reaching Rust. */
 private class RecordingControl : MediaFileTransferControlFfi(NoPointer) {
     val events = mutableListOf<String>()
+    val reads = mutableListOf<Long>()
+
+    @Volatile var counter = 0L
+
+    @Volatile private var closed = false
+
+    @Volatile var readable = true
+
+    @Volatile var failedReads = 0
+
+    /**
+     * Returns the scripted counter, fails a read made after release as the native handle would, and fails
+     * every read while the counter is made unreadable.
+     */
+    override fun processedBytes(): ULong {
+        check(!closed) { "counter read after the control was released" }
+        if (!readable) {
+            failedReads += 1
+            error("counter unavailable")
+        }
+        reads += counter
+        return counter.toULong()
+    }
 
     /** Records the cancel the native control would receive. */
     override fun cancel() {
@@ -121,6 +215,7 @@ private class RecordingControl : MediaFileTransferControlFfi(NoPointer) {
 
     /** Records the release without freeing a native handle. */
     override fun close() {
+        closed = true
         events += "close"
     }
 }

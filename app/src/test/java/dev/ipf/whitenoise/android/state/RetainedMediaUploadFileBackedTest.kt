@@ -91,6 +91,63 @@ class RetainedMediaUploadFileBackedTest {
         assertEquals("a consumed request does not stop a later transfer", 2, cancels)
     }
 
+    /**
+     * A send of one staged file follows MDK's counter, never moves backwards on a late lower reading,
+     * and forgets its bytes when the attempt fails.
+     */
+    @Test
+    fun aSingleStagedFileReportsProgressUntilItsAttemptIsCleared() {
+        val source = stagedSource(ByteArray(100))
+        try {
+            val upload =
+                RetainedMediaUpload(
+                    attachments =
+                        listOf(PendingAttachment(ByteArray(0), "application/pdf", "big.pdf", sourceFile = source)),
+                    caption = null,
+                )
+            assertNull(upload.uploadProgress.value)
+
+            upload.reportTransferProgress(150L)
+            assertEquals(FileUploadPhase.ENCRYPTING, upload.uploadProgress.value?.phase)
+            assertEquals(50L, upload.uploadProgress.value?.phaseBytes)
+
+            upload.reportTransferProgress(120L)
+            assertEquals("a lower reading never moves the ring back", 50L, upload.uploadProgress.value?.phaseBytes)
+
+            upload.clearTransferProgress()
+            assertNull(upload.uploadProgress.value)
+        } finally {
+            source.close()
+        }
+    }
+
+    /** MDK's counter is per item, so an album, or a send held in memory, never shows byte progress. */
+    @Test
+    fun albumsAndInMemorySendsShowNoProgress() {
+        val source = stagedSource(ByteArray(100))
+        try {
+            val album =
+                RetainedMediaUpload(
+                    attachments =
+                        listOf(
+                            PendingAttachment(ByteArray(0), "video/mp4", "a.mp4", sourceFile = source),
+                            PendingAttachment(byteArrayOf(9), "image/jpeg", "b.jpg"),
+                        ),
+                    caption = null,
+                )
+            val inMemory =
+                RetainedMediaUpload(listOf(PendingAttachment(byteArrayOf(1, 2), "text/plain", "a.txt")), null)
+
+            album.reportTransferProgress(50L)
+            inMemory.reportTransferProgress(1L)
+
+            assertNull(album.uploadProgress.value)
+            assertNull(inMemory.uploadProgress.value)
+        } finally {
+            source.close()
+        }
+    }
+
     /** Stages [bytes] into a private snapshot under the test directory. */
     private fun stagedSource(bytes: ByteArray): StagedUploadSource {
         val read = readStagedDocument(temporary.root, bytes.size.toLong()) { ByteArrayInputStream(bytes) }

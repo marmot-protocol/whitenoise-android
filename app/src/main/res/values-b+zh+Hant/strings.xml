@@ -1020,6 +1020,12 @@
     <string name="media_download_queued">排隊等待下載</string>
     <string name="media_download_body_known">已接收 %1$s，共 %2$s</string>
     <string name="media_download_body_unknown">已接收 %1$s</string>
+    <string name="media_upload_preparing_body">正在準備 %1$s，共 %2$s</string>
+    <string name="media_upload_encrypting_body">正在加密 %1$s，共 %2$s</string>
+    <string name="media_upload_body_known">已上傳 %1$s，共 %2$s</string>
+    <string name="media_upload_preparing">正在準備</string>
+    <string name="media_upload_encrypting">正在加密</string>
+    <string name="media_upload_bytes">已上傳 %1$s，共 %2$s</string>
     <string name="media_verifying_download">正在驗證下載</string>
     <string name="media_decrypting_download">正在解密下載</string>
     <string name="media_download_retry_scheduled">等待重試</string>

@@ -1038,6 +1038,12 @@
     <string name="media_download_queued">İndirme kuyruğunda</string>
     <string name="media_download_body_known">%2$s içinden %1$s</string>
     <string name="media_download_body_unknown">%1$s alındı</string>
+    <string name="media_upload_preparing_body">Hazırlanıyor: %2$s içinden %1$s</string>
+    <string name="media_upload_encrypting_body">Şifreleniyor: %2$s içinden %1$s</string>
+    <string name="media_upload_body_known">Yükleniyor: %2$s içinden %1$s</string>
+    <string name="media_upload_preparing">Hazırlanıyor</string>
+    <string name="media_upload_encrypting">Şifreleniyor</string>
+    <string name="media_upload_bytes">%2$s içinden %1$s</string>
     <string name="media_verifying_download">İndirme doğrulanıyor</string>
     <string name="media_decrypting_download">İndirmenin şifresi çözülüyor</string>
     <string name="media_download_retry_scheduled">Yeniden denemek için bekleniyor</string>
