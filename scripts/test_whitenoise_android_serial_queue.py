@@ -501,6 +501,40 @@ class QueueTest(unittest.TestCase):
                                  q.MAX_NOT_SENT_ATTEMPTS)
                 self.writes.clear()
 
+    def test_other_entry_recovery_cannot_release_maintenance_exhaustion(self):
+        from unittest.mock import patch
+        identity = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base, 'd' * 40, 'ENTRY')
+        for kind in ('revoke-integration', 'dequeue'):
+            with self.subTest(kind=kind):
+                self.journal = {'schema': 1, 'effects': {}}
+
+                def never_sent(effect, key):
+                    raise q.NotSent('e' * 64)
+
+                original = q.Effect(kind, identity, 'c' * 64)
+                for index in range(q.MAX_NOT_SENT_ATTEMPTS):
+                    with patch.object(q.time, 'time', return_value=1000 + index * 1000):
+                        q.execute(self.journal, original, never_sent, self.readback, self.save)
+                exhausted = copy.deepcopy(self.journal)
+                for field, value in (('entry_id', 'ANOTHER_ENTRY'), ('source', 'a' * 40),
+                                     ('base', 'e' * 40), ('integration', 'a' * 40)):
+                    self.journal = copy.deepcopy(exhausted)
+                    unrelated = q.Identity(**{**asdict(identity), field: value})
+                    recovery = q.Effect(kind, unrelated, 'f' * 64, generation=1)
+                    self.assertEqual(q.execute(self.journal, recovery, self.write,
+                                              self.readback, self.save), kind + '-confirmed')
+                    self.journal = json.loads(json.dumps(self.saved[-1]))
+                    before = copy.deepcopy(self.journal)
+                    writes = len(self.writes)
+                    changed = q.Effect(kind, identity, 'a' * 64)
+                    self.assertEqual(q.execute(self.journal, changed, self.write,
+                                              self.readback, self.save),
+                                     'not-sent-exhausted-held')
+                    self.assertEqual(q.exhausted_selection_result(self.journal, changed),
+                                     'not-sent-exhausted-held')
+                    self.assertEqual(len(self.writes), writes)
+                    self.assertEqual(self.journal, before)
+
     def test_uncertain_maintenance_cannot_be_replayed_or_bypassed(self):
         self.exhaust_never_sent_budget()
         identity = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base, 'd' * 40, 'ENTRY')
