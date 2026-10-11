@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-notify-mentions
+---
+- assertVisible:
+    text: Notify for
+- assertVisible:
+    text: All messages
+- assertVisible:
+    text: Only mentions
+- tapOn: Only mentions
+- assertVisible:
+    id: presentation.complete

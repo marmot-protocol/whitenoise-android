@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-feedback-add-copyable
+---
+- assertVisible: Maestro presentation feedback
+- assertVisible: Synthetic account presentation detail
+- assertVisible: Copy
+- tapOn: Copy
+- tapOn: OK
+- assertVisible:
+    id: presentation.complete

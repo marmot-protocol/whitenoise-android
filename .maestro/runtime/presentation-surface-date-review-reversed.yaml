@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-date-review-reversed
+---
+- assertVisible:
+    text: Custom Range
+- assertVisible: OK
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: OK
+- tapOn:
+    enabled: false
+    containsChild:
+      text: OK
+- assertVisible: Custom Range
+- assertVisible:
+    text: End date must be on or after the start date.
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

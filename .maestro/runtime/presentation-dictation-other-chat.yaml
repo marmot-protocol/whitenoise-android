@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-other-chat
+---
+- assertVisible: Remaining dictation audio
+- assertVisible: Finish dictation in the original conversation.
+- assertNotVisible: Retry remaining audio
+- tapOn: Keep for later
+- assertVisible:
+    id: presentation.complete

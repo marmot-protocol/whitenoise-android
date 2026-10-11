@@ -1,0 +1,90 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-bubble-colors-invalid-other
+---
+- runFlow: ../fixtures/open-bubble-colors.yaml
+- runFlow: ../fixtures/draft-bubble-color-pair.yaml
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#15803D$
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#15803D$
+- tapOn:
+    id: color.hex
+    text: ^#15803D$
+- eraseText: 100
+- assertVisible:
+    id: color.hex
+    focused: true
+- assertNotVisible:
+    id: color.hex
+    text: ^#15803D$
+- inputText: '#XYZ'
+- assertVisible:
+    id: color.hex
+    text: ^#XYZ$
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#XYZ$
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: 'Enter six hexadecimal digits, such as #1D4ED8.'
+    direction: DOWN
+- assertVisible: 'Enter six hexadecimal digits, such as #1D4ED8.'
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- tapOn:
+    id: bubble_colors.save
+- assertVisible:
+    id: bubble_colors.mine.preview
+- tapOn:
+    id: color.hex
+    text: ^#XYZ$
+- eraseText: 100
+- inputText: '#15803D'
+- assertVisible:
+    id: color.hex
+    text: ^#15803D$
+- hideKeyboard
+- assertNotVisible: 'Enter six hexadecimal digits, such as #1D4ED8.'
+- assertVisible:
+    id: bubble_colors.save
+    enabled: true
+- back
+- runFlow: ../fixtures/reopen-bubble-colors.yaml
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#E5E5E5$
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- scrollUntilVisible:
+    element:
+      id: bubble_colors.other.picker
+      containsDescendants:
+      - id: color.hex
+        text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- back
+- assertVisible:
+    id: appearance.theme.group

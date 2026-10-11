@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-copy
+---
+- assertVisible: Maestro document first line.*
+- assertVisible: Copy text
+- tapOn: Copy text
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

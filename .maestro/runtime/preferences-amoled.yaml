@@ -15,3 +15,5 @@ name: preferences-amoled
 - tapOn: "Appearance"
 - assertVisible:
     id: "appearance.theme.group"
+- assertNotVisible:
+    id: "appearance.colors.group"

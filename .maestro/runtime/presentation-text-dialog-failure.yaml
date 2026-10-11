@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-dialog-failure
+---
+- assertVisible:
+    text: Fixture decoded.txt
+- assertVisible:
+    text: Couldn’t download this file.*
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

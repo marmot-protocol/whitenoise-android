@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-addprofile-signin
+---
+- assertVisible:
+    text: Sign In
+- assertVisible:
+    text: Sign Up
+- tapOn: Sign In
+- assertVisible: Sign In
+- assertVisible:
+    enabled: false
+    containsChild:
+      text: Sign In
+- tapOn:
+    enabled: false
+    containsChild:
+      text: Sign In
+- assertVisible: Sign In
+- tapOn: Back
+- assertVisible:
+    text: Sign Up
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-viewer-malformed
+---
+- assertVisible:
+    text: Couldn't open file
+- assertVisible:
+    enabled: true
+    containsChild:
+      text: Tap to retry
+- back
+- assertVisible:
+    id: presentation.complete

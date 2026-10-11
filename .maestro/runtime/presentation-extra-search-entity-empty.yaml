@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-search-entity-empty
+---
+- assertVisible:
+    text: Chats
+- back
+- assertVisible:
+    id: presentation.complete

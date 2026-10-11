@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-message-pending-failed
+---
+- assertVisible:
+    text: Fixture attachment status
+- back
+- assertVisible:
+    id: presentation.complete

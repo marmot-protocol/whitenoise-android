@@ -29,9 +29,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -205,6 +208,13 @@ internal data class SoleAdminDeletePrompt(
     val candidates: List<AppGroupMemberRecordFfi>,
 )
 
+private fun soleAdminEmptyPickerTag(empty: Boolean): Modifier =
+    if (empty) {
+        Modifier.testTag("sole-admin-delete-picker-empty").semantics { testTagsAsResourceId = true }
+    } else {
+        Modifier
+    }
+
 /**
  * Picker shown when deleting a group as sole admin of a 3+ member group (#1131):
  * choose who becomes admin before leaving. Self-contained (resolves member
@@ -222,6 +232,7 @@ internal fun SoleAdminDeletePicker(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = amoledSheetContainerColor(),
+        modifier = soleAdminEmptyPickerTag(candidates.isEmpty()),
     ) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),

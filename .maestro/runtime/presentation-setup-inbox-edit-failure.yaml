@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-inbox-edit-failure
+---
+- assertVisible: Account setup
+- assertVisible:
+    id: setup-open-chats
+    enabled: false
+- tapOn:
+    id: setup-open-chats
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-INBOX_RELAYS
+- tapOn:
+    id: setup-action-EDIT_DISCOVERY_RELAYS
+- assertVisible: Discovery relays
+- assertVisible: Check these discovery relays
+- tapOn:
+    id: setup-editor-save
+- assertVisible: The connection or operation stopped. Your saved progress is safe.
+- assertVisible: Discovery relays
+- tapOn: Cancel
+- back
+- assertVisible: Account setup
+- back
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-search-menu-cancel
+---
+- assertVisible:
+    text: Folders
+- assertVisible:
+    text: Chats
+- assertVisible:
+    text: Senders
+- assertVisible:
+    text: Clear All
+- back
+- assertVisible:
+    id: presentation.complete

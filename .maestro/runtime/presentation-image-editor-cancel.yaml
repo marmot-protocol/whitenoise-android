@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-image-editor-cancel
+---
+- assertVisible:
+    id: photo.editor
+- assertVisible: Edit photo
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

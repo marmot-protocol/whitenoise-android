@@ -10,6 +10,30 @@ from unittest.mock import Mock, patch
 from scripts import maestro_runtime as runtime
 
 
+class DriverPortTest(unittest.TestCase):
+    def test_runtime_driver_uses_non_ephemeral_port_without_changing_deadline(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(runtime.subprocess, 'run') as run:
+            runtime.invoke_ui('nested-donate', Path(temporary))
+        arguments = run.call_args.args[0]
+        self.assertEqual(arguments[:7], ['maestro', '--device', 'emulator-5554',
+                                        '--driver-host-port', '7001', 'test', '--format'])
+        self.assertEqual(run.call_args.kwargs['timeout'], 120)
+        self.assertEqual(run.call_count, 1)
+
+    def test_driver_startup_failure_is_retained_and_never_replayed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            def failure(arguments, **options):
+                options['stdout'].write('Maestro Android driver did not start up in time\n')
+                return subprocess.CompletedProcess(arguments, 1)
+            with patch.object(runtime.subprocess, 'run', side_effect=failure) as run:
+                result = runtime.run_ui('nested-donate', directory)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(run.call_count, 1)
+            self.assertIn('driver did not start', (directory / 'maestro-output.txt').read_text())
+            self.assertFalse((directory / 'junit.xml').exists())
+
+
 class RunnerMemoryTest(unittest.TestCase):
     def test_retains_oom_evidence_without_unknown_fields_or_raw_values(self):
         samples = {

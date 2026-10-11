@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-photo-web
+---
+- assertVisible: Find Image on Web
+- tapOn: Find Image on Web
+- assertVisible:
+    id: presentation.complete

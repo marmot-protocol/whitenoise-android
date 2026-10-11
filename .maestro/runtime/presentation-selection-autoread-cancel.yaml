@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-autoread-cancel
+---
+- assertVisible: Read messages aloud
+- assertVisible: Cancel
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

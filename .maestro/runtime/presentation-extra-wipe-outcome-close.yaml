@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-wipe-outcome-close
+---
+- assertVisible:
+    text: Wipe finished with 1 issue
+- assertVisible:
+    text: Fixture failure
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

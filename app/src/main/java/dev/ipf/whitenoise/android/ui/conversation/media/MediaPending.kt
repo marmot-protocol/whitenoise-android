@@ -242,7 +242,8 @@ private fun PendingVisualAlbum(
 }
 
 @Composable
-private fun PendingStatusOverlay(
+@Suppress("FunctionNaming")
+internal fun PendingStatusOverlay(
     failed: Boolean,
     hasPreview: Boolean,
     statusLabel: String,

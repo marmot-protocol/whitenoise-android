@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-startup-destination-loading
+---
+- assertVisible:
+    id: full-screen-loading
+- assertVisible: Waiting for disposable fixture
+- back
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-discard-cancel
+---
+- assertVisible: Remaining dictation audio
+- assertVisible: Recording stopped. Some audio is not transcribed.
+- assertVisible:
+    text: Retry remaining audio
+    enabled: true
+- tapOn: Discard
+- assertVisible: Discard untranscribed audio? Text already in the composer stays.
+- tapOn: Cancel
+- assertVisible: Remaining dictation audio
+- tapOn: Keep for later
+- assertVisible:
+    id: presentation.complete

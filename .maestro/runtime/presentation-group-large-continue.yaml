@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-large-continue
+---
+- assertVisible: Invite to a large group?
+- tapOn: Continue
+- assertVisible:
+    id: presentation.complete

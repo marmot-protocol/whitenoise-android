@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-photo-files
+---
+- assertVisible: Choose from Files
+- tapOn: Choose from Files
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-location-cancel
+---
+- assertVisible:
+    text: Share location
+- assertVisible:
+    text: Send this location
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

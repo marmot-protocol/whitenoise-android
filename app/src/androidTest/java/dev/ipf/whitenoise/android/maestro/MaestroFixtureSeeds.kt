@@ -15,6 +15,7 @@ internal suspend fun seedMaestroFixtureMessages(
         fixture in
             listOf(
                 "basic",
+                "large-roster",
                 "reader",
                 "links",
                 "poll-single",

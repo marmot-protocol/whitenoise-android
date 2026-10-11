@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-microphone-cancel
+---
+- assertVisible: Microphone access is off
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

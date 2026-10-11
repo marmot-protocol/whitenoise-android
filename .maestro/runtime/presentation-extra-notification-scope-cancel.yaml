@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-notification-scope-cancel
+---
+- assertVisible:
+    id: conversation-sound-scope-messages_group
+- tapOn:
+    id: conversation-sound-scope-messages_group
+- assertVisible:
+    text: Use global default
+- assertVisible:
+    text: Custom for this chat
+- back
+- assertVisible:
+    id: conversation-sound-scope-messages_group
+- back
+- assertVisible:
+    id: presentation.complete

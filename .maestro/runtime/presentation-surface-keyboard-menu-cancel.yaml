@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-keyboard-menu-cancel
+---
+- assertVisible:
+    text: Fixture menu action
+- back
+- assertVisible:
+    id: presentation.complete

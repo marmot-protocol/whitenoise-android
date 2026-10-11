@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-onboarding-signin
+---
+- tapOn:
+    id: onboarding.welcome.sign_in
+- assertVisible:
+    id: onboarding.sign_in.action
+    enabled: false
+- tapOn: Back
+- assertVisible:
+    id: onboarding.welcome.mark
+- back
+- assertVisible:
+    id: presentation.complete

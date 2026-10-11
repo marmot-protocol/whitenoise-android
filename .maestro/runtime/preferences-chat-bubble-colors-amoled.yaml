@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-chat-bubble-colors-amoled
+---
+- runFlow: ../fixtures/open-amoled-chat-bubble-colors.yaml
+- assertVisible:
+    id: bubble_colors.mine.preview
+- assertVisible:
+    id: bubble_colors.other.preview
+- scrollUntilVisible:
+    element:
+      id: bubble_colors.other.picker
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.other.picker
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- back
+- assertVisible:
+    id: chat_info.list
+- back
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- back
+- assertVisible: Maestro group

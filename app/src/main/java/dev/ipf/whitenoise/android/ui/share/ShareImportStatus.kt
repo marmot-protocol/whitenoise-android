@@ -66,7 +66,7 @@ internal fun ShareImportStatus(
 
 /** Requires explicit partial-batch acknowledgement; an empty batch offers close without staging a destination. */
 @Composable
-private fun ShareImportErrorDialog(
+internal fun ShareImportErrorDialog(
     payload: SharePayload,
     hasContent: Boolean,
     onCancel: () -> Unit,

@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-too-large
+---
+- assertVisible: Maestro complete filename.txt
+- assertVisible: This file is too large to preview safely. Open it in another app.
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

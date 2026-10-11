@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-nostr-article
+---
+- assertVisible: Maestro article title
+- assertVisible: Maestro resolved reader body
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

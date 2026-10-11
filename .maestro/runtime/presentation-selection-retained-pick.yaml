@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-retained-pick
+---
+- assertVisible: Choose profile
+- assertVisible: Fixture One
+- assertVisible:
+    text: Fixture Two
+    enabled: true
+- tapOn: Fixture Two
+- assertVisible:
+    id: presentation.complete

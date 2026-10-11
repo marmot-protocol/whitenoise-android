@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: navigation-group-developer-info
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- runFlow: ../fixtures/open-fixture-developer-mode.yaml
+- back
+- assertVisible:
+    text: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Maestro group
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      text: MLS
+    direction: DOWN
+- assertVisible:
+    text: MLS
+- back
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

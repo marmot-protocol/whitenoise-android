@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-info-empty
+---
+- assertVisible:
+    text: Group identifiers
+- assertVisible:
+    text: MLS group ID
+- assertVisible:
+    text: Nostr group ID
+- scrollUntilVisible:
+    element:
+      text: No relays
+    direction: DOWN
+- assertVisible:
+    text: No relays
+- back
+- assertVisible:
+    id: presentation.complete

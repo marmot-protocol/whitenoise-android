@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-share-empty
+---
+- assertVisible:
+    text: Some files could not be imported
+- assertVisible:
+    text: Cancel and share again.*
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

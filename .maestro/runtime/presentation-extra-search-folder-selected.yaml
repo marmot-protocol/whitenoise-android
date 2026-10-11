@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-search-folder-selected
+---
+- assertVisible:
+    text: Folders
+- assertVisible:
+    text: Fixture folder
+- tapOn: Fixture folder
+- assertVisible:
+    text: Fixture folder
+- tapOn: Done
+- assertVisible:
+    id: presentation.complete

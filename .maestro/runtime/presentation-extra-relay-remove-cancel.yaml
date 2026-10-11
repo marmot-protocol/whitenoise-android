@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-relay-remove-cancel
+---
+- assertVisible:
+    text: Relay
+- assertVisible:
+    id: relay.details.metadata
+- assertVisible:
+    text: wss://fixture.example.invalid
+- scrollUntilVisible:
+    element:
+      text: Remove relay
+    direction: DOWN
+- tapOn: Remove relay
+- assertVisible:
+    text: Remove fixture.example.invalid
+- tapOn: Cancel
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

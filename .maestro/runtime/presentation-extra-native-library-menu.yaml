@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-library-menu
+---
+- assertVisible: Fixture library document.txt
+- tapOn: File actions
+- assertVisible: Save
+- assertVisible: Share
+- back
+- assertVisible: Fixture library document.txt
+- tapOn: File actions
+- assertVisible: Save
+- assertVisible: Share
+- back
+- assertVisible: Fixture library document.txt
+- back
+- assertVisible:
+    id: presentation.complete

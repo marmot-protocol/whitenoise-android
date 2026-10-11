@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-search-folder-empty
+---
+- assertVisible:
+    text: Folders
+- assertVisible:
+    text: No folders
+- tapOn: Done
+- assertVisible:
+    id: presentation.complete

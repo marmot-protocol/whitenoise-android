@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-onboarding-signup
+---
+- assertVisible:
+    id: onboarding.sign_up.name
+- assertVisible:
+    id: onboarding.sign_up.action
+- tapOn:
+    id: onboarding.sign_up.action
+- scrollUntilVisible:
+    element:
+      text: No internet connection.*
+    direction: DOWN
+- assertVisible:
+    text: No internet connection.*
+- tapOn: Back
+- assertVisible:
+    id: onboarding.welcome.mark
+- back
+- assertVisible:
+    id: presentation.complete

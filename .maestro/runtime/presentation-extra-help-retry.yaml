@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-help-retry
+---
+- assertVisible:
+    id: help.bug.open
+- tapOn:
+    id: help.bug.open
+- assertVisible:
+    text: Couldn’t open GitHub
+- tapOn: Retry
+- assertVisible:
+    text: Couldn’t open GitHub
+- tapOn: Cancel
+- assertVisible:
+    id: help.bug.open
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

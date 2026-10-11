@@ -164,7 +164,7 @@
     <ID>FunctionNaming:MediaImageBubbles.kt:@Composable internal fun MediaVisualGridBubble</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable internal fun SharedMediaSection</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun EmptyPlaceholder</ID>
-    <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun FileLibraryRow</ID>
+    <ID>FunctionNaming:MediaLibrary.kt:@Composable internal fun FileLibraryRow</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun FileLibraryTab</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun MediaTileGrid</ID>
     <ID>FunctionNaming:MediaLibrary.kt:@Composable private fun SenderAvatar</ID>
@@ -273,7 +273,7 @@
     <ID>LongMethod:MediaFileBubble.kt:@Composable internal fun MediaFileBubble</ID>
     <ID>LongMethod:MediaImageBubbles.kt:@Composable internal fun MediaImageBubble</ID>
     <ID>LongMethod:MediaImageBubbles.kt:@Composable internal fun MediaImageGridTile</ID>
-    <ID>LongMethod:MediaLibrary.kt:@Composable private fun FileLibraryRow</ID>
+    <ID>LongMethod:MediaLibrary.kt:@Composable internal fun FileLibraryRow</ID>
     <ID>LongMethod:MediaLibrary.kt:@Composable private fun VoiceLibraryRow</ID>
     <ID>LongMethod:MediaPipeline.kt:MediaPipeline$fun readVideoForUpload: VideoReadResult</ID>
     <ID>LongMethod:MediaPipelineTest.kt:MediaPipelineTest$private fun exifOrientationSegment: ByteArray</ID>

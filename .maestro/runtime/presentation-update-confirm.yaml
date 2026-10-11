@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-update-confirm
+---
+- assertVisible: Download update?
+- assertVisible:
+    id: appUpdate.download
+    enabled: true
+- tapOn:
+    id: appUpdate.download
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-details-save-reopen
+---
+- runFlow: ../fixtures/folder-details-draft.yaml
+- runFlow: ../fixtures/save-folder-reopen.yaml
+- runFlow: ../fixtures/reveal-folder-description.yaml
+- assertVisible:
+    id: folder.description
+    text: Maestro folder note
+- scrollUntilVisible:
+    element:
+      id: folder.showWhenEmpty
+    direction: DOWN
+- assertVisible:
+    id: folder.showWhenEmpty
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: folder.sort.NAME
+    direction: DOWN
+- assertVisible:
+    id: folder.sort.NAME
+- back
+- assertVisible:
+    id: chat-folders-content

@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-update-unknown-total
+---
+- assertVisible: Downloading update
+- assertNotVisible:
+    id: appUpdate.install
+- assertNotVisible:
+    id: appUpdate.settings
+- tapOn:
+    id: appUpdate.cancel
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-viewer-retry
+---
+- assertVisible: Couldn't open file
+- assertVisible: Tap to retry
+- tapOn: Tap to retry
+- assertVisible:
+    id: presentation.complete

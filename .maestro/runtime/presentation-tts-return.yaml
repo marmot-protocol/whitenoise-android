@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-tts-return
+---
+- assertVisible:
+    id: tts-return-transition
+- back
+- assertVisible:
+    id: presentation.complete

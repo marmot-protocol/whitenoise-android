@@ -14,14 +14,18 @@ import xml.etree.ElementTree as ET
 
 try:
     from scripts.maestro_credential import DisposableCredential, PIN, accepted_unlock, credential_state
+    from scripts.maestro_screen_coverage import flow_assertions
 except ModuleNotFoundError:
     from maestro_credential import DisposableCredential, PIN, accepted_unlock, credential_state
+    from maestro_screen_coverage import flow_assertions
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'account-actions', 'app-lock', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation', 'inbound-share')
+OBSERVATION_SCENARIOS = frozenset({"extra-wait-signout", "extra-wait-wipe"})
+
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'account-actions', 'app-lock', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation', 'inbound-share', 'presentation')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 660
 UI_TIMEOUTS = {'polls-question-boundary': 240}
@@ -61,6 +65,8 @@ def run_case(name, reports):
     generation = uuid.uuid4().hex
     directory = reports / name
     directory.mkdir()
+    if CASES[name].get('presentation') == 'surface-animated-avatar':
+        return run_motion_fixture(name, directory, generation)
     if not CASES[name]['postcondition'].startswith('app-lock-credential-'):
         return run_fixture(name, directory, generation)
     # Baseline and restoration probes instantiate the same guarded Application as the UI host.
@@ -84,6 +90,44 @@ def run_case(name, reports):
     return result
 
 
+def run_motion_fixture(name, directory, generation):
+    """Only this disposable emulator case enables motion, with checked restoration after native cleanup."""
+    adb = ['adb', '-s', 'emulator-5554', 'shell', 'settings']
+    key = 'animator_duration_scale'
+    baseline = None
+    result = {'case': name, 'generation': generation, **CASES[name], 'passed': False, 'cleanup_safe': False}
+    try:
+        observed = command(adb + ['get', 'global', key]).strip()
+        if observed != 'null' and not re.fullmatch(r'[0-9]+(?:[.][0-9]+)?', observed):
+            raise ValueError('Unqualified emulator motion baseline')
+        baseline = observed
+        command(adb + ['put', 'global', key, '1'])
+        if float(command(adb + ['get', 'global', key]).strip()) != 1:
+            raise ValueError('Emulator motion setting was not applied')
+        result = run_fixture(name, directory, generation)
+    except Exception as error:
+        result['failure'] = f'{type(error).__name__}: {error}'
+    finally:
+        if baseline is not None:
+            try:
+                restore = ['delete', 'global', key] if baseline == 'null' else ['put', 'global', key, baseline]
+                command(adb + restore)
+                if command(adb + ['get', 'global', key]).strip() != baseline:
+                    raise ValueError('Emulator motion baseline was not restored')
+                result['motion_restored'] = True
+            except Exception as error:
+                result['motion_failure'] = f'{type(error).__name__}: {error}'
+                result['passed'] = False
+                result['cleanup_safe'] = False
+        (directory / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
+    return result
+
+
+def fixture_account_count(fixture):
+    """Only the explicit six-member native roster scenario changes the account inventory."""
+    return 6 if fixture == 'large-roster' else 3
+
+
 def disable_fixture_boot_receiver():
     """Require the isolated test-only APK's receiver disabled before any fixture/probe Application."""
     # A fresh AVD can deliver BOOT_COMPLETED while the native fixture is still being prepared.
@@ -91,6 +135,47 @@ def disable_fixture_boot_receiver():
     boot = f'{PACKAGE}/dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver'
     if not command(['adb', '-s', 'emulator-5554', 'shell', 'pm', 'disable', '--user', '0', boot]).strip().endswith('new state: disabled'):
         raise ValueError('Isolated fixture boot receiver was not disabled')
+
+
+def presentation_arguments(case):
+    """Only maintained production fixtures may replace content in the isolated test Activity."""
+    scenario = case.get('presentation')
+    if scenario is None:
+        if case.get('postcondition') in {'presentation-checked', 'presentation-observed'}:
+            raise ValueError('Missing production presentation fixture')
+        return []
+    actions = case.get('presentation_actions', [])
+    if case.get('postcondition') == 'presentation-observed':
+        if scenario not in OBSERVATION_SCENARIOS or actions != []:
+            raise ValueError('Invalid non-cancellable presentation observation')
+        return ['-e', 'presentationScenario', scenario, '-e', 'presentationActions', 'none']
+    if (case.get('postcondition') != 'presentation-checked' or not isinstance(scenario, str)
+            or not re.fullmatch('[a-z][a-z0-9-]+', scenario)
+            or not isinstance(actions, list) or not actions
+            or any(not isinstance(action, str) or not re.fullmatch('[a-z][a-z0-9-]+', action) for action in actions)):
+        raise ValueError('Invalid production presentation fixture')
+    return ['-e', 'presentationScenario', scenario, '-e', 'presentationActions', ','.join(actions)]
+
+
+def qualify_presentation(case, verified):
+    """Dispatch proof and explicit non-cancellable observation retain different acceptance boundaries."""
+    if case['postcondition'] not in {'presentation-checked', 'presentation-observed'}:
+        return
+    presentation_arguments(case)
+    observed = verified.get('presentation')
+    observing = case['postcondition'] == 'presentation-observed'
+    if (not isinstance(observed, dict) or observed.get('verified') is not True
+            or observed.get('scenario') != case.get('presentation')
+            or observed.get('callbacks') != case.get('presentation_actions')
+            or (observing and observed.get('observationOnly') is not True)
+            or (not observing and observed.get('observationOnly') is True)):
+        raise ValueError('Production presentation dispatch was not verified')
+    scenario = case['presentation']
+    copies = (scenario.startswith('feedback-') and scenario.endswith('copyable')) or scenario in {
+        'text-dialog-copy', 'surface-profile-qr-copy'}
+    if copies and any(observed.get(field) is not True for field in (
+            'clipboardBaselineCleared', 'clipboardVerified', 'clipboardCleared')):
+        raise ValueError('Actual fresh presentation clipboard copy and cleanup were not verified')
 
 
 def run_fixture(name, directory, generation):
@@ -112,13 +197,16 @@ def run_fixture(name, directory, generation):
         command(adb + ['shell', 'pm', 'revoke', PACKAGE, camera])
         command(adb + ['shell', 'pm', 'clear-permission-flags', PACKAGE, camera, 'user-set', 'user-fixed'])
     fixture = CASES[name].get('fixture', 'basic')
-    record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False, **CASES[name]}
+    _, hashes = flow_assertions(ROOT / f'.maestro/runtime/{name}.yaml', ROOT)
+    record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False,
+              'flow_sha256': hashes, **CASES[name]}
     failure = None
     with (directory / 'instrumentation.txt').open('w') as log:
         process = subprocess.Popen(adb + ['shell', 'am', 'instrument', '-w', '-r',
                                          '-e', 'class', HOST, '-e', 'fixtureGeneration', generation,
                                          '-e', 'postcondition', CASES[name]['postcondition'],
                                          '-e', 'fixtureScenario', fixture,
+                                         *presentation_arguments(CASES[name]),
                                          f'{PACKAGE}.test/{RUNNER}'], stdout=log, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 120
@@ -127,7 +215,8 @@ def run_fixture(name, directory, generation):
                     raise ValueError('Fixture instrumentation ended before readiness')
                 try:
                     ready = receipt(read('ready'), generation, 'ready')
-                    if ready.get('accounts') != 3 or ready.get('fixture') != fixture or ready.get('uiObserver') != 'maestro':
+                    if (ready.get('accounts') != fixture_account_count(fixture)
+                            or ready.get('fixture') != fixture or ready.get('uiObserver') != 'maestro'):
                         raise ValueError('Fixture account inventory mismatch')
                     if (CASES[name]['postcondition'] == 'app-lock-unavailable'
                             and ready.get('appLockFixtureNoCredential') is not True):
@@ -162,6 +251,7 @@ def run_fixture(name, directory, generation):
                 record['cleanup_safe'] = True
                 verified = receipt(read('verified'), generation, 'verified')
                 (directory / 'verified.json').write_text(json.dumps(verified, indent=2) + '\n')
+                qualify_presentation(CASES[name], verified)
                 if (CASES[name]['postcondition'].startswith('speech-rate-')
                         and verified.get('speechRateVerified') is not True):
                     raise ValueError('Persisted speech rate was not verified')
@@ -171,6 +261,9 @@ def run_fixture(name, directory, generation):
                 if (CASES[name]['postcondition'].startswith('smart-rule-')
                         and verified.get('smartFolderRuleVerified') is not True):
                     raise ValueError('Persisted smart-folder rules were not verified')
+                if (CASES[name]['postcondition'].startswith('folder-details-')
+                        and verified.get('folderDetailsVerified') is not True):
+                    raise ValueError('Persisted folder metadata and account isolation were not verified')
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and verified.get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')
@@ -328,8 +421,11 @@ def invoke_ui(name, directory):
         raise ValueError('Qualified navigation mode required')
     credential_arguments = (['-e', f'APP_LOCK_FIXTURE_PIN={PIN}']
                             if CASES[name]['postcondition'].startswith('app-lock-credential-') else [])
+    # The driver listens on-device too; a host-free ephemeral port can collide with
+    # the native loopback relay there. One sequential driver owns this emulator.
     with (directory / 'maestro-output.txt').open('w') as log:
-        return subprocess.run(['maestro', '--device', 'emulator-5554', 'test', '--format', 'JUNIT',
+        return subprocess.run(['maestro', '--device', 'emulator-5554', '--driver-host-port', '7001',
+                               'test', '--format', 'JUNIT',
                                '-e', f'MAESTRO_NAVIGATION_MODE={navigation}', *credential_arguments,
                                '--output', str(directory / 'junit.xml'), '--debug-output', str(directory / 'debug'),
                                '--test-output-dir', str(directory / 'screenshots'),

@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reveal-folder-description
+---
+- scrollUntilVisible:
+    element:
+      id: folder[.](addDescription|description)
+    direction: DOWN
+- runFlow:
+    when:
+      visible:
+        id: folder.addDescription
+    commands:
+    - tapOn:
+        id: folder.addDescription
+- assertVisible:
+    id: folder.description

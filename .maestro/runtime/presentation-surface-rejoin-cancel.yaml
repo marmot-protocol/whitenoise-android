@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-rejoin-cancel
+---
+- assertVisible:
+    text: Review invitation from Fixture inviter · epoch 9
+- tapOn: Review invitation from Fixture inviter · epoch 9
+- assertVisible:
+    text: Rejoin group\?
+- assertVisible:
+    text: Only rejoin if you trust this invitation.*
+- back
+- assertVisible:
+    text: Review invitation from Fixture inviter · epoch 9
+- back
+- assertVisible:
+    id: presentation.complete

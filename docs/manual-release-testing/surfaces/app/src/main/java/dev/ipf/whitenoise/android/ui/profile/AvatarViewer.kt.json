@@ -73,6 +73,16 @@
           "SCR-004"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Stable native-popup render target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "stableRenderTarget = true",
+        "test_ids": [
+          "SCR-001"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

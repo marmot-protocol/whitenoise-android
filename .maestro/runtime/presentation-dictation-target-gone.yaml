@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-target-gone
+---
+- assertVisible: Remaining dictation audio
+- assertVisible: Conversation unavailable
+- assertNotVisible: Retry remaining audio
+- tapOn: Keep for later
+- assertVisible:
+    id: presentation.complete

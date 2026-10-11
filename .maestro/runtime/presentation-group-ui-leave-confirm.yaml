@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-leave-confirm
+---
+- assertVisible:
+    text: Leave and delete
+- tapOn:
+    text: Leave and delete
+    index: 1
+- assertVisible:
+    id: presentation.complete

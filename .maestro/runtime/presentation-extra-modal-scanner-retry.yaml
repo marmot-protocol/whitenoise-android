@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-scanner-retry
+---
+- assertVisible:
+    text: Camera is unavailable.
+- assertVisible:
+    text: Fixture camera binding failure
+- tapOn: Retry
+- assertVisible:
+    id: presentation.complete

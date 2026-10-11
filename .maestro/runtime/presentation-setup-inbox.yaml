@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-inbox
+---
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-INBOX_RELAYS
+- assertVisible: Inbox relays
+- back
+- assertVisible: Account setup
+- back
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-relays-edit-failure
+---
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-RELAYS
+- assertVisible: Read and write relays
+- tapOn:
+    id: setup-action-EDIT_RELAYS
+- assertVisible: The connection or operation stopped. Your saved progress is safe.
+- assertNotVisible:
+    id: setup-editor-save
+- back
+- assertVisible: Account setup
+- back
+- assertVisible:
+    id: presentation.complete

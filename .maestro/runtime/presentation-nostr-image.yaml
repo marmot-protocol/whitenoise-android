@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-nostr-image
+---
+- tapOn: View image
+- assertVisible: View image
+- tapOn: View image
+- assertVisible: Image
+- tapOn: Close
+- back
+- assertVisible:
+    id: presentation.complete

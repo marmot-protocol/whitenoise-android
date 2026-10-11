@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-inbox-edit-review
+---
+- assertVisible: Account setup
+- assertVisible:
+    id: setup-open-chats
+    enabled: false
+- tapOn:
+    id: setup-open-chats
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-INBOX_RELAYS
+- tapOn:
+    id: setup-action-EDIT_DISCOVERY_RELAYS
+- assertVisible: Discovery relays
+- assertVisible: Check these discovery relays
+- tapOn: Discovery relays
+- inputText: wss://discovery.example.invalid/
+- hideKeyboard
+- tapOn:
+    id: setup-editor-save
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-mute-time
+---
+- assertVisible:
+    text: Mute for
+- tapOn: Custom time
+- assertVisible:
+    text: Next
+- tapOn: Next
+- assertVisible:
+    text: Choose a time
+- tapOn: Cancel
+- assertVisible:
+    text: Mute for
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete
