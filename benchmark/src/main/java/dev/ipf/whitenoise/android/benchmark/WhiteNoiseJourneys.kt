@@ -938,6 +938,7 @@ internal class WhiteNoiseJourneys {
         return texts.take(MAX_REPORTED_TEXTS).joinToString(" | ").ifEmpty { "none" }
     }
 
+    /** Adds the non-blank text of [node] and every descendant to [destination], keeping first-seen order. */
     private fun collectVisibleText(
         node: AccessibilityNodeInfo,
         destination: MutableSet<String>,
