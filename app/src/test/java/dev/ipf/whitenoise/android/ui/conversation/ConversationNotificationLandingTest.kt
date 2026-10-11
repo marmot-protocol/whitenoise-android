@@ -258,6 +258,24 @@ class ConversationNotificationLandingTest {
         assertNull(harness.owner.readingStartGeometry())
     }
 
+    /**
+     * A drag that takes the scroll during the landing's first layout wait ends the landing: it writes nothing more,
+     * neither retries nor falls back to the unread entry, and still reveals the transcript where the reader is.
+     */
+    @Test
+    fun aDragDuringTheLandingStopsItsWritesAndStillRevealsTheTranscript() {
+        val harness = Harness(targetHeightDp = 80, dragDuringLandingLayout = true)
+        harness.mount()
+        harness.awaitAnchored()
+        composeRule.waitForIdle()
+        assertEquals(harness.writesAtDrag, harness.writes.size)
+        assertEquals(1, harness.dragCount)
+        assertEquals(ConversationScrollMode.ReadingHistory(DRAG_ANCHOR_ID, 0), harness.coordinator.mode)
+        assertTrue(harness.landedBacklogs.isEmpty())
+        assertTrue(harness.unavailable.isEmpty())
+        assertNull(harness.owner.readingStartGeometry())
+    }
+
     /** The pairing check refuses a stale or foreign tap, whatever message id it carries. */
     @Test
     fun theLandingTargetOnlyResolvesForItsOwnAccountAndGroup() {
@@ -304,6 +322,7 @@ class ConversationNotificationLandingTest {
         private val disposeOwnerOnBegin: Boolean = false,
         private val jump: JumpScript = JumpScript.NONE,
         private val sentAfterOldestUnread: Boolean = false,
+        private val dragDuringLandingLayout: Boolean = false,
     ) {
         private val timelineScript =
             ScriptedConversationTimelineSubscription(
@@ -327,6 +346,14 @@ class ConversationNotificationLandingTest {
         private val requestId = mutableLongStateOf(1L)
         lateinit var coordinator: ConversationScrollCoordinator
         lateinit var owner: ConversationViewportRestorationOwner
+
+        /** Every list write the production writer performed, in order. */
+        val writes = mutableListOf<Pair<Int, Int>>()
+        var writesAtDrag = -1
+            private set
+        var dragCount = 0
+            private set
+        private var landingResolutions = 0
 
         /** The exact-message jump answer the engine gives while the target resolves. */
         private fun jumpOutcomes(): MutableList<ConversationJumpOutcome> =
@@ -370,7 +397,8 @@ class ConversationNotificationLandingTest {
                         val viewport = remember(listState) { ConversationTimelineViewport(listState) }
                         coordinator =
                             remember(listState) {
-                                ConversationScrollCoordinator(LazyListConversationScrollWriter(listState))
+                                val writer = RecordingWriter(LazyListConversationScrollWriter(listState))
+                                ConversationScrollCoordinator(writer)
                             }
                         val gate = remember(listState) { ConversationPostInitialReanchorGate() }
                         owner = rememberConversationViewportRestorationOwner(controller, coordinator, gate)
@@ -428,7 +456,7 @@ class ConversationNotificationLandingTest {
         /** Recording callbacks for anchoring, backlog seeding and unavailable-target feedback. */
         private fun callbacks() =
             ConversationViewportRestorationCallbacks(
-                navigation = ConversationViewportNavigation(this::listIndexOf) { 0 },
+                navigation = ConversationViewportNavigation(this::resolveLandingRow) { 0 },
                 onAnchored = { anchored.value = true },
                 retireUnreadDivider = { dividerRetirements += 1 },
                 notification =
@@ -446,6 +474,20 @@ class ConversationNotificationLandingTest {
             val request = navigation.begin()
             if (!requestIsCurrent) navigation.begin()
             return request
+        }
+
+        /**
+         * Resolves the landing's row, and on the second resolution, right after the first write's layout wait,
+         * starts a drag the way a reader's finger would, which supersedes the landing command.
+         */
+        private fun resolveLandingRow(anchor: ConversationScrollAnchor): Int? {
+            landingResolutions += 1
+            if (dragDuringLandingLayout && landingResolutions == DRAG_ON_RESOLUTION) {
+                writesAtDrag = writes.size
+                dragCount += 1
+                coordinator.onUserGestureStarted(ConversationScrollAnchor(3, 0, "item", DRAG_ANCHOR_ID))
+            }
+            return listIndexOf(anchor)
         }
 
         /** Resolves a message's list index by identity on the live rendered timeline. */
@@ -497,6 +539,20 @@ class ConversationNotificationLandingTest {
             assertEquals(messageId, (coordinator.mode as ConversationScrollMode.ReadingHistory).anchorMessageId)
         }
 
+        /** Records each write the landing performs while delegating it to the real list writer. */
+        private inner class RecordingWriter(
+            private val delegate: ConversationScrollWriter,
+        ) : ConversationScrollWriter by delegate {
+            /** Records the write before the real list performs it. */
+            override suspend fun scrollToItem(
+                index: Int,
+                scrollOffset: Int,
+            ) {
+                writes += index to scrollOffset
+                delegate.scrollToItem(index, scrollOffset)
+            }
+        }
+
         init {
             harnesses += this
         }
@@ -511,6 +567,8 @@ class ConversationNotificationLandingTest {
         const val ROW_HEIGHT_DP = 72
         const val AWAIT_MILLIS = 10_000L
         const val LIST_TAG = "landing-list"
+        const val DRAG_ON_RESOLUTION = 2
+        const val DRAG_ANCHOR_ID = "dragged-row"
 
         /** A deterministic 64-hex message id for one list position. */
         fun messageId(index: Int): String = index.toString(16).padStart(2, '0').repeat(32)

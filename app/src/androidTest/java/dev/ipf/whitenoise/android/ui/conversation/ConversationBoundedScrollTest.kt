@@ -118,7 +118,7 @@ class ConversationBoundedScrollTest {
         val initial = synchronized(composed) { composed.toSet() }
         composeRule.runOnIdle {
             scope.launch {
-                val placement =
+                val result =
                     coordinator.commitInitialReadingStartAnchor(
                         targetMessageId = "message-$TARGET_INDEX",
                         resultingMode = ConversationScrollMode.ReadingHistory("message-$TARGET_INDEX", 0),
@@ -135,7 +135,7 @@ class ConversationBoundedScrollTest {
                                 traceSections = false,
                             ),
                     )
-                placed.set(placement != null)
+                placed.set(result.reached)
                 finished.set(true)
             }
         }

@@ -322,9 +322,84 @@ class ConversationViewportRestorationOwnerTest {
             val position = landingPosition()
             val probe = LandingGeometry(rowHeight = null).probe()
             assertFalse(fixture.owner.commitInitialPosition(position, { measured() }, {}, probe))
+            assertFalse(fixture.owner.readingStartCommitSuperseded)
             assertTrue(fixture.owner.completeInitialPosition(position, structure(), 720))
             assertNull(fixture.owner.readingStartGeometry())
             assertEquals(ConversationScrollMode.ReadingHistory("message-4", 0), fixture.coordinator.mode)
+        }
+
+    /** A drag during the landing's layout wait is reported as a supersession, which a caller must not retry. */
+    @Test
+    fun aDragDuringTheLandingLayoutWaitIsReportedAsSuperseded() =
+        runTest {
+            val fixture = Fixture()
+            val position = landingPosition()
+            val pausedFrame = CompletableDeferred<Unit>()
+            var committed = true
+            val job =
+                launch {
+                    committed =
+                        fixture.owner.commitInitialPosition(
+                            position,
+                            { measured() },
+                            { pausedFrame.await() },
+                            LandingGeometry().probe(),
+                        )
+                }
+            runCurrent()
+            fixture.coordinator.onUserGestureStarted(ConversationScrollAnchor(3, 0, "item-3", "message-3"))
+            pausedFrame.complete(Unit)
+            job.join()
+            assertFalse(committed)
+            assertTrue(fixture.owner.readingStartCommitSuperseded)
+            assertEquals(ConversationScrollMode.ReadingHistory("message-3", 0), fixture.coordinator.mode)
+            assertEquals(listOf(7 to 300), fixture.writer.writes)
+        }
+
+    /** A later commit that completes clears the supersession of an earlier one. */
+    @Test
+    fun aCompletedLandingCommitClearsAnEarlierSupersession() =
+        runTest {
+            val fixture = Fixture()
+            val position = landingPosition()
+            val pausedFrame = CompletableDeferred<Unit>()
+            val job =
+                launch {
+                    fixture.owner.commitInitialPosition(
+                        position,
+                        { measured() },
+                        { pausedFrame.await() },
+                        LandingGeometry().probe(),
+                    )
+                }
+            runCurrent()
+            fixture.coordinator.onUserGestureStarted(ConversationScrollAnchor(3, 0, "item-3", "message-3"))
+            pausedFrame.complete(Unit)
+            job.join()
+            assertTrue(fixture.owner.readingStartCommitSuperseded)
+            assertTrue(fixture.owner.commitInitialPosition(position, { measured() }, {}, LandingGeometry().probe()))
+            assertFalse(fixture.owner.readingStartCommitSuperseded)
+        }
+
+    /** Completing a superseded landing baselines the gate and leaves the scroll mode and geometry intent alone. */
+    @Test
+    fun completingASupersededLandingSettlesNoAnchorAndNoGeometryIntent() =
+        runTest {
+            val fixture = Fixture()
+            fixture.coordinator.onUserGestureStarted(ConversationScrollAnchor(3, 0, "item-3", "message-3"))
+            assertTrue(fixture.owner.completeSupersededPosition(structure(), 720))
+            assertEquals(ConversationScrollMode.ReadingHistory("message-3", 0), fixture.coordinator.mode)
+            assertNull(fixture.owner.readingStartGeometry())
+            assertTrue(fixture.writer.writes.isEmpty())
+        }
+
+    /** A disposed owner, such as one whose chat or account was replaced, completes no superseded landing. */
+    @Test
+    fun aDisposedOwnerCompletesNoSupersededLanding() =
+        runTest {
+            val fixture = Fixture()
+            fixture.owner.dispose()
+            assertFalse(fixture.owner.completeSupersededPosition(structure(), 720))
         }
 
     /** A landing without the live geometry it needs is a wiring error, never a silent fallback. */
