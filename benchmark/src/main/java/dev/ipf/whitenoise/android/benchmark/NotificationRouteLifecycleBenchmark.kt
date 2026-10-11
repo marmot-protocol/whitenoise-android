@@ -33,8 +33,10 @@ class NotificationRouteLifecycleBenchmark {
      */
     @Test
     fun coldProcessFirstConversationFrame() {
-        runJourney(NotificationRouteJourney.COLD_PROCESS) { journeys ->
+        runJourney(NotificationRouteJourney.COLD_PROCESS) { journeys, deliver ->
             journeys.prepareSourceAccountAtHome()
+            // The card is delivered while the process is alive. `am kill` then ends the process and keeps it.
+            deliver()
             journeys.killAppAndGoHome()
         }
     }
@@ -51,7 +53,10 @@ class NotificationRouteLifecycleBenchmark {
                 "fixture that leaves the target account runtime suspended before every sample.",
             BenchmarkConfig.runtimeNotReadyFixture,
         )
-        runJourney(NotificationRouteJourney.RUNTIME_NOT_READY) { journeys -> journeys.prepareSourceAccountAtHome() }
+        runJourney(NotificationRouteJourney.RUNTIME_NOT_READY) { journeys, deliver ->
+            journeys.prepareSourceAccountAtHome()
+            deliver()
+        }
     }
 
     /**
@@ -75,7 +80,10 @@ class NotificationRouteLifecycleBenchmark {
             metrics = secondaryAccountNotificationMetrics(),
             compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
             iterations = texts.size,
-            setupBlock = { setup.run { journeys.prepareSourceAccountAtHome() } },
+            setupBlock = {
+                setup.run { journeys.prepareSourceAccountAtHome() }
+                journeys.awaitFixtureNotification(texts[sampleIndex], sampleIndex, texts.size)
+            },
             measureBlock = {
                 tracedJourney(SECONDARY_ACCOUNT_NOTIFICATION_TRACE) {
                     toLockSurface += journeys.openNotificationToAppLock(texts[sampleIndex])
@@ -90,7 +98,7 @@ class NotificationRouteLifecycleBenchmark {
     /** Runs one journey for [REQUIRED_ITERATIONS] iterations and fails on its P95 and maximum budgets. */
     private fun runJourney(
         journey: NotificationRouteJourney,
-        prepare: (WhiteNoiseJourneys) -> Unit,
+        prepare: (WhiteNoiseJourneys, deliver: () -> Unit) -> Unit,
     ) {
         val texts = requireSamples()
         val titles = BenchmarkConfig.notificationConversationTitles
@@ -103,7 +111,12 @@ class NotificationRouteLifecycleBenchmark {
             metrics = secondaryAccountNotificationMetrics(),
             compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
             iterations = texts.size,
-            setupBlock = { setup.run { prepare(journeys) } },
+            setupBlock = {
+                // Delivery waits on the host, so setup time here includes that wait and is never a route sample.
+                setup.run {
+                    prepare(journeys) { journeys.awaitFixtureNotification(texts[sampleIndex], sampleIndex, texts.size) }
+                }
+            },
             measureBlock = {
                 tracedJourney(SECONDARY_ACCOUNT_NOTIFICATION_TRACE) {
                     samples +=

@@ -63,6 +63,8 @@ class SecondaryAccountNotificationNavigationMacrobenchmark {
                 journeys.run { resumeToChatList() }
                 journeys.activateNotificationSourceAccount(sourceAccountRef)
                 pressHome()
+                // The host delivers this sample's card now, after the launch above that would have removed it.
+                journeys.awaitFixtureNotification(notificationTexts[sampleIndex], sampleIndex, notificationTexts.size)
             },
             measureBlock = {
                 tracedJourney(SECONDARY_ACCOUNT_NOTIFICATION_TRACE) {
