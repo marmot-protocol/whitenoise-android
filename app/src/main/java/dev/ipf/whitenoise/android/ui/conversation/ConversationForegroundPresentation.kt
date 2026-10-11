@@ -3,9 +3,11 @@ package dev.ipf.whitenoise.android.ui.conversation
 import android.view.ViewTreeObserver
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalView
+import dev.ipf.whitenoise.android.state.TimelineMessage
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -122,4 +124,22 @@ internal fun ConversationForegroundDrawGateEffect(
 /** Schedules the first root draw after the foreground gate opens. */
 internal fun requestConversationForegroundFrame(view: android.view.View) {
     view.postInvalidateOnAnimation()
+}
+
+/** Requests native measurement when a closed draw gate would otherwise starve fixed-size Compose remeasure. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ConversationForegroundTimelineMeasureEffect(
+    viewport: ConversationTimelineViewport?,
+    publication: List<TimelineMessage>,
+    presentationBlocked: Boolean,
+) {
+    val view = LocalView.current
+    SideEffect {
+        // Compose may defer descendant remeasure until dispatchDraw. Force a native layout pass
+        // only for the unmeasured publication; the existing freshness fence still owns drawing.
+        if (presentationBlocked && viewport?.hasMeasuredTimeline(publication) == false) {
+            view.requestLayout()
+        }
+    }
 }

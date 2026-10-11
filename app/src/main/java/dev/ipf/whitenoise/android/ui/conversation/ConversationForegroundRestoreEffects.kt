@@ -131,6 +131,11 @@ internal fun ConversationForegroundRestoreEffects(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val rootView = LocalView.current
+    ConversationForegroundTimelineMeasureEffect(
+        timelineViewport,
+        controller.timeline,
+        scrollCoordinator.foregroundRestoreInProgress,
+    )
     val density = LocalDensity.current
     val imeInsets = WindowInsets.ime
     val imeAnimationTargetInsets = WindowInsets.imeAnimationTarget

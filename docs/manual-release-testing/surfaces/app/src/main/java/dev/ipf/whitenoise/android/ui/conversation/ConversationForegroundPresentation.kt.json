@@ -10,6 +10,14 @@
         "test_ids": [
           "CON-001"
         ]
+      },
+      {
+        "surface": "ConversationForegroundTimelineMeasureEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundPresentation.kt",
+        "anchor": "fun ConversationForegroundTimelineMeasureEffect(",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ],
     "source_coverage": [
