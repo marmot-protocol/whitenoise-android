@@ -629,6 +629,19 @@ class RuntimeEvidenceTest(unittest.TestCase):
             runtime.run_ui('polls-question-boundary', Path(temporary))
             self.assertEqual(run.call_args.kwargs['timeout'], 240)
 
+    def test_poll_question_boundary_uses_bounded_input_without_weakening_the_limit(self):
+        """Keep each device RPC bounded and prove all 1025 bytes before native validation."""
+        commands = yaml.safe_load_all((runtime.ROOT / '.maestro/runtime/polls-question-boundary.yaml').read_text())
+        _, commands = list(commands)
+        chunks = [command['inputText'] for command in commands if 'inputText' in command]
+        self.assertEqual(''.join(chunks), 'q' * 1025)
+        self.assertEqual([len(chunk) for chunk in chunks], [256, 256, 256, 256, 1])
+        last_input = max(index for index, command in enumerate(commands) if 'inputText' in command)
+        self.assertEqual(commands[last_input + 1], {'assertVisible': 'q{1025}'})
+        self.assertLess(last_input + 1, commands.index({'tapOn': 'Post poll'}))
+        self.assertIn({'assertVisible': 'This question is too long.'}, commands)
+        self.assertFalse(any('retry' in command for command in commands))
+
     def test_every_surface_gets_every_edge_without_automatic_pass_or_na(self):
         """A discovered dialog cannot silently omit lifecycle, accessibility or input qualification."""
         result = inventory()

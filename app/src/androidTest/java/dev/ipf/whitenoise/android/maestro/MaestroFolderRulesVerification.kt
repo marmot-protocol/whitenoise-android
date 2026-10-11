@@ -38,7 +38,9 @@ internal suspend fun verifyMaestroFolderRules(
     if (
         postcondition == null ||
         (!postcondition.startsWith("smart-rule-") && !postcondition.startsWith("folder-details-"))
-    ) return false
+    ) {
+        return false
+    }
     val before = checkNotNull(baseline)
     check(before.accounts.size == 3)
     val expected = expectedMaestroFolderRule(postcondition)
