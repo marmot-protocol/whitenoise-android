@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Looper
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MarkdownInlineFfi
@@ -15,6 +16,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+
+private const val BROADCAST_FRAME_TIMEOUT_MILLIS = 500L
+
+// Well short of the hourly cap the stale wait would sleep towards, so only a restarted ticker passes.
+private const val SECOND_TICK_TIMEOUT_MILLIS = 1_500L
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -41,14 +47,15 @@ class MarkdownTimestampRefreshTest {
         composeRule.runOnUiThread {
             ApplicationProvider.getApplicationContext<Context>().sendBroadcast(Intent(Intent.ACTION_TIME_CHANGED))
         }
-        // Robolectric delivers broadcasts from the paused main looper.
+        // Robolectric delivers broadcasts from the paused main looper. Publish the receiver's state
+        // write explicitly, then frame until it recomposes, so the result does not hang on post order.
         shadowOf(Looper.getMainLooper()).idle()
-        composeRule.mainClock.advanceTimeByFrame()
+        Snapshot.sendApplyNotifications()
+        composeRule.mainClock.advanceTimeUntil(BROADCAST_FRAME_TIMEOUT_MILLIS) { revision > settled }
         val corrected = revision
-        assertTrue("the broadcast itself refreshes the label", corrected > settled)
 
         // The seconds label must keep counting rather than sleep out the old hour-long wait.
-        composeRule.mainClock.advanceTimeBy(1_100)
+        composeRule.mainClock.advanceTimeUntil(SECOND_TICK_TIMEOUT_MILLIS) { revision > corrected }
         assertTrue("the next second boundary refreshes the label", revision > corrected)
     }
 }
