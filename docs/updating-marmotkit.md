@@ -18,7 +18,8 @@ The host formats signed Unix seconds with the current local calendar and locale;
 Android ICU supplies localized relative labels. Only relative projections run a
 refresh clock: it wakes at the next label boundary (at most hourly), only while the
 screen is started, and catches up on restart. Timezone, time and locale broadcasts
-invalidate every label.
+invalidate every label and restart that clock, so a corrected wall clock never
+leaves a seconds label waiting out an older, longer wait.
 Native clock icons and each token's own text range carry hover/tap disclosure.
 A linked label keeps navigation while its clock opens disclosure. Message state
 retains only canonical typed nodes. Tap disclosure, hover and an in-progress press

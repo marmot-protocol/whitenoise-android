@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,10 +86,14 @@ internal fun AnnotatedString.Builder.appendMarkdownTimestamp(inline: MarkdownInl
 
 /**
  * Counts display invalidations for [timestamps]: clock, timezone and locale broadcasts, and
- * relative-label boundaries while the screen is started. Never rewrite the owned MDK document.
+ * relative-label boundaries while the screen is started. [nowMillis] reads the wall clock.
+ * Never rewrite the owned MDK document.
  */
 @Composable
-internal fun rememberTimestampRevision(timestamps: List<MarkdownInlineFfi.Timestamp>): Long {
+internal fun rememberTimestampRevision(
+    timestamps: List<MarkdownInlineFfi.Timestamp>,
+    nowMillis: () -> Long = System::currentTimeMillis,
+): Long {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val enabled = timestamps.isNotEmpty()
@@ -97,6 +102,7 @@ internal fun rememberTimestampRevision(timestamps: List<MarkdownInlineFfi.Timest
             timestamps.filter { it.style == MarkdownTimestampStyleFfi.RELATIVE }.map { it.unixSeconds }
         }
     var revision by remember { mutableLongStateOf(0L) }
+    var clockChanges by remember { mutableIntStateOf(0) }
     DisposableEffect(context, enabled) {
         val receiver =
             object : BroadcastReceiver() {
@@ -105,6 +111,7 @@ internal fun rememberTimestampRevision(timestamps: List<MarkdownInlineFfi.Timest
                     intent: Intent?,
                 ) {
                     revision++
+                    clockChanges++
                 }
             }
         if (enabled) {
@@ -118,7 +125,8 @@ internal fun rememberTimestampRevision(timestamps: List<MarkdownInlineFfi.Timest
         }
         onDispose { if (enabled) context.unregisterReceiver(receiver) }
     }
-    LaunchedEffect(lifecycle, relativeSeconds) {
+    // A clock change restarts the wait: the boundary it was sleeping towards may now be far off.
+    LaunchedEffect(lifecycle, relativeSeconds, clockChanges) {
         if (relativeSeconds.isEmpty()) return@LaunchedEffect
         var restarted = false
         // A stopped screen does not tick, so a restart refreshes labels that aged meanwhile.
@@ -126,7 +134,7 @@ internal fun rememberTimestampRevision(timestamps: List<MarkdownInlineFfi.Timest
             if (restarted) revision++
             restarted = true
             while (true) {
-                delay(timestampRelativeRefreshMillis(relativeSeconds, System.currentTimeMillis()))
+                delay(timestampRelativeRefreshMillis(relativeSeconds, nowMillis()))
                 revision++
             }
         }
