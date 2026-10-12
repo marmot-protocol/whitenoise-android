@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui.profile
 
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ProfileAccountWideGroups
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.mergeForwardTargets
 import kotlinx.coroutines.CancellationException
 
 /** Presentation callbacks expire on account/runtime replacement or disposal; accepted native work keeps its owner. */
@@ -35,7 +37,11 @@ internal class PersonProfileOwner(
 internal data class PersonSharedGroups(
     val groups: List<ChatListItem>,
     val unresolvedGroupIds: Set<String>,
-)
+    val readFailed: Boolean = false,
+) {
+    /** Whether the list may be missing groups: a roster is still unresolved or the account-wide read failed. */
+    val incomplete: Boolean get() = unresolvedGroupIds.isNotEmpty() || readFailed
+}
 
 /** Reads current immutable row snapshots without inferring membership from cached titles, counts or group names. */
 internal fun personSharedGroups(
@@ -82,6 +88,14 @@ internal data class PersonProfilePresentation(
     val self: Boolean,
 )
 
-/** Reuses the existing live archived-inclusive projection, never the frozen foreground chat-list snapshot. */
-internal fun WhiteNoiseAppState.personSharedGroupsForProfile(targetHex: String?): PersonSharedGroups =
-    personSharedGroups(forwardTargets(), activeAccount?.accountIdHex, targetHex)
+/**
+ * Reuses the existing live archived-inclusive projection, never the frozen foreground chat-list snapshot, and
+ * adds the chats [accountWide] holds beyond the retained window (#2983).
+ */
+internal fun WhiteNoiseAppState.personSharedGroupsForProfile(
+    targetHex: String?,
+    accountWide: ProfileAccountWideGroups = ProfileAccountWideGroups(),
+): PersonSharedGroups {
+    val items = mergeForwardTargets(forwardTargets(), accountWide.items())
+    return personSharedGroups(items, activeAccount?.accountIdHex, targetHex).copy(readFailed = accountWide.readFailed)
+}

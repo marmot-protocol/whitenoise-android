@@ -234,6 +234,12 @@ documents and does not work around: folding history into the text block would ne
 extras and edges toward a second copy of the message state, and the other standard
 inbox template ellipsizes each line. A body is still cut at 1,000 code points either way.
 
+That bound is the only cut. Mention resolution flattens the body through the same Markdown
+preview path as the chat list, but with `NOTIFICATION_PREVIEW_MAX_UTF16_LENGTH`, two UTF-16
+units per code point, in place of the chat list's one-line budget of 200 characters. Before
+that change, notification resolution used that 200-character budget, so a longer body stopped
+at about 200 characters however far the card expanded.
+
 The threshold is 160 code points, the value this feature already had. The text block
 carries no sender or conversation icon and Android classifies a conversation by its
 conversation template, so a single message that reaches it loses the conversation

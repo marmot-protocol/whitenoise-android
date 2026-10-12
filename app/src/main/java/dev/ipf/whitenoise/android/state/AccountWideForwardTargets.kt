@@ -10,22 +10,49 @@ import java.util.Locale
 // presented list from MDK once, on demand, and merges it under the retained rows: MDK stays the owner
 // of the rows, the controller's window stays the fresh source for anything it retains, and the
 // account-wide read is held only for the lifetime of the open picker.
+//
+// A profile's groups in common and its Add to Groups and Promote pickers read the same snapshot (#2983),
+// held for as long as that profile surface is open.
 
 /**
  * Every eligible forward target MDK presents for the bound account that the retained window does not
  * already hold, projected with this controller's caches; null when no account is bound, the read is
  * unavailable or failed, or the binding changed while the read was in flight.
  */
-internal suspend fun ChatsController.loadAccountWideForwardTargets(): AccountWideForwardTargets? {
+internal suspend fun ChatsController.loadAccountWideForwardTargets(): AccountWideForwardTargets? =
+    (readAccountWideForwardTargets() as? AccountWideRead.Loaded)?.snapshot
+
+/** Outcome of one account-wide presented-list read, keeping a failed read apart from one that cannot run. */
+internal sealed interface AccountWideRead {
+    /** The read succeeded for the binding it started under. */
+    data class Loaded(
+        val snapshot: AccountWideForwardTargets,
+    ) : AccountWideRead
+
+    /** The presented-list read itself failed, so a caller can offer a retry. */
+    data object Failed : AccountWideRead
+
+    /** No account is bound, no reader exists, or the binding changed during the read: nothing to retry. */
+    data object Unavailable : AccountWideRead
+}
+
+/** Reads the presented list once, reporting a failed read separately from a read that could not run. */
+internal suspend fun ChatsController.readAccountWideForwardTargets(): AccountWideRead {
     val account = accountRef
     val read = liveSubscriptions.presentedChatList
-    if (account == null || read == null) return null
+    if (account == null || read == null) return AccountWideRead.Unavailable
     val epoch = bindEpoch
-    return runCatchingCancellable { read(account, true) }
-        .getOrNull()
-        ?.takeIf { isActiveBindEpoch(epoch) && accountRef == account }
-        ?.let { presented -> AccountWideForwardTargets(this, epoch, presented) }
+    val result = runCatchingCancellable { read(account, true) }
+    return when {
+        !isActiveBindEpoch(epoch) || accountRef != account -> AccountWideRead.Unavailable
+        result.isFailure -> AccountWideRead.Failed
+        else -> AccountWideRead.Loaded(AccountWideForwardTargets(this, epoch, result.getOrThrow()))
+    }
 }
+
+/** The active controller's account-wide read, unavailable when no controller is attached. */
+internal suspend fun WhiteNoiseAppState.readAccountWideForwardTargets(): AccountWideRead =
+    groupPresentationChatsController?.readAccountWideForwardTargets() ?: AccountWideRead.Unavailable
 
 /** Native rows owned only by an open picker; derived rows always use the controller's current roster cache. */
 internal class AccountWideForwardTargets(
@@ -48,9 +75,39 @@ internal class AccountWideForwardTargets(
 
     /** Resolves only missing rosters requested from this exact account-owned presented snapshot. */
     suspend fun resolveMembers(groupIds: Set<String>) {
-        if (!isCurrent) return
-        controller.resolveForwardTargetMembers(presented.filter { it.row.groupIdHex in groupIds })
+        resolveMembersBeyondWindow(groupIds)
     }
+
+    /**
+     * Resolves the requested rosters of chats the retained window does not hold, and returns those groups
+     * that still have no roster afterwards, so a profile picker can offer a retry instead of loading forever.
+     * Empty once the binding has expired: a late result is never reported against the next account.
+     */
+    suspend fun resolveMembersBeyondWindow(groupIds: Set<String>): Set<String> {
+        if (!isCurrent) return emptySet()
+        val requested =
+            presented
+                .filter { it.row.groupIdHex in groupIds }
+                .filterNot { controller.containsGroup(it.row.groupIdHex) }
+        controller.resolveForwardTargetMembers(requested)
+        return requested.mapNotNullTo(linkedSetOf()) { row ->
+            row.row.groupIdHex.takeIf { isCurrent && !controller.hasMemberSnapshot(it) }
+        }
+    }
+}
+
+/**
+ * The chats beyond the retained window that one open profile surface reads for its group lookups (#2983):
+ * the account-wide [snapshot], the groups in it whose rosters could not be resolved, and whether the read
+ * itself failed, in which case the lookups are incomplete and offer Retry.
+ */
+internal data class ProfileAccountWideGroups(
+    val snapshot: AccountWideForwardTargets? = null,
+    val failedGroupIds: Set<String> = emptySet(),
+    val readFailed: Boolean = false,
+) {
+    /** Reprojects the snapshot with the controller's current caches; null until a read has succeeded. */
+    fun items(): List<ChatListItem>? = snapshot?.items()
 }
 
 /**

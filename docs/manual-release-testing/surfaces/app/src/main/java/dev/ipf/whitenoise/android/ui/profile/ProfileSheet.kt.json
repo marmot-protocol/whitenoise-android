@@ -395,6 +395,14 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "surface": "Profile group lookups beyond the loaded chat list",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "rememberProfileAccountWideGroups(",
+        "test_ids": [
+          "ACC-021"
+        ]
       }
     ]
   },
