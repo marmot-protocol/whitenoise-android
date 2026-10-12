@@ -99,7 +99,6 @@ import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.memberMutePreferences
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.state.profileNotificationOverrides
-import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
@@ -618,10 +617,13 @@ internal fun ProfileSheet(
     val inviteMessage = stringResource(R.string.invite_message)
     val groupPickerRevision = appState.profileGroupPickerRevision
     val liveGroupsRevision = appState.forwardTargetsRevision
+    // Chats beyond the retained chat-list window, so groups in common and both pickers see every chat (#2983).
+    val accountWideGroups = rememberProfileAccountWideGroups(appState, enabled = hex != null && !targetIsSelf)
+    val accountWide = accountWideGroups.value
     val shared =
-        remember(hex, activeAccountHex, liveGroupsRevision, groupPickerRevision) {
+        remember(hex, activeAccountHex, liveGroupsRevision, groupPickerRevision, accountWide) {
             // Existing on-demand projection includes archived groups and remains live behind a conversation.
-            appState.personSharedGroupsForProfile(hex)
+            appState.personSharedGroupsForProfile(hex, accountWide)
         }
     val groupTitleCopy = rememberGroupTitleCopy()
     val sharedRows =
@@ -637,16 +639,16 @@ internal fun ProfileSheet(
     val sharedItems = remember(shared.groups) { shared.groups.associateBy { it.group.groupIdHex } }
     LaunchedEffect(hex, shared.unresolvedGroupIds) {
         if (owner.canAct() && shared.unresolvedGroupIds.isNotEmpty()) {
-            appState.requestProfileGroupMembers(shared.unresolvedGroupIds)
+            accountWideGroups.requestMembers(shared.unresolvedGroupIds)
         }
     }
     val addableGroupsState =
-        remember(hex, liveGroupsRevision, groupPickerRevision) {
-            hex?.let(appState::profileAddableGroupsState) ?: ProfileGroupPickerState.empty()
+        remember(hex, liveGroupsRevision, groupPickerRevision, accountWide) {
+            hex?.let { appState.profileAddableGroupsState(it, accountWide) } ?: ProfileGroupPickerState.empty()
         }
     val promotableGroupsState =
-        remember(hex, liveGroupsRevision, groupPickerRevision) {
-            hex?.let(appState::profilePromotableGroupsState) ?: ProfileGroupPickerState.empty()
+        remember(hex, liveGroupsRevision, groupPickerRevision, accountWide) {
+            hex?.let { appState.profilePromotableGroupsState(it, accountWide) } ?: ProfileGroupPickerState.empty()
         }
     LaunchedEffect(page, addableGroupsState.pendingGroupIds, promotableGroupsState.pendingGroupIds) {
         val pendingGroupIds =
@@ -659,7 +661,7 @@ internal fun ProfileSheet(
                 -> emptySet()
             }
         if (pendingGroupIds.isNotEmpty()) {
-            appState.requestProfileGroupMembers(pendingGroupIds)
+            accountWideGroups.requestMembers(pendingGroupIds)
         }
     }
     val editorAccount = accountAtOpen?.takeIf { showContactEditorDialog && hex != null && !targetIsSelf }
@@ -1035,10 +1037,7 @@ internal fun ProfileSheet(
                                 busy = addingToGroups,
                                 onClose = { if (!addingToGroups) page = pickerParent },
                                 onRetry = {
-                                    appState.requestProfileGroupMembers(
-                                        addableGroupsState.pendingGroupIds,
-                                        retry = true,
-                                    )
+                                    accountWideGroups.requestMembers(addableGroupsState.pendingGroupIds, retry = true)
                                 },
                                 onAdd = ::addProfileToGroups,
                             )
@@ -1057,7 +1056,7 @@ internal fun ProfileSheet(
                                 busy = promotingAdmin,
                                 onClose = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
                                 onRetry = {
-                                    appState.requestProfileGroupMembers(
+                                    accountWideGroups.requestMembers(
                                         promotableGroupsState.pendingGroupIds,
                                         retry = true,
                                     )
@@ -1078,7 +1077,7 @@ internal fun ProfileSheet(
                             onOpen = { id ->
                                 if (owner.canAct()) {
                                     appState
-                                        .personSharedGroupsForProfile(hex)
+                                        .personSharedGroupsForProfile(hex, accountWideGroups.value)
                                         .groups
                                         .firstOrNull { it.group.groupIdHex == id }
                                         ?.let { item -> owner.leave { onOpenGroup(item, false) } }
@@ -1092,7 +1091,7 @@ internal fun ProfileSheet(
                             },
                             onRetry = {
                                 if (owner.canAct()) {
-                                    appState.requestProfileGroupMembers(shared.unresolvedGroupIds, retry = true)
+                                    accountWideGroups.requestMembers(shared.unresolvedGroupIds, retry = true)
                                 }
                             },
                             avatar = { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },

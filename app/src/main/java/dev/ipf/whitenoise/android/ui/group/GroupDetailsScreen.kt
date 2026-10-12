@@ -101,7 +101,6 @@ import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
@@ -139,6 +138,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsContent
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
+import dev.ipf.whitenoise.android.ui.profile.rememberProfileAccountWideGroups
 import dev.ipf.whitenoise.android.ui.settings.ChatBubbleColorsScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticRow
@@ -405,14 +405,18 @@ internal fun GroupDetailsScreen(
         val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
         val dmAddToGroupsScroll = rememberScrollState()
         val dmGroupPickerRevision = appState.profileGroupPickerRevision
+        // Chats beyond the retained chat-list window, read only while the picker is open (#2983).
+        val dmAccountWideGroups =
+            rememberProfileAccountWideGroups(appState, enabled = showDmAddToGroups && dmPeerAccountIdHex != null)
+        val dmAccountWide = dmAccountWideGroups.value
         val dmAddableGroupsState =
-            remember(dmPeerAccountIdHex, appState.chatListItems, dmGroupPickerRevision) {
-                dmPeerAccountIdHex?.let(appState::profileAddableGroupsState)
+            remember(dmPeerAccountIdHex, appState.chatListItems, dmGroupPickerRevision, dmAccountWide) {
+                dmPeerAccountIdHex?.let { appState.profileAddableGroupsState(it, dmAccountWide) }
                     ?: ProfileGroupPickerState.empty()
             }
         LaunchedEffect(showDmAddToGroups, dmAddableGroupsState.pendingGroupIds) {
             if (showDmAddToGroups && dmAddableGroupsState.pendingGroupIds.isNotEmpty()) {
-                appState.requestProfileGroupMembers(dmAddableGroupsState.pendingGroupIds)
+                dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds)
             }
         }
         if (showDmAddToGroups && dmPeerAccountIdHex != null) {
@@ -428,10 +432,7 @@ internal fun GroupDetailsScreen(
                         busy = addingDmPeerToGroups,
                         onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
                         onRetry = {
-                            appState.requestProfileGroupMembers(
-                                dmAddableGroupsState.pendingGroupIds,
-                                retry = true,
-                            )
+                            dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds, retry = true)
                         },
                         onAdd = { groups ->
                             if (!addingDmPeerToGroups) {

@@ -10,6 +10,9 @@ import java.util.Locale
 // presented list from MDK once, on demand, and merges it under the retained rows: MDK stays the owner
 // of the rows, the controller's window stays the fresh source for anything it retains, and the
 // account-wide read is held only for the lifetime of the open picker.
+//
+// A profile's groups in common and its Add to Groups and Promote pickers read the same snapshot (#2983),
+// held for as long as that profile surface is open.
 
 /**
  * Every eligible forward target MDK presents for the bound account that the retained window does not
@@ -48,9 +51,37 @@ internal class AccountWideForwardTargets(
 
     /** Resolves only missing rosters requested from this exact account-owned presented snapshot. */
     suspend fun resolveMembers(groupIds: Set<String>) {
-        if (!isCurrent) return
-        controller.resolveForwardTargetMembers(presented.filter { it.row.groupIdHex in groupIds })
+        resolveMembersBeyondWindow(groupIds)
     }
+
+    /**
+     * Resolves the requested rosters of chats the retained window does not hold, and returns those groups
+     * that still have no roster afterwards, so a profile picker can offer a retry instead of loading forever.
+     * Empty once the binding has expired: a late result is never reported against the next account.
+     */
+    suspend fun resolveMembersBeyondWindow(groupIds: Set<String>): Set<String> {
+        if (!isCurrent) return emptySet()
+        val requested =
+            presented
+                .filter { it.row.groupIdHex in groupIds }
+                .filterNot { controller.containsGroup(it.row.groupIdHex) }
+        controller.resolveForwardTargetMembers(requested)
+        return requested.mapNotNullTo(linkedSetOf()) { row ->
+            row.row.groupIdHex.takeIf { isCurrent && !controller.hasMemberSnapshot(it) }
+        }
+    }
+}
+
+/**
+ * The chats beyond the retained window that one open profile surface reads for its group lookups (#2983):
+ * the account-wide [snapshot], and the groups in it whose rosters could not be resolved.
+ */
+internal data class ProfileAccountWideGroups(
+    val snapshot: AccountWideForwardTargets? = null,
+    val failedGroupIds: Set<String> = emptySet(),
+) {
+    /** Reprojects the snapshot with the controller's current caches; null until a read has succeeded. */
+    fun items(): List<ChatListItem>? = snapshot?.items()
 }
 
 /**

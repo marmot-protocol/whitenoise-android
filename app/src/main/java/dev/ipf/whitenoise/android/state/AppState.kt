@@ -4102,12 +4102,20 @@ class WhiteNoiseAppState private constructor(
     internal val groupPresentationChatsController: ChatsController?
         get() = chatsController
 
-    internal fun profileAddableGroupsState(accountIdHex: String): ProfileGroupPickerState =
-        chatsController?.profileAddableGroupsState(accountIdHex, activeAccount?.accountIdHex)
+    /** Add to Groups candidates for [accountIdHex], with chats beyond the window from [accountWide]. */
+    internal fun profileAddableGroupsState(
+        accountIdHex: String,
+        accountWide: ProfileAccountWideGroups = ProfileAccountWideGroups(),
+    ): ProfileGroupPickerState =
+        chatsController?.profileAddableGroupsState(accountIdHex, activeAccount?.accountIdHex, accountWide)
             ?: ProfileGroupPickerState.empty()
 
-    internal fun profilePromotableGroupsState(accountIdHex: String): ProfileGroupPickerState =
-        chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex)
+    /** Promote candidates for [accountIdHex], with chats beyond the window from [accountWide]. */
+    internal fun profilePromotableGroupsState(
+        accountIdHex: String,
+        accountWide: ProfileAccountWideGroups = ProfileAccountWideGroups(),
+    ): ProfileGroupPickerState =
+        chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex, accountWide)
             ?: ProfileGroupPickerState.empty()
 
     suspend fun promoteProfileInGroup(
@@ -4216,8 +4224,6 @@ class WhiteNoiseAppState private constructor(
         }
         return outcome.completedSuccessfully
     }
-
-    fun sharedGroupsWith(accountIdHex: String): List<ChatListItem> = chatsController?.sharedGroupsWith(accountIdHex, activeAccount?.accountIdHex).orEmpty()
 
     /**
      * Compose-tracked snapshot of the active account's projected chat list.
