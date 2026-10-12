@@ -70,7 +70,10 @@ internal class RouteSetupLedger {
     var totalMs = 0L
         private set
 
-    /** Runs one setup, retrying a failure once, and keeps the counts whatever happens. */
+    /**
+     * Runs one setup, retrying a failure once, and keeps the counts whatever happens. When the retry fails too, the
+     * first failure travels with it as a suppressed exception, because it is usually the root cause.
+     */
     fun run(setup: () -> Unit) {
         attempts += 1
         val startedAt = System.nanoTime()
@@ -80,7 +83,12 @@ internal class RouteSetupLedger {
             failures += 1
             retries += 1
             attempts += 1
-            setup()
+            try {
+                setup()
+            } catch (retryFailure: IllegalStateException) {
+                retryFailure.addSuppressed(failure)
+                throw retryFailure
+            }
         } finally {
             totalMs += (System.nanoTime() - startedAt) / NANOS_PER_MILLI
         }
