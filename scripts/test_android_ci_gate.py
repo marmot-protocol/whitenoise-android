@@ -640,6 +640,18 @@ class AndroidCiGateTest(unittest.TestCase):
         )
         self.assertIsNotNone(match, 'declare the registry as a top-level input of the shared Test configuration')
 
+    def test_instrumented_invariant_gates_are_an_input_of_every_test_task(self):
+        """Adding or renaming an androidTest gate must re-run InvariantGateRegistryTest, not reuse a cached pass."""
+        test_tasks = self.app_build.split('tasks.withType<Test>().configureEach {', 1)[1]
+        test_tasks = test_tasks.split('\ntasks.register<Test>', 1)[0]
+        match = re.search(
+            r'\n    inputs\s*\.files\(rootProject\.fileTree\("app/src/androidTest"\) \{ include\("\*\*/\*CoverageTest\.kt"\) \}\)'
+            r'\s*\.withPropertyName\("instrumentedInvariantGates"\)'
+            r'\s*\.withPathSensitivity\(PathSensitivity\.RELATIVE\)',
+            test_tasks,
+        )
+        self.assertIsNotNone(match, 'declare the instrumented gate tree as a top-level input of the shared Test configuration')
+
     def test_missing_result_is_rejected(self):
         """An unexpected dependency schema fails closed."""
         outcomes = self.successful_outcomes()

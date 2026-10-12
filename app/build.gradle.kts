@@ -1200,6 +1200,12 @@ tasks.withType<Test>().configureEach {
         .file(rootProject.file("docs/invariant-gates.md"))
         .withPropertyName("invariantGateRegistry")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // The registry test also discovers instrumented gates, whose sources no unit-test task compiles, so adding or
+    // renaming one must invalidate cached results too.
+    inputs
+        .files(rootProject.fileTree("app/src/androidTest") { include("**/*CoverageTest.kt") })
+        .withPropertyName("instrumentedInvariantGates")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     // CI verifies goldens in the complete variant test suites; these inputs also
     // keep focused local verifyRoborazzi tasks correct.
     // Include the custom baseline directory in Gradle's input fingerprint so a
