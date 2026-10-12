@@ -15,6 +15,7 @@ import org.junit.Test
 class MarkdownTimestampProjectionTest {
     private val timestamp = MarkdownInlineFfi.Timestamp(-1, MarkdownTimestampStyleFfi.SHORT_DATE_TIME)
 
+    /** Each nested timestamp keeps its own annotated range, clock prefix and surrounding emphasis. */
     @Test
     fun nestedTimestampKeepsIndividualRangeAndEmphasis() {
         val rendered =
@@ -43,6 +44,7 @@ class MarkdownTimestampProjectionTest {
         assertFalse(rendered.text.contains("<t:"))
     }
 
+    /** A link around a timestamp still navigates from its label, but not from the clock glyph. */
     @Test
     fun surroundingLinkKeepsNavigationButDoesNotCoverTimestampClock() {
         val rendered =
@@ -65,6 +67,7 @@ class MarkdownTimestampProjectionTest {
         assertTrue(rendered.getLinkAnnotations(rendered.length - 4, rendered.length).isNotEmpty())
     }
 
+    /** Timestamp markup inside inline code stays literal text with no disclosure range. */
     @Test
     fun literalCodeDoesNotAcquireTimestampDisclosure() {
         val rendered =
@@ -73,6 +76,7 @@ class MarkdownTimestampProjectionTest {
         assertTrue(rendered.getStringAnnotations(TIMESTAMP_TAG, 0, rendered.length).isEmpty())
     }
 
+    /** A clipped preview keeps the timestamp range only over its visible characters, with no link. */
     @Test
     fun clippedPreviewCarriesOnlyItsVisibleTokenRangeAndNoLink() {
         val document =

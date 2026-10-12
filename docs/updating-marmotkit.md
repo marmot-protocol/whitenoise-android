@@ -9,18 +9,21 @@ MDK has published the corresponding release.
 
 The Android timestamp renderer consumes `MarkdownInlineFfi.Timestamp` and
 `MarkdownTimestampStyleFfi` from [MDK #2214](https://github.com/marmot-protocol/mdk/pull/2214),
-reviewed at `2336afda22f6100ecb76916bf187cb9c311d3c8d`. The pinned immutable
-`marmotkit-snapshot-7692e26649193bd0bfba5f6a425a80b7c2e8f502` archive
-contains these types. Do not regenerate or hand-edit bindings or parse timestamps
-in Kotlin.
+reviewed at `2336afda22f6100ecb76916bf187cb9c311d3c8d` and merged as `f8b5552e`.
+Every MarmotKit snapshot from `marmotkit-snapshot-7692e26649193bd0bfba5f6a425a80b7c2e8f502`
+onward contains these types. Do not regenerate or hand-edit bindings or parse
+timestamps in Kotlin.
 
 The host formats signed Unix seconds with the current local calendar and locale;
 Android ICU supplies localized relative labels. Only relative projections run a
-visible clock; timezone, time and locale broadcasts invalidate absolute labels.
+refresh clock: it wakes at the next label boundary (at most hourly), only while the
+screen is started, and catches up on restart. Timezone, time and locale broadcasts
+invalidate every label.
 Native clock icons and each token's own text range carry hover/tap disclosure.
 A linked label keeps navigation while its clock opens disclosure. Message state
-retains only canonical typed nodes. Tap disclosure stays open across relative
-label refreshes and closes on dismissal or when its token leaves the content.
+retains only canonical typed nodes. Tap disclosure, hover and an in-progress press
+survive relative label refreshes; disclosure and hover close when their token leaves
+the content.
 Calendar values outside `java.time`'s range
 remain visible as their exact canonical token rather than wrapping or crashing.
 

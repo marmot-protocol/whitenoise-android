@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
@@ -23,16 +21,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -47,16 +50,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.window.Popup
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownTimestampStyleFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.outlined.Schedule
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 internal const val TIMESTAMP_TAG = "markdown-timestamp"
 private const val TIMESTAMP_CLOCK_PREFIX = "markdown-timestamp-clock:"
-private const val TIMESTAMP_REFRESH_MILLIS = 1000L
 private const val TIMESTAMP_HOVER_OFFSET_PX = 24
 internal val markdownTimestampInlineContentTag =
     buildAnnotatedString { appendInlineContent("clock", "◷") }
@@ -64,19 +72,7 @@ internal val markdownTimestampInlineContentTag =
         .single()
         .tag
 
-internal fun MarkdownTimestampStyleFfi.code(): Char =
-    when (this) {
-        MarkdownTimestampStyleFfi.SHORT_TIME -> 't'
-        MarkdownTimestampStyleFfi.LONG_TIME -> 'T'
-        MarkdownTimestampStyleFfi.SHORT_DATE -> 'd'
-        MarkdownTimestampStyleFfi.LONG_DATE -> 'D'
-        MarkdownTimestampStyleFfi.SHORT_DATE_TIME -> 'f'
-        MarkdownTimestampStyleFfi.LONG_DATE_TIME -> 'F'
-        MarkdownTimestampStyleFfi.COMPACT_DATE_TIME -> 's'
-        MarkdownTimestampStyleFfi.COMPACT_DATE_TIME_SECONDS -> 'S'
-        MarkdownTimestampStyleFfi.RELATIVE -> 'R'
-    }
-
+/** Appends a clock placeholder and the local label, annotated with the canonical token over both. */
 internal fun AnnotatedString.Builder.appendMarkdownTimestamp(inline: MarkdownInlineFfi.Timestamp) {
     val style = inline.style.code()
     val token = markdownTimestampToken(inline.unixSeconds, style)
@@ -87,14 +83,20 @@ internal fun AnnotatedString.Builder.appendMarkdownTimestamp(inline: MarkdownInl
     addStringAnnotation(TIMESTAMP_TAG, token, start, length)
 }
 
-/** Invalidate only display projections. Never rewrite the owned MDK document. */
+/**
+ * Counts display invalidations for [timestamps]: clock, timezone and locale broadcasts, and
+ * relative-label boundaries while the screen is started. Never rewrite the owned MDK document.
+ */
 @Composable
-internal fun rememberTimestampRevision(
-    enabled: Boolean,
-    relative: Boolean,
-): Long {
+internal fun rememberTimestampRevision(timestamps: List<MarkdownInlineFfi.Timestamp>): Long {
     val context = LocalContext.current
-    var revision by remember { mutableStateOf(0L) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val enabled = timestamps.isNotEmpty()
+    val relativeSeconds =
+        remember(timestamps) {
+            timestamps.filter { it.style == MarkdownTimestampStyleFfi.RELATIVE }.map { it.unixSeconds }
+        }
+    var revision by remember { mutableLongStateOf(0L) }
     DisposableEffect(context, enabled) {
         val receiver =
             object : BroadcastReceiver() {
@@ -116,10 +118,15 @@ internal fun rememberTimestampRevision(
         }
         onDispose { if (enabled) context.unregisterReceiver(receiver) }
     }
-    LaunchedEffect(relative) {
-        if (relative) {
+    LaunchedEffect(lifecycle, relativeSeconds) {
+        if (relativeSeconds.isEmpty()) return@LaunchedEffect
+        var restarted = false
+        // A stopped screen does not tick, so a restart refreshes labels that aged meanwhile.
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            if (restarted) revision++
+            restarted = true
             while (true) {
-                delay(TIMESTAMP_REFRESH_MILLIS)
+                delay(timestampRelativeRefreshMillis(relativeSeconds, System.currentTimeMillis()))
                 revision++
             }
         }
@@ -127,66 +134,64 @@ internal fun rememberTimestampRevision(
     return revision
 }
 
-internal fun markdownInlinesHaveTimestamp(
+/** Visible timestamps in [inlines], in reading order, for display invalidation. */
+internal fun markdownInlineTimestamps(inlines: List<MarkdownInlineFfi>): List<MarkdownInlineFfi.Timestamp> =
+    buildList {
+        collectInlineTimestamps(inlines, 0)
+    }
+
+/** Visible timestamps across every block of [document], in reading order. */
+internal fun markdownDocumentTimestamps(document: MarkdownDocumentFfi): List<MarkdownInlineFfi.Timestamp> =
+    buildList { collectBlockTimestamps(document.blocks, 0) }
+
+/** Adds visible timestamps from [inlines] and their nested emphasis, link and image children. */
+private fun MutableList<MarkdownInlineFfi.Timestamp>.collectInlineTimestamps(
     inlines: List<MarkdownInlineFfi>,
-    relativeOnly: Boolean = false,
-    depth: Int = 0,
-): Boolean =
-    !markdownInlineDepthExceeded(depth) &&
-        markdownVisibleSiblings(inlines).any { inline ->
-            when (inline) {
-                is MarkdownInlineFfi.Timestamp -> !relativeOnly || inline.style == MarkdownTimestampStyleFfi.RELATIVE
-                is MarkdownInlineFfi.Emph -> markdownInlinesHaveTimestamp(inline.children, relativeOnly, depth + 1)
-                is MarkdownInlineFfi.Strong -> markdownInlinesHaveTimestamp(inline.children, relativeOnly, depth + 1)
-                is MarkdownInlineFfi.Strikethrough ->
-                    markdownInlinesHaveTimestamp(
-                        inline.children,
-                        relativeOnly,
-                        depth + 1,
-                    )
-                is MarkdownInlineFfi.Link -> markdownInlinesHaveTimestamp(inline.children, relativeOnly, depth + 1)
-                is MarkdownInlineFfi.Image -> markdownInlinesHaveTimestamp(inline.alt, relativeOnly, depth + 1)
-                else -> false
-            }
-        }
-
-internal fun markdownDocumentHasTimestamp(
-    document: MarkdownDocumentFfi,
-    relativeOnly: Boolean = false,
-): Boolean = markdownBlocksHaveTimestamp(document.blocks, relativeOnly, 0)
-
-private fun markdownBlocksHaveTimestamp(
-    blocks: List<MarkdownBlockFfi>,
-    relativeOnly: Boolean,
     depth: Int,
-): Boolean =
-    !markdownDepthExceeded(depth) &&
-        markdownVisibleSiblings(blocks).any { block ->
-            when (block) {
-                is MarkdownBlockFfi.Paragraph -> markdownInlinesHaveTimestamp(block.inlines, relativeOnly)
-                is MarkdownBlockFfi.Heading -> markdownInlinesHaveTimestamp(block.inlines, relativeOnly)
-                is MarkdownBlockFfi.BlockQuote -> markdownBlocksHaveTimestamp(block.blocks, relativeOnly, depth + 1)
-                is MarkdownBlockFfi.ListBlock ->
-                    markdownVisibleSiblings(block.items).any {
-                        markdownBlocksHaveTimestamp(
-                            it.blocks,
-                            relativeOnly,
-                            depth + 1,
-                        )
-                    }
-                is MarkdownBlockFfi.Details ->
-                    markdownInlinesHaveTimestamp(block.summary, relativeOnly) ||
-                        markdownBlocksHaveTimestamp(block.body, relativeOnly, depth + 1)
-                is MarkdownBlockFfi.Table -> {
-                    val table = markdownVisibleTable(block.header, block.rows)
-                    (listOf(table.header) + table.rows).any { row ->
-                        row.cells.any { markdownInlinesHaveTimestamp(it.inlines, relativeOnly) }
-                    }
-                }
-                else -> false
-            }
+) {
+    if (markdownInlineDepthExceeded(depth)) return
+    for (inline in markdownVisibleSiblings(inlines)) {
+        when (inline) {
+            is MarkdownInlineFfi.Timestamp -> add(inline)
+            is MarkdownInlineFfi.Emph -> collectInlineTimestamps(inline.children, depth + 1)
+            is MarkdownInlineFfi.Strong -> collectInlineTimestamps(inline.children, depth + 1)
+            is MarkdownInlineFfi.Strikethrough -> collectInlineTimestamps(inline.children, depth + 1)
+            is MarkdownInlineFfi.Link -> collectInlineTimestamps(inline.children, depth + 1)
+            is MarkdownInlineFfi.Image -> collectInlineTimestamps(inline.alt, depth + 1)
+            else -> Unit
         }
+    }
+}
 
+/** Adds visible timestamps from [blocks], including quotes, lists, details and table cells. */
+private fun MutableList<MarkdownInlineFfi.Timestamp>.collectBlockTimestamps(
+    blocks: List<MarkdownBlockFfi>,
+    depth: Int,
+) {
+    if (markdownDepthExceeded(depth)) return
+    for (block in markdownVisibleSiblings(blocks)) {
+        when (block) {
+            is MarkdownBlockFfi.Paragraph -> collectInlineTimestamps(block.inlines, 0)
+            is MarkdownBlockFfi.Heading -> collectInlineTimestamps(block.inlines, 0)
+            is MarkdownBlockFfi.BlockQuote -> collectBlockTimestamps(block.blocks, depth + 1)
+            is MarkdownBlockFfi.ListBlock ->
+                markdownVisibleSiblings(block.items).forEach { collectBlockTimestamps(it.blocks, depth + 1) }
+            is MarkdownBlockFfi.Details -> {
+                collectInlineTimestamps(block.summary, 0)
+                collectBlockTimestamps(block.body, depth + 1)
+            }
+            is MarkdownBlockFfi.Table -> {
+                val table = markdownVisibleTable(block.header, block.rows)
+                (listOf(table.header) + table.rows).forEach { row ->
+                    row.cells.forEach { collectInlineTimestamps(it.inlines, 0) }
+                }
+            }
+            else -> Unit
+        }
+    }
+}
+
+/** The full local date/time for [token], followed by the token itself. */
 private fun timestampDisclosure(token: String): String {
     // This is our canonical typed-node metadata, not parsing user-authored Markdown.
     val seconds = token.substring(3, token.lastIndexOf(':')).toLong()
@@ -208,12 +213,13 @@ internal fun MarkdownTimestampText(
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     val ranges = remember(text) { text.getStringAnnotations(TIMESTAMP_TAG, 0, text.length) }
+    val currentRanges by rememberUpdatedState(ranges)
     val state = remember { TimestampTextState() }
-    LaunchedEffect(text) { state.hovered = null }
     LaunchedEffect(ranges) {
-        if (ranges.none { it.item == state.tapped }) {
-            state.tapped = null
-        }
+        // A refreshed relative label keeps its token: hover and disclosure end only when the token leaves.
+        val tokens = ranges.mapTo(HashSet()) { it.item }
+        if (state.hovered !in tokens) state.hovered = null
+        if (state.tapped !in tokens) state.tapped = null
     }
     if (ranges.isEmpty()) {
         Text(
@@ -232,7 +238,7 @@ internal fun MarkdownTimestampText(
         Box(modifier, propagateMinConstraints = true) {
             Text(
                 text = text,
-                modifier = Modifier.timestampPointers(text, ranges, state),
+                modifier = Modifier.timestampPointers(state) { currentRanges },
                 inlineContent = inlineContent + clocks,
                 style = style,
                 textAlign = textAlign,
@@ -249,53 +255,58 @@ internal fun MarkdownTimestampText(
     }
 }
 
+/** Layout, hover and tap state shared by a timestamp text's pointer handler and overlays. */
 private class TimestampTextState {
     var layout: TextLayoutResult? = null
     var hovered by mutableStateOf<String?>(null)
     var tapped by mutableStateOf<String?>(null)
     var hoverPosition by mutableStateOf(Offset.Zero)
 
+    /**
+     * The character whose glyph box contains [position], or null past the line ends. The nearest
+     * caret sits after the glyph on its trailing half, so both characters around it are checked.
+     */
+    fun glyphAt(position: Offset): Int? {
+        val measured = layout ?: return null
+        val caret = measured.getOffsetForPosition(position)
+        return listOf(caret, caret - 1).firstOrNull { offset ->
+            offset in 0 until measured.layoutInput.text.length && measured.getBoundingBox(offset).contains(position)
+        }
+    }
+
+    /** The timestamp range whose glyphs lie under [position]. */
     fun hit(
         position: Offset,
         ranges: List<AnnotatedString.Range<String>>,
     ): AnnotatedString.Range<String>? {
-        val measured = layout ?: return null
-        val offset = measured.getOffsetForPosition(position)
-        // Ignore whitespace clamped to a nearby glyph by getOffsetForPosition.
-        return if (offset in 0 until measured.layoutInput.text.length &&
-            measured.getBoundingBox(offset).contains(position)
-        ) {
-            ranges.firstOrNull { offset >= it.start && offset < it.end }
-        } else {
-            null
-        }
+        val offset = glyphAt(position) ?: return null
+        return ranges.firstOrNull { offset >= it.start && offset < it.end }
     }
 
+    /** Opens disclosure for a short, still tap on an unlinked timestamp glyph. */
     fun timestampTap(
-        change: androidx.compose.ui.input.pointer.PointerInputChange,
+        change: PointerInputChange,
         origin: Offset?,
         downAt: Long,
         ranges: List<AnnotatedString.Range<String>>,
-        viewConfiguration: androidx.compose.ui.platform.ViewConfiguration,
+        viewConfiguration: ViewConfiguration,
     ) {
-        if (origin == null || change.isConsumed) {
-            return
-        }
-        val range = hit(change.position, ranges) ?: return
-        val moved = (change.position - origin).getDistance() >= viewConfiguration.touchSlop
-        val held = change.uptimeMillis - downAt >= viewConfiguration.longPressTimeoutMillis
-        if (!moved && !held) {
-            val offset = layout?.getOffsetForPosition(change.position) ?: -1
-            // Linked labels navigate normally; the clock has its own disclosure target.
-            val links = layout?.layoutInput?.text?.getLinkAnnotations(offset, offset + 1)
-            if (links?.isEmpty() == true) {
-                tapped = range.item
-                change.consume()
-            }
+        if (origin == null || change.isConsumed) return
+        val offset = glyphAt(change.position)
+        val range = offset?.let { glyph -> ranges.firstOrNull { glyph >= it.start && glyph < it.end } }
+        val shortTap =
+            (change.position - origin).getDistance() < viewConfiguration.touchSlop &&
+                change.uptimeMillis - downAt < viewConfiguration.longPressTimeoutMillis
+        // Linked labels navigate normally; the clock has its own disclosure target.
+        val links = offset?.let { layout?.layoutInput?.text?.getLinkAnnotations(it, it + 1) }
+        if (range != null && links?.isEmpty() == true && shortTap) {
+            tapped = range.item
+            change.consume()
         }
     }
 }
 
+/** One clickable native clock icon per timestamp token, keyed by its inline-content id. */
 @Composable
 private fun rememberTimestampClocks(
     ranges: List<AnnotatedString.Range<String>>,
@@ -314,12 +325,15 @@ private fun rememberTimestampClocks(
         }
     }
 
+/**
+ * Hover and tap disclosure for timestamp labels. Keyed to [state] only, so a relative-label
+ * refresh between press and release keeps the press; [ranges] reads the current annotations.
+ */
 private fun Modifier.timestampPointers(
-    text: AnnotatedString,
-    ranges: List<AnnotatedString.Range<String>>,
     state: TimestampTextState,
+    ranges: () -> List<AnnotatedString.Range<String>>,
 ): Modifier =
-    pointerInput(text) {
+    pointerInput(state) {
         awaitPointerEventScope {
             var down: Offset? = null
             var downAt = 0L
@@ -330,7 +344,7 @@ private fun Modifier.timestampPointers(
                     PointerEventType.Exit -> state.hovered = null
                     PointerEventType.Move, PointerEventType.Enter -> {
                         if (!change.pressed) {
-                            state.hovered = state.hit(change.position, ranges)?.item
+                            state.hovered = state.hit(change.position, ranges())?.item
                             state.hoverPosition = change.position
                         }
                     }
@@ -339,7 +353,7 @@ private fun Modifier.timestampPointers(
                         downAt = change.uptimeMillis
                     }
                     PointerEventType.Release -> {
-                        state.timestampTap(change, down, downAt, ranges, viewConfiguration)
+                        state.timestampTap(change, down, downAt, ranges(), viewConfiguration)
                         down = null
                     }
                 }
@@ -347,6 +361,7 @@ private fun Modifier.timestampPointers(
         }
     }
 
+/** Shows the hover tooltip and the tap disclosure dialog for the current [state]. */
 @Suppress("FunctionNaming")
 @Composable
 private fun TimestampOverlays(state: TimestampTextState) {
@@ -374,10 +389,7 @@ private fun TimestampOverlays(state: TimestampTextState) {
             text = { Text(timestampDisclosure(token)) },
             confirmButton = {
                 TextButton(onClick = { state.tapped = null }) {
-                    Text(
-                        androidx.compose.ui.res
-                            .stringResource(dev.ipf.whitenoise.android.R.string.dismiss),
-                    )
+                    Text(stringResource(R.string.dismiss))
                 }
             },
         )

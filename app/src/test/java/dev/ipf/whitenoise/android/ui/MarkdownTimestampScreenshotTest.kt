@@ -39,24 +39,29 @@ class MarkdownTimestampScreenshotTest {
     private val originalLocale = Locale.getDefault()
     private val originalZone = TimeZone.getDefault()
 
+    /** Pins the locale and zone so baselines do not depend on the host machine. */
     @Before
     fun setCalendar() {
         Locale.setDefault(Locale.US)
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
     }
 
+    /** Restores the host locale and zone for later tests. */
     @After
     fun restoreCalendar() {
         Locale.setDefault(originalLocale)
         TimeZone.setDefault(originalZone)
     }
 
+    /** Every timestamp style in the light theme, left to right. */
     @Test
     fun lightTimestamps() = capture("markdown_timestamps_light", LayoutDirection.Ltr)
 
+    /** Every timestamp style in the dark theme, right to left, at a large font scale. */
     @Test
     fun darkLargeRtlTimestamps() = capture("markdown_timestamps_dark_large_rtl", LayoutDirection.Rtl)
 
+    /** Renders each absolute style plus a relative label and records the [name] baseline. */
     private fun capture(
         name: String,
         direction: LayoutDirection,

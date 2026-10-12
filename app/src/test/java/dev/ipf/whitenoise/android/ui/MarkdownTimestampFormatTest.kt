@@ -11,6 +11,7 @@ import java.time.ZoneId
 import java.util.Locale
 
 class MarkdownTimestampFormatTest {
+    /** Relative amounts switch units at the minute boundary and report past or future direction. */
     @Test
     fun relativeClockCrossesSecondsMinutesAndDirectionWithoutStoringLabels() {
         assertEquals(TimestampRelativeAmount(59, 's', true), timestampRelativeAmount(60, 1))
@@ -20,6 +21,7 @@ class MarkdownTimestampFormatTest {
         assertEquals(TimestampRelativeAmount(1, 'm', false), timestampRelativeAmount(60, 120))
     }
 
+    /** Distances between the signed 64-bit extremes are computed without overflow. */
     @Test
     fun relativeDistanceBetweenSignedExtremesDoesNotOverflow() {
         val expected =
@@ -43,6 +45,7 @@ class MarkdownTimestampFormatTest {
         )
     }
 
+    /** A negative epoch formats in every absolute style, distinctly per locale and precision. */
     @Test
     fun negativeEpochUsesCurrentLocalCalendarAndAllAbsoluteStyles() {
         val utc = ZoneId.of("UTC")
@@ -66,6 +69,7 @@ class MarkdownTimestampFormatTest {
         )
     }
 
+    /** Labels follow the zone's daylight-saving transition and differ between zones. */
     @Test
     fun timezoneAndDaylightSavingAreResolvedForEachProjection() {
         val seconds = Instant.parse("2026-03-08T09:59:00Z").epochSecond
@@ -81,6 +85,34 @@ class MarkdownTimestampFormatTest {
         )
     }
 
+    /** Each relative label waits only until its own count or unit next changes, in either direction. */
+    @Test
+    fun relativeChangeWaitsForTheNextLabelBoundary() {
+        // Past: 59 s becomes "1 minute" next second, 61 s becomes "2 minutes" at 120 s.
+        assertEquals(1, timestampRelativeChangeSeconds(0, 59))
+        assertEquals(59, timestampRelativeChangeSeconds(0, 61))
+        assertEquals(3600L - 5, timestampRelativeChangeSeconds(0, 2L * 3600 + 5))
+        assertEquals(86400L - 3600, timestampRelativeChangeSeconds(0, 3L * 86400 + 3600))
+        // Future: "in 1 hour" becomes "in 59 minutes" one second later.
+        assertEquals(1, timestampRelativeChangeSeconds(3600, 0))
+        assertEquals(2, timestampRelativeChangeSeconds(3601, 0))
+        assertEquals(1, timestampRelativeChangeSeconds(60, 0))
+        assertEquals(1, timestampRelativeChangeSeconds(Long.MIN_VALUE, Long.MIN_VALUE))
+        assertTrue(timestampRelativeChangeSeconds(Long.MAX_VALUE, Long.MIN_VALUE) > 0)
+    }
+
+    /** The refresh lands on the soonest label boundary's whole second and never sleeps past the hourly cap. */
+    @Test
+    fun relativeRefreshFollowsTheSoonestLabelAndIsCapped() {
+        assertEquals(1000, timestampRelativeRefreshMillis(listOf(0), 59_000))
+        assertEquals(750, timestampRelativeRefreshMillis(listOf(0), 59_250))
+        assertEquals(30_000, timestampRelativeRefreshMillis(listOf(0), 150_000))
+        assertEquals(1000, timestampRelativeRefreshMillis(listOf(0, 120), 150_000))
+        assertEquals(3_600_000, timestampRelativeRefreshMillis(listOf(0), 40L * 86_400_000))
+        assertEquals(3_600_000L - 10, timestampRelativeRefreshMillis(listOf(Long.MIN_VALUE), 10))
+    }
+
+    /** Instants beyond java.time's calendar range fall back to the exact canonical token. */
     @Test
     fun calendarRangeFailureRetainsExactCanonicalSignedToken() {
         assertEquals("<t:${Long.MIN_VALUE}:F>", markdownTimestampAbsolute(Long.MIN_VALUE, 'F'))

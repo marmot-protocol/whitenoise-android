@@ -704,7 +704,8 @@ internal fun markdownExtraBlankLines(
  * without it the first extra line would cost one whole spacing more than each
  * one after it.
  */
-internal fun markdownBlankRunSpacerHeight(extraBlankLines: Int): Dp = (MARKDOWN_BLANK_LINE_HEIGHT * extraBlankLines - MARKDOWN_BLOCK_SPACING).coerceAtLeast(0.dp)
+internal fun markdownBlankRunSpacerHeight(extraBlankLines: Int): Dp =
+    (MARKDOWN_BLANK_LINE_HEIGHT * extraBlankLines - MARKDOWN_BLOCK_SPACING).coerceAtLeast(0.dp)
 
 @Composable
 private fun MarkdownElisionMarker(
@@ -1335,6 +1336,7 @@ private fun MarkdownTableRowView(
     }
 }
 
+/** Projects [inlines] once per content, colour, mention or timestamp revision change. */
 @Composable
 private fun rememberMarkdownInlineText(
     inlines: List<MarkdownInlineFfi>,
@@ -1347,14 +1349,7 @@ private fun rememberMarkdownInlineText(
     // string when a profile arrives.
     val mentionBech32s = remember(inlines) { markdownInlineMentionBech32s(inlines) }
     val mentionNames = resolveMentionNames(mentionBech32s, ctx.mentionDisplayName)
-    val hasTimestamp = remember(inlines) { markdownInlinesHaveTimestamp(inlines) }
-    val timestampRevision =
-        rememberTimestampRevision(
-            hasTimestamp,
-            remember(inlines) {
-                markdownInlinesHaveTimestamp(inlines, relativeOnly = true)
-            },
-        )
+    val timestampRevision = rememberTimestampRevision(remember(inlines) { markdownInlineTimestamps(inlines) })
     // Links must derive from the content color like every other accent:
     // colorScheme.primary disappears on the outgoing bubble, whose container
     // IS primary. Underline alone carries the affordance on both surfaces.
@@ -1499,10 +1494,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
             // newline (not the CommonMark collapse-to-space) to match how the
             // plaintext fallback has always displayed.
             MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append('\n')
-            is MarkdownInlineFfi.Code ->
-                withStyle(
-                    ctx.codeStyle,
-                ) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
+            is MarkdownInlineFfi.Code -> withStyle(ctx.codeStyle) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
             is MarkdownInlineFfi.Emph ->
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                     appendMarkdownInlines(inline.children, ctx, depth + 1)
@@ -1525,13 +1517,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
             is MarkdownInlineFfi.Autolink -> {
                 val parsedLink = parsedOpenableMarkdownLink(markdownAutolinkDestination(inline.url, inline.kind))
                 if (parsedLink != null) {
-                    withLink(
-                        LinkAnnotation.Url(
-                            parsedLink.destination,
-                            TextLinkStyles(style = ctx.linkStyle),
-                            ctx.linkListener,
-                        ),
-                    ) {
+                    withLink(LinkAnnotation.Url(parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
                         append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                     }
                 } else {
@@ -1539,13 +1525,10 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
                     append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                 }
             }
-            is MarkdownInlineFfi.Math ->
-                withStyle(
-                    ctx.codeStyle,
-                ) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
+            is MarkdownInlineFfi.Timestamp -> appendMarkdownTimestamp(inline)
+            is MarkdownInlineFfi.Math -> withStyle(ctx.codeStyle) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
             is MarkdownInlineFfi.NostrMention -> appendNostrEntity(inline.entity, mention = true, ctx)
             is MarkdownInlineFfi.NostrUri -> appendNostrEntity(inline.entity, mention = false, ctx)
-            is MarkdownInlineFfi.Timestamp -> appendMarkdownTimestamp(inline)
         }
     }
 }
@@ -1709,6 +1692,7 @@ internal fun resolveMentionsInPlaintext(
         "@$visible$trailingPunctuation"
     }
 
+/** Appends a link label whose hit target skips each timestamp clock, so the clock keeps its own disclosure. */
 private fun AnnotatedString.Builder.appendMarkdownLink(
     dest: String,
     children: List<MarkdownInlineFfi>,
@@ -1755,6 +1739,7 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
     }
 }
 
+/** Applies one link [annotation] to a sub-range of a split link label. */
 private fun AnnotatedString.Builder.addMarkdownLinkRange(
     annotation: LinkAnnotation,
     start: Int,
@@ -1835,10 +1820,7 @@ internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
                     is MarkdownInlineFfi.Text -> append(inline.content)
                     is MarkdownInlineFfi.Code -> append(inline.content)
                     is MarkdownInlineFfi.Math -> append(inline.content)
-                    is MarkdownInlineFfi.Timestamp ->
-                        append(
-                            markdownTimestampLabel(inline.unixSeconds, inline.style.code()),
-                        )
+                    is MarkdownInlineFfi.Timestamp -> append(inline.localLabel())
                     is MarkdownInlineFfi.Autolink -> append(inline.url)
                     is MarkdownInlineFfi.Emph -> walk(inline.children)
                     is MarkdownInlineFfi.Strong -> walk(inline.children)
@@ -1870,11 +1852,7 @@ internal fun rememberMarkdownPreviewText(
         } else {
             mentionBech32s.associateWith(mentionDisplayName)
         }
-    val timestampRevision =
-        rememberTimestampRevision(
-            remember(document) { markdownDocumentHasTimestamp(document) },
-            remember(document) { markdownDocumentHasTimestamp(document, relativeOnly = true) },
-        )
+    val timestampRevision = rememberTimestampRevision(remember(document) { markdownDocumentTimestamps(document) })
     return remember(document, contentColor, mentionNames, timestampRevision) {
         markdownDocumentToPreviewAnnotatedString(
             document = document,
@@ -2072,11 +2050,7 @@ private fun openMarkdownLink(
     // Re-parse at launch so ACTION_VIEW receives the same canonical target the
     // annotation and confirmation UI were built from.
     val parsedLink = parsedOpenableMarkdownLink(url) ?: return
-    val intent =
-        android.content.Intent(
-            android.content.Intent.ACTION_VIEW,
-            android.net.Uri.parse(parsedLink.destination),
-        )
+    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(parsedLink.destination))
     try {
         context.startActivity(intent)
     } catch (_: android.content.ActivityNotFoundException) {

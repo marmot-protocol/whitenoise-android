@@ -36,11 +36,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.MarkdownTimestampText
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
@@ -52,6 +54,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Description
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.icons.filled.Mic
 import dev.ipf.whitenoise.android.ui.icons.filled.Movie
+import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 import dev.ipf.whitenoise.android.ui.resolveMentionsInPlaintext
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -150,16 +153,14 @@ internal fun ReplyPreviewCard(
             mediaLabel ?: resolveMentionsInPlaintext(body, mentionDisplayName)
         }
     var bodyDocument by remember(body, appState, appState?.activeAccount?.accountIdHex) {
-        mutableStateOf<dev.ipf.marmotkit.MarkdownDocumentFfi?>(null)
+        mutableStateOf<MarkdownDocumentFfi?>(null)
     }
     LaunchedEffect(body, mediaLabel, appState, appState?.activeAccount?.accountIdHex) {
         bodyDocument = if (mediaLabel == null) appState?.parseMarkdownOrEmpty(body) else null
     }
     val projectedBody =
-        bodyDocument?.takeIf { it.blocks.isNotEmpty() }?.let {
-            dev.ipf.whitenoise.android.ui
-                .rememberMarkdownPreviewText(it, mentionDisplayName)
-        } ?: remember(bodyText) { EmojiShortcodes.annotate(AnnotatedString(bodyText)) }
+        bodyDocument?.takeIf { it.blocks.isNotEmpty() }?.let { rememberMarkdownPreviewText(it, mentionDisplayName) }
+            ?: remember(bodyText) { EmojiShortcodes.annotate(AnnotatedString(bodyText)) }
     val resolvedAccentColor =
         accentColor
             ?: if (isOwn) {
@@ -221,7 +222,7 @@ internal fun ReplyPreviewCard(
                                 tint = resolvedContentColor,
                             )
                         }
-                        dev.ipf.whitenoise.android.ui.MarkdownTimestampText(
+                        MarkdownTimestampText(
                             projectedBody,
                             inlineContent = EmojiShortcodes.content(receivedEmoji),
                             style = MaterialTheme.typography.bodySmall.copy(color = resolvedContentColor),

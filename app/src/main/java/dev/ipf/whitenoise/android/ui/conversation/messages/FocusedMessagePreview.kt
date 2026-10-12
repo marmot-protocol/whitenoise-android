@@ -35,9 +35,12 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.MarkdownTimestampText
+import dev.ipf.whitenoise.android.ui.markdownDocumentTimestamps
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.ui.markdownInlinesToAnnotatedString
 import dev.ipf.whitenoise.android.ui.previewTake
+import dev.ipf.whitenoise.android.ui.rememberTimestampRevision
 import kotlin.math.ceil
 
 /** Display-only excerpt keeps native inline styling but removes all actionable link annotations. */
@@ -126,20 +129,7 @@ internal fun FocusedTextMessagePreview(
     footerContent: (@Composable () -> Unit)? = null,
 ) {
     val timestampRevision =
-        dev.ipf.whitenoise.android.ui.rememberTimestampRevision(
-            remember(document) {
-                document?.let {
-                    dev.ipf.whitenoise.android.ui
-                        .markdownDocumentHasTimestamp(it)
-                } == true
-            },
-            remember(document) {
-                document?.let {
-                    dev.ipf.whitenoise.android.ui
-                        .markdownDocumentHasTimestamp(it, relativeOnly = true)
-                } == true
-            },
-        )
+        rememberTimestampRevision(remember(document) { document?.let(::markdownDocumentTimestamps).orEmpty() })
     val excerpt =
         remember(text, document, mentionDisplayName, isGroupMember, timestampRevision) {
             focusedMessagePreviewText(text, document, mentionDisplayName, isGroupMember)
@@ -166,7 +156,7 @@ internal fun FocusedTextMessagePreview(
             lastLineBaseline = lastLineBaseline.takeIf { warning == null },
         ) {
             Column {
-                dev.ipf.whitenoise.android.ui.MarkdownTimestampText(
+                MarkdownTimestampText(
                     text = excerpt,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
