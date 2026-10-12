@@ -619,7 +619,7 @@ internal fun ProfileSheet(
     val liveGroupsRevision = appState.forwardTargetsRevision
     // Chats beyond the retained chat-list window, so groups in common and both pickers see every chat (#2983).
     val accountWideGroups = rememberProfileAccountWideGroups(appState, enabled = hex != null && !targetIsSelf)
-    val accountWide = accountWideGroups.value
+    val accountWide = accountWideGroups.current()
     val shared =
         remember(hex, activeAccountHex, liveGroupsRevision, groupPickerRevision, accountWide) {
             // Existing on-demand projection includes archived groups and remains live behind a conversation.
@@ -1077,7 +1077,7 @@ internal fun ProfileSheet(
                             onOpen = { id ->
                                 if (owner.canAct()) {
                                     appState
-                                        .personSharedGroupsForProfile(hex, accountWideGroups.value)
+                                        .personSharedGroupsForProfile(hex, accountWideGroups.current())
                                         .groups
                                         .firstOrNull { it.group.groupIdHex == id }
                                         ?.let { item -> owner.leave { onOpenGroup(item, false) } }

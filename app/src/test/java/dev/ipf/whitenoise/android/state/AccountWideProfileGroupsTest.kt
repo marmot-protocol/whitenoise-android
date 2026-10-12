@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.whitenoise.android.ui.profile.PersonSharedGroups
 import dev.ipf.whitenoise.android.ui.profile.ProfileAccountWideGroupsHolder
 import dev.ipf.whitenoise.android.ui.profile.personSharedGroupsForProfile
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
@@ -19,6 +22,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -151,15 +155,41 @@ class AccountWideProfileGroupsTest {
             holder.requestMembers(setOf(BEYOND), retry = true)
             scope.settle()
             assertTrue(holder.value.failedGroupIds.isEmpty())
-            assertEquals(setOf(RETAINED, BEYOND), appState.profileAddableGroupsState(TARGET, holder.value).groups.ids())
+            val addable = appState.profileAddableGroupsState(TARGET, holder.current())
+            assertEquals(setOf(RETAINED, BEYOND), addable.groups.ids())
+        }
+
+    /** A snapshot read before a chat was deleted from this device is withheld, and the reread no longer lists it. */
+    @Test
+    fun snapshotReadBeforeALocalDeleteIsWithheldUntilReread() =
+        runBlocking {
+            val presented = mutableListOf(RETAINED, BEYOND)
+            val targetRoster: RosterRead = { _, _ -> roster(TARGET) }
+            val presentedNow: () -> List<String> = { presented.toList() }
+            val (appState, controller) = profileController(presented = presentedNow, beyondRoster = targetRoster)
+            val holder = ProfileAccountWideGroupsHolder(appState, CoroutineScope(coroutineContext + SupervisorJob()))
+            holder.load()
+            assertTrue(RETAINED in appState.personSharedGroupsForProfile(TARGET, holder.current()).listed())
+
+            presented.remove(RETAINED)
+            val delete = ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, RETAINED)
+            controller.applyChatListSubscriptionUpdate(ACCOUNT_REF, delete)
+            assertNull(holder.current().snapshot)
+            assertFalse(RETAINED in appState.personSharedGroupsForProfile(TARGET, holder.current()).listed())
+
+            holder.load()
+            assertFalse(RETAINED in appState.personSharedGroupsForProfile(TARGET, holder.current()).listed())
+            assertTrue(BEYOND in appState.personSharedGroupsForProfile(TARGET, holder.current()).listed())
         }
 
     /**
-     * Binds a controller whose window retains [RETAINED] with [retainedMembers] and whose account-wide read also
-     * presents [BEYOND], an admin group of this account read through [beyondRoster].
+     * Binds a controller whose window retains [RETAINED] with [retainedMembers] and whose account-wide read
+     * presents the [presented] chats, by default [RETAINED] and [BEYOND], an admin group of this account read
+     * through [beyondRoster].
      */
     private fun profileController(
         retainedMembers: List<AppGroupMemberRecordFfi> = roster(TARGET),
+        presented: () -> List<String> = { listOf(RETAINED, BEYOND) },
         beyondRoster: RosterRead,
     ): Pair<WhiteNoiseAppState, ChatsController> {
         val appState = emptyAppState()
@@ -167,7 +197,7 @@ class AccountWideProfileGroupsTest {
             ChatListLiveSubscriptions(
                 openChatListWindow = { _, _ -> error("no live window in this test") },
                 openChats = { _, _ -> error("no live feed in this test") },
-                presentedChatList = { _, _ -> listOf(presentedRow(RETAINED), presentedRow(BEYOND)) },
+                presentedChatList = { _, _ -> presented().map(::presentedRow) },
             )
         val controller = ChatsController(appState, ACCOUNT_REF, memberSnapshotLoader = beyondRoster)
         controller.applyChatListRow(chatRow(RETAINED))
@@ -187,6 +217,9 @@ class AccountWideProfileGroupsTest {
 
     /** The group ids of these chat-list items. */
     private fun List<ChatListItem>.ids(): Set<String> = mapTo(linkedSetOf()) { it.group.groupIdHex }
+
+    /** Every group the profile presents in common or as still resolving, the rows a reader could see. */
+    private fun PersonSharedGroups.listed(): Set<String> = groups.ids() + unresolvedGroupIds
 
     /** Waits for every job the holder launched into this scope. */
     private suspend fun CoroutineScope.settle() =

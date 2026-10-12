@@ -16,21 +16,39 @@ import kotlinx.coroutines.launch
 
 /**
  * The chats beyond the retained chat-list window behind one open profile surface (#2983). It reads MDK's
- * account-wide snapshot once, sends roster requests for chats outside the window through that snapshot, and
- * records which of those rosters stayed unresolved, so a picker offers Retry instead of loading forever.
+ * account-wide snapshot, sends roster requests for chats outside the window through that snapshot, and records
+ * which of those rosters stayed unresolved, so a picker offers Retry instead of loading forever.
+ *
+ * A snapshot is served only while the controller's chat rows are at the [rowsRevision] it was read under: a
+ * chat deleted from this device since then would still be in it, and the window no longer holds its row to
+ * shadow it.
  */
 @Stable
 internal class ProfileAccountWideGroupsHolder(
     private val appState: WhiteNoiseAppState,
     private val scope: CoroutineScope,
+    private val rowsRevision: () -> Long = { appState.chatRowsRevision() },
 ) {
-    /** The current snapshot and failures, replaced rather than mutated so Compose observes every change. */
+    /** The latest snapshot and failures, replaced rather than mutated so Compose observes every change. */
     var value by mutableStateOf(ProfileAccountWideGroups())
         private set
 
+    /** The chat-row revision [value]'s snapshot was read under, or null before the first read. */
+    private var loadedRevision by mutableStateOf<Long?>(null)
+
+    /** The lookups to serve now: the latest snapshot if it matches the current chat rows, else none. */
+    fun current(): ProfileAccountWideGroups =
+        if (loadedRevision == rowsRevision()) {
+            value
+        } else {
+            ProfileAccountWideGroups()
+        }
+
     /** Reads the account-wide snapshot. A failed read leaves the lookups on the retained rows alone. */
     suspend fun load() {
+        val revision = rowsRevision()
         value = ProfileAccountWideGroups(snapshot = appState.loadAccountWideForwardTargets())
+        loadedRevision = revision
     }
 
     /**
@@ -59,8 +77,9 @@ internal class ProfileAccountWideGroupsHolder(
 }
 
 /**
- * Keeps one [ProfileAccountWideGroupsHolder] per active account and reads its snapshot once [enabled], so a
- * surface that is not showing group lookups never pays for the account-wide read.
+ * Keeps one [ProfileAccountWideGroupsHolder] per active account and, once [enabled], reads its snapshot again
+ * whenever the controller's chat rows change, so a surface that is not showing group lookups never pays for the
+ * account-wide read and a showing one never keeps a chat deleted since its last read.
  */
 @Composable
 internal fun rememberProfileAccountWideGroups(
@@ -70,8 +89,15 @@ internal fun rememberProfileAccountWideGroups(
     val scope = rememberCoroutineScope()
     val accountRef = appState.activeAccountRef
     val holder = remember(appState, accountRef) { ProfileAccountWideGroupsHolder(appState, scope) }
-    LaunchedEffect(holder, enabled) {
-        if (enabled && holder.value.snapshot == null) holder.load()
+    val rowsRevision = appState.chatRowsRevision()
+    LaunchedEffect(holder, enabled, rowsRevision) {
+        if (enabled) holder.load()
     }
     return holder
+}
+
+/** The controller's chat-row membership revision, or 0 before a controller is attached. */
+private fun WhiteNoiseAppState.chatRowsRevision(): Long {
+    val controller = groupPresentationChatsController ?: return 0L
+    return controller.materializedGroupsRevision
 }

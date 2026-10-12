@@ -408,7 +408,7 @@ internal fun GroupDetailsScreen(
         // Chats beyond the retained chat-list window, read only while the picker is open (#2983).
         val dmAccountWideGroups =
             rememberProfileAccountWideGroups(appState, enabled = showDmAddToGroups && dmPeerAccountIdHex != null)
-        val dmAccountWide = dmAccountWideGroups.value
+        val dmAccountWide = dmAccountWideGroups.current()
         val dmAddableGroupsState =
             remember(dmPeerAccountIdHex, appState.chatListItems, dmGroupPickerRevision, dmAccountWide) {
                 dmPeerAccountIdHex?.let { appState.profileAddableGroupsState(it, dmAccountWide) }
