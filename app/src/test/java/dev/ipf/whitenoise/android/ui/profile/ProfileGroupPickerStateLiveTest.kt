@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.profile
 
-import android.os.Looper
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ProfileAccountWideGroups
@@ -15,13 +14,12 @@ import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.group
 import dev.ipf.whitenoise.android.ui.share.member
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import java.time.Duration
 
 /** A profile group picker follows group changes while the chat list is hidden behind a conversation. */
 @RunWith(RobolectricTestRunner::class)
@@ -54,13 +52,16 @@ class ProfileGroupPickerStateLiveTest {
         composeRule.runOnIdle { assertEquals(listOf(GROUP), state.groups.map { it.group.groupIdHex }) }
         val frozen = controller.items
 
-        composeRule.runOnIdle { controller.applyLocalGroupUpdate(adminGroup.copy(admins = emptyList())) }
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            // Compose's frame clock does not advance the controller's debounced recompute on the main looper.
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
-            state.groups.isEmpty()
+        composeRule.runOnIdle {
+            controller.applyLocalGroupUpdate(adminGroup.copy(admins = emptyList()))
+            // A draft change behind the open conversation recomputes the hidden projection synchronously, so the
+            // test does not depend on the debounced recompute reaching the main looper.
+            controller.onDraftSortOrderChanged()
         }
-        composeRule.runOnIdle { assertEquals(frozen, controller.items) }
+        composeRule.runOnIdle {
+            assertTrue(state.groups.isEmpty())
+            assertEquals(frozen, controller.items)
+        }
     }
 
     private companion object {
