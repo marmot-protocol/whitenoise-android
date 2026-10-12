@@ -1476,7 +1476,8 @@ internal fun ConversationScreen(
             timelineViewport = timelineViewport,
             renderedTimelineSize = renderedSize,
             trailingRowCount = trailingRowCount,
-            mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
+            // Read inside the derived flag: a mention tap writes this reserve before its first frame.
+            mentionReadingRowHeightPx = { scrollCoordinator.mentionReadingRowHeightPx },
         )
 
     /** Resolves a saved logical anchor after current header and error rows. */
@@ -4045,7 +4046,9 @@ internal fun ConversationScreen(
                     ?.let { ConversationSearchMarking(it, effectiveSearchMatchIds.toSet()) },
         ) {
             val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
-            val mentionReadingReserve by
+            // Held as State and read only by the transcript's measure pass: a mention tap writes the
+            // reserve before its first frame, and a composition read here recomposed this whole host.
+            val mentionReadingReserve =
                 remember(timelineViewport, density, scrollCoordinator, snackbarContentInset) {
                     derivedStateOf {
                         val rowHeight = scrollCoordinator.mentionReadingRowHeightPx
@@ -4063,6 +4066,7 @@ internal fun ConversationScreen(
                         }
                     }
                 }
+            val readMentionReadingReserve = remember(mentionReadingReserve) { { mentionReadingReserve.value } }
             ConversationTransientNoticeLayout(
                 notice = appState.transientNotice,
                 accountRef = conversationAccountRef,
@@ -4186,10 +4190,10 @@ internal fun ConversationScreen(
                                         .fillMaxSize()
                                         .measureConversationTimelinePadding(
                                             timelineViewport,
-                                            CONVERSATION_TIMELINE_TAIL_GAP +
-                                                snackbarContentInset.value + mentionReadingReserve,
+                                            CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value,
                                             overlayPadding,
                                             timelinePublication,
+                                            mentionReadingReserve = readMentionReadingReserve,
                                         ).trackWhiteNoiseHeader(listState)
                                         .padding(horizontal = 12.dp)
                                         // Paint, TalkBack exposure, and first-useful-frame
@@ -4235,11 +4239,13 @@ internal fun ConversationScreen(
                                 // out of a lazy sentinel leaves the real last row as
                                 // the stable tail anchor.
                                 contentPadding =
-                                    conversationTimelineContentPadding(
-                                        snackbarContentInset.value,
-                                        overlayPadding,
-                                        mentionReadingReserve,
-                                    ),
+                                    remember(snackbarContentInset.value, overlayPadding, readMentionReadingReserve) {
+                                        conversationTimelineContentPadding(
+                                            snackbarContentInset.value,
+                                            overlayPadding,
+                                            readMentionReadingReserve,
+                                        )
+                                    },
                             ) {
                                 // The list is reversed, so the first item emitted
                                 // is laid out against the composer. Emit the newest

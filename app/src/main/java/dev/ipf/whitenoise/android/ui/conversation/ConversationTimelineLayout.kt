@@ -2,8 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
@@ -34,6 +36,43 @@ internal fun conversationTimelineContentPadding(
     PaddingValues(
         bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap + mentionReadingReserve,
     )
+
+/**
+ * The same tail padding with the mention reading reserve resolved at measure time. Remember the
+ * result: a lazy list keys its measure policy on this instance and calls it only while measuring.
+ */
+internal fun conversationTimelineContentPadding(
+    snackbarContentInset: Dp,
+    foregroundOverlap: Dp,
+    mentionReadingReserve: () -> Dp,
+): PaddingValues =
+    ConversationTimelineContentPadding(
+        fixedBottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap,
+        mentionReadingReserve = mentionReadingReserve,
+    )
+
+/**
+ * Bottom-only transcript padding whose mention reserve is read where it is consumed. A mention jump
+ * writes that reserve on its tap frame, and reading it during measurement relays the transcript out
+ * without recomposing the screen that hosts it (#3150).
+ */
+@Stable
+internal class ConversationTimelineContentPadding(
+    private val fixedBottom: Dp,
+    private val mentionReadingReserve: () -> Dp,
+) : PaddingValues {
+    /** Only the tail edge is padded, matching the fixed-value overload. */
+    override fun calculateLeftPadding(layoutDirection: LayoutDirection): Dp = 0.dp
+
+    /** Only the tail edge is padded, matching the fixed-value overload. */
+    override fun calculateTopPadding(): Dp = 0.dp
+
+    /** Only the tail edge is padded, matching the fixed-value overload. */
+    override fun calculateRightPadding(layoutDirection: LayoutDirection): Dp = 0.dp
+
+    /** Fixed tail clearance plus the current reserve, read in the caller's measure pass. */
+    override fun calculateBottomPadding(): Dp = fixedBottom + mentionReadingReserve()
+}
 
 /** Subtracts the target's occupied tail extent, adding only missing runway without timeline rows. */
 internal fun conversationMentionReadingReservePx(

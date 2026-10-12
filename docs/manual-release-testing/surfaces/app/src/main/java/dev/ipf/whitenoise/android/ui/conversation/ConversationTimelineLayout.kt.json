@@ -10,6 +10,14 @@
         "test_ids": [
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineLayout.kt",
+        "surface": "Measure-time mention reading reserve in transcript content padding",
+        "anchor": "class ConversationTimelineContentPadding(",
+        "test_ids": [
+          "CON-032"
+        ]
       }
     ]
   },

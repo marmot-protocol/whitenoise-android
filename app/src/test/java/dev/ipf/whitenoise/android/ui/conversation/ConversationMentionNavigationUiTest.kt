@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -247,6 +246,7 @@ class ConversationMentionNavigationUiTest {
             suspendedAction = action,
         )
 
+    /** Runs the production mention command on a real reversed list and requires the target at the reading top. */
     @Suppress("LongMethod") // One real-list fixture shares measurement and the production command.
     private fun assertMentionTop(fixture: MentionFixture) {
         val target = fixture.target
@@ -340,20 +340,25 @@ class ConversationMentionNavigationUiTest {
                         rememberConversationNearBottom(
                             listState,
                             maxOf(targetIndex, initialIndex) + 13 + state.incomingCount,
-                            mentionReadingRowHeightPx = coordinator.mentionReadingRowHeightPx,
+                            mentionReadingRowHeightPx = { coordinator.mentionReadingRowHeightPx },
                         )
-                    val readingReserve =
-                        conversationMentionReadingReservePx(
-                            viewportHeight - overlap,
-                            padding - overlap,
-                            coordinator.mentionReadingRowHeightPx,
-                        )
+                    // The production padding type reads the reserve in measurement, as the screen does.
+                    val contentPadding =
+                        remember(coordinator) {
+                            ConversationTimelineContentPadding(padding.dp) {
+                                conversationMentionReadingReservePx(
+                                    viewportHeight - overlap,
+                                    padding - overlap,
+                                    coordinator.mentionReadingRowHeightPx,
+                                ).dp
+                            }
+                        }
                     Box(modifier = Modifier.fillMaxWidth().height(viewportHeight.dp)) {
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize().testTag("mention-list"),
                             reverseLayout = true,
-                            contentPadding = PaddingValues(bottom = (padding + readingReserve).dp),
+                            contentPadding = contentPadding,
                         ) {
                             if (state.headerCount > 0) {
                                 item(key = "structural-header") { Text("Local header", Modifier.height(32.dp)) }

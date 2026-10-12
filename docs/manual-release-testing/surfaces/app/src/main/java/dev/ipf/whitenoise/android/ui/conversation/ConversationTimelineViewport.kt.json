@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
+  "legacy_sha256": "f3c43de13f56b98f7e36f0b1fc9450b524ae71cd6402ac47203fb972b8b37572",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.timelineReadingExposure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
+        "anchor": "fun Modifier.timelineReadingExposure(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
+        "surface": "Measured base padding reads the mention reading reserve once per pass",
+        "anchor": "val reserve = mentionReadingReserve()",
+        "test_ids": [
+          "CON-032"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
