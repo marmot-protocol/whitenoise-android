@@ -1,8 +1,9 @@
 name: CodeQL
 
+# Scans master after merge, weekly and on demand rather than every PR push.
+# No ruleset requires this check, so PRs do not wait for it. A finding on master
+# is fixed through an ordinary PR.
 on:
-  pull_request:
-    branches: [master]
   push:
     branches: [master]
   schedule:

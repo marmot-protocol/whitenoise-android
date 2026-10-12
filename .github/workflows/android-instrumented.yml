@@ -7,6 +7,11 @@ name: Android Instrumented Tests
 # not run it, but MarmotKit artifact-integration changes must prove the pinned
 # x86_64 native library loads before merge.
 #
+# On PRs the `changes` job narrows the path-filtered run to the emulator lane(s)
+# the diff can affect, runs the attachment fixture for Zapstore only and skips
+# draft PRs until they are marked ready. master pushes run both lanes and both
+# distributions; an unreadable diff runs both lanes.
+#
 # Ordinary runs use dev debug. The opt-in review demo and document matrix use
 # unsigned isolated preview debug builds and disposable identities.
 
@@ -72,8 +77,11 @@ on:
   push:
     branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/android-instrumented.yml'
+      - 'scripts/select_instrumented_lanes.py'
+      - 'scripts/media-latency.init.gradle'
       - 'app/build.gradle.kts'
       - 'app/src/androidTest/AndroidManifest.xml'
       # Scroll masks must preserve real IME geometry and Android accessibility export.
@@ -160,15 +168,41 @@ permissions:
   contents: read
 
 jobs:
+  # Draft PRs boot no emulators; ready_for_review starts the run.
+  changes:
+    name: Select emulator lanes
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      attachment_fixture: ${{ steps.select.outputs.attachment_fixture }}
+      connected: ${{ steps.select.outputs.connected }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select lanes from the complete PR diff
+        id: select
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 -m scripts.select_instrumented_lanes --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
+
   attachment-fixture:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.responsiveness_only)
+    needs: changes
+    if: needs.changes.outputs.attachment_fixture == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.responsiveness_only))
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        distribution: [Play, Zapstore]
+        # Zapstore carries the self-updater/installer paths the APK probes
+        # exercise; Play runs on master pushes and manual dispatches.
+        distribution: ${{ fromJSON(github.event_name == 'pull_request' && '["Zapstore"]' || '["Play", "Zapstore"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -213,7 +247,8 @@ jobs:
           retention-days: 7
 
   instrumented:
-    if: github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only
+    needs: changes
+    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only)
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60

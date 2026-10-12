@@ -278,11 +278,17 @@ class MaestroWorkflowTest(unittest.TestCase):
         return re.split(r'\n  [a-z][a-z-]*:\n', text, maxsplit=1)[0]
 
     def enabled(self, name, event, selected, responsiveness=False):
-        """Evaluate the trusted job condition with restricted event/input fixtures."""
+        """Evaluate the trusted job condition with restricted event/input fixtures.
+
+        Lane narrowing is tested in test_select_instrumented_lanes.py; here the
+        selector reports both emulator lanes as affected.
+        """
         expression = re.search(r'^    if: (.+)$', self.job(name), re.MULTILINE).group(1)
         expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
+        lanes = SimpleNamespace(outputs=SimpleNamespace(attachment_fixture='true', connected='true'))
         return eval(expression, {'__builtins__': {}},
                     {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness),
+                     'needs': SimpleNamespace(changes=lanes),
                      'startsWith': lambda value, prefix: value.startswith(prefix)})
 
     def test_pilot_and_normal_jobs_are_exclusive_for_every_event(self):

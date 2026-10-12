@@ -73,13 +73,17 @@ Every pull request to `master` (and every push to `master`) runs the
 Kotlin compile errors, unit-test failures, Compose screenshot regressions
 (Roborazzi — see [Screenshot tests](#screenshot-tests)), ktlint violations,
 new detekt findings, or Android lint regressions. Existing detekt findings are
-frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
-`zapstore` and `play` dev debug variants and requires no signing secrets or
-`google-services.json`.
+frozen in `config/detekt/detekt-baseline.xml`. `master` pushes, the nightly run,
+manual dispatches and merge-queue runs cover both the `zapstore` and `play` dev
+debug variants in full. Pull requests run unit tests and lint for `zapstore` only,
+because its source set carries the self-updater and installer; a separate
+`Compile and flavor-check Play` job compiles Play's main, unit-test and androidTest
+sources and runs the unit tests that read `BuildConfig.SELF_UPDATE_ENABLED`. The
+workflow requires no signing secrets or `google-services.json`.
 
 Validation runs concurrently on separate runners: tooling and packaging contracts,
 one static-analysis job per distribution, and one full unit, screenshot and coverage
-job per distribution. Each static-analysis job runs its Android lint variant;
+job per distribution (Zapstore only on PRs). Each static-analysis job runs its Android lint variant;
 the tooling job owns the flavor-independent ktlint and detekt checks. Unit jobs
 run the complete suite once with Roborazzi verification enabled, then require that
 every committed golden was compared. The Zapstore job also enforces all Kover
@@ -92,10 +96,13 @@ daemon before isolated builds. Tooling compilation, static analysis and baseline
 packaging retain process isolation.
 Compose compiler reports and independent unsigned release reproduction run nightly,
 on manual dispatch, and for changed build/packaging/CI inputs; known ordinary source
-PRs defer only those supplemental campaigns. Release lint remains per-PR. See the
+PRs defer only those supplemental campaigns. See the
 conservative classifier and release-candidate requirements in
-[CI request policy](docs/ci-request-policy.md). Draft and ready PRs run the same
-applicable checks; marking a draft ready starts no additional CI.
+[CI request policy](docs/ci-request-policy.md). Draft PRs run the fast lane
+(classification, tooling contracts, the offline signer contract, Zapstore lint and
+unit/screenshot tests, ktlint, detekt and compilation) and defer coverage, baseline
+packaging, Compose reports, the Play check, emulators and release verification.
+Marking a draft ready re-runs CI with every applicable lane.
 Unit suites use three isolated 1 GiB workers;
 tests outside CI stay serial unless `-PciTestForks=3` is set. Coding agents
 use hosted tests rather than duplicating CI compilation locally. Coverage reports run only
@@ -103,6 +110,9 @@ after a successful unit step, so a
 failed suite cannot trigger a second full test execution. The existing
 `Compile, test, ktlint, detekt, Android lint` check aggregates every job, including
 the offline ZSP contract, and fails if any dependency fails or is cancelled.
+It accepts the Play-check skip outside PRs and the draft skips above only when
+the event itself is a non-PR event or a draft PR. On drafts it reports as
+`… (draft fast lane)`, so the required context comes only from a ready run.
 A successful docs-only classifier permits only the explicitly named Android
 job skips on a PR. All tooling/manual-guide/metadata validators still run, and
 missing classification or unexpected skips fail the aggregate. Lightweight
@@ -121,7 +131,7 @@ reduce the serial critical path but repeat some setup/compilation; compare both
 wall time and summed job durations when measuring CI performance. Each Gradle job
 retains its own task outputs on master pushes and same-repository PRs; fork PRs
 restore caches read-only. Assertions execute on every fresh runner. The separate
-MarmotKit cache retains one writer: Play unit tests. GitHub's ephemeral runner
+MarmotKit cache retains one writer: Zapstore unit tests, which every event runs. GitHub's ephemeral runner
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
@@ -132,8 +142,9 @@ permissions and results stay explicit:
   Play debug variants on separate runners and scans each with CodeQL's extended
   security query suite. The existing `Analyze Java and Kotlin` gate requires both
   scans. Zapstore keeps the existing SARIF category; Play has its own category.
-  It runs for pull requests, `master` pushes, a weekly full scan, and manual
-  dispatch. Only its SARIF upload receives `security-events: write`.
+  It runs for `master` pushes, a weekly full scan, and manual dispatch, not on
+  pull requests; no ruleset requires it. Only its SARIF upload receives
+  `security-events: write`.
 - `.github/workflows/dependency-submission.yml` supplies GitHub's dependency
   graph with the resolved Gradle graph after each `master` update so repository
   vulnerability alerts can evaluate direct and transitive Gradle dependencies.
@@ -147,10 +158,19 @@ manages its own Gradle execution. Dependency submission runs only from trusted
 
 Pushes to `master` also run `.github/workflows/android-instrumented.yml`, a
 separate emulator workflow for `:app:connectedDevZapstoreDebugAndroidTest`
-(Zapstore debug, exercising direct-distribution config). Master runs the full
-suite; pull requests that change MarmotKit preparation run the focused packaged
-native-library smoke test. It uploads Android test reports when available and
-retains them for seven days.
+(Zapstore debug, exercising direct-distribution config) and the controlled
+attachment fixture. Master runs the full suite and both fixture distributions.
+Ready (non-draft) pull requests that touch a listed input run the focused
+`@PullRequestDeviceSmoke` suite and/or the Zapstore attachment fixture, chosen by
+`scripts/select_instrumented_lanes.py` from the whole PR diff; an unreadable
+diff runs both. It uploads Android test reports when available and retains them
+for seven days.
+
+`.github/workflows/android-release-runtime.yml` (minified APKs on ART) and
+`.github/workflows/android-repro-verify.yml` (release lint and unsigned
+reproduction) run on `master` pushes, nightly, tags, manual dispatch and in the
+merge queue. Pull requests run them only when release, signing, build or
+dependency inputs change, and not while draft. Neither is a required check.
 
 Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
 builds and uploads a signed `arm64-v8a` staging release APK for internal

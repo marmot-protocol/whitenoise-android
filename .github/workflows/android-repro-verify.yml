@@ -4,13 +4,40 @@ name: Android Reproducible Release Verify
 # at the same commit and requires them to match byte-for-byte. Publishes the
 # verified unsigned APK and SHA256SUMS for third-party comparison (#1261).
 # Signed store/sideload releases are out of scope — see docs/reproducible-apk-builds.md.
+# Runs on master pushes, nightly, tags and in the merge queue. PRs run it only
+# when release, signing, build or dependency inputs change, and not as drafts.
 
 on:
   push:
+    branches: [master]
     tags:
       - '*'
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/android-repro-verify.yml'
+      - 'app/build.gradle.kts'
+      - 'app/proguard-rules.pro'
+      - 'app/src/main/AndroidManifest.xml'
+      - 'app/src/main/marmotkit/**'
+      - 'scripts/prepare_marmotkit_artifact.py'
+      - 'scripts/prepare-marmotkit-artifact.sh'
+      - 'scripts/prepare-marmotkit-artifact.ps1'
+      - 'app/src/staging/**'
+      - 'app/src/zapstore/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'config/android-release.properties'
+      - 'config/compose-stability.conf'
+      - 'scripts/release*'
+      - 'scripts/repro-ci.sh'
+      - 'scripts/repro-verify.sh'
+      - 'scripts/test-repro-verify.sh'
+      - 'scripts/check_ci_changes.py'
   merge_group:
     types: [checks_requested]
   workflow_dispatch:
@@ -27,6 +54,7 @@ permissions:
 jobs:
   changes:
     name: Classify reproduction campaign inputs
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -50,6 +78,7 @@ jobs:
 
   lint:
     name: Release lint (${{ matrix.variant }})
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -196,9 +225,15 @@ jobs:
           CI_EVENT: ${{ github.event_name }}
           BUILD_RESULT: ${{ needs.build.result }}
           LINT_RESULT: ${{ needs.lint.result }}
+          DRAFT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
         shell: bash
         run: |
           set -euo pipefail
+          # Draft PRs deliberately skip every lane; ready_for_review runs them.
+          if [[ "${DRAFT_PR:-}" == true && "$CHANGES_RESULT" == skipped && "$LINT_RESULT" == skipped && "$BUILD_RESULT" == skipped ]]; then
+            echo 'Draft PR: reproduction deferred until ready for review'
+            exit 0
+          fi
           test "$CHANGES_RESULT" = success
           test "$LINT_RESULT" = success
           case "$CAMPAIGNS" in
@@ -231,8 +266,9 @@ jobs:
             "$RUNNER_TEMP/repro-inputs/repro-second" \
             "$RUNNER_TEMP/repro-verify-evidence" | tee repro-verify.log
 
+      # master pushes verify reproducibility without retaining another 90-day APK.
       - name: Upload verified unsigned APK
-        if: github.event_name != 'pull_request' && github.event_name != 'merge_group' && needs.changes.outputs.supplemental_campaigns == 'true'
+        if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && needs.changes.outputs.supplemental_campaigns == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: whitenoise-repro-verify-${{ github.run_number }}-${{ github.sha }}

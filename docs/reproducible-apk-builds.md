@@ -37,9 +37,11 @@ reproducibility and what remains out of scope.
 
 CI workflow [`.github/workflows/android-repro-verify.yml`](../.github/workflows/android-repro-verify.yml)
 runs two independent builds on separate runners through `scripts/repro-ci.sh`,
-using the same build helpers as the local script, on tag pushes, nightly,
-manual dispatch, and pull requests touching build/packaging/CI or unknown inputs.
-Known ordinary source/prose PRs defer these supplemental builds. When they run,
+using the same build helpers as the local script, on `master` and tag pushes,
+nightly, manual dispatch and in the merge queue. Pull requests run it only when
+its path filter matches release, signing, build or dependency inputs, and not
+while draft. Within a PR run, known ordinary source/prose diffs still defer the
+two builds. When they run,
 the required comparison job checks source identity, matching recorded toolchain
 inputs, unsignedness, and APK bytes. See [CI request policy](ci-request-policy.md)
 for conservative whole-diff classification and nightly failure handling.

@@ -8,10 +8,17 @@ name: Android CI
 #
 # Scope: compile + unit tests + ktlint + detekt + Android lint. APK build artifacts are a
 # separate workflow (see issue #247).
+#
+# PRs run unit tests and lint for Zapstore, whose own source set carries the
+# self-updater, plus a Play compile and flavor-sensitive test check. Draft PRs
+# also defer release packaging, Compose reports, coverage and the Play check
+# until ready_for_review. master, nightly, dispatch and merge-queue runs keep
+# both distributions and every lane (docs/ci-request-policy.md).
 
 on:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
     types: [checks_requested]
   push:
@@ -176,6 +183,7 @@ jobs:
         run: |
           python3 -m unittest scripts/test_run_android_instrumented_dispatch.py
           python3 -m unittest scripts/test_check_instrumented_required_cases.py
+          python3 -m unittest scripts/test_select_instrumented_lanes.py
 
   offline-zsp:
     needs: changes
@@ -216,7 +224,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phase: [tooling, baseline]
+        # Drafts keep compile/ktlint/detekt and defer release packaging.
+        phase: ${{ fromJSON(github.event.pull_request.draft && '["tooling"]' || '["tooling", "baseline"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -376,7 +385,7 @@ jobs:
           retention-days: 14
   compose-compiler:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.supplemental_campaigns != 'false'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.supplemental_campaigns != 'false' && !github.event.pull_request.draft
     name: Compose compiler metrics and stability reports
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -473,9 +482,10 @@ jobs:
     timeout-minutes: 30
     strategy:
       # Lint each distribution while build-contracts runs the shared style checks.
+      # PRs lint Zapstore only; secondary-variant compiles Play.
       fail-fast: false
       matrix:
-        flavor: [Zapstore, Play]
+        flavor: ${{ fromJSON(github.event_name == 'pull_request' && '["Zapstore"]' || '["Zapstore", "Play"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -564,9 +574,10 @@ jobs:
       ORG_GRADLE_PROJECT_ciTestForks: '3'
     strategy:
       # Keep both variants' diagnostics; two isolated 1 GiB workers per runner.
+      # PRs test Zapstore only; secondary-variant runs Play's flavor-sensitive tests.
       fail-fast: false
       matrix:
-        flavor: [Zapstore, Play]
+        flavor: ${{ fromJSON(github.event_name == 'pull_request' && '["Zapstore"]' || '["Zapstore", "Play"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -620,7 +631,7 @@ jobs:
       # kover tasks pull in release variants, whose packaging trips the unsigned-release
       # guard (no signing in CI).
       - name: Coverage gate (Kover)
-        if: matrix.flavor == 'Zapstore'
+        if: matrix.flavor == 'Zapstore' && !github.event.pull_request.draft
         run: ./gradlew :app:koverVerifyDevZapstoreDebug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
@@ -629,7 +640,7 @@ jobs:
       # Flavor-specific DevDebug variants only (see gate step).
       - name: Coverage report (Kover)
         id: coverage_report
-        if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' && !github.event.pull_request.draft }}
         continue-on-error: true
         run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
@@ -637,7 +648,7 @@ jobs:
       # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.
       # Viewport family: 82/82 lines, 52/56 branches; preserve 100%/90% floors.
       - name: Runtime listener and viewport restoration coverage floors
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' && !github.event.pull_request.draft }}
         env:
           COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}
         run: |
@@ -647,7 +658,7 @@ jobs:
 
       - name: Save MarmotKit artifact
         if: >-
-          ${{ success() && matrix.flavor == 'Play' &&
+          ${{ success() && matrix.flavor == 'Zapstore' &&
               github.event_name != 'merge_group' &&
               (github.event_name != 'pull_request' ||
                github.event.pull_request.head.repo.full_name == github.repository) &&
@@ -724,12 +735,116 @@ jobs:
           path: build/reports/dependency-security
           if-no-files-found: ignore
           retention-days: 14
+  # PRs run the full suite for Zapstore only. Compile Play (main, unit-test and
+  # androidTest sources) and run the unit tests that branch on its BuildConfig,
+  # so Play-only code still fails the PR. master/nightly run Play's full suite.
+  secondary-variant:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true' && github.event_name == 'pull_request' && !github.event.pull_request.draft
+    name: Compile and flavor-check Play
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Configure MarmotKit cache directory
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17.
+      - name: Set up JDK 17
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      - name: Compile Play and run its flavor-sensitive unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Every other unit test exercises the same shared code under Zapstore.
+          mapfile -t sources < <(grep -rlF 'BuildConfig.SELF_UPDATE_ENABLED' app/src/test/java | sort)
+          if [[ ${#sources[@]} -eq 0 ]]; then
+            echo 'No unit test reads BuildConfig.SELF_UPDATE_ENABLED; update this selector' >&2
+            exit 1
+          fi
+          filters=()
+          for source in "${sources[@]}"; do
+            class="${source#app/src/test/java/}"
+            class="${class%.*}"
+            filters+=(--tests "${class//\//.}")
+          done
+          ./gradlew :app:compileDevPlayDebugAndroidTestKotlin :app:testDevPlayDebugUnitTest "${filters[@]}" \
+            -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-reports-secondary-variant
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-gradle-profiles-secondary-variant
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Read existing resolutions only; retain proof without a second build.
+      - name: Verify selected dependency security floors
+        if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Retain selected dependency security evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-security-${{ github.job }}-${{ strategy.job-index || 0 }}
+          path: build/reports/dependency-security
+          if-no-files-found: ignore
+          retention-days: 14
   # Preserve the existing check name for branch protection and consumers.
   # A successful docs-only classifier permits only the named Android skips.
-  # Missing outputs, unexpected skips, failures and cancellations remain red.
+  # Deliberate PR skips are derived here from the event, never from job output:
+  # secondary-variant runs only on ready PRs, compose-compiler is skipped for
+  # deferred campaigns and drafts. Missing outputs, unexpected skips, failures
+  # and cancellations remain red.
+  # Drafts report under a different name. A green draft result must never be
+  # the latest required check on a head that is then marked ready, because the
+  # ready run creates this job only after its heavy lanes finish.
   validate:
-    name: Compile, test, ktlint, detekt, Android lint
-    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, static-analysis, tests]
+    name: Compile, test, ktlint, detekt, Android lint${{ github.event.pull_request.draft && ' (draft fast lane)' || '' }}
+    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, static-analysis, tests, secondary-variant]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -738,12 +853,16 @@ jobs:
         env:
           JOB_RESULTS: ${{ toJSON(needs) }}
           CI_EVENT: ${{ github.event_name }}
+          PR_DRAFT: ${{ github.event.pull_request.draft == true }}
         shell: bash
         run: |
           set -euo pipefail
           printf '%s\n' "$JOB_RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" '
-            (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "static-analysis", "tests", "tooling-contracts"]) and
+          printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" --arg draft "$PR_DRAFT" '
+            ($event == "pull_request" and $draft == "true") as $is_draft |
+            ($event == "pull_request" and $draft == "false") as $is_ready |
+            ($draft == "true" or $draft == "false") and ($event == "pull_request" or $draft == "false") and
+            (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
             (.changes.result == "success") and
             (."tooling-contracts".result == "success") and
             (.changes.outputs.docs_only == "true" or .changes.outputs.docs_only == "false") and
@@ -753,6 +872,7 @@ jobs:
                 if .key == "changes" or .key == "tooling-contracts" then .value.result == "success"
                 else .value.result == "skipped" end)
             else all(to_entries[];
-              if .key == "compose-compiler" and $campaigns == "false" then .value.result == "skipped"
+              if .key == "compose-compiler" and ($campaigns == "false" or $is_draft) then .value.result == "skipped"
+              elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)
           ' > /dev/null

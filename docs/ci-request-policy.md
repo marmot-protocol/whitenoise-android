@@ -67,18 +67,36 @@ with `docs_only=true` on a PR and the separate tooling validators passed. It
 rejects missing or unexpected outcomes, code-path skips, failures and cancellations. A docs fixup
 on a code PR does not turn that PR into a docs-only candidate.
 
-Code candidates still run every existing core check, including both
-distributions, coverage, screenshots, baseline packaging and the offline signer
-contract. Release lint, runtime regressions and security workflows retain their per-PR gates.
-Both complete unit suites also verify every committed screenshot golden in the same
-execution, with matching verification inputs for Kover reuse; there are no separate
-screenshot test runners.
+Ready code candidates run every core check for the Zapstore distribution,
+including coverage, screenshots, baseline packaging and the offline signer
+contract. Zapstore is the PR primary because its own source set carries the
+self-updater, downloader and installer; Play's adds only a store-listing redirect.
+Play is checked on PRs by compiling its main, unit-test and androidTest sources
+and running the unit tests that read `BuildConfig.SELF_UPDATE_ENABLED`. Play's
+complete unit suite and lint run on every `master` push, nightly, manual dispatch
+and merge-queue run. Every complete unit suite also verifies every committed
+screenshot golden in the same execution, with matching verification inputs for
+Kover reuse; there are no separate screenshot test runners.
 
-## Supplemental campaigns and draft parity
+Release runtime verification and reproduction (with release lint) run on
+`master` pushes, nightly, tags, manual dispatch and the merge queue. PRs run them
+only when their path filters match release, signing, build or dependency inputs.
+CodeQL runs on `master` pushes, weekly and on dispatch. None of these is a
+required check. A `master` failure in any of them is fixed through an owned PR.
 
-The same checks run on draft and ready PRs. Opening, reopening or pushing a PR
-starts its applicable CI; changing only readiness does not start another phase.
-The visual-description updater follows those same events and displays at most
+## Supplemental campaigns and draft PRs
+
+Draft PRs run the fast lane: classification, tooling contracts, the offline
+signer contract, Zapstore lint and unit/screenshot tests, compilation, ktlint and
+detekt. They defer coverage, baseline packaging, Compose reports, the Play check,
+emulator workflows and release verification. `ready_for_review` starts a new run
+with every applicable lane, so the required aggregate is recomputed for the ready
+head. The aggregate accepts the draft skips only when the event is a draft PR,
+and on drafts it reports as `Compile, test, ktlint, detekt, Android lint (draft
+fast lane)`. The required context therefore comes only from a ready run, so a
+green draft result cannot satisfy it after the PR is marked ready.
+Do not rely on a green draft run for readiness; wait for the ready run.
+The visual-description updater follows opening, reopening and pushes and displays at most
 four inline comparisons, retaining links and the bounded list of all changes.
 
 Compose compiler reports and independent unsigned APK reproduction are
@@ -86,7 +104,7 @@ supplemental campaigns. A complete raw diff permits their deferral only for
 known ordinary Kotlin/Java source, main resources, committed goldens and prose.
 Build, packaging, native pins, manifests, CI/tooling, executable/symlink changes,
 unknown inputs or unavailable evidence run the campaigns. All other compilation,
-full-unit/golden/coverage, style, lint, runtime and security gates stay required.
+full-unit/golden/coverage, style and lint gates stay required for ready PRs.
 A mixed PR uses the most demanding classification of its entire diff.
 
 Core CI runs daily at 02:43 UTC and reproduction at 03:17 UTC on default-branch
@@ -103,7 +121,8 @@ The existing aggregate check names remain required. A successful explicit
 classification permits only the named supplemental skips; absent evidence,
 failures, cancellations and unrelated skips remain red. Reproduction's aggregate
 also requires both release-lint variants even when its two builds are deferred.
-The nightly/manual/tag events cannot accept deferred reproduction builds.
+The nightly/manual/tag/master-push events cannot accept deferred reproduction
+builds. Release workflows accept skipped lanes only for draft PRs.
 
 Measure job requests, summed runner minutes, queue wait and time to final green
 checks together. Adding fewer jobs does not guarantee a particular speedup.

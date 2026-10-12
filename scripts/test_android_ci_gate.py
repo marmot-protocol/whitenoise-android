@@ -9,10 +9,16 @@ import subprocess
 import textwrap
 import unittest
 
+from scripts.check_fuzz_pr_triggers import pr_paths
 from scripts.check_runtime_listener_coverage import OWNER, check_coverage
+from scripts.select_instrumented_lanes import matches
 
 
 WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
+PR_PRIMARY_MATRIX = (
+    "        flavor: ${{ fromJSON(github.event_name == 'pull_request' && '[\"Zapstore\"]' "
+    "|| '[\"Zapstore\", \"Play\"]') }}\n"
+)
 APP_BUILD = Path(__file__).resolve().parents[1] / 'app/build.gradle.kts'
 
 
@@ -29,6 +35,7 @@ class AndroidCiGateTest(unittest.TestCase):
         cls.compose_compiler = cls.job_block(cls.workflow, 'compose-compiler')
         cls.static_analysis = cls.job_block(cls.workflow, 'static-analysis')
         cls.tests_job = cls.job_block(cls.workflow, 'tests')
+        cls.secondary = cls.job_block(cls.workflow, 'secondary-variant')
         cls.gate = cls.job_block(cls.workflow, 'validate')
         cls.app_build = APP_BUILD.read_text()
         cls.script = textwrap.dedent(cls.gate.split('        run: |\n', 1)[1])
@@ -63,18 +70,26 @@ class AndroidCiGateTest(unittest.TestCase):
         blocks = re.split(r'(?=^      - name: )', job, flags=re.MULTILINE)
         return [block for block in blocks if './gradlew' in block]
 
-    def run_gate(self, outcomes, event='pull_request'):
+    def run_gate(self, outcomes, event='pull_request', draft='false'):
         """Run the production shell with synthetic, untrusted JSON input."""
         return subprocess.run(
             ['bash', '-c', self.script],
-            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event},
+            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event, 'PR_DRAFT': draft},
             capture_output=True, text=True, check=False,
         )
 
-    def successful_outcomes(self):
-        """Model GitHub's needs object, including empty per-job outputs."""
+    def successful_outcomes(self, event='pull_request', draft='false'):
+        """Model GitHub's needs object, including empty per-job outputs.
+
+        Ready PRs add the Play compile lane; every other event runs the full
+        Play matrix instead, and drafts also defer Compose reports.
+        """
         outcomes = {job: {'result': 'success', 'outputs': {}} for job in self.dependencies}
         outcomes['changes']['outputs'] = {'docs_only': 'false', 'supplemental_campaigns': 'true'}
+        if event != 'pull_request' or draft == 'true':
+            outcomes['secondary-variant']['result'] = 'skipped'
+        if event == 'pull_request' and draft == 'true':
+            outcomes['compose-compiler']['result'] = 'skipped'
         return outcomes
 
     def test_aggregate_covers_every_job_and_runs_after_failures(self):
@@ -82,7 +97,8 @@ class AndroidCiGateTest(unittest.TestCase):
         jobs = set(re.findall(r'^  ([a-z][a-z-]+):$', self.workflow.split('\njobs:\n', 1)[1], re.MULTILINE))
         self.assertEqual(set(self.dependencies), jobs - {'validate'})
         self.assertIn('    if: always()\n', self.gate)
-        self.assertIn('    name: Compile, test, ktlint, detekt, Android lint\n', self.gate)
+        self.assertIn("    name: Compile, test, ktlint, detekt, Android lint${{ github.event.pull_request.draft "
+                      "&& ' (draft fast lane)' || '' }}\n", self.gate)
         self.assertIn('JOB_RESULTS: ${{ toJSON(needs) }}', self.gate)
         self.assertNotIn('continue-on-error:', self.gate)
 
@@ -138,7 +154,7 @@ class AndroidCiGateTest(unittest.TestCase):
         """Both lint variants run concurrently while ktlint and detekt run once."""
         self.assertIn("name: Android lint (${{ matrix.flavor }})", self.static_analysis)
         self.assertIn('      fail-fast: false\n', self.static_analysis)
-        self.assertIn('        flavor: [Zapstore, Play]\n', self.static_analysis)
+        self.assertIn(PR_PRIMARY_MATRIX, self.static_analysis)
         style = self.named_step(self.build_contracts, 'ktlint and detekt')
         lint = self.named_step(self.static_analysis, 'Android lint')
         self.assertIn("        if: matrix.phase == 'tooling'\n", style)
@@ -176,7 +192,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('        id: unit_tests\n', unit_tests)
         coverage_report = test_invocations['Coverage report (Kover)']
         self.assertIn(
-            "if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' }}",
+            "if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' && !github.event.pull_request.draft }}",
             coverage_report,
         )
         self.assertIn('testDevZapstoreDebugUnitTest', self.app_build)
@@ -210,7 +226,7 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_full_suite_compares_every_committed_golden(self):
         """Both full suites must prove complete golden coverage without filters."""
-        self.assertIn('        flavor: [Zapstore, Play]\n', self.tests_job)
+        self.assertIn(PR_PRIMARY_MATRIX, self.tests_job)
         self.assertNotIn('verifyRoborazziDev', self.workflow)
         self.assertNotIn('--tests ', self.tests_job)
         step = self.named_step(self.tests_job, 'Require every committed screenshot golden to be compared')
@@ -238,11 +254,13 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('ref: ${{ github.sha }}', self.changes)
 
     def test_queue_aggregate_requires_real_successful_jobs(self):
-        outcomes = self.successful_outcomes()
+        outcomes = self.successful_outcomes('merge_group')
         self.assertEqual(self.run_gate(outcomes, 'merge_group').returncode, 0)
         for dependency in self.dependencies:
+            if dependency == 'secondary-variant':
+                continue  # The queue runs both full variants instead.
             for result in ['failure', 'cancelled', 'skipped']:
-                bad = self.successful_outcomes()
+                bad = self.successful_outcomes('merge_group')
                 bad[dependency]['result'] = result
                 with self.subTest(dependency=dependency, result=result):
                     self.assertNotEqual(self.run_gate(bad, 'merge_group').returncode, 0)
@@ -266,7 +284,7 @@ class AndroidCiGateTest(unittest.TestCase):
             r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
             self.workflow,
         )
-        self.assertEqual(len(gradle_setup_steps), 4)
+        self.assertEqual(len(gradle_setup_steps), 5)
         for step in gradle_setup_steps:
             self.assertIn(
                 "cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && "
@@ -274,10 +292,11 @@ class AndroidCiGateTest(unittest.TestCase):
                 step,
             )
         self.assertNotIn('uses: actions/cache@', self.workflow)
-        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 4)
+        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 5)
         self.assertEqual(self.workflow.count('uses: actions/cache/save@'), 1)
         save_step = self.named_step(self.tests_job, 'Save MarmotKit artifact')
-        self.assertIn("matrix.flavor == 'Play'", save_step)
+        # Zapstore is the only flavor every event runs.
+        self.assertIn("matrix.flavor == 'Zapstore'", save_step)
         self.assertIn("github.event_name != 'merge_group'", save_step)
         self.assertIn("github.event_name != 'pull_request'", save_step)
         self.assertIn(
@@ -288,7 +307,9 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_build_phases(self):
         """Packaging runs independently, with phase-specific diagnostics."""
-        self.assertIn('phase: [tooling, baseline]', self.build_contracts)
+        self.assertIn(
+            """phase: ${{ fromJSON(github.event.pull_request.draft && '["tooling"]' || '["tooling", "baseline"]') }}""",
+            self.build_contracts)
         self.assertIn('fail-fast: false', self.build_contracts)
         for name, phase in (
             ('Compile (Kotlin)', 'tooling'),
@@ -370,6 +391,56 @@ class AndroidCiGateTest(unittest.TestCase):
                             self.assertEqual(result.returncode == 0, expected,
                                              (campaign, event, changes, build, lint))
 
+    def test_release_workflows_defer_only_whole_draft_runs(self):
+        """Drafts skip every release lane; a partial skip or non-draft skip stays red."""
+        repro = WORKFLOW.with_name('android-repro-verify.yml').read_text()
+        step = self.named_step(self.job_block(repro, 'verify'), 'Require independent builds and release lint')
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        for draft in ('true', 'false', ''):
+            for changes in ('success', 'skipped'):
+                for build in ('success', 'skipped'):
+                    for lint in ('success', 'skipped'):
+                        result = subprocess.run(['bash', '-c', script], env={**os.environ,
+                            'CHANGES_RESULT': changes, 'CAMPAIGNS': '' if changes == 'skipped' else 'true',
+                            'CI_EVENT': 'pull_request', 'BUILD_RESULT': build, 'LINT_RESULT': lint,
+                            'DRAFT_PR': draft}, capture_output=True, check=False)
+                        expected = (changes == build == lint == 'skipped' and draft == 'true' or
+                                    changes == build == lint == 'success')
+                        self.assertEqual(result.returncode == 0, expected, (draft, changes, build, lint))
+        runtime = WORKFLOW.with_name('android-release-runtime.yml').read_text()
+        step = self.named_step(self.job_block(runtime, 'verify'), 'Require both runtime-verifier lanes')
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        for draft in ('true', 'false', ''):
+            for production in ('success', 'skipped', 'failure'):
+                for staging in ('success', 'skipped', 'failure'):
+                    result = subprocess.run(['bash', '-c', script], env={**os.environ,
+                        'PRODUCTION_RESULT': production, 'STAGING_ANDROID17_RESULT': staging,
+                        'DRAFT_PR': draft}, capture_output=True, check=False)
+                    expected = (production == staging == 'success' or
+                                production == staging == 'skipped' and draft == 'true')
+                    self.assertEqual(result.returncode == 0, expected, (draft, production, staging))
+        for workflow in (repro, runtime):
+            events = workflow.split('\non:\n', 1)[1].split('\nconcurrency:', 1)[0]
+            self.assertIn("  push:\n    branches: [master]\n    tags:\n      - '*'\n", events)
+            self.assertIn('  schedule:\n', events)
+            self.assertIn('  merge_group:\n    types: [checks_requested]\n', events)
+            self.assertIn('    paths:\n', events)
+            self.assertIn("      - 'app/build.gradle.kts'\n", events)
+            self.assertIn("      - 'gradle/**'\n", events)
+
+    def test_release_path_filters_cover_every_root_script_build_input(self):
+        """A diff touching only a Gradle-declared script input still starts release checks."""
+        scripts = set(re.findall(r'inputs\.file\(rootProject\.file\("(scripts/[^"]+)"\)\)', self.app_build))
+        self.assertIn('scripts/prepare_marmotkit_artifact.py', scripts)
+        # Compose stability configuration changes the release bytecode.
+        scripts |= set(re.findall(r'stabilityConfigurationFiles\.add\([^)]*file\("([^"]+)"\)', self.app_build))
+        self.assertIn('config/compose-stability.conf', scripts)
+        for name in ('android-release-runtime.yml', 'android-repro-verify.yml'):
+            triggers = pr_paths(WORKFLOW.with_name(name).read_text())
+            for script in sorted(scripts):
+                with self.subTest(workflow=name, script=script):
+                    self.assertTrue(matches(script, triggers))
+
     def test_any_non_successful_job_blocks(self):
         """Failure, cancellation, and skipped matrix jobs all block the gate."""
         for job in self.dependencies:
@@ -400,7 +471,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_slow_tooling_does_not_block_android_job_start(self):
         self.assertNotIn('    needs:', self.tooling_contracts.split('    steps:', 1)[0])
         for name in ('offline-zsp', 'build-contracts', 'compose-compiler',
-                     'static-analysis', 'tests'):
+                     'static-analysis', 'tests', 'secondary-variant'):
             job = self.job_block(self.workflow, name)
             self.assertIn('    needs: changes\n', job)
             self.assertIn("needs.changes.outputs.docs_only != 'true'", job)
@@ -444,7 +515,7 @@ class AndroidCiGateTest(unittest.TestCase):
             outcomes['compose-compiler']['result'] = result
             self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
 
-    def test_campaigns_run_nightly_and_manual_with_draft_event_parity(self):
+    def test_campaigns_run_nightly_and_manual(self):
         for filename in ('android-ci.yml', 'android-repro-verify.yml'):
             workflow = WORKFLOW.with_name(filename).read_text()
             events = workflow.split('\non:\n', 1)[1].split('\nconcurrency:', 1)[0]
@@ -453,11 +524,77 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertIn('${{ github.event_name }}-${{ github.event_name ==', workflow)
             self.assertIn("'merge_group' && github.sha || github.ref", workflow)
             self.assertIn('  pull_request:\n    branches: [master]', events)
-        # A readiness-only trigger or draft guard would create a second CI phase.
-        for path in WORKFLOW.parent.glob('*.yml'):
-            text = path.read_text()
-            self.assertNotIn('ready_for_review', text, path.name)
-            self.assertNotRegex(text, r'github\.event\.pull_request\.draft', path.name)
+            self.assertIn('    types: [opened, synchronize, reopened, ready_for_review]\n', events)
+
+    def test_drafts_defer_only_heavy_lanes(self):
+        """Marking a draft ready re-runs CI; drafts keep primary lint/tests/style."""
+        for job in (self.static_analysis, self.tests_job, self.changes, self.tooling_contracts):
+            self.assertNotIn('draft', job.split('    steps:', 1)[0])
+        self.assertIn('!github.event.pull_request.draft', self.compose_compiler.split('    steps:', 1)[0])
+        self.assertIn('!github.event.pull_request.draft', self.secondary.split('    steps:', 1)[0])
+        for name in ('Coverage gate (Kover)', 'Coverage report (Kover)',
+                     'Runtime listener and viewport restoration coverage floors'):
+            self.assertIn('!github.event.pull_request.draft', self.named_step(self.tests_job, name))
+        self.assertNotIn('draft', self.named_step(self.tests_job, 'Unit tests'))
+        self.assertIn('PR_DRAFT: ${{ github.event.pull_request.draft == true }}', self.gate)
+
+    def test_draft_aggregate_never_reports_the_required_context(self):
+        """A ready run must not inherit a green draft result for the same head."""
+        name = re.search(r'^    name: (.+)$', self.gate, re.MULTILINE).group(1)
+        required = 'Compile, test, ktlint, detekt, Android lint'
+        static, expression = name.split('${{', 1)
+        self.assertEqual(static, required)
+        draft, ready = re.fullmatch(
+            r" github\.event\.pull_request\.draft && '([^']*)' \|\| '([^']*)' }}", expression).groups()
+        self.assertNotEqual(static + draft, required)
+        self.assertEqual(static + ready, required)
+
+    def test_pull_requests_run_one_full_variant_and_compile_the_other(self):
+        self.assertIn("github.event_name == 'pull_request'", self.secondary.split('    steps:', 1)[0])
+        step = self.named_step(self.secondary, 'Compile Play and run its flavor-sensitive unit tests')
+        self.assertIn(':app:compileDevPlayDebugAndroidTestKotlin :app:testDevPlayDebugUnitTest', step)
+        self.assertIn("grep -rlF 'BuildConfig.SELF_UPDATE_ENABLED' app/src/test/java", step)
+        self.assertNotIn('grep -q', step)
+        flavor_tests = [path for path in (APP_BUILD.parent / 'src/test/java').rglob('*.kt')
+                        if 'BuildConfig.SELF_UPDATE_ENABLED' in path.read_text()]
+        self.assertTrue(flavor_tests)
+
+    def test_ready_pr_requires_secondary_variant(self):
+        self.assertEqual(self.run_gate(self.successful_outcomes()).returncode, 0)
+        for result in ('skipped', 'failure', 'cancelled'):
+            outcomes = self.successful_outcomes()
+            outcomes['secondary-variant']['result'] = result
+            self.assertNotEqual(self.run_gate(outcomes).returncode, 0, result)
+
+    def test_full_matrix_events_reject_the_pr_only_lane(self):
+        for event in ('push', 'schedule', 'workflow_dispatch', 'merge_group'):
+            with self.subTest(event=event):
+                outcomes = self.successful_outcomes(event)
+                self.assertEqual(self.run_gate(outcomes, event).returncode, 0)
+                outcomes['secondary-variant']['result'] = 'success'
+                self.assertNotEqual(self.run_gate(outcomes, event).returncode, 0)
+                # A draft flag outside a PR event is never a reason to skip.
+                draft = self.successful_outcomes(event)
+                draft['compose-compiler']['result'] = 'skipped'
+                self.assertNotEqual(self.run_gate(draft, event, 'true').returncode, 0)
+
+    def test_draft_skips_are_accepted_only_for_draft_prs(self):
+        draft = self.successful_outcomes(draft='true')
+        self.assertEqual(self.run_gate(draft, draft='true').returncode, 0)
+        self.assertNotEqual(self.run_gate(draft, draft='false').returncode, 0)
+        for value in ('', 'unexpected'):
+            self.assertNotEqual(self.run_gate(draft, draft=value).returncode, 0)
+        for job in self.dependencies:
+            for result in ('failure', 'cancelled'):
+                with self.subTest(job=job, result=result):
+                    bad = self.successful_outcomes(draft='true')
+                    bad[job]['result'] = result
+                    self.assertNotEqual(self.run_gate(bad, draft='true').returncode, 0)
+        for job in ('changes', 'tooling-contracts', 'offline-zsp', 'build-contracts',
+                    'static-analysis', 'tests'):
+            bad = self.successful_outcomes(draft='true')
+            bad[job]['result'] = 'skipped'
+            self.assertNotEqual(self.run_gate(bad, draft='true').returncode, 0, job)
 
     def test_missing_or_extra_dependency_evidence_blocks(self):
         for job in self.dependencies:

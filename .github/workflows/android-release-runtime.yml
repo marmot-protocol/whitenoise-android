@@ -1,17 +1,48 @@
 name: Android Release Runtime Verify
 
-# R8 can successfully package bytecode that ART later rejects. These pre-merge
-# checks build the optimized production/API-36 and staging/API-37 paths, sign
-# them with disposable CI-only keys, and ask ART to verify every DEX class.
-# On PRs, release lint runs once per variant in android-repro-verify.yml's gate.
+# R8 can successfully package bytecode that ART later rejects. These checks
+# build the optimized production/API-36 and staging/API-37 paths, sign them with
+# disposable CI-only keys, and ask ART to verify every DEX class.
+# They run on every master push, nightly, on tags and in the merge queue. PRs
+# run them only when release, signing, build or dependency inputs change, and
+# not while the PR is a draft. Release lint runs in android-repro-verify.yml.
 
 on:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/android-release-runtime.yml'
+      - 'app/build.gradle.kts'
+      - 'app/proguard-rules.pro'
+      - 'app/src/main/AndroidManifest.xml'
+      - 'app/src/main/marmotkit/**'
+      - 'scripts/prepare_marmotkit_artifact.py'
+      - 'scripts/prepare-marmotkit-artifact.sh'
+      - 'scripts/prepare-marmotkit-artifact.ps1'
+      - 'app/src/staging/**'
+      - 'app/src/zapstore/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'config/android-release.properties'
+      - 'config/compose-stability.conf'
+      - 'scripts/release*'
+      - 'scripts/verify-release-runtime.sh'
+      - 'scripts/verify_notice_resources.py'
+      - 'scripts/stabilize-android17-emulator.sh'
+      - 'scripts/android17-adb-wrapper.sh'
+      - 'scripts/test-android17-emulator-stabilization.sh'
   merge_group:
     types: [checks_requested]
   push:
     branches: [master]
+    tags:
+      - '*'
+  schedule:
+    - cron: '31 3 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -24,6 +55,7 @@ permissions:
 jobs:
   verify-production:
     name: Verify production APK on API 36 ART
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -159,6 +191,7 @@ jobs:
 
   verify-staging-android17:
     name: Verify staging APK on Android 17 ART
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -401,9 +434,15 @@ jobs:
         env:
           PRODUCTION_RESULT: ${{ needs.verify-production.result }}
           STAGING_ANDROID17_RESULT: ${{ needs.verify-staging-android17.result }}
+          DRAFT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true }}
         shell: bash
         run: |
           set -euo pipefail
+          # Draft PRs deliberately skip both lanes; ready_for_review runs them.
+          if [[ "${DRAFT_PR:-}" == true && "$PRODUCTION_RESULT" == skipped && "$STAGING_ANDROID17_RESULT" == skipped ]]; then
+            echo 'Draft PR: runtime verification deferred until ready for review'
+            exit 0
+          fi
           if [[ "$PRODUCTION_RESULT" != success || "$STAGING_ANDROID17_RESULT" != success ]]; then
             printf 'Production/API-36 result: %s\n' "$PRODUCTION_RESULT" >&2
             printf 'Staging/API-37 result: %s\n' "$STAGING_ANDROID17_RESULT" >&2

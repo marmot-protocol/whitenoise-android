@@ -45,8 +45,9 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
   relevant themes, RTL, font scales and UI states, regenerate/commit PNG baselines,
   and verify both distributions. The PR's **Visual changes** must show current-head
   baselines; missing-screenshot CI is blocking.
-- Datawav PRs open draft until CI passes, conflicts are absent and findings are
-  addressed. Recheck discussion before marking ready. Pending checks alone do not
+- Datawav PRs open draft until the draft fast lane passes, conflicts are absent
+  and findings are addressed; marking ready runs the remaining lanes, which must
+  also pass. Recheck discussion before marking ready. Pending checks alone do not
   justify demoting a ready PR; readiness never authorizes merging.
 
 ## Task guides
