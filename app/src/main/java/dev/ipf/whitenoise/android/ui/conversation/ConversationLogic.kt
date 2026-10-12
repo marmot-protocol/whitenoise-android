@@ -229,6 +229,10 @@ internal fun isConversationItemTopAligned(
  * Scroll-backed near-bottom flag for the conversation timeline. Keyed on the
  * rendered timeline size so async hydration cannot capture an initial zero in
  * the derived-state closure (issue #1253).
+ *
+ * [mentionReadingRowHeightPx] is read inside the derived state. A mention jump writes that reserve
+ * before its first frame, so reading it here, not in the caller's composition, re-evaluates only
+ * this flag instead of recomposing the whole screen (#3150).
  */
 @Composable
 internal fun rememberConversationNearBottom(
@@ -236,35 +240,7 @@ internal fun rememberConversationNearBottom(
     renderedTimelineSize: Int,
     trailingRowCount: Int = 0,
     timelineViewport: ConversationTimelineViewport? = null,
-    mentionReadingRowHeightPx: Int? = null,
-): Boolean {
-    val nearBottom by
-        remember(listState, renderedTimelineSize, trailingRowCount, timelineViewport, mentionReadingRowHeightPx) {
-            derivedStateOf {
-                isNearBottom(
-                    listState,
-                    renderedTimelineSize,
-                    trailingRowCount,
-                    timelineViewport,
-                    mentionReadingRowHeightPx,
-                )
-            }
-        }
-    return nearBottom
-}
-
-/**
- * Near-bottom flag that reads the mention reading reserve inside its derived state. A mention jump
- * writes that reserve before its first frame, so reading it here, not in the caller's composition,
- * re-evaluates only this flag instead of recomposing the whole screen (#3150).
- */
-@Composable
-internal fun rememberConversationNearBottom(
-    listState: LazyListState,
-    renderedTimelineSize: Int,
-    trailingRowCount: Int,
-    timelineViewport: ConversationTimelineViewport?,
-    mentionReadingRowHeightPx: () -> Int?,
+    mentionReadingRowHeightPx: () -> Int? = { null },
 ): Boolean {
     val readMentionReadingRowHeightPx by rememberUpdatedState(mentionReadingRowHeightPx)
     val nearBottom by

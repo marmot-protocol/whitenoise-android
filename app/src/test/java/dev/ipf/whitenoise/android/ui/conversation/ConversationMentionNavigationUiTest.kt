@@ -340,7 +340,7 @@ class ConversationMentionNavigationUiTest {
                         rememberConversationNearBottom(
                             listState,
                             maxOf(targetIndex, initialIndex) + 13 + state.incomingCount,
-                            mentionReadingRowHeightPx = coordinator.mentionReadingRowHeightPx,
+                            mentionReadingRowHeightPx = { coordinator.mentionReadingRowHeightPx },
                         )
                     val readingReserve =
                         conversationMentionReadingReservePx(
