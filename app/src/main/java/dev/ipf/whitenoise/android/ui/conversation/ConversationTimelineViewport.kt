@@ -173,6 +173,8 @@ internal fun LazyListLayoutInfo.newestReadRow(timelineListIndices: IntRange): La
 /**
  * Records the publication and padding consumed by this native list measure, including unchanged-total transitions.
  * [mentionReadingReserve] is read here, in measurement, so a reserve change relays the list out without recomposing.
+ * It is read once, before the list measures: the reserve derives from the list's layout info, which that measure
+ * rewrites, so a later read could record a base the list's own content padding did not use in this pass.
  */
 internal fun Modifier.measureConversationTimelinePadding(
     viewport: ConversationTimelineViewport,
@@ -182,9 +184,10 @@ internal fun Modifier.measureConversationTimelinePadding(
     mentionReadingReserve: () -> Dp = { 0.dp },
 ): Modifier =
     layout { measurable, constraints ->
+        val reserve = mentionReadingReserve()
         val placeable =
             traceConversationUiSection(ConversationUiTrace.TRANSCRIPT_MEASURE) { measurable.measure(constraints) }
-        viewport.onPaddingMeasured((basePadding + mentionReadingReserve()).roundToPx(), foregroundOverlap.roundToPx())
+        viewport.onPaddingMeasured((basePadding + reserve).roundToPx(), foregroundOverlap.roundToPx())
         viewport.onTimelineMeasured(timelinePublication)
         layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
     }

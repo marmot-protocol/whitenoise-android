@@ -10,9 +10,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -160,14 +164,86 @@ class ConversationMentionReserveCompositionTest {
         composeRule.runOnUiThread { assertEquals(beforeReserve + 1, hostCompositions) }
     }
 
+    /**
+     * With a reserve derived from the reading layout, as the screen derives it, and composer overlap present, every
+     * measure pass records the base its list padding used, so a growing viewport never misreports the overlap.
+     */
+    @Test
+    fun layoutDerivedReserveRecordsTheBaseTheListUsedInEveryPass() {
+        val listState = LazyListState()
+        val viewport = ConversationTimelineViewport(listState)
+        val height = mutableStateOf(SHORT_TRANSCRIPT_HEIGHT)
+        val passes = mutableListOf<Pair<Int, Int>>()
+        composeRule.setContent { LayoutDerivedReserveTranscript(listState, viewport, height.value, passes) }
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread { height.value = TALL_TRANSCRIPT_HEIGHT }
+        composeRule.waitForIdle()
+
+        val overlapPx = with(composeRule.density) { OVERLAP.roundToPx() }
+        composeRule.runOnUiThread {
+            assertTrue("the probe sampled the viewport growth", passes.any { it.second > passes.first().second })
+            passes.forEach { (readingHeight, listHeight) ->
+                val clearHeight = (listHeight - overlapPx).toFloat()
+                assertEquals("reading overlap in a $listHeight px pass", clearHeight, readingHeight.toFloat(), 1f)
+            }
+        }
+        assertNewestRowGap(TALL_TRANSCRIPT_HEIGHT - ROW_HEIGHT)
+    }
+
+    /** The screen's reserve wiring over [ReservedTranscript], sampling the reading height after each measure. */
+    @Composable
+    private fun LayoutDerivedReserveTranscript(
+        listState: LazyListState,
+        viewport: ConversationTimelineViewport,
+        height: Dp,
+        passes: MutableList<Pair<Int, Int>>,
+    ) {
+        val density = LocalDensity.current
+        val reserve =
+            remember(viewport, density) {
+                derivedStateOf {
+                    with(density) {
+                        conversationMentionReadingReservePx(
+                            readingHeightPx = viewport.readingHeightPx(),
+                            basePaddingPx = CONVERSATION_TIMELINE_TAIL_GAP.roundToPx(),
+                            rowHeightPx = ROW_HEIGHT.roundToPx(),
+                        ).toDp()
+                    }
+                }
+            }
+        val readReserve = remember(reserve) { { reserve.value } }
+        ReservedTranscript(
+            listState = listState,
+            contentPadding = remember(readReserve) { conversationTimelineContentPadding(0.dp, OVERLAP, readReserve) },
+            height = height,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .layout { measurable, constraints ->
+                        // Outside the padding modifier, so each sample follows that pass's recorded base.
+                        val placeable = measurable.measure(constraints)
+                        passes += Snapshot.withoutReadObservation { viewport.readingHeightPx() } to placeable.height
+                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                    }.measureConversationTimelinePadding(
+                        viewport,
+                        CONVERSATION_TIMELINE_TAIL_GAP,
+                        OVERLAP,
+                        NO_PUBLICATION,
+                        mentionReadingReserve = readReserve,
+                    ),
+        )
+    }
+
     /** A reversed transcript of fixed-height rows, newest first, laid out against its bottom edge. */
     @Composable
     private fun ReservedTranscript(
         listState: LazyListState,
         contentPadding: PaddingValues,
         modifier: Modifier,
+        height: Dp = TRANSCRIPT_HEIGHT,
     ) {
-        Box(Modifier.height(TRANSCRIPT_HEIGHT).testTag(TRANSCRIPT_TAG)) {
+        Box(Modifier.height(height).testTag(TRANSCRIPT_TAG)) {
             LazyColumn(
                 modifier = modifier,
                 state = listState,
@@ -198,8 +274,16 @@ class ConversationMentionReserveCompositionTest {
 
     /** Requires the measured gap between the transcript bottom and its newest row to equal [expected]. */
     private fun assertNewestRowGap(expected: Dp) {
-        val transcriptBottom = composeRule.onNodeWithTag(TRANSCRIPT_TAG).fetchSemanticsNode().boundsInRoot.bottom
-        val newestBottom = composeRule.onNodeWithTag(NEWEST_ROW_TAG).fetchSemanticsNode().boundsInRoot.bottom
+        val transcriptBottom =
+            composeRule
+                .onNodeWithTag(TRANSCRIPT_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
+        val newestBottom =
+            composeRule
+                .onNodeWithTag(NEWEST_ROW_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
         assertEquals(with(composeRule.density) { expected.toPx() }, transcriptBottom - newestBottom, 1f)
     }
 
@@ -220,6 +304,9 @@ private const val HISTORY_SIZE = 50
 private const val HISTORY_READING_INDEX = 20
 private const val RESERVED_ROW_HEIGHT_PX = 120
 private val TRANSCRIPT_HEIGHT = 400.dp
+private val SHORT_TRANSCRIPT_HEIGHT = 300.dp
+private val TALL_TRANSCRIPT_HEIGHT = 360.dp
+private val OVERLAP = 60.dp
 private val HISTORY_VIEWPORT = 100.dp
 private val ROW_HEIGHT = 40.dp
 private val RESERVE = 100.dp

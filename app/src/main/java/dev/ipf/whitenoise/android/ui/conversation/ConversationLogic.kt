@@ -231,8 +231,8 @@ internal fun isConversationItemTopAligned(
  * the derived-state closure (issue #1253).
  *
  * [mentionReadingRowHeightPx] is read inside the derived state. A mention jump writes that reserve
- * before its first frame, so reading it here, not in the caller's composition, re-evaluates only
- * this flag instead of recomposing the whole screen (#3150).
+ * before its first frame, so reading it here, not in the caller's composition, recomposes the caller
+ * only when the flag's value changes rather than on every reserve write (#3150).
  */
 @Composable
 internal fun rememberConversationNearBottom(
