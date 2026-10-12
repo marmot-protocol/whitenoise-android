@@ -50,7 +50,10 @@ def mention_phase_metrics(query, window):
     """Scope async phases to the receiver; separate reached landing from the later highlight hold."""
     phases = {}
     scoped_window = re.sub(r"\bts\b", "s.ts", window)
-    for phase in ("total", "availability", "approach", "position", "animation", "layout", "correction", "landed", "highlight"):
+    for phase in (
+        "total", "availability", "approach", "prefetch", "position", "animation", "layout", "correction", "landed",
+        "highlight",
+    ):
         rows = query(
             f"select count(*) n, sum(s.dur)/1e6 ms from process_slice s "
             f"where s.process_name='{PKG}' and s.name='WhiteNoise.conversation.mention.{phase}' "
@@ -219,7 +222,7 @@ def main(argv):
             if r["test"] == "jumpToUnreadMentionFromHistory":
                 print("  mention phases (ms; total includes highlight; dash means unmeasured): " + ", ".join(
                     f"{phase}={ms(r.get(f'mention_{phase}_ms'), 0)}"
-                    for phase in ("tap_to_landing", "total", "availability", "approach", "position",
+                    for phase in ("tap_to_landing", "total", "availability", "approach", "prefetch", "position",
                                   "animation", "layout", "correction", "highlight")
                 ) + f"; corrections={r.get('mention_correction_n', 0)}")
         print()

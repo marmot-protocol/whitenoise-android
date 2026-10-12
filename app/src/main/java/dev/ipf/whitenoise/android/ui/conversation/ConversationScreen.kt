@@ -29,7 +29,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -762,9 +761,11 @@ internal fun ConversationScreen(
                 notificationOpenRequestId = notificationOpenRequestId,
             )
         }
+    val destinationPrefetch = key(controller) { remember { ConversationDestinationPrefetch() } }
     val listState =
         key(controller) {
-            rememberLazyListState(
+            rememberConversationTranscriptListState(
+                prefetch = destinationPrefetch,
                 initialFirstVisibleItemIndex =
                     positionalScrollRestore?.firstVisibleItemIndex ?: firstFrameSeed.initialListIndex,
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
@@ -787,7 +788,7 @@ internal fun ConversationScreen(
             scrollEvidenceSink,
         ) {
             ConversationScrollCoordinator(
-                writer = LazyListConversationScrollWriter(listState, scrollEvidenceSink),
+                writer = LazyListConversationScrollWriter(listState, scrollEvidenceSink, destinationPrefetch),
                 initialMode =
                     if (scrollRestore != null) {
                         ConversationScrollMode.ReadingHistory(

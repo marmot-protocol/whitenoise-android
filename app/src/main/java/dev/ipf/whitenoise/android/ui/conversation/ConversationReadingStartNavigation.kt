@@ -70,7 +70,8 @@ internal data class ConversationReadingStartPlacement(
 /**
  * Live list access for one reading-start target. The index is resolved by message identity on every
  * read, so header or page changes while a command is suspended cannot leave a stale row behind.
- * [traceSections] stays on for the mention button, whose benchmark budgets read those sections.
+ * [traceSections] stays on for the mention button, whose benchmark budgets read those sections and
+ * whose far snap prepares its destination rows first.
  */
 internal data class ConversationReadingStartProbe(
     val resolveTargetIndex: () -> Int?,
@@ -167,7 +168,7 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
                 animateScrollToItem(
                     index,
                     offset,
-                    traceMentionJump = probe.traceSections,
+                    mentionJump = probe.traceSections,
                     resolveIndex = probe.resolveTargetIndex,
                     resolveScrollOffset = { resolved ->
                         placedIndex = resolved

@@ -790,11 +790,13 @@ internal class ConversationScrollCoordinator(
          * insert or remove list headers while the command is suspended.
          * [resolveScrollOffset] reads geometry after prepositioning so a later settle pass can use
          * the actual approach coordinate instead of an obsolete measurement.
+         * [mentionJump] marks the mention button's jump: its phases are traced, and its far snap
+         * prepares the destination rows first.
          */
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
-            traceMentionJump: Boolean = false,
+            mentionJump: Boolean = false,
             resolveScrollOffset: (Int) -> Int = { scrollOffset },
             resolveIndex: () -> Int? = { index },
         ): Boolean {
@@ -804,7 +806,7 @@ internal class ConversationScrollCoordinator(
             while (
                 targetIndex != null &&
                 repositionAttempts < MAX_TARGET_REPOSITION_ATTEMPTS &&
-                prePositionIfFar(targetIndex, traceMentionJump)
+                prePositionIfFar(targetIndex, mentionJump)
             ) {
                 repositionAttempts++
                 ensureCurrent()
@@ -815,11 +817,11 @@ internal class ConversationScrollCoordinator(
             // Use the geometry now available, not an offset captured before that handoff.
             val resolvedScrollOffset = resolveScrollOffset(resolvedTargetIndex)
             if (isFar(resolvedTargetIndex)) {
-                traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.POSITION) {
+                traceMentionWrite(mentionJump, ConversationMentionJumpTrace.POSITION) {
                     writer.scrollToItem(resolvedTargetIndex, resolvedScrollOffset)
                 }
             } else {
-                traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.ANIMATION) {
+                traceMentionWrite(mentionJump, ConversationMentionJumpTrace.ANIMATION) {
                     writer.animateScrollToItem(resolvedTargetIndex, resolvedScrollOffset)
                 }
             }
@@ -858,9 +860,14 @@ internal class ConversationScrollCoordinator(
             return true
         }
 
+        /**
+         * Snaps near a far [targetIndex]. A [mentionJump] first prepares the rows that snap will show,
+         * so it does not compose a whole uncomposed viewport in one frame (#3150), and afterwards
+         * releases any it did not use, including when the command is superseded while waiting.
+         */
         private suspend fun prePositionIfFar(
             targetIndex: Int,
-            traceMentionJump: Boolean,
+            mentionJump: Boolean,
         ): Boolean {
             val currentIndex = writer.firstVisibleItemIndex
             if (!isFar(targetIndex)) return false
@@ -870,8 +877,18 @@ internal class ConversationScrollCoordinator(
                 } else {
                     targetIndex + MAX_ANIMATED_SCROLL_ITEMS
                 }
-            traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.POSITION) {
-                writer.scrollToItem(approachIndex, 0)
+            try {
+                if (mentionJump) {
+                    traceMentionWrite(true, ConversationMentionJumpTrace.PREFETCH) {
+                        writer.prepareSnapDestination(approachIndex)
+                    }
+                    ensureCurrent()
+                }
+                traceMentionWrite(mentionJump, ConversationMentionJumpTrace.POSITION) {
+                    writer.scrollToItem(approachIndex, 0)
+                }
+            } finally {
+                if (mentionJump) writer.releaseSnapDestination()
             }
             return true
         }
@@ -1169,15 +1186,38 @@ internal interface ConversationScrollWriter {
      * edge, meets the top of the viewport. A no-op unless the row overhangs.
      */
     suspend fun alignReadingStart(index: Int) = Unit
+
+    /** Prepares the rows a snap to [index] will show before the snap writes; a no-op by default. */
+    suspend fun prepareSnapDestination(index: Int) = Unit
+
+    /** Releases prepared rows the snap did not bring into view; a no-op by default. */
+    fun releaseSnapDestination() = Unit
 }
 
 /** The only implementation that writes the Compose list state. */
 internal class LazyListConversationScrollWriter(
     private val listState: LazyListState,
     private val evidenceSink: ConversationScrollEvidenceSink? = null,
+    private val destinationPrefetch: ConversationDestinationPrefetch? = null,
 ) : ConversationScrollWriter {
     override val firstVisibleItemIndex: Int
         get() = listState.firstVisibleItemIndex
+
+    /**
+     * Prepares one current viewport of rows from [index] upward: in the reversed transcript a snap to
+     * [index] lays that row at the bottom and older rows above it.
+     */
+    override suspend fun prepareSnapDestination(index: Int) {
+        val prefetch = destinationPrefetch ?: return
+        val layoutInfo = listState.layoutInfo
+        val end = (index + layoutInfo.visibleItemsInfo.size + 1).coerceAtMost(layoutInfo.totalItemsCount)
+        prefetch.prepare(index until end, layoutInfo.visibleItemsInfo.mapTo(HashSet()) { it.index })
+    }
+
+    /** Keeps prepared rows that are now in view and cancels the rest. */
+    override fun releaseSnapDestination() {
+        destinationPrefetch?.release(listState.layoutInfo.visibleItemsInfo.mapTo(HashSet()) { it.index })
+    }
 
     override suspend fun scrollToItem(
         index: Int,
