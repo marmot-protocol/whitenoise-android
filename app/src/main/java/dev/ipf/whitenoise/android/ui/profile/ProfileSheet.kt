@@ -643,13 +643,9 @@ internal fun ProfileSheet(
         }
     }
     val addableGroupsState =
-        remember(hex, liveGroupsRevision, groupPickerRevision, accountWide) {
-            hex?.let { appState.profileAddableGroupsState(it, accountWide) } ?: ProfileGroupPickerState.empty()
-        }
+        rememberProfileGroupPickerState(appState, hex, accountWide, WhiteNoiseAppState::profileAddableGroupsState)
     val promotableGroupsState =
-        remember(hex, liveGroupsRevision, groupPickerRevision, accountWide) {
-            hex?.let { appState.profilePromotableGroupsState(it, accountWide) } ?: ProfileGroupPickerState.empty()
-        }
+        rememberProfileGroupPickerState(appState, hex, accountWide, WhiteNoiseAppState::profilePromotableGroupsState)
     LaunchedEffect(page, addableGroupsState.pendingGroupIds, promotableGroupsState.pendingGroupIds) {
         val pendingGroupIds =
             when (page) {

@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ProfileAccountWideGroups
+import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
@@ -111,6 +112,30 @@ internal fun rememberProfileAccountWideGroups(
         if (enabled) holder.load()
     }
     return holder
+}
+
+/** Projects one profile group picker's state for a target identity from the live controller caches. */
+internal typealias ProfileGroupPickerProjection =
+    WhiteNoiseAppState.(String, ProfileAccountWideGroups) -> ProfileGroupPickerState
+
+/**
+ * Remembers one profile group picker's state for [targetAccountIdHex] through [project]. It recomputes on
+ * [WhiteNoiseAppState.forwardTargetsRevision] and the roster revision rather than on the visible chat-list
+ * items, because those stay frozen while the chat list is hidden behind a conversation, and group changes
+ * there must still reach a picker opened from a profile or a direct chat's settings.
+ */
+@Composable
+internal fun rememberProfileGroupPickerState(
+    appState: WhiteNoiseAppState,
+    targetAccountIdHex: String?,
+    accountWide: ProfileAccountWideGroups,
+    project: ProfileGroupPickerProjection,
+): ProfileGroupPickerState {
+    val liveGroupsRevision = appState.forwardTargetsRevision
+    val rosterRevision = appState.profileGroupPickerRevision
+    return remember(targetAccountIdHex, liveGroupsRevision, rosterRevision, accountWide) {
+        targetAccountIdHex?.let { appState.project(it, accountWide) } ?: ProfileGroupPickerState.empty()
+    }
 }
 
 /** The controller's chat-row membership revision, or 0 before a controller is attached. */
