@@ -20,9 +20,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +33,9 @@ import org.robolectric.RobolectricTestRunner
 
 /** The roster MDK would return for one group, keyed by group id. */
 private typealias RosterRead = suspend (String, String) -> List<AppGroupMemberRecordFfi>
+
+/** The group ids MDK's account-wide read presents, in order. */
+private typealias PresentedRead = suspend () -> List<String>
 
 /** A profile's groups in common and its group pickers see chats beyond the retained chat-list window (#2983). */
 @RunWith(RobolectricTestRunner::class)
@@ -165,7 +171,7 @@ class AccountWideProfileGroupsTest {
         runBlocking {
             val presented = mutableListOf(RETAINED, BEYOND)
             val targetRoster: RosterRead = { _, _ -> roster(TARGET) }
-            val presentedNow: () -> List<String> = { presented.toList() }
+            val presentedNow: PresentedRead = { presented.toList() }
             val (appState, controller) = profileController(presented = presentedNow, beyondRoster = targetRoster)
             val holder = ProfileAccountWideGroupsHolder(appState, CoroutineScope(coroutineContext + SupervisorJob()))
             holder.load()
@@ -182,6 +188,65 @@ class AccountWideProfileGroupsTest {
             assertTrue(BEYOND in appState.personSharedGroupsForProfile(TARGET, holder.current()).listed())
         }
 
+    /** A failed account-wide read leaves the pickers FAILED with Retry, and Retry with nothing pending recovers. */
+    @Test
+    fun failedAccountWideReadOffersRetryAndRecovers() =
+        runBlocking {
+            var reads = 0
+            val presentedOnRetry: PresentedRead = {
+                reads += 1
+                check(reads > 1) { "presented list unavailable" }
+                listOf(RETAINED, BEYOND)
+            }
+            val anyRoster: RosterRead = { _, _ -> roster() }
+            val (appState, _) = profileController(roster(), presentedOnRetry, anyRoster)
+            val scope = CoroutineScope(coroutineContext + SupervisorJob())
+            val holder = ProfileAccountWideGroupsHolder(appState, scope)
+            holder.load()
+
+            val failed = appState.profileAddableGroupsState(TARGET, holder.current())
+            assertEquals(ProfileGroupPickerLoadState.FAILED, failed.loadState)
+            assertEquals(setOf(RETAINED), failed.groups.ids())
+            assertTrue(appState.personSharedGroupsForProfile(TARGET, holder.current()).incomplete)
+
+            holder.requestMembers(emptySet(), retry = true)
+            scope.settle()
+            val recovered = appState.profileAddableGroupsState(TARGET, holder.current())
+            assertFalse(holder.current().readFailed)
+            assertEquals(setOf(BEYOND), recovered.pendingGroupIds)
+            holder.requestMembers(recovered.pendingGroupIds)
+            scope.settle()
+            val ready = appState.profileAddableGroupsState(TARGET, holder.current())
+            assertEquals(setOf(RETAINED, BEYOND), ready.groups.ids())
+        }
+
+    /** A slower read started before the chat rows changed never replaces the newer read that finished first. */
+    @Test
+    fun olderReadFinishingLastDoesNotReplaceTheNewerRead() =
+        runBlocking {
+            val release = CompletableDeferred<Unit>()
+            var reads = 0
+            val firstReadHeld: PresentedRead = {
+                reads += 1
+                if (reads == 1) release.await()
+                listOf(RETAINED, BEYOND)
+            }
+            val (appState, controller) = profileController(presented = firstReadHeld) { _, _ -> roster(TARGET) }
+            val holder = ProfileAccountWideGroupsHolder(appState, CoroutineScope(coroutineContext + SupervisorJob()))
+            val older = async { holder.load() }
+            yield()
+
+            controller.applyChatListRow(chatRow(ADDED))
+            holder.load()
+            val newer = holder.current().snapshot
+            release.complete(Unit)
+            older.await()
+
+            assertEquals(2, reads)
+            assertNotNull(newer)
+            assertSame(newer, holder.current().snapshot)
+        }
+
     /**
      * Binds a controller whose window retains [RETAINED] with [retainedMembers] and whose account-wide read
      * presents the [presented] chats, by default [RETAINED] and [BEYOND], an admin group of this account read
@@ -189,7 +254,7 @@ class AccountWideProfileGroupsTest {
      */
     private fun profileController(
         retainedMembers: List<AppGroupMemberRecordFfi> = roster(TARGET),
-        presented: () -> List<String> = { listOf(RETAINED, BEYOND) },
+        presented: PresentedRead = { listOf(RETAINED, BEYOND) },
         beyondRoster: RosterRead,
     ): Pair<WhiteNoiseAppState, ChatsController> {
         val appState = emptyAppState()
@@ -230,6 +295,7 @@ class AccountWideProfileGroupsTest {
     private companion object {
         val RETAINED = "e1".repeat(32)
         val BEYOND = "e2".repeat(32)
+        val ADDED = "e3".repeat(32)
         val TARGET = PEER_A
         val OTHER = PEER_B
     }

@@ -520,6 +520,10 @@ internal fun profilePromotableGroupsState(
     }
 }
 
+/** A failed account-wide read leaves the picker incomplete, so it reports FAILED and offers Retry. */
+private fun ProfileGroupPickerState.failedWhenAccountWideReadFailed(accountWide: ProfileAccountWideGroups) =
+    if (accountWide.readFailed) copy(loadState = ProfileGroupPickerLoadState.FAILED) else this
+
 private fun profileGroupPickerAccounts(
     activeAccountIdHex: String?,
     targetAccountIdHex: String,
@@ -3950,7 +3954,7 @@ class ChatsController private constructor(
             targetAccountIdHex = targetAccountIdHex,
             activeAccountIdHex = activeAccountIdHex,
             failedGroupIds = failedMemberFetches + accountWide.failedGroupIds,
-        )
+        ).failedWhenAccountWideReadFailed(accountWide)
 
     /** Groups [targetAccountIdHex] can be made an admin of, including those [accountWide] holds beyond the window. */
     internal fun profilePromotableGroupsState(
@@ -3963,7 +3967,7 @@ class ChatsController private constructor(
             targetAccountIdHex = targetAccountIdHex,
             activeAccountIdHex = activeAccountIdHex,
             failedGroupIds = failedMemberFetches + accountWide.failedGroupIds,
-        )
+        ).failedWhenAccountWideReadFailed(accountWide)
 
     /**
      * The confirmed, still-active 1:1 DM with [reference] (npub or hex), or

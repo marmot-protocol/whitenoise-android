@@ -819,7 +819,7 @@ internal fun ProfileSheet(
                         promotableGroupsState.groups.isNotEmpty() ||
                             promotableGroupsState.loadState != ProfileGroupPickerLoadState.READY
                     ),
-            showSharedGroups = sharedRows.isNotEmpty() || shared.unresolvedGroupIds.isNotEmpty(),
+            showSharedGroups = sharedRows.isNotEmpty() || shared.incomplete,
             copied = copied,
             onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
             onMessage = { openOrCreateProfileChat() },
@@ -1072,7 +1072,7 @@ internal fun ProfileSheet(
                     ) {
                         PersonGroupsInCommonContent(
                             rows = sharedRows,
-                            unresolved = shared.unresolvedGroupIds.isNotEmpty(),
+                            unresolved = shared.incomplete,
                             onBack = { page = ProfileSheetPage.PROFILE },
                             onOpen = { id ->
                                 if (owner.canAct()) {

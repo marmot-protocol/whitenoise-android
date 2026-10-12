@@ -8,8 +8,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ProfileAccountWideGroups
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -36,6 +38,9 @@ internal class ProfileAccountWideGroupsHolder(
     /** The chat-row revision [value]'s snapshot was read under, or null before the first read. */
     private var loadedRevision by mutableStateOf<Long?>(null)
 
+    /** Identifies the newest read, so a slower older read can never replace its result. */
+    private var latestRead = 0L
+
     /** The lookups to serve now: the latest snapshot if it matches the current chat rows, else none. */
     fun current(): ProfileAccountWideGroups =
         if (loadedRevision == rowsRevision()) {
@@ -44,11 +49,23 @@ internal class ProfileAccountWideGroupsHolder(
             ProfileAccountWideGroups()
         }
 
-    /** Reads the account-wide snapshot. A failed read leaves the lookups on the retained rows alone. */
+    /**
+     * Reads the account-wide snapshot. The result applies only if this is still the newest read and the chat
+     * rows have not changed since it started. A failed read is recorded so the lookups offer Retry, while a
+     * read that could not run leaves them on the retained rows alone.
+     */
     suspend fun load() {
+        val token = ++latestRead
         val revision = rowsRevision()
-        value = ProfileAccountWideGroups(snapshot = appState.loadAccountWideForwardTargets())
-        loadedRevision = revision
+        val read = appState.readAccountWideForwardTargets()
+        if (token == latestRead && revision == rowsRevision()) {
+            value =
+                ProfileAccountWideGroups(
+                    snapshot = (read as? AccountWideRead.Loaded)?.snapshot,
+                    readFailed = read is AccountWideRead.Failed,
+                )
+            loadedRevision = revision
+        }
     }
 
     /**

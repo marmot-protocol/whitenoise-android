@@ -37,7 +37,11 @@ internal class PersonProfileOwner(
 internal data class PersonSharedGroups(
     val groups: List<ChatListItem>,
     val unresolvedGroupIds: Set<String>,
-)
+    val readFailed: Boolean = false,
+) {
+    /** Whether the list may be missing groups: a roster is still unresolved or the account-wide read failed. */
+    val incomplete: Boolean get() = unresolvedGroupIds.isNotEmpty() || readFailed
+}
 
 /** Reads current immutable row snapshots without inferring membership from cached titles, counts or group names. */
 internal fun personSharedGroups(
@@ -93,5 +97,5 @@ internal fun WhiteNoiseAppState.personSharedGroupsForProfile(
     accountWide: ProfileAccountWideGroups = ProfileAccountWideGroups(),
 ): PersonSharedGroups {
     val items = mergeForwardTargets(forwardTargets(), accountWide.items())
-    return personSharedGroups(items, activeAccount?.accountIdHex, targetHex)
+    return personSharedGroups(items, activeAccount?.accountIdHex, targetHex).copy(readFailed = accountWide.readFailed)
 }
