@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
+import dev.ipf.whitenoise.android.notifications.MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS
 import dev.ipf.whitenoise.android.ui.markdownDocumentMentionBech32s
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewText
 import kotlinx.coroutines.CancellationException
@@ -68,6 +69,13 @@ internal fun profileLookupRelays(
     activeAccountRelays: List<String>,
 ): List<String> = (bootstrapRelays + activeAccountRelays).distinct()
 
+/**
+ * UTF-16 budget for a flattened notification body: two units per code point, so a body of
+ * [MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS] code points survives flattening whole and the formatter's
+ * code-point bound is the one that applies. The chat list's one-line budget would cut it near 200 characters.
+ */
+internal const val NOTIFICATION_PREVIEW_MAX_UTF16_LENGTH = MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS * 2
+
 /** Flattens a parsed notification body while resolving each distinct mention once. */
 internal suspend fun resolveNotificationPreviewText(
     raw: String?,
@@ -84,6 +92,7 @@ internal suspend fun resolveNotificationPreviewText(
         }
         markdownDocumentToPreviewText(
             document = document,
+            maxLength = NOTIFICATION_PREVIEW_MAX_UTF16_LENGTH,
             mentionDisplayName = mentionNames::get,
         ).takeIf { it.isNotBlank() }
     }
