@@ -184,12 +184,12 @@ class ConversationScrollRestoreTest {
         )
     }
 
-    /** A landing rests at the newest edge only when it is near the bottom and no newer pages remain unloaded. */
+    /** A landing rests at the newest edge only at the native tail clamp with no newer pages left unloaded. */
     @Test
-    fun landingRestsAtTheNewestEdgeOnlyWhenNoNewerPagesRemain() {
-        assertTrue(conversationLandingAtNewestEdge(nearBottom = true, hasMoreAfter = false))
-        assertFalse(conversationLandingAtNewestEdge(nearBottom = true, hasMoreAfter = true))
-        assertFalse(conversationLandingAtNewestEdge(nearBottom = false, hasMoreAfter = false))
-        assertFalse(conversationLandingAtNewestEdge(nearBottom = false, hasMoreAfter = true))
+    fun landingRestsAtTheNewestEdgeOnlyAtTheNativeTailWithNoNewerPages() {
+        assertTrue(conversationLandingAtNewestEdge(atNaturalTail = true, hasMoreAfter = false))
+        assertFalse(conversationLandingAtNewestEdge(atNaturalTail = true, hasMoreAfter = true))
+        assertFalse(conversationLandingAtNewestEdge(atNaturalTail = false, hasMoreAfter = false))
+        assertFalse(conversationLandingAtNewestEdge(atNaturalTail = false, hasMoreAfter = true))
     }
 }

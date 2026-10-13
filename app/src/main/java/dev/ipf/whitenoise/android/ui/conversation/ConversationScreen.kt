@@ -2536,7 +2536,7 @@ internal fun ConversationScreen(
                                     scrollCoordinator.settleLandingAt(
                                         currentScrollAnchor(),
                                         conversationLandingAtNewestEdge(
-                                            nearBottom = liveNearBottom(),
+                                            atNaturalTail = timelineViewport.isAtNaturalTail,
                                             hasMoreAfter = controller.hasMoreAfterTimeline,
                                         ),
                                     )

@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -189,6 +190,62 @@ class ConversationMentionNavigationUiTest {
                 padding = 12,
                 restoreTail = true,
                 incomingAfterLanding = true,
+            ),
+        )
+    }
+
+    /** A newest mention slightly taller than the clear viewport keeps its beginning when a row arrives. */
+    @Test
+    fun slightlyOversizedNewestMentionKeepsItsReadingTopAcrossAnArrival() {
+        assertMentionTop(
+            MentionFixture(
+                target = Target(480, 0),
+                viewportHeight = 420,
+                padding = 144,
+                overlap = 132,
+                initialIndex = 90,
+                incomingAfterLanding = true,
+            ),
+        )
+    }
+
+    /** A newest mention slightly taller than the clear viewport saves its reading snapshot on leave. */
+    @Test
+    fun slightlyOversizedNewestMentionKeepsItsSnapshotAcrossReopen() {
+        assertMentionTop(
+            MentionFixture(
+                target = Target(480, 0),
+                viewportHeight = 420,
+                padding = 144,
+                overlap = 132,
+                initialIndex = 90,
+                reopenAfterLanding = true,
+            ),
+        )
+    }
+
+    /** An older mention with only a sliver of the newest row visible keeps its reading top on an arrival. */
+    @Test
+    fun olderMentionWithAPartlyVisibleTailKeepsItsReadingTopAcrossAnArrival() {
+        assertMentionTop(
+            MentionFixture(
+                target = Target(80, 5),
+                viewportHeight = 420,
+                padding = 12,
+                incomingAfterLanding = true,
+            ),
+        )
+    }
+
+    /** An older mention with only a sliver of the newest row visible saves its snapshot on leave. */
+    @Test
+    fun olderMentionWithAPartlyVisibleTailKeepsItsSnapshotAcrossReopen() {
+        assertMentionTop(
+            MentionFixture(
+                target = Target(80, 5),
+                viewportHeight = 420,
+                padding = 12,
+                reopenAfterLanding = true,
             ),
         )
     }
@@ -461,9 +518,9 @@ class ConversationMentionNavigationUiTest {
                                                 state.completionCount++
                                                 coordinator.settleLandingAt(
                                                     anchor(),
-                                                    isNearBottom(
-                                                        listState,
-                                                        maxOf(targetIndex, initialIndex) + 13 + state.incomingCount,
+                                                    conversationLandingAtNewestEdge(
+                                                        atNaturalTail = !listState.canScrollBackward,
+                                                        hasMoreAfter = false,
                                                     ),
                                                 )
                                             },
@@ -673,8 +730,8 @@ class ConversationMentionNavigationUiTest {
         if (fixture.reopenAfterLanding) {
             composeRule.onNodeWithTag("mention-reopen").performClick()
             composeRule.waitForIdle()
-            // Resting at the newest edge saves no history snapshot, so reopening enters at that same edge.
-            assertNull(state.savedSnapshot)
+            // Resting at the newest edge saves no snapshot and reopens there, any other landing keeps its snapshot.
+            if (following) assertNull(state.savedSnapshot) else assertNotNull(state.savedSnapshot)
             val reopenedTop =
                 composeRule
                     .onNodeWithTag("message-$targetIndex")

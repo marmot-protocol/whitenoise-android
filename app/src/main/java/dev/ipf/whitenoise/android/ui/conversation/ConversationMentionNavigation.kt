@@ -3,13 +3,15 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.withFrameNanos
 
 /**
- * Whether a finished navigation landing rests at the real newest edge. The last loaded row of a window that still
- * has newer pages is not that edge, so tail following and the dropped leave snapshot must wait until they load.
+ * Whether a finished navigation landing rests at the real newest edge. It takes the native newest-edge clamp, not
+ * the tolerant near-bottom reading used for gestures, because a landing can reach its reading start while part of
+ * the tail is still clipped and must keep that position. The last loaded row of a window that still has newer
+ * pages is not the edge either, so tail following and the dropped leave snapshot wait until they load.
  */
 internal fun conversationLandingAtNewestEdge(
-    nearBottom: Boolean,
+    atNaturalTail: Boolean,
     hasMoreAfter: Boolean,
-): Boolean = nearBottom && !hasMoreAfter
+): Boolean = atNaturalTail && !hasMoreAfter
 
 /**
  * Keeps the approach and measured correction in one latest-wins, distance-bounded command. This thin
