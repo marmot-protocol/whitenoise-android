@@ -172,7 +172,10 @@ class MediaCodecCorpusDeviceTest {
         val animation =
             dev.ipf.whitenoise.android.media.MediaPipeline
                 .decodeAnimatedDrawable(source, 96)
-        println("MEDIA_FORMAT_QUALIFICATION format=rotatedWebP api=${android.os.Build.VERSION.SDK_INT} animation=${animation != null}")
+        println(
+            "MEDIA_FORMAT_QUALIFICATION format=rotatedWebP " +
+                "api=${android.os.Build.VERSION.SDK_INT} animation=${animation != null}",
+        )
         if (animation != null) assertChangingFrames(animation as IsolatedAnimationDrawable)
         requireNotNull(IsolatedMediaDecoder.decode(image(Bitmap.CompressFormat.PNG), 2)).recycle()
     }
