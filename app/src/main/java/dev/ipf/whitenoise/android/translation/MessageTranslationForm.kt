@@ -77,18 +77,26 @@ internal fun MessageTranslationForm(
                 TextButton(onClick = onOpenEngine) { Text(stringResource(R.string.translation_open_engine)) }
             }
         }
-        WhiteNoiseButton(
-            onClick = onTranslate,
-            enabled = enabled,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = WhiteNoiseSpacing.Section,
-                        vertical = WhiteNoiseSpacing.Related,
-                    ).testTag("translation.confirm"),
-        ) { Text(stringResource(R.string.translation_title)) }
+        TranslationConfirmation(enabled, onTranslate)
     }
+}
+
+@Composable
+private fun TranslationConfirmation(
+    enabled: Boolean,
+    onTranslate: () -> Unit,
+) {
+    WhiteNoiseButton(
+        onClick = onTranslate,
+        enabled = enabled,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = WhiteNoiseSpacing.Section,
+                    vertical = WhiteNoiseSpacing.Related,
+                ).testTag("translation.confirm"),
+    ) { Text(stringResource(R.string.translation_title)) }
 }
 
 @Suppress("LongParameterList")

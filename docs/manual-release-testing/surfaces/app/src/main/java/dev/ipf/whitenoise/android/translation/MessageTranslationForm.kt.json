@@ -66,6 +66,14 @@
         "test_ids": [
           "SET-033"
         ]
+      },
+      {
+        "surface": "TranslationConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "fun TranslationConfirmation(",
+        "test_ids": [
+          "SET-033"
+        ]
       }
     ]
   },

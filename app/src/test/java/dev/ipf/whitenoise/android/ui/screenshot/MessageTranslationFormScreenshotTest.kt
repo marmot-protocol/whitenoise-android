@@ -68,7 +68,7 @@ class MessageTranslationFormScreenshotTest {
 
     @Test
     fun recoveryOpensTheEngineWithoutSubmitting() {
-        render(failure = TranslationFailure.SOURCE_MODEL)
+        render(Appearance(failure = TranslationFailure.SOURCE_MODEL))
         composeRule.onNodeWithText("Open engine").performClick()
         assertEquals(1, engineOpened)
         assertEquals(emptyList<Pair<String, String>>(), requests)
@@ -76,54 +76,56 @@ class MessageTranslationFormScreenshotTest {
 
     @Test
     fun unavailableRequestKeepsThePrimaryActionDisabled() {
-        render(enabled = false)
+        render(Appearance(enabled = false))
         composeRule.onNodeWithTag("translation.confirm").assertIsNotEnabled()
     }
 
     @Test fun light() = capture("translation_form_light.png")
 
-    @Test fun dark() = capture("translation_form_dark.png", dark = true)
+    @Test fun dark() = capture("translation_form_dark.png", Appearance(dark = true))
 
-    @Test fun amoled() = capture("translation_form_amoled.png", dark = true, amoled = true)
+    @Test fun amoled() = capture("translation_form_amoled.png", Appearance(dark = true, amoled = true))
 
-    @Test fun largeRtl() = capture("translation_form_large_rtl.png", scale = 2f, rtl = true)
+    @Test fun largeRtl() = capture("translation_form_large_rtl.png", Appearance(scale = 2f, rtl = true))
 
-    @Test fun recovery() = capture("translation_form_recovery.png", failure = TranslationFailure.SOURCE_MODEL)
+    @Test fun recovery() = capture("translation_form_recovery.png", Appearance(failure = TranslationFailure.SOURCE_MODEL))
+
+    private data class Appearance(
+        val dark: Boolean = false,
+        val amoled: Boolean = false,
+        val scale: Float = 1f,
+        val rtl: Boolean = false,
+        val failure: TranslationFailure? = null,
+        val enabled: Boolean = true,
+    )
 
     private fun capture(
         name: String,
-        dark: Boolean = false,
-        amoled: Boolean = false,
-        scale: Float = 1f,
-        rtl: Boolean = false,
-        failure: TranslationFailure? = null,
+        appearance: Appearance = Appearance(),
     ) {
-        render(dark, amoled, scale, rtl, failure)
+        render(appearance)
         composeRule.onNodeWithTag("translation.form.fixture").captureRoboImage("src/test/snapshots/$name")
     }
 
-    private fun render(
-        dark: Boolean = false,
-        amoled: Boolean = false,
-        scale: Float = 1f,
-        rtl: Boolean = false,
-        failure: TranslationFailure? = null,
-        enabled: Boolean = true,
-    ) {
+    private fun render(appearance: Appearance = Appearance()) {
         composeRule.setContent {
             var from by remember { mutableStateOf("") }
             var target by remember { mutableStateOf("de") }
             CompositionLocalProvider(
-                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalLayoutDirection provides if (appearance.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
+                WhiteNoiseTheme(
+                    darkTheme = appearance.dark,
+                    amoled = appearance.amoled,
+                    fontScale = appearance.scale,
+                ) {
                     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
                         Column(Modifier.width(360.dp).heightIn(max = 650.dp).testTag("translation.form.fixture")) {
                             MessageTranslationForm(
                                 from = from,
                                 target = target,
-                                failure = failure,
-                                enabled = enabled,
+                                failure = appearance.failure,
+                                enabled = appearance.enabled,
                                 onFromChange = { from = it },
                                 onTargetChange = { target = it },
                                 onTranslate = { requests.add(from to target) },

@@ -82,6 +82,22 @@
         "test_ids": [
           "SET-035"
         ]
+      },
+      {
+        "surface": "WidgetConfigurationAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "fun WidgetConfigurationAction(",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "WidgetAccountGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "fun WidgetAccountGroup(",
+        "test_ids": [
+          "SET-035"
+        ]
       }
     ]
   },

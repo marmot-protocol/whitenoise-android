@@ -18,10 +18,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
@@ -37,16 +39,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.settings.settingsRowBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
-
-/** Transient rendering data. Only the stable reference is handed back to native-validated configuration. */
-internal data class WidgetAccountPresentation(
-    val reference: String,
-    val seed: String,
-    val name: String,
-    val pictureUrl: String? = null,
-    val active: Boolean = false,
-    val picture: ImageBitmap? = null,
-)
 
 @Composable
 internal fun ConversationWidgetConfigurationContent(
@@ -69,23 +61,16 @@ internal fun ConversationWidgetConfigurationContent(
         onBack = onCancel,
         modifier = Modifier.testTag("widget.configuration"),
         bottomBar = {
-            SettingsBottomAction {
-                if (accounts.isEmpty()) {
-                    WhiteNoiseButton(onOpenApp, Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.widget_open_app))
+            WidgetConfigurationAction(
+                available = accounts.isNotEmpty(),
+                canSave = account in references,
+                onOpenApp = onOpenApp,
+                onSave = {
+                    account?.takeIf { it in references }?.let {
+                        onSave(ConversationWidgetChoice(it, all, false, unread))
                     }
-                } else {
-                    WhiteNoiseButton(
-                        enabled = account in references,
-                        modifier = Modifier.fillMaxWidth().testTag("widget.save"),
-                        onClick = {
-                            account?.takeIf { it in references }?.let {
-                                onSave(ConversationWidgetChoice(it, all, false, unread))
-                            }
-                        },
-                    ) { Text(stringResource(R.string.save)) }
-                }
-            }
+                },
+            )
         },
     ) {
         SettingsList {
@@ -93,15 +78,7 @@ internal fun ConversationWidgetConfigurationContent(
             if (accounts.isNotEmpty()) {
                 item { SettingsSection(stringResource(R.string.account)) }
                 item {
-                    SettingsGroup(Modifier.selectableGroup()) {
-                        accounts.forEach { profile ->
-                            row(profile.reference) { context ->
-                                WidgetAccountChoice(context, profile, account == profile.reference) {
-                                    account = profile.reference
-                                }
-                            }
-                        }
-                    }
+                    WidgetAccountGroup(accounts, account) { account = it }
                 }
                 item {
                     SettingsGroup {
@@ -124,6 +101,45 @@ internal fun ConversationWidgetConfigurationContent(
 }
 
 @Composable
+private fun WidgetConfigurationAction(
+    available: Boolean,
+    canSave: Boolean,
+    onOpenApp: () -> Unit,
+    onSave: () -> Unit,
+) {
+    SettingsBottomAction {
+        if (available) {
+            WhiteNoiseButton(
+                enabled = canSave,
+                modifier = Modifier.fillMaxWidth().testTag("widget.save"),
+                onClick = onSave,
+            ) { Text(stringResource(R.string.save)) }
+        } else {
+            WhiteNoiseButton(onOpenApp, Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.widget_open_app))
+            }
+        }
+    }
+}
+
+@Composable
+private fun WidgetAccountGroup(
+    accounts: List<WidgetAccountPresentation>,
+    selected: String?,
+    onSelected: (String) -> Unit,
+) {
+    SettingsGroup(Modifier.selectableGroup()) {
+        accounts.forEach { profile ->
+            row(profile.reference) { context ->
+                WidgetAccountChoice(context, profile, selected == profile.reference) {
+                    onSelected(profile.reference)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun WidgetAccountChoice(
     context: SettingsRowContext,
     profile: WidgetAccountPresentation,
@@ -135,7 +151,11 @@ private fun WidgetAccountChoice(
         onClick = onClick,
         shapes = context.shapes,
         modifier =
-            Modifier.fillMaxWidth().settingsRowBorder(context, true).testTag("widget.profile.${profile.reference}"),
+            Modifier
+                .fillMaxWidth()
+                .settingsRowBorder(context, true)
+                .testTag("widget.profile.${profile.reference}")
+                .semantics { role = Role.RadioButton },
         leadingContent = {
             Avatar(profile.name, profile.seed, 48.dp, pictureUrl = profile.pictureUrl, picture = profile.picture)
         },

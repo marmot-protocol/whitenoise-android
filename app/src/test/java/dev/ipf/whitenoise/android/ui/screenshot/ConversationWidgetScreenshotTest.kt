@@ -52,11 +52,11 @@ class ConversationWidgetScreenshotTest {
 
     @Test fun configurationDefaults() = configuration("widget_configuration_defaults.png")
 
-    @Test fun configurationDark() = configuration("widget_configuration_dark.png", dark = true)
+    @Test fun configurationDark() = configuration("widget_configuration_dark.png", Appearance(dark = true))
 
-    @Test fun configurationAmoled() = configuration("widget_configuration_amoled.png", dark = true, amoled = true)
+    @Test fun configurationAmoled() = configuration("widget_configuration_amoled.png", Appearance(dark = true, amoled = true))
 
-    @Test fun configurationLargeRtl() = configuration("widget_configuration_large_rtl.png", rtl = true, scale = 2f)
+    @Test fun configurationLargeRtl() = configuration("widget_configuration_large_rtl.png", Appearance(rtl = true, scale = 2f))
 
     @Test fun configurationUnavailable() = configuration("widget_configuration_unavailable.png", accounts = emptyList())
 
@@ -114,32 +114,37 @@ class ConversationWidgetScreenshotTest {
         assertEquals("Curious Penguin", widgetProfileTitle("Curious Penguin", "Profile", 0))
     }
 
+    private data class Appearance(
+        val dark: Boolean = false,
+        val amoled: Boolean = false,
+        val rtl: Boolean = false,
+        val scale: Float = 1f,
+    )
+
     private fun configuration(
         name: String,
-        dark: Boolean = false,
-        amoled: Boolean = false,
-        rtl: Boolean = false,
-        scale: Float = 1f,
+        appearance: Appearance = Appearance(),
         accounts: List<WidgetAccountPresentation> = profiles,
     ) {
-        renderConfiguration(accounts, dark, amoled, rtl, scale)
+        renderConfiguration(accounts, appearance)
         capture(name)
     }
 
     private fun renderConfiguration(
         accounts: List<WidgetAccountPresentation> = profiles,
-        dark: Boolean = false,
-        amoled: Boolean = false,
-        rtl: Boolean = false,
-        scale: Float = 1f,
+        appearance: Appearance = Appearance(),
         open: () -> Unit = {},
         save: (ConversationWidgetChoice) -> Unit = {},
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
-                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalLayoutDirection provides if (appearance.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
+                WhiteNoiseTheme(
+                    darkTheme = appearance.dark,
+                    amoled = appearance.amoled,
+                    fontScale = appearance.scale,
+                ) {
                     Box(Modifier.size(360.dp, 700.dp).testTag("widget-fixture")) {
                         ConversationWidgetConfigurationContent(accounts, open, save)
                     }
