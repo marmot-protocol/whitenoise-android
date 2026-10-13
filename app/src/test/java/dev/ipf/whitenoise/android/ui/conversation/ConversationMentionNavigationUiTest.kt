@@ -18,14 +18,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -407,34 +408,32 @@ class ConversationMentionNavigationUiTest {
                                 )
                             }
                         }
-                        if (!state.captureInProgress) {
-                            TextButton(
-                                onClick = {
-                                    scope.launch {
-                                        state.completed =
-                                            coordinator.jumpToMentionReadingStart(
-                                                targetMessageId = "message-$targetIndex",
-                                                resolveTargetIndex = {
-                                                    targetIndex + state.incomingCount + state.headerCount
-                                                },
-                                                readLayout = { index ->
-                                                    mentionJumpLayout(listState, overlap, index, state)
-                                                },
-                                                awaitLayout = {
-                                                    withFrameNanos { }
-                                                    state.awaitSuspendedLayout(fixture.suspendedAction)
-                                                },
-                                                onCompleted = {
-                                                    state.completionCount++
-                                                    coordinator.settleReadingAt(anchor())
-                                                },
-                                            )
-                                    }
-                                },
-                                modifier = Modifier.testTag("mention-jump"),
-                            ) {
-                                Text("@")
-                            }
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    state.completed =
+                                        coordinator.jumpToMentionReadingStart(
+                                            targetMessageId = "message-$targetIndex",
+                                            resolveTargetIndex = {
+                                                targetIndex + state.incomingCount + state.headerCount
+                                            },
+                                            readLayout = { index ->
+                                                mentionJumpLayout(listState, overlap, index, state)
+                                            },
+                                            awaitLayout = {
+                                                withFrameNanos { }
+                                                state.awaitSuspendedLayout(fixture.suspendedAction)
+                                            },
+                                            onCompleted = {
+                                                state.completionCount++
+                                                coordinator.settleReadingAt(anchor())
+                                            },
+                                        )
+                                }
+                            },
+                            modifier = Modifier.graphicsLayer { alpha = state.captureOpacity }.testTag("mention-jump"),
+                        ) {
+                            Text("@")
                         }
                         if (restoreTail && !nearBottom) {
                             ConversationJumpToNewestButton(
@@ -482,10 +481,10 @@ class ConversationMentionNavigationUiTest {
             assertEquals("initial target index", targetIndex, state.measuredIndices.first())
             assertEquals("a newer row shifts the same target", targetIndex + 1, state.measuredIndices.last())
         }
-        composeRule.runOnIdle { state.captureInProgress = true }
+        composeRule.runOnIdle { state.captureOpacity = 0f }
         composeRule.waitForIdle()
         captureMentionFixture(fixture)
-        composeRule.runOnIdle { state.captureInProgress = false }
+        composeRule.runOnIdle { state.captureOpacity = 1f }
         assertMentionFollowUps(fixture, state, messageTop)
     }
 
@@ -676,7 +675,7 @@ class ConversationMentionNavigationUiTest {
         var completionCount = 0
         val measuredIndices = mutableListOf<Int>()
         val layoutRelease = CompletableDeferred<Unit>()
-        var captureInProgress by mutableStateOf(false)
+        var captureOpacity by mutableFloatStateOf(1f)
         var atNaturalTail = false
         var completed = false
         var incomingCount by mutableIntStateOf(0)

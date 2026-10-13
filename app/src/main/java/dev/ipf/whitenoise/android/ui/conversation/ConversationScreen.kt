@@ -1506,7 +1506,6 @@ internal fun ConversationScreen(
             timelineViewport = timelineViewport,
             renderedTimelineSize = renderedSize,
             trailingRowCount = trailingRowCount,
-            // Read inside the derived flag: a mention tap writes this reserve before its first frame.
         )
 
     /** Resolves a saved logical anchor after current header and error rows. */

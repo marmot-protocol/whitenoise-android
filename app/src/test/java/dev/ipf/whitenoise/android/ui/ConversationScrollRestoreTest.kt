@@ -67,12 +67,12 @@ class ConversationScrollRestoreTest {
         )
     }
 
-    /** Native offset zero still owns a history snapshot when a newest mention needs reading room. */
+    /** A history anchor at offset zero is saved without adding transient layout state. */
     @Test
-    fun newestMentionOnLeavePersistsItsReadingRoomWithTheLogicalAnchor() {
+    fun readingAnchorAtZeroOffsetPersistsWithoutSyntheticRoom() {
         assertEquals(
-            ConversationScrollSnapshot(0, 0, "msg:mention", "mention", 80),
-            conversationScrollSnapshotOnLeave(0, 0, false, "msg:mention", "mention", 80),
+            ConversationScrollSnapshot(0, 0, "msg:mention", "mention"),
+            conversationScrollSnapshotOnLeave(0, 0, false, "msg:mention", "mention"),
         )
     }
 
