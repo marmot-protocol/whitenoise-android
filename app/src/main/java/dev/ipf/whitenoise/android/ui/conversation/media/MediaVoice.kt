@@ -574,6 +574,8 @@ internal fun MediaVoiceBubble(
 /**
  * Voice bubble content: the 48dp play target, a progress track that doubles as the seek surface,
  * the time label, and a compact speed pill that appears only while this clip is playing or paused.
+ * A visible [transfer] takes over the play target with its ring and Cancel or Retry action, while
+ * the time label keeps the clip's time.
  * [onSeek] receives the tapped or dragged track fraction (0..1) and is null when seeking is unavailable.
  */
 internal fun VoiceAttachmentContent(
@@ -661,13 +663,9 @@ internal fun VoiceAttachmentContent(
                 onSeek = onSeek,
                 modifier = Modifier.weight(1f),
             )
+            // A transfer shows only in the ring; its step and bytes are the play target's description.
             Text(
-                text =
-                    if (action.transfer != null) {
-                        action.description
-                    } else {
-                        voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs)
-                    },
+                text = voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs),
                 style = MaterialTheme.typography.labelMedium,
                 color = secondaryContent,
                 maxLines = 1,

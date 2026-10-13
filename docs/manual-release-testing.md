@@ -638,3 +638,5 @@ Never delete an old ID. Move it here when its user-visible behavior is removed.
 |---|---|---|---|
 | MSG-027 | #2960 | Separate poll-discussion checklist consolidated into the existing encrypted-poll lifecycle check during master integration; all reply, reaction, layout and stale-target coverage is retained. | MSG-021 |
 | MED-002 | #2751 | The recent-media permission flow was removed in favor of Android's system photo picker. | MED-001 |
+| NCH-004 | #3247 | Android-only Note to self entry and creation removed pending shared interoperable MDK support. | NCH-001 |
+| NCH-005 | #3247 | Android-only notes recovery and naming rules removed pending shared interoperable MDK support. | NCH-001 |
