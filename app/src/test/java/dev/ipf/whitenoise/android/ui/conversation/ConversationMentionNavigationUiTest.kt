@@ -479,7 +479,8 @@ class ConversationMentionNavigationUiTest {
         }
         if (fixture.suspendedAction == SuspendedMentionAction.Window) {
             assertEquals("initial target index", targetIndex, state.measuredIndices.first())
-            assertEquals("a newer row shifts the same target", targetIndex + 1, state.measuredIndices.last())
+            // The suspended action adds one newer row and one structural header, each moving the target one index.
+            assertEquals("a row and a header shift the target", targetIndex + 2, state.measuredIndices.last())
         }
         composeRule.runOnIdle { state.captureOpacity = 0f }
         composeRule.waitForIdle()
