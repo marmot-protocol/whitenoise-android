@@ -1,0 +1,78 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+  "legacy_sha256": "06e5791db241bb4f1816a948c5d81ce70d9b8eedd69cb66344370d2c5b0bbbb3",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: SelectedMembersComponents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "surface": "onInitialAdminChange",
+        "anchor": "onInitialAdminChange",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "surface": "R.string.admin",
+        "anchor": "R.string.admin",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "surface": "R.string.member",
+        "anchor": "R.string.member",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "surface": "R.string.remove_member_named",
+        "anchor": "R.string.remove_member_named",
+        "test_ids": [
+          "GRP-030"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: SelectedMembersComponents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "SelectedMemberSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "fun SelectedMemberSummary(",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "SelectedMembersReviewScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "fun SelectedMembersReviewScreen(",
+        "test_ids": [
+          "NCH-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

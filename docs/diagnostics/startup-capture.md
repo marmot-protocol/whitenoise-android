@@ -29,8 +29,8 @@ reset the record. Between-stage gaps are named rather than blamed on an earlier
 completed stage. Thrown failures retain the innermost failed stage after unwind.
 
 On a timeout, **Copy** includes the active stage, durations and native pin.
-**Share startup diagnostics** creates a host-only text file (32 KiB maximum) and
-opens the system chooser after the user's tap. It never enables uploads, queries
+**Share startup diagnostics** creates a bounded text file (32 KiB maximum) and
+opens the system chooser after the user's tap. It never enables uploads, enumerates
 MDK log files, or changes diagnostic-sharing preferences. Only three export copies
 are retained. Export has a five-second presentation wait and at most one writer;
 if disk remains blocked, repeated taps cannot create extra writers. A late result
@@ -44,6 +44,6 @@ recipient is selected by the user in the share sheet.
 For the affected user: install the verified signed APK as an in-place update,
 open staging, wait for Retry, tap Copy, then tap Share startup diagnostics and send
 the text file to the investigating developer. A recorded `NATIVE_CONSTRUCT` or
-`MARMOT_START` stall identifies a host boundary, not a native root cause. Follow
-that evidence with targeted native instrumentation or a thread/system trace;
-this diagnostic build does not repair the underlying failure.
+`MARMOT_START` stall identifies a host boundary, not a native root cause. After native construction, this build also enables MDK’s bounded startup recorder before account/start work. Sharing reads fixed phases and anonymous timings on the existing export IO owner, with a 12 KiB native-detail ceiling inside the whole 32 KiB export ceiling. The source is fenced to the published runtime; native failure retains the host receipt. Construction failures have no native runtime to query. Copy and the retained host file remain independent of native calls. These observations do not repair the underlying failure.
+
+An explicit diagnostic archive during an active local performance session also includes selected native process-cumulative counters and duration sums. These are labelled as cumulative, rather than as measurements of only the host session. Native snapshots introduce no polling, uploads or consent changes.

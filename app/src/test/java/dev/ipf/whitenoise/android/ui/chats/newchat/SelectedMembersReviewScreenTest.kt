@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -165,6 +168,40 @@ class SelectedMembersReviewScreenTest {
 
         assertEquals(false, confirmed)
         assertEquals(false, removed)
+    }
+
+    @Test
+    fun inviteRolesDefaultToMemberAndChangeOnlyTheExplicitlyChosenRecipient() {
+        val roles = mutableStateListOf<String>()
+        var submitted = emptySet<String>()
+        val state = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SelectedMembersReviewScreen(
+                    members = members,
+                    appState = state,
+                    busy = false,
+                    onBack = {},
+                    onRemove = { roles.remove(it.accountIdHex) },
+                    onConfirm = { submitted = roles.toSet() },
+                    confirmIcon = Icons.Default.Check,
+                    confirmLabel = context.getString(R.string.add_member),
+                    initialAdminIds = roles.toSet(),
+                    onInitialAdminChange = { member, admin ->
+                        roles.remove(member.accountIdHex)
+                        if (admin) roles.add(member.accountIdHex)
+                    },
+                )
+            }
+        }
+        val first = composeRule.onNodeWithContentDescription("${members.first().displayName}, ${context.getString(R.string.admin)}")
+        val second = composeRule.onNodeWithContentDescription("${members.last().displayName}, ${context.getString(R.string.admin)}")
+        first.assertIsOff().performClick().assertIsOn()
+        second.assertIsOff()
+        composeRule.onNodeWithText(context.getString(R.string.add_member)).performClick()
+        assertEquals(setOf(members.first().accountIdHex), submitted)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.remove_member_named, members.first().displayName)).performClick()
+        assertEquals(emptyList<String>(), roles.toList())
     }
 
     private fun appState() =

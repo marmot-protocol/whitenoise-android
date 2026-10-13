@@ -22,6 +22,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -165,6 +166,8 @@ internal fun SelectedMembersReviewScreen(
     onConfirm: () -> Unit,
     confirmIcon: ImageVector,
     confirmLabel: String,
+    initialAdminIds: Set<String> = emptySet(),
+    onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
 ) {
     Scaffold(
         topBar = {
@@ -226,15 +229,34 @@ internal fun SelectedMembersReviewScreen(
                     avatarSeed = member.accountIdHex,
                     avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
                     trailing = {
-                        FilledTonalIconButton(
-                            onClick = { onRemove(member) },
-                            enabled = !busy,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.remove_member_named, memberName),
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            onInitialAdminChange?.let { change ->
+                                val admin = initialAdminIds.any { it.equals(member.accountIdHex, ignoreCase = true) }
+                                val adminLabel = stringResource(R.string.admin)
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        stringResource(if (admin) R.string.admin else R.string.member),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                    Switch(
+                                        checked = admin,
+                                        onCheckedChange = { change(member, it) },
+                                        enabled = !busy,
+                                        modifier =
+                                            Modifier.semantics { contentDescription = "$memberName, $adminLabel" },
+                                    )
+                                }
+                            }
+                            FilledTonalIconButton(
+                                onClick = { onRemove(member) },
+                                enabled = !busy,
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.remove_member_named, memberName),
+                                )
+                            }
                         }
                     },
                 )

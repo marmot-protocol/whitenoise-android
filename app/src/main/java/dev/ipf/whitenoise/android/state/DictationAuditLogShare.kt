@@ -4,6 +4,7 @@ import android.content.Context
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.NATIVE_PERFORMANCE_SNAPSHOT_FILE_NAME
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -15,13 +16,18 @@ internal fun prepareAuditAndDictationLogArchive(
     context: Context,
     sourcePaths: List<String>,
     performanceLogBytes: ByteArray? = PerformanceDiagnostics.storedLogForExport(),
+    nativePerformanceLogBytes: ByteArray? = null,
 ): File? {
     val dmEntries = DmCreationDiagnostics.snapshot()
     val hasDmRecords = dmEntries.keys.any { it.endsWith(".jsonl") } || diagnosticDroppedCount(dmEntries) > 0
-    val entries = DictationDiagnostics.snapshot() + if (hasDmRecords) dmEntries else emptyMap()
+    val entries =
+        DictationDiagnostics.snapshot() +
+            (if (hasDmRecords) dmEntries else emptyMap()) +
+            (nativePerformanceLogBytes?.let { mapOf(NATIVE_PERFORMANCE_SNAPSHOT_FILE_NAME to it) } ?: emptyMap())
     val dropped = diagnosticDroppedCount(entries)
     val hasDictationRecords = entries.keys.any { it.endsWith(".jsonl") } || dropped != 0L
-    if (sourcePaths.isEmpty() && !hasDictationRecords && performanceLogBytes == null) return null
+    val hasPerformanceRecords = performanceLogBytes != null || nativePerformanceLogBytes != null
+    if (sourcePaths.isEmpty() && !hasDictationRecords && !hasPerformanceRecords) return null
     return prepareAuditLogArchive(
         context.cacheDir,
         File(context.filesDir, "Marmot"),

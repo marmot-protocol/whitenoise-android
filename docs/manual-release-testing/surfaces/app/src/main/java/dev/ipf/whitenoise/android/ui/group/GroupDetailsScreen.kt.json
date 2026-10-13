@@ -115,6 +115,15 @@
         "test_ids": [
           "GRP-027"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "surface": "GroupManagementSnapshotRefreshEffect",
+        "anchor": "fun GroupManagementSnapshotRefreshEffect(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-030"
+        ]
       }
     ],
     "settings_controls": [

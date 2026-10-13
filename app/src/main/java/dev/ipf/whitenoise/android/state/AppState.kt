@@ -1464,6 +1464,7 @@ class WhiteNoiseAppState private constructor(
     private fun publishMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) AvatarImageLoader.clearStoredAvatars()
         marmotRuntime = runtime
+        StartupDiagnostics.bindNative(runtime.marmot)
         hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
         mutationsScope.launch {
@@ -1474,6 +1475,7 @@ class WhiteNoiseAppState private constructor(
     /** Clears only the runtime that failed and immediately fences its permission callbacks. */
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
+        StartupDiagnostics.unbindNative(runtime.marmot)
         AvatarImageLoader.clearStoredAvatars()
         hostPerformance.clearEmitter(runtime)
         marmotRuntime = null
@@ -5994,11 +5996,18 @@ class WhiteNoiseAppState private constructor(
     }
 
     private suspend fun loadAccountSwitchProfileSeeds(profileIds: List<String>): List<AccountSwitchProfileSeed> =
-        coroutineScope {
-            val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
-            profileIds
-                .map { id -> async { gate.withPermit { loadAccountSwitchProfileSeed(id) } } }
-                .awaitAll()
+        if (profileReader != null || profileDisplayNameReader != null) {
+            // Existing injected single-identity readers retain their fixture contract.
+            coroutineScope {
+                val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
+                profileIds
+                    .map { id -> async { gate.withPermit { loadAccountSwitchProfileSeed(id) } } }
+                    .awaitAll()
+            }
+        } else {
+            loadAccountSwitchIdentityPages(profileIds) { page ->
+                marmotIo(MarmotTraceSection.PROFILE_READ) { cachedIdentityProjections(page) }
+            }
         }
 
     internal fun consumeAccountSwitchLocalSnapshot(accountRef: String?) = accountSwitchHandoff.consume(accountRef)
@@ -7299,7 +7308,22 @@ class WhiteNoiseAppState private constructor(
                 }
         return runCatchingCancellable {
             withContext(Dispatchers.IO) {
-                prepareAuditAndDictationLogArchive(appContext, sourcePaths)
+                val nativePerformance =
+                    if (PerformanceDiagnostics.isActive()) {
+                        runCatchingCancellable {
+                            marmotIo {
+                                dev.ipf.whitenoise.android.diagnostics
+                                    .formatNativePerformanceSnapshot(appPerformanceSnapshot())
+                            }.toByteArray(Charsets.UTF_8)
+                        }.getOrNull()
+                    } else {
+                        null
+                    }
+                prepareAuditAndDictationLogArchive(
+                    appContext,
+                    sourcePaths,
+                    nativePerformanceLogBytes = nativePerformance,
+                )
             }.also { if (it == null) presentTransient(R.string.toast_no_audit_logs_to_export) }
         }.getOrElse {
             present(R.string.toast_couldnt_export_audit_logs)
