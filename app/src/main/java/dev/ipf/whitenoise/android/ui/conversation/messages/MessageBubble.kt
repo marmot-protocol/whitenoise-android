@@ -1064,7 +1064,11 @@ internal fun MessageBubble(
         if (deleted) return
         // Polls use the current question/options; ordinary messages copy the visible rendition.
         val text =
-            if (isPollRecord) currentPollCopyText(controller, pollOwner, messageTextCopy) else visibleTranslation ?: displayedBody
+            if (isPollRecord) {
+                currentPollCopyText(controller, pollOwner, messageTextCopy)
+            } else {
+                visibleTranslation ?: displayedBody
+            }
         text?.let { clipboard.setText(AnnotatedString(it)) }
         onActionMenuOpenChange(false)
     }
