@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
+import dev.ipf.whitenoise.android.ui.conversation.conversationLandingAtNewestEdge
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollRestoreListIndex
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollSnapshotOnLeave
@@ -181,5 +182,14 @@ class ConversationScrollRestoreTest {
                 renderedItemIds = (0 until 50).map { "msg:$it" },
             ),
         )
+    }
+
+    /** A landing rests at the newest edge only when it is near the bottom and no newer pages remain unloaded. */
+    @Test
+    fun landingRestsAtTheNewestEdgeOnlyWhenNoNewerPagesRemain() {
+        assertTrue(conversationLandingAtNewestEdge(nearBottom = true, hasMoreAfter = false))
+        assertFalse(conversationLandingAtNewestEdge(nearBottom = true, hasMoreAfter = true))
+        assertFalse(conversationLandingAtNewestEdge(nearBottom = false, hasMoreAfter = false))
+        assertFalse(conversationLandingAtNewestEdge(nearBottom = false, hasMoreAfter = true))
     }
 }

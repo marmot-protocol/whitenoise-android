@@ -459,15 +459,16 @@ internal class ConversationScrollCoordinator(
     /**
      * Commits the durable intent of a finished navigation landing by the same rule as a finished drag.
      *
-     * A landing that rests near the newest edge resumes tail following, so a message arriving next is revealed
+     * A landing that rests at the real newest edge resumes tail following, so a message arriving next is revealed
      * instead of hiding behind the composer and a later leave saves no history snapshot. Any other landing keeps
-     * its logical history anchor through [settleReadingAt].
+     * its logical history anchor through [settleReadingAt]. [atNewestEdge] is the caller's verdict, and a window that
+     * still has newer pages never qualifies.
      */
     fun settleLandingAt(
         anchor: ConversationScrollAnchor,
-        nearBottom: Boolean,
+        atNewestEdge: Boolean,
     ) {
-        if (!nearBottom) {
+        if (!atNewestEdge) {
             settleReadingAt(anchor)
             return
         }

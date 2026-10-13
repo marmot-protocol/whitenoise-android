@@ -2533,7 +2533,13 @@ internal fun ConversationScreen(
                             readLayout = { index -> mentionJumpLayout(targetMessageId, index) },
                             onCompleted = {
                                 if (navigationRequest.isCurrent()) {
-                                    scrollCoordinator.settleLandingAt(currentScrollAnchor(), liveNearBottom())
+                                    scrollCoordinator.settleLandingAt(
+                                        currentScrollAnchor(),
+                                        conversationLandingAtNewestEdge(
+                                            nearBottom = liveNearBottom(),
+                                            hasMoreAfter = controller.hasMoreAfterTimeline,
+                                        ),
+                                    )
                                 }
                             },
                         )
