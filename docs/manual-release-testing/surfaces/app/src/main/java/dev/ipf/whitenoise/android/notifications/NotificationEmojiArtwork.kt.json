@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiArtwork.kt",
+  "legacy_sha256": "36447abf1f74fbe9de98d3f20b460a3121c6acc672f7c3211696df0f6c7fcfbc",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "bounded local emoji notification artwork",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiArtwork.kt",
+        "anchor": "internal suspend fun notificationEmojiArtwork(",
+        "test_ids": [
+          "NTF-034",
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "received reaction artwork provenance and bounded preparation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiArtwork.kt",
+        "anchor": "internal suspend fun notificationReactionEmojiArtwork(",
+        "test_ids": [
+          "NTF-034",
+          "NTF-030"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

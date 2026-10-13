@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 
 data class LocalNotificationContent(
     val notificationTag: String,
@@ -158,6 +159,10 @@ object LocalNotificationFormatter {
      */
     fun isReaction(update: NotificationUpdateFfi): Boolean =
         update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !clean(update.reactionEmoji).isNullOrEmpty()
+
+    /** Only the exact reaction token supplies artwork; shortcodes in the quoted message are unrelated. */
+    fun reactionArtworkShortcode(update: NotificationUpdateFfi): String? =
+        update.reactionEmoji?.takeIf { isReaction(update) && EmojiShortcodes.isShortcode(it) }
 
     /** True when the caller should resolve [update.previewText] before formatting. */
     fun needsPreviewTextResolution(update: NotificationUpdateFfi): Boolean = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !isReaction(update)

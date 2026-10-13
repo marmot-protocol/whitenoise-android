@@ -79,6 +79,15 @@
           "NTF-030",
           "NTF-036"
         ]
+      },
+      {
+        "surface": "native reaction picture template and privacy fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private fun reactionNotificationStyle(",
+        "test_ids": [
+          "NTF-034",
+          "NTF-030"
+        ]
       }
     ],
     "source_coverage": [

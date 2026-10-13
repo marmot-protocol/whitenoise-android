@@ -11,6 +11,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -144,6 +145,9 @@ class LocalNotificationPresenter(
         notificationEmojiArtwork(context, text, source)
     },
     private val emojiArtworkTimeoutMs: Long = NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS,
+    private val reactionArtworkPreparer: suspend (String) -> Bitmap? = { shortcode ->
+        notificationReactionEmojiArtwork(context, shortcode)
+    },
     // First argument is opaque account scope, never the local account label stored in a system payload.
     private val contactAvatarOverride: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
     // Kept last so callers may still pass it as a trailing lambda.
@@ -658,6 +662,7 @@ class LocalNotificationPresenter(
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
+        var reactionArtwork: Bitmap? = null
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
         try {
@@ -677,6 +682,12 @@ class LocalNotificationPresenter(
                                 update.previewText,
                                 emojiArtworkTimeoutMs,
                             )
+                    }
+                    if (!redactContent && previewToken.allowed && decision.style == NotificationStyleChoice.Plain) {
+                        LocalNotificationFormatter.reactionArtworkShortcode(update)?.let { shortcode ->
+                            reactionArtwork =
+                                prepareNotificationReactionArtwork(reactionArtworkPreparer, shortcode, emojiArtworkTimeoutMs)
+                        }
                     }
                     val showGenerationAllowsPost = {
                         if (replaceCurrentMessage) {
@@ -829,14 +840,15 @@ class LocalNotificationPresenter(
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
                         // reactions channel, see LocalNotificationFormatter) so they're muted
-                        // independently of messages. They aren't repliable, so no
-                        // MessagingStyle / reply / mark-read — just a plain expandable card.
+                        // independently of messages. Artwork uses the standard picture template;
+                        // the card keeps its existing actions and never becomes a conversation.
                         NotificationStyleChoice.Plain -> {
                             builder.setContentTitle(notificationContent.title)
                             if (notificationContent.body.isNotBlank()) {
                                 builder
                                     .setContentText(notificationContent.body)
-                                    .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                                    .setStyle(reactionNotificationStyle(notificationContent.body, reactionArtwork))
+                                reactionArtwork?.let { builder.setLargeIcon(it) }
                             } else {
                                 // Expand the same sentence for long group names without repeating its title.
                                 builder.setStyle(
@@ -1255,6 +1267,20 @@ class LocalNotificationPresenter(
             if (!written) heldAlert?.release()
         }
         return written
+    }
+
+    /** Standard Android artwork with the same readable fallback, summary and accessibility text. */
+    private fun reactionNotificationStyle(
+        body: String,
+        artwork: Bitmap?,
+    ): NotificationCompat.Style {
+        if (artwork == null) return NotificationCompat.BigTextStyle().bigText(body)
+        return NotificationCompat
+            .BigPictureStyle()
+            .bigPicture(artwork)
+            .bigLargeIcon(null as Bitmap?)
+            .setSummaryText(body)
+            .also { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) it.setContentDescription(body) }
     }
 
     private suspend fun dispatchMessagingEnrichment(
