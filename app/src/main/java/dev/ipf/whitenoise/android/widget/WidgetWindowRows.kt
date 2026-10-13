@@ -39,7 +39,7 @@ internal suspend fun widgetWindowRows(
             frame.rows
                 .lastOrNull()
                 ?.row
-                ?.groupIdHex ?: return matches.values.toList()
+                ?.groupIdHex ?: break
         // Native capped windows need the retained tail as their anchor before advancing.
         val anchored = handle.setVisibleAnchor(frame.sequence, edge)
         check(anchored.subscriptionGeneration == generation)
@@ -50,7 +50,7 @@ internal suspend fun widgetWindowRows(
                 ?.row
                 ?.groupIdHex == edge
         ) {
-            return matches.values.toList()
+            break
         }
     }
     return matches.values.toList()
