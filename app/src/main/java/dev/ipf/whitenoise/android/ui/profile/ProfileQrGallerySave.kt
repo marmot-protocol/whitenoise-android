@@ -27,7 +27,7 @@ internal class ProfileQrGallerySave(
         spec: QrShareCardSpec,
         ownsSheet: () -> Boolean,
         render: suspend (QrShareCardSpec) -> ByteArray = QrShareCardRenderer::pngBytes,
-        persist: suspend (ByteArray) -> Boolean = { bytes ->
+        persist: suspend (ByteArray) -> Boolean? = { bytes ->
             withContext(storageDispatcher) {
                 coroutineContext.ensureActive()
                 if (ownsSheet()) {
@@ -38,7 +38,7 @@ internal class ProfileQrGallerySave(
                         "image/png",
                     )
                 } else {
-                    false
+                    null
                 }
             }
         },

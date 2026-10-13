@@ -127,6 +127,21 @@ class ProfileQrGallerySaveTest {
             assertFalse(action.inProgress)
         }
 
+    /** A skipped write stays silent even if ownership returns before its result is delivered. */
+    @Test
+    fun brieflyReplacedOriginDoesNotReportAWriteFailure() =
+        runTest {
+            val provider = ProfileQrGalleryProvider(context)
+            ShadowContentResolver.registerProviderInternal(MediaStore.AUTHORITY, provider)
+            val action = ProfileQrGallerySave(StandardTestDispatcher(testScheduler))
+            var checks = 0
+            val result = action.save(context, spec, { checks++ != 2 }, { byteArrayOf(1) })
+            assertNull(result)
+            assertEquals(4, checks)
+            assertEquals(0, provider.insertCount)
+            assertFalse(action.inProgress)
+        }
+
     /** Cancelled rendering releases the busy guard and does not turn cancellation into save feedback. */
     @Test
     fun cancellationAndFailedWritesReleaseTheAction() =
