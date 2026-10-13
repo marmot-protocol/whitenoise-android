@@ -1,8 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -10,11 +10,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +29,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -39,6 +40,7 @@ import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason
 import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
+import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.TimelinePageOutcome
 import dev.ipf.whitenoise.android.state.conversationTimelineTestAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
@@ -48,7 +50,6 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -63,9 +64,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * The production entry positioning, effect and owner on a real reversed list: a notified message is
- * measured by its physical top edge against the transcript's own top, never by a screenshot. The
- * notified message is always a different row from both the oldest unread and the newest, so a landing
- * on either of those cannot pass for it.
+ * measured by its physical edges against the transcript, never by a screenshot alone. Older and
+ * tall targets retain their reading top; short newest and near-tail targets use the natural boundary.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
@@ -109,29 +109,97 @@ class ConversationNotificationLandingTest {
         harness.assertLandedAtTop(NOTIFIED)
     }
 
-    /**
-     * The newest message has no rows below it, so a short one cannot scroll to the top on its own. The landing
-     * reserves the missing runway the way the mention button does, instead of accepting the clamped position
-     * beside the composer.
-     */
+    /** A short newest notification rests at the real tail instead of reserving a viewport of blank space. */
     @Test
-    fun aShortNewestNotifiedMessageStartsAtThePhysicalTop() {
+    fun aShortNewestNotifiedMessageHasNoTrailingGapSnapshot() {
         val newest = messageId(MESSAGE_COUNT - 1)
         val harness = Harness(targetHeightDp = 80, notified = newest)
         harness.mount()
         harness.awaitAnchored()
-        harness.assertLandedAtTop(newest)
-        assertNotNull(harness.coordinator.mentionReadingRowHeightPx)
+        harness.assertNaturalTailLanding(newest)
+        harness.capture("conversation_notification_newest_light")
     }
 
-    /** A short message with only one short row below it still lacks the runway to reach the top unaided. */
+    /** A near-tail notification remains wholly visible above its newer row without artificial runway. */
     @Test
-    fun aShortSecondNewestNotifiedMessageStartsAtThePhysicalTop() {
+    fun aShortSecondNewestNotifiedMessageHasNoTrailingGapSnapshot() {
         val secondNewest = messageId(MESSAGE_COUNT - 2)
-        val harness = Harness(targetHeightDp = 80, notified = secondNewest)
+        val harness = Harness(targetHeightDp = 80, notified = secondNewest, dark = true)
         harness.mount()
         harness.awaitAnchored()
-        harness.assertLandedAtTop(secondNewest)
+        harness.assertNaturalTailLanding(secondNewest)
+        harness.capture("conversation_notification_near_tail_dark")
+    }
+
+    /** Large text, RTL and a keyboard-sized viewport keep the newest row at the same resting edge. */
+    @Test
+    fun aShortNewestNotificationInLargeRtlHasNoTrailingGapSnapshot() {
+        val newest = messageId(MESSAGE_COUNT - 1)
+        val harness =
+            Harness(
+                targetHeightDp = 80,
+                notified = newest,
+                viewportHeightDp = 260,
+                rtl = true,
+                fontScale = 2f,
+            )
+        harness.mount()
+        harness.awaitAnchored()
+        harness.assertNaturalTailLanding(newest)
+        harness.capture("conversation_notification_newest_large_rtl")
+    }
+
+    /** Removing the short-row reserve must not open an oversized newest notification at its end. */
+    @Test
+    fun aTallNewestNotificationStillStartsAtItsBeginningSnapshot() {
+        val newest = messageId(MESSAGE_COUNT - 1)
+        val harness = Harness(targetHeightDp = 0, targetBodyLines = 40, notified = newest)
+        harness.mount()
+        harness.awaitAnchored()
+        harness.assertLandedAtTop(newest)
+        assertNull(harness.coordinator.mentionReadingRowHeightPx)
+        harness.capture("conversation_notification_tall_newest")
+    }
+
+    /** A resize and a second card tap cannot reinstate the removed reserve or replay a clamped offset. */
+    @Test
+    fun aShortNewestNotificationStaysAtTheNaturalTailAcrossResizeAndRepeatedTap() {
+        val newest = messageId(MESSAGE_COUNT - 1)
+        val harness = Harness(targetHeightDp = 80, notified = newest)
+        harness.mount()
+        harness.awaitAnchored()
+        harness.assertNaturalTailLanding(newest)
+        harness.resizeViewport(260)
+        harness.awaitSettled()
+        harness.assertNaturalTailLanding(newest)
+        harness.tapAgain(newest)
+        harness.awaitAnchored()
+        harness.assertNaturalTailLanding(newest)
+        assertEquals(2, harness.landedBacklogs.size)
+    }
+
+    /** Late media growth beyond the viewport still reveals the beginning without adding trailing padding. */
+    @Test
+    fun aShortNewestNotificationThatGrowsStillRevealsItsBeginning() {
+        val newest = messageId(MESSAGE_COUNT - 1)
+        val harness = Harness(targetHeightDp = 80, notified = newest)
+        harness.mount()
+        harness.awaitAnchored()
+        harness.assertNaturalTailLanding(newest)
+        harness.growTarget(640)
+        harness.awaitSettled()
+        harness.assertLandedAtTop(newest)
+        assertNull(harness.coordinator.mentionReadingRowHeightPx)
+    }
+
+    /** A fresh card tap also removes reading room retained from a previous explicit mention jump. */
+    @Test
+    fun aNotificationLandingClearsPreviouslyReservedMentionSpace() {
+        val newest = messageId(MESSAGE_COUNT - 1)
+        val harness = Harness(targetHeightDp = 80, notified = newest, initialReadingHeightPx = 80)
+        harness.mount()
+        harness.awaitAnchored()
+        harness.assertNaturalTailLanding(newest)
     }
 
     /** A message taller than the viewport lands at its beginning, where offset zero would show its end. */
@@ -382,6 +450,8 @@ class ConversationNotificationLandingTest {
         private val jump: JumpScript = JumpScript.NONE,
         private val sentAfterOldestUnread: Boolean = false,
         private val dragDuringLandingLayout: Boolean = false,
+        private val dark: Boolean = false,
+        private val initialReadingHeightPx: Int? = null,
     ) {
         private val timelineScript =
             ScriptedConversationTimelineSubscription(
@@ -407,6 +477,7 @@ class ConversationNotificationLandingTest {
         lateinit var owner: ConversationViewportRestorationOwner
         private lateinit var list: LazyListState
         private val targetHeight = mutableIntStateOf(targetHeightDp)
+        private val viewportHeight = mutableIntStateOf(viewportHeightDp)
 
         /** Every list write the production writer performed, in order. */
         val writes = mutableListOf<Pair<Int, Int>>()
@@ -449,7 +520,7 @@ class ConversationNotificationLandingTest {
         /** Mounts the reversed list with the production restoration effects wired to recording callbacks. */
         fun mount() {
             composeRule.setContent {
-                WhiteNoiseTheme {
+                WhiteNoiseTheme(darkTheme = dark) {
                     CompositionLocalProvider(
                         LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                         LocalDensity provides Density(LocalDensity.current.density, fontScale),
@@ -460,37 +531,15 @@ class ConversationNotificationLandingTest {
                         coordinator =
                             remember(listState) {
                                 val writer = RecordingWriter(LazyListConversationScrollWriter(listState))
-                                ConversationScrollCoordinator(writer)
+                                ConversationScrollCoordinator(
+                                    writer,
+                                    initialMentionReadingRowHeightPx = initialReadingHeightPx,
+                                )
                             }
                         val gate = remember(listState) { ConversationPostInitialReanchorGate() }
                         owner = rememberConversationViewportRestorationOwner(controller, coordinator, gate)
                         val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-                        val density = LocalDensity.current
-                        val reserve by remember(coordinator, viewport, density) {
-                            derivedStateOf {
-                                coordinator.mentionReadingRowHeightPx?.let { rowHeightPx ->
-                                    with(density) {
-                                        conversationMentionReadingReservePx(
-                                            readingHeightPx = viewport.readingHeightPx(),
-                                            basePaddingPx = 0,
-                                            rowHeightPx = rowHeightPx,
-                                        ).toDp()
-                                    }
-                                } ?: 0.dp
-                            }
-                        }
-                        Box(Modifier.fillMaxWidth().height(viewportHeightDp.dp)) {
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize().testTag(LIST_TAG),
-                                reverseLayout = true,
-                                contentPadding = PaddingValues(bottom = reserve),
-                            ) {
-                                items(rendered.asReversed(), key = { it.presentationId }) { item ->
-                                    Row(item.record.messageIdHex)
-                                }
-                            }
-                        }
+                        Transcript(listState, viewport, rendered)
                         ConversationViewportRestorationEffects(
                             controller = controller,
                             viewport = viewport,
@@ -503,17 +552,74 @@ class ConversationNotificationLandingTest {
             }
         }
 
+        /** Renders the real reversed transcript with the production measured padding contract. */
+        @Composable
+        private fun Transcript(
+            listState: LazyListState,
+            viewport: ConversationTimelineViewport,
+            rendered: List<TimelineMessage>,
+        ) {
+            val density = LocalDensity.current
+            val reserve =
+                remember(coordinator, viewport, density) {
+                    derivedStateOf {
+                        coordinator.mentionReadingRowHeightPx?.let { rowHeightPx ->
+                            with(density) {
+                                conversationMentionReadingReservePx(
+                                    readingHeightPx = viewport.readingHeightPx(),
+                                    basePaddingPx = CONVERSATION_TIMELINE_TAIL_GAP.roundToPx(),
+                                    rowHeightPx = rowHeightPx,
+                                ).toDp()
+                            }
+                        } ?: 0.dp
+                    }
+                }
+            val readReserve = remember(reserve) { { reserve.value } }
+            val contentPadding =
+                remember(readReserve) {
+                    conversationTimelineContentPadding(0.dp, 0.dp, readReserve)
+                }
+            Box(Modifier.fillMaxWidth().height(viewportHeight.intValue.dp)) {
+                LazyColumn(
+                    state = listState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                            .measureConversationTimelinePadding(
+                                viewport,
+                                CONVERSATION_TIMELINE_TAIL_GAP,
+                                0.dp,
+                                rendered,
+                                readReserve,
+                            ).testTag(LIST_TAG),
+                    reverseLayout = true,
+                    contentPadding = contentPadding,
+                ) {
+                    items(rendered.asReversed(), key = { it.presentationId }) { item ->
+                        Row(item.record.messageIdHex)
+                    }
+                }
+            }
+        }
+
         /** One row whose height is fixed, or follows the font scale when it is the target with body lines. */
         @Composable
         private fun Row(messageId: String) {
             val isTarget = messageId == notified
             if (isTarget && targetBodyLines != null) {
                 Column(Modifier.fillMaxWidth().testTag(messageId)) {
-                    repeat(targetBodyLines) { Text("Notified line $it") }
+                    repeat(targetBodyLines) {
+                        Text("Notified line $it", color = MaterialTheme.colorScheme.onBackground)
+                    }
                 }
             } else {
                 val rowHeightDp = if (isTarget) targetHeight.intValue else ROW_HEIGHT_DP
-                Text("Message", Modifier.fillMaxWidth().height(rowHeightDp.dp).testTag(messageId))
+                Text(
+                    if (isTarget) "Notified message" else "Message",
+                    Modifier.fillMaxWidth().height(rowHeightDp.dp).testTag(messageId),
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
             }
         }
 
@@ -610,6 +716,34 @@ class ConversationNotificationLandingTest {
         fun growTarget(by: Int) {
             composeRule.runOnIdle { targetHeight.intValue += by }
             composeRule.waitForIdle()
+        }
+
+        /** Changes the clear viewport through real list measurement rather than a mocked layout. */
+        fun resizeViewport(heightDp: Int) {
+            composeRule.runOnIdle { viewportHeight.intValue = heightDp }
+            composeRule.waitForIdle()
+        }
+
+        /** Proves actual visible target geometry and the newest row's normal eight-dp composer interval. */
+        fun assertNaturalTailLanding(targetId: String) {
+            val viewportBounds = composeRule.onNodeWithTag(LIST_TAG).getUnclippedBoundsInRoot()
+            val targetBounds = composeRule.onNodeWithTag(targetId).getUnclippedBoundsInRoot()
+            val newestBounds = composeRule.onNodeWithTag(messageId(MESSAGE_COUNT - 1)).getUnclippedBoundsInRoot()
+            assertTrue(targetBounds.top >= viewportBounds.top)
+            assertTrue(targetBounds.bottom <= viewportBounds.bottom)
+            assertEquals(
+                CONVERSATION_TIMELINE_TAIL_GAP.value,
+                viewportBounds.bottom.value - newestBounds.bottom.value,
+                1f,
+            )
+            assertFalse(list.canScrollBackward)
+            assertNull(coordinator.mentionReadingRowHeightPx)
+            assertEquals(targetId, (coordinator.mode as ConversationScrollMode.ReadingHistory).anchorMessageId)
+        }
+
+        /** Records only the real transcript after the production entry owner has committed it. */
+        fun capture(name: String) {
+            composeRule.onNodeWithTag(LIST_TAG).captureRoboImage("src/test/snapshots/$name.png")
         }
 
         /** The row's top edge relative to the list's top, negative once it is scrolled above it. */
