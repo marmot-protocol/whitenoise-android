@@ -17,6 +17,7 @@
     <string name="poll_cancel_custom_time">Önceki süreyi kullan</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Anket</string>
+    <string name="poll_copy_heading">Anket: %1$s</string>
     <string name="poll_unsupported">Bu anket görüntülenemiyor</string>
     <string name="poll_closed">Anket kapandı</string>
     <string name="poll_vote_failed">Oy gönderilemedi</string>

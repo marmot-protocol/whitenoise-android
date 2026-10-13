@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.core.pollCopyText
+import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -62,6 +65,33 @@ internal fun pollMessageActionsEligible(
             item.status == MessageStatus.Received ||
             item.status == MessageStatus.Pending
     return if (!matchesTarget || !livePoll || !retained) false else available
+}
+
+/**
+ * The poll's readable copy text, read from its current row when Copy is chosen rather than from the mounted bubble.
+ * Null once the conversation owner changed, or the poll was deleted, expired, failed or left the loaded window, so
+ * neither the bare label nor stale content reaches the clipboard. Copying only reads, so unlike discussion actions it
+ * needs no send permission.
+ */
+internal fun currentPollCopyText(
+    controller: ConversationController,
+    owner: PollMessageActionOwner,
+    copy: MessageTextCopy,
+    nowSeconds: ULong = (System.currentTimeMillis() / POLL_ACTION_MILLIS_PER_SECOND).toULong(),
+): String? {
+    val accountRef = owner.accountRef
+    val ownerCurrent = accountRef != null && controller.acceptsConversationActionOwner(accountRef, owner.groupId)
+    // Already excludes deleted and locally expired rows, and includes this account's own pending poll.
+    val item = if (ownerCurrent) controller.currentActionTimelineItem(owner.messageId) else null
+    val projected = item?.projected
+    val copyable =
+        item != null &&
+            projected != null &&
+            item.record.groupIdHex == owner.groupId &&
+            MessageProjector.isPollKind(item.record.kind) &&
+            !usesPersistedFailurePresentation(projected) &&
+            (item.record.retentionExpiresAt?.let { it > nowSeconds } ?: true)
+    return projected?.poll?.takeIf { copyable }?.let { pollCopyText(it, copy) }
 }
 
 private const val POLL_ACTION_MILLIS_PER_SECOND = 1_000L

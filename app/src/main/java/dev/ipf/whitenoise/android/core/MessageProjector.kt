@@ -71,10 +71,14 @@ data class MessageTextCopy(
     val mediaCountedFormat: String = "%1\$s (%2\$d)",
     val message: String,
     val poll: String = "Poll",
+    val pollCopyHeadingFormat: String = "Poll: %1\$s",
     val giphyMedia: String = "GIF via GIPHY",
     val groupSystem: GroupSystemCopy = GroupSystemCopy.Default,
 ) {
     fun reacted(value: String): String = String.format(reactedFormat, value)
+
+    /** The first line of a copied poll: the localized poll label carrying its [question]. */
+    fun pollCopyHeading(question: String): String = String.format(pollCopyHeadingFormat, question)
 
     fun mediaLabel(kind: ReplyMediaKind): String =
         when (kind) {
