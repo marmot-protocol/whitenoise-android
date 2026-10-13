@@ -102,6 +102,7 @@ internal fun AnimatedProfileAvatarOverlay(
     modifier: Modifier = Modifier,
     maxEdgePx: Int = PROFILE_AVATAR_MAX_DIMENSION,
 ) {
+    // This layer cannot animate without explicit viewer intent.
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val source =
         remember(url, firstFrame, lifetime) {
@@ -129,6 +130,7 @@ internal fun AnimatedProfileAvatarLayer(
     contentScale: ContentScale,
     modifier: Modifier = Modifier,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
+    explicitViewer: Boolean = false,
     decode: suspend (ByteArray, Int) -> Drawable? = ::decodeAnimatedProfileAvatar,
 ) {
     // Not keyed on the source: the visibility node only reports changes, so a reset here would leave a
@@ -138,7 +140,7 @@ internal fun AnimatedProfileAvatarLayer(
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow
         .collectAsState()
     val foreground = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
-    val animate = shouldAnimateProfileAvatar(animationsEnabled, visible, foreground)
+    val animate = explicitViewer && shouldAnimateProfileAvatar(animationsEnabled, visible, foreground)
     val drawable by produceState<Drawable?>(null, source, maxEdgePx, animate) {
         value = null
         if (animate) value = decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE))

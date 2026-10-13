@@ -544,6 +544,7 @@ private fun ZoomableAvatarImage(
         )
         if (animatedSource != null) {
             AnimatedProfileAvatarLayer(
+                explicitViewer = true,
                 source = animatedSource,
                 maxEdgePx = MAX_ANIMATED_PROFILE_AVATAR_EDGE,
                 contentScale = ContentScale.Fit,
@@ -570,14 +571,11 @@ private fun avatarViewerFileName(url: String): String {
 private fun avatarViewerMimeType(
     bytes: ByteArray,
     fallbackFileName: String,
-): String {
-    val options =
-        android.graphics.BitmapFactory
-            .Options()
-            .apply { inJustDecodeBounds = true }
-    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-    return options.outMimeType ?: avatarViewerMimeType(fallbackFileName)
-}
+): String =
+    dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+        .inspect(bytes)
+        ?.mime
+        ?.takeIf { it.isNotEmpty() } ?: avatarViewerMimeType(fallbackFileName)
 
 private fun avatarViewerMimeType(fileName: String): String =
     when (fileName.substringAfterLast('.', "").lowercase(Locale.ROOT)) {

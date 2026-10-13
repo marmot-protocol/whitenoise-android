@@ -191,21 +191,18 @@ private fun decodeStagedPreviewBitmap(
         // forever on a video and leaves the sheet stuck). Scaled to
         // the staging tile size — full-res posters from a 4K clip
         // would be a ~33 MB ARGB bitmap per tile.
-        runCatching {
-            val mmr = android.media.MediaMetadataRetriever()
-            try {
-                mmr.setDataSource(context, uri)
-                mmr
-                    .getScaledFrameAtTime(
-                        0L,
-                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                        maxEdgePx,
-                        maxEdgePx,
-                    )
-            } finally {
-                runCatching { mmr.release() }
-            }
-        }.getOrNull()
+        ensureActive()
+        val poster =
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .probeUri(context.contentResolver, uri, maxEdgePx)
+                ?.poster
+        try {
+            ensureActive()
+            poster
+        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+            poster?.recycle()
+            throw cancelled
+        }
     } else {
         // Decode the picked image straight to a sampled bitmap,
         // preserving its native format and alpha. Earlier this
@@ -247,7 +244,10 @@ internal sealed class StagedPreviewItem {
 internal fun stagedPreviewItems(
     mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
-): List<StagedPreviewItem> = mediaSlots.map { StagedPreviewItem.Media(it) } + documentUris.map { StagedPreviewItem.Document(it) }
+): List<StagedPreviewItem> {
+    val media = mediaSlots.map { StagedPreviewItem.Media(it) }
+    return media + documentUris.map { StagedPreviewItem.Document(it) }
+}
 
 /**
  * Where the preview cursor lands after removing [removedIndex] from a list

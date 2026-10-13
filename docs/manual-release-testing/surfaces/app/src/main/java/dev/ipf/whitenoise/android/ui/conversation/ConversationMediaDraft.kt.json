@@ -33,6 +33,16 @@
           "MED-009"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Photo editor processing budget refusal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
+        "anchor": "R.string.photo_editor_budget_exceeded",
+        "test_ids": [
+          "MED-031"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

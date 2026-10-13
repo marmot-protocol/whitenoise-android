@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -100,9 +99,9 @@ class DurableAvatarScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_row_durable_avatar_light.png")
     }
 
-    /** A stored GIF animates in a row only when the asset is a person's picture, never as a group image. */
+    /** A stored GIF remains a first-frame picture for both person and group rows. */
     @Test
-    fun storedGifAnimatesOnlyAsAPersonPicture() {
+    fun storedGifRemainsStillForPersonAndGroupRows() {
         val appState = appState()
         val asset = asset()
         val key = requireNotNull(asset.cacheKey(ACCOUNT_REF))
@@ -126,9 +125,8 @@ class DurableAvatarScreenshotTest {
 
         personPicture = true
 
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
     }
 
     /** A 64px solid PNG for the stored-bytes fixture. */

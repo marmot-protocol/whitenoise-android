@@ -15,6 +15,7 @@ internal fun NostrEventReaderBlock(
     block: MarkdownBlockFfi,
     mentionDisplayName: (String) -> String?,
     onNostrProfileTap: (String) -> Unit,
+    onWebLinkActivated: ((String) -> Boolean)? = null,
 ) {
     CompositionLocalProvider(LocalReceivedEmoji provides ReceivedEmoji.None) {
         MarkdownMessageBody(
@@ -27,6 +28,7 @@ internal fun NostrEventReaderBlock(
             mentionDisplayName = mentionDisplayName,
             onNostrProfileTap = onNostrProfileTap,
             useDecorativeBackgrounds = true,
+            onWebLinkActivated = onWebLinkActivated,
         )
     }
 }

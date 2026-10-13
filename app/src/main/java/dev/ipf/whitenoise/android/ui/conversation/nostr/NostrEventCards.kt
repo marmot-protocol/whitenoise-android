@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -62,6 +64,7 @@ internal fun NostrEventCards(
     modifier: Modifier = Modifier,
 ) {
     if (references.isEmpty()) return
+    var videoSelection by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
     var readerSelection by remember(resolver) { mutableStateOf<NostrEventReaderSelection?>(null) }
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -76,6 +79,7 @@ internal fun NostrEventCards(
                     contentColor = contentColor,
                     mentionDisplayName = mentionDisplayName,
                     parseMarkdown = parseMarkdown,
+                    onPlayVideo = { card -> videoSelection = card },
                     onReadEvent = { card, authoredReference ->
                         readerSelection = NostrEventReaderSelection(card, authoredReference)
                     },
@@ -94,6 +98,11 @@ internal fun NostrEventCards(
             onDismiss = { readerSelection = null },
         )
     }
+    videoSelection?.let { card ->
+        card.mediaUrl?.let { url ->
+            NostrVideoPlayerDialog(url, card.mediaMimeType, onDismiss = { videoSelection = null })
+        }
+    }
 }
 
 private data class NostrEventReaderSelection(
@@ -111,6 +120,7 @@ private fun ResolvedNostrEventCard(
     mentionDisplayName: (String) -> String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     onReadEvent: (NostrEventCardModel, String?) -> Unit,
+    onPlayVideo: (NostrEventCardModel) -> Unit,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -133,6 +143,7 @@ private fun ResolvedNostrEventCard(
             }
         },
         onReadNote = { card -> onReadEvent(card, authoredReference) },
+        onPlayVideo = onPlayVideo,
         onOpen = { card ->
             when {
                 card != null -> onReadEvent(card, authoredReference)
@@ -159,6 +170,7 @@ internal fun NostrEventCard(
     onOpen: (NostrEventCardModel?) -> Unit,
     onReadNote: (NostrEventCardModel) -> Unit = {},
     referenceLabel: String? = null,
+    onPlayVideo: (NostrEventCardModel) -> Unit = {},
 ) {
     val openDescription = stringResource(R.string.nostr_event_open)
     val copyDescription = stringResource(R.string.nostr_event_copy)
@@ -167,20 +179,26 @@ internal fun NostrEventCard(
         contentColor = contentColor,
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, contentColor.copy(alpha = 0.22f)),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag(NOSTR_EVENT_CARD_BOUNDS_TAG),
     ) {
-        EventCardBody(
-            state = state,
-            authorDisplayName = authorDisplayName,
-            referenceLabel = referenceLabel,
-            contentColor = contentColor,
-            copyDescription = copyDescription,
-            openDescription = openDescription,
-            onRetry = onRetry,
-            onCopy = onCopy,
-            onOpen = onOpen,
-            onReadNote = onReadNote,
-        )
+        NostrEventCardLayout(
+            maximumHeight = nostrEventPreviewMaximumHeight(),
+            onExpand = { onOpen((state as? NostrEventCardState.Loaded)?.card) },
+        ) {
+            EventCardBody(
+                onPlayVideo = onPlayVideo,
+                state = state,
+                authorDisplayName = authorDisplayName,
+                referenceLabel = referenceLabel,
+                contentColor = contentColor,
+                copyDescription = copyDescription,
+                openDescription = openDescription,
+                onRetry = onRetry,
+                onCopy = onCopy,
+                onOpen = onOpen,
+                onReadNote = onReadNote,
+            )
+        }
     }
 }
 
@@ -197,6 +215,7 @@ private fun EventCardBody(
     onCopy: () -> Unit,
     onOpen: (NostrEventCardModel?) -> Unit,
     onReadNote: (NostrEventCardModel) -> Unit,
+    onPlayVideo: (NostrEventCardModel) -> Unit,
 ) {
     when (state) {
         NostrEventCardState.Loading ->
@@ -253,6 +272,7 @@ private fun EventCardBody(
                 onCopy = onCopy,
                 onOpen = { onOpen(state.card) },
                 onReadNote = { onReadNote(state.card) },
+                onPlayVideo = { onPlayVideo(state.card) },
             )
     }
 }
@@ -268,6 +288,7 @@ private fun LoadedEventCard(
     onCopy: () -> Unit,
     onOpen: () -> Unit,
     onReadNote: () -> Unit,
+    onPlayVideo: () -> Unit,
 ) {
     val primaryAction = card.primaryAction()
     Column(Modifier.padding(start = 10.dp, top = 6.dp, end = 4.dp, bottom = 7.dp)) {
@@ -299,6 +320,14 @@ private fun LoadedEventCard(
         )
         LoadedEventMetadata(card.metadata, contentColor)
         EventReferenceLabel(referenceLabel, contentColor)
+        card.imageUrls.firstOrNull()?.let { url ->
+            NostrEventImagePane(url = url, compact = true)
+        }
+        if (card.mediaUrl != null) {
+            TextButton(onClick = onPlayVideo, colors = ButtonDefaults.textButtonColors(contentColor = contentColor)) {
+                Text(stringResource(R.string.nostr_event_play_video))
+            }
+        }
     }
 }
 
@@ -430,6 +459,7 @@ internal fun compactEventReference(authoredReference: String): String {
 }
 
 internal const val NOSTR_NOTE_PREVIEW_ACTION_TAG = "nostr-note-preview-action"
+internal const val NOSTR_EVENT_CARD_BOUNDS_TAG = "nostr-event-card-bounds"
 
 private const val MAX_CARDS_PER_MESSAGE = 3
 private const val COMPACT_REFERENCE_LENGTH = 28

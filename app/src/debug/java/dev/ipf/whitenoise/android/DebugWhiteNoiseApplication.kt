@@ -5,6 +5,10 @@ import android.os.StrictMode
 /** Debug-only process entry point; release bytecode contains no StrictMode references. */
 class DebugWhiteNoiseApplication : WhiteNoiseApplication() {
     override fun onCreate() {
+        if (android.os.Process.isIsolated()) {
+            super.onCreate()
+            return
+        }
         DebugStrictModePolicy.install()
         RuntimePolicyHooks.install(DebugStrictModePolicy)
         super.onCreate()

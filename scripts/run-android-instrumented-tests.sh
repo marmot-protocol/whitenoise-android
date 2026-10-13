@@ -7,6 +7,24 @@ event_name="${1:-}"
 review_demo_e2e="${2:-false}"
 document_provider_matrix="${3:-false}"
 responsiveness_only="${4:-false}"
+media_sandbox_only="${5:-false}"
+
+if [[ "$event_name" == "workflow_dispatch" && "$media_sandbox_only" == "true" ]]; then
+  if [[ "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" ]]; then
+    echo "Select one focused instrumented suite per dispatch" >&2
+    exit 2
+  fi
+  timeout --signal=INT --kill-after=30s 25m ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+    -Pandroid.testInstrumentationRunnerArguments.class=dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest \
+    -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000 \
+    -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+    --no-daemon --stacktrace
+  required_file="$(mktemp)"
+  trap 'rm -f "$required_file"' EXIT
+  grep -F '.IsolatedMediaDecoderDeviceTest#' config/instrumented-required-cases.txt > "$required_file"
+  python3 scripts/check_instrumented_required_cases.py app/build/outputs/androidTest-results/connected --required "$required_file"
+  exit 0
+fi
 
 if [[ "$event_name" == "workflow_dispatch" && "$review_demo_e2e" == "true" && "$document_provider_matrix" == "true" ]]; then
   echo "Select one opt-in instrumented suite per dispatch" >&2

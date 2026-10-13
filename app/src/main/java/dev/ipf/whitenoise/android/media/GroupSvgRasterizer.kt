@@ -22,6 +22,28 @@ internal object GroupSvgRasterizer {
 
     suspend fun rasterize(
         bytes: ByteArray,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): ByteArray =
+        withContext(dispatcher) {
+            val bitmap =
+                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                    .svg(bytes)
+                    ?: throw ImageUploadPreparationException.UnsupportedSvg
+            try {
+                val output = ByteArrayOutputStream()
+                if (!bitmap.compress(Bitmap.CompressFormat.PNG, PNG_COMPRESSION_QUALITY, output) ||
+                    output.size() > REMOTE_PROFILE_IMAGE_MAX_BYTES
+                ) {
+                    throw ImageUploadPreparationException.UnsupportedSvg
+                }
+                output.toByteArray()
+            } finally {
+                bitmap.recycle()
+            }
+        }
+
+    internal suspend fun rasterizeInDecoder(
+        bytes: ByteArray,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
     ): ByteArray =
         withContext(dispatcher) {
