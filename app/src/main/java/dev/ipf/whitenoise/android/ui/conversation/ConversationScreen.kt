@@ -95,7 +95,6 @@ import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageSearch
 import dev.ipf.whitenoise.android.core.RecentEmojiList
@@ -169,7 +168,6 @@ import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
-import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -641,7 +639,7 @@ internal fun ConversationScreen(
     searchChatsController: ChatsController? = null,
     onBroadenSearch: (GlobalSearchState) -> Unit = {},
 ) {
-    /** Records a conversation product observation for each open of this controller, chat and runtime. */
+    /** Records a conversation product observation per controller, chat, runtime and notification open. */
     @Composable
     fun productObservationEffect() {
         androidx.compose.runtime.LaunchedEffect(
@@ -733,15 +731,8 @@ internal fun ConversationScreen(
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.
     var showDetails by presentationState.showDetails
-    var pendingTopBarLeaveAction by remember { mutableStateOf<LeaveAction?>(null) }
-    // Sole-admin Leave gate: a sole admin with other members can't leave until
-    // they hand admin to someone else. Instead of the old toast-only dead end,
-    // the Leave action surfaces a "Transfer admin first" dialog that routes
-    // into the group details transfer picker (#417, adversarial review).
-    var showTransferAdminFirst by remember { mutableStateOf(false) }
-    // Set when the user opts to transfer from that dialog: opens details with
-    // the transfer picker auto-expanded. Keyed on chat.id so it doesn't leak
-    // across a conversation switch.
+    // Opens details with the transfer picker auto-expanded. Keyed on chat.id so
+    // it doesn't leak across a conversation switch.
     var openTransferOnDetails by remember(chat.id) { mutableStateOf(false) }
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
@@ -1937,7 +1928,7 @@ internal fun ConversationScreen(
         exitConversationRoute()
     }
 
-    /** Shows the imported-share shelf and stages newly shared items into this chat's draft. */
+    /** Restores and persists the imported-share shelf and stages newly shared items into this chat's draft. */
     @Composable
     fun importedShareEffects() {
         dev.ipf.whitenoise.android.share.ImportedShareShelf(
@@ -4887,48 +4878,6 @@ internal fun ConversationScreen(
             )
         }
 
-        pendingTopBarLeaveAction?.let { leaveAction ->
-            val soleMember = leaveAction == LeaveAction.SoleMemberDeletesGroup
-            val topBarGroupName = controller.title(groupTitleCopy)
-            ConfirmDialog(
-                title =
-                    if (soleMember) {
-                        stringResource(R.string.confirm_leave_sole_member_title, topBarGroupName)
-                    } else {
-                        stringResource(R.string.confirm_leave_title)
-                    },
-                message =
-                    if (soleMember) {
-                        stringResource(R.string.confirm_leave_sole_member_message)
-                    } else {
-                        stringResource(R.string.confirm_leave_message)
-                    },
-                confirmLabel = stringResource(R.string.leave),
-                onConfirm = {
-                    pendingTopBarLeaveAction = null
-                    appState.launchMutation {
-                        if (controller.leaveGroup()) exitConversation()
-                    }
-                },
-                onDismiss = { pendingTopBarLeaveAction = null },
-                destructive = soleMember,
-            )
-        }
-
-        if (showTransferAdminFirst) {
-            ConfirmDialog(
-                title = stringResource(R.string.sole_admin_leave_blocked_title),
-                message = stringResource(R.string.sole_admin_leave_blocked_message),
-                confirmLabel = stringResource(R.string.transfer_admin),
-                onConfirm = {
-                    showTransferAdminFirst = false
-                    openTransferOnDetails = true
-                    showDetails = true
-                },
-                onDismiss = { showTransferAdminFirst = false },
-            )
-        }
-
         pendingContactShare?.let { contact ->
             ContactPreviewScreen(
                 contact = contact,
@@ -5040,5 +4989,5 @@ internal fun ConversationScreen(
             )
         }
     }
-    }
     conversationOverlays()
+}
