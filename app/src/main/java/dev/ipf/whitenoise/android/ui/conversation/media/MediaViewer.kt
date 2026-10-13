@@ -1103,8 +1103,10 @@ internal fun ViewerPage(
         onDispose {
             when (owned) {
                 is DecodedAttachmentPresentation.Static -> owned.bitmap.recycle()
-                is DecodedAttachmentPresentation.Animated ->
-                    (owned.drawable as? android.graphics.drawable.AnimatedImageDrawable)?.stop()
+                is DecodedAttachmentPresentation.Animated -> {
+                    (owned.drawable as? android.graphics.drawable.Animatable)?.stop()
+                    (owned.drawable as? java.io.Closeable)?.close()
+                }
                 null -> Unit
             }
         }

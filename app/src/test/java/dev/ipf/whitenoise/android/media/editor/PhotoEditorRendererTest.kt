@@ -25,11 +25,12 @@ import java.nio.ByteBuffer
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PhotoEditorRendererTest {
     @Test
-    fun unsupportedTightCropIsRejectedBeforePixelDecodeOrEncode() =
+    fun tightCropUsesRegionWithoutDecodingOrClampingTheWholeSource() =
         runTest {
             val source = solidPng(16, 16, Color.BLUE)
             var decodeCalls = 0
             var encodeCalls = 0
+            var regionCalls = 0
             dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.installTestTransport(
                 object : dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport by
                 dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport {
@@ -46,6 +47,17 @@ class PhotoEditorRendererTest {
                         decodeCalls += 1
                         return null
                     }
+
+                    override fun region(
+                        bytes: ByteArray,
+                        region: dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion,
+                        edge: Int,
+                    ): Bitmap? {
+                        regionCalls += 1
+                        assertTrue(region.validFor(8000, 6000))
+                        assertTrue(edge in 1..4096)
+                        return null
+                    }
                 },
             )
             try {
@@ -56,13 +68,34 @@ class PhotoEditorRendererTest {
                         PhotoEditRecipe(crop = NormalizedRect(0.25f, 0.25f, 0.75f, 0.75f)),
                         MediaQuality.High,
                     )
-                assertEquals(PhotoEditorRenderResult.MemoryLimit, result)
+                assertEquals(PhotoEditorRenderResult.DecodeFailed, result)
+                assertEquals(1, regionCalls)
                 assertEquals(0, decodeCalls)
                 assertEquals(0, encodeCalls)
             } finally {
                 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.installTestTransport(
                     dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport,
                 )
+            }
+        }
+
+    @Test
+    fun largeSourceTightCropSucceedsWithItsOwnPixelLandmarks() =
+        runTest {
+            val bitmap = Bitmap.createBitmap(5000, 200, Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(Color.BLUE)
+            val canvas = android.graphics.Canvas(bitmap)
+            canvas.drawRect(1000f, 0f, 2500f, 200f, android.graphics.Paint().apply { color = Color.RED })
+            val source = encodePng(bitmap)
+            val result = renderer().render(source, PhotoEditRecipe(crop = NormalizedRect(0.2f, 0f, 0.5f, 1f)), MediaQuality.Original)
+            assertTrue(result is PhotoEditorRenderResult.Success)
+            val image = (result as PhotoEditorRenderResult.Success).image
+            val output = BitmapFactory.decodeByteArray(image.bytes, 0, image.bytes.size)
+            try {
+                assertEquals(1500, output.width)
+                assertTrue(Color.red(output.getPixel(output.width / 2, output.height / 2)) > 250)
+            } finally {
+                output.recycle()
             }
         }
 

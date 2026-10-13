@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.media
 
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.drawable.AnimatedImageDrawable
+import android.graphics.drawable.Animatable
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
@@ -30,25 +30,26 @@ import java.io.ByteArrayOutputStream
  */
 @RunWith(AndroidJUnit4::class)
 @PullRequestDeviceSmoke
+@dev.ipf.whitenoise.android.media.sandbox.MediaContainmentAcceptance
 @SdkSuppress(minSdkVersion = 30)
 class AnimationSourceAdmissionDeviceTest {
     @Test
     fun admittedGifDecodesThroughTheNativeAnimatedDecoder() {
         assertTrue(admitAnimationSource(ordinaryGif()) is AnimationSourceAdmission.Admitted)
-        assertTrue(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()) is AnimatedImageDrawable)
+        assertIsolatedAnimation(ordinaryGif())
     }
 
     @Test
     fun advertisedStillMimeCannotSuppressAnAdmittedAnimation() {
-        assertTrue(decode(ordinaryGif(), "image/png") is DecodedAttachmentPresentation.Animated)
+        assertAnimatedPresentation(decode(ordinaryGif(), "image/png"))
     }
 
     @Test
     fun platformEncodedWebpFramesAnimateAndCannotBypassAdmissionWithAStillMime() {
         val source = ordinaryAnimatedWebp()
         assertTrue(admitAnimationSource(source) is AnimationSourceAdmission.Admitted)
-        assertTrue(MediaPipeline.decodeAnimatedDrawable(source) is AnimatedImageDrawable)
-        assertTrue(decode(source, "image/png") is DecodedAttachmentPresentation.Animated)
+        assertIsolatedAnimation(source)
+        assertAnimatedPresentation(decode(source, "image/png"))
         val oversized = source.copyOf()
         // VP8X canvas width minus one, little-endian at byte 24.
         oversized[24] = 0
@@ -85,6 +86,98 @@ class AnimationSourceAdmissionDeviceTest {
         val decoded = decode(png, "image/gif")
         assertTrue(decoded is DecodedAttachmentPresentation.Static)
         (decoded as DecodedAttachmentPresentation.Static).bitmap.recycle()
+    }
+
+    @Test
+    fun isolatedFramesChangePixelsAndPauseResumeWithoutBlockingStillImages() {
+        val instrumentation =
+            androidx.test.platform.app.InstrumentationRegistry
+                .getInstrumentation()
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .install(instrumentation.targetContext)
+        for (source in listOf(ordinaryGif(), ordinaryAnimatedWebp())) {
+            val animated = requireNotNull(MediaPipeline.decodeAnimatedDrawable(source))
+            val pixels = Bitmap.createBitmap(animated.intrinsicWidth, animated.intrinsicHeight, Bitmap.Config.ARGB_8888)
+            try {
+                val worker = requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation)
+                assertTrue(worker.isolated && !worker.internetGranted && !worker.runtimeInitialized)
+                assertTrue(worker.uid != android.os.Process.myUid())
+                val colors = HashSet<Int>()
+                instrumentation.runOnMainSync { (animated as Animatable).start() }
+                val deadline = android.os.SystemClock.elapsedRealtime() + 3000L
+                while (colors.size < 2 && android.os.SystemClock.elapsedRealtime() < deadline) {
+                    instrumentation.runOnMainSync {
+                        animated.setBounds(0, 0, pixels.width, pixels.height)
+                        animated.draw(android.graphics.Canvas(pixels))
+                        colors.add(pixels.getPixel(0, 0))
+                    }
+                    Thread.sleep(25L)
+                }
+                assertTrue("Real isolated frames must change the displayed pixels", colors.size >= 2)
+                instrumentation.runOnMainSync { (animated as Animatable).stop() }
+                Thread.sleep(200L)
+                var stopped = 0
+                instrumentation.runOnMainSync {
+                    animated.draw(android.graphics.Canvas(pixels))
+                    stopped = pixels.getPixel(0, 0)
+                }
+                Thread.sleep(250L)
+                instrumentation.runOnMainSync {
+                    animated.draw(android.graphics.Canvas(pixels))
+                    assertEquals(stopped, pixels.getPixel(0, 0))
+                }
+                // The healthy paused stream must also survive beyond the image-request watchdog.
+                val png = ByteArrayOutputStream().also { pixels.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+                requireNotNull(MediaPipeline.decodeSampledBitmap(png, 2)).recycle()
+                instrumentation.runOnMainSync {
+                    (animated as Animatable).start()
+                    assertTrue(animated.isRunning)
+                }
+            } finally {
+                instrumentation.runOnMainSync { (animated as java.io.Closeable).close() }
+                pixels.recycle()
+            }
+        }
+    }
+
+    @Test
+    fun accountResetRejectsOldAnimationFramesAndAllowsANewGeneration() {
+        val instrumentation =
+            androidx.test.platform.app.InstrumentationRegistry
+                .getInstrumentation()
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .install(instrumentation.targetContext)
+        val old = requireNotNull(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()))
+        val oldUid = requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation).uid
+        try {
+            instrumentation.runOnMainSync {
+                (old as Animatable).start()
+                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                    .resetForAccount()
+            }
+            val replacement = requireNotNull(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()))
+            try {
+                assertTrue(oldUid != requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation).uid)
+            } finally {
+                instrumentation.runOnMainSync { (replacement as java.io.Closeable).close() }
+            }
+        } finally {
+            instrumentation.runOnMainSync { (old as java.io.Closeable).close() }
+        }
+    }
+
+    private fun assertIsolatedAnimation(source: ByteArray) {
+        val decoded = requireNotNull(MediaPipeline.decodeAnimatedDrawable(source))
+        try {
+            assertTrue(decoded is dev.ipf.whitenoise.android.media.sandbox.IsolatedAnimationDrawable)
+        } finally {
+            (decoded as java.io.Closeable).close()
+        }
+    }
+
+    private fun assertAnimatedPresentation(presentation: DecodedAttachmentPresentation?) {
+        assertTrue(presentation is DecodedAttachmentPresentation.Animated)
+        ((presentation as DecodedAttachmentPresentation.Animated).drawable as java.io.Closeable).close()
     }
 
     private fun decode(

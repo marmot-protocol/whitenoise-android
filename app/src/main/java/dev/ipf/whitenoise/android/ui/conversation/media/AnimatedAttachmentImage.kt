@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.graphics.Bitmap
-import android.graphics.drawable.AnimatedImageDrawable
+import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.widget.ImageView
 import androidx.compose.runtime.Composable
@@ -12,8 +12,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeAdmittedAttachmentImage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /** Decoded pixels for a chat message image attachment. */
 sealed interface DecodedAttachmentPresentation {
@@ -41,7 +39,7 @@ suspend fun decodeMessageAttachmentImage(
     animatedMaxEdgePx: Int = MediaPipeline.ANIMATED_IMAGE_MAX_EDGE_PX,
     animationAllowed: Boolean = false,
 ): DecodedAttachmentPresentation? =
-    withContext(Dispatchers.Default) {
+    dev.ipf.whitenoise.android.media.decodeOwnedMedia(decode = {
         val admission =
             dev.ipf.whitenoise.android.media
                 .admitAnimationSource(bytes)
@@ -61,7 +59,12 @@ suspend fun decodeMessageAttachmentImage(
                 }
             },
         )
-    }
+    }, discard = { presentation ->
+        when (presentation) {
+            is DecodedAttachmentPresentation.Static -> presentation.bitmap.recycle()
+            is DecodedAttachmentPresentation.Animated -> (presentation.drawable as? java.io.Closeable)?.close()
+        }
+    })
 
 @Composable
 fun AnimatedDrawableAttachmentImage(
@@ -72,12 +75,14 @@ fun AnimatedDrawableAttachmentImage(
     active: Boolean = true,
 ) {
     DisposableEffect(drawable, active) {
-        val animated = drawable as? AnimatedImageDrawable
-        animated?.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
+        val animated = drawable as? Animatable
         if (active) animated?.start() else animated?.stop()
         onDispose {
             animated?.stop()
         }
+    }
+    DisposableEffect(drawable) {
+        onDispose { (drawable as? java.io.Closeable)?.close() }
     }
     AndroidView(
         modifier = modifier,

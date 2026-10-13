@@ -33,6 +33,17 @@ internal interface MediaDecodeTransport {
 
     fun inspect(bytes: ByteArray): ImageInspection?
 
+    fun region(
+        bytes: ByteArray,
+        region: MediaImageRegion,
+        edge: Int,
+    ): Bitmap? = null
+
+    fun animation(
+        bytes: ByteArray,
+        edge: Int,
+    ): android.graphics.drawable.Drawable? = null
+
     fun probe(
         file: File,
         edge: Int,
@@ -186,6 +197,21 @@ internal class IsolatedMediaTransport(
             }
         }
 
+    override fun region(
+        bytes: ByteArray,
+        region: MediaImageRegion,
+        edge: Int,
+    ): Bitmap? =
+        serialized {
+            val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return@serialized null
+            SharedMemory.create("media-region", capacity).use { output ->
+                sources.withInput(bytes) { input ->
+                    exchange(input, output, MediaDecodeRequest(edge, false, MediaDecodePolicy.REGION, region = region))
+                        ?.let { copyPixels(it, output, edge) }
+                }
+            }
+        }
+
     override fun inspect(bytes: ByteArray): ImageInspection? =
         serialized {
             SharedMemory.create("media-inspection", Int.SIZE_BYTES).use { output ->
@@ -326,6 +352,12 @@ internal class IsolatedMediaTransport(
             putBoolean("oriented", request.option)
             putLong("offset", request.offset)
             putLong("length", request.length ?: input.statSize)
+            request.region?.let {
+                putInt("left", it.left)
+                putInt("top", it.top)
+                putInt("right", it.right)
+                putInt("bottom", it.bottom)
+            }
             putParcelable("input", input)
             putParcelable("output", output)
         }
@@ -439,4 +471,5 @@ internal data class MediaDecodeRequest(
     val operation: Int,
     val offset: Long = 0L,
     val length: Long? = null,
+    val region: MediaImageRegion? = null,
 )

@@ -36,8 +36,6 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.MAX_ANIMATED_PROFILE_AVATAR_EDGE
 import dev.ipf.whitenoise.android.core.PROFILE_AVATAR_MAX_DIMENSION
 import dev.ipf.whitenoise.android.media.MediaPipeline
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /** Test tag on the animated layer, present only while a decoded animation is attached. */
@@ -87,7 +85,11 @@ internal fun rememberSystemAnimationsEnabled(): Boolean {
 internal suspend fun decodeAnimatedProfileAvatar(
     source: ByteArray,
     maxEdgePx: Int,
-): Drawable? = withContext(Dispatchers.Default) { MediaPipeline.decodeAnimatedDrawable(source, maxEdgePx) }
+): Drawable? =
+    dev.ipf.whitenoise.android.media.decodeOwnedMedia(
+        decode = { MediaPipeline.decodeAnimatedDrawable(source, maxEdgePx) },
+        discard = { (it as? java.io.Closeable)?.close() },
+    )
 
 /**
  * Overlays the cached animation for [url] at no more than [maxEdgePx], on top of the first frame the
@@ -155,6 +157,7 @@ internal fun AnimatedProfileAvatarLayer(
             (current as? Animatable)?.start()
             onDispose {
                 (current as? Animatable)?.stop()
+                (current as? java.io.Closeable)?.close()
                 current.callback = null
                 painter.cancelScheduled()
             }

@@ -41,6 +41,12 @@ class MediaDecodeService : Service() {
                     TimeUnit.MILLISECONDS,
                 )
             try {
+                if (dev.ipf.whitenoise.android.BuildConfig.DEBUG &&
+                    data.getInt("operation") == MediaDecodePolicy.DEBUG_BAD_REPLY
+                ) {
+                    sendMalformedMediaReply(reply.binder, requestId, data.getInt("edge"))
+                    return@execute
+                }
                 val result =
                     try {
                         execute(data)
@@ -67,8 +73,19 @@ class MediaDecodeService : Service() {
         input.use {
             output.use {
                 if (data.getInt("version") != MediaDecodePolicy.VERSION) return response
+                response.putInt("inputWriteErrno", readOnlyInputErrno(input))
                 return imageOperation(input, output, data, response)
             }
+        }
+    }
+
+    private fun readOnlyInputErrno(input: ParcelFileDescriptor): Int {
+        if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG) return -1
+        return try {
+            android.system.Os.write(input.fileDescriptor, byteArrayOf(0), 0, 1)
+            0
+        } catch (failure: android.system.ErrnoException) {
+            failure.errno
         }
     }
 
@@ -102,7 +119,7 @@ class MediaDecodeService : Service() {
             Thread.sleep(MediaDecodePolicy.DEBUG_HANG_MS)
             return response
         }
-        val bytes = readInput(input) ?: return response
+        val bytes = readDecoderInput(input) ?: return response
         if (operation == MediaDecodePolicy.EXIF) {
             response.putInt(
                 "orientation",
@@ -131,26 +148,21 @@ class MediaDecodeService : Service() {
                         data.getBoolean("oriented"),
                     )
                 MediaDecodePolicy.SVG -> PlatformMediaDecoder.svg(bytes)
+                MediaDecodePolicy.REGION ->
+                    PlatformMediaDecoder.region(
+                        bytes,
+                        MediaImageRegion(
+                            data.getInt("left"),
+                            data.getInt("top"),
+                            data.getInt("right"),
+                            data.getInt("bottom"),
+                        ),
+                        data.getInt("edge"),
+                    )
                 else -> null
             } ?: return response
         bitmap.usePixels(output, data.getInt("edge"), response)
         return response
-    }
-
-    @Suppress("ReturnCount") // Stat length, truncation and trailing data are separate descriptor guards.
-    private fun readInput(input: ParcelFileDescriptor): ByteArray? {
-        val size = input.statSize
-        if (size !in 1..MediaDecodePolicy.MAX_INPUT_BYTES.toLong()) return null
-        return ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(input.fileDescriptor)).use { stream ->
-            val bytes = ByteArray(size.toInt())
-            var offset = 0
-            while (offset < bytes.size) {
-                val count = stream.read(bytes, offset, bytes.size - offset)
-                if (count <= 0) return null
-                offset += count
-            }
-            bytes.takeIf { stream.read() == -1 }
-        }
     }
 
     private fun Bitmap.usePixels(

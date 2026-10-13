@@ -127,30 +127,50 @@ internal class PhotoEditorRenderer(
                 val source = (inspected as PhotoEditorInspectResult.Success).source
                 val plan = outputPlan(source, recipe, quality) ?: return@withLock PhotoEditorRenderResult.InvalidRecipe
                 val decodeLongEdge = decodeLongEdge(source, plan.geometry)
+                val region =
+                    if (decodeLongEdge > dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy.MAX_EDGE) {
+                        plan.geometry.encodedCropRegion()
+                    } else {
+                        null
+                    }
+                val edge =
+                    if (region == null) {
+                        decodeLongEdge
+                    } else {
+                        max(plan.geometry.outputSize.width, plan.geometry.outputSize.height)
+                    }
                 val decodeCapacity =
                     dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy
-                        .outputCapacity(decodeLongEdge)
+                        .outputCapacity(edge)
                         ?: return@withLock PhotoEditorRenderResult.MemoryLimit
                 val decodedDimensions =
                     MediaPipeline.targetDimensions(
-                        srcWidth = source.orientedSize.width,
-                        srcHeight = source.orientedSize.height,
-                        maxEdgePx = decodeLongEdge,
+                        srcWidth = region?.width ?: source.orientedSize.width,
+                        srcHeight = region?.height ?: source.orientedSize.height,
+                        maxEdgePx = edge,
                     )
                 if (!fitsMemoryBudget(sourceBytes.size, decodedDimensions, decodeCapacity, plan)) {
                     return@withLock PhotoEditorRenderResult.MemoryLimit
                 }
                 currentCoroutineContext().ensureActive()
                 val decoded =
-                    MediaPipeline.decodeSampledBitmap(
-                        bytes = sourceBytes,
-                        maxEdgePx = decodeLongEdge,
-                        honorExifOrientation = true,
-                    ) ?: return@withLock PhotoEditorRenderResult.DecodeFailed
-                currentCoroutineContext().ensureActive()
+                    if (region != null) {
+                        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                            .region(sourceBytes, region, edge)
+                    } else {
+                        MediaPipeline.decodeSampledBitmap(
+                            bytes = sourceBytes,
+                            maxEdgePx = decodeLongEdge,
+                            honorExifOrientation = true,
+                        )
+                    } ?: return@withLock PhotoEditorRenderResult.DecodeFailed
                 val rendered =
-                    renderPixels(decoded, plan.geometry)
-                        ?: return@withLock PhotoEditorRenderResult.RenderFailed
+                    try {
+                        currentCoroutineContext().ensureActive()
+                        renderPixels(decoded, plan.geometry, region)
+                    } finally {
+                        if (!decoded.isRecycled) decoded.recycle()
+                    } ?: return@withLock PhotoEditorRenderResult.RenderFailed
                 currentCoroutineContext().ensureActive()
                 val finalized =
                     MediaPipeline.finalizeRenderedImage(
@@ -257,6 +277,7 @@ internal class PhotoEditorRenderer(
     private suspend fun renderPixels(
         decoded: Bitmap,
         geometry: PhotoEditGeometry,
+        region: dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion? = null,
     ): Bitmap? {
         var output: Bitmap? = null
         return try {
@@ -269,7 +290,7 @@ internal class PhotoEditorRenderer(
                     ).apply { setHasAlpha(true) }
             val canvas = Canvas(output)
             canvas.drawColor(android.graphics.Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-            val matrix = photoMatrix(decoded.width, decoded.height, geometry)
+            val matrix = photoMatrix(decoded.width, decoded.height, geometry, region)
             canvas.save()
             canvas.concat(matrix)
             canvas.drawBitmap(
@@ -301,8 +322,14 @@ internal class PhotoEditorRenderer(
         decodedWidth: Int,
         decodedHeight: Int,
         geometry: PhotoEditGeometry,
+        region: dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion?,
     ): Matrix {
-        val affine = geometry.orientedBitmapToOutputAffine(decodedWidth, decodedHeight)
+        val affine =
+            if (region == null) {
+                geometry.orientedBitmapToOutputAffine(decodedWidth, decodedHeight)
+            } else {
+                geometry.regionBitmapToOutputAffine(decodedWidth, decodedHeight, region)
+            }
         return Matrix().apply {
             setValues(
                 floatArrayOf(

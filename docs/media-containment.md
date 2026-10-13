@@ -31,7 +31,9 @@ HEIF/HEIC is not qualified by the JPEG/PNG tests. Some Android image implementat
 
 ## Automatic versus explicit parsing
 
-Remote timeline/GIPHY images and profile/list avatar overlays use isolated first frames. Admitted native animation is enabled only in the user-opened current media/avatar viewer, with existing visibility, motion and lifecycle controls. Composer previews also use isolated still frames because an external share intent does not attest a playback gesture. Outgoing original animation bytes retain their existing format/admission contract. `AnimatedImageDrawable` playback still uses the app process; full animation isolation requires separately qualified frame/surface IPC.
+Remote timeline/GIPHY images and profile/list avatar overlays use isolated first frames. Admitted native animation is enabled only in the user-opened current media/avatar viewer, with existing visibility, motion and lifecycle controls. Composer previews also use isolated still frames because an external share intent does not attest a playback gesture. Outgoing original animation bytes retain their existing format/admission contract.
+
+Explicit GIF/WebP playback uses a separate nonexported permissionless animation worker. The app-owned drawable implements Animatable and contains copied raw pixels only. One session is admitted process-wide, with a 1080-pixel edge ceiling and one outstanding frame. The worker drives software AnimatedImageDrawable scheduling, with a minimum 32-millisecond frame delay. The parent validates kernel UID, session, sequence, primitive flags and output bounds, copies pixels into its own bitmap, and acknowledges only after consumption. The reusable parent-owned shared buffer remains writable by the worker; no immutable-memory claim is made. Concurrent worker mutation can affect bounded pixel values, not the app-owned drawable or its dimensions. Native decode/draw has a six-second independent watchdog; unacknowledged frames have an eight-second deadline. Healthy paused sessions remain bound until their viewer disposes them. Disposal/account reset invalidates callbacks and requests retirement; only Binder/system-confirmed death reopens the process slot. Image parsing uses its independent lane and can continue during animation.
 
 Received and picked video playback uses local file/content inputs and an explicit progressive source, rather than choosing a network/playlist protocol from its suffix. Media3 container extractors still execute in the app during explicit playback. Platform codec isolation is useful but does not isolate every Media3 parser. Referenced Nostr-event networking retains its existing owner and explicit loading policy.
 
@@ -48,9 +50,12 @@ Unit fixtures cover pixel limits, malformed bytes, primitive reply validation an
 Inspection and the editor share a 200-million-pixel source limit and a 32768-pixel
 source-edge limit. Decoded output remains capped at 4096 pixels on its longest edge
 and 64 MiB. A tight crop may require a larger full-source decode even when its final
-output is smaller: refuse that operation before IPC and explain the processing
-limit while retaining the previous attachment. Do not clamp the decode and upscale
-it into a misleading high-quality output. Isolated region decoding is future work.
+output is smaller: map the crop into outward-rounded encoded-source coordinates
+and request an isolated BitmapRegionDecoder subset. Keep its encoded origin in the
+final EXIF/rotation transform. The power-of-two intermediate has its own 16-Mi-pixel
+ceiling before native allocation; transferred output retains the 4096-pixel/64-MiB
+ceiling. Unsupported regions or budgets refuse while retaining the previous
+attachment. Do not clamp a full-image preview and upscale it into misleading detail.
 The editor budgets the shared pixel buffer and returned host bitmap concurrently,
 as well as rendering and encoding peaks.
 
@@ -69,3 +74,12 @@ unconfirmed upright assumption. A later healthy request may retry normally.
 Optional notification emoji decoding is interruptible so its short artwork deadline
 can continue to text-only posting while the image worker is busy. Cancellation
 recycles undelivered pixels and preserves the account/notification ownership checks.
+
+The hosted MediaContainmentAcceptance campaign includes malformed JPEG/PNG/EXIF/SVG,
+actual malformed isolated-UID Binder replies, selected-input write denial,
+changing GIF/WebP pixels, pause/resume, account reset, a row-encoded synthetic
+108-megapixel region and an unmodified CTS HEIF fixture. Record each API's HEIF
+inspect/preview/region outcome; a safe refusal is not successful format support.
+These controlled fixtures do not replace ordinary messenger or actual camera
+corpus qualification, including 200-megapixel and ten-bit HEIF sources. MED-032
+retains the separate manual acceptance.

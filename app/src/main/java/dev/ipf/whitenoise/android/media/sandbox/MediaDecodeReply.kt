@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.Parcel
 
-internal const val MEDIA_REPLY_DESCRIPTOR = "dev.ipf.whitenoise.media.pixels.v1"
+internal const val MEDIA_REPLY_DESCRIPTOR = "dev.ipf.whitenoise.media.pixels.v2"
 
 /** Worker replies contain only explicitly read primitives, never arbitrary parcelable objects. */
 internal fun sendMediaDecodeReply(
@@ -22,6 +22,7 @@ internal fun sendMediaDecodeReply(
         parcel.writeInt(if (result.getBoolean("runtimeInitialized")) 1 else 0)
         parcel.writeInt(if (result.getBoolean("privateCanaryDenied")) 1 else 0)
         parcel.writeInt(result.getInt("privateCanaryErrno"))
+        parcel.writeInt(result.getInt("inputWriteErrno", -1))
         parcel.writeInt(result.getInt("width"))
         parcel.writeInt(result.getInt("height"))
         parcel.writeInt(result.getInt("orientation"))
@@ -39,12 +40,13 @@ internal fun sendMediaDecodeReply(
 
 internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
     val result = Bundle()
-    result.putBoolean("success", parcel.readInt() == 1)
-    result.putBoolean("isolated", parcel.readInt() == 1)
-    result.putBoolean("internetGranted", parcel.readInt() == 1)
-    result.putBoolean("runtimeInitialized", parcel.readInt() == 1)
-    result.putBoolean("privateCanaryDenied", parcel.readInt() == 1)
+    result.putBoolean("success", readMediaBoolean(parcel))
+    result.putBoolean("isolated", readMediaBoolean(parcel))
+    result.putBoolean("internetGranted", readMediaBoolean(parcel))
+    result.putBoolean("runtimeInitialized", readMediaBoolean(parcel))
+    result.putBoolean("privateCanaryDenied", readMediaBoolean(parcel))
     result.putInt("privateCanaryErrno", parcel.readInt())
+    result.putInt("inputWriteErrno", parcel.readInt())
     result.putInt("width", parcel.readInt())
     result.putInt("height", parcel.readInt())
     val orientation = parcel.readInt()
@@ -61,7 +63,7 @@ internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
     val duration = parcel.readLong()
     require(duration in 0..MAX_MEDIA_DURATION_MS)
     result.putLong("duration", duration)
-    result.putBoolean("pixels", parcel.readInt() == 1)
+    result.putBoolean("pixels", readMediaBoolean(parcel))
     val count = parcel.readInt()
     require(count == -1 || count == dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS)
     if (count == dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS) {
@@ -71,4 +73,28 @@ internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
     }
     require(parcel.dataAvail() == 0)
     return result
+}
+
+private fun readMediaBoolean(parcel: Parcel): Boolean = parcel.readInt().also { require(it in 0..1) } == 1
+
+/** Actual isolated-UID callback corruption for debug instrumentation, never a production command. */
+@Suppress("MagicNumber") // Four controlled malformed-frame fixtures, available only through debug dispatch.
+internal fun sendMalformedMediaReply(
+    callback: IBinder,
+    id: Int,
+    mode: Int,
+) {
+    val parcel = Parcel.obtain()
+    try {
+        parcel.writeInterfaceToken(MEDIA_REPLY_DESCRIPTOR)
+        parcel.writeInt(if (mode == 1) id + 1 else id)
+        when (mode) {
+            2 -> parcel.writeInt(1) // Truncated primitive frame.
+            3 -> parcel.writeByteArray(ByteArray(MediaDecodePolicy.MAX_REPLY_BYTES))
+            4 -> parcel.writeInt(7) // Boolean values must be canonical.
+        }
+        callback.transact(IBinder.FIRST_CALL_TRANSACTION, parcel, null, IBinder.FLAG_ONEWAY)
+    } finally {
+        parcel.recycle()
+    }
 }

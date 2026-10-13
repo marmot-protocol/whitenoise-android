@@ -45,6 +45,43 @@ class PhotoEditorScreenshotTest {
     @Test
     fun budgetRefusalDark() = captureBudgetRefusal(dark = true, suffix = "dark")
 
+    @Test
+    fun tightLargePhotoCropLight() = captureLargeCrop(dark = false, suffix = "light")
+
+    @Test
+    fun tightLargePhotoCropDark() = captureLargeCrop(dark = true, suffix = "dark")
+
+    private fun captureLargeCrop(
+        dark: Boolean,
+        suffix: String,
+    ) {
+        val preview = editorSourceBitmap()
+        val size = EditorPixelSize(12000, 9000)
+        val recipe =
+            PhotoEditRecipe(
+                crop =
+                    dev.ipf.whitenoise.android.media.editor
+                        .NormalizedRect(0.1f, 0.1f, 0.2f, 0.3f),
+            )
+        val holder = PhotoEditorStateHolder(recipe, MediaQuality.High, size)
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = dark) {
+                    PhotoEditorScreen(
+                        previewBitmap = preview,
+                        sourceInfo = PhotoEditorSourceInfo(size, size, 1, "image/jpeg", false),
+                        stateHolder = holder,
+                        onCancel = {},
+                        onSave = { _, _ -> },
+                    )
+                }
+            }
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_large_region_crop_$suffix.png")
+        } finally {
+            preview.recycle()
+        }
+    }
+
     private fun captureBudgetRefusal(
         dark: Boolean,
         suffix: String,
