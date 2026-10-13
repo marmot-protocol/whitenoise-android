@@ -1,0 +1,112 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MessageTranslationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageTranslationDialog(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "MessageTranslationRendition",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageTranslationRendition(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_detection_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_detection_failed",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_engine_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_engine_failed",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_loading",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_missing_engine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_missing_engine",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_show_original",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_show_original",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_show_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_show_result",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_source_model_missing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_source_model_missing",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_unverified_engine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_unverified_engine",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "fun rememberMessageTranslationSource(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun rememberMessageTranslationSource(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "Open installed translation engine without message text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun openOfflineTranslator(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "Explicit-source cold engine recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "session.request(it.copy(target = target), from)",
+        "test_ids": [
+          "SET-033"
+        ]
+      }
+    ]
+  }
+}

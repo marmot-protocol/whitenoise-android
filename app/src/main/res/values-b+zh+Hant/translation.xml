@@ -1,0 +1,23 @@
+<resources>
+    <string name="translation_title">翻譯</string>
+    <string name="translation_automatic">自動翻譯訊息</string>
+    <string name="translation_detect_language">偵測語言</string>
+    <string name="translation_source_language">來源語言</string>
+    <string name="translation_target_language">目標語言</string>
+    <string name="translation_show_original">顯示原文</string>
+    <string name="translation_show_result">顯示譯文</string>
+    <string name="translation_loading">正在裝置上翻譯…</string>
+    <string name="translation_open_engine">開啟翻譯引擎</string>
+    <string name="translation_engine_managed">推薦翻譯引擎：Offline Translator。翻譯在你的裝置上執行；請在該應用程式中管理語言套件。</string>
+    <string name="translation_missing_engine">請安裝 Offline Translator 以在此裝置上翻譯。</string>
+    <string name="translation_unverified_engine">此引擎未經驗證或不受支援。未傳送任何文字。</string>
+    <string name="translation_detection_failed">請選擇來源語言並重試。</string>
+    <string name="translation_source_model_missing">請在引擎中安裝來源語言包。</string>
+    <string name="translation_engine_failed">翻譯失敗。請檢查引擎中的語言包後重試。</string>
+    <string name="translation_recovery_notice">翻譯無法使用。點選翻譯以重試或開啟引擎。</string>
+    <string name="translation_inherit">使用全域設定</string>
+    <string name="translation_on">開啟</string>
+    <string name="translation_off">關閉</string>
+    <string name="translation_inherit_language">使用全域目標語言</string>
+    <string name="translation_privacy_warning">Offline Translator 可能將訊息文字和譯文寫入 Android 系統記錄。White Noise 無法保證其他應用程式處理文字時的安全性。</string>
+</resources>

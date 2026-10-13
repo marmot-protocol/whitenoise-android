@@ -15,6 +15,7 @@ internal enum class MessageActionKind {
     CopyText,
     Speak,
     SpeakCodeLiterally,
+    Translate,
     Forward,
     KeepOnScreen,
     Share,
@@ -46,6 +47,7 @@ internal fun messageActionKinds(
     canCopyText: Boolean,
     canSpeak: Boolean,
     canSpeakCodeLiterally: Boolean = false,
+    canTranslate: Boolean = false,
     canForward: Boolean,
     canKeepOnScreen: Boolean = false,
     canShare: Boolean = false,
@@ -64,6 +66,7 @@ internal fun messageActionKinds(
         if (canShare) add(MessageActionKind.Share)
         if (canSave) add(MessageActionKind.Save)
         if (canCopyText) add(MessageActionKind.CopyText)
+        if (canTranslate) add(MessageActionKind.Translate)
         if (canSpeak) add(MessageActionKind.Speak)
         if (canSpeak && canSpeakCodeLiterally) add(MessageActionKind.SpeakCodeLiterally)
         if (canSelect) add(MessageActionKind.Select)
@@ -108,36 +111,46 @@ internal fun estimatedMessageActionMenuHeight(
 /** The menu row label for an action, matching the prototype's wording. */
 @Composable
 internal fun messageActionLabel(kind: MessageActionKind): String =
-    when (kind) {
-        MessageActionKind.Reply -> stringResource(R.string.reply)
-        MessageActionKind.Edit -> stringResource(R.string.edit)
-        MessageActionKind.Select -> stringResource(R.string.select)
-        MessageActionKind.SelectText -> stringResource(R.string.select_text)
-        MessageActionKind.CopyText -> stringResource(R.string.copy)
-        MessageActionKind.Speak -> stringResource(R.string.read_aloud)
-        MessageActionKind.SpeakCodeLiterally -> stringResource(R.string.read_code_literally)
-        MessageActionKind.Forward -> stringResource(R.string.forward)
-        MessageActionKind.KeepOnScreen -> stringResource(R.string.floating_keep)
-        MessageActionKind.Share -> stringResource(R.string.shared_media_share)
-        MessageActionKind.Save -> stringResource(R.string.save_attachments)
-        MessageActionKind.Info -> stringResource(R.string.info)
-        MessageActionKind.Report -> stringResource(R.string.report_message)
-    }
+    stringResource(
+        messageActionLabelResources.getValue(kind),
+    )
+
+private val messageActionLabelResources =
+    mapOf(
+        MessageActionKind.Reply to R.string.reply,
+        MessageActionKind.Edit to R.string.edit,
+        MessageActionKind.Select to R.string.select,
+        MessageActionKind.SelectText to R.string.select_text,
+        MessageActionKind.CopyText to R.string.copy,
+        MessageActionKind.Speak to R.string.read_aloud,
+        MessageActionKind.SpeakCodeLiterally to R.string.read_code_literally,
+        MessageActionKind.Translate to R.string.translation_title,
+        MessageActionKind.Forward to R.string.forward,
+        MessageActionKind.KeepOnScreen to R.string.floating_keep,
+        MessageActionKind.Share to R.string.shared_media_share,
+        MessageActionKind.Save to R.string.save_attachments,
+        MessageActionKind.Info to R.string.info,
+        MessageActionKind.Report to R.string.report_message,
+    )
 
 /** The drawable the menu row leads with, mirroring the prototype's icon set. */
 @DrawableRes
-internal fun messageActionIconRes(kind: MessageActionKind): Int =
-    when (kind) {
-        MessageActionKind.Reply -> R.drawable.ic_reply
-        MessageActionKind.Edit -> R.drawable.ic_edit
-        MessageActionKind.Select -> R.drawable.ic_check
-        MessageActionKind.SelectText -> R.drawable.ic_text_fields
-        MessageActionKind.CopyText -> R.drawable.ic_content_copy
-        MessageActionKind.Speak, MessageActionKind.SpeakCodeLiterally -> R.drawable.ic_volume_up
-        MessageActionKind.Forward -> R.drawable.ic_forward
-        MessageActionKind.Report -> R.drawable.ic_emoji_flags
-        MessageActionKind.KeepOnScreen -> R.drawable.ic_floating_message
-        MessageActionKind.Share -> R.drawable.ic_share
-        MessageActionKind.Save -> R.drawable.ic_download
-        MessageActionKind.Info -> R.drawable.ic_info
-    }
+internal fun messageActionIconRes(kind: MessageActionKind): Int = messageActionIconResources.getValue(kind)
+
+private val messageActionIconResources =
+    mapOf(
+        MessageActionKind.Reply to R.drawable.ic_reply,
+        MessageActionKind.Edit to R.drawable.ic_edit,
+        MessageActionKind.Select to R.drawable.ic_check,
+        MessageActionKind.SelectText to R.drawable.ic_text_fields,
+        MessageActionKind.CopyText to R.drawable.ic_content_copy,
+        MessageActionKind.Speak to R.drawable.ic_volume_up,
+        MessageActionKind.SpeakCodeLiterally to R.drawable.ic_code,
+        MessageActionKind.Translate to R.drawable.ic_translate,
+        MessageActionKind.Forward to R.drawable.ic_forward,
+        MessageActionKind.Report to R.drawable.ic_emoji_flags,
+        MessageActionKind.KeepOnScreen to R.drawable.ic_floating_message,
+        MessageActionKind.Share to R.drawable.ic_share,
+        MessageActionKind.Save to R.drawable.ic_download,
+        MessageActionKind.Info to R.drawable.ic_info,
+    )

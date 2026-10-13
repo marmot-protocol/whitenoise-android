@@ -412,7 +412,8 @@ internal fun MessageBubble(
             }
         }
     val mine = controller.isMessageMine(record)
-    val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
+    val deleted =
+        item.projected?.deleted == true || MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds)
     // The same capability model the controller re-validates on the mutation
     // path; the UI only decides what to OFFER from it, never what to permit.
     val deleteCapability =
@@ -637,6 +638,38 @@ internal fun MessageBubble(
     // over the original projection. Keyed on editState so a fresh edit
     // recomposes the bubble in place.
     val editState = controller.editsByTarget[record.messageIdHex]
+    var translationDialogOpen by remember(controller, record.messageIdHex) { mutableStateOf(false) }
+    var translationTarget by remember(controller, record.messageIdHex) { mutableStateOf<String?>(null) }
+    val translationSource =
+        dev.ipf.whitenoise.android.translation.rememberMessageTranslationSource(
+            messageId = record.messageIdHex,
+            text =
+                if (record.kind == 9uL && !deleted && !persistedFailure) {
+                    editState?.latestText ?: record.plaintext
+                } else {
+                    ""
+                },
+            account = controller.boundAccountRef,
+            group = controller.group.groupIdHex,
+            automaticEligible = !mine && !readOnly,
+            selectedTarget = translationTarget,
+            sourceRevision =
+                listOf(record.sourceEpoch, editState?.count, editState?.versions?.lastOrNull()?.messageIdHex)
+                    .joinToString(":"),
+        )
+    val visibleTranslation =
+        dev.ipf.whitenoise.android.translation.LocalConversationTranslation.current
+            ?.renditions
+            ?.get(translationSource)
+            ?.takeIf { it.showTranslation }
+            ?.text
+    if (translationDialogOpen && translationSource != null) {
+        dev.ipf.whitenoise.android.translation.MessageTranslationDialog(
+            source = translationSource,
+            onTargetSelected = { translationTarget = it },
+            onDismiss = { translationDialogOpen = false },
+        )
+    }
     val displayedBody =
         remember(item, deleted, messageTextCopy, deletedBodyText, invalidatedBodyText, editState) {
             messageBubbleDisplayedBody(
@@ -776,7 +809,7 @@ internal fun MessageBubble(
         appState.ttsController.preparedSpeechFor(record.messageIdHex, speakableProjection?.projectionId)
     val ttsProjectionResolver =
         rememberTtsHighlightProjectionResolver(
-            speakableProjection,
+            speakableProjection.takeIf { visibleTranslation == null },
             preparedTtsSpeech,
         )
     val ttsLeafHighlightResolver =
@@ -1029,8 +1062,13 @@ internal fun MessageBubble(
     /** Copies the whole message as plain text, a poll as its question and options from the current row. */
     fun copyMessageText() {
         if (deleted) return
-        // A poll's displayed body is only its "Poll" label, and the poll may have changed since the menu opened.
-        val text = if (isPollRecord) currentPollCopyText(controller, pollOwner, messageTextCopy) else displayedBody
+        // Polls use the current question/options; ordinary messages copy the visible rendition.
+        val text =
+            if (isPollRecord) {
+                currentPollCopyText(controller, pollOwner, messageTextCopy)
+            } else {
+                visibleTranslation ?: displayedBody
+            }
         text?.let { clipboard.setText(AnnotatedString(it)) }
         onActionMenuOpenChange(false)
     }
@@ -2054,7 +2092,7 @@ internal fun MessageBubble(
                 // - Non-media: render displayedBody (covers reactions,
                 //   deletions, agent streams, plain text).
                 val bodyTextToRender: String? =
-                    messageBodyTextToRender(
+                    visibleTranslation ?: messageBodyTextToRender(
                         displayedBody = displayedBody,
                         deleted = deleted,
                         persistedFailure = persistedFailure,
@@ -2068,17 +2106,21 @@ internal fun MessageBubble(
                         mediaCaption = mediaCaption,
                     )
                 val displayedMarkdownDocument =
-                    rememberMessageMarkdownDocumentForDisplayedBody(
-                        messageIdHex = record.messageIdHex,
-                        bodyText = bodyTextToRender,
-                        recordPlaintext = record.plaintext,
-                        storedDocument = record.contentTokens,
-                        overrideDocument = editedMarkdownDocument,
-                        deleted = deleted,
-                        persistedFailure = persistedFailure,
-                        fallbackParsingEnabled = record.kind == 9uL,
-                        parseMarkdown = parseMarkdown,
-                    )
+                    if (visibleTranslation != null) {
+                        null
+                    } else {
+                        rememberMessageMarkdownDocumentForDisplayedBody(
+                            messageIdHex = record.messageIdHex,
+                            bodyText = bodyTextToRender,
+                            recordPlaintext = record.plaintext,
+                            storedDocument = record.contentTokens,
+                            overrideDocument = editedMarkdownDocument,
+                            deleted = deleted,
+                            persistedFailure = persistedFailure,
+                            fallbackParsingEnabled = record.kind == 9uL,
+                            parseMarkdown = parseMarkdown,
+                        )
+                    }
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
                 val soleCaptionedVisual =
@@ -2594,6 +2636,8 @@ internal fun MessageBubble(
                         )
                     }
                 }
+                dev.ipf.whitenoise.android.translation
+                    .MessageTranslationRendition(translationSource)
                 MessageActionMenu(
                     // A tombstone gets a focused delete-only menu. Batch or partial
                     // text selection still owns the row interaction completely.
@@ -2624,6 +2668,11 @@ internal fun MessageBubble(
                     // Speak aloud uses the same edit-aware user-authored text as TTS
                     // projection, not the display fallback (filenames, placeholders,
                     // reactions, system copy).
+                    canTranslate = translationSource != null,
+                    onTranslate = {
+                        onActionMenuOpenChange(false)
+                        translationDialogOpen = true
+                    },
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,
                     canSelectText = !isPollRecord && !deleted && !bodyTextToRender.isNullOrBlank(),

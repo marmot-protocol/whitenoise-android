@@ -1,0 +1,4 @@
+<resources>
+    <color name="conversation_widget_background">#151515</color>
+    <color name="conversation_widget_foreground">#FFFFFF</color>
+</resources>

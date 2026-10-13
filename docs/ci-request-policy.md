@@ -48,6 +48,25 @@ the full head/artifact provenance through the existing handoff before recording
 human PASS. Missing current-head previews hold any required device/human gate;
 they are not permission to use old APKs or build a substitute locally.
 
+## Two smoke tests before a human handoff
+
+Every candidate needs two separately recorded smoke results before its APK or
+preview link is sent for human testing:
+
+1. Upgrade the populated shared-preview fixture in place from a build using the
+   current master MarmotKit artifact. Open the prepared account and synthetic
+   history and verify that bootstrap completes without a migration error.
+2. Fully stop the candidate process, launch it cold and verify the same retained
+   account and history again. An installation-only check cannot pass either test.
+
+Bind both results to the exact source and APK digest, baseline runtime, device
+and observed ready state. Run the changed-feature assertions after these checks.
+A clean or older-schema fixture does not cover the first smoke test. Before
+requesting a stable preview, compare its complete MarmotKit lock with current
+master and adopt the current artifact when they differ. Never clear storage,
+alter migration records or lower the schema number to make a smoke test pass.
+See `INT-010` in the combined manual checklist.
+
 ## Documentation-only core validation
 
 The core workflow always starts and reports the existing required check. Its

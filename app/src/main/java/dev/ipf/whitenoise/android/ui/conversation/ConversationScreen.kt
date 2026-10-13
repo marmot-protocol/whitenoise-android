@@ -660,6 +660,9 @@ internal fun ConversationScreen(
     // misattributes "is me" nor resets scroll/selection state when the
     // active ref catches up.
     val conversationAccountRef = controller.boundAccountRef
+    val translationPreferences =
+        dev.ipf.whitenoise.android.translation
+            .rememberTranslationPreferences()
     val conversationSelfAccountIdHex = controller.boundAccountIdHex
     val presentationState =
         surfaceState
@@ -820,6 +823,14 @@ internal fun ConversationScreen(
     var measuredBottomChromeHeightPx by bottomInsetState.measuredBottomChromeHeightPx
     var bottomInputRevision by bottomInsetState.bottomInputRevision
     var routePresentationFrozen by bottomInsetState.routePresentationFrozen
+    val translationSession =
+        dev.ipf.whitenoise.android.translation.rememberConversationTranslation(
+            appState,
+            conversationAccountRef,
+            controller.group.groupIdHex,
+            translationPreferences,
+            routeActive = !routeTransitionInProgress && !routePresentationFrozen && !showDetails,
+        )
     val freezeRoutePresentation =
         conversationRoutePresentationShouldFreeze(
             routeTransitionInProgress = routeTransitionInProgress,
@@ -1167,7 +1178,12 @@ internal fun ConversationScreen(
                                     } else {
                                         MessageProjector.copyableText(record, editedText)
                                     },
-                                forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
+                                forwardableText =
+                                    if (invalidated) {
+                                        null
+                                    } else {
+                                        MessageProjector.forwardableText(record, editedText)
+                                    },
                                 // Same authoritative accessor the single-message
                                 // surface and the mutation guard use, so bulk
                                 // routing never diverges from per-message policy.
@@ -4187,6 +4203,8 @@ internal fun ConversationScreen(
         },
     ) { padding ->
         CompositionLocalProvider(
+            dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
+            dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
             LocalPollVotesHost provides pollVotesHost,
             LocalKeptMessages provides keptMessagesController,
             // Bubbles mark their own matches while search is open, so a hit is obvious on any

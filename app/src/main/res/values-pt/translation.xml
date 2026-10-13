@@ -1,0 +1,23 @@
+<resources>
+    <string name="translation_title">Traduzir</string>
+    <string name="translation_automatic">Traduzir mensagens automaticamente</string>
+    <string name="translation_detect_language">Detectar idioma</string>
+    <string name="translation_source_language">Idioma de origem</string>
+    <string name="translation_target_language">Idioma de destino</string>
+    <string name="translation_show_original">Mostrar original</string>
+    <string name="translation_show_result">Mostrar tradução</string>
+    <string name="translation_loading">A traduzir no dispositivo…</string>
+    <string name="translation_open_engine">Abrir motor</string>
+    <string name="translation_engine_managed">Mecanismo recomendado: Offline Translator. A tradução ocorre no seu dispositivo; gerencie os pacotes de idiomas nesse aplicativo.</string>
+    <string name="translation_missing_engine">Instala Offline Translator para traduzir neste dispositivo.</string>
+    <string name="translation_unverified_engine">Este motor não está verificado ou não é compatível. Nenhum texto foi enviado.</string>
+    <string name="translation_detection_failed">Escolhe um idioma de origem e tenta novamente.</string>
+    <string name="translation_source_model_missing">Instala o pacote do idioma de origem no motor.</string>
+    <string name="translation_engine_failed">A tradução falhou. Verifica os pacotes de idiomas e tenta novamente.</string>
+    <string name="translation_recovery_notice">Tradução indisponível. Toca em Traduzir para tentar novamente ou abrir o motor.</string>
+    <string name="translation_inherit">Usar definição global</string>
+    <string name="translation_on">Ativado</string>
+    <string name="translation_off">Desativado</string>
+    <string name="translation_inherit_language">Usar idioma de destino global</string>
+    <string name="translation_privacy_warning">Offline Translator pode gravar mensagens e traduções nos registros do sistema Android. White Noise não pode garantir a segurança do texto processado por outro aplicativo.</string>
+</resources>

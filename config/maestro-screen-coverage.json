@@ -146,6 +146,9 @@
     "Developer": [
       "developer-unlock",
       "developer-mode-off"
+    ],
+    "Translation": [
+      "settings-translation"
     ]
   },
   "main_routes": {

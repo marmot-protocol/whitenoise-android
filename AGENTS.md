@@ -33,6 +33,13 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
   applicable validators and required aggregate, plus non-compiling link/path checks
   and `git diff --check`. State-wiping connected tests
   require explicit authorization.
+- Before sending any preview for human testing, record two successful smoke tests
+  on its exact signed APK: an in-place upgrade over a populated install using the
+  current master runtime, then a full process stop and cold restart with that same
+  retained data. Both must reach usable chats without bootstrap/migration errors
+  and retain the prepared account and history. Run the feature checks separately.
+  Compare the candidate MarmotKit lock to current master before requesting a stable
+  preview; an older native reader cannot reopen a newer shared-preview database.
 - For user-visible changes, update permanent IDs in the [manual checklist](docs/manual-release-testing.md)
   and [surface inventory](docs/manual-release-testing-surfaces.json) in the same PR.
   Prefer [small scenario and source files](docs/manual-release-testing/README.md)
