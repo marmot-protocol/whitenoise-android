@@ -1414,6 +1414,7 @@ internal fun MessageBubble(
                         showPendingPlaceholder && pendingAttachmentsForRecord.any(::isPendingGeneralFile)
                     )
             )
+
     /** Maps a double tap on the message text to window space and seeks or starts read-aloud there. */
     val messageTextDoubleTap: (Offset) -> Unit = { position ->
         val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
@@ -2137,6 +2138,7 @@ internal fun MessageBubble(
                 // setting disabled never collapse (#325, #1180).
                 val bodyCanCollapse = collapseLongMessages && !deleted && !persistedFailure
                 val collapsible = bodyCanCollapse && !textSelectionMode && !ttsBodyExpanded
+
                 /**
                  * The sender-name label (group chats only). Rendered above the
                  * shared media card when media is present, or as the first child
@@ -2171,6 +2173,7 @@ internal fun MessageBubble(
                         )
                     }
                 }
+
                 /**
                  * The reply quote card. Self-contained (own translucent Surface),
                  * so it renders correctly whether inside the text bubble or
@@ -2229,11 +2232,13 @@ internal fun MessageBubble(
                         )
                     }
                 }
+
                 /** Records the plain-text leaf's layout and registers it for selection once positioned. */
                 val onPlainTextLayout: (TextLayoutResult) -> Unit = {
                     textLayouts.plainTextLayoutTracker.layoutResult = it
                     reportPlainTextLayoutIfReady()
                 }
+
                 /** Wraps the message text in a selection container while text selection mode is active. */
                 val selectionWrapper: @Composable (@Composable () -> Unit) -> Unit = { content ->
                     if (textSelectionMode) {

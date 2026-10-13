@@ -77,6 +77,7 @@ internal class MessageBubbleTextLayouts {
     val plainTextLayoutTracker = SelectableTextLayoutTracker()
     var textSelectionSeeded by mutableStateOf(false)
     var textSelectionBoundsInWindow by mutableStateOf<Rect?>(null)
+
     /** Keeps the latest layout of each rendered link leaf, and drops it when the leaf reports no layout. */
     val markdownLinkLayoutReporter: MarkdownLinkTextLayoutReporter = { key, text, layoutResult, coordinates ->
         if (layoutResult != null && coordinates != null) {
@@ -85,6 +86,7 @@ internal class MessageBubbleTextLayouts {
             markdownLinkLayouts.remove(key)
         }
     }
+
     /** Keeps the latest layout of each selectable text leaf for selection seeding and read-aloud hit tests. */
     val selectableTextLayoutReporter: SelectableTextLayoutReporter = { key, layoutResult, coordinates ->
         selectableTextLayouts.update(key, layoutResult, coordinates)
