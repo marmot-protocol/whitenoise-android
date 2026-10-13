@@ -300,6 +300,10 @@ jobs:
         if: matrix.phase == 'tooling'
         run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck :app:detekt --build-cache --profile --no-daemon --stacktrace
 
+      - name: Verify invariant registry cache invalidation
+        if: matrix.phase == 'tooling'
+        run: python3 scripts/check_invariant_gate_cache.py
+
       # Package on a separate runner so release compilation overlaps tooling checks.
       - name: Assemble app for Baseline Profile verification
         if: matrix.phase == 'baseline'

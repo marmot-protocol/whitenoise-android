@@ -63,32 +63,54 @@ function parseRegistry(markdown) {
  * (even across lines), and link reference definitions with their titles. Best effort, not a full renderer.
  */
 function visibleProse(body) {
-  return withoutFencedCode((body || '').replace(/\r\n?/g, '\n'))
-    .replace(/<!--(?:-?>|[\s\S]*?(?:-->|$))/g, '')
+  return withoutCodeAndComments((body || '').replace(/\r\n?/g, '\n'))
     .replace(/<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, '')
     .replace(HTML_TAG, '')
     .replace(LINK_REFERENCE_DEFINITION, '')
 }
 
 /**
- * Drops CommonMark fenced code blocks line by line. A fence closes only on a line of the same character, at least
+ * Drops comments and CommonMark fenced code blocks together, ignoring fences inside comments and treating comment
+ * markers inside code as literal text. A fence closes only on a line of the same character, at least
  * as long as its opener, with nothing else after it — so a shorter or annotated inner fence stays hidden. An
  * unclosed fence hides everything after it.
  */
-function withoutFencedCode(text) {
+function withoutCodeAndComments(text) {
   const kept = []
   let fence = null
+  let comment = false
   for (const line of text.split('\n')) {
     if (fence) {
       const closing = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line)
       if (closing && closing[1][0] === fence[0] && closing[1].length >= fence.length) fence = null
       continue
     }
-    const opening = /^ {0,3}(`{3,}|~{3,})/.exec(line)
+    // Inspect a fence before comments: a comment marker in its info string is literal code too.
+    const opening = !comment && /^ {0,3}(`{3,}|~{3,})/.exec(line)
     if (opening) {
       fence = opening[1]
     } else {
-      kept.push(line)
+      let visible = ''
+      let offset = 0
+      while (offset < line.length) {
+        if (comment) {
+          const end = line.indexOf('-->', offset)
+          if (end === -1) break
+          comment = false
+          offset = end + 3
+        } else {
+          const start = line.indexOf('<!--', offset)
+          if (start === -1) {
+            visible += line.slice(offset)
+            break
+          }
+          visible += line.slice(offset, start)
+          const short = /^<!---?>/.exec(line.slice(start))
+          offset = start + (short ? short[0].length : 4)
+          comment = !short
+        }
+      }
+      kept.push(visible)
     }
   }
   return kept.join('\n')

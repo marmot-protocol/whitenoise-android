@@ -121,6 +121,23 @@ test('keeps a declaration hidden behind a shorter or annotated inner fence', () 
   assert.equal(gate({ body: closed }).status, 'pass')
 })
 
+test('ignores fences inside comments without interpreting comments inside fenced code', () => {
+  const visible = [
+    '<!--\n```\n-->\nInvariant gate: StalenessGuardCoverageTest',
+    '<!--\n~~~~\n-->\nInvariant gate: StalenessGuardCoverageTest',
+    '<!-- ``` -->\nInvariant gate: StalenessGuardCoverageTest',
+  ]
+  for (const body of visible) assert.equal(gate({ body }).status, 'pass', body)
+  const literalComment = [
+    '```\n<!--\n```\nInvariant gate: StalenessGuardCoverageTest\n-->',
+    '```\n<!--\n```\nInvariant gate: StalenessGuardCoverageTest',
+  ]
+  // These declarations follow a closed code fence: its comment opener was literal code.
+  for (const body of literalComment) assert.equal(gate({ body }).status, 'pass', body)
+  assert.equal(gate({ body: '<!--\n```\nInvariant gate: StalenessGuardCoverageTest\n-->' }).status, 'fail')
+  assert.equal(gate({ body: '```\n<!--\nInvariant gate: StalenessGuardCoverageTest\n-->\n```' }).status, 'fail')
+})
+
 test('run follows closing-issue pages and full label lists before deciding a PR closes no bug', async () => {
   const pages = [
     { nodes: [feature], pageInfo: { hasNextPage: true, endCursor: 'page-2' } },

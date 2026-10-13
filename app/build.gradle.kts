@@ -1200,10 +1200,10 @@ tasks.withType<Test>().configureEach {
         .file(rootProject.file("docs/invariant-gates.md"))
         .withPropertyName("invariantGateRegistry")
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    // The registry test also discovers instrumented gates, whose sources no unit-test task compiles, so adding or
-    // renaming one must invalidate cached results too.
+    // Any instrumented Kotlin test can be registered, even without the CoverageTest suffix. Unit-test tasks do
+    // not compile these sources, so their additions, deletions and renames must invalidate cached validation.
     inputs
-        .files(rootProject.fileTree("app/src/androidTest") { include("**/*CoverageTest.kt") })
+        .files(rootProject.fileTree("app/src/androidTest") { include("**/*.kt") })
         .withPropertyName("instrumentedInvariantGates")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     // CI verifies goldens in the complete variant test suites; these inputs also

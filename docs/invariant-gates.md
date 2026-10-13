@@ -83,8 +83,13 @@ registered, when a gate name or path is registered twice, when a registered path
 no longer exists or is not a Kotlin test under `app/src/test` or `app/src/androidTest`,
 when a row's name differs from its file name, or when a row leaves its invariant or
 owner blank. The registry is a declared Gradle input of every unit-test task, so a
-registry-only edit re-runs the suite instead of reusing cached results. Keep the
-table sorted by gate name.
+registry-only edit re-runs the suite instead of reusing cached results. Every
+instrumented Kotlin source is also an input: registered gates need not use the
+`CoverageTest` suffix, so their deletion or rename must invalidate validation.
+The scoped CI cache campaign (`scripts/check_invariant_gate_cache.py`) registers
+an ordinary instrumented test, establishes an `UP-TO-DATE` baseline, deletes it
+and requires a rerun that rejects the missing path, then restores and validates
+the original tree. Keep the table sorted by gate name.
 
 - **Add:** create the test, then add one row in the same pull request. Link the
   gate name to the test path relative to this page, state the invariant as a rule
