@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,20 +15,31 @@ import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.ui.settings.ShareConnectContent
 import dev.ipf.whitenoise.android.ui.settings.shareConnectFixture
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Share & Connect pinned in every theme plus RTL at 200 %, and with the invalid-scan message. */
+/**
+ * Share & Connect pinned in every theme plus RTL at 200 %, with the invalid-scan message, the Share menu
+ * holding Save to Gallery, and the busy state while a gallery export runs.
+ */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class ShareConnectScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** Restores the platform font scale that the large-text menu capture raises. */
+    @After
+    fun restorePlatformFontScale() {
+        RuntimeEnvironment.setFontScale(1f)
+    }
 
     /** Light theme, resting state. */
     @Test
@@ -64,13 +76,32 @@ class ShareConnectScreenScreenshotTest {
         capture("copied_invalid_scan")
     }
 
-    /** The share menu makes the URL and picture paths explicit. */
+    /** The share menu makes the URL, picture and Save to Gallery paths explicit. */
     @Test
     fun shareConnectMenu() {
         render(darkTheme = false)
         composeRule.onNodeWithTag("share_connect.share").performClick()
         composeRule.onNode(isPopup()).assertExists()
         captureScreenRoboImage("src/test/snapshots/share_connect_menu_light.png")
+    }
+
+    /** A gallery export in flight swaps the Share icon for a spinner and keeps the trigger disabled. */
+    @Test
+    fun shareConnectSavingDark() {
+        render(darkTheme = true, saving = true)
+        composeRule.onNodeWithTag("share_connect.share").assertIsNotEnabled()
+        capture("saving_dark")
+    }
+
+    /** RTL at 200 % in dark keeps every menu entry, Save to Gallery included, inside the screen. */
+    @Test
+    fun shareConnectMenuRtlLargeFont() {
+        // The popup window reads the platform font scale, not the composition's density override, so set both.
+        RuntimeEnvironment.setFontScale(2f)
+        render(darkTheme = true, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        composeRule.onNodeWithTag("share_connect.share").performClick()
+        composeRule.onNode(isPopup()).assertExists()
+        captureScreenRoboImage("src/test/snapshots/share_connect_menu_rtl_large_font.png")
     }
 
     /** Composes the surface under test with the given fixture. */
@@ -81,6 +112,7 @@ class ShareConnectScreenScreenshotTest {
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         copied: Boolean = false,
         scanInvalid: Boolean = false,
+        saving: Boolean = false,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -94,6 +126,7 @@ class ShareConnectScreenScreenshotTest {
                         qrContent = "marmot://profile/${shareConnectFixture.npub}?from=qr",
                         copied = copied,
                         scanInvalid = scanInvalid,
+                        gallerySaveInProgress = saving,
                         onBack = {},
                         onShareUrl = {},
                         onSharePicture = {},
