@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -157,7 +156,6 @@ class ConversationNotificationLandingTest {
         harness.mount()
         harness.awaitAnchored()
         harness.assertLandedAtTop(newest)
-        assertNull(harness.coordinator.mentionReadingRowHeightPx)
         harness.capture("conversation_notification_tall_newest")
     }
 
@@ -189,17 +187,6 @@ class ConversationNotificationLandingTest {
         harness.growTarget(640)
         harness.awaitSettled()
         harness.assertLandedAtTop(newest)
-        assertNull(harness.coordinator.mentionReadingRowHeightPx)
-    }
-
-    /** A fresh card tap also removes reading room retained from a previous explicit mention jump. */
-    @Test
-    fun aNotificationLandingClearsPreviouslyReservedMentionSpace() {
-        val newest = messageId(MESSAGE_COUNT - 1)
-        val harness = Harness(targetHeightDp = 80, notified = newest, initialReadingHeightPx = 80)
-        harness.mount()
-        harness.awaitAnchored()
-        harness.assertNaturalTailLanding(newest)
     }
 
     /** A message taller than the viewport lands at its beginning, where offset zero would show its end. */
@@ -451,7 +438,6 @@ class ConversationNotificationLandingTest {
         private val sentAfterOldestUnread: Boolean = false,
         private val dragDuringLandingLayout: Boolean = false,
         private val dark: Boolean = false,
-        private val initialReadingHeightPx: Int? = null,
     ) {
         private val timelineScript =
             ScriptedConversationTimelineSubscription(
@@ -533,7 +519,6 @@ class ConversationNotificationLandingTest {
                                 val writer = RecordingWriter(LazyListConversationScrollWriter(listState))
                                 ConversationScrollCoordinator(
                                     writer,
-                                    initialMentionReadingRowHeightPx = initialReadingHeightPx,
                                 )
                             }
                         val gate = remember(listState) { ConversationPostInitialReanchorGate() }
@@ -559,26 +544,6 @@ class ConversationNotificationLandingTest {
             viewport: ConversationTimelineViewport,
             rendered: List<TimelineMessage>,
         ) {
-            val density = LocalDensity.current
-            val reserve =
-                remember(coordinator, viewport, density) {
-                    derivedStateOf {
-                        coordinator.mentionReadingRowHeightPx?.let { rowHeightPx ->
-                            with(density) {
-                                conversationMentionReadingReservePx(
-                                    readingHeightPx = viewport.readingHeightPx(),
-                                    basePaddingPx = CONVERSATION_TIMELINE_TAIL_GAP.roundToPx(),
-                                    rowHeightPx = rowHeightPx,
-                                ).toDp()
-                            }
-                        } ?: 0.dp
-                    }
-                }
-            val readReserve = remember(reserve) { { reserve.value } }
-            val contentPadding =
-                remember(readReserve) {
-                    conversationTimelineContentPadding(0.dp, 0.dp, readReserve)
-                }
             Box(Modifier.fillMaxWidth().height(viewportHeight.intValue.dp)) {
                 LazyColumn(
                     state = listState,
@@ -591,10 +556,9 @@ class ConversationNotificationLandingTest {
                                 CONVERSATION_TIMELINE_TAIL_GAP,
                                 0.dp,
                                 rendered,
-                                readReserve,
                             ).testTag(LIST_TAG),
                     reverseLayout = true,
-                    contentPadding = contentPadding,
+                    contentPadding = conversationTimelineContentPadding(0.dp),
                 ) {
                     items(rendered.asReversed(), key = { it.presentationId }) { item ->
                         Row(item.record.messageIdHex)
@@ -737,7 +701,6 @@ class ConversationNotificationLandingTest {
                 1f,
             )
             assertFalse(list.canScrollBackward)
-            assertNull(coordinator.mentionReadingRowHeightPx)
             assertEquals(targetId, (coordinator.mode as ConversationScrollMode.ReadingHistory).anchorMessageId)
         }
 

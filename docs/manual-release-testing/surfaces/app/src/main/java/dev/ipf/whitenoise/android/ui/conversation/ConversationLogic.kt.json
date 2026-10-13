@@ -5,16 +5,16 @@
     "source_coverage": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationLogic.kt",
-        "surface": "Newest mention reading intent, visible return control and route snapshot room",
-        "anchor": "mentionReadingRowHeightPx: Int? = null",
+        "surface": "Saved reading position uses the real transcript anchor",
+        "anchor": "internal data class ConversationScrollSnapshot(",
         "test_ids": [
           "CON-032"
         ]
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationLogic.kt",
-        "surface": "Near-bottom flag reads the mention reserve inside its derived state",
-        "anchor": "mentionReadingRowHeightPx: () -> Int?",
+        "surface": "Near-bottom state follows the native reversed-list boundary",
+        "anchor": "internal fun rememberConversationNearBottom(",
         "test_ids": [
           "CON-032"
         ]

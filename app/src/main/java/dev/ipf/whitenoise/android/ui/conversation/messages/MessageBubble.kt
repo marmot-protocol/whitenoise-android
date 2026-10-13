@@ -147,6 +147,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNo
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
+import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
@@ -1058,9 +1059,13 @@ internal fun MessageBubble(
         }
     }
 
+    /** Copies the whole message as plain text, a poll as its question and options from the current row. */
     fun copyMessageText() {
         if (deleted) return
-        clipboard.setText(AnnotatedString(visibleTranslation ?: displayedBody))
+        // Polls use the current question/options; ordinary messages copy the visible rendition.
+        val text =
+            if (isPollRecord) currentPollCopyText(controller, pollOwner, messageTextCopy) else visibleTranslation ?: displayedBody
+        text?.let { clipboard.setText(AnnotatedString(it)) }
         onActionMenuOpenChange(false)
     }
 
@@ -2651,9 +2656,11 @@ internal fun MessageBubble(
                     canSelect = !deleted && !actionsReadOnly && batchSelectable,
                     // Whole-message Copy keeps using its actual clipboard payload,
                     // including card-style bubbles whose body is rendered by the
-                    // card rather than the text renderer. Partial selection is only
-                    // available when this bubble has selectable rendered text.
-                    canCopyText = !deleted && displayedBody.isNotBlank(),
+                    // card rather than the text renderer — a poll card copies its
+                    // question and options. Partial selection is only available
+                    // when this bubble has selectable rendered text.
+                    canCopyText =
+                        messageBubbleCanCopyText(item, deleted, persistedFailure, displayedBody, messageTextCopy),
                     // Speak aloud uses the same edit-aware user-authored text as TTS
                     // projection, not the display fallback (filenames, placeholders,
                     // reactions, system copy).

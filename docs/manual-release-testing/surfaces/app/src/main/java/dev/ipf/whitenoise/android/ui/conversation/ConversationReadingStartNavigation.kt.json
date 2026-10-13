@@ -5,9 +5,13 @@
     "source_coverage": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReadingStartNavigation.kt",
-        "surface": "Measured fully visible notification clamp without reserved trailing space",
-        "anchor": "if (!probe.reserveTailSpace && layout.isFullyVisibleAtNaturalTail)",
-        "test_ids": ["NTF-037"]
+        "surface": "Measured fully visible natural-tail clamp without artificial padding",
+        "anchor": "if (layout.isFullyVisibleAtNaturalTail)",
+        "test_ids": [
+          "CON-028",
+          "CON-032",
+          "NTF-037"
+        ]
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReadingStartNavigation.kt",
@@ -19,8 +23,8 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReadingStartNavigation.kt",
-        "surface": "Physical destination validation for a clamped newest mention",
-        "anchor": "val isAtReadingStart: Boolean",
+        "surface": "Physical visibility validation for a clamped newest mention",
+        "anchor": "val isFullyVisibleAtNaturalTail: Boolean",
         "test_ids": [
           "CON-032"
         ]

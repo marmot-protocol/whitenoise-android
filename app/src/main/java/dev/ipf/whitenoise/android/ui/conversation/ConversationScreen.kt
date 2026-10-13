@@ -799,7 +799,6 @@ internal fun ConversationScreen(
                     } else {
                         ConversationScrollMode.FollowingTail
                     },
-                initialMentionReadingRowHeightPx = scrollRestore?.mentionReadingRowHeightPx,
                 onExplicitNavigation = {
                     unreadJumpState = unreadJumpState.suppressCurrentStack()
                 },
@@ -1523,8 +1522,6 @@ internal fun ConversationScreen(
             timelineViewport = timelineViewport,
             renderedTimelineSize = renderedSize,
             trailingRowCount = trailingRowCount,
-            // Read inside the derived flag: a mention tap writes this reserve before its first frame.
-            mentionReadingRowHeightPx = { scrollCoordinator.mentionReadingRowHeightPx },
         )
 
     /** Resolves a saved logical anchor after current header and error rows. */
@@ -1543,6 +1540,17 @@ internal fun ConversationScreen(
             timelineIndex = timelineIndex,
             timelineSize = liveRenderedTimeline.size,
             trailingRowCount = controller.conversationTrailingRowCount(liveRenderedTimeline.size),
+        )
+    }
+
+    /** Reads near-bottom from the live rows, so a settle never sees stale derived state. */
+    fun liveNearBottom(): Boolean {
+        val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+        return isNearBottom(
+            listState = listState,
+            timelineViewport = timelineViewport,
+            timelineSize = liveRenderedSize,
+            trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
         )
     }
 
@@ -1568,19 +1576,8 @@ internal fun ConversationScreen(
                     snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
                 },
                 onSettled = {
-                    val liveRenderedSize =
-                        controller.timeline.count { !MessageProjector.isEdit(it.record) }
                     val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
-                    scrollCoordinator.onUserGestureSettled(
-                        currentScrollAnchor(),
-                        isNearBottom(
-                            listState = listState,
-                            timelineViewport = timelineViewport,
-                            timelineSize = liveRenderedSize,
-                            trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
-                            mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
-                        ),
-                    )
+                    scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), liveNearBottom())
                 },
             )
         }
@@ -1624,7 +1621,6 @@ internal fun ConversationScreen(
                         nearBottom = scrollCoordinator.isFollowingTail,
                         anchorItemId = anchor?.id,
                         anchorMessageIdHex = anchor?.record?.messageIdHex,
-                        mentionReadingRowHeightPx = scrollCoordinator.mentionReadingRowHeightPx,
                     ),
                 )
             }
@@ -2515,7 +2511,6 @@ internal fun ConversationScreen(
     ): ConversationMentionJumpLayout =
         timelineViewport.readingStartLayout(
             index = index,
-            isNewest = index == controller.conversationTrailingRowCount(renderedTimeline.size),
             cachedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
         )
 
@@ -2554,7 +2549,13 @@ internal fun ConversationScreen(
                             readLayout = { index -> mentionJumpLayout(targetMessageId, index) },
                             onCompleted = {
                                 if (navigationRequest.isCurrent()) {
-                                    scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                                    scrollCoordinator.settleLandingAt(
+                                        currentScrollAnchor(),
+                                        conversationLandingAtNewestEdge(
+                                            atNaturalTail = timelineViewport.isAtNaturalTail,
+                                            hasMoreAfter = controller.hasMoreAfterTimeline,
+                                        ),
+                                    )
                                 }
                             },
                         )
@@ -4214,27 +4215,6 @@ internal fun ConversationScreen(
                     ?.let { ConversationSearchMarking(it, effectiveSearchMatchIds.toSet()) },
         ) {
             val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
-            // Held as State and read only by the transcript's measure pass: a mention tap writes the
-            // reserve before its first frame, and a composition read here recomposed this whole host.
-            val mentionReadingReserve =
-                remember(timelineViewport, density, scrollCoordinator, snackbarContentInset) {
-                    derivedStateOf {
-                        val rowHeight = scrollCoordinator.mentionReadingRowHeightPx
-                        if (rowHeight == null) {
-                            0.dp
-                        } else {
-                            with(density) {
-                                conversationMentionReadingReservePx(
-                                    readingHeightPx = timelineViewport.readingHeightPx(),
-                                    basePaddingPx =
-                                        (CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value).roundToPx(),
-                                    rowHeightPx = rowHeight,
-                                ).toDp()
-                            }
-                        }
-                    }
-                }
-            val readMentionReadingReserve = remember(mentionReadingReserve) { { mentionReadingReserve.value } }
             ConversationTransientNoticeLayout(
                 notice = appState.transientNotice,
                 accountRef = conversationAccountRef,
@@ -4361,7 +4341,6 @@ internal fun ConversationScreen(
                                             CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value,
                                             overlayPadding,
                                             timelinePublication,
-                                            mentionReadingReserve = readMentionReadingReserve,
                                         ).trackWhiteNoiseHeader(listState)
                                         .padding(horizontal = 12.dp)
                                         // Paint, TalkBack exposure, and first-useful-frame
@@ -4407,11 +4386,10 @@ internal fun ConversationScreen(
                                 // out of a lazy sentinel leaves the real last row as
                                 // the stable tail anchor.
                                 contentPadding =
-                                    remember(snackbarContentInset.value, overlayPadding, readMentionReadingReserve) {
+                                    remember(snackbarContentInset.value, overlayPadding) {
                                         conversationTimelineContentPadding(
                                             snackbarContentInset.value,
                                             overlayPadding,
-                                            readMentionReadingReserve,
                                         )
                                     },
                             ) {

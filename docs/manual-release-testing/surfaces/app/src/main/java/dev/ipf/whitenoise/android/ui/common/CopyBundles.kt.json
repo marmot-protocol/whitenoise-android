@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+  "legacy_sha256": "0d7fe482b33ce9c103505b313aa81dcd2b17ba83a7b10eb9f83630a59e62fbb3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberedMessageBubbleTime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "fun rememberedMessageBubbleTime(",
+        "test_ids": [
+          "CON-018"
+        ]
+      },
+      {
+        "surface": "string:poll_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.poll_preview",
+        "test_ids": [
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "string:poll_copy_heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.poll_copy_heading",
+        "test_ids": [
+          "MSG-038"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "message-copy:giphy_media_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.giphy_media_preview",
+        "test_ids": [
+          "MED-021"
+        ]
+      },
+      {
+        "surface": "setting:conversation_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.conversation_unavailable",
+        "test_ids": [
+          "CHL-016"
+        ]
+      },
+      {
+        "surface": "setting:unnamed_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.unnamed_group",
+        "test_ids": [
+          "CHL-016"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -17,9 +17,36 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], manifest = Config.NONE)
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationMentionNavigationTest {
-    /** Native tail clamping must report unreached while preserving command-settlement cleanup. */
+    /** A fully visible near-tail target succeeds without adding synthetic reading room. */
     @Test
-    fun clampedNewestPositionDoesNotReportReached() =
+    fun fullyVisibleNearTailMentionUsesTheNaturalClamp() =
+        runTest {
+            val writer = RecordingWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var completions = 0
+            val reached =
+                coordinator.jumpToMentionReadingStart(
+                    targetMessageId = "near-tail-mention",
+                    resolveTargetIndex = { 1 },
+                    readLayout = {
+                        ConversationMentionJumpLayout(
+                            viewportEndOffsetPx = 500,
+                            itemHeightPx = 80,
+                            itemOffsetPx = 74,
+                            isAtNaturalTail = true,
+                        )
+                    },
+                    awaitLayout = {},
+                    onCompleted = { completions++ },
+                )
+            assertTrue(reached)
+            assertEquals(1, completions)
+            assertEquals(listOf(Write(true, 1, -420)), writer.writes)
+        }
+
+    /** An unachieved reading start gives up after bounded corrections and still settles the command. */
+    @Test
+    fun unsettledReadingStartStopsAfterBoundedCorrections() =
         runTest {
             val writer = RecordingWriter()
             var completions = 0
@@ -33,12 +60,16 @@ class ConversationMentionNavigationTest {
                 )
             assertFalse(reached)
             assertEquals(1, completions)
-            assertTrue(writer.writes.size <= 4)
+            // One animated approach, then exactly the three bounded corrections.
+            assertEquals(
+                listOf(Write(true, 0, -420), Write(false, 0, -420), Write(false, 0, -420), Write(false, 0, -420)),
+                writer.writes,
+            )
         }
 
-    /** A new window may shift the target while native room is remeasured; never correct the obsolete index. */
+    /** A new window may shift the target while its row is measured, so the obsolete index is never corrected. */
     @Test
-    fun newestMentionReResolvesIndexAfterItsReadingRoomIsMeasured() =
+    fun newestMentionReResolvesIndexAfterItsApproachIsMeasured() =
         runTest {
             val writer = RecordingWriter()
             var index = 0
@@ -48,13 +79,13 @@ class ConversationMentionNavigationTest {
                 ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
                     targetMessageId = "newest-mention",
                     resolveTargetIndex = { index },
-                    readLayout = { current ->
-                        ConversationMentionJumpLayout(500, height, isNewest = current == 0)
-                    },
+                    readLayout = { ConversationMentionJumpLayout(500, height) },
                     awaitLayout = {
                         layoutPass++
-                        if (layoutPass == 2) height = 160
-                        if (layoutPass == 3) index = 1
+                        if (layoutPass == 1) {
+                            height = 160
+                            index = 1
+                        }
                     },
                 )
             assertTrue(reached)

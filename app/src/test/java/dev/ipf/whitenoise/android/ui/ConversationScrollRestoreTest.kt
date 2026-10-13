@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
+import dev.ipf.whitenoise.android.ui.conversation.conversationLandingAtNewestEdge
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollRestoreListIndex
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollSnapshotOnLeave
@@ -67,12 +68,12 @@ class ConversationScrollRestoreTest {
         )
     }
 
-    /** Native offset zero still owns a history snapshot when a newest mention needs reading room. */
+    /** A history anchor at offset zero is saved without adding transient layout state. */
     @Test
-    fun newestMentionOnLeavePersistsItsReadingRoomWithTheLogicalAnchor() {
+    fun readingAnchorAtZeroOffsetPersistsWithoutSyntheticRoom() {
         assertEquals(
-            ConversationScrollSnapshot(0, 0, "msg:mention", "mention", 80),
-            conversationScrollSnapshotOnLeave(0, 0, false, "msg:mention", "mention", 80),
+            ConversationScrollSnapshot(0, 0, "msg:mention", "mention"),
+            conversationScrollSnapshotOnLeave(0, 0, false, "msg:mention", "mention"),
         )
     }
 
@@ -181,5 +182,14 @@ class ConversationScrollRestoreTest {
                 renderedItemIds = (0 until 50).map { "msg:$it" },
             ),
         )
+    }
+
+    /** A landing rests at the newest edge only at the native tail clamp with no newer pages left unloaded. */
+    @Test
+    fun landingRestsAtTheNewestEdgeOnlyAtTheNativeTailWithNoNewerPages() {
+        assertTrue(conversationLandingAtNewestEdge(atNaturalTail = true, hasMoreAfter = false))
+        assertFalse(conversationLandingAtNewestEdge(atNaturalTail = true, hasMoreAfter = true))
+        assertFalse(conversationLandingAtNewestEdge(atNaturalTail = false, hasMoreAfter = false))
+        assertFalse(conversationLandingAtNewestEdge(atNaturalTail = false, hasMoreAfter = true))
     }
 }
