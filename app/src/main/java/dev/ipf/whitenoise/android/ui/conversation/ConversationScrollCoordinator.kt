@@ -745,7 +745,7 @@ internal class ConversationScrollCoordinator(
         suspend fun prepareReadingSpace(reason: ConversationScrollReason?) {
             ensureCurrent()
             if (reason == null || mentionReadingRowHeightPx == null) return
-            if (reason == ConversationScrollReason.Mention || reason == ConversationScrollReason.SavedRestore) return
+            if (reason == ConversationScrollReason.SavedRestore) return
             mentionReadingRowHeightPx = null
             withFrameNanos { }
             ensureCurrent()

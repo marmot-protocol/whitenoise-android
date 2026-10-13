@@ -29,7 +29,13 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
         settleReadingStart(
             targetMessageId = targetMessageId,
             reason = ConversationScrollReason.Mention,
-            probe = ConversationReadingStartProbe(resolveTargetIndex, readLayout, awaitLayout),
+            probe =
+                ConversationReadingStartProbe(
+                    resolveTargetIndex,
+                    readLayout,
+                    awaitLayout,
+                    reserveTailSpace = false,
+                ),
             approach = ConversationReadingStartApproach.Animated,
         )
     if (result.commandCompleted) onCompleted()

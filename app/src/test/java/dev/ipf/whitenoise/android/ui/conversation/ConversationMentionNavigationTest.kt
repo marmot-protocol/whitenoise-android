@@ -7,6 +7,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -17,6 +18,34 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], manifest = Config.NONE)
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationMentionNavigationTest {
+    /** A fully visible near-tail target succeeds without adding synthetic reading room. */
+    @Test
+    fun fullyVisibleNearTailMentionUsesTheNaturalClamp() =
+        runTest {
+            val writer = RecordingWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            var completions = 0
+            val reached =
+                coordinator.jumpToMentionReadingStart(
+                    targetMessageId = "near-tail-mention",
+                    resolveTargetIndex = { 1 },
+                    readLayout = {
+                        ConversationMentionJumpLayout(
+                            viewportEndOffsetPx = 500,
+                            itemHeightPx = 80,
+                            itemOffsetPx = 74,
+                            isAtNaturalTail = true,
+                        )
+                    },
+                    awaitLayout = {},
+                    onCompleted = { completions++ },
+                )
+            assertTrue(reached)
+            assertEquals(1, completions)
+            assertNull(coordinator.mentionReadingRowHeightPx)
+            assertEquals(listOf(Write(true, 1, -420)), writer.writes)
+        }
+
     /** Native tail clamping must report unreached while preserving command-settlement cleanup. */
     @Test
     fun clampedNewestPositionDoesNotReportReached() =
@@ -38,7 +67,7 @@ class ConversationMentionNavigationTest {
 
     /** A new window may shift the target while native room is remeasured; never correct the obsolete index. */
     @Test
-    fun newestMentionReResolvesIndexAfterItsReadingRoomIsMeasured() =
+    fun newestMentionReResolvesIndexAfterItsApproachIsMeasured() =
         runTest {
             val writer = RecordingWriter()
             var index = 0
@@ -53,8 +82,10 @@ class ConversationMentionNavigationTest {
                     },
                     awaitLayout = {
                         layoutPass++
-                        if (layoutPass == 2) height = 160
-                        if (layoutPass == 3) index = 1
+                        if (layoutPass == 1) {
+                            height = 160
+                            index = 1
+                        }
                     },
                 )
             assertTrue(reached)

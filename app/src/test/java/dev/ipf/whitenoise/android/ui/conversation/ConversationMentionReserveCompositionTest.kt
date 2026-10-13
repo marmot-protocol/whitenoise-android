@@ -34,7 +34,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * A mention jump to the newest row writes its reading reserve before the tap's first frame (#3150).
+ * A retained legacy reading snapshot can restore its reserve before the first frame (#3150).
  * These pin that the reserve reaches layout through measurement alone, so that frame relays the
  * transcript out instead of recomposing the screen hosting it.
  */

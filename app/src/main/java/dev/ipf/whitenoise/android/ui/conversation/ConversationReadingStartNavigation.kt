@@ -38,7 +38,7 @@ internal data class ConversationMentionJumpLayout(
     val readingStartOffset: Int
         get() = ReplyNavigation.readingStartScrollOffset(viewportEndOffsetPx, itemHeightPx ?: estimatedItemHeightPx)
 
-    /** A clamped notification target is readable without inventing blank space below the newest row. */
+    /** A clamped target is readable without inventing blank space below the newest row. */
     val isFullyVisibleAtNaturalTail: Boolean
         get() =
             isAtNaturalTail &&
@@ -50,8 +50,8 @@ internal data class ConversationMentionJumpLayout(
 
 /**
  * The complete measured geometry a reading-start settle needs for [index]: the clear viewport end, the row's size
- * and offset, and the tail extent that decides how much scroll runway a mention needs. Notifications use the
- * same physical geometry but accept a fully visible native tail clamp instead of reserving empty runway.
+ * and offset, and any legacy tail extent. Mention and notification navigation accept a fully visible
+ * native tail clamp instead of reserving empty runway.
  * [cachedItemHeightPx] is a height seen earlier for an unmeasured row.
  */
 internal fun ConversationTimelineViewport.readingStartLayout(
@@ -90,7 +90,7 @@ internal data class ConversationReadingStartProbe(
     val readLayout: (Int) -> ConversationMentionJumpLayout,
     val awaitLayout: suspend () -> Unit = { withFrameNanos { } },
     val traceSections: Boolean = true,
-    /** Mention jumps retain their runway; notification opens stay within the real transcript bounds. */
+    /** Compatibility opt-in for retained reading space; production mention and notification probes opt out. */
     val reserveTailSpace: Boolean = true,
 )
 
@@ -120,7 +120,7 @@ internal data class ConversationReadingStartResult(
 /**
  * The settle core shared by the mention button and notification landing: reach the row, then keep
  * correcting against fresh signed reverse-list geometry until its reading start sits at the top,
- * or a notification target is fully visible at the natural newest boundary without extra padding.
+ * or a target is fully visible at the natural newest boundary without extra padding.
  * One latest-wins command owns the whole sequence under [reason], so a drag or newer navigation
  * cancels it before a stale correction can be written.
  */
