@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -28,6 +29,7 @@ class ShareConnectScreenBehaviorTest {
     private var pictureShareCount = 0
     private var copyCount = 0
     private var scannerCount = 0
+    private var saveCount = 0
 
     /** Back and both explicit top-bar share choices invoke their callers once per tap. */
     @Test
@@ -81,10 +83,32 @@ class ShareConnectScreenBehaviorTest {
         composeRule.onNodeWithText("Scan to connect.").assertIsDisplayed()
     }
 
+    /** Download has its own action, while a busy export fences both download and picture sharing. */
+    @Test
+    fun saveActionDoesNotOpenTheShareChooser() {
+        mount()
+        composeRule.onNodeWithTag("profile.qr.save").assertIsDisplayed().performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, saveCount)
+            assertEquals(0, pictureShareCount)
+            assertEquals(0, urlShareCount)
+        }
+    }
+
+    @Test
+    fun savingDisablesExportsAndPreservesScanner() {
+        mount(saving = true)
+        composeRule.onNodeWithTag("profile.qr.save").assertIsNotEnabled()
+        composeRule.onNodeWithTag("share_connect.share").assertIsNotEnabled()
+        composeRule.onNodeWithText("Scan QR Code").performClick()
+        composeRule.runOnIdle { assertEquals(1, scannerCount) }
+    }
+
     /** Mounts the composable under test. */
     private fun mount(
         copied: Boolean = false,
         scanInvalid: Boolean = false,
+        saving: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
@@ -93,6 +117,8 @@ class ShareConnectScreenBehaviorTest {
                     qrContent = "marmot://profile/${shareConnectFixture.npub}?from=qr",
                     copied = copied,
                     scanInvalid = scanInvalid,
+                    pictureSaveInProgress = saving,
+                    onSavePicture = { saveCount++ },
                     onBack = { backCount++ },
                     onShareUrl = { urlShareCount++ },
                     onSharePicture = { pictureShareCount++ },

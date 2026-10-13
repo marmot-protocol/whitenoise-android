@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,6 +39,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -62,12 +65,15 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
+import dev.ipf.whitenoise.android.ui.profile.ProfileQrGallerySave
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Sizes fixed by the prototype's Share & Connect layout. */
 private object ShareConnectDefaults {
@@ -124,6 +130,8 @@ internal fun ShareConnectScreen(
     var nextScannerSession by remember(accountIdHex, runtime) { mutableStateOf(0L) }
     var scanInvalid by rememberSaveable(accountIdHex) { mutableStateOf(false) }
     var pictureShareInProgress by remember(accountIdHex, runtime) { mutableStateOf(false) }
+    val gallerySave = remember(accountIdHex, runtime) { ProfileQrGallerySave() }
+    val saveScope = rememberCoroutineScope()
     val profileCardHeadline = stringResource(R.string.profile_share_card_headline)
 
     LaunchedEffect(copied) {
@@ -139,6 +147,29 @@ internal fun ShareConnectScreen(
         copied = copied,
         scanInvalid = scanInvalid,
         pictureShareInProgress = pictureShareInProgress,
+        pictureSaveInProgress = gallerySave.inProgress,
+        onSavePicture = save@{
+            if (!ownsScreen() || pictureShareInProgress || gallerySave.inProgress || link == null) return@save
+            val spec =
+                QrShareCardSpec(
+                    headline = profileCardHeadline,
+                    qrPayload = link.qrUri,
+                    displayName = profile.name,
+                    avatar = AvatarImageLoader.peekBitmap(profile.pictureUrl),
+                )
+            saveScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                runCatchingCancellable { gallerySave.save(context, spec, ::ownsScreen) }
+                    .onSuccess { saved ->
+                        if (ownsScreen() && saved != null) {
+                            if (saved) {
+                                appState.presentTransient(R.string.media_saved)
+                            } else {
+                                appState.present(R.string.media_save_failed)
+                            }
+                        }
+                    }.onFailure { if (ownsScreen()) appState.present(R.string.media_save_failed) }
+            }
+        },
         onBack = {
             if (ownsScreen()) {
                 routeActive = false
@@ -154,7 +185,7 @@ internal fun ShareConnectScreen(
             ).onFailure { appState.presentOutboundShareFailure("PROFILE_URL_SHARE", it) }
         },
         onSharePicture = picture@{
-            if (!ownsScreen() || pictureShareInProgress || link == null) return@picture
+            if (!ownsScreen() || pictureShareInProgress || gallerySave.inProgress || link == null) return@picture
             pictureShareInProgress = true
             appState.launchMutation {
                 runCatchingCancellable {
@@ -242,12 +273,15 @@ internal fun ShareConnectContent(
     copied: Boolean,
     scanInvalid: Boolean,
     pictureShareInProgress: Boolean = false,
+    pictureSaveInProgress: Boolean = false,
+    onSavePicture: () -> Unit = {},
     onBack: () -> Unit,
     onShareUrl: () -> Unit,
     onSharePicture: () -> Unit,
     onCopy: () -> Unit,
     onOpenScanner: () -> Unit,
 ) {
+    val saveLabel = stringResource(R.string.media_save)
     var shareMenuExpanded by remember { mutableStateOf(false) }
     WhiteNoiseScaffold(
         modifier = Modifier.fillMaxSize().testTag("share_connect.screen"),
@@ -265,10 +299,27 @@ internal fun ShareConnectContent(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = onSavePicture,
+                        enabled = qrContent.isNotBlank() && !pictureShareInProgress && !pictureSaveInProgress,
+                        modifier = Modifier.testTag("profile.qr.save").semantics { contentDescription = saveLabel },
+                    ) {
+                        if (pictureSaveInProgress) {
+                            CircularProgressIndicator(
+                                Modifier.size(ShareConnectDefaults.IconSize),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_download),
+                                contentDescription = null,
+                            )
+                        }
+                    }
                     Box {
                         IconButton(
                             onClick = { shareMenuExpanded = true },
-                            enabled = !pictureShareInProgress,
+                            enabled = !pictureShareInProgress && !pictureSaveInProgress,
                             modifier = Modifier.testTag("share_connect.share"),
                         ) {
                             if (pictureShareInProgress) {
