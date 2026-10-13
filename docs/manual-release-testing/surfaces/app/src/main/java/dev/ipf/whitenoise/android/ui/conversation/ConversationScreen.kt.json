@@ -195,6 +195,22 @@
         "test_ids": [
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Share user picker title",
+        "anchor": "R.string.share_user_title",
+        "test_ids": [
+          "MED-013"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Share user picker send action",
+        "anchor": "R.string.send",
+        "test_ids": [
+          "MED-013"
+        ]
       }
     ]
   },
