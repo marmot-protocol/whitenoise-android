@@ -1,0 +1,117 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+  "legacy_sha256": "3a3c042b4cffbb3497978c62b986817d03a4303cea682a4f3c2fde2e29afc495",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "string:media_cancel_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_cancel_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "MediaVoiceBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun MediaVoiceBubble(",
+        "test_ids": [
+          "MED-001",
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "VoiceActionGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun VoiceActionGlyph(",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "VoiceAttachmentContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun VoiceAttachmentContent(",
+        "test_ids": [
+          "MED-008",
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "VoiceSeekTrack",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun VoiceSeekTrack(",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "VoiceSpeedPill",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun VoiceSpeedPill(",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "VoiceWaveform",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "fun VoiceWaveform(",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "voice-action:media-downloading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:media-download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_pause",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice-action:play",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_play",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:voice_message_speed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_speed",
+        "test_ids": [
+          "MED-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
