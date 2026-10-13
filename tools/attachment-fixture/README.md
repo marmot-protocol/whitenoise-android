@@ -195,11 +195,17 @@ only for the uncached source (a retained or host-cached source is served locally
 exactly one receipt per forwarded copy, one distinct destination message per send, and the issue's per-forward ceilings
 (15 s for a retained or cached source, 30 s uncached) as loopback regression guards. It reports each variant's slowest forward against the direct-send median and the issue's two-times
 relation, but does not fail on that relation, because loopback fixed costs dominate both numbers. It records
-`physical_device_qualified: false`; the physical cached and uncached matrices on known-responsive infrastructure remain
-separate.
+`physical_device_qualified: false` on an emulator. The same runner can run once on one explicitly authorized phone,
+with its serial given twice and the Pixel profile, after `apk_physical_runner.py install` has updated the isolated
+identity in place; only a qualified run there records `physical_device_qualified: true`. That run reaches the loopback
+fixture servers over `adb reverse`, so it measures the phone's own work against a responsive endpoint, and the matrices
+on known-responsive public infrastructure remain separate.
 
 ```bash
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-forward
+python3 tools/attachment-fixture/forward_runner.py --adb "$ADB" --serial "$SERIAL" \
+  --physical-fixture-serial "$SERIAL" --budget-profile pixel-api37-arm64 \
+  --root "$RUN/forward" --output "$RUN/forward.json"
 ```
 
 These are **transport interruption** checks. They do not simulate a JobScheduler

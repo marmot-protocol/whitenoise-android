@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,6 +39,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -62,12 +66,15 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
+import dev.ipf.whitenoise.android.ui.profile.ProfileQrGallerySave
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Sizes fixed by the prototype's Share & Connect layout. */
 private object ShareConnectDefaults {
@@ -124,6 +131,8 @@ internal fun ShareConnectScreen(
     var nextScannerSession by remember(accountIdHex, runtime) { mutableStateOf(0L) }
     var scanInvalid by rememberSaveable(accountIdHex) { mutableStateOf(false) }
     var pictureShareInProgress by remember(accountIdHex, runtime) { mutableStateOf(false) }
+    val gallerySave = remember(accountIdHex, runtime) { ProfileQrGallerySave() }
+    val saveScope = rememberCoroutineScope()
     val profileCardHeadline = stringResource(R.string.profile_share_card_headline)
 
     LaunchedEffect(copied) {
@@ -139,6 +148,31 @@ internal fun ShareConnectScreen(
         copied = copied,
         scanInvalid = scanInvalid,
         pictureShareInProgress = pictureShareInProgress,
+        gallerySaveInProgress = gallerySave.inProgress,
+        canSaveToGallery = link != null,
+        onSaveToGallery = save@{
+            val exportInProgress = pictureShareInProgress || gallerySave.inProgress
+            if (!ownsScreen() || exportInProgress || link == null) return@save
+            val spec =
+                QrShareCardSpec(
+                    headline = profileCardHeadline,
+                    qrPayload = link.qrUri,
+                    displayName = profile.name,
+                    avatar = AvatarImageLoader.peekBitmap(profile.pictureUrl),
+                )
+            saveScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                runCatchingCancellable { gallerySave.save(context, spec, ::ownsScreen) }
+                    .onSuccess { saved ->
+                        if (ownsScreen() && saved != null) {
+                            if (saved) {
+                                appState.presentTransient(R.string.media_saved)
+                            } else {
+                                appState.present(R.string.media_save_failed)
+                            }
+                        }
+                    }.onFailure { if (ownsScreen()) appState.present(R.string.media_save_failed) }
+            }
+        },
         onBack = {
             if (ownsScreen()) {
                 routeActive = false
@@ -154,7 +188,8 @@ internal fun ShareConnectScreen(
             ).onFailure { appState.presentOutboundShareFailure("PROFILE_URL_SHARE", it) }
         },
         onSharePicture = picture@{
-            if (!ownsScreen() || pictureShareInProgress || link == null) return@picture
+            val exportInProgress = pictureShareInProgress || gallerySave.inProgress
+            if (!ownsScreen() || exportInProgress || link == null) return@picture
             pictureShareInProgress = true
             appState.launchMutation {
                 runCatchingCancellable {
@@ -242,13 +277,15 @@ internal fun ShareConnectContent(
     copied: Boolean,
     scanInvalid: Boolean,
     pictureShareInProgress: Boolean = false,
+    gallerySaveInProgress: Boolean = false,
+    canSaveToGallery: Boolean = qrContent.isNotBlank(),
+    onSaveToGallery: () -> Unit = {},
     onBack: () -> Unit,
     onShareUrl: () -> Unit,
     onSharePicture: () -> Unit,
     onCopy: () -> Unit,
     onOpenScanner: () -> Unit,
 ) {
-    var shareMenuExpanded by remember { mutableStateOf(false) }
     WhiteNoiseScaffold(
         modifier = Modifier.fillMaxSize().testTag("share_connect.screen"),
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -265,42 +302,14 @@ internal fun ShareConnectContent(
                     }
                 },
                 actions = {
-                    Box {
-                        IconButton(
-                            onClick = { shareMenuExpanded = true },
-                            enabled = !pictureShareInProgress,
-                            modifier = Modifier.testTag("share_connect.share"),
-                        ) {
-                            if (pictureShareInProgress) {
-                                CircularProgressIndicator(
-                                    Modifier.size(ShareConnectDefaults.IconSize),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_share),
-                                    contentDescription = stringResource(R.string.share_profile),
-                                )
-                            }
-                        }
-                        WhiteNoiseDropdownMenu(
-                            expanded = shareMenuExpanded,
-                            onDismissRequest = { shareMenuExpanded = false },
-                            items =
-                                listOf(
-                                    WhiteNoiseMenuItem(
-                                        stringResource(R.string.share_profile_url),
-                                        onShareUrl,
-                                        R.drawable.ic_link,
-                                    ),
-                                    WhiteNoiseMenuItem(
-                                        stringResource(R.string.share_profile_picture),
-                                        onSharePicture,
-                                        R.drawable.ic_image,
-                                    ),
-                                ),
-                        )
-                    }
+                    ShareConnectShareAction(
+                        pictureShareInProgress = pictureShareInProgress,
+                        gallerySaveInProgress = gallerySaveInProgress,
+                        canSaveToGallery = canSaveToGallery,
+                        onShareUrl = onShareUrl,
+                        onSharePicture = onSharePicture,
+                        onSaveToGallery = onSaveToGallery,
+                    )
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
@@ -315,6 +324,78 @@ internal fun ShareConnectContent(
         AdaptiveContent(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             ShareProfileContent(profile, qrContent, copied, scanInvalid, onCopy)
         }
+    }
+}
+
+/**
+ * Top-bar Share action: the trigger and its anchored menu with Share profile URL, Share profile card and Save to
+ * Gallery. Any export disables the trigger and every export entry, and a save announces Saving to TalkBack.
+ */
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // One trigger, its busy semantics and its menu rows.
+@Composable
+private fun ShareConnectShareAction(
+    pictureShareInProgress: Boolean,
+    gallerySaveInProgress: Boolean,
+    canSaveToGallery: Boolean,
+    onShareUrl: () -> Unit,
+    onSharePicture: () -> Unit,
+    onSaveToGallery: () -> Unit,
+) {
+    val shareLabel = stringResource(R.string.share_profile)
+    val savingLabel = stringResource(R.string.photo_editor_saving_action)
+    val exporting = pictureShareInProgress || gallerySaveInProgress
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    // An export that starts while the menu is open closes it, and the menu must not reopen when the export ends.
+    LaunchedEffect(exporting) { if (exporting) menuExpanded = false }
+
+    Box {
+        IconButton(
+            onClick = { menuExpanded = true },
+            enabled = !exporting,
+            modifier =
+                Modifier.testTag("share_connect.share").semantics {
+                    if (exporting) contentDescription = shareLabel
+                    if (gallerySaveInProgress) stateDescription = savingLabel
+                },
+        ) {
+            if (exporting) {
+                CircularProgressIndicator(
+                    Modifier.size(ShareConnectDefaults.IconSize),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.ic_share),
+                    contentDescription = shareLabel,
+                )
+            }
+        }
+        WhiteNoiseDropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+            items =
+                listOf(
+                    WhiteNoiseMenuItem(
+                        stringResource(R.string.share_profile_url),
+                        onShareUrl,
+                        R.drawable.ic_link,
+                    ),
+                    WhiteNoiseMenuItem(
+                        stringResource(R.string.share_profile_picture),
+                        onSharePicture,
+                        R.drawable.ic_image,
+                        enabled = !exporting,
+                    ),
+                    WhiteNoiseMenuItem(
+                        stringResource(R.string.share_connect_save_to_gallery),
+                        onSaveToGallery,
+                        R.drawable.ic_download,
+                        enabled = canSaveToGallery && !exporting,
+                        modifier = Modifier.testTag("share_connect.save_to_gallery"),
+                    ),
+                ),
+        )
     }
 }
 
