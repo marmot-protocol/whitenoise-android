@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,7 +27,6 @@ class ConversationNotificationClampTest {
             assertTrue(result.reached)
             assertEquals(ConversationReadingStartPlacement(0, 0), result.placement)
             assertEquals(listOf(0 to -332), writer.writes)
-            assertNull(coordinator.mentionReadingRowHeightPx)
         }
 
     @Test
@@ -44,7 +42,6 @@ class ConversationNotificationClampTest {
                 )
             assertTrue(result.reached)
             assertEquals(ConversationReadingStartPlacement(1, -74), result.placement)
-            assertNull(coordinator.mentionReadingRowHeightPx)
         }
 
     @Test
@@ -74,7 +71,6 @@ class ConversationNotificationClampTest {
         readLayout = { layout },
         awaitLayout = {},
         traceSections = false,
-        reserveTailSpace = false,
     )
 
     private class ClampWriter : ConversationScrollWriter {

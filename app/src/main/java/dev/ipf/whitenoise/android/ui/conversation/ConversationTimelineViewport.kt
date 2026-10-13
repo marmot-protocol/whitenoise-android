@@ -104,12 +104,6 @@ internal class ConversationTimelineViewport(
     val isAtNaturalTail: Boolean
         get() = !listState.canScrollBackward
 
-    /**
-     * The measured extent from the newest row through [index], counting structural rows and spacing even beneath
-     * composer occlusion, so it reads the native layout rather than the reading layout.
-     */
-    fun tailContentHeightPx(index: Int): Int? = listState.layoutInfo.mentionTailContentHeightPx(index)
-
     /** Stores actual list coordinates; this never modifies or substitutes the native list's physical bounds. */
     fun onPaintViewportMeasured(coordinates: LayoutCoordinates) {
         val position = coordinates.positionInWindow()
@@ -176,22 +170,17 @@ internal fun LazyListLayoutInfo.newestReadRow(timelineListIndices: IntRange): La
 
 /**
  * Records the publication and padding consumed by this native list measure, including unchanged-total transitions.
- * [mentionReadingReserve] is read here, in measurement, so a reserve change relays the list out without recomposing.
- * It is read once, before the list measures: the reserve derives from the list's layout info, which that measure
- * rewrites, so a later read could record a base the list's own content padding did not use in this pass.
  */
 internal fun Modifier.measureConversationTimelinePadding(
     viewport: ConversationTimelineViewport,
     basePadding: Dp,
     foregroundOverlap: Dp,
     timelinePublication: List<TimelineMessage>,
-    mentionReadingReserve: () -> Dp = { 0.dp },
 ): Modifier =
     layout { measurable, constraints ->
-        val reserve = mentionReadingReserve()
         val placeable =
             traceConversationUiSection(ConversationUiTrace.TRANSCRIPT_MEASURE) { measurable.measure(constraints) }
-        viewport.onPaddingMeasured((basePadding + reserve).roundToPx(), foregroundOverlap.roundToPx())
+        viewport.onPaddingMeasured(basePadding.roundToPx(), foregroundOverlap.roundToPx())
         viewport.onTimelineMeasured(timelinePublication)
         layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
     }

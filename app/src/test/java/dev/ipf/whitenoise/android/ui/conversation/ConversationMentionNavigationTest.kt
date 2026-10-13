@@ -7,7 +7,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,13 +41,12 @@ class ConversationMentionNavigationTest {
                 )
             assertTrue(reached)
             assertEquals(1, completions)
-            assertNull(coordinator.mentionReadingRowHeightPx)
             assertEquals(listOf(Write(true, 1, -420)), writer.writes)
         }
 
-    /** Native tail clamping must report unreached while preserving command-settlement cleanup. */
+    /** An unachieved reading start gives up after bounded corrections and still settles the command. */
     @Test
-    fun clampedNewestPositionDoesNotReportReached() =
+    fun unsettledReadingStartStopsAfterBoundedCorrections() =
         runTest {
             val writer = RecordingWriter()
             var completions = 0
@@ -65,7 +63,7 @@ class ConversationMentionNavigationTest {
             assertTrue(writer.writes.size <= 4)
         }
 
-    /** A new window may shift the target while native room is remeasured; never correct the obsolete index. */
+    /** A new window may shift the target while its row is measured; never correct the obsolete index. */
     @Test
     fun newestMentionReResolvesIndexAfterItsApproachIsMeasured() =
         runTest {
@@ -77,9 +75,7 @@ class ConversationMentionNavigationTest {
                 ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
                     targetMessageId = "newest-mention",
                     resolveTargetIndex = { index },
-                    readLayout = { current ->
-                        ConversationMentionJumpLayout(500, height, isNewest = current == 0)
-                    },
+                    readLayout = { ConversationMentionJumpLayout(500, height) },
                     awaitLayout = {
                         layoutPass++
                         if (layoutPass == 1) {

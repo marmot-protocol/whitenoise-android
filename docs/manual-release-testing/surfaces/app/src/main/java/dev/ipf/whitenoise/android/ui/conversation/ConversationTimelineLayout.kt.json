@@ -5,16 +5,16 @@
     "source_coverage": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineLayout.kt",
-        "surface": "Native newest-mention reading room without extra timeline rows",
-        "anchor": "conversationMentionReadingReservePx(",
+        "surface": "Resting timeline padding contains no mention runway",
+        "anchor": "internal fun conversationTimelineContentPadding(",
         "test_ids": [
           "CON-032"
         ]
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineLayout.kt",
-        "surface": "Measure-time mention reading reserve in transcript content padding",
-        "anchor": "class ConversationTimelineContentPadding(",
+        "surface": "Timeline content padding preserves composer and snackbar clearance",
+        "anchor": "bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap",
         "test_ids": [
           "CON-032"
         ]

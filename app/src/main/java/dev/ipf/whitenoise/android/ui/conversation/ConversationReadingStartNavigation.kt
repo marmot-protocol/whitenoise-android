@@ -17,9 +17,7 @@ internal data class ConversationMentionJumpLayout(
     val viewportEndOffsetPx: Int,
     val itemHeightPx: Int?,
     val estimatedItemHeightPx: Int? = null,
-    val isNewest: Boolean = false,
     val itemOffsetPx: Int? = null,
-    val tailContentHeightPx: Int? = null,
     val viewportStartOffsetPx: Int = 0,
     val isAtNaturalTail: Boolean = false,
 ) {
@@ -50,13 +48,12 @@ internal data class ConversationMentionJumpLayout(
 
 /**
  * The complete measured geometry a reading-start settle needs for [index]: the clear viewport end, the row's size
- * and offset, and any legacy tail extent. Mention and notification navigation accept a fully visible
+ * and offset. Mention and notification navigation accept a fully visible
  * native tail clamp instead of reserving empty runway.
  * [cachedItemHeightPx] is a height seen earlier for an unmeasured row.
  */
 internal fun ConversationTimelineViewport.readingStartLayout(
     index: Int,
-    isNewest: Boolean,
     cachedItemHeightPx: Int? = null,
 ): ConversationMentionJumpLayout {
     val layout = readingLayoutInfo()
@@ -66,9 +63,7 @@ internal fun ConversationTimelineViewport.readingStartLayout(
         itemHeightPx = row?.size,
         estimatedItemHeightPx =
             cachedItemHeightPx ?: ReplyNavigation.estimateItemHeightPx(layout.visibleItemsInfo.map { it.size }),
-        isNewest = isNewest,
         itemOffsetPx = row?.offset,
-        tailContentHeightPx = tailContentHeightPx(index),
         viewportStartOffsetPx = layout.viewportStartOffset,
         isAtNaturalTail = isAtNaturalTail,
     )
@@ -90,8 +85,6 @@ internal data class ConversationReadingStartProbe(
     val readLayout: (Int) -> ConversationMentionJumpLayout,
     val awaitLayout: suspend () -> Unit = { withFrameNanos { } },
     val traceSections: Boolean = true,
-    /** Compatibility opt-in for retained reading space; production mention and notification probes opt out. */
-    val reserveTailSpace: Boolean = true,
 )
 
 /** How a reading-start settle reaches the row before it validates fresh geometry. */
@@ -171,9 +164,7 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     approach: ConversationReadingStartApproach,
 ): ConversationReadingStartPlacement? {
     if (approach is ConversationReadingStartApproach.InPlace) return approach.placement
-    var index = probe.resolveTargetIndex() ?: return null
-    reserveReadingStartSpace(index, probe)
-    index = probe.resolveTargetIndex() ?: return null
+    val index = probe.resolveTargetIndex() ?: return null
     val offset = probe.readLayout(index).readingStartOffset
     var placedIndex = index
     var placedOffset = offset
@@ -199,34 +190,6 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     return ConversationReadingStartPlacement(placedIndex, placedOffset).takeIf { reached }
 }
 
-/** Reserves only the missing native runway; unknown near-tail geometry waits for the measured approach. */
-private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.reserveReadingStartSpace(
-    index: Int,
-    probe: ConversationReadingStartProbe,
-) {
-    if (!probe.reserveTailSpace) return
-    val layout = probe.readLayout(index)
-    val height =
-        layout.tailContentHeightPx
-            ?: if (layout.isNewest) layout.itemHeightPx ?: layout.estimatedItemHeightPx ?: 1 else null
-    if (height != null) reserveMentionReadingStart(height, probe.awaitLayout)
-}
-
-/** Re-resolves the logical target after a reserved-padding layout pass before validating its coordinate. */
-private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.readLayoutAfterReserve(
-    probe: ConversationReadingStartProbe,
-): Pair<Int, ConversationMentionJumpLayout>? {
-    val measured = resolveMeasuredLayout(probe) ?: return null
-    val layout = measured.second
-    val height = layout.tailContentHeightPx ?: layout.itemHeightPx.takeIf { layout.isNewest }
-    return if (probe.reserveTailSpace && height != null) {
-        reserveMentionReadingStart(height, probe.awaitLayout)
-        resolveMeasuredLayout(probe)
-    } else {
-        measured
-    }
-}
-
 /** Pairs the current logical index with measured geometry, rejecting targets absent from the viewport. */
 private fun resolveMeasuredLayout(probe: ConversationReadingStartProbe): Pair<Int, ConversationMentionJumpLayout>? =
     probe.resolveTargetIndex()?.let { index ->
@@ -242,9 +205,9 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     var attempt = 0
     var reached = false
     while (attempt <= MAX_READING_START_LAYOUT_CORRECTIONS && !reached) {
-        val measured = readLayoutAfterReserve(probe) ?: break
+        val measured = resolveMeasuredLayout(probe) ?: break
         val (index, layout) = measured
-        if (!probe.reserveTailSpace && layout.isFullyVisibleAtNaturalTail) {
+        if (layout.isFullyVisibleAtNaturalTail) {
             // The requested negative offset may have clamped. Keep the actual
             // coordinate so a resize or saved restore cannot replay the overshoot.
             placement = ConversationReadingStartPlacement(index, -requireNotNull(layout.itemOffsetPx))

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -45,7 +47,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -129,7 +130,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** The real leave snapshot supplies the native padding before saved-position restoration. */
+    /** A real leave snapshot restores the natural landing without synthetic reading space. */
     @Test
     fun newestMentionNaturalLandingSurvivesRouteRecreation() {
         assertMentionTop(
@@ -144,7 +145,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** The keyboard viewport retains the same physical destination for the true final row. */
+    /** Keyboard/RTL geometry uses fixed rows; enlarged glyphs provide separate rendering coverage. */
     @Test
     fun shortNewestMentionWithKeyboardUsesNormalTailSpacing() {
         assertMentionTop(
@@ -322,7 +323,6 @@ class ConversationMentionNavigationUiTest {
                                             it.firstVisibleItemScrollOffset,
                                         )
                                     } ?: ConversationScrollMode.FollowingTail,
-                                initialMentionReadingRowHeightPx = initialReadingReserve(fixture, state),
                             )
                         }
                     state.activeCoordinator = coordinator
@@ -344,7 +344,6 @@ class ConversationMentionNavigationUiTest {
                                     isNearBottom(
                                         listState,
                                         maxOf(targetIndex, initialIndex) + 13 + state.incomingCount,
-                                        mentionReadingRowHeightPx = coordinator.mentionReadingRowHeightPx,
                                     ),
                                 )
                             },
@@ -377,19 +376,7 @@ class ConversationMentionNavigationUiTest {
                         rememberConversationNearBottom(
                             listState,
                             maxOf(targetIndex, initialIndex) + 13 + state.incomingCount,
-                            mentionReadingRowHeightPx = { coordinator.mentionReadingRowHeightPx },
                         )
-                    // The production padding type reads the reserve in measurement, as the screen does.
-                    val contentPadding =
-                        remember(coordinator) {
-                            ConversationTimelineContentPadding(padding.dp) {
-                                conversationMentionReadingReservePx(
-                                    viewportHeight - overlap,
-                                    padding - overlap,
-                                    coordinator.mentionReadingRowHeightPx,
-                                ).dp
-                            }
-                        }
                     Box(modifier = Modifier.fillMaxWidth().height(viewportHeight.dp)) {
                         LazyColumn(
                             state = listState,
@@ -399,7 +386,7 @@ class ConversationMentionNavigationUiTest {
                                     .background(MaterialTheme.colorScheme.background)
                                     .testTag("mention-list"),
                             reverseLayout = true,
-                            contentPadding = contentPadding,
+                            contentPadding = PaddingValues(bottom = padding.dp),
                         ) {
                             if (state.headerCount > 0) {
                                 item(key = "structural-header") { Text("Local header", Modifier.height(32.dp)) }
@@ -420,46 +407,39 @@ class ConversationMentionNavigationUiTest {
                                 )
                             }
                         }
-                        TextButton(
-                            onClick = {
-                                scope.launch {
-                                    state.completed =
-                                        coordinator.jumpToMentionReadingStart(
-                                            targetMessageId = "message-$targetIndex",
-                                            resolveTargetIndex = {
-                                                targetIndex + state.incomingCount + state.headerCount
-                                            },
-                                            readLayout = { index ->
-                                                mentionJumpLayout(listState, overlap, index, state)
-                                            },
-                                            awaitLayout = {
-                                                withFrameNanos { }
-                                                state.awaitSuspendedLayout(fixture.suspendedAction)
-                                            },
-                                            onCompleted = {
-                                                state.completionCount++
-                                                coordinator.settleReadingAt(anchor())
-                                            },
-                                        )
-                                }
-                            },
-                            modifier = Modifier.testTag("mention-jump"),
-                        ) {
-                            Text("@")
+                        if (!state.captureInProgress) {
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        state.completed =
+                                            coordinator.jumpToMentionReadingStart(
+                                                targetMessageId = "message-$targetIndex",
+                                                resolveTargetIndex = {
+                                                    targetIndex + state.incomingCount + state.headerCount
+                                                },
+                                                readLayout = { index ->
+                                                    mentionJumpLayout(listState, overlap, index, state)
+                                                },
+                                                awaitLayout = {
+                                                    withFrameNanos { }
+                                                    state.awaitSuspendedLayout(fixture.suspendedAction)
+                                                },
+                                                onCompleted = {
+                                                    state.completionCount++
+                                                    coordinator.settleReadingAt(anchor())
+                                                },
+                                            )
+                                    }
+                                },
+                                modifier = Modifier.testTag("mention-jump"),
+                            ) {
+                                Text("@")
+                            }
                         }
                         if (restoreTail && !nearBottom) {
                             ConversationJumpToNewestButton(
                                 unreadIncomingCount = 0,
-                                onClick = {
-                                    scope.launch {
-                                        state.tailReturned =
-                                            coordinator.programmaticJump(
-                                                targetMessageId = null,
-                                                reason = ConversationScrollReason.JumpToNewest,
-                                                resultingMode = ConversationScrollMode.FollowingTail,
-                                            ) { scrollToTail(0) }
-                                    }
-                                },
+                                onClick = {},
                                 modifier = Modifier.offset(y = 48.dp).testTag("mention-tail"),
                             )
                         }
@@ -473,7 +453,6 @@ class ConversationMentionNavigationUiTest {
                                             coordinator.isFollowingTail,
                                             "message-$targetIndex",
                                             "message-$targetIndex",
-                                            coordinator.mentionReadingRowHeightPx,
                                         )
                                     state.routeGeneration++
                                 },
@@ -496,28 +475,19 @@ class ConversationMentionNavigationUiTest {
         val messageTop = assertMentionLandingBounds(fixture, state)
         composeRule.runOnIdle {
             assertTrue(state.completed)
-            assertNull(
-                "mention navigation must not retain synthetic padding",
-                state.activeCoordinator?.mentionReadingRowHeightPx,
-            )
             assertEquals(1, state.completionCount)
             assertTrue(state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
         }
         if (fixture.suspendedAction == SuspendedMentionAction.Window) {
-            assertEquals("initial newest classification", targetIndex == 0, state.newestEvaluations.first())
-            assertFalse("the new message--1 supersedes it as newest", state.newestEvaluations.last())
+            assertEquals("initial target index", targetIndex, state.measuredIndices.first())
+            assertEquals("a newer row shifts the same target", targetIndex + 1, state.measuredIndices.last())
         }
+        composeRule.runOnIdle { state.captureInProgress = true }
+        composeRule.waitForIdle()
         captureMentionFixture(fixture)
+        composeRule.runOnIdle { state.captureInProgress = false }
         assertMentionFollowUps(fixture, state, messageTop)
     }
-
-    /** Retained legacy geometry belongs only to the explicit recreation regression. */
-    private fun initialReadingReserve(
-        fixture: MentionFixture,
-        state: MentionHarnessState,
-    ): Int? =
-        state.savedSnapshot?.mentionReadingRowHeightPx
-            ?: if (fixture.reopenAfterLanding && state.routeGeneration == 0) fixture.target.height else null
 
     /** Validates either the natural tail clamp or the reading top, against actual composed row bounds. */
     private fun assertMentionLandingBounds(
@@ -582,7 +552,7 @@ class ConversationMentionNavigationUiTest {
             else -> 72
         }
 
-    /** Records newest classification and captures the current measured reading viewport. */
+    /** Records the resolved target index and captures the current measured reading viewport. */
     private fun mentionJumpLayout(
         listState: LazyListState,
         overlap: Int,
@@ -592,16 +562,13 @@ class ConversationMentionNavigationUiTest {
         val layoutInfo = listState.layoutInfo
         val layout = conversationReadingLayoutInfo(layoutInfo, overlap)
         state.atNaturalTail = !listState.canScrollBackward
-        val isNewest = index == state.headerCount
-        state.newestEvaluations.add(isNewest)
+        state.measuredIndices.add(index)
         val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
         return ConversationMentionJumpLayout(
             viewportEndOffsetPx = layout.viewportEndOffset,
             itemHeightPx = item?.size,
             estimatedItemHeightPx = state.targetHeight,
-            isNewest = isNewest,
             itemOffsetPx = item?.offset,
-            tailContentHeightPx = layoutInfo.mentionTailContentHeightPx(index),
             viewportStartOffsetPx = layout.viewportStartOffset,
             isAtNaturalTail = state.atNaturalTail,
         )
@@ -660,7 +627,6 @@ class ConversationMentionNavigationUiTest {
                     .getUnclippedBoundsInRoot()
                     .top.value
             assertEquals(landedTop, reopenedTop, 1f)
-            composeRule.runOnIdle { assertNull(state.savedSnapshot?.mentionReadingRowHeightPx) }
         }
         if (fixture.restoreTail) {
             // A fully visible newest mention already rests at the real tail; no return control is needed.
@@ -708,11 +674,11 @@ class ConversationMentionNavigationUiTest {
         var awaitingLayout = false
         var suspensionUsed = false
         var completionCount = 0
-        val newestEvaluations = mutableListOf<Boolean>()
+        val measuredIndices = mutableListOf<Int>()
         val layoutRelease = CompletableDeferred<Unit>()
+        var captureInProgress by mutableStateOf(false)
         var atNaturalTail = false
         var completed = false
-        var tailReturned = false
         var incomingCount by mutableIntStateOf(0)
         var routeGeneration by mutableIntStateOf(0)
         var savedSnapshot: ConversationScrollSnapshot? = null

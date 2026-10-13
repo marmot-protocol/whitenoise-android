@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlin.math.abs
@@ -55,7 +54,6 @@ internal data class ConversationScrollSnapshot(
     val firstVisibleItemScrollOffset: Int,
     val anchorItemId: String? = null,
     val anchorMessageIdHex: String? = null,
-    val mentionReadingRowHeightPx: Int? = null,
 )
 
 /** Whether saved history may own this open instead of the first-unread anchor. */
@@ -87,7 +85,6 @@ internal fun conversationScrollSnapshotOnLeave(
     nearBottom: Boolean,
     anchorItemId: String? = null,
     anchorMessageIdHex: String? = null,
-    mentionReadingRowHeightPx: Int? = null,
 ): ConversationScrollSnapshot? =
     if (nearBottom) {
         null
@@ -97,7 +94,6 @@ internal fun conversationScrollSnapshotOnLeave(
             firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
             anchorItemId = anchorItemId,
             anchorMessageIdHex = anchorMessageIdHex,
-            mentionReadingRowHeightPx = mentionReadingRowHeightPx,
         )
     }
 
@@ -173,11 +169,7 @@ internal fun isNearBottom(
     timelineSize: Int,
     trailingRowCount: Int = 0,
     timelineViewport: ConversationTimelineViewport? = null,
-    mentionReadingRowHeightPx: Int? = null,
 ): Boolean {
-    // Reserved room belongs to a reading anchor, even at the native padded tail origin.
-    // Keep the return-to-newest action available and gestures in history intent until it is released.
-    if (mentionReadingRowHeightPx != null) return false
     // The transcript is reversed, so history lies toward higher indices and the
     // newest edge is exhausted when the list can no longer scroll backward.
     if (!listState.canScrollBackward) return true
@@ -229,10 +221,6 @@ internal fun isConversationItemTopAligned(
  * Scroll-backed near-bottom flag for the conversation timeline. Keyed on the
  * rendered timeline size so async hydration cannot capture an initial zero in
  * the derived-state closure (issue #1253).
- *
- * [mentionReadingRowHeightPx] is read inside the derived state. A mention jump writes that reserve
- * before its first frame, so reading it here, not in the caller's composition, recomposes the caller
- * only when the flag's value changes rather than on every reserve write (#3150).
  */
 @Composable
 internal fun rememberConversationNearBottom(
@@ -240,9 +228,7 @@ internal fun rememberConversationNearBottom(
     renderedTimelineSize: Int,
     trailingRowCount: Int = 0,
     timelineViewport: ConversationTimelineViewport? = null,
-    mentionReadingRowHeightPx: () -> Int? = { null },
 ): Boolean {
-    val readMentionReadingRowHeightPx by rememberUpdatedState(mentionReadingRowHeightPx)
     val nearBottom by
         remember(listState, renderedTimelineSize, trailingRowCount, timelineViewport) {
             derivedStateOf {
@@ -251,7 +237,6 @@ internal fun rememberConversationNearBottom(
                     renderedTimelineSize,
                     trailingRowCount,
                     timelineViewport,
-                    readMentionReadingRowHeightPx(),
                 )
             }
         }
