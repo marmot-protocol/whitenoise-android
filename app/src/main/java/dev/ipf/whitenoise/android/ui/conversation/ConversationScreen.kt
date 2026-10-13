@@ -1182,7 +1182,12 @@ internal fun ConversationScreen(
                                     } else {
                                         MessageProjector.copyableText(record, editedText)
                                     },
-                                forwardableText = if (invalidated) null else MessageProjector.forwardableText(record, editedText),
+                                forwardableText =
+                                    if (invalidated) {
+                                        null
+                                    } else {
+                                        MessageProjector.forwardableText(record, editedText)
+                                    },
                                 // Same authoritative accessor the single-message
                                 // surface and the mutation guard use, so bulk
                                 // routing never diverges from per-message policy.

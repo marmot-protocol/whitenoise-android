@@ -3335,15 +3335,6 @@
       "assertions": "Visit Bob\u2019s actual Profile Keys and deliberately reveal/hide his disposable key, then restore Alice and copy Alice while hidden. Native proof requires restored active Alice and her exact original SDK nsec in one plain-text Android clipboard item with private-key label/sensitive flag and no URI/Intent/HTML, actual foreground focus and FLAG_SECURE. Only the matched generated secret is cleared and empty clipboard verified; no key contents enter evidence. Three original identities and both original messages must remain. This completed account-return route does not qualify pending-key callbacks/owner races, external sharing, hardware authentication, process death or full ACC010/ACC017 acceptance.",
       "postcondition": "private-key-copy-owner"
     },
-    "settings-text-assistance": {
-      "suite": "settings",
-      "manual_ids": [
-        "SET-001",
-        "SET-034"
-      ],
-      "assertions": "Text assistance opens its expected content; toolbar Back returns to Settings and Chats.",
-      "postcondition": "none"
-    },
     "settings-translation": {
       "suite": "settings",
       "manual_ids": [

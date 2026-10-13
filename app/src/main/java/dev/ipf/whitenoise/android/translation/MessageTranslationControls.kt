@@ -117,7 +117,8 @@ internal fun MessageTranslationDialog(
             target = target,
             failure = session.failure,
             enabled =
-                source != null && target in offlineTranslatorLanguages &&
+                source != null &&
+                    target in offlineTranslatorLanguages &&
                     (from.isEmpty() || from in offlineTranslatorLanguages),
             onFromChange = { from = it },
             onTargetChange = { target = it },

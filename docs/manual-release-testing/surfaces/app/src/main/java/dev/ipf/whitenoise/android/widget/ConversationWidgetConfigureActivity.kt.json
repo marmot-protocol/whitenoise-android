@@ -4,65 +4,25 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "ConversationWidgetConfigurationContent",
+        "surface": "WidgetConfigurationHost",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigureActivity.kt",
-        "anchor": "fun ConversationWidgetConfigurationContent(",
+        "anchor": "fun WidgetConfigurationHost(",
         "test_ids": [
           "SET-035"
         ]
       },
       {
-        "surface": "WidgetChoiceCheckbox",
+        "surface": "widgetProfiles",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigureActivity.kt",
-        "anchor": "fun WidgetChoiceCheckbox(",
+        "anchor": "fun widgetProfiles(",
         "test_ids": [
           "SET-035"
         ]
       },
       {
-        "surface": "R.string.save",
+        "surface": "R.string.profile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigureActivity.kt",
-        "anchor": "R.string.save",
-        "test_ids": [
-          "SET-035"
-        ]
-      },
-      {
-        "surface": "R.string.widget_all_accounts",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigureActivity.kt",
-        "anchor": "R.string.widget_all_accounts",
-        "test_ids": [
-          "SET-035"
-        ]
-      },
-      {
-        "surface": "R.string.widget_open_app",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigureActivity.kt",
-        "anchor": "R.string.widget_open_app",
-        "test_ids": [
-          "SET-035"
-        ]
-      },
-      {
-        "surface": "R.string.widget_privacy",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigureActivity.kt",
-        "anchor": "R.string.widget_privacy",
-        "test_ids": [
-          "SET-035"
-        ]
-      },
-      {
-        "surface": "R.string.widget_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigureActivity.kt",
-        "anchor": "R.string.widget_title",
-        "test_ids": [
-          "SET-035"
-        ]
-      },
-      {
-        "surface": "R.string.widget_unread_only",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigureActivity.kt",
-        "anchor": "R.string.widget_unread_only",
+        "anchor": "R.string.profile",
         "test_ids": [
           "SET-035"
         ]

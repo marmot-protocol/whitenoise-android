@@ -158,13 +158,6 @@ internal enum class SettingsHomeRow(
         "read_aloud",
         SettingsDetail.TextToSpeech,
     ),
-    TextIntelligence(
-        SettingsHomeSection.AppPreferences,
-        R.string.intelligence_title,
-        R.drawable.ic_text_fields,
-        "text_intelligence",
-        SettingsDetail.TextIntelligence,
-    ),
     Translation(
         SettingsHomeSection.AppPreferences,
         R.string.translation_title,
@@ -516,7 +509,6 @@ private fun SettingsDetailRoute(
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Translation -> TranslationSettingsScreen(onBack = { onDetailChange(null) })
-        SettingsDetail.TextIntelligence -> TextIntelligenceSettingsScreen(onBack = { onDetailChange(null) })
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })

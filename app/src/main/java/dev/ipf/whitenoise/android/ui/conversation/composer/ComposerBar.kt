@@ -322,27 +322,12 @@ internal class ComposerTextState(
 
     /** Applies field state while advancing acceptance ownership only for content edits. */
     fun updateValue(value: TextFieldValue) {
-        if (value.text != valueState.value.text ||
-            value.selection != valueState.value.selection
-        ) {
-            assistanceRevision += 1L
-        }
         if (value.text != valueState.value.text) {
             contentRevision += 1L
             collapsedBySend = false
         }
         valueState.value = value
     }
-
-    private var assistanceRevision = 0L
-
-    fun assistanceToken(): ComposerAssistanceToken = ComposerAssistanceToken(this, assistanceRevision, valueState.value)
-
-    fun isCurrentAssistance(token: ComposerAssistanceToken): Boolean =
-        token.source === this &&
-            token.revision == assistanceRevision &&
-            token.value.text == valueState.value.text &&
-            token.value.selection == valueState.value.selection
 
     /** Clears an accepted send only while its exact text generation still owns the field. */
     fun clearAccepted(token: ComposerAcceptanceToken): Boolean {
@@ -366,12 +351,6 @@ internal class ComposerAcceptanceToken(
         contentRevision: Long,
     ): Boolean = source === state && this.text == text && this.contentRevision == contentRevision
 }
-
-internal data class ComposerAssistanceToken(
-    val source: ComposerTextState,
-    val revision: Long,
-    val value: TextFieldValue,
-)
 
 // Last measured keyboard pane height per orientation, shared across composer
 // instances for the life of the process. The keyboard's height belongs to the
@@ -796,12 +775,7 @@ internal fun ComposerBar(
         attachmentSheetState.dismiss()
     }
 
-    LaunchedEffect(
-        composerKeyboardRestorePending,
-        currentImePaneHeight,
-        targetImePaneHeight,
-        emojiPaneHeightAnim.value,
-    ) {
+    LaunchedEffect(composerKeyboardRestorePending, currentImePaneHeight, targetImePaneHeight, emojiPaneHeightAnim.value) {
         if (attachmentSheetState.isOpen) {
             if (
                 shouldSwapComposerEmojiPaneToIme(
@@ -1585,34 +1559,6 @@ internal fun ComposerBar(
                                 .align(trailingActionAlignment)
                                 .expandedComposerActionRow(),
                     ) {
-                        val assistanceState = appState?.takeIf { draftAccountRef != null && draftGroupIdHex != null }
-                        val assistanceAvailable =
-                            textFieldValue.text.isNotBlank() && voiceReview == null && !attachmentSendInFlight
-                        if (assistanceState != null && assistanceAvailable) {
-                            val assistanceRuntime = assistanceState.runtimeGeneration
-                            dev.ipf.whitenoise.android.intelligence.ComposerTextAssistanceAction(
-                                textState = textState,
-                                ownerKey =
-                                    listOf(
-                                        textState,
-                                        draftKey,
-                                        draftAccountRef,
-                                        draftGroupIdHex,
-                                        editingMessageId,
-                                        assistanceRuntime,
-                                    ),
-                                ownerCurrent = {
-                                    assistanceState.activeAccountRef == draftAccountRef &&
-                                        assistanceState.runtimeGeneration == assistanceRuntime &&
-                                        !appState.appLockScreenVisible
-                                },
-                                onApply = { value ->
-                                    applyComposerFieldValue(
-                                        repairComposerMentionEdit(textFieldValue, value, mentionPickerEnabled),
-                                    )
-                                },
-                            )
-                        }
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
                         if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {

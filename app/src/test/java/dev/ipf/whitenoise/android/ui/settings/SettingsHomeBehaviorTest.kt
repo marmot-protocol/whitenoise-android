@@ -47,7 +47,7 @@ class SettingsHomeBehaviorTest {
     @Test
     fun translationUsesTheDedicatedLanguageGlyph() {
         assertEquals(R.drawable.ic_translate, SettingsHomeRow.Translation.iconRes)
-        org.junit.Assert.assertNotEquals(SettingsHomeRow.TextIntelligence.iconRes, SettingsHomeRow.Translation.iconRes)
+        org.junit.Assert.assertNotEquals(R.drawable.ic_text_fields, SettingsHomeRow.Translation.iconRes)
     }
 
     /** Signed-out Settings retains its Profile action without claiming a profile read is running. */

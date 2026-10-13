@@ -1551,21 +1551,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextIntelligenceSettingsScreen.kt",
-      "calls": {
-        "SettingsList": 1
-      },
-      "family": "settings",
-      "policy": "ordinary",
-      "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004",
-        "SET-034"
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
       "calls": {
         "SettingsList": 1

@@ -3,10 +3,23 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Canvas
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.core.app.ApplicationProvider
@@ -15,6 +28,9 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.widget.ConversationWidgetChoice
 import dev.ipf.whitenoise.android.widget.ConversationWidgetConfigurationContent
 import dev.ipf.whitenoise.android.widget.ConversationWidgetRow
+import dev.ipf.whitenoise.android.widget.WidgetAccountPresentation
+import dev.ipf.whitenoise.android.widget.widgetProfileTitle
+import org.junit.Assert.assertEquals
 import dev.ipf.whitenoise.android.widget.conversationWidgetViews
 import org.junit.Rule
 import org.junit.Test
@@ -29,15 +45,114 @@ import org.robolectric.annotation.GraphicsMode
 class ConversationWidgetScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    @Test fun configurationDefaults() {
+    private val profiles = listOf(
+        WidgetAccountPresentation("account-a", "seed-a", "Curious Penguin", picture = portrait(), active = true),
+        WidgetAccountPresentation("account-b", "seed-b", "Loyal Otter"),
+    )
+
+    @Test fun configurationDefaults() = configuration("widget_configuration_defaults.png")
+
+    @Test fun configurationDark() = configuration("widget_configuration_dark.png", dark = true)
+
+    @Test fun configurationAmoled() = configuration("widget_configuration_amoled.png", dark = true, amoled = true)
+
+    @Test fun configurationLargeRtl() = configuration("widget_configuration_large_rtl.png", rtl = true, scale = 2f)
+
+    @Test fun configurationUnavailable() = configuration("widget_configuration_unavailable.png", accounts = emptyList())
+
+    @Test fun activeAccountDefaultsToItsStableReference() {
+        val saved = mutableListOf<ConversationWidgetChoice>()
+        renderConfiguration(accounts = profiles.reversed(), save = { saved.add(it) })
+        composeRule.onNodeWithText("Curious Penguin").assertIsDisplayed()
+        composeRule.onNodeWithText("account-a").assertDoesNotExist()
+        composeRule.onNodeWithTag("widget.save").performClick()
+        assertEquals(listOf(ConversationWidgetChoice("account-a")), saved)
+    }
+
+    @Test fun selectionSurvivesProfileRefreshAndSavesFilterChoices() {
+        val accounts = mutableStateOf(profiles)
+        val saved = mutableListOf<ConversationWidgetChoice>()
         composeRule.setContent {
             WhiteNoiseTheme {
-                Box(Modifier.size(360.dp, 700.dp).testTag("widget-fixture")) {
-                    ConversationWidgetConfigurationContent(listOf("Alice", "Bob"), {}, {})
+                ConversationWidgetConfigurationContent(accounts.value, {}, { saved.add(it) })
+            }
+        }
+        composeRule.onNodeWithTag("widget.profile.account-b").performClick()
+        composeRule.runOnIdle { accounts.value = profiles.map { it.copy(name = "Updated ${it.name}") } }
+        composeRule.onNodeWithText("Updated Loyal Otter").assertIsDisplayed()
+        composeRule.onNodeWithText("All accounts").performClick()
+        composeRule.onNodeWithText("Unread only").performClick()
+        composeRule.onNodeWithTag("widget.save").performClick()
+        assertEquals(listOf(ConversationWidgetChoice("account-b", true, false, true)), saved)
+    }
+
+    @Test fun disappearingSelectedAccountRequiresAnotherChoice() {
+        val accounts = mutableStateOf(profiles)
+        composeRule.setContent {
+            WhiteNoiseTheme { ConversationWidgetConfigurationContent(accounts.value, {}, {}) }
+        }
+        composeRule.onNodeWithTag("widget.profile.account-b").performClick()
+        composeRule.runOnIdle { accounts.value = profiles.take(1) }
+        composeRule.onNodeWithTag("widget.save").assertIsNotEnabled()
+        composeRule.onNodeWithTag("widget.profile.account-a").performClick()
+        composeRule.onNodeWithTag("widget.save").performClick()
+    }
+
+    @Test fun unavailableConfigurationOffersTheAppWithoutSaving() {
+        var opened = 0
+        val saved = mutableListOf<ConversationWidgetChoice>()
+        renderConfiguration(accounts = emptyList(), open = { opened++ }, save = { saved.add(it) })
+        composeRule.onNodeWithTag("widget.save").assertDoesNotExist()
+        composeRule.onNodeWithText("Open White Noise").performClick()
+        assertEquals(1, opened)
+        assertEquals(emptyList<ConversationWidgetChoice>(), saved)
+    }
+
+    @Test fun unresolvedIdentitiesUseProfileTitles() {
+        assertEquals("Profile 1", widgetProfileTitle("npub1abcdef…", "Profile", 0))
+        assertEquals("Profile 2", widgetProfileTitle("a".repeat(64), "Profile", 1))
+        assertEquals("Curious Penguin", widgetProfileTitle("Curious Penguin", "Profile", 0))
+    }
+
+    private fun configuration(
+        name: String,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+        scale: Float = 1f,
+        accounts: List<WidgetAccountPresentation> = profiles,
+    ) {
+        renderConfiguration(accounts, dark, amoled, rtl, scale)
+        capture(name)
+    }
+
+    private fun renderConfiguration(
+        accounts: List<WidgetAccountPresentation> = profiles,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+        scale: Float = 1f,
+        open: () -> Unit = {},
+        save: (ConversationWidgetChoice) -> Unit = {},
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
+                    Box(Modifier.size(360.dp, 700.dp).testTag("widget-fixture")) {
+                        ConversationWidgetConfigurationContent(accounts, open, save)
+                    }
                 }
             }
         }
-        capture("widget_configuration_defaults.png")
+        composeRule.waitForIdle()
+    }
+
+    private fun portrait(): ImageBitmap = ImageBitmap(48, 48).also {
+        Canvas(it).drawCircle(Offset(24f, 24f), 24f, Paint().apply { color = Color(0xFF006A6A) })
+        Canvas(it).drawCircle(Offset(24f, 18f), 8f, Paint().apply { color = Color.White })
+        Canvas(it).drawCircle(Offset(24f, 42f), 14f, Paint().apply { color = Color.White })
     }
 
     @Test fun redactedNarrow() =

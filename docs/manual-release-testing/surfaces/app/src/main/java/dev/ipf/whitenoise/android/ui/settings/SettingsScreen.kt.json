@@ -139,14 +139,6 @@
         ]
       },
       {
-        "surface": "R.string.intelligence_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.intelligence_title",
-        "test_ids": [
-          "SET-034"
-        ]
-      },
-      {
         "surface": "R.string.translation_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "R.string.translation_title",

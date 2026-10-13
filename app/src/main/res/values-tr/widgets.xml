@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_title">Konuşma widget’ı</string>
+    <string name="widget_privacy">Hesap seçin. İçerik varsayılan olarak gizlenir, kilitliyken veya kullanılamıyorken temizlenir.</string>
+    <string name="widget_all_accounts">Tüm hesapları dahil et ve her satırı etiketle</string>
+    <string name="widget_unread_only">Yalnızca okunmamış son konuşmalar</string>
+    <string name="widget_unavailable">Konuşmalar kullanılamıyor</string>
+    <string name="widget_open_app">White Noise’u aç</string>
+    <string name="widget_conversation">Konuşma</string>
+    <string name="widget_unread">Okunmamış mesajlar</string>
+    <string name="widget_recent">Son konuşma</string>
+</resources>

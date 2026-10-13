@@ -33,7 +33,6 @@
          need the signer app to be visible to this package. -->
     <queries>
         <package android:name="dev.davidv.translator" />
-        <package android:name="com.google.android.aicore" />
         <!-- The dictation settings recommend Offline Speech to Text only when
              its production package is not already installed. -->
         <package android:name="app.offlinespeechtotext" />

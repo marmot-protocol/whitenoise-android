@@ -32,7 +32,6 @@ internal enum class SettingsDetail {
     Donate,
     TextToSpeech,
     Translation,
-    TextIntelligence,
     Dictation,
     ChatFolders,
     Gestures,

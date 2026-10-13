@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_title">Conversations widget</string>
+    <string name="widget_privacy">Choose an account for this widget. Message text stays hidden.</string>
+    <string name="widget_all_accounts">All accounts</string>
+    <string name="widget_unread_only">Unread only</string>
+    <string name="widget_unavailable">Conversations unavailable</string>
+    <string name="widget_open_app">Open White Noise</string>
+    <string name="widget_conversation">Conversation</string>
+    <string name="widget_unread">Unread messages</string>
+    <string name="widget_recent">Recent conversation</string>
+</resources>
