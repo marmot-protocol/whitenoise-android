@@ -2314,4 +2314,5 @@
     <string name="group_create_edit_members">Modifica membri</string>
     <string name="group_create_unattributed_failure">Non è stato possibile identificare la persona interessata. Riprova o modifica i membri.</string>
     <string name="media_reply_draft_conflict">La bozza è cambiata. Mantieni questa risposta e riprova, oppure annulla la risposta prima di inviare.</string>
+    <string name="photo_editor_budget_exceeded">Questo ritaglio richiede più dettagli dell’immagine o memoria di quanto sia possibile elaborare in sicurezza. Scegli un ritaglio più ampio o una qualità inferiore. L’allegato precedente rimane invariato.</string>
 </resources>

@@ -42,7 +42,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import dev.ipf.whitenoise.android.R
@@ -171,6 +170,7 @@ private fun KeepScreenOnWhilePlaying(playing: Boolean) {
  * remembering its position, volume and speed) as soon as either stops holding.
  */
 @Composable
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal fun rememberDraftVideoPlayer(
     uri: Uri,
     active: Boolean,
@@ -197,6 +197,7 @@ internal fun rememberDraftVideoPlayer(
             if (!holds) {
                 release()
             } else if (player == null) {
+                val source = localVideoSource(context, uri) ?: return
                 player =
                     ExoPlayer
                         .Builder(context)
@@ -204,7 +205,8 @@ internal fun rememberDraftVideoPlayer(
                         .setHandleAudioBecomingNoisy(true)
                         .build()
                         .apply {
-                            setMediaItem(MediaItem.fromUri(uri), position)
+                            setMediaSource(source)
+                            seekTo(position)
                             this.volume = volume
                             setPlaybackSpeed(speed)
                             playWhenReady = false

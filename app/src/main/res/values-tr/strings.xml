@@ -2312,4 +2312,5 @@
     <string name="group_create_edit_members">Üyeleri düzenle</string>
     <string name="group_create_unattributed_failure">Sorunun hangi kişide olduğunu belirleyemedik. Yeniden deneyin veya üyeleri düzenleyin.</string>
     <string name="media_reply_draft_conflict">Taslağınız değişti. Bu yanıtı koruyup yeniden deneyin veya göndermeden önce yanıtı iptal edin.</string>
+    <string name="photo_editor_budget_exceeded">Bu kırpma, güvenli şekilde işlenebilecek olandan daha fazla görüntü ayrıntısı veya bellek gerektiriyor. Daha geniş bir alanı kırpın veya daha düşük bir kalite seçin. Önceki ek değişmeden kalır.</string>
 </resources>

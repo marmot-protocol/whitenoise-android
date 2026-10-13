@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AnimatedAttachmentImage.kt",
+  "legacy_sha256": "25f19b4eef995caf50acf59e2869d73b5dc898edf057a926fa6a098dd253bf9d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AnimatedDrawableAttachmentImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AnimatedAttachmentImage.kt",
+        "anchor": "fun AnimatedDrawableAttachmentImage(",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Attachment decoder dispatch after animation admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AnimatedAttachmentImage.kt",
+        "anchor": "suspend fun decodeMessageAttachmentImage(",
+        "test_ids": [
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "Explicit viewer animation admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AnimatedAttachmentImage.kt",
+        "anchor": "animationAllowed: Boolean = false",
+        "test_ids": [
+          "MED-031"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

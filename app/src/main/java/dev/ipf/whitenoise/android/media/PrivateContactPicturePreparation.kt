@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import dev.ipf.whitenoise.android.state.ContactPictureStore
 import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +15,7 @@ internal suspend fun preparePrivateContactPicture(
     require(source.size in 1..IDENTITY_IMAGE_SOURCE_MAX_BYTES)
     val rendered = renderIdentityImageDraft(source, crop, MediaQuality.Low)
     return withContext(Dispatchers.Default) {
-        val decoded = checkNotNull(BitmapFactory.decodeByteArray(rendered.plaintext, 0, rendered.plaintext.size))
+        val decoded = checkNotNull(MediaPipeline.decodeSampledBitmap(rendered.plaintext, PRIVATE_CONTACT_PICTURE_EDGE))
         try {
             val edge = minOf(decoded.width, decoded.height, PRIVATE_CONTACT_PICTURE_EDGE)
             val bounded = Bitmap.createScaledBitmap(decoded, edge, edge, true)

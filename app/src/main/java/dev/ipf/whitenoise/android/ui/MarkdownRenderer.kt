@@ -158,6 +158,7 @@ internal fun MarkdownMessageBody(
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
     ttsSentenceActions: TtsSentenceActions? = null,
     searchHighlight: MessageSearchHighlight? = null,
+    onWebLinkActivated: ((String) -> Boolean)? = null,
 ) {
     val context = LocalContext.current
     // A tapped spoofable `[label](url)` link parks its destination here until
@@ -169,11 +170,11 @@ internal fun MarkdownMessageBody(
     // surface destinations hidden behind author-controlled labels first;
     // nostr-profile Clickable annotations stay in-app.
     val linkListener =
-        remember(context, onNostrProfileTap, deferLinkActivation) {
+        remember(context, onNostrProfileTap, deferLinkActivation, onWebLinkActivated) {
             LinkInteractionListener { annotation ->
                 val activate: () -> Unit = {
                     when (annotation) {
-                        is LinkAnnotation.Url -> openMarkdownLink(context, annotation.url)
+                        is LinkAnnotation.Url -> openMarkdownLink(context, annotation.url, onWebLinkActivated)
                         is LinkAnnotation.Clickable ->
                             when {
                                 annotation.tag.startsWith(CONFIRM_LINK_TAG_PREFIX) ->
@@ -245,7 +246,7 @@ internal fun MarkdownMessageBody(
                 TextButton(
                     onClick = {
                         pendingLinkUrl = null
-                        openMarkdownLink(context, url)
+                        openMarkdownLink(context, url, onWebLinkActivated)
                     },
                 ) { Text(stringResource(R.string.link_confirm_open)) }
             },
@@ -2046,10 +2047,12 @@ private fun canonicalPortSuffix(rawPort: String): String? {
 private fun openMarkdownLink(
     context: android.content.Context,
     url: String,
+    onWebLinkActivated: ((String) -> Boolean)? = null,
 ) {
     // Re-parse at launch so ACTION_VIEW receives the same canonical target the
     // annotation and confirmation UI were built from.
     val parsedLink = parsedOpenableMarkdownLink(url) ?: return
+    if (onWebLinkActivated?.invoke(parsedLink.destination) == true) return
     val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(parsedLink.destination))
     try {
         context.startActivity(intent)

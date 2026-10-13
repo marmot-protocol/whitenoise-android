@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -232,9 +231,9 @@ class AnimatedProfileAvatarLayerTest {
         assertFalse(first.running)
     }
 
-    /** Avatar animates a cached GIF source, and keeps a static picture's first frame untouched. */
+    /** Row avatars keep cached GIF and static pictures on their first frame. */
     @Test
-    fun avatarOverlaysOnlyCachedGifSources() {
+    fun avatarRowsKeepOnlyFirstFrames() {
         val firstFrame = ImageBitmap(4, 4)
         AvatarImageLoader.putCachedAnimated("https://profiles.example/animated", firstFrame, twoFrameGif())
         AvatarImageLoader.putCached("https://profiles.example/static", ImageBitmap(4, 4))
@@ -244,9 +243,8 @@ class AnimatedProfileAvatarLayerTest {
             Harness { Avatar(title = "Alice", seed = "alice", size = 40.dp, pictureUrl = url) }
         }
         // The real decoder runs off the main thread, outside the compose idling resource.
-        composeRule.waitUntil(DECODE_TIMEOUT_MS) {
-            composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
 
         url = "https://profiles.example/static"
         composeRule.waitForIdle()
@@ -254,9 +252,9 @@ class AnimatedProfileAvatarLayerTest {
         composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
     }
 
-    /** A stored picture animates only when its caller names it as a person's picture. */
+    /** A stored person-picture key does not grant animation intent to a row. */
     @Test
-    fun storedPictureAnimatesOnlyWithAPersonPictureKey() {
+    fun storedPersonPictureKeyDoesNotAnimateInRows() {
         val key = "marmot-avatar:owner:peer@1"
         val firstFrame = ImageBitmap(4, 4)
         AvatarImageLoader.putCachedAnimated(key, firstFrame, twoFrameGif())
@@ -272,14 +270,13 @@ class AnimatedProfileAvatarLayerTest {
 
         animationKey = key
 
-        composeRule.waitUntil(DECODE_TIMEOUT_MS) {
-            composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
     }
 
-    /** Share and forward pickers pass a DM's stored person-picture key through ContactRow. */
+    /** Share and forward picker rows never animate a stored person picture automatically. */
     @Test
-    fun pickerRowAnimatesAStoredPersonPicture() {
+    fun pickerRowKeepsStoredPersonPictureStill() {
         val key = "marmot-avatar:owner:picker@1"
         val firstFrame = ImageBitmap(4, 4)
         AvatarImageLoader.putCachedAnimated(key, firstFrame, twoFrameGif())
@@ -297,9 +294,8 @@ class AnimatedProfileAvatarLayerTest {
             }
         }
 
-        composeRule.waitUntil(DECODE_TIMEOUT_MS) {
-            composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
     }
 
     /** The gate needs all three conditions at once. */
@@ -338,6 +334,7 @@ class AnimatedProfileAvatarLayerTest {
         decoder: suspend (ByteArray, Int) -> Drawable? = decode,
     ) {
         AnimatedProfileAvatarLayer(
+            explicitViewer = true,
             source = source,
             maxEdgePx = 48,
             contentScale = ContentScale.Crop,

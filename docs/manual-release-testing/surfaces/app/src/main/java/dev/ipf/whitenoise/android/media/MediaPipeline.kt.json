@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt",
+  "legacy_sha256": "51f58f154f757c256aee15018a3552dd5615e4d1c9ab9a932ae16edcdd689a63",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Native animated decoder admission chokepoint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt",
+        "anchor": "fun decodeAnimatedDrawable(",
+        "test_ids": [
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "Isolated image decode and metadata boundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt",
+        "anchor": "fun decodeSampledBitmap(",
+        "test_ids": [
+          "MED-031"
+        ]
+      },
+      {
+        "surface": "Unavailable orientation refuses metadata stripping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt",
+        "anchor": "val orientation = readExifOrientation(sourceBytes) ?: return OriginalImageReadResult.Failed",
+        "test_ids": [
+          "MED-031"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -67,6 +67,7 @@ internal data class PhotoEditorMessages(
     val sourceNotEditable: String,
     val sourceUnavailable: String,
     val saveFailed: String,
+    val budgetExceeded: String = saveFailed,
 )
 
 internal data class ActivePhotoEditor(
@@ -319,7 +320,7 @@ internal class ConversationMediaDraftState(
                         )
                     dismissEditor(editor)
                 }
-                else -> editor.stateHolder.finishSaving(messages.saveFailed)
+                else -> editor.stateHolder.finishSaving(photoEditorSaveFailureMessage(result, messages))
             }
         }
     }
@@ -754,6 +755,7 @@ internal fun rememberConversationMediaDraftState(
             sourceNotEditable = stringResource(R.string.photo_editor_not_editable_source),
             sourceUnavailable = stringResource(R.string.photo_editor_source_unavailable),
             saveFailed = stringResource(R.string.photo_editor_save_failed),
+            budgetExceeded = stringResource(R.string.photo_editor_budget_exceeded),
         )
     val state =
         remember(appState, controller, chatId, controller.boundAccountRef, context, scope, messages) {

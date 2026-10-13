@@ -364,10 +364,9 @@ class VideoAttachmentCacheStateTest {
             needsPoster >= 0 && posterExtraction > needsPoster,
         )
         assertTrue(
-            "a cached poster must bypass getScaledFrameAtTime while duration metadata is still read",
-            Regex(
-                """val frame\s*=\s*if \(needsPoster\) \{[\s\S]*?mmr\.getScaledFrameAtTime\([\s\S]*?\}\s*else\s*(?:\{\s*null\s*\}|null)""",
-            ).containsMatchIn(bubble),
+            "a cached poster disables isolated frame extraction while duration metadata is still read",
+            Regex("""IsolatedMediaDecoder\.probe\(\s*f,\s*MediaPipeline\.THUMBNAIL_MAX_EDGE_PX,\s*needsPoster,""")
+                .containsMatchIn(bubble),
         )
     }
 

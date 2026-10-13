@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * attachment downloads are rescheduled, with and without the interruption-backoff opt-in.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = WhiteNoiseApplication::class)
+@Config(sdk = [36], application = dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTestApplication::class)
 class AttachmentDownloadInterruptionBackoffTest {
     private lateinit var application: WhiteNoiseApplication
     private val clock = VirtualClock()

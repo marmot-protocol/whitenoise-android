@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -35,7 +34,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * A GIF profile picture draws its first frame with no layout change next to a static picture and an
- * undecodable one, whether the animation is attached or reduced motion keeps it still.
+ * undecodable one, without attaching a native animation decoder to a chat-row surface.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -61,13 +60,13 @@ class AnimatedProfileAvatarScreenshotTest {
         AvatarImageLoader.clear()
     }
 
-    /** Light theme with the animation attached: the GIF shows its first frame in place. */
+    /** Light theme: the GIF stays on its first frame without attaching animation. */
     @Test
-    fun animatedAvatarLight() = captureAnimating(darkTheme = false, name = "animated_profile_avatar_light")
+    fun animatedAvatarLight() = captureFirstFrame(darkTheme = false, name = "isolated_profile_first_frame_light")
 
-    /** Dark theme with the animation attached. */
+    /** Dark theme: the same first-frame behavior. */
     @Test
-    fun animatedAvatarDark() = captureAnimating(darkTheme = true, name = "animated_profile_avatar_dark")
+    fun animatedAvatarDark() = captureFirstFrame(darkTheme = true, name = "isolated_profile_first_frame_dark")
 
     /** Reduced motion never attaches the animation, and the still frame is pixel-identical in place. */
     @Test
@@ -81,15 +80,14 @@ class AnimatedProfileAvatarScreenshotTest {
             .captureRoboImage("src/test/snapshots/animated_profile_avatar_reduced_motion_light.png")
     }
 
-    /** Captures the row once the off-main decode has attached the animated layer. */
-    private fun captureAnimating(
+    /** Captures the first-frame row and checks no native animated layer attaches. */
+    private fun captureFirstFrame(
         darkTheme: Boolean,
         name: String,
     ) {
         composeRule.setContent { Avatars(darkTheme) }
-        composeRule.waitUntil(DECODE_TIMEOUT_MS) {
-            composeRule.onAllNodesWithTag(ANIMATED_PROFILE_AVATAR_TAG).fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(ANIMATED_PROFILE_AVATAR_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(ROW_TAG).captureRoboImage("src/test/snapshots/$name.png")
     }
 
@@ -121,6 +119,5 @@ class AnimatedProfileAvatarScreenshotTest {
         const val STATIC_URL = "https://profiles.example/static.gif"
         const val BROKEN_URL = "https://profiles.example/broken.gif"
         const val STATIC_BLUE = 0xFF1E88E5.toInt()
-        const val DECODE_TIMEOUT_MS = 5_000L
     }
 }

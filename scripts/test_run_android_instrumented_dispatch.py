@@ -39,6 +39,15 @@ class InstrumentedDispatchTest(unittest.TestCase):
             )
             return result.stdout
 
+    def test_media_sandbox_dispatch_is_focused_and_requires_every_case(self):
+        output = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
+        self.assertIn("media.sandbox.IsolatedMediaDecoderDeviceTest", output)
+        self.assertIn("required-cases", output)
+        self.assertNotIn(":cryptoBenchmark:", output)
+        self.assertNotIn("PullRequestDeviceSmoke", output)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
     def test_review_demo_dispatch_remains_available(self):
         """An explicit review-demo dispatch hands off to its isolated runner."""
         self.assertEqual(self.run_dispatch("workflow_dispatch", "true", "false"), "run-review-demo-e2e.sh")

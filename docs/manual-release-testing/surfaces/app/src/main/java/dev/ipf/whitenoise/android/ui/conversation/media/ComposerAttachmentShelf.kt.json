@@ -88,6 +88,16 @@
           "MED-009"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Isolated first-frame composer preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "rememberShelfAnimation",
+        "test_ids": [
+          "MED-031"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

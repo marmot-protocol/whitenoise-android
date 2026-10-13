@@ -592,6 +592,25 @@ class NostrEventCardResolverTest {
         assertEquals(NostrEventCardKind.File, event("e".repeat(64), kind = 1_063).toCardModel().kind)
     }
 
+    @Test
+    fun kindOneNotesExposeDeclaredVideoWithoutChangingTheirKind() {
+        val note =
+            event(
+                id = "a".repeat(64),
+                kind = 1,
+                tags = listOf(listOf("imeta", "url https://media.example/opaque-resource", "m video/mp4")),
+            ).toCardModel()
+        assertEquals(NostrEventCardKind.Note, note.kind)
+        assertEquals("https://media.example/opaque-resource", note.mediaUrl)
+        val untyped =
+            event(
+                id = "b".repeat(64),
+                kind = 1,
+                tags = listOf(listOf("imeta", "url https://images.example/photo")),
+            ).toCardModel()
+        assertEquals(null, untyped.mediaUrl)
+    }
+
     private fun event(
         id: String,
         pubkey: String = "c".repeat(64),
