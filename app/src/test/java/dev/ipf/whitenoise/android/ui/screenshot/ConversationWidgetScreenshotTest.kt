@@ -29,9 +29,9 @@ import dev.ipf.whitenoise.android.widget.ConversationWidgetChoice
 import dev.ipf.whitenoise.android.widget.ConversationWidgetConfigurationContent
 import dev.ipf.whitenoise.android.widget.ConversationWidgetRow
 import dev.ipf.whitenoise.android.widget.WidgetAccountPresentation
+import dev.ipf.whitenoise.android.widget.conversationWidgetViews
 import dev.ipf.whitenoise.android.widget.widgetProfileTitle
 import org.junit.Assert.assertEquals
-import dev.ipf.whitenoise.android.widget.conversationWidgetViews
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,10 +45,11 @@ import org.robolectric.annotation.GraphicsMode
 class ConversationWidgetScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    private val profiles = listOf(
-        WidgetAccountPresentation("account-a", "seed-a", "Curious Penguin", picture = portrait(), active = true),
-        WidgetAccountPresentation("account-b", "seed-b", "Loyal Otter"),
-    )
+    private val profiles =
+        listOf(
+            WidgetAccountPresentation("account-a", "seed-a", "Curious Penguin", picture = portrait(), active = true),
+            WidgetAccountPresentation("account-b", "seed-b", "Loyal Otter"),
+        )
 
     @Test fun configurationDefaults() = configuration("widget_configuration_defaults.png")
 
@@ -162,11 +163,12 @@ class ConversationWidgetScreenshotTest {
         composeRule.waitForIdle()
     }
 
-    private fun portrait(): ImageBitmap = ImageBitmap(48, 48).also {
-        Canvas(it).drawCircle(Offset(24f, 24f), 24f, Paint().apply { color = Color(0xFF006A6A) })
-        Canvas(it).drawCircle(Offset(24f, 18f), 8f, Paint().apply { color = Color.White })
-        Canvas(it).drawCircle(Offset(24f, 42f), 14f, Paint().apply { color = Color.White })
-    }
+    private fun portrait(): ImageBitmap =
+        ImageBitmap(48, 48).also {
+            Canvas(it).drawCircle(Offset(24f, 24f), 24f, Paint().apply { color = Color(0xFF006A6A) })
+            Canvas(it).drawCircle(Offset(24f, 18f), 8f, Paint().apply { color = Color.White })
+            Canvas(it).drawCircle(Offset(24f, 42f), 14f, Paint().apply { color = Color.White })
+        }
 
     @Test fun redactedNarrow() =
         views(
