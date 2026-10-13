@@ -142,8 +142,9 @@ internal fun messageActionIconRes(kind: MessageActionKind): Int =
         MessageActionKind.Select -> R.drawable.ic_check
         MessageActionKind.SelectText -> R.drawable.ic_text_fields
         MessageActionKind.CopyText -> R.drawable.ic_content_copy
-        MessageActionKind.Speak, MessageActionKind.SpeakCodeLiterally -> R.drawable.ic_volume_up
-        MessageActionKind.Translate -> R.drawable.ic_text_fields
+        MessageActionKind.Speak -> R.drawable.ic_volume_up
+        MessageActionKind.SpeakCodeLiterally -> R.drawable.ic_code
+        MessageActionKind.Translate -> R.drawable.ic_translate
         MessageActionKind.Forward -> R.drawable.ic_forward
         MessageActionKind.Report -> R.drawable.ic_emoji_flags
         MessageActionKind.KeepOnScreen -> R.drawable.ic_floating_message

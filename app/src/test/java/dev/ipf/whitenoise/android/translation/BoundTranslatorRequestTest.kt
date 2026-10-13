@@ -10,6 +10,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,112 +22,170 @@ import java.util.concurrent.CopyOnWriteArrayList
 @Config(sdk = [36])
 class BoundTranslatorRequestTest {
     @Test
-    fun explicitLanguageRecoversColdCatalogOnTheSameService() =
+    fun coldCatalogCannotSilentlyUseEnglishDefaultForSpanishTarget() =
         runBlocking {
+            var catalogLoaded = false
             val service =
-                FakeTranslator { attempt, callback ->
-                    if (attempt == 1) {
+                FakeTranslator { submission, callback ->
+                    val resolvedTarget = if (catalogLoaded) submission[2] else "en"
+                    catalogLoaded = true
+                    if (submission[0] == "") {
                         callback.onTranslationError(failure(ErrorType.COULD_NOT_DETECT_LANGUAGE))
                     } else {
-                        callback.onTranslationResult("Hello world")
+                        callback.onTranslationResult(if (resolvedTarget == "es") "Hola mundo" else "Hello world")
                     }
                 }
-            var validations = 0
-            val translated = request(service, beforeSubmission = { validations += 1 })
-            assertEquals("Hello world", translated)
-            assertEquals(2, validations)
-            assertEquals(
-                listOf(listOf("Hola mundo", "es", "en"), listOf("Hola mundo", "es", "en")),
-                service.submissions,
-            )
+            assertEquals("Hola mundo", request(service))
+            assertEquals(listOf(listOf("", "", ""), listOf("Hello world", "en", "es")), service.submissions)
         }
 
     @Test
-    fun automaticDetectionFailureIsNotRetried() =
+    fun automaticDetectionKeepsSelectedTargetAfterReadiness() =
         runBlocking {
-            val service =
-                FakeTranslator { _, callback ->
-                    callback.onTranslationError(failure(ErrorType.COULD_NOT_DETECT_LANGUAGE))
-                }
-            assertEquals(TranslationFailure.DETECTION, failureOf { request(service, source = "") })
-            assertEquals(1, service.submissions.size)
+            val service = readyTranslator("Bonjour le monde")
+            assertEquals("Bonjour le monde", request(service, source = "", target = "fr"))
+            assertEquals(listOf("Hello world", "", "fr"), service.submissions.last())
         }
 
     @Test
-    fun repeatedExplicitDetectionFailureStopsAfterOneRetry() =
+    fun emptySuccessAlsoCompletesTheCatalogBarrier() =
         runBlocking {
             val service =
-                FakeTranslator { _, callback ->
-                    callback.onTranslationError(failure(ErrorType.COULD_NOT_DETECT_LANGUAGE))
+                FakeTranslator { submission, callback ->
+                    callback.onTranslationResult(if (submission[0] == "") "" else "Hola mundo")
                 }
-            assertEquals(TranslationFailure.DETECTION, failureOf { request(service) })
+            assertEquals("Hola mundo", request(service))
             assertEquals(2, service.submissions.size)
         }
 
     @Test
-    fun unavailableLanguagePackIsNotRetried() =
+    fun messageWaitsForReadinessCallbackAndRevalidatesIdentity() =
         runBlocking {
+            val probe = CompletableDeferred<ITranslationCallback>()
+            var validations = 0
             val service =
-                FakeTranslator { _, callback ->
-                    callback.onTranslationError(failure(ErrorType.DETECTED_BUT_UNAVAILABLE))
+                FakeTranslator { submission, callback ->
+                    if (submission[0] == "") probe.complete(callback) else callback.onTranslationResult("Hola mundo")
                 }
-            assertEquals(TranslationFailure.SOURCE_MODEL, failureOf { request(service) })
-            assertEquals(1, service.submissions.size)
+            val pending = async { request(service, beforeSubmission = { validations += 1 }) }
+            val callback = withTimeout(2_000L) { probe.await() }
+            assertFalse(pending.isCompleted)
+            assertEquals(listOf(listOf("", "", "")), service.submissions)
+            callback.onTranslationError(failure(ErrorType.COULD_NOT_DETECT_LANGUAGE))
+            assertEquals("Hola mundo", withTimeout(2_000L) { pending.await() })
+            assertEquals(2, validations)
         }
 
     @Test
-    fun changedEngineIdentityReceivesNoRetryPlaintext() =
+    fun unknownCatalogCodesReceiveNoProbeOrMessage() =
         runBlocking {
-            val service =
-                FakeTranslator { _, callback ->
-                    callback.onTranslationError(failure(ErrorType.COULD_NOT_DETECT_LANGUAGE))
-                }
+            val service = readyTranslator("unexpected")
+            assertEquals(TranslationFailure.INVALID_REQUEST, failureOf { request(service, target = "zz") })
+            assertEquals(TranslationFailure.INVALID_REQUEST, failureOf { request(service, source = "eng") })
+            assertTrue(service.submissions.isEmpty())
+        }
+
+    @Test
+    fun malformedProbeOrEngineErrorNeverReceivesMessage() =
+        runBlocking {
+            val malformed = FakeTranslator { _, callback -> callback.onTranslationResult("not empty") }
+            assertEquals(TranslationFailure.ENGINE, failureOf { request(malformed) })
+            assertEquals(listOf(listOf("", "", "")), malformed.submissions)
+            val unavailable = FakeTranslator { _, callback -> callback.onTranslationError(failure(ErrorType.UNEXPECTED)) }
+            assertEquals(TranslationFailure.ENGINE, failureOf { request(unavailable) })
+            assertEquals(1, unavailable.submissions.size)
+        }
+
+    @Test
+    fun actualDetectionOrMissingPackErrorsAreNotRetried() =
+        runBlocking {
+            val failures =
+                listOf(
+                    ErrorType.COULD_NOT_DETECT_LANGUAGE to TranslationFailure.DETECTION,
+                    ErrorType.DETECTED_BUT_UNAVAILABLE to TranslationFailure.SOURCE_MODEL,
+                    ErrorType.UNEXPECTED to TranslationFailure.ENGINE,
+                )
+            for ((type, expected) in failures) {
+                val service =
+                    FakeTranslator { submission, callback ->
+                        val error = if (submission[0] == "") ErrorType.COULD_NOT_DETECT_LANGUAGE else type
+                        callback.onTranslationError(failure(error))
+                    }
+                assertEquals(expected, failureOf { request(service) })
+                assertEquals(2, service.submissions.size)
+            }
+        }
+
+    @Test
+    fun changedEngineIdentityReceivesNoMessageAfterProbe() =
+        runBlocking {
+            val service = readyTranslator("unexpected")
             var validations = 0
             val observed =
                 failureOf {
-                    request(
-                        service,
-                        beforeSubmission = {
-                            validations += 1
-                            if (validations == 2) throw TranslationException(TranslationFailure.UNVERIFIED_ENGINE)
-                        },
-                    )
+                    request(service, beforeSubmission = {
+                        validations += 1
+                        if (validations == 2) throw TranslationException(TranslationFailure.UNVERIFIED_ENGINE)
+                    })
                 }
             assertEquals(TranslationFailure.UNVERIFIED_ENGINE, observed)
-            assertEquals(1, service.submissions.size)
+            assertEquals(listOf(listOf("", "", "")), service.submissions)
         }
 
     @Test
-    fun cancelledRetryCannotDeliverALateResult() =
+    fun cancellingCatalogWaitPreventsLateMessageSubmission() =
         runBlocking {
-            val retryStarted = CompletableDeferred<Unit>()
-            val retryCallback = CompletableDeferred<ITranslationCallback>()
+            val probe = CompletableDeferred<ITranslationCallback>()
+            var active: CompletableDeferred<String>? = null
+            val service = FakeTranslator { _, callback -> probe.complete(callback) }
+            val pending = async { request(service, activeResult = { active = it }) }
+            val callback = withTimeout(2_000L) { probe.await() }
+            withTimeout(2_000L) { pending.cancelAndJoin() }
+            callback.onTranslationError(failure(ErrorType.COULD_NOT_DETECT_LANGUAGE))
+            assertTrue(pending.isCancelled)
+            assertTrue(checkNotNull(active).isCancelled)
+            assertEquals(listOf(listOf("", "", "")), service.submissions)
+        }
+
+    @Test
+    fun cancelledTranslationCannotDeliverALateResult() =
+        runBlocking {
+            val resultCallback = CompletableDeferred<ITranslationCallback>()
             var active: CompletableDeferred<String>? = null
             val service =
-                FakeTranslator { attempt, callback ->
-                    if (attempt == 1) {
+                FakeTranslator { submission, callback ->
+                    if (submission[0] == "") {
                         callback.onTranslationError(failure(ErrorType.COULD_NOT_DETECT_LANGUAGE))
                     } else {
-                        retryCallback.complete(callback)
-                        retryStarted.complete(Unit)
+                        resultCallback.complete(callback)
                     }
                 }
             val pending = async { request(service, activeResult = { active = it }) }
-            withTimeout(2_000L) { retryStarted.await() }
+            val callback = withTimeout(2_000L) { resultCallback.await() }
             withTimeout(2_000L) { pending.cancelAndJoin() }
-            retryCallback.await().onTranslationResult("Late synthetic output")
+            callback.onTranslationResult("Late synthetic output")
             assertTrue(pending.isCancelled)
             assertTrue(checkNotNull(active).isCancelled)
             assertEquals(2, service.submissions.size)
         }
 
+    private fun readyTranslator(output: String): FakeTranslator =
+        FakeTranslator { submission, callback ->
+            if (submission[0] == "") {
+                callback.onTranslationError(failure(ErrorType.COULD_NOT_DETECT_LANGUAGE))
+            } else {
+                callback.onTranslationResult(output)
+            }
+        }
+
     private suspend fun request(
         service: ITranslationService,
-        source: String = "es",
+        source: String = "en",
+        target: String = "es",
         beforeSubmission: suspend () -> Unit = {},
         activeResult: (CompletableDeferred<String>) -> Unit = {},
     ): String =
-        translateOnBoundTranslator(service, "Hola mundo", source, "en") {
+        translateOnBoundTranslator(service, "Hello world", source, target) {
             activeResult(it)
             beforeSubmission()
         }
@@ -137,7 +196,7 @@ class BoundTranslatorRequestTest {
     private fun failure(type: Byte): TranslationError = TranslationError().apply { this.type = type }
 
     private class FakeTranslator(
-        private val deliver: (Int, ITranslationCallback) -> Unit,
+        private val deliver: (List<String?>, ITranslationCallback) -> Unit,
     ) : ITranslationService.Stub() {
         val submissions = CopyOnWriteArrayList<List<String?>>()
 
@@ -147,8 +206,9 @@ class BoundTranslatorRequestTest {
             target: String?,
             callback: ITranslationCallback?,
         ) {
-            submissions.add(listOf(text, source, target))
-            deliver(submissions.size, checkNotNull(callback))
+            val submission = listOf(text, source, target)
+            submissions.add(submission)
+            deliver(submission, checkNotNull(callback))
         }
     }
 }

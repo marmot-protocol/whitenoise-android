@@ -6,7 +6,7 @@ import dev.davidv.translator.ITranslationService
 import dev.davidv.translator.TranslationError
 import kotlinx.coroutines.CompletableDeferred
 
-/** Recovery stays on the same verified binding and within the caller's overall deadline. */
+/** Catalog initialization stays on the verified binding and within the caller's overall deadline. */
 internal suspend fun translateOnBoundTranslator(
     service: ITranslationService,
     text: String,
@@ -14,22 +14,49 @@ internal suspend fun translateOnBoundTranslator(
     target: String,
     prepareSubmission: suspend (CompletableDeferred<String>) -> Unit,
 ): String {
-    repeat(2) { attempt ->
-        val result = CompletableDeferred<String>()
-        try {
-            prepareSubmission(result)
-            runTranslatorBinderCall { service.translate(text, source, target, translationCallback(result)) }
-            return result.await()
-        } catch (error: TranslationException) {
-            // The reviewed engine resolves explicit languages before its catalog finishes loading.
-            // Its detection-error callback arrives after initialization; retry that explicit choice once.
-            if (attempt != 0 || source.isEmpty() || error.failure != TranslationFailure.DETECTION) throw error
-        } finally {
-            result.cancel()
+    if (target !in offlineTranslatorLanguages || (source.isNotEmpty() && source !in offlineTranslatorLanguages)) {
+        throw TranslationException(TranslationFailure.INVALID_REQUEST)
+    }
+    val ready = CompletableDeferred<String>()
+    try {
+        prepareSubmission(ready)
+        // 0.8.3–0.8.5 resolve language codes before waiting for their catalog. An empty
+        // request's callback runs after that wait. Discard it, then resolve the actual
+        // requested pair on this still-bound service. No message text reaches the probe.
+        runTranslatorBinderCall { service.translate("", "", "", catalogReadyCallback(ready)) }
+        ready.await()
+    } finally {
+        ready.cancel()
+    }
+    val result = CompletableDeferred<String>()
+    try {
+        prepareSubmission(result)
+        runTranslatorBinderCall { service.translate(text, source, target, translationCallback(result)) }
+        return result.await()
+    } finally {
+        result.cancel()
+    }
+}
+
+private fun catalogReadyCallback(ready: CompletableDeferred<String>): ITranslationCallback.Stub =
+    object : ITranslationCallback.Stub() {
+        override fun onTranslationResult(translatedText: String?) {
+            if (translatedText == "") {
+                ready.complete("")
+            } else {
+                ready.completeExceptionally(TranslationException(TranslationFailure.ENGINE))
+            }
+        }
+
+        override fun onTranslationError(error: TranslationError?) {
+            // Empty input normally cannot be detected. These callbacks occur only after
+            // the engine's language-availability check finishes; neither is user output.
+            when (error?.type) {
+                ErrorType.COULD_NOT_DETECT_LANGUAGE, ErrorType.DETECTED_BUT_UNAVAILABLE -> ready.complete("")
+                else -> ready.completeExceptionally(TranslationException(TranslationFailure.ENGINE))
+            }
         }
     }
-    error("Translator retry exhausted without a result")
-}
 
 private fun translationCallback(result: CompletableDeferred<String>): ITranslationCallback.Stub =
     object : ITranslationCallback.Stub() {

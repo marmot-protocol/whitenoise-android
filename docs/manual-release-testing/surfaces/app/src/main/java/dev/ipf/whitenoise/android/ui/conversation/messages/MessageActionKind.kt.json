@@ -127,6 +127,14 @@
           "MSG-004",
           "MSG-016"
         ]
+      },
+      {
+        "surface": "Distinct translation, text selection and literal-code icons",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "internal fun messageActionIconRes(kind: MessageActionKind): Int =",
+        "test_ids": [
+          "SET-033"
+        ]
       }
     ]
   },

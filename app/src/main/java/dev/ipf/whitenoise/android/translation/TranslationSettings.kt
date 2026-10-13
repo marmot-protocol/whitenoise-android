@@ -46,36 +46,7 @@ internal fun TranslationLanguagePicker(
     Box {
         TextButton(onClick = { expanded = true }) { Text("$title: ${name(selected)}") }
         DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
-            val codes =
-                listOf(
-                    "ar",
-                    "cs",
-                    "da",
-                    "de",
-                    "el",
-                    "en",
-                    "es",
-                    "fi",
-                    "fr",
-                    "he",
-                    "hi",
-                    "hu",
-                    "id",
-                    "it",
-                    "ja",
-                    "ko",
-                    "nl",
-                    "no",
-                    "pl",
-                    "pt",
-                    "ro",
-                    "ru",
-                    "sv",
-                    "tr",
-                    "uk",
-                    "zh",
-                )
-            (if (allowDetection) listOf("") + codes else codes).forEach { code ->
+            (if (allowDetection) listOf("") + offlineTranslatorLanguages else offlineTranslatorLanguages).forEach { code ->
                 DropdownMenuItem(text = { Text(name(code)) }, onClick = {
                     onSelected(code)
                     expanded = false
