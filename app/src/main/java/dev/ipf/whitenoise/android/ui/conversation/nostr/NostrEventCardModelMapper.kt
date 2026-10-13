@@ -5,7 +5,7 @@ import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 /** Maps a verified Nostr event into the bounded presentation model used by cards and readers. */
 internal fun NostrEvent.toCardModel(): NostrEventCardModel {
     val cardKind = cardKind()
-    val videoMetadata = takeIf { cardKind == NostrEventCardKind.Video }?.videoMetadata()
+    val videoMetadata = videoMetadata()
     val tagTitle = firstSafeTag("title") ?: firstSafeTag("name")
     val tagSummary = firstSafeExcerptTag("summary") ?: firstSafeExcerptTag("description")
     return NostrEventCardModel(

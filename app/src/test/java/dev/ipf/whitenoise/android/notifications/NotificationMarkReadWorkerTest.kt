@@ -26,7 +26,7 @@ import java.util.UUID
  * whose FFI boundary is a controllable fixture.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = WhiteNoiseApplication::class)
+@Config(sdk = [36], application = dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTestApplication::class)
 class NotificationMarkReadWorkerTest {
     private lateinit var realContext: Context
 

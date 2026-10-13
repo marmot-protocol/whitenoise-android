@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
 import android.content.Context
-import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -213,29 +212,17 @@ private const val EMOJI_DECODE_PX = 128
  * Emoji artwork downsampled so its longer edge is under twice [EMOJI_DECODE_PX]; null when not an image.
  * Sampling by the longer edge bounds memory for extreme aspect ratios (e.g. 100000x255).
  */
-internal fun decodeEmojiImage(bytes: ByteArray): ImageBitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-        return null
-    }
-    var sample = 1
-    val longerEdge = maxOf(bounds.outWidth, bounds.outHeight)
-    while (longerEdge / (sample * 2) >= EMOJI_DECODE_PX) {
-        sample *= 2
-    }
-    val options = BitmapFactory.Options().apply { inSampleSize = sample }
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
-}
+internal fun decodeEmojiImage(bytes: ByteArray): ImageBitmap? =
+    dev.ipf.whitenoise.android.media.MediaPipeline
+        .decodeSampledBitmap(bytes, EMOJI_DECODE_PX)
+        ?.asImageBitmap()
 
 /** File extension for a decodable image, from its content rather than its name. */
 private fun imageExtension(bytes: ByteArray): String? {
-    if (decodeEmojiImage(bytes) == null) {
-        return null
-    }
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    return when (bounds.outMimeType) {
+    val info =
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .inspect(bytes) ?: return null
+    return when (info.mime) {
         "image/png" -> "png"
         "image/gif" -> "gif"
         "image/webp" -> "webp"

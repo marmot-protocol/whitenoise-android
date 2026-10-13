@@ -33,6 +33,37 @@ class GroupSvgRasterizerTest {
     private val header = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
 
     @Test
+    fun finalHostPngEncodingMustFitUploadBoundAndReleasePixels() =
+        runTest {
+            val bitmap = Bitmap.createBitmap(1024, 1024, Bitmap.Config.ARGB_8888)
+            val random = java.util.Random(1)
+            val pixels = IntArray(1024 * 1024) { random.nextInt() or (0xff shl 24) }
+            bitmap.setPixels(pixels, 0, 1024, 0, 0, 1024, 1024)
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.installTestTransport(
+                object : dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport by
+                dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport {
+                    override fun decode(
+                        bytes: ByteArray,
+                        edge: Int,
+                        oriented: Boolean,
+                        operation: Int,
+                    ): Bitmap = bitmap
+                },
+            )
+            try {
+                val failure =
+                    runCatching { GroupSvgRasterizer.rasterize("$header</svg>".toByteArray()) }.exceptionOrNull()
+                assertEquals(ImageUploadPreparationException.UnsupportedSvg, failure)
+                assertTrue(bitmap.isRecycled)
+            } finally {
+                bitmap.recycle()
+                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.installTestTransport(
+                    dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport,
+                )
+            }
+        }
+
+    @Test
     fun transparentSvgBecomesBoundedPngBeforeCroppingAndOrdinaryUploadDraft() =
         runTest {
             val source = "$header<rect x=\"25\" y=\"25\" width=\"50\" height=\"50\" fill=\"red\"/></svg>"

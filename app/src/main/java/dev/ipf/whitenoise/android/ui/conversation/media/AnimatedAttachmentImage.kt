@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 sealed interface DecodedAttachmentPresentation {
     data class Static(
         val bitmap: Bitmap,
+        val animationDeferred: Boolean = false,
     ) : DecodedAttachmentPresentation
 
     data class Animated(
@@ -38,18 +39,25 @@ suspend fun decodeMessageAttachmentImage(
     mediaType: String,
     staticMaxEdgePx: Int,
     animatedMaxEdgePx: Int = MediaPipeline.ANIMATED_IMAGE_MAX_EDGE_PX,
+    animationAllowed: Boolean = false,
 ): DecodedAttachmentPresentation? =
     withContext(Dispatchers.Default) {
+        val admission =
+            dev.ipf.whitenoise.android.media
+                .admitAnimationSource(bytes)
+        val animationDeferred =
+            !animationAllowed && admission is dev.ipf.whitenoise.android.media.AnimationSourceAdmission.Admitted
         decodeAdmittedAttachmentImage<DecodedAttachmentPresentation>(
             bytes = bytes,
+            admission = admission,
             decodeAnimated = {
-                MediaPipeline.decodeAnimatedDrawable(bytes, animatedMaxEdgePx)?.let {
+                (if (animationAllowed) MediaPipeline.decodeAnimatedDrawable(bytes, animatedMaxEdgePx) else null)?.let {
                     DecodedAttachmentPresentation.Animated(it)
                 }
             },
             decodeStill = {
                 MediaPipeline.decodeSampledBitmap(bytes, staticMaxEdgePx)?.let {
-                    DecodedAttachmentPresentation.Static(it)
+                    DecodedAttachmentPresentation.Static(it, animationDeferred)
                 }
             },
         )
@@ -61,11 +69,12 @@ fun AnimatedDrawableAttachmentImage(
     contentDescription: String?,
     contentScale: ContentScale,
     modifier: Modifier = Modifier,
+    active: Boolean = true,
 ) {
-    DisposableEffect(drawable) {
+    DisposableEffect(drawable, active) {
         val animated = drawable as? AnimatedImageDrawable
         animated?.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
-        animated?.start()
+        if (active) animated?.start() else animated?.stop()
         onDispose {
             animated?.stop()
         }

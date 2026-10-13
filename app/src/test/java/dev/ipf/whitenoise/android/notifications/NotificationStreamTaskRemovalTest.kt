@@ -10,7 +10,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], application = WhiteNoiseApplication::class)
+@Config(sdk = [34], application = dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTestApplication::class)
 class NotificationStreamTaskRemovalTest {
     @Test
     fun recentsSwipeClearsProcessOwnedConversationStateThroughTheServiceBoundary() {

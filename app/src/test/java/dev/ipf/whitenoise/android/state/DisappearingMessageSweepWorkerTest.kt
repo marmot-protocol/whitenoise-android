@@ -26,7 +26,7 @@ private typealias SweepOverride = PerformDisappearingMessageSweep
 private typealias AccountOverride = HasRetentionSweepAccount
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = WhiteNoiseApplication::class)
+@Config(sdk = [36], application = dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTestApplication::class)
 class DisappearingMessageSweepWorkerTest {
     private lateinit var application: WhiteNoiseApplication
     private lateinit var appContext: Context

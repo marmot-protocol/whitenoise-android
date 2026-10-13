@@ -1991,6 +1991,7 @@
     <string name="photo_editor_discard">Discard</string>
     <string name="photo_editor_limit_strokes">Drawing limit reached. Undo or reset to continue.</string>
     <string name="photo_editor_limit_points">This stroke was simplified to keep editing responsive.</string>
+    <string name="photo_editor_budget_exceeded">This crop needs more image detail or memory than can be processed safely. Choose a wider crop or lower quality. The previous attachment is unchanged.</string>
     <string name="photo_editor_save_failed">Couldn’t save the edited photo. The previous attachment is unchanged.</string>
     <string name="photo_editor_edit_action">Edit photo</string>
     <string name="photo_editor_not_editable_animation">Animated images can be sent unchanged, but cannot be edited.</string>

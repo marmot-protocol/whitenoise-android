@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
+  "legacy_sha256": "a699c3e06edcc6a468d59491c5e8a727f4803b06f4801c5b9566039ed4f9e603",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Bounded profile banner decode variant",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
+        "anchor": "fun profileBannerDecodeDimension(",
+        "test_ids": [
+          "PRO-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Isolated automatic and stored profile imagery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
+        "anchor": "private fun decode(",
+        "test_ids": [
+          "MED-031"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
