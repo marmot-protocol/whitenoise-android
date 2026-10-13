@@ -26,6 +26,7 @@ internal class ConversationDictationAudioChunkBuffer(
     private val sessionId: Long,
     private val chunkBytes: Int = DEFAULT_DICTATION_CHUNK_BYTES,
     private val maxBufferedBytes: Int = DEFAULT_DICTATION_BUFFER_BYTES,
+    private val minimumTailBytes: Int = 0,
 ) {
     private val queued = ArrayDeque<ConversationDictationAudioChunk>()
     private val inFlight = mutableMapOf<Long, ConversationDictationAudioChunk>()
@@ -45,6 +46,7 @@ internal class ConversationDictationAudioChunkBuffer(
     init {
         require(chunkBytes > 0 && chunkBytes % 2 == 0)
         require(maxBufferedBytes >= chunkBytes && maxBufferedBytes % 2 == 0)
+        require(minimumTailBytes in 0..chunkBytes && minimumTailBytes % 2 == 0)
     }
 
     /** Appends one complete PCM16 read, or rejects all of it when the bounded backlog is full. */
@@ -75,6 +77,7 @@ internal class ConversationDictationAudioChunkBuffer(
     fun finish() {
         if (finished) return
         finished = true
+        coalesceFinalTail()
         if (currentSize > 0) sealCurrent()
     }
 
@@ -87,14 +90,16 @@ internal class ConversationDictationAudioChunkBuffer(
         return true
     }
 
-    /** Moves the oldest sealed chunk into the in-flight set. */
+    /** Holds the newest boundary until a useful successor exists or capture finishes. */
     @Synchronized
-    fun poll(): ConversationDictationAudioChunk? =
-        if (inFlight.isNotEmpty()) {
+    fun poll(): ConversationDictationAudioChunk? {
+        val boundaryHeld = !finished && queued.size == 1 && currentSize < minimumTailBytes
+        return if (inFlight.isNotEmpty() || boundaryHeld) {
             null
         } else {
             queued.pollFirst()?.also { chunk -> inFlight[chunk.chunkId] = chunk }
         }
+    }
 
     /** A final chunk is proven only after capture seals and no later PCM can extend its input. */
     @Synchronized
@@ -173,6 +178,36 @@ internal class ConversationDictationAudioChunkBuffer(
         currentHasSpeech = false
         bufferedBytes = 0
         finished = true
+    }
+
+    /**
+     * A stop just after a sentence boundary must not send a context-free subsecond request.
+     * The last unclaimed chunk is still ours: merge its short tail, or rebalance a full chunk
+     * into two bounded requests. No samples are discarded, replayed or classified as silence.
+     */
+    private fun coalesceFinalTail() {
+        if (currentSize == 0 || currentSize >= minimumTailBytes || queued.isEmpty()) return
+        val previous = queued.removeLast()
+        val combined = ByteArray(previous.pcm.size + currentSize)
+        previous.pcm.copyInto(combined)
+        current.copyInto(combined, destinationOffset = previous.pcm.size, endIndex = currentSize)
+        val hasSpeech = previous.hasSpeech || currentHasSpeech
+        val prefixBytes = if (combined.size <= chunkBytes) combined.size else combined.size - minimumTailBytes
+        queued.addLast(
+            previous.copy(
+                lastSampleExclusive = previous.firstSample + prefixBytes / 2L,
+                hasSpeech = hasSpeech,
+                pcm = combined.copyOf(prefixBytes),
+            ),
+        )
+        nextSample = previous.firstSample + prefixBytes / 2L
+        current.fill(0)
+        currentSize = combined.size - prefixBytes
+        combined.copyInto(current, startIndex = prefixBytes)
+        // Conservatively retain speech evidence after rebalancing; never infer silence from duration.
+        currentHasSpeech = currentSize > 0 && hasSpeech
+        previous.pcm.fill(0)
+        combined.fill(0)
     }
 
     /** Copies the partial buffer into an immutable chunk and advances its non-overlapping sample range. */

@@ -20,65 +20,9 @@
         ]
       },
       {
-        "surface": "ConversationDictationRecoveryPanel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "fun ConversationDictationRecoveryPanel(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "ConversationDictationDiscardConfirmation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "fun ConversationDictationDiscardConfirmation(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_remaining_audio",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "R.string.dictation_remaining_audio",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "string:dictation_stopped_remaining",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
         "anchor": "R.string.dictation_stopped_remaining",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_remaining_explanation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "R.string.dictation_remaining_explanation",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_retry_remaining",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "R.string.dictation_retry_remaining",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_keep_later",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "R.string.dictation_keep_later",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_discard_remaining",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "R.string.dictation_discard_remaining",
         "test_ids": [
           "DIC-002"
         ]
@@ -138,31 +82,15 @@
         "test_ids": [
           "DIC-002"
         ]
-      },
-      {
-        "surface": "string:discard",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "R.string.discard",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "DIC-002"
-        ]
       }
     ],
     "source_coverage": [
       {
-        "surface": "Keep for later requests retention separately from ordinary dialog dismissal",
+        "surface": "Dictate starts a fresh recording without a recovery decision dialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationComposerRecovery.kt",
-        "anchor": "onKeepForLater =",
+        "anchor": "controller.requestFreshComposerStart",
         "test_ids": [
-          "DIC-002"
+          "DIC-009"
         ]
       }
     ]
