@@ -25,6 +25,63 @@ import java.nio.ByteBuffer
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PhotoEditorRendererTest {
     @Test
+    fun unsupportedTightCropIsRejectedBeforePixelDecodeOrEncode() =
+        runTest {
+            val source = solidPng(16, 16, Color.BLUE)
+            var decodeCalls = 0
+            var encodeCalls = 0
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.installTestTransport(
+                object : dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport by
+                dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport {
+                    override fun inspect(bytes: ByteArray) =
+                        dev.ipf.whitenoise.android.media.sandbox
+                            .ImageInspection(8000, 6000, "image/png", 1)
+
+                    override fun decode(
+                        bytes: ByteArray,
+                        edge: Int,
+                        oriented: Boolean,
+                        operation: Int,
+                    ): Bitmap? {
+                        decodeCalls += 1
+                        return null
+                    }
+                },
+            )
+            try {
+                val renderer = renderer { encodeCalls += 1 }
+                val result =
+                    renderer.render(
+                        source,
+                        PhotoEditRecipe(crop = NormalizedRect(0.25f, 0.25f, 0.75f, 0.75f)),
+                        MediaQuality.High,
+                    )
+                assertEquals(PhotoEditorRenderResult.MemoryLimit, result)
+                assertEquals(0, decodeCalls)
+                assertEquals(0, encodeCalls)
+            } finally {
+                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.installTestTransport(
+                    dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport,
+                )
+            }
+        }
+
+    @Test
+    fun ipcOutputAndHostBitmapPeakMustFitMemoryBudget() =
+        runTest {
+            val source = solidPng(2048, 32, Color.BLUE)
+            val renderer =
+                PhotoEditorRenderer(
+                    renderDispatcher = UnconfinedTestDispatcher(),
+                    memoryBudgetBytes = { 8L * 1024 * 1024 },
+                )
+            assertEquals(
+                PhotoEditorRenderResult.MemoryLimit,
+                renderer.render(source, PhotoEditRecipe.Original, MediaQuality.Standard),
+            )
+        }
+
+    @Test
     fun standardAndHighShareRecipeGeometryButUseDifferentOutputPlans() {
         val renderer = renderer()
         val source =

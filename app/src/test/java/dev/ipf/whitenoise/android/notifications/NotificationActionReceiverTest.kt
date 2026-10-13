@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config
  * direct `onReceive` call.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = WhiteNoiseApplication::class)
+@Config(sdk = [36], application = dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTestApplication::class)
 class NotificationActionReceiverTest {
     private lateinit var application: WhiteNoiseApplication
 

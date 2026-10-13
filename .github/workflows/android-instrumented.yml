@@ -18,6 +18,17 @@ name: Android Instrumented Tests
 on:
   workflow_dispatch:
     inputs:
+      media_sandbox_only:
+        description: Run only codec isolation and recovery on the selected Android API
+        required: false
+        type: boolean
+        default: false
+      media_sandbox_api:
+        description: Android API for focused decoder compatibility
+        required: false
+        type: choice
+        options: ['30', '34', '36']
+        default: '30'
       responsiveness_only:
         description: Run only retained transcript and connectivity responsiveness acceptance
         required: false
@@ -126,6 +137,8 @@ on:
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AnimatedAttachmentImage.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmissionDeviceTest.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/**'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox/**'
       - 'cryptoBenchmark/**'
       - 'settings.gradle.kts'
       - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt'
@@ -161,7 +174,7 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.responsiveness_only && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.responsiveness_only && 'responsiveness' || 'standard') }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.responsiveness_only && 'responsiveness' || 'standard') }}
   cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}
 
 permissions:
@@ -193,7 +206,7 @@ jobs:
 
   attachment-fixture:
     needs: changes
-    if: needs.changes.outputs.attachment_fixture == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.responsiveness_only))
+    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only))
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -248,7 +261,7 @@ jobs:
 
   instrumented:
     needs: changes
-    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only)
+    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only)
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -300,10 +313,16 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Reject incompatible focused decoder inputs
+        if: inputs.media_sandbox_only && (inputs.maestro_pilot || inputs.responsiveness_only || inputs.review_demo_e2e || inputs.document_provider_matrix)
+        run: |
+          echo "Select one focused instrumented suite per dispatch" >&2
+          exit 2
+
       - name: Run connected Android tests
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          api-level: 34
+          api-level: ${{ inputs.media_sandbox_only && inputs.media_sandbox_api || 34 }}
           target: google_apis
           arch: x86_64
           force-avd-creation: false
@@ -311,7 +330,7 @@ jobs:
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
-          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}"
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}"
 
       - name: Upload instrumented test reports
         if: always()
@@ -328,9 +347,24 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Record instrumentation checkout revision
+        if: success()
+        run: git rev-parse HEAD > app/build/outputs/apk/source-revision.txt
+
+      - name: Retain built-revision instrumentation APKs
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-instrumented-apks-${{ github.sha }}
+          path: |
+            app/build/outputs/apk/**/*.apk
+            app/build/outputs/apk/source-revision.txt
+          if-no-files-found: error
+          retention-days: 7
+
   maestro-pilot:
     name: Optional Maestro onboarding pilot
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.responsiveness_only && !startsWith(inputs.maestro_suite, 'runtime-')
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && !startsWith(inputs.maestro_suite, 'runtime-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -441,7 +475,7 @@ jobs:
 
   maestro-runtime-build:
     name: Build isolated Maestro fixture pair
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.responsiveness_only && startsWith(inputs.maestro_suite, 'runtime-')
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && startsWith(inputs.maestro_suite, 'runtime-')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -629,7 +663,7 @@ jobs:
 
   maestro-runtime-summary:
     name: Reconcile every selected Maestro runtime case
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.responsiveness_only && startsWith(inputs.maestro_suite, 'runtime-')
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && startsWith(inputs.maestro_suite, 'runtime-')
     needs: [maestro-runtime-build, maestro-runtime]
     runs-on: ubuntu-latest
     timeout-minutes: 5

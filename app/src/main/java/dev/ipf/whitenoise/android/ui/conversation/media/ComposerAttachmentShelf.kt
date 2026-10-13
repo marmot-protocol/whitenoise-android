@@ -350,7 +350,7 @@ private fun ComposerAttachmentFilename(
 }
 
 /**
- * Decode the chosen local animation at thumbnail size; the shared drawable renderer owns playback/disposal.
+ * Render the admitted first frame in isolation; a share intent is not proof of an animation playback gesture.
  *
  * The native decoder sees the source only after content admission, so a refused, oversized or unreadable
  * source stays on the still tile, and a replaced or removed preview never receives a late drawable.
@@ -358,6 +358,7 @@ private fun ComposerAttachmentFilename(
 @Composable
 private fun rememberShelfAnimation(uri: Uri): Drawable? {
     val resolver = LocalContext.current.contentResolver
+    val resources = LocalContext.current.resources
     return key(resolver, uri) {
         val drawable by produceState<Drawable?>(null, resolver, uri) {
             value =
@@ -368,7 +369,9 @@ private fun rememberShelfAnimation(uri: Uri): Drawable? {
                             ensureActive = { ensureActive() },
                         )
                     decodeLocalPreviewAnimation(source) { bytes ->
-                        MediaPipeline.decodeAnimatedDrawable(bytes, PREVIEW_DECODE_EDGE)
+                        MediaPipeline.decodeSampledBitmap(bytes, PREVIEW_DECODE_EDGE)?.let {
+                            android.graphics.drawable.BitmapDrawable(resources, it)
+                        }
                     }
                 }
         }

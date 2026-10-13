@@ -131,6 +131,14 @@
         "test_ids": [
           "RDR-001"
         ]
+      },
+      {
+        "surface": "Confirmed media destination hook",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "onWebLinkActivated",
+        "test_ids": [
+          "RDR-004"
+        ]
       }
     ],
     "source_coverage": [

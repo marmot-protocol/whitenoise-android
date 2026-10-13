@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.onboarding
 
-import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -90,7 +89,9 @@ internal fun SignUpScreen(
                 null
             } else {
                 withContext(Dispatchers.Default) {
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                    dev.ipf.whitenoise.android.media.MediaPipeline
+                        .decodeSampledBitmap(bytes, dev.ipf.whitenoise.android.core.PROFILE_AVATAR_MAX_DIMENSION)
+                        ?.asImageBitmap()
                 }
             }
     }

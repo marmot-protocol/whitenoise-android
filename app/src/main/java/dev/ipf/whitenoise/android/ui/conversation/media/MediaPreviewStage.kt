@@ -164,7 +164,10 @@ private fun MediaPreviewPage(
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center,
     ) {
-        if (metadata?.isVideo == true) {
+        if (metadata?.isVideo == true && !isLocalVideoUri(item.uri)) {
+            MediaPreviewDocumentPage(label)
+            MediaPreviewInclusionButton(included, label, onIncludedChange, Modifier.align(Alignment.BottomEnd))
+        } else if (metadata?.isVideo == true) {
             var controlsVisible by remember(item.uri) { mutableStateOf(true) }
             DraftVideoPreview(
                 uri = item.uri,

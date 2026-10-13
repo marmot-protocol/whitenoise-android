@@ -34,7 +34,7 @@ import org.robolectric.shadows.ShadowLog
 internal class ConversationDictationForegroundServiceTest : ConversationDictationForegroundTestCase() {
     /** A stale PendingIntent in a new process cannot initialize MDK or a speech controller. */
     @Test
-    @Config(application = WhiteNoiseApplication::class)
+    @Config(application = dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTestApplication::class)
     fun unownedCompletionCommandKeepsApplicationStateLazy() {
         ConversationDictationForegroundService.hostResolver = defaultResolver
         val application = RuntimeEnvironment.getApplication() as WhiteNoiseApplication

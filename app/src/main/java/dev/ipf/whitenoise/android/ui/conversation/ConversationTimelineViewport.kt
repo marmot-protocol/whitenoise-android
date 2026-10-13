@@ -100,6 +100,10 @@ internal class ConversationTimelineViewport(
     /** Returns the clear measured height consumed by native centering, tail, selection and speech owners. */
     fun readingHeightPx(): Int = readingLayoutInfo().viewportSize.height
 
+    /** Native newest-edge clamp, independent of a requested reading-start offset. */
+    val isAtNaturalTail: Boolean
+        get() = !listState.canScrollBackward
+
     /**
      * The measured extent from the newest row through [index], counting structural rows and spacing even beneath
      * composer occlusion, so it reads the native layout rather than the reading layout.

@@ -10,12 +10,10 @@ import android.graphics.Rect
 import android.net.Uri
 import android.service.notification.StatusBarNotification
 import androidx.appcompat.content.res.AppCompatResources
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
-import dev.ipf.whitenoise.android.ui.decodeEmojiImage
 import dev.ipf.whitenoise.android.ui.sanitizeEmojiCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -214,7 +212,7 @@ private suspend fun localNotificationEmojiBitmap(
         val bitmap =
             bytes
                 ?.takeIf { it.size <= CustomEmojiStore.MAX_BYTES }
-                ?.let { runCatching { decodeEmojiImage(it)?.asAndroidBitmap() }.getOrNull() }
+                ?.let { decodeNotificationEmojiInterruptibly(it) }
         if (bitmap != null) return bitmap
     }
     return null

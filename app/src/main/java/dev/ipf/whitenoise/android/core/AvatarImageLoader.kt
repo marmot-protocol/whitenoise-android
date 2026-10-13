@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.core
 
-import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.graphics.ImageBitmap
@@ -409,6 +408,8 @@ object AvatarImageLoader {
 
     /** Wipes cached avatars and invalidates every queued or in-flight fetch. */
     fun clear() {
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .resetForAccount()
         synchronized(lock) {
             observedCacheLifetime.longValue = cacheLifetime.advance()
             cache.evictAll()
@@ -557,16 +558,12 @@ object AvatarImageLoader {
         maxDimension: Int,
     ): android.graphics.Bitmap? {
         if (variant == ProfileImageVariant.AVATAR) AvatarCacheDiagnostics.decode(AvatarCacheKind.PROFILE)
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        val target = boundedDecodeDimension(bounds.outWidth, bounds.outHeight, maxDimension)
-        val options =
-            BitmapFactory.Options().apply {
-                inSampleSize = profileDecodeSampleSize(bounds.outWidth, bounds.outHeight, variant, target)
-            }
-        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
-        return scaleAvatarBitmapToMaxDimension(decoded, target)
+        val info =
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .inspect(bytes) ?: return null
+        val target = boundedDecodeDimension(info.width, info.height, maxDimension)
+        return dev.ipf.whitenoise.android.media.MediaPipeline
+            .decodeSampledBitmap(bytes, target)
     }
 }
 

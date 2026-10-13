@@ -287,11 +287,20 @@ object MediaPipeline {
         bytes: ByteArray,
         maxEdgePx: Int,
         honorExifOrientation: Boolean = false,
+    ): Bitmap? =
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .decode(bytes, maxEdgePx, honorExifOrientation)
+
+    @Suppress("ReturnCount") // Reject invalid bounds and native allocation failure before returning pixels.
+    internal fun decodeSampledBitmapInDecoder(
+        bytes: ByteArray,
+        maxEdgePx: Int,
+        honorExifOrientation: Boolean = false,
     ): Bitmap? {
         if (bytes.isEmpty()) return null
         val orientation =
             if (honorExifOrientation) {
-                readExifOrientation(bytes)
+                readExifOrientationInDecoder(bytes)
             } else {
                 EXIF_ORIENTATION_NORMAL
             }
@@ -301,6 +310,7 @@ object MediaPipeline {
         val opts =
             BitmapFactory.Options().apply {
                 inSampleSize = target.sampleSize
+                inPreferredConfig = Bitmap.Config.ARGB_8888
             }
         // The power-of-two sample only lands the decode in [target, 2×target),
         // so a source just under 2× the cap decodes at up to ~4× the intended
@@ -525,48 +535,8 @@ object MediaPipeline {
         uri: Uri,
         maxEdgePx: Int = THUMBNAIL_MAX_EDGE_PX,
     ): Bitmap? =
-        try {
-            val orientation = readExifOrientation(contentResolver, uri)
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            contentResolver.openInputStream(uri).use { stream ->
-                stream ?: return null
-                BitmapFactory.decodeStream(stream, null, bounds)
-            }
-            val srcW = bounds.outWidth
-            val srcH = bounds.outHeight
-            if (srcW <= 0 || srcH <= 0) {
-                null
-            } else {
-                val target = orientedDecodeTarget(srcW, srcH, maxEdgePx, orientation)
-                if (target == null) {
-                    null
-                } else {
-                    val opts =
-                        BitmapFactory.Options().apply {
-                            inSampleSize = target.sampleSize
-                        }
-                    val decoded =
-                        contentResolver.openInputStream(uri).use { stream ->
-                            if (stream == null) {
-                                null
-                            } else {
-                                try {
-                                    BitmapFactory.decodeStream(stream, null, opts)
-                                } catch (_: OutOfMemoryError) {
-                                    null
-                                }
-                            }
-                        }
-                    decoded?.let { scaleAndOrientBitmap(it, target.rawWidth, target.rawHeight, orientation) }
-                }
-            }
-        } catch (_: java.io.IOException) {
-            null
-        } catch (_: SecurityException) {
-            null
-        } catch (_: OutOfMemoryError) {
-            null
-        }
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .decodeUri(contentResolver, uri, maxEdgePx)
 
     private data class OrientedDecodeTarget(
         val rawWidth: Int,
@@ -596,7 +566,10 @@ object MediaPipeline {
             else -> EXIF_ORIENTATION_NORMAL
         }
 
-    internal fun exifOrientationRequiresPixelTransform(orientation: Int?): Boolean = normalizeExifOrientation(orientation) != EXIF_ORIENTATION_NORMAL
+    internal fun exifOrientationRequiresPixelTransform(orientation: Int?): Boolean {
+        val normalized = normalizeExifOrientation(orientation)
+        return normalized != EXIF_ORIENTATION_NORMAL
+    }
 
     internal fun exifOrientationSwapsDimensions(orientation: Int?): Boolean =
         when (normalizeExifOrientation(orientation)) {
@@ -635,7 +608,13 @@ object MediaPipeline {
         maxEdgePx: Int,
         orientation: Int,
     ): OrientedDecodeTarget? {
-        val (displayTargetW, displayTargetH) = targetDimensionsForExifOrientation(srcWidth, srcHeight, maxEdgePx, orientation)
+        val (displayTargetW, displayTargetH) =
+            targetDimensionsForExifOrientation(
+                srcWidth,
+                srcHeight,
+                maxEdgePx,
+                orientation,
+            )
         if (displayTargetW == 0 || displayTargetH == 0) return null
         val (rawTargetW, rawTargetH) =
             if (exifOrientationSwapsDimensions(orientation)) {
@@ -700,47 +679,6 @@ object MediaPipeline {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
-    private fun readExifOrientation(
-        contentResolver: ContentResolver,
-        uri: Uri,
-    ): Int =
-        try {
-            contentResolver.openInputStream(uri).use { stream ->
-                stream ?: return EXIF_ORIENTATION_NORMAL
-                normalizeExifOrientation(
-                    ExifInterface(stream).getAttributeInt(
-                        ExifInterface.TAG_ORIENTATION,
-                        EXIF_ORIENTATION_NORMAL,
-                    ),
-                )
-            }
-        } catch (_: java.io.IOException) {
-            readExifOrientationFromUriPrefix(contentResolver, uri)
-        } catch (_: SecurityException) {
-            EXIF_ORIENTATION_NORMAL
-        } catch (_: RuntimeException) {
-            readExifOrientationFromUriPrefix(contentResolver, uri)
-        }
-
-    private fun readExifOrientationFromUriPrefix(
-        contentResolver: ContentResolver,
-        uri: Uri,
-    ): Int =
-        try {
-            contentResolver.openInputStream(uri).use { stream ->
-                stream ?: return EXIF_ORIENTATION_NORMAL
-                normalizeExifOrientation(
-                    jpegExifOrientation(readPrefixBytes(stream, EXIF_FALLBACK_PREFIX_BYTES)),
-                )
-            }
-        } catch (_: java.io.IOException) {
-            EXIF_ORIENTATION_NORMAL
-        } catch (_: SecurityException) {
-            EXIF_ORIENTATION_NORMAL
-        } catch (_: RuntimeException) {
-            EXIF_ORIENTATION_NORMAL
-        }
-
     private fun readPrefixBytes(
         stream: java.io.InputStream,
         cap: Int,
@@ -759,7 +697,11 @@ object MediaPipeline {
         return buffer.toByteArray()
     }
 
-    internal fun readExifOrientation(bytes: ByteArray): Int =
+    internal fun readExifOrientation(bytes: ByteArray): Int? =
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .exif(bytes)
+
+    internal fun readExifOrientationInDecoder(bytes: ByteArray): Int =
         try {
             bytes.inputStream().use { stream ->
                 normalizeExifOrientation(
@@ -883,7 +825,8 @@ object MediaPipeline {
         // Orientation=Rotate90/270, stripping APP1 would make "Original"
         // sends display sideways. Fall back to the JPEG privacy path so the
         // orientation is baked into pixels while still dropping metadata.
-        if (exifOrientationRequiresPixelTransform(readExifOrientation(sourceBytes))) {
+        val orientation = readExifOrientation(sourceBytes) ?: return OriginalImageReadResult.Failed
+        if (exifOrientationRequiresPixelTransform(orientation)) {
             return OriginalImageReadResult.Unsupported
         }
         val stripped = stripOriginalImageMetadata(sourceBytes) ?: return OriginalImageReadResult.Unsupported
@@ -915,7 +858,8 @@ object MediaPipeline {
     @Suppress("ReturnCount") // Every guard fails closed before provider bytes can become an attachment.
     internal fun sanitizeAnimatedImageMetadata(bytes: ByteArray): ByteArray? {
         if (imageAnimationStatus(bytes) != ImageAnimationStatus.ANIMATED) return null
-        if (exifOrientationRequiresPixelTransform(readExifOrientation(bytes))) return null
+        val orientation = readExifOrientation(bytes) ?: return null
+        if (exifOrientationRequiresPixelTransform(orientation)) return null
         val sanitized =
             when (imageContainerKind(bytes)) {
                 ImageContainerKind.Gif -> stripGifMetadata(bytes)
@@ -937,40 +881,8 @@ object MediaPipeline {
         maxEdgePx: Int = DEFAULT_MAX_EDGE_PX,
         quality: Int = DEFAULT_JPEG_QUALITY,
     ): DownscaledJpeg? {
-        // Two-pass decode: first read just the bounds so we can decide an
-        // inSampleSize, then decode at that sampled size. Avoids a 50MB
-        // bitmap in heap for a 12MP source. Any I/O or decode failure below
-        // surfaces as null (see the catch) so callers never crash or ship
-        // partial bytes.
-        return try {
-            val orientation = readExifOrientation(contentResolver, uri)
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            contentResolver.openInputStream(uri).use { stream ->
-                stream ?: return null
-                BitmapFactory.decodeStream(stream, null, bounds)
-            }
-            val srcW = bounds.outWidth
-            val srcH = bounds.outHeight
-            if (srcW <= 0 || srcH <= 0) return null
-
-            val target = orientedDecodeTarget(srcW, srcH, maxEdgePx, orientation) ?: return null
-
-            val decoded: Bitmap =
-                contentResolver.openInputStream(uri).use { stream ->
-                    stream ?: return null
-                    val opts = BitmapFactory.Options().apply { inSampleSize = target.sampleSize }
-                    BitmapFactory.decodeStream(stream, null, opts) ?: return null
-                }
-            val scaled = scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation) ?: return null
-
-            finishDownscaledJpeg(scaled, quality)
-        } catch (_: java.io.IOException) {
-            null
-        } catch (_: SecurityException) {
-            null
-        } catch (_: OutOfMemoryError) {
-            null
-        }
+        val bitmap = decodeSampledFromUri(contentResolver, uri, maxEdgePx) ?: return null
+        return finishDownscaledJpeg(bitmap, quality)
     }
 
     /**
@@ -983,24 +895,7 @@ object MediaPipeline {
         bytes: ByteArray,
         maxEdgePx: Int = DEFAULT_MAX_EDGE_PX,
         quality: Int = DEFAULT_JPEG_QUALITY,
-    ): DownscaledJpeg? {
-        if (bytes.isEmpty()) return null
-        return try {
-            val orientation = readExifOrientation(bytes)
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            val target = orientedDecodeTarget(bounds.outWidth, bounds.outHeight, maxEdgePx, orientation) ?: return null
-            val options = BitmapFactory.Options().apply { inSampleSize = target.sampleSize }
-            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
-            val scaled = scaleAndOrientBitmap(decoded, target.rawWidth, target.rawHeight, orientation) ?: return null
-
-            finishDownscaledJpeg(scaled, quality)
-        } catch (_: OutOfMemoryError) {
-            null
-        } catch (_: RuntimeException) {
-            null
-        }
-    }
+    ): DownscaledJpeg? = decodeSampledBitmap(bytes, maxEdgePx, true)?.let { finishDownscaledJpeg(it, quality) }
 
     /**
      * Flattens alpha before both placeholder hashing and JPEG compression so
@@ -1106,15 +1001,10 @@ object MediaPipeline {
      * to the receiver so the bubble lays out before the bytes finish
      * decoding.
      */
-    fun imageDimOrNull(bytes: ByteArray): String? {
-        if (bytes.isEmpty()) return null
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        val w = bounds.outWidth
-        val h = bounds.outHeight
-        if (w <= 0 || h <= 0) return null
-        return "${w}x$h"
-    }
+    fun imageDimOrNull(bytes: ByteArray): String? =
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .inspect(bytes)
+            ?.let { "${it.width}x${it.height}" }
 
     /** Maps a positively identified original-image container to its wire MIME. */
     private fun originalImageMediaType(bytes: ByteArray): String? =
@@ -1237,7 +1127,6 @@ object MediaPipeline {
     private const val ISO_BMFF_BRAND_BYTES = 4
     private const val ISO_BMFF_FILE_TYPE_MIN_BYTES = 16L
     private val EXIF_PREAMBLE = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0x00, 0x00) // "Exif\u0000\u0000"
-    private const val EXIF_FALLBACK_PREFIX_BYTES = 256 * 1024
     private const val EXIF_ORIENTATION_TAG = 0x0112
     private const val TIFF_IFD_ENTRY_SIZE = 12
     private const val TIFF_TYPE_SHORT = 3
@@ -1370,37 +1259,10 @@ object MediaPipeline {
      * Reads dimensions and a poster thumbhash from a seekable local video, the same metadata
      * [readVideoForUpload] attaches. Null when the platform retriever cannot open the file.
      */
-    fun readVideoFileMetadata(file: java.io.File): VideoFileMetadata? {
-        val mmr = android.media.MediaMetadataRetriever()
-        return try {
-            mmr.setDataSource(file.absolutePath)
-            val width =
-                mmr
-                    .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-                    ?.toIntOrNull() ?: 0
-            val height =
-                mmr
-                    .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-                    ?.toIntOrNull() ?: 0
-            // Thumbhash output is tiny (~25 bytes), so we just need a
-            // representative downscaled frame — don't pull a 4K bitmap
-            // through to encode it.
-            val poster =
-                mmr.getScaledFrameAtTime(
-                    0L,
-                    android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                    THUMBNAIL_MAX_EDGE_PX,
-                    THUMBNAIL_MAX_EDGE_PX,
-                )
-            VideoFileMetadata(width, height, posterThumbhash(poster))
-        } catch (_: RuntimeException) {
-            null
-        } catch (_: OutOfMemoryError) {
-            null
-        } finally {
-            runCatching { mmr.release() }
+    fun readVideoFileMetadata(file: java.io.File): VideoFileMetadata? =
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.probe(file)?.let {
+            VideoFileMetadata(it.width, it.height, posterThumbhash(it.poster))
         }
-    }
 
     private fun posterThumbhash(poster: Bitmap?): String? {
         if (poster == null) return null

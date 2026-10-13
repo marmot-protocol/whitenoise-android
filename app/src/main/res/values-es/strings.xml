@@ -2314,4 +2314,5 @@
     <string name="group_create_edit_members">Editar miembros</string>
     <string name="group_create_unattributed_failure">No pudimos identificar a la persona afectada. Vuelve a intentarlo o edita los miembros.</string>
     <string name="media_reply_draft_conflict">Tu borrador ha cambiado. Conserva esta respuesta y vuelve a intentarlo, o cancela la respuesta antes de enviar.</string>
+    <string name="photo_editor_budget_exceeded">Este recorte requiere más detalle de imagen o memoria de lo que se puede procesar de forma segura. Elige un recorte más amplio o una calidad inferior. El archivo adjunto anterior no cambia.</string>
 </resources>

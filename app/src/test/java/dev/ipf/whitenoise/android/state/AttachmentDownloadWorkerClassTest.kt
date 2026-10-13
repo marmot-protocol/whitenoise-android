@@ -36,7 +36,7 @@ import org.robolectric.shadows.ShadowLog
 private typealias DownloadOverride = PerformDurableAttachmentDownload
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = WhiteNoiseApplication::class)
+@Config(sdk = [36], application = dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTestApplication::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 class AttachmentDownloadWorkerClassTest {
     private lateinit var application: WhiteNoiseApplication

@@ -236,24 +236,25 @@ class MediaPipelineTest {
     }
 
     @Test
-    fun animatedImageSanitizerDropsGifAndWebpMetadataWithoutFlatteningAnimation() {
-        val gif = MediaPipeline.sanitizeAnimatedImageMetadata(animatedGifWithMetadata())!!
-        assertFalse(gif.containsAscii("private comment"))
-        assertTrue(gif.containsAscii("NETSCAPE2.0"))
-        assertEquals(2, gif.count { it == 0x2c.toByte() })
+    fun animatedImageSanitizerDropsGifAndWebpMetadataWithoutFlatteningAnimation() =
+        withConfirmedFixtureExif {
+            val gif = MediaPipeline.sanitizeAnimatedImageMetadata(animatedGifWithMetadata())!!
+            assertFalse(gif.containsAscii("private comment"))
+            assertTrue(gif.containsAscii("NETSCAPE2.0"))
+            assertEquals(2, gif.count { it == 0x2c.toByte() })
 
-        val (webp, firstFrame, secondFrame) = animatedWebpWithMetadata()
+            val (webp, firstFrame, secondFrame) = animatedWebpWithMetadata()
 
-        val sanitizedWebp = MediaPipeline.sanitizeAnimatedImageMetadata(webp)!!
+            val sanitizedWebp = MediaPipeline.sanitizeAnimatedImageMetadata(webp)!!
 
-        assertFalse(sanitizedWebp.containsAscii("gps"))
-        assertFalse(sanitizedWebp.containsAscii("private xmp"))
-        assertFalse(sanitizedWebp.containsAscii("private profile"))
-        assertTrue(sanitizedWebp.containsAscii("ANIM"))
-        assertTrue(sanitizedWebp.containsSubsequence(firstFrame))
-        assertTrue(sanitizedWebp.containsSubsequence(secondFrame))
-        assertEquals(ImageAnimationStatus.ANIMATED, MediaPipeline.imageAnimationStatus(sanitizedWebp))
-    }
+            assertFalse(sanitizedWebp.containsAscii("gps"))
+            assertFalse(sanitizedWebp.containsAscii("private xmp"))
+            assertFalse(sanitizedWebp.containsAscii("private profile"))
+            assertTrue(sanitizedWebp.containsAscii("ANIM"))
+            assertTrue(sanitizedWebp.containsSubsequence(firstFrame))
+            assertTrue(sanitizedWebp.containsSubsequence(secondFrame))
+            assertEquals(ImageAnimationStatus.ANIMATED, MediaPipeline.imageAnimationStatus(sanitizedWebp))
+        }
 
     private fun animatedWebpWithMetadata(): Triple<ByteArray, ByteArray, ByteArray> {
         val firstFrame =
@@ -672,5 +673,29 @@ class MediaPipelineTest {
                 byteArrayOf(0xff.toByte(), 0xff.toByte(), 0xff.toByte(), 0x7f)
 
         assertFalse(MediaPipeline.hasWebpAnimChunk(craftedWebp))
+    }
+
+    /** These literal containers have normal orientation; this fixture never decodes pixels. */
+    private fun withConfirmedFixtureExif(block: () -> Unit) {
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.installTestTransport(
+            object : dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport {
+                override fun decode(
+                    bytes: ByteArray,
+                    edge: Int,
+                    oriented: Boolean,
+                    operation: Int,
+                ): android.graphics.Bitmap? = null
+
+                override fun inspect(bytes: ByteArray): dev.ipf.whitenoise.android.media.sandbox.ImageInspection? = null
+
+                override fun exif(bytes: ByteArray): Int = MediaPipeline.EXIF_ORIENTATION_NORMAL
+            },
+        )
+        try {
+            block()
+        } finally {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .installTestTransport(null)
+        }
     }
 }

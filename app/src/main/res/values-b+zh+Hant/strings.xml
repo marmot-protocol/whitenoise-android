@@ -2281,4 +2281,5 @@
     <string name="group_create_edit_members">編輯成員</string>
     <string name="group_create_unattributed_failure">無法確定受影響的成員。請重試或編輯成員清單。</string>
     <string name="media_reply_draft_conflict">草稿已變更。請保留此回覆並重試，或在傳送前取消回覆。</string>
+    <string name="photo_editor_budget_exceeded">此裁切所需的影像細節或記憶體超出安全處理範圍。請選擇更大的裁切區域或降低畫質。原附件保持不變。</string>
 </resources>
