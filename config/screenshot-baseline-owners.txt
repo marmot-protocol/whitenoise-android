@@ -159,8 +159,8 @@
 
 *.ComposerDraftTopSettlementTest.clearingScrolledManualDraftRemovesTopAction
 
-# Dictation recovery preserves both ordinary composer layouts and exposes app-local resolution.
+# Dictation recovery preserves both ordinary composer layouts without decision dialogs.
 *.ConversationDictationDraftPresentationTest.retainedAudioKeepsDictateVisibleAndOrdinarySendUsableWithoutNotifications
-*.ConversationDictationDraftPresentationTest.expandedComposerSettingsReturnOffersDraftOnlyRemainingAudioRetry
+*.ConversationDictationDraftPresentationTest.expandedComposerRecoveryPastesTextAndFreshDictationNeedsNoChoice
 
 *.ComposerAutofillMenuTest.unfocusedDraftLongPressSelectsAWordAndOffersNativeActions

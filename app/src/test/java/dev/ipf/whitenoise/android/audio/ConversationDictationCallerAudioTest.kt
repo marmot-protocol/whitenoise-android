@@ -640,7 +640,7 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
-    /** Finishing keeps available recorder audio together instead of creating a tiny final request. */
+    /** A completion already in progress also keeps available recorder audio together. */
     @Test
     fun finishDoesNotSplitAtASentenceBoundaryDuringRecorderDrain() {
         val clock = FakeElapsedRealtime()
@@ -774,7 +774,7 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
-    private class FakeElapsedRealtime {
+    internal class FakeElapsedRealtime {
         private val millis = AtomicLong(0L)
 
         fun now(): Long = millis.get()
@@ -903,7 +903,7 @@ class ConversationDictationCallerAudioTest {
     }
 
     /** Holds the recorder after continuous speech and again after the exact five-read quiet gap. */
-    private class QuietGapCaptureDevice(
+    internal class QuietGapCaptureDevice(
         private val clock: FakeElapsedRealtime,
         private val finalRead: Boolean = false,
     ) : ConversationDictationAudioCaptureDevice {

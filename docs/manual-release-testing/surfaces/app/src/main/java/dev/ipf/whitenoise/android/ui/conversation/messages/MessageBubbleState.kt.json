@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
+        "surface": "Per-message sheet, dialog and in-flight state reset with the message id",
+        "anchor": "internal class MessageBubbleSurfaceState",
+        "test_ids": [
+          "MSG-005",
+          "MSG-008",
+          "MSG-013",
+          "MSG-016"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
+        "surface": "Per-row long-press position, menu anchor and focused-media geometry",
+        "anchor": "internal class MessageBubblePressState",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
+        "surface": "Per-message rendered text layouts for selection and link long-press",
+        "anchor": "internal class MessageBubbleTextLayouts",
+        "test_ids": [
+          "MSG-001",
+          "MSG-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

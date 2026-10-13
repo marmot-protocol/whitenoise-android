@@ -355,17 +355,17 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
         )
-        composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Retry Send").performClick()
-        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
-        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertDoesNotExist()
+        composeRule.onNodeWithText("Send recognized text").assertDoesNotExist()
     }
 
-    /** A final no-match retains the same localized failure and requires a partial-send confirmation. */
+    /** Unsaved text remains protected, but recovery never asks to send an incomplete prefix. */
     @Test
-    fun unsavedIncompleteSendFailureRequiresExplicitTextConfirmation() {
+    fun unsavedIncompleteSendFailureHasNoPartialSendConfirmation() {
         val fixture = fixture(TextFieldValue(""))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         val initial = fixture.controller.state
@@ -390,12 +390,12 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
         )
-        composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Retry Send").performClick()
-        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
-        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertDoesNotExist()
+        composeRule.onNodeWithText("Send recognized text").assertDoesNotExist()
     }
 
     /** Error controls retain audio Retry and Dismiss without a manual text-recovery action. */
@@ -424,9 +424,9 @@ class ConversationDictationPersistentControlTest {
         }
     }
 
-    /** Provider settings remain available while the unsent prefix requires an explicit review choice. */
+    /** Provider failure recovery never turns local draft recovery into a partial-send dialog. */
     @Test
-    fun partialProviderFailureOffersRetrySendAndSettingsInConfirmation() {
+    fun partialProviderFailureOffersLocalPasteWithoutConfirmation() {
         val fixture = fixture(TextFieldValue(""))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         val initial = fixture.controller.state
@@ -442,9 +442,8 @@ class ConversationDictationPersistentControlTest {
                     recognitionIncomplete = true,
                 ),
         )
-        composeRule.onNodeWithContentDescription("Retry Send").performClick()
-        composeRule.onNodeWithText("Open the speech service").assertIsDisplayed()
-        composeRule.onNodeWithText("Paste").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithTag("dictation-partial-send-dialog").assertDoesNotExist()
     }
 
     /** Completed recognition that failed validation must not be described as interrupted speech. */
@@ -469,9 +468,9 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
     }
 
-    /** Unknown recognition failures still require explicit consent before sending a prefix. */
+    /** Unknown recognition failures never offer an implicit or confirmed partial-prefix send. */
     @Test
-    fun unknownRecognitionFailureStillRequiresPartialSendConfirmation() {
+    fun unknownRecognitionFailureHasNoPartialSendConfirmation() {
         val fixture = fixture(TextFieldValue(""))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         val initial = fixture.controller.state
@@ -487,9 +486,9 @@ class ConversationDictationPersistentControlTest {
                     recognitionIncomplete = true,
                 ),
         )
-        composeRule.onNodeWithContentDescription("Retry Send").performClick()
-        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
-        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertDoesNotExist()
+        composeRule.onNodeWithText("Send recognized text").assertDoesNotExist()
     }
 
     /** Edited saved text without retained audio has no confirmation action to offer. */

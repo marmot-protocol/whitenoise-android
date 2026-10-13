@@ -97,7 +97,8 @@ class ConversationAuthoritativeTimelineScreenshotTest {
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
             composeRule.waitUntil(5_000L) {
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
-                fixture.controller.automaticOlderPagingBlocked
+                // The guard is published before the paging coroutine's finally clears loading.
+                fixture.controller.automaticOlderPagingBlocked && !fixture.controller.isLoadingOlder
             }
             composeRule.runOnIdle {
                 assertNull(fixture.controller.error)
