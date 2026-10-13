@@ -1844,12 +1844,71 @@ class ConversationFileBackedMediaSendTest {
                 Dispatchers.resetMain()
             }
         }
+
+    /** Two documents picked together that cannot share the in-memory budget are both sent, not just the first. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun composerSendsTwoLargeDocumentsPickedTogether() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
+            val picks =
+                listOf("first.bin", "second.bin").map {
+                    scriptedPick(state, it, "application/octet-stream", IN_MEMORY_DOCUMENT_BYTES.toLong())
+                }
+            val sent = java.util.Collections.synchronizedList(mutableListOf<String>())
+            val bothSent = CompletableDeferred<Unit>()
+            val controller = recordingUploadController(state, sent, bothSent)
+            try {
+                controller.retryMembers()
+                composerSender(state, controller).sendStagedAttachments(emptyList(), picks, caption = "")
+
+                bothSent.await()
+                assertEquals(listOf("first.bin", "second.bin"), sent.sorted())
+                assertTrue(controller.timeline.none { it.status == MessageStatus.Failed })
+            } finally {
+                ScriptedPickProvider.picks.clear()
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
 }
 
 /** A 20 MiB in-memory document; two of them overflow the 32 MiB retained heap. */
 private fun inMemoryDocument(name: String): PendingAttachment {
     val bytes = ByteArray(IN_MEMORY_DOCUMENT_BYTES)
     return PendingAttachment(bytes, "application/pdf", name)
+}
+
+/** A controller whose in-memory and file uploads both record the names they send, completing [done] at two. */
+private fun recordingUploadController(
+    state: WhiteNoiseAppState,
+    sent: MutableList<String>,
+    done: CompletableDeferred<Unit>,
+): ConversationController {
+    val record = { names: List<String> ->
+        sent += names
+        if (sent.size >= 2) done.complete(Unit)
+    }
+    return ConversationController(
+        appState = state,
+        initialGroup = group(),
+        initialMemberSnapshot = memberSnapshot(),
+        groupRosterReader = { _, _ -> authoritativeRoster() },
+        mediaUploader = { _, _, request ->
+            record(request.attachments.map { it.fileName })
+            uploadResult(mediaReference())
+        },
+        mediaFileUploader = { _, _, request, _ ->
+            record(request.attachments.map { it.fileName })
+            oneAttachmentUpload()
+        },
+        fileBatchCiphertextBytes = { FILE_BATCH_CIPHERTEXT_BYTES },
+        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+        mediaPublisher = { _, _, _, _ -> acceptedPendingSummary() },
+        markdownParser = { emptyMarkdownDocument() },
+    )
 }
 
 /** The composer's media sender with native limits supplied, so no MarmotKit library is loaded. */
