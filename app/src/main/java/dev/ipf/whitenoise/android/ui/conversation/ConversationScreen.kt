@@ -731,9 +731,6 @@ internal fun ConversationScreen(
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.
     var showDetails by presentationState.showDetails
-    // Opens details with the transfer picker auto-expanded. Keyed on chat.id so
-    // it doesn't leak across a conversation switch.
-    var openTransferOnDetails by remember(chat.id) { mutableStateOf(false) }
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
     var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
@@ -3587,16 +3584,13 @@ internal fun ConversationScreen(
                 controller = controller,
                 onBack = {
                     showDetails = false
-                    openTransferOnDetails = false
                     openAddMemberOnDetails = false
                 },
                 onLeft = exitConversation,
                 onJumpToMessage = { messageId ->
                     showDetails = false
-                    openTransferOnDetails = false
                     scrollToSearchMatch(messageId)
                 },
-                autoOpenTransferAdmin = openTransferOnDetails,
                 autoOpenAddMember = openAddMemberOnDetails,
                 onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
                 onOpenSearch = {

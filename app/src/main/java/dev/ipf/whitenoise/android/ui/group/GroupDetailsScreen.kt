@@ -259,10 +259,6 @@ internal fun GroupDetailsScreen(
     // Jump back to a message in the conversation (Shared Media tile tap). The
     // caller closes details and reuses the existing focus-scroll mechanism.
     onJumpToMessage: (String) -> Unit = {},
-    // When true (sole admin routed in from the blocked top-level Leave gate),
-    // open the transfer-admin picker immediately so the trapped admin lands on
-    // the action instead of having to hunt for it in the Admins section (#417).
-    autoOpenTransferAdmin: Boolean = false,
     // When true (empty-group CTA), open the shared add-member sheet after the
     // details screen is mounted so the initial invite path reuses later-add UI.
     autoOpenAddMember: Boolean = false,
@@ -313,15 +309,6 @@ internal fun GroupDetailsScreen(
         // rather than the standalone transfer-only action. Holds the group name for
         // the leave call/toast.
         var transferThenLeaveName by remember(controller.group.groupIdHex) { mutableStateOf<String?>(null) }
-        // Honor the caller's request to jump straight into the transfer picker
-        // (sole admin routed here from the blocked top-level Leave gate). Gated on
-        // the sole-admin predicate so a stale flag can't pop the sheet once the
-        // user is no longer trapped (e.g. transfer already completed).
-        LaunchedEffect(autoOpenTransferAdmin, controller.isSoleAdminWithOtherMembers) {
-            if (autoOpenTransferAdmin && controller.isSoleAdminWithOtherMembers) {
-                showTransferAdmin = true
-            }
-        }
         // Disband eligibility, blockers, and any in-flight request are
         // engine-authoritative; fetch on entry and again whenever the group
         // record moves, so a remote admin's enable/disband lands here without
