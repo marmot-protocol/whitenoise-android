@@ -77,6 +77,15 @@ class NotificationReactionArtworkScreenshotTest {
     fun unicodeReactionInDarkTheme() =
         runBlocking { capture(post("👍"), "notification_reaction_unicode_dark") }
 
+    /** A rejected picture still delivers the accessible reaction through the native text template. */
+    @Test
+    fun rejectedPictureShowsTextFallback() =
+        runBlocking {
+            val card = post(":marmot:", rejectPicture = true)
+            assertNull(card.getLargeIcon())
+            capture(card, "notification_reaction_rejected_picture_light")
+        }
+
     /** Generic hidden cards contain neither reaction artwork nor private names at large font. */
     @Test
     @Config(qualifiers = "ldrtl-w360dp-h800dp-night-mdpi")
@@ -114,6 +123,7 @@ class NotificationReactionArtworkScreenshotTest {
     private suspend fun post(
         emoji: String,
         redacted: Boolean = false,
+        rejectPicture: Boolean = false,
     ): Notification {
         val presenter =
             LocalNotificationPresenter(
@@ -122,6 +132,12 @@ class NotificationReactionArtworkScreenshotTest {
                 groupReconciliation = {},
                 enrichmentLauncher = {},
                 emojiArtworkTimeoutMs = 5_000L,
+                notificationPoster = { target, tag, id, card ->
+                    if (rejectPicture && card.extras.containsKey(Notification.EXTRA_PICTURE)) {
+                        throw IllegalArgumentException("picture rejected")
+                    }
+                    target.notify(tag, id, card)
+                },
             )
         presenter.ensureChannels()
         check(presenter.show(reactionArtworkUpdate(emoji), redactContent = redacted, shortNpub = { "npub1fixture" }))

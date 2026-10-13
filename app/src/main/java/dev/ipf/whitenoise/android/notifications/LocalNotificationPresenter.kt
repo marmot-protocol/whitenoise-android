@@ -663,6 +663,7 @@ class LocalNotificationPresenter(
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
         var reactionArtwork: Bitmap? = null
+        var reactionArtworkPostAttempted = false
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
         try {
@@ -686,7 +687,11 @@ class LocalNotificationPresenter(
                     if (!redactContent && previewToken.allowed && decision.style == NotificationStyleChoice.Plain) {
                         LocalNotificationFormatter.reactionArtworkShortcode(update)?.let { shortcode ->
                             reactionArtwork =
-                                prepareNotificationReactionArtwork(reactionArtworkPreparer, shortcode, emojiArtworkTimeoutMs)
+                                prepareNotificationReactionArtwork(
+                                    reactionArtworkPreparer,
+                                    shortcode,
+                                    emojiArtworkTimeoutMs,
+                                )
                         }
                     }
                     val showGenerationAllowsPost = {
@@ -1196,7 +1201,8 @@ class LocalNotificationPresenter(
                                     ) {
                                         return@withLock false
                                     }
-                                    val postResult =
+                                    reactionArtworkPostAttempted = reactionArtwork != null
+                                    var postResult =
                                         postNotificationSafely(
                                             notificationManager,
                                             notificationContent.notificationTag,
@@ -1211,6 +1217,36 @@ class LocalNotificationPresenter(
                                                     rewriteLease?.dismissed?.get() != true
                                             },
                                         )
+                                    if (postResult == NotificationCardWriteResult.FAILED && reactionArtwork != null) {
+                                        cancelNotification(
+                                            notificationManager,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                        )
+                                        if (!profileAllowsPost() || !showGenerationAllowsPost()) return@withLock false
+                                        builder
+                                            .setLargeIcon(null as Bitmap?)
+                                            .setStyle(
+                                                NotificationCompat.BigTextStyle().bigText(notificationContent.body),
+                                            )
+                                        postResult =
+                                            postNotificationSafely(
+                                                notificationManager,
+                                                notificationContent.notificationTag,
+                                                notificationContent.notificationId,
+                                                buildSettled(true),
+                                                writeObserver,
+                                                // This attempt owns the cancellation;
+                                                // generation/dismissal gates still apply.
+                                                mustBeLive = false,
+                                                hiddenShortcut = hiddenShortcut,
+                                                finalPostAllowed = {
+                                                    profileAllowsPost() &&
+                                                        showGenerationAllowsPost() &&
+                                                        rewriteLease?.dismissed?.get() != true
+                                                },
+                                            )
+                                    }
                                     if (postResult == NotificationCardWriteResult.WRITTEN) {
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
                                             ConversationCardOp.SHOW_NOTIFY,
@@ -1257,6 +1293,8 @@ class LocalNotificationPresenter(
                     true
                 }
         } finally {
+            // Rejecting eligibility before a platform attempt leaves no potential OS bitmap owner.
+            if (!reactionArtworkPostAttempted) reactionArtwork?.recycle()
             carriedArtworkLease?.close()
             emojiArtifact?.close()
             // Plain-text cards create no exports; their normal write observer already reconciles the summary.

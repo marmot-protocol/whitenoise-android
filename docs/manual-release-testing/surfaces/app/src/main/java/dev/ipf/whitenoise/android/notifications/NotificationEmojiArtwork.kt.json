@@ -13,9 +13,9 @@
         ]
       },
       {
-        "surface": "received reaction artwork provenance and bounded preparation",
+        "surface": "shared static bundled emoji rendering",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiArtwork.kt",
-        "anchor": "internal suspend fun notificationReactionEmojiArtwork(",
+        "anchor": "notificationBuiltinEmojiBitmap(context, code)",
         "test_ids": [
           "NTF-034",
           "NTF-030"

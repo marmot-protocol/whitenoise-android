@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.core.app.NotificationManagerCompat
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -162,11 +163,14 @@ class NotificationReactionArtworkTest {
     fun previewsDisabledDuringPreparationCannotLeakArtwork() =
         runBlocking {
             val card =
-                post(":marmot:", prepare = {
-                    val image = notificationReactionEmojiArtwork(context, it)
-                    NotificationPreviewPreferences.setEnabled(context, false, scrub = { true })
-                    image
-                })
+                post(
+                    ":marmot:",
+                    prepare = {
+                        val image = notificationReactionEmojiArtwork(context, it)
+                        NotificationPreviewPreferences.setEnabled(context, false, scrub = { true })
+                        image
+                    },
+                )
             assertNoArtwork(card)
             assertNoArtwork(card.publicVersion)
             assertFalse(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":marmot:"))
@@ -191,13 +195,18 @@ class NotificationReactionArtworkTest {
     fun dismissalDuringPreparationRejectsThePost() =
         runBlocking {
             val key = LocalNotificationFormatter.reactionDismissalKey("account", "group")
-            val presenter = presenter {
-                ConversationCardPostSynchronizer.markDismissed(key.tag, key.id)
-                notificationReactionEmojiArtwork(context, it)
-            }
+            val image = requireNotNull(notificationReactionEmojiArtwork(context, ":marmot:"))
+            val presenter =
+                presenter(
+                    prepare = {
+                        ConversationCardPostSynchronizer.markDismissed(key.tag, key.id)
+                        image
+                    },
+                )
             presenter.ensureChannels()
             assertFalse(presenter.show(reactionArtworkUpdate(":marmot:"), shortNpub = { "npub1fixture" }))
             assertTrue(manager.activeNotifications.isEmpty())
+            assertTrue(image.isRecycled)
         }
 
     /** A timeout discards and releases even a non-cancellable result; cancellation remains cancellation. */
@@ -207,7 +216,12 @@ class NotificationReactionArtworkTest {
             val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
             assertNull(
                 prepareNotificationReactionArtwork(
-                    prepare = { withContext(NonCancellable) { delay(40); bitmap } },
+                    prepare = {
+                        withContext(NonCancellable) {
+                            delay(40)
+                            bitmap
+                        }
+                    },
                     shortcode = ":marmot:",
                     timeoutMs = 5,
                 ),
@@ -223,6 +237,98 @@ class NotificationReactionArtworkTest {
             assertTrue(manager.activeNotifications.isEmpty())
         }
 
+    /** Android image rejection gets one text-only retry with the same reaction identity and routing. */
+    @Test
+    fun rejectedPictureRetriesReadableTextOnce() =
+        runBlocking {
+            var attempts = 0
+            val card =
+                post(
+                    ":marmot:",
+                    poster = { target, tag, id, notification ->
+                        attempts++
+                        if (attempts == 1) {
+                            assertPicture(notification, ":marmot:")
+                            throw IllegalArgumentException("picture rejected")
+                        }
+                        assertNoArtwork(notification)
+                        target.notify(tag, id, notification)
+                    },
+                )
+            assertEquals(2, attempts)
+            assertNoArtwork(card)
+            assertTrue(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":marmot:"))
+            assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
+            assertEquals(UserEventNotificationGroup.KEY, card.group)
+            assertTrue(card.actions.isNullOrEmpty())
+        }
+
+    /** A live silent correction may retry after its own cancellation without losing dismissal safeguards. */
+    @Test
+    fun rejectedPictureCorrectionRetriesAfterItsOwnCancel() =
+        runBlocking {
+            post(":marmot:")
+            var attempts = 0
+            val presenter =
+                presenter(
+                    prepare = { notificationReactionEmojiArtwork(context, it) },
+                    poster = { target, tag, id, card ->
+                        attempts++
+                        if (attempts == 1) throw IllegalArgumentException("picture rejected")
+                        target.notify(tag, id, card)
+                    },
+                )
+            assertTrue(
+                presenter.show(
+                    reactionArtworkUpdate(":marmot:"),
+                    silentUpdate = true,
+                    replaceCurrentMessage = true,
+                    shortNpub = { "npub1fixture" },
+                ),
+            )
+            assertEquals(2, attempts)
+            assertNoArtwork(manager.activeNotifications.single().notification)
+        }
+
+    /** A second platform failure cancels the card; retry cannot become an unbounded loop. */
+    @Test
+    fun failedTextRetryStopsAfterTwoAttempts() =
+        runBlocking {
+            var attempts = 0
+            val presenter =
+                presenter(
+                    prepare = { notificationReactionEmojiArtwork(context, it) },
+                    poster = { _, _, _, _ ->
+                        attempts++
+                        throw IllegalArgumentException("post rejected")
+                    },
+                )
+            presenter.ensureChannels()
+            assertFalse(presenter.show(reactionArtworkUpdate(":marmot:"), shortNpub = { "npub1fixture" }))
+            assertEquals(2, attempts)
+            assertTrue(manager.activeNotifications.isEmpty())
+        }
+
+    /** Dismissal during a failed platform attempt invalidates the text retry as well. */
+    @Test
+    fun dismissalAfterPictureFailurePreventsRetry() =
+        runBlocking {
+            var attempts = 0
+            val presenter =
+                presenter(
+                    prepare = { notificationReactionEmojiArtwork(context, it) },
+                    poster = { _, tag, id, _ ->
+                        attempts++
+                        ConversationCardPostSynchronizer.markDismissed(tag, id)
+                        throw IllegalArgumentException("picture rejected")
+                    },
+                )
+            presenter.ensureChannels()
+            assertFalse(presenter.show(reactionArtworkUpdate(":marmot:"), shortNpub = { "npub1fixture" }))
+            assertEquals(1, attempts)
+            assertTrue(manager.activeNotifications.isEmpty())
+        }
+
     /** Only a whole reaction shortcode qualifies, never a shortcode inside its target preview. */
     @Test
     fun formatterQualifiesOnlyTheExactReactionToken() {
@@ -233,13 +339,19 @@ class NotificationReactionArtworkTest {
     }
 
     /** Inject optional failures without replacing the real platform posting path. */
-    private fun presenter(prepare: suspend (String) -> Bitmap?): LocalNotificationPresenter =
+    private fun presenter(
+        prepare: suspend (String) -> Bitmap?,
+        poster: (NotificationManagerCompat, String, Int, Notification) -> Unit = { target, tag, id, card ->
+            target.notify(tag, id, card)
+        },
+    ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context,
             groupReconciliation = {},
             enrichmentLauncher = {},
             emojiArtworkTimeoutMs = 5_000L,
             reactionArtworkPreparer = prepare,
+            notificationPoster = poster,
         )
 
     /** Return the actual card written by the presenter. */
@@ -247,9 +359,12 @@ class NotificationReactionArtworkTest {
         emoji: String,
         redacted: Boolean = false,
         prepare: suspend (String) -> Bitmap? = { notificationReactionEmojiArtwork(context, it) },
+        poster: (NotificationManagerCompat, String, Int, Notification) -> Unit = { target, tag, id, card ->
+            target.notify(tag, id, card)
+        },
     ): Notification {
         manager.cancelAll()
-        val presenter = presenter(prepare)
+        val presenter = presenter(prepare, poster)
         presenter.ensureChannels()
         assertTrue(
             presenter.show(reactionArtworkUpdate(emoji), redactContent = redacted, shortNpub = { "npub1fixture" }),
@@ -260,7 +375,9 @@ class NotificationReactionArtworkTest {
     /** Verify artwork and every textual representation survive the platform round trip. */
     private fun assertPicture(card: Notification, shortcode: String) {
         assertEquals("android.app.Notification\$BigPictureStyle", card.extras.getString(Notification.EXTRA_TEMPLATE))
-        assertNotNull(card.extras.getParcelable<Bitmap>(Notification.EXTRA_PICTURE))
+        val picture = card.extras.getParcelable<Bitmap>(Notification.EXTRA_PICTURE)
+        assertNotNull(picture)
+        assertFalse(requireNotNull(picture).isRecycled)
         assertNotNull(card.getLargeIcon())
         val textKeys =
             listOf(

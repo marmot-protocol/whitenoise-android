@@ -9,7 +9,6 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
 import android.service.notification.StatusBarNotification
-import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
@@ -136,43 +135,6 @@ internal suspend fun notificationEmojiArtwork(
     }
 }
 
-/**
- * Received reactions have no attachment provenance in NotificationUpdateFfi. Only APK-bundled artwork
- * is safe to resolve by name; a device-local image with the same shortcode must never impersonate it.
- */
-internal suspend fun notificationReactionEmojiArtwork(
-    context: Context,
-    shortcode: String,
-): Bitmap? =
-    withContext(Dispatchers.IO) {
-        notificationEmojiBitmap(context, shortcode, EmojiReadBudget(), allowLocal = false)
-    }
-
-/** Bounded optional reaction preparation: image failures keep text, while caller cancellation propagates. */
-internal suspend fun prepareNotificationReactionArtwork(
-    prepare: suspend (String) -> Bitmap?,
-    shortcode: String,
-    timeoutMs: Long = NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS,
-): Bitmap? {
-    var bitmap: Bitmap? = null
-    var handedOff = false
-    return try {
-        withTimeoutOrNull(timeoutMs) { prepare(shortcode).also { bitmap = it } }
-            .also { handedOff = it != null }
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (
-        @Suppress("TooGenericExceptionCaught") // Optional image errors cannot suppress the reaction text.
-        _: Exception,
-    ) {
-        null
-    } catch (_: OutOfMemoryError) {
-        null
-    } finally {
-        if (!handedOff) bitmap?.recycle()
-    }
-}
-
 /** A flattened preview loses link annotations, so only qualified original text can supply artwork. */
 private fun notificationEmojiCodes(
     text: String,
@@ -206,27 +168,15 @@ internal fun renderNotificationEmojiArtwork(images: List<Bitmap>): Bitmap {
     return output
 }
 
-/** Reuse bundled rendering while allowing received reactions to bypass device-local shortcode overrides. */
+/** Ordinary message previews retain their existing device-local then bundled artwork precedence. */
 private suspend fun notificationEmojiBitmap(
     context: Context,
     code: String,
     readBudget: EmojiReadBudget,
-    allowLocal: Boolean = true,
 ): Bitmap? {
-    val local = if (allowLocal) localNotificationEmojiBitmap(context, code, readBudget) else null
+    val local = localNotificationEmojiBitmap(context, code, readBudget)
     if (local != null) return local
-    val drawable = EmojiShortcodes.builtinDrawable(code)?.let { AppCompatResources.getDrawable(context, it) }
-    return drawable?.let {
-        Bitmap
-            .createBitmap(
-                NOTIFICATION_EMOJI_TILE_PX,
-                NOTIFICATION_EMOJI_TILE_PX,
-                Bitmap.Config.ARGB_8888,
-            ).also { bitmap ->
-                it.setBounds(0, 0, bitmap.width, bitmap.height)
-                it.draw(Canvas(bitmap))
-            }
-    }
+    return notificationBuiltinEmojiBitmap(context, code)
 }
 
 private suspend fun localNotificationEmojiBitmap(
