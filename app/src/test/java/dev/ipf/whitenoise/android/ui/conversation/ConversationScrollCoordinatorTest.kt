@@ -447,6 +447,36 @@ class ConversationScrollCoordinatorTest {
         assertEquals(ConversationScrollMode.ReadingHistory("reader", 72), snapshot.settledMode)
     }
 
+    /** A landing that rests at the newest edge follows the tail like a drag that ends there, and drops its anchor. */
+    @Test
+    fun landingAtTheNewestEdgeResumesTailFollowing() {
+        val coordinator =
+            ConversationScrollCoordinator(
+                writer = RecordingScrollWriter(),
+                initialMode = ConversationScrollMode.ReadingHistory("older", 0),
+            )
+        val transient = anchor(messageId = "transient", listIndex = 0)
+
+        coordinator.settleLandingAt(anchor(messageId = "mention", listIndex = 0), atNewestEdge = true)
+
+        assertEquals(ConversationScrollMode.FollowingTail, coordinator.mode)
+        assertTrue(coordinator.isFollowingTail)
+        assertEquals(transient, coordinator.bookmark(transient).anchor)
+    }
+
+    /** A landing short of the newest edge keeps the logical history anchor, so an arrival never pulls it away. */
+    @Test
+    fun landingShortOfTheNewestEdgeKeepsItsHistoryAnchor() {
+        val coordinator = ConversationScrollCoordinator(RecordingScrollWriter())
+        val landed = anchor(messageId = "mention", listIndex = 8, pixelOffset = -420)
+
+        coordinator.settleLandingAt(landed, atNewestEdge = false)
+
+        assertEquals(ConversationScrollMode.ReadingHistory("mention", -420), coordinator.mode)
+        assertFalse(coordinator.isFollowingTail)
+        assertEquals(landed, coordinator.bookmark(anchor(messageId = "transient", listIndex = 3)).anchor)
+    }
+
     @Test
     fun followingTailResumeAppliesOneCorrectionForChangedGeometry() =
         runTest {

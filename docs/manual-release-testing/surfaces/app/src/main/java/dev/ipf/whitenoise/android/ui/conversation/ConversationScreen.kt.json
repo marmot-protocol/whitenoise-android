@@ -174,8 +174,8 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "surface": "Native content padding for a short final mention",
-        "anchor": "val readMentionReadingReserve =",
+        "surface": "Mention landings retain only normal transcript tail clearance",
+        "anchor": "conversationTimelineContentPadding(",
         "test_ids": [
           "CON-032"
         ]

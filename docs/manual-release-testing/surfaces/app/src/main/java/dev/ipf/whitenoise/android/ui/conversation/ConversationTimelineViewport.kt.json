@@ -15,14 +15,18 @@
     "source_coverage": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
-        "surface": "Native newest boundary for notification clamp validation",
+        "surface": "Native newest boundary for notification and mention clamp validation",
         "anchor": "get() = !listState.canScrollBackward",
-        "test_ids": ["NTF-037"]
+        "test_ids": [
+          "CON-028",
+          "CON-032",
+          "NTF-037"
+        ]
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
-        "surface": "Measured base padding reads the mention reading reserve once per pass",
-        "anchor": "val reserve = mentionReadingReserve()",
+        "surface": "Measured viewport tracks actual base padding without a synthetic reserve",
+        "anchor": "viewport.onPaddingMeasured(basePadding.roundToPx()",
         "test_ids": [
           "CON-032"
         ]
