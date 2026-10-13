@@ -32,12 +32,13 @@ line of visible prose at the start of a line:
 
 The checker reads the description as GitHub renders it, as a best effort rather
 than a full Markdown renderer. It ignores text GitHub does not show: fenced code
-blocks, HTML comments (including the short `<!-->` form), `<script>` and
-`<style>` blocks, HTML tags and their attributes (even when an attribute spans
-lines), and link reference definitions with their titles. Text inside an
-expandable `<details>` block counts, because readers can open it. Write the
-declaration as a plain line; a list marker, blockquote, bold label or indented
-code block in front of it is not recognised.
+blocks, HTML comments (including the short `<!-->` form), HTML tags and their
+attributes (even when an attribute spans lines), and link reference definitions
+with their titles. GitHub shows `<script>` and `<style>` blocks as plain text,
+and text inside an expandable `<details>` block counts because readers can open
+it, so declarations in either are counted. Write the declaration as a plain
+line; a list marker, blockquote, bold label or indented code block in front of
+it is not recognised.
 
 | Reason key | When it applies |
 | --- | --- |

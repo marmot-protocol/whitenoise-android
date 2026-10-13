@@ -62,12 +62,12 @@ function parseRegistry(markdown) {
 
 /**
  * Returns the description as GitHub would show it, minus text it never renders: fenced code, HTML comments
- * (including the short `<!-->` and `<!--->` forms), `<script>`/`<style>` blocks, HTML tags with their attributes
- * (even across lines), and link reference definitions with their titles. Best effort, not a full renderer.
+ * (including the short `<!-->` and `<!--->` forms), HTML tags with their attributes (even across lines), and link
+ * reference definitions with their titles. GitHub's tag filter shows `<script>` and `<style>` content as text, so it
+ * stays. Best effort, not a full renderer.
  */
 function visibleProse(body) {
   return withoutCodeAndComments((body || '').replace(/\r\n?/g, '\n'))
-    .replace(/<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, '')
     .replace(HTML_TAG, '')
     .replace(LINK_REFERENCE_DEFINITION, '')
 }

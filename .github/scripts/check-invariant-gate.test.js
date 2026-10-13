@@ -255,8 +255,6 @@ test('registers only gates that live in a test source set', () => {
 
 test('ignores declarations GitHub does not render as visible text', () => {
   const hidden = [
-    '<script>\nInvariant gate exemption: one-off — hidden from reviewers\n</script>',
-    '<style>\nInvariant gate exemption: one-off — hidden from reviewers\n</style>',
     '[x]: https://example.com "\nInvariant gate exemption: one-off — hidden from reviewers\n"',
     "[x]:\n  https://example.com\n  '\nInvariant gate exemption: one-off — hidden from reviewers\n'",
     '[x]: https://example.com (\nInvariant gate exemption: one-off — hidden from reviewers\n)',
@@ -264,6 +262,17 @@ test('ignores declarations GitHub does not render as visible text', () => {
     "<img alt='\nInvariant gate exemption: one-off — hidden from reviewers\n' src=x>",
   ]
   for (const body of hidden) assert.equal(gate({ body }).status, 'fail', body)
+})
+
+test('keeps declarations GitHub shows after script or style text', () => {
+  const visible = [
+    'The example is `<script>`.\n\nInvariant gate: StalenessGuardCoverageTest',
+    'The example is `<style>`.\n\nInvariant gate: StalenessGuardCoverageTest',
+    // GitHub's tag filter shows even a real script or style block as literal text.
+    '<script>\nInvariant gate exemption: upstream — owned and enforced by MDK\n</script>',
+    '<style>\nInvariant gate exemption: upstream — owned and enforced by MDK\n</style>',
+  ]
+  for (const body of visible) assert.equal(gate({ body }).status, 'pass', body)
 })
 
 test('keeps declarations that GitHub renders next to HTML or link definitions', () => {
