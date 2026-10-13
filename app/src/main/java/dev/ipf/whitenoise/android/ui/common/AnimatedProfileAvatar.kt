@@ -145,7 +145,11 @@ internal fun AnimatedProfileAvatarLayer(
     val animate = explicitViewer && shouldAnimateProfileAvatar(animationsEnabled, visible, foreground)
     val drawable by produceState<Drawable?>(null, source, maxEdgePx, animate) {
         value = null
-        if (animate) value = decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE))
+        if (animate) {
+            val produced = decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE))
+            value = produced
+            awaitDispose { (produced as? java.io.Closeable)?.close() }
+        }
     }
     Box(
         modifier.onVisibilityChanged(minFractionVisible = VISIBLE_FRACTION) { visible = it },

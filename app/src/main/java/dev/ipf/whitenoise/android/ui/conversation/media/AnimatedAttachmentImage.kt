@@ -101,6 +101,27 @@ fun AnimatedDrawableAttachmentImage(
 
 internal fun DecodedAttachmentPresentation.Static.toImageBitmap() = bitmap.asImageBitmap()
 
+/** The page owns assigned resources even if their drawable has not reached a rendering composition. */
+@Composable
+internal fun OwnLatestAttachmentPresentation(
+    pageKey: Any,
+    presentation: androidx.compose.runtime.State<DecodedAttachmentPresentation?>,
+) {
+    DisposableEffect(pageKey, presentation) {
+        onDispose { presentation.value?.releaseOwnedPresentation() }
+    }
+}
+
+internal fun DecodedAttachmentPresentation.releaseOwnedPresentation() {
+    when (this) {
+        is DecodedAttachmentPresentation.Static -> bitmap.recycle()
+        is DecodedAttachmentPresentation.Animated -> {
+            (drawable as? Animatable)?.stop()
+            (drawable as? java.io.Closeable)?.close()
+        }
+    }
+}
+
 private fun ContentScale.toImageViewScaleType(): ImageView.ScaleType =
     when (this) {
         ContentScale.Crop -> ImageView.ScaleType.CENTER_CROP

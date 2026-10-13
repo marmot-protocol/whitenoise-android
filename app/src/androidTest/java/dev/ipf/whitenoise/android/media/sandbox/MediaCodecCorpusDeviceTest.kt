@@ -27,7 +27,7 @@ class MediaCodecCorpusDeviceTest {
         val caller = Process.myPid()
         val jpeg = image(Bitmap.CompressFormat.JPEG)
         val png = image(Bitmap.CompressFormat.PNG)
-        val marker = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xe1.toByte(), 0x7f, 0xff)
+        val marker = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xe1.toByte(), 0x7f, 0xff.toByte())
         val app1 = marker + "Exif\u0000\u0000II".toByteArray()
         val corpus =
             listOf(

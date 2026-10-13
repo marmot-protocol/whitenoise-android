@@ -182,6 +182,23 @@ class AnimatedProfileAvatarLayerTest {
         assertNull(first.callback)
     }
 
+    @Test
+    fun decodeDeliveredImmediatelyBeforeRemovalIsClosedWithoutStarting() {
+        var shown by mutableStateOf(true)
+        val produced = FakeAnimation()
+        lifecycleOwner.moveTo(Lifecycle.State.RESUMED)
+        val removeDuringDecode: suspend (ByteArray, Int) -> Drawable? = { _, _ ->
+            shown = false
+            produced
+        }
+        composeRule.setContent {
+            Harness { if (shown) Layer(animationsEnabled = true, decoder = removeDuringDecode) }
+        }
+        composeRule.waitForIdle()
+        assertTrue(produced.closed)
+        assertEquals(0, produced.starts)
+    }
+
     /** Scrolling the avatar out of the viewport stops it even though it stays composed. */
     @Test
     fun scrollingOffScreenStopsTheAnimation() {
@@ -358,11 +375,20 @@ class AnimatedProfileAvatarLayerTest {
     /** A drawable that only records whether it is running. */
     private class FakeAnimation :
         Drawable(),
-        Animatable {
+        Animatable,
+        java.io.Closeable {
         var running = false
+        var closed = false
+        var starts = 0
+
+        override fun close() {
+            closed = true
+            running = false
+        }
 
         /** Marks the fake as running. */
         override fun start() {
+            starts++
             running = true
         }
 

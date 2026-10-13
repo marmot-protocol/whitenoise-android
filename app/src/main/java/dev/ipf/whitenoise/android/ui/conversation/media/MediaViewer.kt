@@ -1049,7 +1049,9 @@ internal fun ViewerPage(
                 ?.asImageBitmap()
         }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
-    var presentation by remember(pageKey) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
+    val presentationState = remember(pageKey) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
+    var presentation by presentationState
+    OwnLatestAttachmentPresentation(pageKey, presentationState)
     var viewerFailed by remember(pageKey) { mutableStateOf(false) }
     // A verified image above the preview budget is not a failure: Retry cannot shrink it, Save and Share still work.
     var viewerTooLarge by remember(pageKey) { mutableStateOf(false) }
@@ -1101,14 +1103,7 @@ internal fun ViewerPage(
     DisposableEffect(pageKey, presentation) {
         val owned = presentation
         onDispose {
-            when (owned) {
-                is DecodedAttachmentPresentation.Static -> owned.bitmap.recycle()
-                is DecodedAttachmentPresentation.Animated -> {
-                    (owned.drawable as? android.graphics.drawable.Animatable)?.stop()
-                    (owned.drawable as? java.io.Closeable)?.close()
-                }
-                null -> Unit
-            }
+            owned?.releaseOwnedPresentation()
         }
     }
 
