@@ -45,10 +45,8 @@ import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
-import dev.ipf.whitenoise.android.state.NOTE_TO_SELF_GROUP_NAME
 import dev.ipf.whitenoise.android.state.ScopedGroupImageMutation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.isNoteToSelfRoster
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
@@ -128,19 +126,9 @@ internal fun GroupEditScreen(
         val context = LocalContext.current
         val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
         val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
-        // Keep the native notes name discoverable; unknown rosters cannot unlock renaming.
-        val notesNameLocked =
-            controller.group.name == NOTE_TO_SELF_GROUP_NAME &&
-                (
-                    controller.members.isEmpty() ||
-                        isNoteToSelfRoster(
-                            controller.members.map { it.memberIdHex },
-                            controller.boundAccountIdHex.orEmpty(),
-                        )
-                )
         val nameEditable =
             groupNameEmojiEditable(
-                canEdit = canEdit && !notesNameLocked,
+                canEdit = canEdit,
                 saving = saving,
                 mutationInFlight = controller.mutationInFlight,
             )
@@ -153,11 +141,10 @@ internal fun GroupEditScreen(
         val hasGroupImage =
             ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl) != null ||
                 controller.group.imageHashHex != null
-        val savedName = if (notesNameLocked) controller.group.name else name.text
         val saveEnabled =
             !saving &&
                 !controller.mutationInFlight &&
-                (savedName != controller.group.name || description != controller.group.description)
+                (name.text != controller.group.name || description != controller.group.description)
 
         LaunchedEffect(nameEditable) {
             if (!nameEditable) showEmojiPicker = false
@@ -169,7 +156,7 @@ internal fun GroupEditScreen(
             controller.clearLastMutationError()
             appState.launchMutation {
                 try {
-                    if (controller.updateGroupProfile(savedName, description)) onBack()
+                    if (controller.updateGroupProfile(name.text, description)) onBack()
                 } finally {
                     saving = false
                 }
