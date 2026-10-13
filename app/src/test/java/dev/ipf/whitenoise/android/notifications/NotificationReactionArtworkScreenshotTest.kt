@@ -34,7 +34,11 @@ class NotificationReactionArtworkScreenshotTest {
     @Before
     fun setUp() {
         manager.cancelAll()
-        context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE).edit().clear().commit()
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
 
@@ -50,8 +54,7 @@ class NotificationReactionArtworkScreenshotTest {
     /** Another bundled custom emoji has the same hierarchy in dark mode. */
     @Test
     @Config(qualifiers = "w360dp-h800dp-night-mdpi")
-    fun whiteNoiseReactionInDarkTheme() =
-        runBlocking { capture(post(":wn:"), "notification_reaction_wn_dark") }
+    fun whiteNoiseReactionInDarkTheme() = runBlocking { capture(post(":wn:"), "notification_reaction_wn_dark") }
 
     /** The large RTL picture card retains readable reaction context. */
     @Test
@@ -74,8 +77,7 @@ class NotificationReactionArtworkScreenshotTest {
     /** Standard Unicode stays readable in the text template. */
     @Test
     @Config(qualifiers = "w360dp-h800dp-night-mdpi")
-    fun unicodeReactionInDarkTheme() =
-        runBlocking { capture(post("👍"), "notification_reaction_unicode_dark") }
+    fun unicodeReactionInDarkTheme() = runBlocking { capture(post("👍"), "notification_reaction_unicode_dark") }
 
     /** A rejected picture still delivers the accessible reaction through the native text template. */
     @Test

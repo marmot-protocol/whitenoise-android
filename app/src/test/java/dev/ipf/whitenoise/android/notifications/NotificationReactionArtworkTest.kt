@@ -44,7 +44,11 @@ class NotificationReactionArtworkTest {
     @Before
     fun setUp() {
         manager.cancelAll()
-        context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE).edit().clear().commit()
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
 
@@ -77,7 +81,12 @@ class NotificationReactionArtworkTest {
                 card.extras.getString(Notification.EXTRA_TEMPLATE),
             )
             assertNotNull(card.getLargeIcon())
-            assertTrue(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":wn:"))
+            assertTrue(
+                card.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    .toString()
+                    .contains(":wn:"),
+            )
         }
 
     /** Unicode reactions stay ordinary text and never look for custom image files. */
@@ -95,7 +104,12 @@ class NotificationReactionArtworkTest {
                 )
             assertEquals(0, calls)
             assertNoArtwork(card)
-            assertTrue(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("👍"))
+            assertTrue(
+                card.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    .toString()
+                    .contains("👍"),
+            )
         }
 
     /** Missing received artwork cannot borrow a same-named device-local custom image. */
@@ -103,10 +117,11 @@ class NotificationReactionArtworkTest {
     fun receivedCustomEmojiNeverBorrowsLocalArtwork() =
         runBlocking {
             val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
-            val bytes = java.io.ByteArrayOutputStream().use {
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-                it.toByteArray()
-            }
+            val bytes =
+                java.io.ByteArrayOutputStream().use {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                    it.toByteArray()
+                }
             val store = CustomEmojiStore(File(context.filesDir, CustomEmojiStore.DIRECTORY))
             store.save("party", bytes)
             store.save("marmot", bytes)
@@ -116,7 +131,12 @@ class NotificationReactionArtworkTest {
                 assertFalse(marmot.getPixel(64, 64) == Color.GREEN)
                 val card = post(":party:")
                 assertNoArtwork(card)
-                assertTrue(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":party:"))
+                assertTrue(
+                    card.extras
+                        .getCharSequence(Notification.EXTRA_TEXT)
+                        .toString()
+                        .contains(":party:"),
+                )
             } finally {
                 File(context.filesDir, "emoji/party.png").delete()
                 File(context.filesDir, "emoji/marmot.png").delete()
@@ -136,7 +156,12 @@ class NotificationReactionArtworkTest {
             for (prepare in preparers) {
                 val card = post(":marmot:", prepare = prepare)
                 assertNoArtwork(card)
-                assertTrue(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":marmot:"))
+                assertTrue(
+                    card.extras
+                        .getCharSequence(Notification.EXTRA_TEXT)
+                        .toString()
+                        .contains(":marmot:"),
+                )
             }
         }
 
@@ -155,7 +180,12 @@ class NotificationReactionArtworkTest {
             val card = post(":marmot:", prepare = prepare)
             assertEquals(0, calls)
             assertNoArtwork(card)
-            assertFalse(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":marmot:"))
+            assertFalse(
+                card.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    .toString()
+                    .contains(":marmot:"),
+            )
         }
 
     /** An opt-out that wins while preparation is suspended scrubs the picture, thumbnail and description. */
@@ -173,7 +203,12 @@ class NotificationReactionArtworkTest {
                 )
             assertNoArtwork(card)
             assertNoArtwork(card.publicVersion)
-            assertFalse(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":marmot:"))
+            assertFalse(
+                card.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    .toString()
+                    .contains(":marmot:"),
+            )
         }
 
     /** Already posted picture cards use the existing allowlisted redactor, with routing unchanged. */
@@ -257,7 +292,12 @@ class NotificationReactionArtworkTest {
                 )
             assertEquals(2, attempts)
             assertNoArtwork(card)
-            assertTrue(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":marmot:"))
+            assertTrue(
+                card.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    .toString()
+                    .contains(":marmot:"),
+            )
             assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
             assertEquals(UserEventNotificationGroup.KEY, card.group)
             assertTrue(card.actions.isNullOrEmpty())
@@ -373,7 +413,10 @@ class NotificationReactionArtworkTest {
     }
 
     /** Verify artwork and every textual representation survive the platform round trip. */
-    private fun assertPicture(card: Notification, shortcode: String) {
+    private fun assertPicture(
+        card: Notification,
+        shortcode: String,
+    ) {
         assertEquals("android.app.Notification\$BigPictureStyle", card.extras.getString(Notification.EXTRA_TEMPLATE))
         val picture = card.extras.getParcelable<Bitmap>(Notification.EXTRA_PICTURE)
         assertNotNull(picture)
@@ -386,7 +429,12 @@ class NotificationReactionArtworkTest {
                 Notification.EXTRA_PICTURE_CONTENT_DESCRIPTION,
             )
         for (key in textKeys) {
-            assertTrue(card.extras.getCharSequence(key).toString().contains(shortcode))
+            assertTrue(
+                card.extras
+                    .getCharSequence(key)
+                    .toString()
+                    .contains(shortcode),
+            )
         }
     }
 
