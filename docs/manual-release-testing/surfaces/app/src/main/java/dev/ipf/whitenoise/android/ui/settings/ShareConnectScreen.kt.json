@@ -235,6 +235,14 @@
         "test_ids": [
           "PRO-011"
         ]
+      },
+      {
+        "surface": "Parsed profile required for gallery export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "canSavePicture = link != null,",
+        "test_ids": [
+          "PRO-011"
+        ]
       }
     ]
   },

@@ -148,6 +148,7 @@ internal fun ShareConnectScreen(
         scanInvalid = scanInvalid,
         pictureShareInProgress = pictureShareInProgress,
         pictureSaveInProgress = gallerySave.inProgress,
+        canSavePicture = link != null,
         onSavePicture = save@{
             val exportInProgress = pictureShareInProgress || gallerySave.inProgress
             if (!ownsScreen() || exportInProgress || link == null) return@save
@@ -276,6 +277,7 @@ internal fun ShareConnectContent(
     scanInvalid: Boolean,
     pictureShareInProgress: Boolean = false,
     pictureSaveInProgress: Boolean = false,
+    canSavePicture: Boolean = qrContent.isNotBlank(),
     onSavePicture: () -> Unit = {},
     onBack: () -> Unit,
     onShareUrl: () -> Unit,
@@ -303,7 +305,7 @@ internal fun ShareConnectContent(
                 actions = {
                     IconButton(
                         onClick = onSavePicture,
-                        enabled = qrContent.isNotBlank() && !pictureShareInProgress && !pictureSaveInProgress,
+                        enabled = canSavePicture && !pictureShareInProgress && !pictureSaveInProgress,
                         modifier = Modifier.testTag("profile.qr.save").semantics { contentDescription = saveLabel },
                     ) {
                         if (pictureSaveInProgress) {

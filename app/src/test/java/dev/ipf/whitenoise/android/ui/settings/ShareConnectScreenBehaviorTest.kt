@@ -104,11 +104,20 @@ class ShareConnectScreenBehaviorTest {
         composeRule.runOnIdle { assertEquals(1, scannerCount) }
     }
 
+    /** A nonblank display value without a parsed profile link cannot advertise a working download. */
+    @Test
+    fun invalidProfileDisablesSave() {
+        mount(canSave = false)
+        composeRule.onNodeWithTag("profile.qr.save").assertIsNotEnabled()
+        composeRule.runOnIdle { assertEquals(0, saveCount) }
+    }
+
     /** Mounts the composable under test. */
     private fun mount(
         copied: Boolean = false,
         scanInvalid: Boolean = false,
         saving: Boolean = false,
+        canSave: Boolean = true,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
@@ -118,6 +127,7 @@ class ShareConnectScreenBehaviorTest {
                     copied = copied,
                     scanInvalid = scanInvalid,
                     pictureSaveInProgress = saving,
+                    canSavePicture = canSave,
                     onSavePicture = { saveCount++ },
                     onBack = { backCount++ },
                     onShareUrl = { urlShareCount++ },
