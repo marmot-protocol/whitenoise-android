@@ -5,9 +5,11 @@
     "source_coverage": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNotificationLanding.kt",
-        "surface": "Notification entry disables mention-only tail runway",
-        "anchor": "reserveTailSpace = false",
-        "test_ids": ["NTF-037"]
+        "surface": "Notification entry uses measured natural-tail landing",
+        "anchor": "ConversationReadingStartProbe(",
+        "test_ids": [
+          "NTF-037"
+        ]
       }
     ],
     "composable_surfaces": [

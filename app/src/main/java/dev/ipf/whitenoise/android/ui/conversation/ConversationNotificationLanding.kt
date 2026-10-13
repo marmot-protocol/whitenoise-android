@@ -271,12 +271,10 @@ internal class ConversationEntryPositioning(
                 readLayout = { index ->
                     viewport.readingStartLayout(
                         index = index,
-                        isNewest = index == controller.conversationTrailingRowCount(renderedTimeline().size),
                         cachedItemHeightPx = position.anchor.messageId?.let(callbacks.notification.cachedItemHeightPx),
                     )
                 },
                 traceSections = false,
-                reserveTailSpace = false,
             )
         val captureLayout = { viewport.initialAnchorLayout(position.index) }
         var attempts = 0
