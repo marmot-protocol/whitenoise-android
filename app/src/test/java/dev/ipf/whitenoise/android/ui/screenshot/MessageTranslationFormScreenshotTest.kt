@@ -13,7 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertIsDisabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -37,7 +37,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w400dp-h1000dp-mdpi")
-class MessageTranslationFormTest {
+class MessageTranslationFormScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
     private val requests = mutableListOf<Pair<String, String>>()
     private var dismissed = 0
@@ -77,7 +77,7 @@ class MessageTranslationFormTest {
     @Test
     fun unavailableRequestKeepsThePrimaryActionDisabled() {
         render(enabled = false)
-        composeRule.onNodeWithTag("translation.confirm").assertIsDisabled()
+        composeRule.onNodeWithTag("translation.confirm").assertIsNotEnabled()
     }
 
     @Test fun light() = capture("translation_form_light.png")
