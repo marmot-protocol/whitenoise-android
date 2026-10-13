@@ -54,7 +54,13 @@ class IsolatedAnimationPixelsScreenshotTest {
         try {
             composeRule.setContent {
                 Box(Modifier.fillMaxSize().background(if (dark) ComposeColor.Black else ComposeColor.White)) {
-                    AnimatedDrawableAttachmentImage(drawable, "Animated image", ContentScale.Fit, Modifier.size(192.dp), active = false)
+                    AnimatedDrawableAttachmentImage(
+                        drawable,
+                        "Animated image",
+                        ContentScale.Fit,
+                        Modifier.size(192.dp),
+                        active = false,
+                    )
                 }
             }
             composeRule.onRoot().captureRoboImage("src/test/snapshots/isolated_animation_pixels_$suffix.png")

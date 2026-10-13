@@ -13,6 +13,7 @@ internal object AnimationFrameProtocol {
     const val MAX_REPLY_BYTES = 256
     const val MIN_FRAME_DELAY_MS = 32L
     const val FLAG_COUNT = 3
+    const val FRAME_PRIMITIVE_BYTES = 36
 }
 
 internal data class AnimationFrameInfo(
@@ -50,11 +51,17 @@ internal fun writeAnimationFrame(
 internal fun readAnimationFrame(parcel: Parcel): AnimationFrameInfo {
     require(parcel.dataAvail() <= AnimationFrameProtocol.MAX_REPLY_BYTES)
     parcel.enforceInterface(AnimationFrameProtocol.DESCRIPTOR)
+    require(parcel.dataAvail() == AnimationFrameProtocol.FRAME_PRIMITIVE_BYTES)
     val session = parcel.readInt()
     val sequence = parcel.readLong()
     val width = parcel.readInt()
     val height = parcel.readInt()
-    val flags = IntArray(AnimationFrameProtocol.FLAG_COUNT) { parcel.readInt().also { value -> require(value in 0..1) } }
+    val flags =
+        IntArray(AnimationFrameProtocol.FLAG_COUNT) {
+            val value = parcel.readInt()
+            require(value in 0..1)
+            value
+        }
     val canary = parcel.readInt()
     require(sequence > 0 && width in 1..AnimationFrameProtocol.MAX_EDGE && height in 1..AnimationFrameProtocol.MAX_EDGE)
     require(parcel.dataAvail() == 0)

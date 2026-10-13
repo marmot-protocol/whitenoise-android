@@ -5,6 +5,7 @@ import android.os.IBinder
 import android.os.Parcel
 
 internal const val MEDIA_REPLY_DESCRIPTOR = "dev.ipf.whitenoise.media.pixels.v2"
+private const val MIN_MEDIA_REPLY_BYTES = 72
 
 /** Worker replies contain only explicitly read primitives, never arbitrary parcelable objects. */
 internal fun sendMediaDecodeReply(
@@ -39,6 +40,7 @@ internal fun sendMediaDecodeReply(
 }
 
 internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
+    require(parcel.dataAvail() >= MIN_MEDIA_REPLY_BYTES)
     val result = Bundle()
     result.putBoolean("success", readMediaBoolean(parcel))
     result.putBoolean("isolated", readMediaBoolean(parcel))
@@ -67,6 +69,7 @@ internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
     val count = parcel.readInt()
     require(count == -1 || count == dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS)
     if (count == dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS) {
+        require(parcel.dataAvail() == count * Float.SIZE_BYTES)
         val waveform = FloatArray(count) { parcel.readFloat() }
         require(waveform.all { it.isFinite() && it in 0f..1f })
         result.putFloatArray("waveform", waveform)

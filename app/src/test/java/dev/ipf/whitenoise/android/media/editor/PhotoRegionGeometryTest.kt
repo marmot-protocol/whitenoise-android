@@ -13,7 +13,10 @@ class PhotoRegionGeometryTest {
                     PhotoEditGeometry.create(
                         EditorPixelSize(12000, 9000),
                         orientation,
-                        PhotoEditRecipe(crop = NormalizedRect(0.07f, 0.13f, 0.41f, 0.62f), quarterTurnsClockwise = turn),
+                        PhotoEditRecipe(
+                            crop = NormalizedRect(0.07f, 0.13f, 0.41f, 0.62f),
+                            quarterTurnsClockwise = turn,
+                        ),
                         4096,
                         12_000_000L,
                     )

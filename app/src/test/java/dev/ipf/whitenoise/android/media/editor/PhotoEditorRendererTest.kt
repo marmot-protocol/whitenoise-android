@@ -87,7 +87,8 @@ class PhotoEditorRendererTest {
             val canvas = android.graphics.Canvas(bitmap)
             canvas.drawRect(1000f, 0f, 2500f, 200f, android.graphics.Paint().apply { color = Color.RED })
             val source = encodePng(bitmap)
-            val result = renderer().render(source, PhotoEditRecipe(crop = NormalizedRect(0.2f, 0f, 0.5f, 1f)), MediaQuality.Original)
+            val recipe = PhotoEditRecipe(crop = NormalizedRect(0.2f, 0f, 0.5f, 1f))
+            val result = renderer().render(source, recipe, MediaQuality.Original)
             assertTrue(result is PhotoEditorRenderResult.Success)
             val image = (result as PhotoEditorRenderResult.Success).image
             val output = BitmapFactory.decodeByteArray(image.bytes, 0, image.bytes.size)

@@ -127,7 +127,8 @@ class AnimationSourceAdmissionDeviceTest {
                     assertEquals(stopped, pixels.getPixel(0, 0))
                 }
                 // The healthy paused stream must also survive beyond the image-request watchdog.
-                val png = ByteArrayOutputStream().also { pixels.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+                val encoded = ByteArrayOutputStream().also { pixels.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                val png = encoded.toByteArray()
                 requireNotNull(MediaPipeline.decodeSampledBitmap(png, 2)).recycle()
                 instrumentation.runOnMainSync {
                     (animated as Animatable).start()
@@ -157,7 +158,8 @@ class AnimationSourceAdmissionDeviceTest {
             }
             val replacement = requireNotNull(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()))
             try {
-                assertTrue(oldUid != requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation).uid)
+                val current = requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation)
+                assertTrue(oldUid != current.uid)
             } finally {
                 instrumentation.runOnMainSync { (replacement as java.io.Closeable).close() }
             }

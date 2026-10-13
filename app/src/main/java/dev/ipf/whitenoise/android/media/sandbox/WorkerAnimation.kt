@@ -49,7 +49,13 @@ internal class WorkerAnimation(
                     decoder.setTargetSize(target.first, target.second)
                 } as? AnimatedImageDrawable,
             )
-        val capacity = MediaDecodePolicy.pixelBytes(drawable.intrinsicWidth, drawable.intrinsicHeight, edge, output.size)
+        val capacity =
+            MediaDecodePolicy.pixelBytes(
+                drawable.intrinsicWidth,
+                drawable.intrinsicHeight,
+                edge,
+                output.size,
+            )
         require(capacity != null)
         drawable.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
         drawable.callback = this

@@ -32,7 +32,7 @@ class AnimationFrameProtocolTest {
 
     @Test
     fun oversizedTrailingAndInvalidSequenceOrDimensionsNeverBecomeFrames() {
-        for (variant in 0..4) {
+        for (variant in 0..5) {
             val parcel = Parcel.obtain()
             try {
                 parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)
@@ -43,7 +43,7 @@ class AnimationFrameProtocolTest {
                 parcel.writeInt(if (variant == 3) 7 else 1)
                 parcel.writeInt(0)
                 parcel.writeInt(0)
-                parcel.writeInt(-1)
+                if (variant != 5) parcel.writeInt(-1)
                 if (variant == 0) parcel.writeByteArray(ByteArray(300))
                 if (variant == 4) parcel.writeInt(123)
                 parcel.setDataPosition(0)

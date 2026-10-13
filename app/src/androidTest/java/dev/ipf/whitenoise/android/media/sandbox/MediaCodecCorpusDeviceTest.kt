@@ -27,7 +27,8 @@ class MediaCodecCorpusDeviceTest {
         val caller = Process.myPid()
         val jpeg = image(Bitmap.CompressFormat.JPEG)
         val png = image(Bitmap.CompressFormat.PNG)
-        val app1 = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xe1.toByte(), 0x7f, 0xff) + "Exif\u0000\u0000II".toByteArray()
+        val marker = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xe1.toByte(), 0x7f, 0xff)
+        val app1 = marker + "Exif\u0000\u0000II".toByteArray()
         val corpus =
             listOf(
                 jpeg.copyOf(8),
@@ -106,7 +107,8 @@ class MediaCodecCorpusDeviceTest {
                 assertTrue(worker.isolated && worker.uid != Process.myUid() && !worker.internetGranted)
             }
             println(
-                "MEDIA_FORMAT_QUALIFICATION format=HEIF api=${android.os.Build.VERSION.SDK_INT} inspect=${inspected != null} preview=${preview != null} region=${region != null}",
+                "MEDIA_FORMAT_QUALIFICATION format=HEIF api=${android.os.Build.VERSION.SDK_INT} " +
+                    "inspect=${inspected != null} preview=${preview != null} region=${region != null}",
             )
         } finally {
             preview?.recycle()
@@ -142,13 +144,21 @@ class MediaCodecCorpusDeviceTest {
             val admission =
                 dev.ipf.whitenoise.android.media
                     .admitAnimationSource(source)
-            assertTrue("CTS animation must remain usable: $admission", admission is dev.ipf.whitenoise.android.media.AnimationSourceAdmission.Admitted)
+            assertTrue(
+                "CTS animation must remain usable: $admission",
+                admission is dev.ipf.whitenoise.android.media.AnimationSourceAdmission.Admitted,
+            )
             val animation =
                 requireNotNull(
                     dev.ipf.whitenoise.android.media.MediaPipeline
                         .decodeAnimatedDrawable(source, 96),
                 )
-            val pixels = Bitmap.createBitmap(animation.intrinsicWidth, animation.intrinsicHeight, Bitmap.Config.ARGB_8888)
+            val pixels =
+                Bitmap.createBitmap(
+                    animation.intrinsicWidth,
+                    animation.intrinsicHeight,
+                    Bitmap.Config.ARGB_8888,
+                )
             try {
                 val hashes = HashSet<Int>()
                 val buffer = IntArray(pixels.width * pixels.height)
