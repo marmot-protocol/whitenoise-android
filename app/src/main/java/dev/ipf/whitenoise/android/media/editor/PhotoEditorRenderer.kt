@@ -21,7 +21,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -126,12 +125,16 @@ internal class PhotoEditorRenderer(
                 }
                 val source = (inspected as PhotoEditorInspectResult.Success).source
                 val plan = outputPlan(source, recipe, quality) ?: return@withLock PhotoEditorRenderResult.InvalidRecipe
-                val spec = decodeSpec(source, plan.geometry) ?: return@withLock PhotoEditorRenderResult.MemoryLimit
+                val spec =
+                    PhotoEditorDecoder.plan(source, plan.geometry)
+                        ?: return@withLock PhotoEditorRenderResult.MemoryLimit
                 if (!fitsMemoryBudget(sourceBytes.size, spec.dimensions, spec.capacity, plan)) {
                     return@withLock PhotoEditorRenderResult.MemoryLimit
                 }
                 currentCoroutineContext().ensureActive()
-                val decoded = decodePixels(sourceBytes, spec) ?: return@withLock PhotoEditorRenderResult.DecodeFailed
+                val decoded =
+                    PhotoEditorDecoder.decode(sourceBytes, spec)
+                        ?: return@withLock PhotoEditorRenderResult.DecodeFailed
                 val rendered =
                     try {
                         currentCoroutineContext().ensureActive()
@@ -148,51 +151,6 @@ internal class PhotoEditorRenderer(
                     } ?: return@withLock PhotoEditorRenderResult.EncodeFailed
                 PhotoEditorRenderResult.Success(finalized, plan)
             }
-        }
-
-    private data class DecodeSpec(
-        val region: dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion?,
-        val edge: Int,
-        val capacity: Int,
-        val dimensions: Pair<Int, Int>,
-    )
-
-    private fun decodeSpec(
-        source: PhotoEditorSourceInfo,
-        geometry: PhotoEditGeometry,
-    ): DecodeSpec? {
-        val fullEdge = decodeLongEdge(source, geometry)
-        val region =
-            if (fullEdge > dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy.MAX_EDGE) {
-                geometry.encodedCropRegion()
-            } else {
-                null
-            }
-        val edge = if (region == null) fullEdge else max(geometry.outputSize.width, geometry.outputSize.height)
-        val capacity =
-            dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy
-                .outputCapacity(edge) ?: return null
-        return DecodeSpec(
-            region,
-            edge,
-            capacity,
-            MediaPipeline.targetDimensions(
-                region?.width ?: source.orientedSize.width,
-                region?.height ?: source.orientedSize.height,
-                edge,
-            ),
-        )
-    }
-
-    private fun decodePixels(
-        sourceBytes: ByteArray,
-        spec: DecodeSpec,
-    ): Bitmap? =
-        if (spec.region != null) {
-            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-                .region(sourceBytes, spec.region, spec.edge)
-        } else {
-            MediaPipeline.decodeSampledBitmap(sourceBytes, spec.edge, honorExifOrientation = true)
         }
 
     internal fun outputPlan(
@@ -505,25 +463,6 @@ internal class PhotoEditorRenderer(
             sourceBytes + outputPixels * BYTES_PER_PIXEL * outputCopies + estimatedEncoded * 2
         val decodePeak = sourceBytes + decodeCapacity + decodedPixels * BYTES_PER_PIXEL
         return maxOf(renderPeak, encodePeak, decodePeak) <= memoryBudgetBytes()
-    }
-
-    private fun decodeLongEdge(
-        source: PhotoEditorSourceInfo,
-        geometry: PhotoEditGeometry,
-    ): Int {
-        val cropWidth = source.orientedSize.width * geometry.recipe.crop.width
-        val cropHeight = source.orientedSize.height * geometry.recipe.crop.height
-        val naturalWidth = if (geometry.recipe.quarterTurnsClockwise % 2 == 0) cropWidth else cropHeight
-        val naturalHeight = if (geometry.recipe.quarterTurnsClockwise % 2 == 0) cropHeight else cropWidth
-        val scale =
-            min(
-                geometry.outputSize.width / naturalWidth.coerceAtLeast(1f),
-                geometry.outputSize.height / naturalHeight.coerceAtLeast(1f),
-            ).coerceAtMost(1f)
-        return ceil(max(source.orientedSize.width, source.orientedSize.height) * scale)
-            .toInt()
-            .coerceAtLeast(max(geometry.outputSize.width, geometry.outputSize.height))
-            .coerceAtMost(max(source.orientedSize.width, source.orientedSize.height))
     }
 
     private data class RenderedStroke(

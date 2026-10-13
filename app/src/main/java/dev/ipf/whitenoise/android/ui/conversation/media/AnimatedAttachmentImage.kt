@@ -103,6 +103,7 @@ internal fun DecodedAttachmentPresentation.Static.toImageBitmap() = bitmap.asIma
 
 /** The page owns assigned resources even if their drawable has not reached a rendering composition. */
 @Composable
+@Suppress("FunctionNaming") // A lifecycle owner follows Compose component naming.
 internal fun OwnLatestAttachmentPresentation(
     pageKey: Any,
     presentation: androidx.compose.runtime.State<DecodedAttachmentPresentation?>,

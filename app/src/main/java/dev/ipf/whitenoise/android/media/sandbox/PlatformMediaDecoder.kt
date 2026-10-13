@@ -60,7 +60,7 @@ internal object PlatformMediaDecoder {
         val width = (region.width.toLong() + sample - 1) / sample
         val height = (region.height.toLong() + sample - 1) / sample
         if (width * height > MediaDecodePolicy.MAX_REGION_DECODE_PIXELS) return null
-        val decoder = android.graphics.BitmapRegionDecoder.newInstance(bytes, 0, bytes.size, false) ?: return null
+        val decoder = android.graphics.BitmapRegionDecoder.newInstance(bytes, 0, bytes.size, false)
         try {
             val options =
                 android.graphics.BitmapFactory.Options().apply {
@@ -71,22 +71,22 @@ internal object PlatformMediaDecoder {
             val decoded =
                 decoder.decodeRegion(bounds, options)
                     ?: return null
-            val target = MediaPipeline.targetDimensions(decoded.width, decoded.height, edge)
-            return try {
-                if (decoded.width == target.first && decoded.height == target.second) {
-                    decoded
-                } else {
-                    Bitmap.createScaledBitmap(decoded, target.first, target.second, true).also { decoded.recycle() }
-                }
-            } catch (failure: Exception) {
-                decoded.recycle()
-                throw failure
-            } catch (failure: OutOfMemoryError) {
-                decoded.recycle()
-                throw failure
-            }
+            return scaleRegion(decoded, edge)
         } finally {
             decoder.recycle()
+        }
+    }
+
+    private fun scaleRegion(
+        decoded: Bitmap,
+        edge: Int,
+    ): Bitmap {
+        val target = MediaPipeline.targetDimensions(decoded.width, decoded.height, edge)
+        if (decoded.width == target.first && decoded.height == target.second) return decoded
+        return try {
+            Bitmap.createScaledBitmap(decoded, target.first, target.second, true)
+        } finally {
+            decoded.recycle()
         }
     }
 }

@@ -93,15 +93,10 @@ internal class IsolatedAnimationSession private constructor(
         uid: Int,
     ): Delivery? =
         synchronized(lock) {
-            if (closed ||
-                frame.session != id ||
-                frame.sequence != sequence + 1L ||
-                uid == Process.myUid() ||
-                (workerUid != null && workerUid != uid) ||
-                !frame.isolated ||
-                frame.internetGranted ||
-                frame.runtimeInitialized
-            ) {
+            val current = !closed && frame.session == id && frame.sequence == sequence + 1L
+            val isolated = frame.isolated && !frame.internetGranted && !frame.runtimeInitialized
+            val kernelWorker = uid != Process.myUid() && (workerUid == null || workerUid == uid)
+            if (!current || !isolated || !kernelWorker) {
                 return@synchronized null
             }
             val count =
@@ -131,17 +126,15 @@ internal class IsolatedAnimationSession private constructor(
         val pixels = output.mapReadOnly()
         try {
             val bitmap = Bitmap.createBitmap(frame.width, frame.height, Bitmap.Config.ARGB_8888)
+            var copied = false
             try {
                 pixels.limit(count)
                 check(bitmap.byteCount == count)
                 bitmap.copyPixelsFromBuffer(pixels)
+                copied = true
                 return bitmap
-            } catch (failure: RuntimeException) {
-                bitmap.recycle()
-                throw failure
-            } catch (failure: OutOfMemoryError) {
-                bitmap.recycle()
-                throw failure
+            } finally {
+                if (!copied) bitmap.recycle()
             }
         } finally {
             SharedMemory.unmap(pixels)
@@ -187,11 +180,14 @@ internal class IsolatedAnimationSession private constructor(
                     connection,
                 )
         }
-        if (!bound) {
-            releaseLease()
-            return null
-        }
-        if (!connected.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS) || closed) return null
+        val available =
+            if (bound) {
+                connected.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS) && !closed
+            } else {
+                releaseLease()
+                false
+            }
+        if (!available) return null
         sources.withInput(bytes) { input ->
             remote?.send(
                 Message.obtain().apply {
@@ -211,9 +207,9 @@ internal class IsolatedAnimationSession private constructor(
                 },
             )
         }
-        if (!firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)) return null
+        val received = firstFrame.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
         return synchronized(lock) {
-            if (closed) {
+            if (closed || !received) {
                 null
             } else {
                 firstPixels?.let { pixels ->
@@ -334,37 +330,27 @@ internal class IsolatedAnimationSession private constructor(
             bytes: ByteArray,
             edge: Int,
         ): IsolatedAnimationDrawable? {
+            val validSource =
+                bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
+                    edge in 1..AnimationFrameProtocol.MAX_EDGE
             if (Looper.myLooper() == Looper.getMainLooper() ||
-                bytes.size !in 1..MediaDecodePolicy.MAX_INPUT_BYTES ||
-                edge !in 1..AnimationFrameProtocol.MAX_EDGE ||
+                !validSource ||
                 !admission.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
             ) {
                 return null
             }
-            val session =
-                try {
-                    IsolatedAnimationSession(context.applicationContext, edge)
-                } catch (_: Exception) {
-                    admission.release()
-                    return null
-                } catch (_: OutOfMemoryError) {
-                    admission.release()
-                    return null
-                }
-            active.set(session)
+            var session: IsolatedAnimationSession? = null
+            var delivered: IsolatedAnimationDrawable? = null
             return try {
-                session.open(bytes).also { if (it == null) session.close() }
-            } catch (
-                interrupted: InterruptedException,
-            ) {
-                session.close()
-                throw interrupted
-            } catch (_: Exception) {
-                session.close()
-                null
-            } catch (_: OutOfMemoryError) {
-                session.close()
-                null
+                val created = IsolatedAnimationSession(context.applicationContext, edge)
+                session = created
+                active.set(created)
+                created.open(bytes).also { delivered = it }
+            } finally {
+                // The facade handles failure/cancellation; this scope only owns cleanup.
+                if (delivered == null) {
+                    if (session == null) admission.release() else session.close()
+                }
             }
         }
 

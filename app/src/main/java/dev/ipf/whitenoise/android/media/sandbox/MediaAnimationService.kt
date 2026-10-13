@@ -32,8 +32,13 @@ class MediaAnimationService : Service() {
         if (!Process.isIsolated()) return true
         if (message.what == MediaDecodePolicy.RETIRE) {
             Process.killProcess(Process.myPid())
-            return true
+        } else {
+            dispatch(message)
         }
+        return true
+    }
+
+    private fun dispatch(message: Message) {
         val command = message.what
         val id = message.arg1
         val ack = message.data.getLong("sequence")
@@ -61,7 +66,6 @@ class MediaAnimationService : Service() {
                 Process.killProcess(Process.myPid())
             }
         }
-        return true
     }
 
     @Suppress("DEPRECATION") // API 30 descriptor access, supplied only by the nonexported bound client.

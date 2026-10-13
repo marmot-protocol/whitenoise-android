@@ -17,6 +17,8 @@ internal class IsolatedAnimationDrawable(
     java.io.Closeable {
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private var running = false
+    internal var presentedFrame: Long = 1L
+        private set
 
     @Volatile private var closed = false
     private val width = frame.width
@@ -64,6 +66,7 @@ internal class IsolatedAnimationDrawable(
         }
         val previous = frame
         frame = next
+        presentedFrame++
         invalidateSelf()
         previous.recycle()
     }

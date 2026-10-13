@@ -158,7 +158,10 @@ class AnimationSourceAdmissionDeviceTest {
             }
             val replacement = requireNotNull(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()))
             try {
-                val current = requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation)
+                val current =
+                    requireNotNull(
+                        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation,
+                    )
                 assertTrue(oldUid != current.uid)
             } finally {
                 instrumentation.runOnMainSync { (replacement as java.io.Closeable).close() }

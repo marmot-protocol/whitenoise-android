@@ -153,31 +153,45 @@ class MediaCodecCorpusDeviceTest {
                     dev.ipf.whitenoise.android.media.MediaPipeline
                         .decodeAnimatedDrawable(source, 96),
                 )
-            val pixels =
-                Bitmap.createBitmap(
-                    animation.intrinsicWidth,
-                    animation.intrinsicHeight,
-                    Bitmap.Config.ARGB_8888,
-                )
-            try {
-                val hashes = HashSet<Int>()
-                val buffer = IntArray(pixels.width * pixels.height)
-                instrumentation.runOnMainSync { (animation as android.graphics.drawable.Animatable).start() }
-                val until = android.os.SystemClock.elapsedRealtime() + 3500L
-                while (hashes.size < 2 && android.os.SystemClock.elapsedRealtime() < until) {
-                    instrumentation.runOnMainSync {
-                        animation.setBounds(0, 0, pixels.width, pixels.height)
-                        animation.draw(android.graphics.Canvas(pixels))
-                        pixels.getPixels(buffer, 0, pixels.width, 0, 0, pixels.width, pixels.height)
-                        hashes.add(buffer.contentHashCode())
-                    }
-                    Thread.sleep(25L)
-                }
-                assertTrue("Decoded CTS animation must show changing frames", hashes.size >= 2)
-            } finally {
-                instrumentation.runOnMainSync { (animation as java.io.Closeable).close() }
-                pixels.recycle()
+            assertChangingFrames(animation as IsolatedAnimationDrawable)
+        }
+    }
+
+    private fun assertChangingFrames(animation: IsolatedAnimationDrawable) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val pixels = Bitmap.createBitmap(animation.intrinsicWidth, animation.intrinsicHeight, Bitmap.Config.ARGB_8888)
+        val buffer = IntArray(pixels.width * pixels.height)
+
+        fun sample(): Pair<Long, Int> {
+            var result = 0L to 0
+            instrumentation.runOnMainSync {
+                pixels.eraseColor(Color.TRANSPARENT)
+                animation.setBounds(0, 0, pixels.width, pixels.height)
+                animation.draw(android.graphics.Canvas(pixels))
+                pixels.getPixels(buffer, 0, pixels.width, 0, 0, pixels.width, pixels.height)
+                result = animation.presentedFrame to buffer.contentHashCode()
             }
+            return result
+        }
+        try {
+            val first = sample() // create() has already waited for the first isolated decoded frame.
+            assertEquals(1L, first.first)
+            instrumentation.runOnMainSync { animation.start() }
+            val until = android.os.SystemClock.elapsedRealtime() + 3500L
+            var later = first
+            while ((later.first == first.first || later.second == first.second) &&
+                android.os.SystemClock.elapsedRealtime() < until
+            ) {
+                later = sample()
+                Thread.sleep(25L)
+            }
+            assertTrue(
+                "A later accepted frame must have different pixels",
+                later.first > first.first && later.second != first.second,
+            )
+        } finally {
+            instrumentation.runOnMainSync { animation.close() }
+            pixels.recycle()
         }
     }
 

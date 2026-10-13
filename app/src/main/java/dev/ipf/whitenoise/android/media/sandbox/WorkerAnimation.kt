@@ -11,6 +11,8 @@ import android.os.Handler
 import android.os.SharedMemory
 import android.os.SystemClock
 import dev.ipf.whitenoise.android.media.AnimationSourceAdmission
+import dev.ipf.whitenoise.android.media.MAX_ANIMATION_SOURCE_CANVAS_PIXELS
+import dev.ipf.whitenoise.android.media.MAX_ANIMATION_SOURCE_EDGE_PX
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.admitAnimationSource
 import java.nio.ByteBuffer
@@ -43,24 +45,28 @@ internal class WorkerAnimation(
         drawable =
             requireNotNull(
                 ImageDecoder.decodeDrawable(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
-                    require(MediaDecodePolicy.sourceAllowed(info.size.width, info.size.height))
-                    val target = MediaPipeline.targetDimensions(info.size.width, info.size.height, edge)
+                    require(info.size.width in 1..MAX_ANIMATION_SOURCE_EDGE_PX)
+                    require(info.size.height in 1..MAX_ANIMATION_SOURCE_EDGE_PX)
+                    require(info.size.width.toLong() * info.size.height <= MAX_ANIMATION_SOURCE_CANVAS_PIXELS)
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                    decoder.setTargetSize(target.first, target.second)
                 } as? AnimatedImageDrawable,
             )
+        // API 30's rotated animated WebP decoder can reject frame zero when decoder target-size
+        // scaling is used. Admission already bounds the native canvas to 4 Mi pixels; render
+        // that bounded source into target-sized pixels instead of adding a privileged fallback.
+        val target = MediaPipeline.targetDimensions(drawable.intrinsicWidth, drawable.intrinsicHeight, edge)
         val capacity =
             MediaDecodePolicy.pixelBytes(
-                drawable.intrinsicWidth,
-                drawable.intrinsicHeight,
+                target.first,
+                target.second,
                 edge,
                 output.size,
             )
         require(capacity != null)
         drawable.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
         drawable.callback = this
-        drawable.setBounds(0, 0, drawable.intrinsicWidth, drawable.intrinsicHeight)
-        bitmap = Bitmap.createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, target.first, target.second)
+        bitmap = Bitmap.createBitmap(target.first, target.second, Bitmap.Config.ARGB_8888)
         canvas = Canvas(bitmap)
     }
 
