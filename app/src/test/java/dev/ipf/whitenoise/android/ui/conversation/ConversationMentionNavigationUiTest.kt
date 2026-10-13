@@ -32,6 +32,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -113,9 +114,9 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** A gesture at the natural tail keeps reading ownership without creating a return affordance. */
+    /** An explicit gesture to the natural tail restores ordinary following without a return affordance. */
     @Test
-    fun gestureAtNewestMentionRetainsReadingIntentWithoutAnUnneededReturnControl() {
+    fun gestureAtNewestMentionResumesTailFollowingWithoutAnUnneededReturnControl() {
         assertMentionTop(
             MentionFixture(
                 target = Target(80, 0),
@@ -321,13 +322,7 @@ class ConversationMentionNavigationUiTest {
                                             it.firstVisibleItemScrollOffset,
                                         )
                                     } ?: ConversationScrollMode.FollowingTail,
-                                initialMentionReadingRowHeightPx =
-                                    state.savedSnapshot?.mentionReadingRowHeightPx
-                                        ?: if (reopenAfterLanding && state.routeGeneration == 0) {
-                                            target.height
-                                        } else {
-                                            null
-                                        },
+                                initialMentionReadingRowHeightPx = initialReadingReserve(fixture, state),
                             )
                         }
                     state.activeCoordinator = coordinator
@@ -498,38 +493,7 @@ class ConversationMentionNavigationUiTest {
             composeRule.onNodeWithTag("message-$targetIndex").assertDoesNotExist()
             return
         }
-        val listTop =
-            composeRule
-                .onNodeWithTag("mention-list")
-                .getUnclippedBoundsInRoot()
-                .top.value
-        val messageTop =
-            composeRule
-                .onNodeWithTag("message-$targetIndex")
-                .getUnclippedBoundsInRoot()
-                .top.value
-        if (state.atNaturalTail) {
-            val messageBottom =
-                composeRule
-                    .onNodeWithTag("message-$targetIndex")
-                    .getUnclippedBoundsInRoot()
-                    .bottom.value
-            assertTrue("the mention is fully visible below the header", messageTop >= listTop - 1f)
-            assertTrue("the mention clears composer overlap", messageBottom <= listTop + viewportHeight - overlap + 1f)
-            val newestBottom =
-                composeRule
-                    .onNodeWithTag("message-${-state.incomingCount}")
-                    .getUnclippedBoundsInRoot()
-                    .bottom.value
-            assertEquals(
-                "only normal padding and structural rows below the newest message",
-                listTop + viewportHeight - padding - state.headerCount * 32,
-                newestBottom,
-                1f,
-            )
-        } else {
-            assertEquals(listTop, messageTop, 1f)
-        }
+        val messageTop = assertMentionLandingBounds(fixture, state)
         composeRule.runOnIdle {
             assertTrue(state.completed)
             assertNull(
@@ -543,10 +507,66 @@ class ConversationMentionNavigationUiTest {
             assertEquals("initial newest classification", targetIndex == 0, state.newestEvaluations.first())
             assertFalse("the new message--1 supersedes it as newest", state.newestEvaluations.last())
         }
+        captureMentionFixture(fixture)
+        assertMentionFollowUps(fixture, state, messageTop)
+    }
+
+    /** Retained legacy geometry belongs only to the explicit recreation regression. */
+    private fun initialReadingReserve(
+        fixture: MentionFixture,
+        state: MentionHarnessState,
+    ): Int? =
+        state.savedSnapshot?.mentionReadingRowHeightPx
+            ?: if (fixture.reopenAfterLanding && state.routeGeneration == 0) fixture.target.height else null
+
+    /** Validates either the natural tail clamp or the reading top, against actual composed row bounds. */
+    private fun assertMentionLandingBounds(
+        fixture: MentionFixture,
+        state: MentionHarnessState,
+    ): Float {
+        val listTop =
+            composeRule
+                .onNodeWithTag("mention-list")
+                .getUnclippedBoundsInRoot()
+                .top.value
+        val messageTop =
+            composeRule
+                .onNodeWithTag("message-${fixture.target.index}")
+                .getUnclippedBoundsInRoot()
+                .top.value
+        if (state.atNaturalTail) {
+            val messageBottom =
+                composeRule
+                    .onNodeWithTag("message-${fixture.target.index}")
+                    .getUnclippedBoundsInRoot()
+                    .bottom.value
+            assertTrue("the mention is fully visible below the header", messageTop >= listTop - 1f)
+            assertTrue(
+                "the mention clears composer overlap",
+                messageBottom <= listTop + fixture.viewportHeight - fixture.overlap + 1f,
+            )
+            val newestBottom =
+                composeRule
+                    .onNodeWithTag("message-${-state.incomingCount}")
+                    .getUnclippedBoundsInRoot()
+                    .bottom.value
+            assertEquals(
+                "only normal padding and structural rows below the newest message",
+                listTop + fixture.viewportHeight - fixture.padding - state.headerCount * 32,
+                newestBottom,
+                1f,
+            )
+        } else {
+            assertEquals(listTop, messageTop, 1f)
+        }
+        return messageTop
+    }
+
+    /** Captures only fixtures selected by the registered screenshot owner filters. */
+    private fun captureMentionFixture(fixture: MentionFixture) {
         fixture.captureName?.let {
             composeRule.onNodeWithTag("mention-list").captureRoboImage("src/test/snapshots/$it.png")
         }
-        assertMentionFollowUps(fixture, state, messageTop)
     }
 
     /** Resolves mixed-height rows independently of the real-list interaction harness. */
@@ -602,7 +622,7 @@ class ConversationMentionNavigationUiTest {
                     state.headerCount++
                 }
             SuspendedMentionAction.RepeatedTap -> composeRule.onNodeWithTag("mention-jump").performClick()
-            SuspendedMentionAction.Drag -> composeRule.onNodeWithTag("mention-list").performTouchInput { swipeUp() }
+            SuspendedMentionAction.Drag -> composeRule.onNodeWithTag("mention-list").performTouchInput { swipeDown() }
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { state.layoutRelease.complete(Unit) }
@@ -629,7 +649,7 @@ class ConversationMentionNavigationUiTest {
         if (fixture.gestureAfterLanding) {
             composeRule.onNodeWithTag("mention-list").performTouchInput { swipeUp() }
             composeRule.waitForIdle()
-            composeRule.runOnIdle { assertTrue(state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory) }
+            composeRule.runOnIdle { assertEquals(ConversationScrollMode.FollowingTail, state.activeCoordinator?.mode) }
         }
         if (fixture.reopenAfterLanding) {
             composeRule.onNodeWithTag("mention-reopen").performClick()
