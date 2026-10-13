@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -42,6 +43,12 @@ class SettingsHomeBehaviorTest {
     private var signOutCount = 0
     private var appUpdateCount = 0
     private var backCount = 0
+
+    @Test
+    fun translationUsesTheDedicatedLanguageGlyph() {
+        assertEquals(R.drawable.ic_translate, SettingsHomeRow.Translation.iconRes)
+        org.junit.Assert.assertNotEquals(SettingsHomeRow.TextIntelligence.iconRes, SettingsHomeRow.Translation.iconRes)
+    }
 
     /** Signed-out Settings retains its Profile action without claiming a profile read is running. */
     @Test fun signedOutHasNoReadinessSpinnerCopy() {

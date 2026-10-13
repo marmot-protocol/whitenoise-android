@@ -1,0 +1,73 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "R.string.translation_detect_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "R.string.translation_detect_language",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_open_engine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "R.string.translation_open_engine",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_source_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "R.string.translation_source_language",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_target_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "R.string.translation_target_language",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "MessageTranslationForm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "internal fun MessageTranslationForm(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "TranslationLanguageRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "private fun TranslationLanguageRow(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "testTag(\"translation.confirm\")",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "testTag(\"translation.confirm\")",
+        "test_ids": [
+          "SET-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

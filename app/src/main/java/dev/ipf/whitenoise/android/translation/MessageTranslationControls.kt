@@ -8,7 +8,6 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +27,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 
 @Composable
 internal fun rememberMessageTranslationSource(
@@ -109,47 +109,30 @@ internal fun MessageTranslationDialog(
     val context = LocalContext.current
     var target by remember(source) { mutableStateOf(source?.target.orEmpty()) }
     var from by remember(source) { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.translation_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.translation_engine_managed))
-                TranslationLanguagePicker(
-                    stringResource(R.string.translation_source_language),
-                    from,
-                    { from = it },
-                    allowDetection = true,
-                )
-                TranslationLanguagePicker(stringResource(R.string.translation_target_language), target, { target = it })
-                session.failure?.let { Text(stringResource(translationFailureResource(it))) }
-                TextButton(onClick = { openOfflineTranslator(context) }) {
-                    Text(stringResource(R.string.translation_open_engine))
+    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
+        MessageTranslationForm(
+            from = from,
+            target = target,
+            failure = session.failure,
+            enabled =
+                source != null && target in offlineTranslatorLanguages &&
+                    (from.isEmpty() || from in offlineTranslatorLanguages),
+            onFromChange = { from = it },
+            onTargetChange = { target = it },
+            onTranslate = {
+                source?.let {
+                    onTargetSelected(target)
+                    session.retry()
+                    session.remove(it)
+                    session.remove(it.copy(target = target))
+                    session.request(it.copy(target = target), from)
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled =
-                    source != null &&
-                        translationLanguageValid(target) &&
-                        (from.isEmpty() || translationLanguageValid(from)),
-                onClick = {
-                    source?.let {
-                        onTargetSelected(target)
-                        session.retry()
-                        session.remove(it)
-                        session.remove(it.copy(target = target))
-                        session.request(it.copy(target = target), from)
-                    }
-                    onDismiss()
-                },
-            ) { Text(stringResource(R.string.translation_title)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
+                onDismiss()
+            },
+            onDismiss = onDismiss,
+            onOpenEngine = { openOfflineTranslator(context) },
+        )
+    }
 }
 
 internal fun translationFailureResource(failure: TranslationFailure): Int {

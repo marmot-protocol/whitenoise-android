@@ -168,7 +168,7 @@ internal enum class SettingsHomeRow(
     Translation(
         SettingsHomeSection.AppPreferences,
         R.string.translation_title,
-        R.drawable.ic_text_fields,
+        R.drawable.ic_translate,
         "translation",
         SettingsDetail.Translation,
     ),

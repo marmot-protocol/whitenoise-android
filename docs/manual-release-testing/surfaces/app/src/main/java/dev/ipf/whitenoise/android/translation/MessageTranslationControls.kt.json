@@ -20,14 +20,6 @@
         ]
       },
       {
-        "surface": "R.string.cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
         "surface": "R.string.translation_detection_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "R.string.translation_detection_failed",
@@ -39,14 +31,6 @@
         "surface": "R.string.translation_engine_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "R.string.translation_engine_failed",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
-        "surface": "R.string.translation_engine_managed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_engine_managed",
         "test_ids": [
           "SET-033"
         ]
@@ -68,14 +52,6 @@
         ]
       },
       {
-        "surface": "R.string.translation_open_engine",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_open_engine",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
         "surface": "R.string.translation_show_original",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "R.string.translation_show_original",
@@ -92,33 +68,9 @@
         ]
       },
       {
-        "surface": "R.string.translation_source_language",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_source_language",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
         "surface": "R.string.translation_source_model_missing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "R.string.translation_source_model_missing",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
-        "surface": "R.string.translation_target_language",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_target_language",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
-        "surface": "R.string.translation_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_title",
         "test_ids": [
           "SET-033"
         ]
