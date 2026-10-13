@@ -62,7 +62,8 @@ internal class IsolatedAnimationDrawable(
     fun accept(next: Bitmap) {
         // The worker may finish its one outstanding frame after PAUSE. ACK still happens in
         // the session, but a stopped drawable must retain the pixels already on screen.
-        if (closed || !running || next.width != width || next.height != height) {
+        val inactive = closed || !running
+        if (inactive || next.width != width || next.height != height) {
             next.recycle()
             return
         }
