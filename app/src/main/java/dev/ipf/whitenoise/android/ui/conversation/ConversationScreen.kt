@@ -1334,6 +1334,7 @@ internal fun ConversationScreen(
         return true
     }
 
+    /** Ends a message drag, optionally clearing the selection, and settles reading at the current anchor. */
     fun finishMessageDrag(clearSelection: Boolean) {
         val hadActiveDrag = dragAnchorTimelineId != null
         dragAnchorTimelineId = null
