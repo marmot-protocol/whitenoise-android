@@ -19,4 +19,5 @@
     <string name="translation_on">Açık</string>
     <string name="translation_off">Kapalı</string>
     <string name="translation_inherit_language">Genel hedef dili kullan</string>
+    <string name="translation_privacy_update_required">Özel metinleri günlüklerden kaldıran bir motor güncellemesine kadar çeviri duraklatıldı. Hiçbir metin gönderilmedi.</string>
 </resources>

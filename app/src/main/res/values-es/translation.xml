@@ -19,4 +19,5 @@
     <string name="translation_on">Activado</string>
     <string name="translation_off">Desactivado</string>
     <string name="translation_inherit_language">Usar idioma de destino global</string>
+    <string name="translation_privacy_update_required">La traducción está pausada hasta que una actualización del motor deje de registrar texto privado. No se ha enviado texto.</string>
 </resources>

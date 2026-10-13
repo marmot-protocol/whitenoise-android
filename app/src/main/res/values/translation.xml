@@ -19,4 +19,5 @@
     <string name="translation_on">On</string>
     <string name="translation_off">Off</string>
     <string name="translation_inherit_language">Use global target language</string>
+    <string name="translation_privacy_update_required">Translation is paused until an engine update removes private-text logging. No text was sent.</string>
 </resources>

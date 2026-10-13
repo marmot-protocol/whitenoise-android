@@ -12,7 +12,7 @@ import androidx.core.content.ContextCompat
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSubscription
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
-import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.state.FfiChatListWindowHandle
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -218,19 +218,8 @@ internal object ConversationWidgets {
             var handle: ChatListWindowSubscription? = null
             try {
                 state.marmotIo {
-                    handle = openChatListWindow(account, ChatListViewFfi.CHATS, WIDGET_NATIVE_PAGE_SIZE.toUInt())
-                    checkNotNull(handle?.snapshot()).rows.take(WIDGET_NATIVE_PAGE_SIZE).map { presented ->
-                        val row = presented.row
-                        ConversationWidgetRow(
-                            account,
-                            row.groupIdHex,
-                            ProfileSanitizer.displayName(row.groupName).orEmpty(),
-                            row.unreadCount > 0uL,
-                            // Launcher hosts retain RemoteViews after process death; never hand them plaintext.
-                            preview = null,
-                            activity = row.activitySortAt,
-                        )
-                    }
+                    handle = openChatListWindow(account, ChatListViewFfi.CHATS, WIDGET_NATIVE_PAGE_SIZE)
+                    widgetWindowRows(account, choice.unreadOnly, FfiChatListWindowHandle(checkNotNull(handle)))
                 }
             } finally {
                 withContext(NonCancellable + Dispatchers.IO) { handle?.close() }
@@ -251,4 +240,3 @@ internal fun widgetUnlocked(
 internal const val WIDGET_READ_TIMEOUT_MS = 4_000L
 private const val DEFAULT_WIDGET_HEIGHT_DP = 160
 private const val WIDGET_ROW_HEIGHT_DP = 52
-private const val WIDGET_NATIVE_PAGE_SIZE = 50

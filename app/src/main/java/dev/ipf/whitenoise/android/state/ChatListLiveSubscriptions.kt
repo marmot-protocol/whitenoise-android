@@ -58,7 +58,7 @@ internal interface ChatsSubscriptionHandle {
 }
 
 /** Production adapter around MarmotKit's chat-list window. */
-private class FfiChatListWindowHandle(
+internal class FfiChatListWindowHandle(
     private val subscription: ChatListWindowSubscription,
 ) : ChatListWindowHandle {
     /** Delegates the initial replacement without changing native cursor identity. */

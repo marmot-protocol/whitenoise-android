@@ -19,4 +19,5 @@
     <string name="translation_on">开启</string>
     <string name="translation_off">关闭</string>
     <string name="translation_inherit_language">使用全局目标语言</string>
+    <string name="translation_privacy_update_required">翻译已暂停，需等待翻译引擎更新以停止记录私密文本。未发送任何文本。</string>
 </resources>

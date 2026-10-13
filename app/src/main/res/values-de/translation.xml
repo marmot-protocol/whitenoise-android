@@ -19,4 +19,5 @@
     <string name="translation_on">Ein</string>
     <string name="translation_off">Aus</string>
     <string name="translation_inherit_language">Globale Zielsprache verwenden</string>
+    <string name="translation_privacy_update_required">Die Übersetzung ist pausiert, bis ein Update der Übersetzungs-App private Texte nicht mehr protokolliert. Es wurde kein Text gesendet.</string>
 </resources>

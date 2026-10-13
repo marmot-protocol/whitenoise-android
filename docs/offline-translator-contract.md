@@ -1,3 +1,11 @@
+# Translation privacy qualification
+
+Translation is blocked for the reviewed publisher releases 0.8.3–0.8.5. Their exported Binder service has a plaintext-success logging path; current upstream also retains it, and no privacy-qualified signed release is available. Package/certificate and ABI compatibility do not prove absence of private-text logging. The adapter rejects these releases before binding or submitting text. Open engine remains a text-free launcher action.
+
+Before enabling any future release, inspect its exact signed APK, release source and success/error/native logging paths. Run a unique synthetic probe and check the engine process log for payload leakage, alongside catalog readiness, requested-language, model and lifecycle tests. Record artifact hashes, version name/code, signer and actual results. Never treat a guessed future version or an unsigned development build as qualified.
+
+Source evidence: [released Binder service](https://github.com/DavidVentura/offline-translator/blob/bc7cf607450d18ff44c95233c1605f90b6beb078/app/src/main/java/dev/davidv/translator/AidlTranslationService.kt#L110). The following ABI/readiness notes are retained implementation evidence and do not enable the blocked releases.
+
 # Offline Translator Binder contract
 
 The four files in `app/src/main/aidl/dev/davidv/translator/` reproduce only the

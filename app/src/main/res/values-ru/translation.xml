@@ -19,4 +19,5 @@
     <string name="translation_on">Включено</string>
     <string name="translation_off">Выключено</string>
     <string name="translation_inherit_language">Использовать общий язык перевода</string>
+    <string name="translation_privacy_update_required">Перевод приостановлен до обновления движка, которое устранит запись личных текстов в журнал. Текст не отправлялся.</string>
 </resources>

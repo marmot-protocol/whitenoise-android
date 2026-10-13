@@ -63,6 +63,10 @@ private fun validateTranslatorPackage(info: PackageInfo) {
     if (info.versionName !in setOf("0.8.3", "0.8.4", "0.8.5")) {
         throw TranslationException(TranslationFailure.INCOMPATIBLE_ENGINE)
     }
+    // These publisher releases include plaintext logging in the exported Binder service.
+    // No release is privacy-qualified yet. A new signed artifact must be inspected before
+    // adding it here; version names and signer identity alone cannot establish this boundary.
+    throw TranslationException(TranslationFailure.PRIVACY_UNQUALIFIED_ENGINE)
 }
 
 private fun compatibleTranslatorService(service: ServiceInfo?): Boolean {
