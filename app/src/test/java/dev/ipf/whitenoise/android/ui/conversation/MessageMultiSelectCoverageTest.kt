@@ -115,6 +115,7 @@ class MessageMultiSelectCoverageTest {
         )
     }
 
+    /** Batch selection draws a leading gutter and tints behind the bubble content instead of over it. */
     @Test
     fun bubbleSelectionUsesLeadingGutterWithTintBehindContent() {
         val source = source("messages/MessageBubble.kt")
@@ -178,6 +179,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.split("surfaces.deleteInFlight = false").size - 1 == 2)
     }
 
+    /** Reads a conversation source file from either the module or the repository working directory. */
     private fun source(relativePath: String): String =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/$relativePath"),

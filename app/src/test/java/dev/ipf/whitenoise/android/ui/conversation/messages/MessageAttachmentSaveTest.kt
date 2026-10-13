@@ -94,6 +94,7 @@ class MessageAttachmentSaveTest {
         DocumentDestinationCancelledException().rethrowParentCancellation()
     }
 
+    /** A parent cancellation is rethrown so it still cancels the attachment batch. */
     @Test(expected = CancellationException::class)
     fun parentCancellationStillEscapesAttachmentBatch() {
         CancellationException("parent cancelled").rethrowParentCancellation()

@@ -946,6 +946,7 @@ internal fun MessageBubble(
         }
     }
 
+    /** Starts a reply to this message, or to the current poll target, unless it is deleted or read-only. */
     fun beginReply() {
         if (deleted || actionsReadOnly) return
         val target = if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else record
@@ -1192,6 +1193,7 @@ internal fun MessageBubble(
         }
     }
 
+    /** Seeks read-aloud to a tapped sentence through the history session when this message is not projected. */
     fun seekRenderedSentenceOutsideCurrentProjection(
         hit: RenderedTextHit,
         allowOmittedLinkNeighbor: Boolean,
@@ -1335,6 +1337,7 @@ internal fun MessageBubble(
             }
         }
 
+    /** Copies a link destination to the clipboard and closes the action menu. */
     fun copyMarkdownLink(url: String) {
         if (deleted) return
         clipboard.setText(AnnotatedString(url))
@@ -1411,6 +1414,7 @@ internal fun MessageBubble(
                         showPendingPlaceholder && pendingAttachmentsForRecord.any(::isPendingGeneralFile)
                     )
             )
+    /** Maps a double tap on the message text to window space and seeks or starts read-aloud there. */
     val messageTextDoubleTap: (Offset) -> Unit = { position ->
         val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
         if (pressInWindow != null) seekSpeakAloudAt(pressInWindow)
@@ -2133,9 +2137,11 @@ internal fun MessageBubble(
                 // setting disabled never collapse (#325, #1180).
                 val bodyCanCollapse = collapseLongMessages && !deleted && !persistedFailure
                 val collapsible = bodyCanCollapse && !textSelectionMode && !ttsBodyExpanded
-                // The sender-name label (group chats only). Rendered above the
-                // shared media card when media is present, or as the first child
-                // of the text-only bubble otherwise.
+                /**
+                 * The sender-name label (group chats only). Rendered above the
+                 * shared media card when media is present, or as the first child
+                 * of the text-only bubble otherwise.
+                 */
                 val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     if (showSenderName) {
                         EmojiLabel(
@@ -2165,9 +2171,11 @@ internal fun MessageBubble(
                         )
                     }
                 }
-                // The reply quote card. Self-contained (own translucent Surface),
-                // so it renders correctly whether inside the text bubble or
-                // standalone above the media card.
+                /**
+                 * The reply quote card. Self-contained (own translucent Surface),
+                 * so it renders correctly whether inside the text bubble or
+                 * standalone above the media card.
+                 */
                 val replyPreviewCard: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     replyPreview?.let { preview ->
                         val pairedReplyAccent = bubbleContentColor.takeIf { insideBubble }
@@ -2221,10 +2229,12 @@ internal fun MessageBubble(
                         )
                     }
                 }
+                /** Records the plain-text leaf's layout and registers it for selection once positioned. */
                 val onPlainTextLayout: (TextLayoutResult) -> Unit = {
                     textLayouts.plainTextLayoutTracker.layoutResult = it
                     reportPlainTextLayoutIfReady()
                 }
+                /** Wraps the message text in a selection container while text selection mode is active. */
                 val selectionWrapper: @Composable (@Composable () -> Unit) -> Unit = { content ->
                     if (textSelectionMode) {
                         val systemReadAloudKeyIds =
