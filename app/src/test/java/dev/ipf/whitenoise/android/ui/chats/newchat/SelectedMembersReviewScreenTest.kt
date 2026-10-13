@@ -194,13 +194,15 @@ class SelectedMembersReviewScreenTest {
                 )
             }
         }
-        val first = composeRule.onNodeWithContentDescription("${members.first().displayName}, ${context.getString(R.string.admin)}")
-        val second = composeRule.onNodeWithContentDescription("${members.last().displayName}, ${context.getString(R.string.admin)}")
+        val adminLabel = context.getString(R.string.admin)
+        val first = composeRule.onNodeWithContentDescription("${members.first().displayName}, $adminLabel")
+        val second = composeRule.onNodeWithContentDescription("${members.last().displayName}, $adminLabel")
         first.assertIsOff().performClick().assertIsOn()
         second.assertIsOff()
         composeRule.onNodeWithText(context.getString(R.string.add_member)).performClick()
         assertEquals(setOf(members.first().accountIdHex), submitted)
-        composeRule.onNodeWithContentDescription(context.getString(R.string.remove_member_named, members.first().displayName)).performClick()
+        val removeLabel = context.getString(R.string.remove_member_named, members.first().displayName)
+        composeRule.onNodeWithContentDescription(removeLabel).performClick()
         assertEquals(emptyList<String>(), roles.toList())
     }
 

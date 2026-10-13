@@ -23,6 +23,7 @@ internal class NativeStartupDiagnosticCapture(
 
     private val source = AtomicReference<Source?>()
 
+    @Synchronized
     fun bind(
         owner: Any,
         enable: () -> Unit,
@@ -32,10 +33,14 @@ internal class NativeStartupDiagnosticCapture(
         if (!enabled) return
         if (source.get()?.owner === owner) return
         val bound = Source(owner, read, disable)
-        source.set(bound)
-        if (runCatching(enable).isFailure) source.compareAndSet(bound, null)
+        source.getAndSet(bound)?.let { runCatching(it.disable) }
+        if (runCatching(enable).isFailure) {
+            source.compareAndSet(bound, null)
+            runCatching(bound.disable)
+        }
     }
 
+    @Synchronized
     fun unbind(owner: Any) {
         val bound = source.get() ?: return
         if (bound.owner === owner && source.compareAndSet(bound, null)) runCatching(bound.disable)
@@ -44,10 +49,13 @@ internal class NativeStartupDiagnosticCapture(
     /** Call on the existing export IO owner; a failed/stale capture keeps host output usable. */
     fun snapshot(): String? {
         if (!enabled) return null
-        val bound = source.get() ?: return "native_startup=unavailable\n"
-        val snapshot = runCatching(bound.read).getOrNull()
-        if (snapshot == null || source.get() !== bound) return "native_startup=unavailable\n"
-        return formatNativeStartupSnapshot(snapshot)
+        val bound = source.get()
+        val snapshot = bound?.let { runCatching(it.read).getOrNull() }
+        return if (snapshot == null || source.get() !== bound) {
+            "native_startup=unavailable\n"
+        } else {
+            formatNativeStartupSnapshot(snapshot)
+        }
     }
 }
 

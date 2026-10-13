@@ -86,6 +86,27 @@ class AccountSwitchIdentityBatchTest {
             loadAccountSwitchIdentityPages(List(101) { ID }) { throw CancellationException("cancelled") }
         }
 
+    @Test
+    fun failedLaterPageCannotPublishTheEarlierSuccessfulPage() =
+        runTest {
+            val ids = (0..100).map { it.toString(16).padStart(64, '0') }
+            for (malformed in listOf(false, true)) {
+                var reads = 0
+                val result =
+                    loadAccountSwitchIdentityPages(ids) { page ->
+                        if (reads++ == 0) {
+                            page.map(::missingProfile)
+                        } else if (malformed) {
+                            emptyList()
+                        } else {
+                            error("later page unavailable")
+                        }
+                    }
+                assertEquals(2, reads)
+                assertTrue(result.isEmpty())
+            }
+        }
+
     private fun missingProfile(id: String) = CachedIdentityProjectionFfi(id, id.lowercase(), null, null, "Local name")
 
     private companion object {

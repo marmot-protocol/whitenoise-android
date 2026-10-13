@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppPerformanceOperationSnapshotFfi
 import dev.ipf.marmotkit.AppPerformanceSnapshotFfi
 
 /** Complete deployed SDK record fixture; selected export fields use the supplied operation. */
+@Suppress("LongMethod") // All fields of the generated native record must be supplied together.
 internal fun nativePerformanceFixture(operation: AppPerformanceOperationSnapshotFfi): AppPerformanceSnapshotFfi =
     AppPerformanceSnapshotFfi(
         runtimeOperations = emptyList(),

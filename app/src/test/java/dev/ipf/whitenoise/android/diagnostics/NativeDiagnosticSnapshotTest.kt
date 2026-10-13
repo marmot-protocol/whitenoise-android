@@ -63,6 +63,21 @@ class NativeDiagnosticSnapshotTest {
     }
 
     @Test
+    fun replacingRuntimeDisablesOldCaptureBeforeEnablingNewCapture() {
+        val capture = NativeStartupDiagnosticCapture(enabled = true)
+        val transitions = mutableListOf<String>()
+        val old = Any()
+        val current = Any()
+        capture.bind(old, { transitions += "enable old" }, { snapshot() }, { transitions += "disable old" })
+        capture.bind(current, { transitions += "enable current" }, { snapshot() }, { transitions += "disable current" })
+        capture.unbind(old)
+        assertEquals(listOf("enable old", "disable old", "enable current"), transitions)
+        assertTrue(capture.snapshot()!!.contains("stage=ACCOUNT_RESOLUTION"))
+        capture.unbind(current)
+        assertEquals("disable current", transitions.last())
+    }
+
+    @Test
     fun failedCaptureNeverExportsTheExceptionOrPreventsHostOnlySharing() {
         val capture = NativeStartupDiagnosticCapture(enabled = true)
         capture.bind(Any(), {}, { error("nsec-private account=/private/database") }, {})

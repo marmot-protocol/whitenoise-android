@@ -2559,6 +2559,7 @@ private data class ActiveGroupMutation(
 private const val KEY_COPY_FEEDBACK_MILLIS = 2_000L
 
 /** Visible details follow settled membership as well as metadata, without polling equal native records. */
+@Suppress("FunctionNaming") // Compose effect follows the same naming convention as other composables.
 @Composable
 internal fun GroupManagementSnapshotRefreshEffect(controller: ConversationController) {
     LaunchedEffect(

@@ -34,7 +34,10 @@ class GroupManagementSnapshotRefreshEffectTest {
                 context = ApplicationProvider.getApplicationContext<Context>(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
                 accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
-                accounts = listOf(AccountSummaryFfi("alice", ConversationTimelineTestIds.ACCOUNT_ID, true, false, false, true)),
+                accounts =
+                    listOf(
+                        AccountSummaryFfi("alice", ConversationTimelineTestIds.ACCOUNT_ID, true, false, false, true),
+                    ),
                 activeAccountRef = "alice",
             )
         val controller =

@@ -72,7 +72,10 @@ class AuditLogShareTest {
                         nativePerformanceLogBytes = native,
                     ),
                 )
-            assertEquals(mapOf("native-performance-snapshot.txt" to native.decodeToString()), archive.entries())
+            val entries = archive.entries()
+            assertEquals(native.decodeToString(), entries["native-performance-snapshot.txt"])
+            assertEquals(setOf("dictation-manifest.json", "native-performance-snapshot.txt"), entries.keys)
+            assertFalse(JSONObject(entries.getValue("dictation-manifest.json")).getBoolean("collection_enabled"))
             clearAuditAndDictationLogShares(context.cacheDir)
             assertNull(prepareAuditAndDictationLogArchive(context, emptyList(), performanceLogBytes = null))
         } finally {

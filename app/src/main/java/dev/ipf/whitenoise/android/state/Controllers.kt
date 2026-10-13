@@ -11877,7 +11877,8 @@ class ConversationController(
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
-                    if (nativeInvoked && reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore)) {
+                    val uncertainReply = nativeInvoked && inviteReplyNeedsReconciliation(throwable)
+                    if (uncertainReply && reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore)) {
                         presentConversationTransient(R.string.toast_invite_sent)
                         return@track true
                     }
@@ -11931,6 +11932,16 @@ class ConversationController(
         if (!sameFrontier || controllerCleared || isAccountTeardownRequested()) return
         applyManagementSnapshot(account, result.details, result.managementState)
     }
+
+    /** These typed key/routing rejections happen before the native membership commit. */
+    private fun inviteReplyNeedsReconciliation(throwable: Throwable): Boolean =
+        when (throwable) {
+            is MarmotKitException.MissingKeyPackage,
+            is MarmotKitException.MissingMemberInboxRoute,
+            is MarmotKitException.InvalidKeyPackageEvent,
+            -> false
+            else -> true
+        }
 
     /** Read actual membership after an uncertain reply, without issuing a second invitation. */
     private suspend fun reconcileInitialAdminInvite(

@@ -9,8 +9,8 @@ internal suspend fun loadAccountSwitchIdentityPages(
     ids: List<String>,
     read: suspend (List<String>) -> List<CachedIdentityProjectionFfi>,
 ): List<AccountSwitchProfileSeed> =
-    ids.chunked(IDENTITY_PAGE_SIZE).flatMap { page ->
-        runCatchingCancellable {
+    runCatchingCancellable {
+        ids.chunked(IDENTITY_PAGE_SIZE).flatMap { page ->
             val rows = read(page)
             check(rows.size == page.size) { "Identity page changed its requested row count" }
             rows.zip(page).mapNotNull { (row, requested) ->
@@ -19,5 +19,5 @@ internal suspend fun loadAccountSwitchIdentityPages(
                 check(canonical.equals(requested, ignoreCase = true)) { "Identity page changed its identity" }
                 accountSwitchProfileSeed(requested, row.profile, row.resolvedName)
             }
-        }.getOrDefault(emptyList())
-    }
+        }
+    }.getOrDefault(emptyList())
