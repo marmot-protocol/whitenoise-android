@@ -138,6 +138,21 @@ test('ignores fences inside comments without interpreting comments inside fenced
   assert.equal(gate({ body: '```\n<!--\nInvariant gate: StalenessGuardCoverageTest\n-->\n```' }).status, 'fail')
 })
 
+test('keeps a declaration after a comment opener GitHub shows as literal text', () => {
+  const visible = [
+    'Treat the `<!--` opener as code.\nInvariant gate: StalenessGuardCoverageTest',
+    'Strip `<!--` and `-->` markers.\nInvariant gate: StalenessGuardCoverageTest',
+    'A literal <!-- opener never closes.\n\nInvariant gate: StalenessGuardCoverageTest',
+    'A literal <!-- opener.\nInvariant gate: StalenessGuardCoverageTest\n\n<!-- generated -->',
+  ]
+  for (const body of visible) assert.equal(gate({ body }).status, 'pass', body)
+  const hidden = [
+    'Summary <!--\nInvariant gate: StalenessGuardCoverageTest\n-->',
+    'Summary <!-- note\nInvariant gate exemption: upstream — owned by MDK entirely --> done',
+  ]
+  for (const body of hidden) assert.equal(gate({ body }).status, 'fail', body)
+})
+
 test('run follows closing-issue pages and full label lists before deciding a PR closes no bug', async () => {
   const pages = [
     { nodes: [feature], pageInfo: { hasNextPage: true, endCursor: 'page-2' } },

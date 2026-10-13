@@ -659,6 +659,12 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('run: python3 scripts/check_invariant_gate_cache.py', step)
         self.assertNotIn('continue-on-error', step)
 
+    def test_proposed_invariant_gate_checker_tests_run_in_android_ci(self):
+        """The gate workflow tests only the base checker, so a changed checker must be tested on its own tree."""
+        step = self.named_step(self.tooling_contracts, 'Test PR GitHub scripts')
+        self.assertIn('.github/scripts/check-invariant-gate.test.js', step)
+        self.assertNotIn('continue-on-error', step)
+
     def test_missing_result_is_rejected(self):
         """An unexpected dependency schema fails closed."""
         outcomes = self.successful_outcomes()

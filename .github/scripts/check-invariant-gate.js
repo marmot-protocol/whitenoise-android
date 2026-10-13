@@ -29,6 +29,9 @@ const LINK_REFERENCE_DEFINITION = new RegExp(
 // Characters that render as nothing: whitespace, format characters such as zero-width spaces, and controls.
 const INVISIBLE = /[\s\p{Cf}\p{Zs}\p{Cc}]/gu
 const GATE_EXPLANATION_SEPARATOR = /\s+[—–-]\s+/
+const FENCE_OPENING = /^ {0,3}(`{3,}|~{3,})/
+// A single-line inline code span: a backtick run, then the next run of exactly the same length.
+const CODE_SPAN = /(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g
 
 /**
  * True when [file] is a Kotlin test under a test source set (`app/src/test` or `app/src/androidTest`), with no
@@ -73,20 +76,24 @@ function visibleProse(body) {
  * Drops comments and CommonMark fenced code blocks together, ignoring fences inside comments and treating comment
  * markers inside code as literal text. A fence closes only on a line of the same character, at least
  * as long as its opener, with nothing else after it — so a shorter or annotated inner fence stays hidden. An
- * unclosed fence hides everything after it.
+ * unclosed fence hides everything after it. A comment that starts a line runs to its `-->`, like an HTML block. One
+ * that starts mid-line is inline HTML, and stays literal text unless it closes within its paragraph, as does a
+ * `<!--` inside an inline code span.
  */
 function withoutCodeAndComments(text) {
+  const lines = text.split('\n')
   const kept = []
   let fence = null
   let comment = false
-  for (const line of text.split('\n')) {
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]
     if (fence) {
       const closing = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line)
       if (closing && closing[1][0] === fence[0] && closing[1].length >= fence.length) fence = null
       continue
     }
     // Inspect a fence before comments: a comment marker in its info string is literal code too.
-    const opening = !comment && /^ {0,3}(`{3,}|~{3,})/.exec(line)
+    const opening = !comment && FENCE_OPENING.exec(line)
     if (opening) {
       fence = opening[1]
     } else {
@@ -99,21 +106,49 @@ function withoutCodeAndComments(text) {
           comment = false
           offset = end + 3
         } else {
-          const start = line.indexOf('<!--', offset)
+          const start = nextCommentOpener(line, offset)
           if (start === -1) {
             visible += line.slice(offset)
             break
           }
-          visible += line.slice(offset, start)
           const short = /^<!---?>/.exec(line.slice(start))
+          const block = /^ {0,3}$/.test(line.slice(0, start))
+          const literal = !short && !block && !inlineCommentCloses(lines, index, start)
+          visible += line.slice(offset, literal ? start + 4 : start)
           offset = start + (short ? short[0].length : 4)
-          comment = !short
+          comment = !short && !literal
         }
       }
       kept.push(visible)
     }
   }
   return kept.join('\n')
+}
+
+/** Index of the next `<!--` at or after [from] that is not inside an inline code span on [line], or -1. */
+function nextCommentOpener(line, from) {
+  const rest = line.slice(from)
+  const spans = [...rest.matchAll(CODE_SPAN)].map(match => [match.index, match.index + match[0].length])
+  let start = rest.indexOf('<!--')
+  while (start !== -1) {
+    const span = spans.find(([open, close]) => start >= open && start < close)
+    if (!span) return from + start
+    start = rest.indexOf('<!--', span[1])
+  }
+  return -1
+}
+
+/**
+ * True when the `<!--` at [start] of `lines[index]` closes before its paragraph ends, at a blank line or a fence.
+ * GitHub shows an inline comment that never closes as literal text.
+ */
+function inlineCommentCloses(lines, index, start) {
+  if (lines[index].includes('-->', start + 4)) return true
+  for (let next = index + 1; next < lines.length; next++) {
+    if (!lines[next].trim() || FENCE_OPENING.test(lines[next])) return false
+    if (lines[next].includes('-->')) return true
+  }
+  return false
 }
 
 /**

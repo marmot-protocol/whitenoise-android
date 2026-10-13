@@ -129,8 +129,11 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Test PR screenshot renderer
-        run: node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
+      # The invariant-gate workflow runs base-revision tests, so a proposed checker change is tested only here.
+      - name: Test PR GitHub scripts
+        run: >-
+          node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
+          .github/scripts/check-invariant-gate.test.js
 
       - name: Test GitHub triage reconciliation
         run: python3 -m unittest scripts/test_check_github_triage.py
