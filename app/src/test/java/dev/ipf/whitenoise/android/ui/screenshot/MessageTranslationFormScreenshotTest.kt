@@ -46,6 +46,11 @@ class MessageTranslationFormScreenshotTest {
     @Test
     fun chosenLanguagesReachThePrimaryAction() {
         render()
+        composeRule
+            .onNodeWithText(
+                "Offline Translator can write message text and translations to Android system logs. " +
+                    "White Noise cannot guarantee the security of text handled by another app.",
+            ).assertIsDisplayed()
         composeRule.onNodeWithText("Source language").performClick()
         composeRule.onNodeWithText("English").performClick()
         composeRule.onNodeWithText("Target language").performClick()

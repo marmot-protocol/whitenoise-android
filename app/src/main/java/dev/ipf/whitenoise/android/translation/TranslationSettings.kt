@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -26,9 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import java.util.Locale
 
 /** Language choices are not a claim that the corresponding pack is installed. */
@@ -64,9 +67,14 @@ internal fun TranslationGlobalSettingsContent(preferences: TranslationPreference
     val context = LocalContext.current
     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.translation_engine_managed))
+        Text(stringResource(R.string.translation_privacy_warning))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.translation_automatic), Modifier.weight(1f))
-            Switch(choice.enabled, { preferences.setGlobal(it, choice.target) })
+            Switch(
+                checked = choice.enabled,
+                onCheckedChange = { preferences.setGlobal(it, choice.target) },
+                modifier = Modifier.testTag("translation.automatic"),
+            )
         }
         TranslationLanguagePicker(
             stringResource(R.string.translation_target_language),
@@ -99,7 +107,11 @@ internal fun TranslationChatSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.translation_automatic)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.fadingVerticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(stringResource(R.string.translation_privacy_warning))
                 TranslationOverride.entries.forEach { option ->
                     val label =
                         when (option) {

@@ -143,7 +143,6 @@ internal fun translationFailureResource(failure: TranslationFailure): Int {
     return when (failure) {
         TranslationFailure.MISSING_ENGINE -> R.string.translation_missing_engine
         TranslationFailure.UNVERIFIED_ENGINE, TranslationFailure.INCOMPATIBLE_ENGINE -> unverified
-        TranslationFailure.PRIVACY_UNQUALIFIED_ENGINE -> R.string.translation_privacy_update_required
         TranslationFailure.DETECTION -> R.string.translation_detection_failed
         TranslationFailure.SOURCE_MODEL -> R.string.translation_source_model_missing
         else -> R.string.translation_engine_failed

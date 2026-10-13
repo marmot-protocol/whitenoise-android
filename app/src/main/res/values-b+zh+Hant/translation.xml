@@ -8,7 +8,7 @@
     <string name="translation_show_result">顯示譯文</string>
     <string name="translation_loading">正在裝置上翻譯…</string>
     <string name="translation_open_engine">開啟翻譯引擎</string>
-    <string name="translation_engine_managed">本機翻譯使用 Offline Translator。請在該應用程式中管理語言包。</string>
+    <string name="translation_engine_managed">推薦翻譯引擎：Offline Translator。翻譯在你的裝置上執行；請在該應用程式中管理語言套件。</string>
     <string name="translation_missing_engine">請安裝 Offline Translator 以在此裝置上翻譯。</string>
     <string name="translation_unverified_engine">此引擎未經驗證或不受支援。未傳送任何文字。</string>
     <string name="translation_detection_failed">請選擇來源語言並重試。</string>
@@ -19,5 +19,5 @@
     <string name="translation_on">開啟</string>
     <string name="translation_off">關閉</string>
     <string name="translation_inherit_language">使用全域目標語言</string>
-    <string name="translation_privacy_update_required">翻譯已暫停，需等待翻譯引擎更新以停止記錄私密文字。未傳送任何文字。</string>
+    <string name="translation_privacy_warning">Offline Translator 可能將訊息文字和譯文寫入 Android 系統記錄。White Noise 無法保證其他應用程式處理文字時的安全性。</string>
 </resources>

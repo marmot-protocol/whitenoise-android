@@ -67,8 +67,40 @@ class TranslationPreferencesTest {
         val preferences = TranslationPreferences(context)
         preferences.setOverride("account", "group", TranslationOverride.ON, "de")
         val stored = context.getSharedPreferences("translation_choices", 0).all
-        assertEquals(setOf("chat:7:account:group", "chat:7:account:group:target"), stored.keys)
+        assertEquals(
+            setOf(
+                "privacy_notice_version",
+                "chat:7:account:group",
+                "chat:7:account:group:target",
+            ),
+            stored.keys,
+        )
         assertTrue(preferences.effective("account", "group").enabled)
         preferences.close()
+    }
+
+    @Test fun legacyAutomaticOptInsResetOnceWhileLanguageAndOtherChoicesSurvive() {
+        context
+            .getSharedPreferences("translation_choices", 0)
+            .edit()
+            .putBoolean("global", true)
+            .putString("target", "es")
+            .putString("chat:1:a:group", "ON")
+            .putString("chat:1:a:group:target", "fr")
+            .putString("chat:1:b:group", "OFF")
+            .putString("chat:1:b:group:target", "de")
+            .commit()
+        val first = TranslationPreferences(context)
+        assertEquals(TranslationChoice(false, "es"), first.global())
+        assertEquals(TranslationChoice(false, "fr"), first.effective("a", "group"))
+        assertEquals(TranslationChoice(false, "de"), first.effective("b", "group"))
+        first.setGlobal(true, "es")
+        first.setOverride("a", "group", TranslationOverride.ON, "fr")
+        first.close()
+        val reopened = TranslationPreferences(context)
+        assertEquals(TranslationChoice(true, "es"), reopened.global())
+        assertEquals(TranslationChoice(true, "fr"), reopened.effective("a", "group"))
+        assertEquals(TranslationChoice(false, "de"), reopened.effective("b", "group"))
+        reopened.close()
     }
 }

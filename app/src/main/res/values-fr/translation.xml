@@ -8,7 +8,7 @@
     <string name="translation_show_result">Afficher la traduction</string>
     <string name="translation_loading">Traduction sur l’appareil…</string>
     <string name="translation_open_engine">Ouvrir le moteur</string>
-    <string name="translation_engine_managed">La traduction locale utilise Offline Translator. Gérez les packs de langues dans cette application.</string>
+    <string name="translation_engine_managed">Moteur recommandé : Offline Translator. La traduction se fait sur votre appareil ; gérez les packs de langues dans cette application.</string>
     <string name="translation_missing_engine">Installez Offline Translator pour traduire sur cet appareil.</string>
     <string name="translation_unverified_engine">Ce moteur n’est pas vérifié ou compatible. Aucun texte n’a été envoyé.</string>
     <string name="translation_detection_failed">Choisissez une langue source et réessayez.</string>
@@ -19,5 +19,5 @@
     <string name="translation_on">Activé</string>
     <string name="translation_off">Désactivé</string>
     <string name="translation_inherit_language">Utiliser la langue cible globale</string>
-    <string name="translation_privacy_update_required">La traduction est suspendue jusqu’à ce qu’une mise à jour du moteur cesse de journaliser les textes privés. Aucun texte n’a été envoyé.</string>
+    <string name="translation_privacy_warning">Offline Translator peut écrire les messages et leurs traductions dans les journaux du système Android. White Noise ne peut pas garantir la sécurité du texte traité par une autre application.</string>
 </resources>

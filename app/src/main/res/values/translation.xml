@@ -8,7 +8,7 @@
     <string name="translation_show_result">Show translation</string>
     <string name="translation_loading">Translating on device…</string>
     <string name="translation_open_engine">Open engine</string>
-    <string name="translation_engine_managed">On-device translation uses Offline Translator. Manage language packs in that app.</string>
+    <string name="translation_engine_managed">Recommended engine: Offline Translator. Translation runs on your device; manage language packs in that app.</string>
     <string name="translation_missing_engine">Install Offline Translator to translate on this device.</string>
     <string name="translation_unverified_engine">This engine is unverified or unsupported. No text was sent.</string>
     <string name="translation_detection_failed">Choose a source language and retry.</string>
@@ -19,5 +19,5 @@
     <string name="translation_on">On</string>
     <string name="translation_off">Off</string>
     <string name="translation_inherit_language">Use global target language</string>
-    <string name="translation_privacy_update_required">Translation is paused until an engine update removes private-text logging. No text was sent.</string>
+    <string name="translation_privacy_warning">Offline Translator can write message text and translations to Android system logs. White Noise cannot guarantee the security of text handled by another app.</string>
 </resources>

@@ -67,6 +67,12 @@ internal fun MessageTranslationForm(
                 )
             }
         }
+        Text(
+            text = stringResource(R.string.translation_privacy_warning),
+            modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.Section),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+        )
         if (failure != null) {
             Column(Modifier.padding(horizontal = WhiteNoiseSpacing.Section)) {
                 Text(

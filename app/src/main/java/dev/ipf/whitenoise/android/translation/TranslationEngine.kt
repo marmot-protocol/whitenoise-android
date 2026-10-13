@@ -6,7 +6,6 @@ internal enum class TranslationFailure {
     MISSING_ENGINE,
     UNVERIFIED_ENGINE,
     INCOMPATIBLE_ENGINE,
-    PRIVACY_UNQUALIFIED_ENGINE,
     CONNECTION,
     SERVICE_DIED,
     TIMEOUT,

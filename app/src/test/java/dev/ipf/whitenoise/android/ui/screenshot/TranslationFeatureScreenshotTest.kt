@@ -16,6 +16,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.translation.TranslationGlobalSettingsContent
 import dev.ipf.whitenoise.android.translation.TranslationPreferences
+import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -58,7 +59,7 @@ class TranslationFeatureScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
                     Box(Modifier.size(360.dp, 650.dp).testTag("translation-fixture")) {
-                        TranslationGlobalSettingsContent(preferences)
+                        SettingsList { item { TranslationGlobalSettingsContent(preferences) } }
                     }
                 }
             }

@@ -106,6 +106,22 @@
         "test_ids": [
           "SET-033"
         ]
+      },
+      {
+        "surface": "R.string.translation_privacy_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_privacy_warning",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "testTag(\"translation.automatic\")",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "testTag(\"translation.automatic\")",
+        "test_ids": [
+          "SET-033"
+        ]
       }
     ]
   }

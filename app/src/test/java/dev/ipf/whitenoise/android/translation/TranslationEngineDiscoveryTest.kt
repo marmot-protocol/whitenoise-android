@@ -30,10 +30,12 @@ class TranslationEngineDiscoveryTest {
     }
 
     @Test
-    fun publisherReleasesWithPlaintextLoggingAreRejectedBeforeBinding() {
+    fun reviewedPublisherReleasesRemainAvailableWithTheUiPrivacyWarning() {
         for ((version, code) in listOf("0.8.3" to 282L, "0.8.4" to 292L, "0.8.5" to 302L)) {
             installEngine(version, code)
-            assertFailure(TranslationFailure.PRIVACY_UNQUALIFIED_ENGINE)
+            val service = discoverOfflineTranslator(context)
+            assertEquals(OFFLINE_TRANSLATOR_PACKAGE, service.component.packageName)
+            assertEquals(code, service.identity.version)
         }
     }
 
@@ -50,9 +52,9 @@ class TranslationEngineDiscoveryTest {
     }
 
     @Test
-    fun unqualifiedReleaseStillFailsClosedWithMissingService() {
+    fun aNonExportedServiceCannotReceiveText() {
         installEngine("0.8.5", 302L, exported = false)
-        assertFailure(TranslationFailure.PRIVACY_UNQUALIFIED_ENGINE)
+        assertFailure(TranslationFailure.INCOMPATIBLE_ENGINE)
     }
 
     private fun assertFailure(expected: TranslationFailure) {

@@ -26,7 +26,22 @@ internal class TranslationPreferences(
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> revision.value += 1 }
 
     init {
+        resetLegacyAutomaticChoices()
         preferences.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    /** Earlier previews enabled automatic translation without the provider logging notice. */
+    private fun resetLegacyAutomaticChoices() {
+        val noticeVersion = runCatching { preferences.getInt(PRIVACY_NOTICE_VERSION, 0) }.getOrDefault(0)
+        if (noticeVersion >= CURRENT_PRIVACY_NOTICE) return
+        val edit = preferences.edit().putInt(PRIVACY_NOTICE_VERSION, CURRENT_PRIVACY_NOTICE)
+        if (preferences.contains("global")) edit.putBoolean("global", false)
+        preferences.all.forEach { (key, value) ->
+            if (key.startsWith("chat:") && !key.endsWith(":target") && value == TranslationOverride.ON.name) {
+                edit.putString(key, TranslationOverride.OFF.name)
+            }
+        }
+        edit.apply()
     }
 
     fun close() {
@@ -100,5 +115,10 @@ internal class TranslationPreferences(
     ): String {
         require(account.isNotBlank() && group.isNotBlank())
         return "chat:${account.length}:$account:$group"
+    }
+
+    private companion object {
+        const val PRIVACY_NOTICE_VERSION = "privacy_notice_version"
+        const val CURRENT_PRIVACY_NOTICE = 1
     }
 }

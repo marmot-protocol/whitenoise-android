@@ -74,6 +74,14 @@
         "test_ids": [
           "SET-033"
         ]
+      },
+      {
+        "surface": "R.string.translation_privacy_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "R.string.translation_privacy_warning",
+        "test_ids": [
+          "SET-033"
+        ]
       }
     ]
   },
