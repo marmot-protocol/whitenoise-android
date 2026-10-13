@@ -808,7 +808,14 @@ internal class ConversationDictationController internal constructor(
         val phase =
             when {
                 current.target != null && !isOwnedBy(accountRef, groupIdHex) ->
-                    ConversationDictationComposerPhase.OtherConversation
+                    if (failed != null &&
+                        failedComposerPhase(failed) == ConversationDictationComposerPhase.Ready &&
+                        runCatching { targetAvailable(accountRef, groupIdHex) }.getOrDefault(false)
+                    ) {
+                        ConversationDictationComposerPhase.Ready
+                    } else {
+                        ConversationDictationComposerPhase.OtherConversation
+                    }
                 pendingCaptureLeaseReleaseGeneration != null -> ConversationDictationComposerPhase.ClosingMicrophone
                 failed != null -> failedComposerPhase(failed)
                 recoveryHandedToComposer -> ConversationDictationComposerPhase.Transcribing
@@ -876,6 +883,55 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
+    /** An explicit fresh Dictate gesture never opens a retained-audio decision dialog. */
+    internal fun requestFreshComposerStart(
+        accountRef: String,
+        groupIdHex: String,
+        draft: TextFieldValue,
+        replyToMessageIdHex: String?,
+    ): ConversationDictationComposerAccess {
+        if (!runCatching { targetAvailable(accountRef, groupIdHex) }.getOrDefault(false)) {
+            return composerAccess(accountRef, groupIdHex).copy(
+                phase = ConversationDictationComposerPhase.TargetUnavailable,
+            )
+        }
+        val previousRevision = completionRevision(accountRef, groupIdHex)
+        (state as? ConversationDictationState.Failed)
+            ?.takeIf { it.target.matchesConversation(accountRef, groupIdHex) }
+            ?.let { finishFailedToDraft(it.sessionId) }
+        val startingDraft =
+            if (completionRevision(accountRef, groupIdHex) != previousRevision) {
+                runCatching { readDraft(accountRef, groupIdHex).value }.getOrNull()
+            } else {
+                draft
+            }
+        return startingDraft?.let { value ->
+            if (state is ConversationDictationState.Idle && !foregroundMicrophoneRequired) {
+                val key = ConversationDictationKey.from(accountRef, groupIdHex)
+                parkedRecoveries[key]?.let { parked ->
+                    if (runCatching { parked.audio.discard() }.isSuccess) parkedRecoveries.remove(key)
+                }
+            }
+            requestComposerStart(accountRef, groupIdHex, value, replyToMessageIdHex)
+        } ?: composerAccess(accountRef, groupIdHex)
+    }
+
+    /** Paste recovered text or end an empty attempt; never treat an uncertain send as cancelled. */
+    internal fun finishFailedToDraft(sessionId: Long) {
+        val failed = (state as? ConversationDictationState.Failed)?.takeIf { it.sessionId == sessionId } ?: return
+        if (failed.reason == ConversationDictationFailure.DeliveryUnknown || deliveryInProgress) return
+        val recovery = recoverRecognizedDraftResult(sessionId, failed.target, failed.retainedTranscript)
+        if (state !== failed) return
+        val textSafe =
+            failed.retainedTranscript.isNullOrBlank() ||
+                recovery.draftRecovered ||
+                recovery == ConversationDictationDraftRecovery.Result.Superseded
+        val captureSafe =
+            !foregroundMicrophoneRequired &&
+                runCatching(platform::callerAudioHasPending).getOrNull() != null
+        if (textSafe && captureSafe) cancelSession()
+    }
+
     /** Recovery actions are enabled only for the displayed current or parked recording. */
     internal fun canRetryComposerAudio(access: ConversationDictationComposerAccess): Boolean {
         if (composerRecovery(access) != null) return canRetryRetainedAudio
@@ -927,7 +983,8 @@ internal class ConversationDictationController internal constructor(
                 !hasUnrecoveredTranscript
         if (!ownsFailure || !safeToKeep) return false
         val key = ConversationDictationKey.from(failed.target.accountRef, failed.target.groupIdHex)
-        if (!runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
+        val pendingAudio = runCatching(platform::callerAudioHasPending).getOrNull() ?: return false
+        if (!pendingAudio) {
             cancelSession()
             return true
         }
@@ -2524,16 +2581,9 @@ internal class ConversationDictationController internal constructor(
                             continueOrFinalizeCallerAudioDrain(sessionId, target)
                             return
                         }
-                        if (
-                            error == ConversationDictationFailure.NoMatch &&
-                            recognitionSession?.callerAudioFullyFed() == true &&
-                            recognitionSession?.callerAudioIsFinalChunk() == true
-                        ) {
-                            // Sealed final PCM cannot gain context. Keep it recoverable instead of
-                            // repeating the same rejected input before showing explicit recovery.
-                            failWithRetainedCallerAudio(sessionId, target, failure)
-                            return
-                        }
+                        // A complete supplied recording can still get an isolated empty decode.
+                        // Retry its exact retained PCM under the existing budget before settling,
+                        // without asking the user to keep/discard or reacquiring the microphone.
                         val retainedCallerAudio =
                             if (error.isEmptyRecognition) {
                                 recognitionSession?.retryCallerAudioWithFollowingAudio() == true
@@ -2832,10 +2882,17 @@ internal class ConversationDictationController internal constructor(
         val onClosed: () -> Unit = {
             finishPlaybackInterruption(sessionId)
             acknowledgeCaptureClosed(sessionId, captureGeneration)
-            if (state === failed && notificationSessionToken == token) {
+            val currentFailure =
+                (state as? ConversationDictationState.Failed)?.takeIf {
+                    it.sessionId == sessionId &&
+                        captureClosureGeneration == captureGeneration &&
+                        notificationSessionToken == token
+                }
+            if (currentFailure != null) {
                 val retainedAudio = runCatching(platform::callerAudioHasPending).getOrDefault(true)
-                handRecoveryToComposer(failed)
-                if (!retainedAudio && failed.retainedTranscript.isNullOrBlank()) releaseDurableSessionLease()
+                handRecoveryToComposer(currentFailure)
+                parkClosedRecovery(currentFailure)
+                if (!retainedAudio && currentFailure.retainedTranscript.isNullOrBlank()) releaseDurableSessionLease()
             }
         }
         captureClosureTimeoutHandle?.cancel()
@@ -2868,6 +2925,22 @@ internal class ConversationDictationController internal constructor(
             // The drain deadline cannot stand in for an actual recorder-closure acknowledgement.
             requestForcedRecoveryCaptureClosure(onClosed)
         }
+    }
+
+    /** Closed recovery belongs to its origin, not the app-wide active recording slot. */
+    private fun parkClosedRecovery(failed: ConversationDictationState.Failed) {
+        if (state !== failed || runCatching(platform::callerAudioHasPending).getOrNull() != true) return
+        val access =
+            ConversationDictationComposerAccess(
+                failed.sessionId,
+                notificationActionGeneration,
+                ConversationDictationComposerPhase.RemainingAudio,
+                failed.cause ?: failed.reason,
+            )
+        val parked = keepComposerAudioForLater(access)
+        conversationDictationDiagnostic(
+            "event=recovery_owner_release session=${failed.sessionId} outcome=${if (parked) "parked" else "protected"}",
+        )
     }
 
     /** Absence of a capture permits closure; an exception proves no such absence. */
@@ -3496,6 +3569,7 @@ internal class ConversationDictationController internal constructor(
             recoveryHandedToComposer = true
             notificationActionGeneration += 1L
         }
+        if (!foregroundMicrophoneRequired) parkClosedRecovery(failed)
     }
 
     /** Bounds foreground protection without treating elapsed time as permission to destroy recovery data. */

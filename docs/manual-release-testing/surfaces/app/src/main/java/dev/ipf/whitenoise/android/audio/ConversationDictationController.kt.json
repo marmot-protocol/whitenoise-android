@@ -18,14 +18,6 @@
         "test_ids": [
           "DIC-001"
         ]
-      },
-      {
-        "surface": "ConversationDictationFinalNoMatchRecovery",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "error == ConversationDictationFailure.NoMatch",
-        "test_ids": [
-          "DIC-002"
-        ]
       }
     ],
     "source_coverage": [
@@ -251,7 +243,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "internal fun keepComposerAudioForLater(",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "DIC-009"
+        ]
+      },
+      {
+        "surface": "Automatically release a closed failed dictation owner while keeping origin-scoped audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun parkClosedRecovery(",
+        "test_ids": [
+          "DIC-009"
         ]
       },
       {
@@ -260,6 +261,30 @@
         "anchor": "internal fun canRetryComposerAudio(",
         "test_ids": [
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "Fresh Dictate retires only its origin's prior kept recording after safe settlement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal fun requestFreshComposerStart(",
+        "test_ids": [
+          "DIC-009"
+        ]
+      },
+      {
+        "surface": "Failed recognition settles saved text or ends an empty attempt without replaying an uncertain send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal fun finishFailedToDraft(",
+        "test_ids": [
+          "DIC-009"
+        ]
+      },
+      {
+        "surface": "Final caller-audio blank decode uses the bounded retained-PCM recovery budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun retryRetainedCallerAudioOrFail(",
+        "test_ids": [
+          "DIC-009"
         ]
       }
     ]

@@ -24,10 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
+import dev.ipf.whitenoise.android.audio.ConversationDictationParkedAudio
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.timelineAppMessage
@@ -45,11 +48,67 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
+private typealias DictationListener = ConversationDictationRecognitionListener
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w320dp-h640dp-mdpi")
 class ComposerDictationControlTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** A real controller tail failure leaves a normal composer, with audio recovery only in its own chat. */
+    @Test
+    fun automaticallyKeptFailedTailDoesNotReplaceNormalComposerActions() {
+        val platform = RecoverableAudioPlatform()
+        var draft = TextFieldValue("")
+        var revision = 0L
+        var now = 100L
+        val restarts = mutableListOf<() -> Unit>()
+        val controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
+                writeDraft = { _, _, expected, value ->
+                    if (expected != revision) {
+                        null
+                    } else {
+                        draft = value
+                        revision += 1L
+                        revision
+                    }
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+                elapsedRealtime = { now },
+                scheduleTimeout = { delay, callback ->
+                    if (delay == 500L) restarts += callback
+                    ConversationDictationTimeoutHandle {}
+                },
+            )
+        assertTrue(controller.requestStart(ACCOUNT, GROUP, draft))
+        platform.listener.onResult("Recognized prefix")
+        now += 500L
+        restarts.last().invoke()
+        controller.send()
+        repeat(3) {
+            platform.listener.onError(ConversationDictationFailure.NoMatch)
+            if (controller.state is ConversationDictationState.Starting) {
+                now += 500L
+                restarts.last().invoke()
+            }
+        }
+        assertTrue(controller.state is ConversationDictationState.Idle)
+        assertTrue(controller.hasParkedComposerAudio(ACCOUNT, GROUP))
+        assertEquals("Recognized prefix", draft.text)
+        render(draft = draft, suppliedController = controller)
+
+        composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Send").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").assertDoesNotExist()
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag("dictation-recovery-status").assertDoesNotExist()
+        composeRule.onNodeWithTag("dictation-recovery-panel").assertDoesNotExist()
+    }
 
     @Test
     fun dictationStartedFromAReplyBannerPinsThatVisibleMessageIdentity() {
@@ -244,8 +303,9 @@ class ComposerDictationControlTest {
         withAttachments: Boolean = false,
         voiceRecordingController: VoiceRecordingController? = null,
         replyingTo: dev.ipf.marmotkit.AppMessageRecordFfi? = null,
+        suppliedController: ConversationDictationController? = null,
     ): ConversationDictationController {
-        val dictationController = idleDictationController(draft)
+        val dictationController = suppliedController ?: idleDictationController(draft)
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -318,6 +378,50 @@ class ComposerDictationControlTest {
                 override fun cancel() = Unit
 
                 override fun destroy() = Unit
+            }
+        }
+    }
+
+    private class RecoverableAudioPlatform : ConversationDictationPlatform {
+        lateinit var listener: ConversationDictationRecognitionListener
+        private var pending = true
+
+        override fun hasRecordAudioPermission() = true
+
+        override fun recognitionAvailable() = true
+
+        override fun callerAudioHasPending() = pending
+
+        override fun parkCallerAudio(): ConversationDictationParkedAudio {
+            pending = false
+            return object : ConversationDictationParkedAudio {
+                override fun restore(): Boolean {
+                    pending = true
+                    return true
+                }
+
+                override fun discard() = Unit
+            }
+        }
+
+        override fun createSession(listener: DictationListener): ConversationDictationRecognitionSession {
+            this.listener = listener
+            return object : ConversationDictationRecognitionSession {
+                override fun start() = Unit
+
+                override fun stop() = Unit
+
+                override fun cancel() = Unit
+
+                override fun destroy() = Unit
+
+                override fun usesCallerAudioCapture() = true
+
+                override fun acknowledgeCallerAudio() = true
+
+                override fun callerAudioFullyFed() = true
+
+                override fun callerAudioIsFinalChunk() = true
             }
         }
     }
