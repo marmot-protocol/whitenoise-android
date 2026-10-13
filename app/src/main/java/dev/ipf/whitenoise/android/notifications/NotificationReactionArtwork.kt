@@ -36,7 +36,7 @@ internal suspend fun prepareNotificationReactionArtwork(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (
-        @Suppress("TooGenericExceptionCaught") // Optional image errors cannot suppress the reaction text.
+        @Suppress("TooGenericExceptionCaught")
         _: Exception,
     ) {
         null
