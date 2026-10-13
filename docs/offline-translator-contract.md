@@ -29,12 +29,21 @@ the installation link. Opening the app does not grant it translation trust;
 every submission still passes signer, reviewed-version and explicit-service checks.
 
 The reviewed service looks up explicit languages before awaiting its asynchronous
-catalog initialization. If an explicit-source request receives a detection error,
-the client retries once on the same binding after that callback. Both submissions
-revalidate the package identity and share the overall request deadline. Automatic
-detection errors, missing packs, cancellation and other failures are not retried.
-This recovers the observed cold-start detection failure; the API still exposes no
-readiness or returned-language metadata to validate upstream fallback choices.
+catalog initialization. An unresolved target silently becomes the engine's default.
+The client first submits empty text with empty language codes on the verified
+binding and waits for its callback. The service emits that callback after its
+language-availability wait, so the subsequent message request resolves the selected
+source and target against the loaded catalog. The empty result or expected detection
+failure is discarded; other failures stop the request before message text is sent.
+Both submissions revalidate the package identity and share the overall deadline.
+Cancellation, service death and package changes retire the callback and binding.
+
+The picker and adapter share the reviewed catalog codes. Unknown codes are rejected
+before either call to prevent another default-target fallback. The API provides no
+readiness method or returned-language metadata, so this initialization barrier
+relies on the inspected callback ordering of the pinned compatible releases.
+Qualification must use a selected target different from the engine default, with
+both explicit and automatically detected source languages and a cold service.
 
 The service takes source text, source language, target language and a callback.
 Empty source means automatic detection. Its error parcel contains an enum and
