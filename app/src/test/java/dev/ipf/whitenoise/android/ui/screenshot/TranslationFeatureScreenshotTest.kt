@@ -1,7 +1,8 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -58,7 +59,10 @@ class TranslationFeatureScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
-                    Box(Modifier.size(360.dp, 650.dp).testTag("translation-fixture")) {
+                    Surface(
+                        modifier = Modifier.size(360.dp, 650.dp).testTag("translation-fixture"),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
                         SettingsList { item { TranslationGlobalSettingsContent(preferences) } }
                     }
                 }

@@ -85,6 +85,13 @@ class MessageTranslationFormScreenshotTest {
         composeRule.onNodeWithTag("translation.confirm").assertIsNotEnabled()
     }
 
+    @Test
+    fun largeTextKeepsThePrimaryActionVisibleBelowTheScrollingWarning() {
+        render(Appearance(scale = 2f, rtl = true))
+        composeRule.onNodeWithTag("translation.confirm").assertIsDisplayed().performClick()
+        assertEquals(listOf("" to "de"), requests)
+    }
+
     @Test fun light() = capture("translation_form_light.png")
 
     @Test fun dark() = capture("translation_form_dark.png", Appearance(dark = true))

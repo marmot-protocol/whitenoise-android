@@ -43,44 +43,50 @@ internal fun MessageTranslationForm(
     onDismiss: () -> Unit,
     onOpenEngine: () -> Unit,
 ) {
-    WhiteNoiseSheetHeader(stringResource(R.string.translation_title), onClose = onDismiss)
-    Column(
-        Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).testTag("translation.form"),
-        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
-    ) {
-        SettingsGroup {
-            row("source") { context ->
-                TranslationLanguageRow(
-                    context = context,
-                    title = stringResource(R.string.translation_source_language),
-                    selected = from,
-                    onSelected = onFromChange,
-                    allowDetection = true,
-                )
+    Column(Modifier.fillMaxWidth()) {
+        WhiteNoiseSheetHeader(stringResource(R.string.translation_title), onClose = onDismiss)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .fadingVerticalScroll(rememberScrollState())
+                .testTag("translation.form"),
+            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+        ) {
+            SettingsGroup {
+                row("source") { context ->
+                    TranslationLanguageRow(
+                        context = context,
+                        title = stringResource(R.string.translation_source_language),
+                        selected = from,
+                        onSelected = onFromChange,
+                        allowDetection = true,
+                    )
+                }
+                row("target") { context ->
+                    TranslationLanguageRow(
+                        context = context,
+                        title = stringResource(R.string.translation_target_language),
+                        selected = target,
+                        onSelected = onTargetChange,
+                    )
+                }
             }
-            row("target") { context ->
-                TranslationLanguageRow(
-                    context = context,
-                    title = stringResource(R.string.translation_target_language),
-                    selected = target,
-                    onSelected = onTargetChange,
-                )
-            }
-        }
-        Text(
-            text = stringResource(R.string.translation_privacy_warning),
-            modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.Section),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        if (failure != null) {
-            Column(Modifier.padding(horizontal = WhiteNoiseSpacing.Section)) {
-                Text(
-                    stringResource(translationFailureResource(failure)),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                TextButton(onClick = onOpenEngine) { Text(stringResource(R.string.translation_open_engine)) }
+            Text(
+                text = stringResource(R.string.translation_privacy_warning),
+                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.Section),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (failure != null) {
+                Column(Modifier.padding(horizontal = WhiteNoiseSpacing.Section)) {
+                    Text(
+                        stringResource(translationFailureResource(failure)),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    TextButton(onClick = onOpenEngine) { Text(stringResource(R.string.translation_open_engine)) }
+                }
             }
         }
         TranslationConfirmation(enabled, onTranslate)
