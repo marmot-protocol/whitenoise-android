@@ -17,6 +17,7 @@
     <string name="poll_cancel_custom_time">Usa la scadenza precedente</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Sondaggio</string>
+    <string name="poll_copy_heading">Sondaggio: %1$s</string>
     <string name="poll_unsupported">Impossibile visualizzare questo sondaggio</string>
     <string name="poll_closed">Sondaggio chiuso</string>
     <string name="poll_vote_failed">Impossibile inviare il voto</string>

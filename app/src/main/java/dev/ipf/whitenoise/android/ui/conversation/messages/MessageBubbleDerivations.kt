@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.core.pollCopyText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -52,6 +53,25 @@ internal fun messageBubbleDisplayedBody(
                 ),
             )
         else -> MessageProjector.displayBody(item.record, textCopy)
+    }
+
+/**
+ * Whether whole-message Copy has anything to put on the clipboard. A poll copies its question and options, so a
+ * deleted, failed or malformed poll offers no Copy rather than its bare label; every other bubble copies the
+ * [displayedBody] it shows.
+ */
+internal fun messageBubbleCanCopyText(
+    item: TimelineMessage,
+    deleted: Boolean,
+    persistedFailure: Boolean,
+    displayedBody: String,
+    textCopy: MessageTextCopy,
+): Boolean =
+    when {
+        deleted -> false
+        MessageProjector.isPollKind(item.record.kind) ->
+            !persistedFailure && item.projected?.poll?.let { pollCopyText(it, textCopy) } != null
+        else -> displayedBody.isNotBlank()
     }
 
 /**

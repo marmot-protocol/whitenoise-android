@@ -17,6 +17,7 @@
     <string name="poll_cancel_custom_time">Use previous deadline</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Poll</string>
+    <string name="poll_copy_heading">Poll: %1$s</string>
     <string name="poll_unsupported">This poll cannot be displayed</string>
     <string name="poll_closed">Poll closed</string>
     <string name="poll_vote_failed">Couldn\'t submit vote</string>
