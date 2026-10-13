@@ -83,7 +83,10 @@ class ConversationWidgetConfigureActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun widgetProfiles(state: WhiteNoiseAppState?, available: Boolean): List<WidgetAccountPresentation> {
+    private fun widgetProfiles(
+        state: WhiteNoiseAppState?,
+        available: Boolean,
+    ): List<WidgetAccountPresentation> {
         val profileIds = if (available) state?.accounts?.map { it.accountIdHex }.orEmpty() else emptyList()
         LaunchedEffect(state, profileIds) {
             try {
@@ -144,8 +147,7 @@ class ConversationWidgetConfigureActivity : ComponentActivity() {
                 withContext(Dispatchers.IO) {
                     runCatching {
                         ConversationWidgetConfiguration(this@ConversationWidgetConfigureActivity).save(id, choice)
-                    }
-                        .getOrDefault(false)
+                    }.getOrDefault(false)
                 }
             if (!saved || !widgetUnlocked(state, keyguard) || generation != state?.runtimeGeneration) return
             application.applicationScope.launch { ConversationWidgets.refresh(application, state) }
