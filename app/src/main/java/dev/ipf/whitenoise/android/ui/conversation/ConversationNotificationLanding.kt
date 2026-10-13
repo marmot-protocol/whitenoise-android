@@ -276,6 +276,7 @@ internal class ConversationEntryPositioning(
                     )
                 },
                 traceSections = false,
+                reserveTailSpace = false,
             )
         val captureLayout = { viewport.initialAnchorLayout(position.index) }
         var attempts = 0
