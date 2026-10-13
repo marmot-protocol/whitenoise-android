@@ -83,7 +83,16 @@ class NotificationReactionArtworkTest {
     @Test
     fun unicodeDoesNotPrepareArtworkFromTheQuotedMessage() =
         runBlocking {
-            val card = post("👍", prepare = { error("Unicode must not resolve shortcode artwork") })
+            var calls = 0
+            val card =
+                post(
+                    "👍",
+                    prepare = {
+                        calls++
+                        null
+                    },
+                )
+            assertEquals(0, calls)
             assertNoArtwork(card)
             assertTrue(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("👍"))
         }
@@ -118,10 +127,11 @@ class NotificationReactionArtworkTest {
     @Test
     fun unavailableArtworkKeepsTheReactionReadable() =
         runBlocking {
-            val preparers = listOf<suspend (String) -> Bitmap?>(
-                { null },
-                { throw IllegalStateException("image unavailable") },
-            )
+            val preparers =
+                listOf<suspend (String) -> Bitmap?>(
+                    { null },
+                    { throw IllegalStateException("image unavailable") },
+                )
             for (prepare in preparers) {
                 val card = post(":marmot:", prepare = prepare)
                 assertNoArtwork(card)
@@ -133,10 +143,16 @@ class NotificationReactionArtworkTest {
     @Test
     fun hiddenPreviewsNeverPrepareOrExposeArtwork() =
         runBlocking {
-            val fail: suspend (String) -> Bitmap? = { error("Hidden previews must not prepare artwork") }
-            assertNoArtwork(post(":marmot:", redacted = true, prepare = fail))
+            var calls = 0
+            val prepare: suspend (String) -> Bitmap? = {
+                calls++
+                null
+            }
+            assertNoArtwork(post(":marmot:", redacted = true, prepare = prepare))
+            assertEquals(0, calls)
             NotificationPreviewPreferences.setEnabled(context, false, scrub = { true })
-            val card = post(":marmot:", prepare = fail)
+            val card = post(":marmot:", prepare = prepare)
+            assertEquals(0, calls)
             assertNoArtwork(card)
             assertFalse(card.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains(":marmot:"))
         }
@@ -246,11 +262,12 @@ class NotificationReactionArtworkTest {
         assertEquals("android.app.Notification\$BigPictureStyle", card.extras.getString(Notification.EXTRA_TEMPLATE))
         assertNotNull(card.extras.getParcelable<Bitmap>(Notification.EXTRA_PICTURE))
         assertNotNull(card.getLargeIcon())
-        val textKeys = listOf(
-            Notification.EXTRA_TEXT,
-            Notification.EXTRA_SUMMARY_TEXT,
-            Notification.EXTRA_PICTURE_CONTENT_DESCRIPTION,
-        )
+        val textKeys =
+            listOf(
+                Notification.EXTRA_TEXT,
+                Notification.EXTRA_SUMMARY_TEXT,
+                Notification.EXTRA_PICTURE_CONTENT_DESCRIPTION,
+            )
         for (key in textKeys) {
             assertTrue(card.extras.getCharSequence(key).toString().contains(shortcode))
         }
