@@ -1,18 +1,17 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.runtime.withFrameNanos
 
-/** Includes measured newer rows, structural rows and spacing, even beneath composer occlusion. */
-internal fun LazyListLayoutInfo.mentionTailContentHeightPx(index: Int): Int? {
-    val origin = visibleItemsInfo.firstOrNull { it.index == 0 }
-    val target = visibleItemsInfo.firstOrNull { it.index == index }
-    return if (origin != null && target != null) {
-        (target.offset + target.size - origin.offset).coerceAtLeast(1)
-    } else {
-        null
-    }
-}
+/**
+ * Whether a finished navigation landing rests at the real newest edge. It takes the native newest-edge clamp, not
+ * the tolerant near-bottom reading used for gestures, because a landing can reach its reading start while part of
+ * the tail is still clipped and must keep that position. The last loaded row of a window that still has newer
+ * pages is not the edge either, so tail following and the dropped leave snapshot wait until they load.
+ */
+internal fun conversationLandingAtNewestEdge(
+    atNaturalTail: Boolean,
+    hasMoreAfter: Boolean,
+): Boolean = atNaturalTail && !hasMoreAfter
 
 /**
  * Keeps the approach and measured correction in one latest-wins, distance-bounded command. This thin
@@ -29,7 +28,12 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
         settleReadingStart(
             targetMessageId = targetMessageId,
             reason = ConversationScrollReason.Mention,
-            probe = ConversationReadingStartProbe(resolveTargetIndex, readLayout, awaitLayout),
+            probe =
+                ConversationReadingStartProbe(
+                    resolveTargetIndex,
+                    readLayout,
+                    awaitLayout,
+                ),
             approach = ConversationReadingStartApproach.Animated,
         )
     if (result.commandCompleted) onCompleted()

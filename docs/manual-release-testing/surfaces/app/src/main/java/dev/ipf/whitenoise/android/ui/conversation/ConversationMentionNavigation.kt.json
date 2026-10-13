@@ -4,7 +4,7 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Unread mention reading-start navigation",
+        "surface": "Unread mention navigation without artificial tail spacing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
         "anchor": "jumpToMentionReadingStart(",
         "test_ids": [
