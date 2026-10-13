@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -125,7 +124,8 @@ class ConversationDictationDraftPresentationTest {
 
     @Test
     fun submittedPrefixClearsMountedEditorAndAudioRetryKeepsNewEditsWithoutResending() {
-        val f = Fixture(dispatchRecognized = true)
+        // Refused parking preserves the explicit controller recovery path without rendering a dialog.
+        val f = Fixture(dispatchRecognized = true, allowParking = false)
         composeRule.setContent { f.RenderComposer() }
         composeRule.runOnIdle {
             f.pendingAudio = true
@@ -161,6 +161,43 @@ class ConversationDictationDraftPresentationTest {
         }
     }
 
+    /** Normal Send consumes recovered text; a fresh Dictate gesture does not reopen a recovery dialog. */
+    @Test
+    fun ordinarySendAfterAutomaticParkingDoesNotResubmitThePrefixOnFreshDictation() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val f = Fixture()
+        composeRule.setContent { f.RenderComposer() }
+        composeRule.runOnIdle { f.retainTail() }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
+        composeRule.runOnIdle {
+            assertTrue(f.keptAudio)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
+            f.lateSendAcceptance.invoke()
+            assertEquals("", f.editor.valueState.value.text)
+            // AppState clears the durable draft separately, only after MDK accepts the send.
+            assertEquals("Draft recognized", f.draft.text)
+            f.edit(TextFieldValue(""))
+        }
+        composeRule.runOnIdle { assertEquals("", f.draft.text) }
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("New edit")
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
+        composeRule.onNodeWithTag("dictation-recovery-panel").assertDoesNotExist()
+        composeRule.runOnIdle {
+            f.runRestart()
+            f.pendingAudio = false
+            f.controller.paste()
+            f.result("tail")
+        }
+        composeRule.onNodeWithText("New edit tail").assertExists()
+        composeRule.runOnIdle {
+            assertEquals(listOf("Draft recognized"), f.sent)
+            assertTrue(f.dictationSends.isEmpty())
+            assertEquals("New edit tail", f.draft.text)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
+            assertFalse(f.controller.hasParkedComposerAudio(ACCOUNT, GROUP))
+        }
+    }
+
     @Test
     fun retainedAudioKeepsDictateVisibleAndOrdinarySendUsableWithoutNotifications() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -173,9 +210,7 @@ class ConversationDictationDraftPresentationTest {
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.dictate_text))
                 .assertIsDisplayed()
-                .performClick()
-            composeRule.onNodeWithTag("dictation-recovery-panel").assertIsDisplayed()
-            composeRule.onNodeWithText(context.getString(R.string.dictation_keep_later)).performClick()
+            composeRule.onNodeWithTag("dictation-recovery-panel").assertDoesNotExist()
             composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).assertIsDisplayed()
             composeRule
                 .onNodeWithTag("dictation-composer")
@@ -197,7 +232,7 @@ class ConversationDictationDraftPresentationTest {
     }
 
     @Test
-    fun expandedComposerSettingsReturnOffersDraftOnlyRemainingAudioRetry() {
+    fun expandedComposerRecoveryPastesTextAndFreshDictationNeedsNoChoice() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val f = Fixture(dispatchRecognized = true)
         composeRule.setContent { f.RenderComposer() }
@@ -217,7 +252,6 @@ class ConversationDictationDraftPresentationTest {
             f.result("recognized")
             f.runRestart()
             f.failTail()
-            f.controller.sendRecognizedText()
             f.controller.onAppForegrounded()
             f.controller.onAppForegrounded()
         }
@@ -227,6 +261,7 @@ class ConversationDictationDraftPresentationTest {
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
         assertEquals(context.getString(R.string.composer_collapse), expandedActions.single().label)
+        composeRule.onNodeWithTag("dictation-recovery-status").assertDoesNotExist()
         composeRule
             .onNodeWithTag("dictation-composer")
             .captureRoboImage("src/test/snapshots/dictation_retained_expanded_composer.png")
@@ -234,41 +269,40 @@ class ConversationDictationDraftPresentationTest {
             .onNodeWithContentDescription(context.getString(R.string.dictate_text))
             .assertIsDisplayed()
             .performClick()
-        composeRule.onNodeWithText(context.getString(R.string.dictation_retry_remaining)).performClick()
-        composeRule
-            .onNodeWithTag("dictation-recovery-status")
-            .assertTextEquals(context.getString(R.string.dictation_processing))
-        composeRule.onNodeWithText(context.getString(R.string.dictation_keep_later)).performClick()
+        composeRule.onNodeWithTag("dictation-recovery-panel").assertDoesNotExist()
+        composeRule.onNodeWithTag("dictation-discard-confirmation").assertDoesNotExist()
         composeRule.onNode(hasSetTextAction()).performTextReplacement("New edit")
         composeRule.runOnIdle {
             f.runRestart()
             f.pendingAudio = false
+            f.controller.paste()
             f.result("tail")
         }
         composeRule.onNodeWithText("New edit tail").assertExists()
         composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).assertIsDisplayed()
-        composeRule.runOnIdle { assertEquals(listOf("Draft recognized"), f.dictationSends) }
+        composeRule.runOnIdle { assertTrue(f.dictationSends.isEmpty()) }
     }
 
     @Test
-    fun refusedKeepForLaterClosesThePanelWithoutDiscardingAudio() {
+    fun closedFailureSettlesToItsDraftBeforeFreshDictationWithoutAPanel() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val f = Fixture(allowParking = false)
         composeRule.setContent { f.RenderComposer() }
         composeRule.runOnIdle { f.retainTail() }
         composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
-        composeRule.onNodeWithTag("dictation-recovery-panel").assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.dictation_keep_later)).performClick()
         composeRule.onNodeWithTag("dictation-recovery-panel").assertDoesNotExist()
         composeRule.runOnIdle {
-            assertTrue(f.pendingAudio)
+            f.runRestart()
+            assertFalse(f.pendingAudio)
             assertFalse(f.keptAudio)
-            assertTrue(f.controller.state is ConversationDictationState.Failed)
+            assertEquals("Draft recognized", f.draft.text)
+            assertTrue(f.controller.state is ConversationDictationState.Listening)
+            f.controller.cancel()
         }
     }
 
     @Test
-    fun staleDiscardDialogCannotConsumeAudioAfterConversationNavigation() {
+    fun staleDictateGestureCannotConsumeAudioAfterConversationNavigation() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val f = Fixture()
         var currentDictate: () -> Unit = {}
@@ -278,8 +312,6 @@ class ConversationDictationDraftPresentationTest {
             f.RenderComposer()
         }
         composeRule.runOnIdle { f.retainTail() }
-        composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.discard)).performClick()
         val oldDictate = currentDictate
         composeRule.runOnIdle { f.visibleGroup = "other" }
         composeRule.waitForIdle()
@@ -289,11 +321,20 @@ class ConversationDictationDraftPresentationTest {
             val availabilityReads = f.targetAvailabilityReads
             oldDictate()
             assertEquals(availabilityReads, f.targetAvailabilityReads)
-            assertTrue(f.pendingAudio)
-            assertTrue(f.controller.state is ConversationDictationState.Failed)
+            assertFalse(f.pendingAudio)
+            assertTrue(f.keptAudio)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.dictate_text)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.dictation_original_conversation)).assertIsDisplayed()
+        composeRule.onNodeWithTag("dictation-recovery-panel").assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertEquals(
+                "other",
+                f.controller.state.target
+                    ?.groupIdHex,
+            )
+            assertTrue(f.keptAudio)
+        }
     }
 
     private class Fixture(
@@ -469,7 +510,12 @@ class ConversationDictationDraftPresentationTest {
 
         fun result(text: String) = listener.onResult(text)
 
-        fun failTail() = listener.onError(ConversationDictationFailure.NoMatch)
+        fun failTail() {
+            repeat(3) {
+                listener.onError(ConversationDictationFailure.NoMatch)
+                if (controller.state is ConversationDictationState.Starting) runRestart()
+            }
+        }
 
         fun runRestart() {
             elapsedMillis += 500L

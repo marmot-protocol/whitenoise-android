@@ -136,11 +136,14 @@ control surface unpredictable. Offer the provider's own setup app instead.
 If a later provider generation fails after useful text was accumulated, save
 that text into the original draft when its revision can be verified. The ordinary
 composer stays editable and sendable. Dictate remains visible in compact and
-expanded layouts: unresolved audio opens app-local Retry remaining audio, Keep
-for later, and confirmed Discard instead of starting overlapping capture. Retry
-transcribes sealed audio into the draft without reopening the microphone or
-replaying an earlier Send. Pending native closure and indeterminate audio state
-remain inspectable and fail closed. An uncertain send retains its independent
+expanded layouts: completion needs no Keep/Discard or partial-send decision
+dialog. Automatic recovery retries sealed PCM within its existing finite budget,
+without reopening the microphone or replaying an earlier Send. If recognition
+cannot finish, available text stays in the original draft and an empty attempt
+ends cleanly. Idle private audio does not add a stopped-audio banner; a fresh
+explicit Dictate gesture retires only its origin's old take and starts normally.
+Pending native closure and indeterminate audio state remain nonmodal and fail
+closed. An uncertain send retains its independent
 Delivery not confirmed warning and cannot be replayed.
 
 The 65-minute logical capture watchdog and bounded processing/send timeouts

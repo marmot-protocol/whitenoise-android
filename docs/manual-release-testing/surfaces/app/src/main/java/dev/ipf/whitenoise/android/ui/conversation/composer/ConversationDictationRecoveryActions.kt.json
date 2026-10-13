@@ -4,52 +4,20 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "string:dictation_incomplete_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": "R.string.dictation_incomplete_title",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_incomplete_text",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": "R.string.dictation_incomplete_text",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:dictation_send_recognized_text",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": "R.string.dictation_send_recognized_text",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "ConversationDictationSendConfirmation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": "fun ConversationDictationSendConfirmation(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "ConversationDictationPartialSendDialog",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": "fun ConversationDictationPartialSendDialog(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "ConversationDictationFailureAction",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "fun ConversationDictationFailureAction(",
         "test_ids": [
           "DIC-001",
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.paste",
+        "test_ids": [
+          "DIC-009"
         ]
       }
     ],
@@ -97,14 +65,11 @@
         ]
       },
       {
-        "surface": "Scroll boundaries: ConversationDictationRecoveryActions",
+        "surface": "Incomplete recognition settles available text into the draft without partial-send confirmation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": ".fadingVerticalScroll(",
+        "anchor": "controller.finishFailedToDraft",
         "test_ids": [
-          "SCR-001",
-          "SCR-002",
-          "SCR-003",
-          "SCR-004"
+          "DIC-009"
         ]
       }
     ]

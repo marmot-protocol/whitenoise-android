@@ -8,6 +8,172 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationDictationAudioChunkBufferTest {
+    /** Reproduces the supplied 10.5-second sentence plus 319 ms stop/drain remainder byte for byte. */
+    @Test
+    fun sendJustAfterSentenceBoundaryKeepsShortTailWithItsRecognitionContext() {
+        val buffer =
+            ConversationDictationAudioChunkBuffer(
+                sessionId = 4L,
+                minimumTailBytes = CALLER_AUDIO_MINIMUM_TAIL_BYTES,
+            )
+        val sentence = ByteArray(336_000) { (it % 127).toByte() }
+        val tail = ByteArray(10_236) { 1 }
+        assertTrue(buffer.append(sentence, sentence.size, hasSpeech = true))
+        assertTrue(buffer.sealCurrentIfAtLeast(320_000))
+        assertNull("a boundary alone must not expose a context-free next request", buffer.poll())
+        assertTrue(buffer.append(tail, tail.size, hasSpeech = true))
+        assertNull(buffer.poll())
+        buffer.finish()
+        buffer.finish()
+
+        val final = checkNotNull(buffer.poll())
+        assertArrayEquals(sentence + tail, final.pcm)
+        assertEquals(0L, final.firstSample)
+        assertEquals(173_118L, final.lastSampleExclusive)
+        assertTrue(final.hasSpeech)
+        assertTrue(buffer.isFinalChunk(final.chunkId))
+        assertEquals(346_236, buffer.bufferedBytes)
+        assertTrue(buffer.acknowledge(final.chunkId))
+        assertFalse(buffer.hasPending)
+    }
+
+    /** The hard 30-second maximum also leaves a useful final request instead of a tiny remainder. */
+    @Test
+    fun fullChunkAndShortFinalTailAreRebalancedWithinTheProviderCeiling() {
+        val buffer =
+            ConversationDictationAudioChunkBuffer(
+                sessionId = 4L,
+                minimumTailBytes = CALLER_AUDIO_MINIMUM_TAIL_BYTES,
+            )
+        val input = ByteArray(970_236) { (it % 127).toByte() }
+        assertTrue(buffer.append(input, input.size, hasSpeech = true))
+        assertNull(buffer.poll())
+        buffer.finish()
+        val first = checkNotNull(buffer.poll())
+        assertEquals(906_236, first.pcm.size)
+        assertArrayEquals(input.copyOf(first.pcm.size), first.pcm)
+        assertFalse(buffer.isFinalChunk(first.chunkId))
+        assertTrue(buffer.acknowledge(first.chunkId))
+        val last = checkNotNull(buffer.poll())
+        assertEquals(CALLER_AUDIO_MINIMUM_TAIL_BYTES, last.pcm.size)
+        assertArrayEquals(input.copyOfRange(first.pcm.size, input.size), last.pcm)
+        assertEquals(first.lastSampleExclusive, last.firstSample)
+        assertEquals(input.size / 2L, last.lastSampleExclusive)
+        assertTrue(buffer.acknowledge(last.chunkId))
+        assertEquals(0, buffer.bufferedBytes)
+    }
+
+    /** Holding the boundary delays streaming by at most the configured following context, not until stop. */
+    @Test
+    fun sufficientFollowingContextReleasesTheSentenceBeforeCaptureFinishes() {
+        val buffer =
+            ConversationDictationAudioChunkBuffer(
+                sessionId = 1L,
+                chunkBytes = 12,
+                maxBufferedBytes = 24,
+                minimumTailBytes = 4,
+            )
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6), 6, hasSpeech = true))
+        assertTrue(buffer.sealCurrentIfAtLeast(6))
+        assertNull(buffer.poll())
+        assertTrue(buffer.append(byteArrayOf(7, 8), 2, hasSpeech = false))
+        assertNull(buffer.poll())
+        assertTrue(buffer.append(byteArrayOf(9, 10), 2, hasSpeech = true))
+        val first = checkNotNull(buffer.poll())
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4, 5, 6), first.pcm)
+        assertTrue(buffer.acknowledge(first.chunkId))
+        buffer.finish()
+        val tail = checkNotNull(buffer.poll())
+        assertArrayEquals(byteArrayOf(7, 8, 9, 10), tail.pcm)
+        assertEquals(first.lastSampleExclusive, tail.firstSample)
+        assertTrue(tail.hasSpeech)
+    }
+
+    /** A stopped sentence and a genuinely short first utterance are available immediately, with no timer. */
+    @Test
+    fun finishReleasesHeldBoundaryOrShortFirstUtteranceImmediately() {
+        for (sealBoundary in listOf(false, true)) {
+            val buffer =
+                ConversationDictationAudioChunkBuffer(
+                    sessionId = 1L,
+                    chunkBytes = 8,
+                    maxBufferedBytes = 16,
+                    minimumTailBytes = 4,
+                )
+            val pcm = byteArrayOf(1, 2)
+            assertTrue(buffer.append(pcm, pcm.size, hasSpeech = true))
+            if (sealBoundary) assertTrue(buffer.sealCurrentIfAtLeast(2))
+            assertNull(buffer.poll())
+            buffer.finish()
+            val final = checkNotNull(buffer.poll())
+            assertArrayEquals(pcm, final.pcm)
+            assertTrue(final.hasSpeech)
+            assertTrue(buffer.isFinalChunk(final.chunkId))
+        }
+    }
+
+    /** Quiet nonzero tails keep their evidence; a rejected append and retry do not lose held PCM. */
+    @Test
+    fun heldBoundaryPreservesOverflowRetryAndDiscardOwnership() {
+        val buffer =
+            ConversationDictationAudioChunkBuffer(
+                sessionId = 1L,
+                chunkBytes = 8,
+                maxBufferedBytes = 8,
+                minimumTailBytes = 4,
+            )
+        val pcm = byteArrayOf(0, 0, 0, 0, 1, 0)
+        assertTrue(buffer.append(pcm, 4, hasSpeech = false))
+        assertTrue(buffer.sealCurrentIfAtLeast(4))
+        assertTrue(buffer.append(pcm.copyOfRange(4, 6), 2, hasSpeech = true))
+        assertFalse(buffer.append(byteArrayOf(2, 0, 3, 0), 4, hasSpeech = true))
+        buffer.finish()
+        val rejected = checkNotNull(buffer.poll())
+        assertArrayEquals(pcm, rejected.pcm)
+        assertTrue(rejected.hasSpeech)
+        assertTrue(buffer.retry(rejected.chunkId))
+        val retry = checkNotNull(buffer.poll())
+        assertEquals(rejected.chunkId, retry.chunkId)
+        assertArrayEquals(pcm, retry.pcm)
+        assertEquals(6, buffer.bufferedBytes)
+        buffer.discard()
+        assertArrayEquals(ByteArray(6), retry.pcm)
+        assertFalse(buffer.hasPending)
+        assertFalse(buffer.append(pcm, 2, hasSpeech = true))
+    }
+
+    /** Long continuous capture maintains exact ordering and its existing 90-second memory ceiling. */
+    @Test
+    fun heldHardBoundariesPreserveEverySampleAcrossContinuousCapture() {
+        val buffer =
+            ConversationDictationAudioChunkBuffer(
+                sessionId = 1L,
+                minimumTailBytes = CALLER_AUDIO_MINIMUM_TAIL_BYTES,
+            )
+        var nextSample = 0L
+        repeat(180) { second ->
+            val pcm = ByteArray(32_000) { second.toByte() }
+            assertTrue(buffer.append(pcm, pcm.size, hasSpeech = true))
+            buffer.poll()?.let { chunk ->
+                assertEquals(nextSample, chunk.firstSample)
+                assertEquals((nextSample / 16_000).toByte(), chunk.pcm.first())
+                assertTrue(chunk.pcm.size <= 960_000)
+                nextSample = chunk.lastSampleExclusive
+                assertTrue(buffer.acknowledge(chunk.chunkId))
+            }
+            assertTrue(buffer.bufferedBytes <= 2_880_000)
+        }
+        buffer.finish()
+        while (buffer.hasPending) {
+            val chunk = checkNotNull(buffer.poll())
+            assertEquals(nextSample, chunk.firstSample)
+            nextSample = chunk.lastSampleExclusive
+            assertTrue(buffer.acknowledge(chunk.chunkId))
+        }
+        assertEquals(180L * 16_000, nextSample)
+        assertEquals(0, buffer.bufferedBytes)
+    }
+
     /** Exact ownership and sealed capture are both required; inspection never releases retained bytes. */
     @Test
     fun finalChunkRequiresSealedCaptureAndExactInflightOwnership() {
