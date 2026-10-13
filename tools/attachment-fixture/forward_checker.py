@@ -273,8 +273,12 @@ def _summary(samples, sends):
     return direct, variants
 
 
-def check_forward(metrics, events):
-    """Fail closed on a missing sample, phase, receipt, marker or unexpected request; report the direct-send ratio."""
+def check_forward(metrics, events, physical=False):
+    """Fail closed on a missing sample, phase, receipt, marker or unexpected request; report the direct-send ratio.
+
+    `physical` says the run was on the one authorized physical device. Only a passing physical run reports
+    `physical_device_qualified`; the ceilings and the ledger contract are the same either way.
+    """
     if not isinstance(metrics, list) or any(not isinstance(m, dict) for m in metrics):
         return {"passed": False, "violations": ["invalid metric collection"], "scope": SCOPE,
                 "physical_device_qualified": False}
@@ -289,4 +293,4 @@ def check_forward(metrics, events):
     direct, variants = _summary(samples, sends)
     return {"passed": not violations, "violations": violations, "scope": SCOPE,
             "direct_send_median_ms": direct, "direct_ratio_target": DIRECT_RATIO_TARGET, "variants": variants,
-            "physical_device_qualified": False}
+            "physical_device_qualified": bool(physical) and not violations}
