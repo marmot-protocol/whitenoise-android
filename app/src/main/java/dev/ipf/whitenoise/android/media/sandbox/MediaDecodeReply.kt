@@ -17,26 +17,33 @@ internal fun sendMediaDecodeReply(
     try {
         parcel.writeInterfaceToken(MEDIA_REPLY_DESCRIPTOR)
         parcel.writeInt(id)
-        parcel.writeInt(if (result.getBoolean("success")) 1 else 0)
-        parcel.writeInt(if (result.getBoolean("isolated")) 1 else 0)
-        parcel.writeInt(if (result.getBoolean("internetGranted")) 1 else 0)
-        parcel.writeInt(if (result.getBoolean("runtimeInitialized")) 1 else 0)
-        parcel.writeInt(if (result.getBoolean("privateCanaryDenied")) 1 else 0)
-        parcel.writeInt(result.getInt("privateCanaryErrno"))
-        parcel.writeInt(result.getInt("inputWriteErrno", -1))
-        parcel.writeInt(result.getInt("width"))
-        parcel.writeInt(result.getInt("height"))
-        parcel.writeInt(result.getInt("orientation"))
-        parcel.writeString(result.getString("mime").orEmpty().take(MediaDecodePolicy.MAX_MIME_CHARS))
-        parcel.writeInt(result.getInt("sourceWidth"))
-        parcel.writeInt(result.getInt("sourceHeight"))
-        parcel.writeLong(result.getLong("duration"))
-        parcel.writeInt(if (result.getBoolean("pixels")) 1 else 0)
-        parcel.writeFloatArray(result.getFloatArray("waveform"))
+        writeMediaDecodePayload(parcel, result)
         callback.transact(IBinder.FIRST_CALL_TRANSACTION, parcel, null, IBinder.FLAG_ONEWAY)
     } finally {
         parcel.recycle()
     }
+}
+
+private fun writeMediaDecodePayload(
+    parcel: Parcel,
+    result: Bundle,
+) {
+    parcel.writeInt(if (result.getBoolean("success")) 1 else 0)
+    parcel.writeInt(if (result.getBoolean("isolated")) 1 else 0)
+    parcel.writeInt(if (result.getBoolean("internetGranted")) 1 else 0)
+    parcel.writeInt(if (result.getBoolean("runtimeInitialized")) 1 else 0)
+    parcel.writeInt(if (result.getBoolean("privateCanaryDenied")) 1 else 0)
+    parcel.writeInt(result.getInt("privateCanaryErrno"))
+    parcel.writeInt(result.getInt("inputWriteErrno", -1))
+    parcel.writeInt(result.getInt("width"))
+    parcel.writeInt(result.getInt("height"))
+    parcel.writeInt(result.getInt("orientation"))
+    parcel.writeString(result.getString("mime").orEmpty().take(MediaDecodePolicy.MAX_MIME_CHARS))
+    parcel.writeInt(result.getInt("sourceWidth"))
+    parcel.writeInt(result.getInt("sourceHeight"))
+    parcel.writeLong(result.getLong("duration"))
+    parcel.writeInt(if (result.getBoolean("pixels")) 1 else 0)
+    parcel.writeFloatArray(result.getFloatArray("waveform"))
 }
 
 internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
@@ -94,7 +101,15 @@ internal fun sendMalformedMediaReply(
         when (mode) {
             2 -> parcel.writeInt(1) // Truncated primitive frame.
             3 -> parcel.writeByteArray(ByteArray(MediaDecodePolicy.MAX_REPLY_BYTES))
-            4 -> parcel.writeInt(7) // Boolean values must be canonical.
+            4 -> {
+                // Keep the rest of the frame complete so rejection reaches the boolean guard.
+                val start = parcel.dataPosition()
+                writeMediaDecodePayload(parcel, Bundle().apply { putBoolean("isolated", true) })
+                val end = parcel.dataPosition()
+                parcel.setDataPosition(start)
+                parcel.writeInt(7)
+                parcel.setDataPosition(end)
+            }
         }
         callback.transact(IBinder.FIRST_CALL_TRANSACTION, parcel, null, IBinder.FLAG_ONEWAY)
     } finally {
