@@ -77,3 +77,18 @@ private suspend fun nextWidgetFrame(
 }
 
 internal const val WIDGET_NATIVE_PAGE_SIZE = 50u
+
+/** Account count does not limit inclusion; only the retained display rows are capped. */
+internal suspend fun widgetAccountRows(
+    choice: ConversationWidgetChoice,
+    accounts: Set<String>,
+    read: suspend (String) -> List<ConversationWidgetRow>,
+): List<ConversationWidgetRow> {
+    val selected = if (choice.allAccounts) accounts else setOf(choice.account)
+    var rows = emptyList<ConversationWidgetRow>()
+    for (account in selected) {
+        currentCoroutineContext().ensureActive()
+        rows = selectConversationWidgetRows(choice, accounts, true, rows + read(account), MAX_WIDGET_ROWS)
+    }
+    return rows
+}

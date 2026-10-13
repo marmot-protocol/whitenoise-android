@@ -55,6 +55,34 @@ class WidgetWindowRowsTest {
             assertTrue(widgetWindowRows("account", true, window).isEmpty())
             assertEquals(1, window.pagesRead)
         }
+
+    @Test
+    fun allAccountsIncludesUnreadBeyondTheEighthAccount() =
+        runTest {
+            val accounts = (1..9).map { "account-$it" }.toSet()
+            val queried = mutableListOf<String>()
+            val choice = ConversationWidgetChoice("account-1", allAccounts = true, unreadOnly = true)
+            val rows =
+                widgetAccountRows(choice, accounts) {
+                    queried.add(it)
+                    if (it == "account-9") listOf(ConversationWidgetRow(it, "older", "Unread", true)) else emptyList()
+                }
+            assertEquals(accounts.toList(), queried)
+            assertEquals(listOf("account-9"), rows.map { it.account })
+        }
+
+    @Test
+    fun allAccountsRetainsOnlyTheMostRecentWidgetCapacityAcrossAccounts() =
+        runTest {
+            val accounts = (1..10).map { "account-$it" }.toSet()
+            val rows =
+                widgetAccountRows(ConversationWidgetChoice("account-1", allAccounts = true), accounts) { account ->
+                    val activity = account.substringAfter('-').toULong()
+                    listOf(ConversationWidgetRow(account, "same-id", account, false, activity = activity))
+                }
+            assertEquals(MAX_WIDGET_ROWS, rows.size)
+            assertEquals((10 downTo 3).map { "account-$it" }, rows.map { it.account })
+        }
 }
 
 private class WidgetTestWindow(

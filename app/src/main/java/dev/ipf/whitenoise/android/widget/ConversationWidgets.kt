@@ -212,9 +212,8 @@ internal object ConversationWidgets {
         state: WhiteNoiseAppState,
         choice: ConversationWidgetChoice,
         accounts: Set<String>,
-    ): List<ConversationWidgetRow> {
-        val selected = if (choice.allAccounts) accounts.take(MAX_WIDGET_ROWS) else listOf(choice.account)
-        return selected.flatMap { account ->
+    ): List<ConversationWidgetRow> =
+        widgetAccountRows(choice, accounts) { account ->
             var handle: ChatListWindowSubscription? = null
             try {
                 state.marmotIo {
@@ -225,7 +224,6 @@ internal object ConversationWidgets {
                 withContext(NonCancellable + Dispatchers.IO) { handle?.close() }
             }
         }
-    }
 }
 
 internal fun widgetUnlocked(
