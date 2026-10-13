@@ -165,11 +165,15 @@ internal class IsolatedAnimationSession private constructor(
                 if (closed) retireAndUnbind()
             }
 
-            override fun onServiceDisconnected(name: ComponentName) = workerDied()
+            override fun onServiceDisconnected(name: ComponentName) = bindingUnavailable()
 
-            override fun onBindingDied(name: ComponentName) = workerDied()
+            override fun onBindingDied(name: ComponentName) = bindingUnavailable()
 
-            override fun onNullBinding(name: ComponentName) = workerDied()
+            override fun onNullBinding(name: ComponentName) {
+                // A null binding cannot have received OPEN or any source capability.
+                releaseLease()
+                close()
+            }
         }
 
     private fun open(bytes: ByteArray): IsolatedAnimationDrawable? {
@@ -193,7 +197,7 @@ internal class IsolatedAnimationSession private constructor(
                 Message.obtain().apply {
                     what = AnimationFrameProtocol.OPEN
                     arg1 = id
-                    replyTo = callback
+                    replyTo = this@IsolatedAnimationSession.callback
                     data =
                         android.os.Bundle().apply {
                             putInt("edge", edge)
@@ -274,6 +278,14 @@ internal class IsolatedAnimationSession private constructor(
         releaseLease() // Only system/Binder-confirmed death reopens process admission.
         close()
         main.post { drawable?.stop() }
+    }
+
+    private fun bindingUnavailable() {
+        if (remote?.binder?.isBinderAlive == false) {
+            workerDied()
+        } else {
+            close() // Unbinding/connection loss alone is not proof of native process death.
+        }
     }
 
     private fun releaseLease() {
