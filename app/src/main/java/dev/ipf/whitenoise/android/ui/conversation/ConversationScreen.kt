@@ -1527,6 +1527,17 @@ internal fun ConversationScreen(
         )
     }
 
+    /** Reads near-bottom from the live rows, so a settle never sees stale derived state. */
+    fun liveNearBottom(): Boolean {
+        val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
+        return isNearBottom(
+            listState = listState,
+            timelineViewport = timelineViewport,
+            timelineSize = liveRenderedSize,
+            trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
+        )
+    }
+
     /** Lets user drags, never programmatic movement, cancel navigation and update reading intent. */
     @Composable
     fun dragInteractionEffect() {
@@ -1549,18 +1560,8 @@ internal fun ConversationScreen(
                     snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
                 },
                 onSettled = {
-                    val liveRenderedSize =
-                        controller.timeline.count { !MessageProjector.isEdit(it.record) }
                     val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
-                    scrollCoordinator.onUserGestureSettled(
-                        currentScrollAnchor(),
-                        isNearBottom(
-                            listState = listState,
-                            timelineViewport = timelineViewport,
-                            timelineSize = liveRenderedSize,
-                            trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
-                        ),
-                    )
+                    scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), liveNearBottom())
                 },
             )
         }
@@ -2532,7 +2533,7 @@ internal fun ConversationScreen(
                             readLayout = { index -> mentionJumpLayout(targetMessageId, index) },
                             onCompleted = {
                                 if (navigationRequest.isCurrent()) {
-                                    scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                                    scrollCoordinator.settleLandingAt(currentScrollAnchor(), liveNearBottom())
                                 }
                             },
                         )

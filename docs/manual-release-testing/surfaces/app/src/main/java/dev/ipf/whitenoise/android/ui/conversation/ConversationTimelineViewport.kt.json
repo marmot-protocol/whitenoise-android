@@ -15,9 +15,11 @@
     "source_coverage": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
-        "surface": "Native newest boundary for notification clamp validation",
+        "surface": "Native newest boundary for notification and mention clamp validation",
         "anchor": "get() = !listState.canScrollBackward",
         "test_ids": [
+          "CON-028",
+          "CON-032",
           "NTF-037"
         ]
       },

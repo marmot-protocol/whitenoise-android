@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -60,6 +61,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Suppress("LargeClass") // Every mention landing variant shares one real-list fixture and its harness state.
 class ConversationMentionNavigationUiTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -79,7 +81,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** Keyboard and composer reduction retain the measured newer-row runway in the native list. */
+    /** Keyboard and composer reduction keep a near-tail mention fully visible above the composer, with no extra gap. */
     @Test
     fun shortSecondNewestMentionClearsComposerWithoutExtraSpacing() {
         assertMentionTop(
@@ -87,9 +89,9 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** A fresh near-tail command must remeasure newer content after an incoming row and header shift. */
+    /** A near-tail command must remeasure and re-resolve its target after an incoming row and header shift it. */
     @Test
-    fun secondNewestMentionWindowChangeUsesCurrentTailExtent() {
+    fun secondNewestMentionWindowChangeRemeasuresTheShiftedTarget() {
         assertMentionTop(
             MentionFixture(
                 Target(80, 1),
@@ -116,7 +118,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** An explicit gesture to the natural tail restores ordinary following without a return affordance. */
+    /** A gesture at the natural tail keeps ordinary following and shows no return affordance. */
     @Test
     fun gestureAtNewestMentionResumesTailFollowingWithoutAnUnneededReturnControl() {
         assertMentionTop(
@@ -131,7 +133,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** A real leave snapshot restores the natural landing without synthetic reading space. */
+    /** A natural-tail landing follows the tail, so leaving saves no snapshot and reopening rests at the same edge. */
     @Test
     fun newestMentionNaturalLandingSurvivesRouteRecreation() {
         assertMentionTop(
@@ -146,7 +148,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** Keyboard/RTL geometry uses fixed rows; enlarged glyphs provide separate rendering coverage. */
+    /** Keyboard and RTL geometry uses fixed rows, enlarged glyphs provide separate rendering coverage. */
     @Test
     fun shortNewestMentionWithKeyboardUsesNormalTailSpacing() {
         assertMentionTop(
@@ -162,25 +164,42 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** Stable row keys retain the visited reading top when a new tail message arrives. */
+    /** A reader resting at the newest mention follows the tail, so one arrival is revealed above the composer. */
     @Test
-    fun incomingAfterNewestMentionDoesNotPullTheReaderToTheTail() {
+    fun incomingAfterNewestMentionIsRevealedAtTheTail() {
         assertMentionTop(
             MentionFixture(
                 target = Target(80, 0),
                 viewportHeight = 420,
                 padding = 12,
                 initialIndex = 90,
+                restoreTail = true,
                 incomingAfterLanding = true,
             ),
         )
     }
 
+    /** A reader parked at an earlier mention keeps that position, and the return control reports the arrival. */
+    @Test
+    fun incomingAfterEarlierMentionKeepsTheReadingTop() {
+        assertMentionTop(
+            MentionFixture(
+                target = Target(80),
+                viewportHeight = 420,
+                padding = 12,
+                restoreTail = true,
+                incomingAfterLanding = true,
+            ),
+        )
+    }
+
+    /** A short mention with enough newer content lands at the physical reading top. */
     @Test
     fun shortMentionStartsAtThePhysicalTop() {
         assertMentionTop(MentionFixture(target = Target(80), viewportHeight = 420, padding = 12))
     }
 
+    /** A mention taller than the viewport lands with its beginning at the physical top. */
     @Test
     fun oversizedMentionStartsAtThePhysicalTop() {
         assertMentionTop(
@@ -193,16 +212,19 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
+    /** A keyboard-reduced viewport still shows the beginning of a tall mention. */
     @Test
     fun keyboardReducedViewportStillShowsTheBeginning() {
         assertMentionTop(MentionFixture(target = Target(720), viewportHeight = 260, padding = 32))
     }
 
+    /** An expanded composer overlapping the list does not move the reading top. */
     @Test
     fun expandedComposerOverlapDoesNotShiftTheReadingTop() {
         assertMentionTop(MentionFixture(target = Target(80), viewportHeight = 420, padding = 144, overlap = 120))
     }
 
+    /** A tall mention with an expanded composer in RTL still shows its beginning. */
     @Test
     fun tallMentionWithExpandedComposerAndRtlShowsTheBeginning() {
         assertMentionTop(
@@ -216,11 +238,13 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
+    /** A far, unmeasured target is reached through bounded navigation and measured against fresh geometry. */
     @Test
     fun farUnmeasuredMentionUsesBoundedNavigationAndFreshGeometry() {
         assertMentionTop(MentionFixture(target = Target(720, 150), viewportHeight = 420, padding = 12))
     }
 
+    /** A tall end mention across more than fifty mixed rows still starts at the physical top. */
     @Test
     fun endMentionAcrossMoreThanFiftyMixedRowsStillStartsAtThePhysicalTop() {
         assertMentionTop(
@@ -234,6 +258,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
+    /** A short end mention with a reduced viewport and expanded composer still starts at the physical top. */
     @Test
     fun endMentionWithKeyboardAndComposerStillStartsAtThePhysicalTop() {
         assertMentionTop(
@@ -248,7 +273,7 @@ class ConversationMentionNavigationUiTest {
         )
     }
 
-    /** A media-like target height changes after native reading room has suspended the real list command. */
+    /** A media-like target height changes while the real list command is suspended awaiting layout. */
     @Test
     fun targetMeasurementChangeDuringSuspensionUsesFreshPhysicalBounds() {
         assertMentionTop(suspendedFixture(SuspendedMentionAction.Height))
@@ -306,8 +331,7 @@ class ConversationMentionNavigationUiTest {
                     val listState =
                         key(state.routeGeneration) {
                             rememberLazyListState(
-                                initialFirstVisibleItemIndex =
-                                    state.savedSnapshot?.firstVisibleItemIndex ?: initialIndex,
+                                initialFirstVisibleItemIndex = entryListIndex(state, initialIndex),
                                 initialFirstVisibleItemScrollOffset =
                                     state.savedSnapshot?.firstVisibleItemScrollOffset ?: 0,
                             )
@@ -373,6 +397,15 @@ class ConversationMentionNavigationUiTest {
                             },
                         )
                     }
+                    // Mirrors the screen's append follow, which moves only while the settled intent follows the tail.
+                    LaunchedEffect(listState, coordinator, state.incomingCount) {
+                        if (state.incomingCount > 0) {
+                            coordinator.followTailIfAllowed(
+                                resolveTailIndex = { 0 },
+                                reason = ConversationScrollReason.NewMessage,
+                            )
+                        }
+                    }
                     val nearBottom =
                         rememberConversationNearBottom(
                             listState,
@@ -426,7 +459,13 @@ class ConversationMentionNavigationUiTest {
                                             },
                                             onCompleted = {
                                                 state.completionCount++
-                                                coordinator.settleReadingAt(anchor())
+                                                coordinator.settleLandingAt(
+                                                    anchor(),
+                                                    isNearBottom(
+                                                        listState,
+                                                        maxOf(targetIndex, initialIndex) + 13 + state.incomingCount,
+                                                    ),
+                                                )
                                             },
                                         )
                                 }
@@ -475,7 +514,9 @@ class ConversationMentionNavigationUiTest {
         composeRule.runOnIdle {
             assertTrue(state.completed)
             assertEquals(1, state.completionCount)
-            assertTrue(state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
+            // A landing at the newest edge follows the tail like a drag that ends there, any other keeps its anchor.
+            assertEquals(state.atNaturalTail, state.activeCoordinator?.isFollowingTail)
+            assertEquals(!state.atNaturalTail, state.activeCoordinator?.mode is ConversationScrollMode.ReadingHistory)
         }
         if (fixture.suspendedAction == SuspendedMentionAction.Window) {
             assertEquals("initial target index", targetIndex, state.measuredIndices.first())
@@ -531,6 +572,12 @@ class ConversationMentionNavigationUiTest {
         }
         return messageTop
     }
+
+    /** Enters at the saved row, at the newest edge for a route reopened without a snapshot, else at the seed row. */
+    private fun entryListIndex(
+        state: MentionHarnessState,
+        seedIndex: Int,
+    ): Int = state.savedSnapshot?.firstVisibleItemIndex ?: if (state.routeGeneration > 0) 0 else seedIndex
 
     /** Captures only fixtures selected by the registered screenshot owner filters. */
     private fun captureMentionFixture(fixture: MentionFixture) {
@@ -595,7 +642,7 @@ class ConversationMentionNavigationUiTest {
         composeRule.runOnIdle { state.layoutRelease.complete(Unit) }
     }
 
-    /** Exercises reading-intent lifetime through incoming rows, gestures, route recreation and explicit return. */
+    /** Exercises reading-intent lifetime through incoming rows, gestures and route recreation. */
     private fun assertMentionFollowUps(
         fixture: MentionFixture,
         state: MentionHarnessState,
@@ -603,15 +650,20 @@ class ConversationMentionNavigationUiTest {
     ) {
         val target = fixture.target
         val targetIndex = target.index
+        val following = state.activeCoordinator?.isFollowingTail == true
         if (fixture.incomingAfterLanding) {
             composeRule.runOnIdle { state.incomingCount++ }
             composeRule.waitForIdle()
-            val afterIncoming =
-                composeRule
-                    .onNodeWithTag("message-$targetIndex")
-                    .getUnclippedBoundsInRoot()
-                    .top.value
-            assertEquals(landedTop, afterIncoming, 1f)
+            if (following) {
+                assertIncomingRevealedAtTheTail(fixture, state)
+            } else {
+                val afterIncoming =
+                    composeRule
+                        .onNodeWithTag("message-$targetIndex")
+                        .getUnclippedBoundsInRoot()
+                        .top.value
+                assertEquals(landedTop, afterIncoming, 1f)
+            }
         }
         if (fixture.gestureAfterLanding) {
             composeRule.onNodeWithTag("mention-list").performTouchInput { swipeUp() }
@@ -621,6 +673,8 @@ class ConversationMentionNavigationUiTest {
         if (fixture.reopenAfterLanding) {
             composeRule.onNodeWithTag("mention-reopen").performClick()
             composeRule.waitForIdle()
+            // Resting at the newest edge saves no history snapshot, so reopening enters at that same edge.
+            assertNull(state.savedSnapshot)
             val reopenedTop =
                 composeRule
                     .onNodeWithTag("message-$targetIndex")
@@ -629,9 +683,33 @@ class ConversationMentionNavigationUiTest {
             assertEquals(landedTop, reopenedTop, 1f)
         }
         if (fixture.restoreTail) {
-            // A fully visible newest mention already rests at the real tail; no return control is needed.
-            composeRule.onNodeWithTag("mention-tail").assertDoesNotExist()
+            // A reader at the real tail needs no return control, a reader parked away from it keeps one.
+            val returnControl = composeRule.onNodeWithTag("mention-tail")
+            if (following) returnControl.assertDoesNotExist() else returnControl.assertExists()
         }
+    }
+
+    /** One arrival after a natural-tail landing is followed into the clear viewport above the composer. */
+    private fun assertIncomingRevealedAtTheTail(
+        fixture: MentionFixture,
+        state: MentionHarnessState,
+    ) {
+        val listTop =
+            composeRule
+                .onNodeWithTag("mention-list")
+                .getUnclippedBoundsInRoot()
+                .top.value
+        val arrivalBottom =
+            composeRule
+                .onNodeWithTag("message-${-state.incomingCount}")
+                .getUnclippedBoundsInRoot()
+                .bottom.value
+        assertEquals(
+            "the arrival rests above the composer with only the normal padding below it",
+            listTop + fixture.viewportHeight - fixture.padding - state.headerCount * 32,
+            arrivalBottom,
+            1f,
+        )
     }
 
     /** Layout and navigation variants share the same production list/command boundary. */

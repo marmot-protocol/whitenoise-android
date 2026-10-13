@@ -13,6 +13,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], manifest = Config.NONE)
 class ConversationNotificationClampTest {
+    /** A newest target already at the natural tail is accepted as measured and saved with its real coordinate. */
     @Test
     fun newestNotificationSavesThePhysicalClampWithoutAllocatingReserve() =
         runTest {
@@ -29,6 +30,7 @@ class ConversationNotificationClampTest {
             assertEquals(listOf(0 to -332), writer.writes)
         }
 
+    /** A near-tail target saves the offset the list actually clamped to, not the overshoot that was requested. */
     @Test
     fun nearTailNotificationSavesItsPhysicalOffsetInsteadOfTheRequestedOvershoot() =
         runTest {
@@ -44,6 +46,7 @@ class ConversationNotificationClampTest {
             assertEquals(ConversationReadingStartPlacement(1, -74), result.placement)
         }
 
+    /** The natural-tail acceptance rejects clipped, composer-occluded, offscreen and unmeasured targets. */
     @Test
     fun aNaturalTailFlagNeverAcceptsClippedOccludedOrUnmeasuredTargets() {
         assertFalse(measured(offset = -20).isFullyVisibleAtNaturalTail)
@@ -54,6 +57,7 @@ class ConversationNotificationClampTest {
         assertFalse(measured(offset = 0).copy(isAtNaturalTail = false).isFullyVisibleAtNaturalTail)
     }
 
+    /** Measures an 80px row at [offset] in a natural-tail viewport with an 8px tail gap. */
     private fun measured(offset: Int) =
         ConversationMentionJumpLayout(
             viewportEndOffsetPx = 412,
@@ -63,6 +67,7 @@ class ConversationNotificationClampTest {
             isAtNaturalTail = true,
         )
 
+    /** Builds a probe that resolves one fixed row and reads one fixed measured layout. */
     private fun naturalProbe(
         index: Int,
         layout: ConversationMentionJumpLayout,

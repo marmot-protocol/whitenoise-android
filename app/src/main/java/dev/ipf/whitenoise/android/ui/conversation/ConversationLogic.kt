@@ -78,7 +78,6 @@ internal fun conversationScrollKey(
  * Snapshot to persist when leaving a conversation. Returns null when the reader
  * was at/near the bottom so the normal unread/newest anchor runs on re-entry.
  */
-@Suppress("LongParameterList") // One route snapshot retains the complete logical anchor and its required native room.
 internal fun conversationScrollSnapshotOnLeave(
     firstVisibleItemIndex: Int,
     firstVisibleItemScrollOffset: Int,

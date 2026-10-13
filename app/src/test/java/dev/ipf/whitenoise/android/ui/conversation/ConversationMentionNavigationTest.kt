@@ -60,10 +60,14 @@ class ConversationMentionNavigationTest {
                 )
             assertFalse(reached)
             assertEquals(1, completions)
-            assertTrue(writer.writes.size <= 4)
+            // One animated approach, then exactly the three bounded corrections.
+            assertEquals(
+                listOf(Write(true, 0, -420), Write(false, 0, -420), Write(false, 0, -420), Write(false, 0, -420)),
+                writer.writes,
+            )
         }
 
-    /** A new window may shift the target while its row is measured; never correct the obsolete index. */
+    /** A new window may shift the target while its row is measured, so the obsolete index is never corrected. */
     @Test
     fun newestMentionReResolvesIndexAfterItsApproachIsMeasured() =
         runTest {

@@ -456,6 +456,26 @@ internal class ConversationScrollCoordinator(
         setSettledMode(settled, forceRevision = true)
     }
 
+    /**
+     * Commits the durable intent of a finished navigation landing by the same rule as a finished drag.
+     *
+     * A landing that rests near the newest edge resumes tail following, so a message arriving next is revealed
+     * instead of hiding behind the composer and a later leave saves no history snapshot. Any other landing keeps
+     * its logical history anchor through [settleReadingAt].
+     */
+    fun settleLandingAt(
+        anchor: ConversationScrollAnchor,
+        nearBottom: Boolean,
+    ) {
+        if (!nearBottom) {
+            settleReadingAt(anchor)
+            return
+        }
+        invalidateActiveCommand()
+        userGestureInProgress = false
+        setSettledMode(ConversationScrollMode.FollowingTail, forceRevision = true)
+    }
+
     /** Replaces transient command ownership with a durable logical history anchor. */
     fun settleReadingAt(anchor: ConversationScrollAnchor) {
         invalidateActiveCommand()
