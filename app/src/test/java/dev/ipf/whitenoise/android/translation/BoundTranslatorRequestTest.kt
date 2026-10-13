@@ -91,7 +91,8 @@ class BoundTranslatorRequestTest {
             val malformed = FakeTranslator { _, callback -> callback.onTranslationResult("not empty") }
             assertEquals(TranslationFailure.ENGINE, failureOf { request(malformed) })
             assertEquals(listOf(listOf("", "", "")), malformed.submissions)
-            val unavailable = FakeTranslator { _, callback -> callback.onTranslationError(failure(ErrorType.UNEXPECTED)) }
+            val unavailable =
+                FakeTranslator { _, callback -> callback.onTranslationError(failure(ErrorType.UNEXPECTED)) }
             assertEquals(TranslationFailure.ENGINE, failureOf { request(unavailable) })
             assertEquals(1, unavailable.submissions.size)
         }

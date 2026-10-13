@@ -135,20 +135,22 @@ private val messageActionLabelResources =
 
 /** The drawable the menu row leads with, mirroring the prototype's icon set. */
 @DrawableRes
-internal fun messageActionIconRes(kind: MessageActionKind): Int =
-    when (kind) {
-        MessageActionKind.Reply -> R.drawable.ic_reply
-        MessageActionKind.Edit -> R.drawable.ic_edit
-        MessageActionKind.Select -> R.drawable.ic_check
-        MessageActionKind.SelectText -> R.drawable.ic_text_fields
-        MessageActionKind.CopyText -> R.drawable.ic_content_copy
-        MessageActionKind.Speak -> R.drawable.ic_volume_up
-        MessageActionKind.SpeakCodeLiterally -> R.drawable.ic_code
-        MessageActionKind.Translate -> R.drawable.ic_translate
-        MessageActionKind.Forward -> R.drawable.ic_forward
-        MessageActionKind.Report -> R.drawable.ic_emoji_flags
-        MessageActionKind.KeepOnScreen -> R.drawable.ic_floating_message
-        MessageActionKind.Share -> R.drawable.ic_share
-        MessageActionKind.Save -> R.drawable.ic_download
-        MessageActionKind.Info -> R.drawable.ic_info
-    }
+internal fun messageActionIconRes(kind: MessageActionKind): Int = messageActionIconResources.getValue(kind)
+
+private val messageActionIconResources =
+    mapOf(
+        MessageActionKind.Reply to R.drawable.ic_reply,
+        MessageActionKind.Edit to R.drawable.ic_edit,
+        MessageActionKind.Select to R.drawable.ic_check,
+        MessageActionKind.SelectText to R.drawable.ic_text_fields,
+        MessageActionKind.CopyText to R.drawable.ic_content_copy,
+        MessageActionKind.Speak to R.drawable.ic_volume_up,
+        MessageActionKind.SpeakCodeLiterally to R.drawable.ic_code,
+        MessageActionKind.Translate to R.drawable.ic_translate,
+        MessageActionKind.Forward to R.drawable.ic_forward,
+        MessageActionKind.Report to R.drawable.ic_emoji_flags,
+        MessageActionKind.KeepOnScreen to R.drawable.ic_floating_message,
+        MessageActionKind.Share to R.drawable.ic_share,
+        MessageActionKind.Save to R.drawable.ic_download,
+        MessageActionKind.Info to R.drawable.ic_info,
+    )
