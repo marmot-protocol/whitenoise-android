@@ -1285,14 +1285,8 @@ internal fun ComposerBar(
                         },
                     )
                 }
-                val parkedDictationAudio =
-                    dictationController != null &&
-                        dictationAccountRef != null &&
-                        dictationGroupIdHex != null &&
-                        dictationController.hasParkedComposerAudio(dictationAccountRef, dictationGroupIdHex)
                 val showDictationRecovery =
-                    (dictationOwnedByComposer && dictationController?.recoveryHandedToComposer == true) ||
-                        parkedDictationAudio
+                    dictationOwnedByComposer && dictationController?.recoveryHandedToComposer == true
                 if (showDictationRecovery) {
                     ConversationDictationRecoveryStatus(
                         checkNotNull(dictationController).composerAccess(

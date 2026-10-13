@@ -4,6 +4,12 @@
   "categories": {
     "source_coverage": [
       {
+        "surface": "Caller capture holds the newest boundary for short final recognition context",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "minimumTailBytes = CALLER_AUDIO_MINIMUM_TAIL_BYTES",
+        "test_ids": ["DIC-009"]
+      },
+      {
         "surface": "Dictation capture-close callback retains an in-progress recorder read and restores media after available audio drains",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
         "anchor": "internal fun onCaptureClosed(",
