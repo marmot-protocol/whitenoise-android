@@ -148,9 +148,9 @@ internal fun ShareConnectScreen(
         copied = copied,
         scanInvalid = scanInvalid,
         pictureShareInProgress = pictureShareInProgress,
-        pictureSaveInProgress = gallerySave.inProgress,
-        canSavePicture = link != null,
-        onSavePicture = save@{
+        gallerySaveInProgress = gallerySave.inProgress,
+        canSaveToGallery = link != null,
+        onSaveToGallery = save@{
             val exportInProgress = pictureShareInProgress || gallerySave.inProgress
             if (!ownsScreen() || exportInProgress || link == null) return@save
             val spec =
@@ -277,18 +277,15 @@ internal fun ShareConnectContent(
     copied: Boolean,
     scanInvalid: Boolean,
     pictureShareInProgress: Boolean = false,
-    pictureSaveInProgress: Boolean = false,
-    canSavePicture: Boolean = qrContent.isNotBlank(),
-    onSavePicture: () -> Unit = {},
+    gallerySaveInProgress: Boolean = false,
+    canSaveToGallery: Boolean = qrContent.isNotBlank(),
+    onSaveToGallery: () -> Unit = {},
     onBack: () -> Unit,
     onShareUrl: () -> Unit,
     onSharePicture: () -> Unit,
     onCopy: () -> Unit,
     onOpenScanner: () -> Unit,
 ) {
-    val saveLabel = stringResource(R.string.media_save)
-    val savingLabel = stringResource(R.string.photo_editor_saving_action)
-    var shareMenuExpanded by remember { mutableStateOf(false) }
     WhiteNoiseScaffold(
         modifier = Modifier.fillMaxSize().testTag("share_connect.screen"),
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -305,66 +302,14 @@ internal fun ShareConnectContent(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            shareMenuExpanded = false
-                            onSavePicture()
-                        },
-                        enabled = canSavePicture && !pictureShareInProgress && !pictureSaveInProgress,
-                        modifier =
-                            Modifier.testTag("profile.qr.save").semantics {
-                                contentDescription = saveLabel
-                                if (pictureSaveInProgress) stateDescription = savingLabel
-                            },
-                    ) {
-                        if (pictureSaveInProgress) {
-                            CircularProgressIndicator(
-                                Modifier.size(ShareConnectDefaults.IconSize),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_download),
-                                contentDescription = null,
-                            )
-                        }
-                    }
-                    Box {
-                        IconButton(
-                            onClick = { shareMenuExpanded = true },
-                            enabled = !pictureShareInProgress && !pictureSaveInProgress,
-                            modifier = Modifier.testTag("share_connect.share"),
-                        ) {
-                            if (pictureShareInProgress) {
-                                CircularProgressIndicator(
-                                    Modifier.size(ShareConnectDefaults.IconSize),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_share),
-                                    contentDescription = stringResource(R.string.share_profile),
-                                )
-                            }
-                        }
-                        WhiteNoiseDropdownMenu(
-                            expanded = shareMenuExpanded,
-                            onDismissRequest = { shareMenuExpanded = false },
-                            items =
-                                listOf(
-                                    WhiteNoiseMenuItem(
-                                        stringResource(R.string.share_profile_url),
-                                        onShareUrl,
-                                        R.drawable.ic_link,
-                                    ),
-                                    WhiteNoiseMenuItem(
-                                        stringResource(R.string.share_profile_picture),
-                                        onSharePicture,
-                                        R.drawable.ic_image,
-                                    ),
-                                ),
-                        )
-                    }
+                    ShareConnectShareAction(
+                        pictureShareInProgress = pictureShareInProgress,
+                        gallerySaveInProgress = gallerySaveInProgress,
+                        canSaveToGallery = canSaveToGallery,
+                        onShareUrl = onShareUrl,
+                        onSharePicture = onSharePicture,
+                        onSaveToGallery = onSaveToGallery,
+                    )
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
@@ -379,6 +324,78 @@ internal fun ShareConnectContent(
         AdaptiveContent(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             ShareProfileContent(profile, qrContent, copied, scanInvalid, onCopy)
         }
+    }
+}
+
+/**
+ * Top-bar Share action: the trigger and its anchored menu with Share profile URL, Share profile card and Save to
+ * Gallery. Any export disables the trigger and every export entry, and a save announces Saving to TalkBack.
+ */
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList") // One trigger, its busy semantics and its menu rows.
+@Composable
+private fun ShareConnectShareAction(
+    pictureShareInProgress: Boolean,
+    gallerySaveInProgress: Boolean,
+    canSaveToGallery: Boolean,
+    onShareUrl: () -> Unit,
+    onSharePicture: () -> Unit,
+    onSaveToGallery: () -> Unit,
+) {
+    val shareLabel = stringResource(R.string.share_profile)
+    val savingLabel = stringResource(R.string.photo_editor_saving_action)
+    val exporting = pictureShareInProgress || gallerySaveInProgress
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    // An export that starts while the menu is open closes it, and the menu must not reopen when the export ends.
+    LaunchedEffect(exporting) { if (exporting) menuExpanded = false }
+
+    Box {
+        IconButton(
+            onClick = { menuExpanded = true },
+            enabled = !exporting,
+            modifier =
+                Modifier.testTag("share_connect.share").semantics {
+                    if (exporting) contentDescription = shareLabel
+                    if (gallerySaveInProgress) stateDescription = savingLabel
+                },
+        ) {
+            if (exporting) {
+                CircularProgressIndicator(
+                    Modifier.size(ShareConnectDefaults.IconSize),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.ic_share),
+                    contentDescription = shareLabel,
+                )
+            }
+        }
+        WhiteNoiseDropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+            items =
+                listOf(
+                    WhiteNoiseMenuItem(
+                        stringResource(R.string.share_profile_url),
+                        onShareUrl,
+                        R.drawable.ic_link,
+                    ),
+                    WhiteNoiseMenuItem(
+                        stringResource(R.string.share_profile_picture),
+                        onSharePicture,
+                        R.drawable.ic_image,
+                        enabled = !exporting,
+                    ),
+                    WhiteNoiseMenuItem(
+                        stringResource(R.string.share_connect_save_to_gallery),
+                        onSaveToGallery,
+                        R.drawable.ic_download,
+                        enabled = canSaveToGallery && !exporting,
+                        modifier = Modifier.testTag("share_connect.save_to_gallery"),
+                    ),
+                ),
+        )
     }
 }
 

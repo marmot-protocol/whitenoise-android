@@ -2480,4 +2480,5 @@
     <string name="group_create_edit_members">Edit members</string>
     <string name="group_create_unattributed_failure">We could not identify an affected person. Retry or edit your members.</string>
     <string name="media_reply_draft_conflict">Your draft changed. Keep this reply and try again, or cancel the reply before sending.</string>
+    <string name="share_connect_save_to_gallery">Save to Gallery</string>
 </resources>

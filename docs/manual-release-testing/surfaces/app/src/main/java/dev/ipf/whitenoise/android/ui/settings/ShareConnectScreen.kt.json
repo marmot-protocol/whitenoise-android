@@ -41,6 +41,17 @@
         ]
       },
       {
+        "surface": "ShareConnectShareAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "fun ShareConnectShareAction(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004",
+          "ACC-019",
+          "PRO-011"
+        ]
+      },
+      {
         "surface": "ShareProfileContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
         "anchor": "fun ShareProfileContent(",
@@ -197,17 +208,17 @@
         ]
       },
       {
-        "surface": "Profile QR gallery save: onSavePicture = save@",
+        "surface": "Profile QR gallery save: onSaveToGallery = save@",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
-        "anchor": "onSavePicture = save@",
+        "anchor": "onSaveToGallery = save@",
         "test_ids": [
           "PRO-011"
         ]
       },
       {
-        "surface": "Profile QR gallery save: R.string.media_save",
+        "surface": "Profile QR gallery save: R.string.share_connect_save_to_gallery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
-        "anchor": "R.string.media_save",
+        "anchor": "R.string.share_connect_save_to_gallery",
         "test_ids": [
           "PRO-011"
         ]
@@ -229,23 +240,23 @@
         ]
       },
       {
-        "surface": "Profile QR gallery save: \"profile.qr.save\"",
+        "surface": "Profile QR gallery save: \"share_connect.save_to_gallery\"",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
-        "anchor": "\"profile.qr.save\"",
+        "anchor": "\"share_connect.save_to_gallery\"",
         "test_ids": [
           "PRO-011"
         ]
       },
       {
-        "surface": "Parsed profile required for gallery export",
+        "surface": "Parsed profile required for Save to Gallery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
-        "anchor": "canSavePicture = link != null,",
+        "anchor": "canSaveToGallery = link != null,",
         "test_ids": [
           "PRO-011"
         ]
       },
       {
-        "surface": "Gallery-save accessibility busy description",
+        "surface": "Save to Gallery accessibility busy description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
         "anchor": "R.string.photo_editor_saving_action",
         "test_ids": [

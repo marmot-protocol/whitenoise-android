@@ -32,6 +32,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.IOException
 
+/** The gallery saver renders, guards ownership and publishes the profile card without owning any screen state. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
@@ -44,6 +45,7 @@ class ProfileQrGallerySaveTest {
             "Ada",
         )
 
+    /** Removes the registered gallery provider so the next test starts from a clean resolver. */
     @After
     fun resetResolver() = ShadowContentResolver.reset()
 

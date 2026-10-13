@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -11,13 +15,17 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /** Behaviour contract of Share & Connect: back, share, copy and the scanner entry each reach their caller. */
@@ -33,6 +41,14 @@ class ShareConnectScreenBehaviorTest {
     private var copyCount = 0
     private var scannerCount = 0
     private var saveCount = 0
+    private val savingState = mutableStateOf(false)
+    private val sharingState = mutableStateOf(false)
+
+    /** Restores the platform font scale that the large-text case raises. */
+    @After
+    fun restorePlatformFontScale() {
+        RuntimeEnvironment.setFontScale(1f)
+    }
 
     /** Back and both explicit top-bar share choices invoke their callers once per tap. */
     @Test
@@ -86,11 +102,27 @@ class ShareConnectScreenBehaviorTest {
         composeRule.onNodeWithText("Scan to connect.").assertIsDisplayed()
     }
 
-    /** Download has its own action, while a busy export fences both download and picture sharing. */
+    /** Save to Gallery is the Share menu's last entry, and the toolbar carries no separate save action. */
     @Test
-    fun saveActionDoesNotOpenTheShareChooser() {
+    fun saveToGalleryLivesOnlyInsideTheShareMenu() {
         mount()
-        composeRule.onNodeWithTag("profile.qr.save").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag(SAVE_ENTRY).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Save").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Download").assertDoesNotExist()
+        openShareMenu()
+        composeRule.onNodeWithText("Share profile URL").assertIsDisplayed()
+        composeRule.onNodeWithText("Share profile card").assertIsDisplayed()
+        composeRule.onNodeWithTag(SAVE_ENTRY).assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithText("Save to Gallery").assertIsDisplayed()
+    }
+
+    /** One tap on Save to Gallery closes the menu and reaches only the save caller. */
+    @Test
+    fun saveToGalleryClosesTheMenuAndFiresOncePerTap() {
+        mount()
+        openShareMenu()
+        composeRule.onNodeWithTag(SAVE_ENTRY).performClick()
+        composeRule.onNodeWithText("Save to Gallery").assertDoesNotExist()
         composeRule.runOnIdle {
             assertEquals(1, saveCount)
             assertEquals(0, pictureShareCount)
@@ -98,35 +130,76 @@ class ShareConnectScreenBehaviorTest {
         }
     }
 
+    /** A saving export disables Share, announces Saving, keeps the menu shut and leaves the scanner usable. */
     @Test
-    fun savingDisablesExportsAndPreservesScanner() {
+    fun savingDisablesShareAnnouncesSavingAndPreservesScanner() {
         mount(saving = true)
-        composeRule.onNodeWithTag("profile.qr.save").assertIsNotEnabled()
-        val saveControl = composeRule.onNodeWithTag("profile.qr.save")
-        val savingState = saveControl.fetchSemanticsNode().config[SemanticsProperties.StateDescription]
-        assertEquals("Saving…", savingState)
-        composeRule.onNodeWithTag("share_connect.share").assertIsNotEnabled()
+        val trigger = composeRule.onNodeWithTag("share_connect.share").assertIsNotEnabled()
+        val config = trigger.fetchSemanticsNode().config
+        assertEquals("Saving…", config[SemanticsProperties.StateDescription])
+        assertEquals(listOf("Share profile"), config[SemanticsProperties.ContentDescription])
+        trigger.performClick()
+        composeRule.onNodeWithText("Save to Gallery").assertDoesNotExist()
         composeRule.onNodeWithText("Scan QR Code").performClick()
-        composeRule.runOnIdle { assertEquals(1, scannerCount) }
+        composeRule.runOnIdle {
+            assertEquals(1, scannerCount)
+            assertEquals(0, saveCount)
+        }
     }
 
-    /** A nonblank display value without a parsed profile link cannot advertise a working download. */
+    /** A picture share in flight also disables the trigger, without claiming that a save is running. */
     @Test
-    fun invalidProfileDisablesSave() {
+    fun pictureSharingDisablesShareWithoutASavingAnnouncement() {
+        sharingState.value = true
+        mount()
+        val trigger = composeRule.onNodeWithTag("share_connect.share").assertIsNotEnabled()
+        val config = trigger.fetchSemanticsNode().config
+        assertFalse(config.contains(SemanticsProperties.StateDescription))
+        assertEquals(listOf("Share profile"), config[SemanticsProperties.ContentDescription])
+    }
+
+    /** A nonblank display value without a parsed profile link keeps the entry visible but disabled. */
+    @Test
+    fun invalidProfileDisablesTheSaveEntry() {
         mount(canSave = false)
-        composeRule.onNodeWithTag("profile.qr.save").assertIsNotEnabled()
+        openShareMenu()
+        composeRule
+            .onNodeWithTag(SAVE_ENTRY)
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+            .performClick()
+        composeRule.onNodeWithText("Share profile URL").assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, saveCount) }
     }
 
-    /** A captured accessibility action cannot leave an earlier share menu active behind gallery export. */
+    /** A save that starts behind an open menu, as a captured accessibility action could, closes it for good. */
     @Test
-    fun saveDismissesTheOpenShareMenu() {
+    fun exportStartedWhileTheMenuIsOpenClosesItAndItStaysClosed() {
         mount()
-        composeRule.onNodeWithTag("share_connect.share").performClick()
-        composeRule.onNodeWithText("Share profile URL").assertIsDisplayed()
-        composeRule.onNodeWithTag("profile.qr.save").performSemanticsAction(SemanticsActions.OnClick) { it() }
-        composeRule.onNodeWithText("Share profile URL").assertDoesNotExist()
+        openShareMenu()
+        composeRule.runOnIdle { savingState.value = true }
+        composeRule.onNodeWithText("Save to Gallery").assertDoesNotExist()
+        composeRule.onNodeWithTag("share_connect.share").assertIsNotEnabled()
+        composeRule.runOnIdle { savingState.value = false }
+        composeRule.onNodeWithTag("share_connect.share").assertIsEnabled()
+        composeRule.onNodeWithText("Save to Gallery").assertDoesNotExist()
+    }
+
+    /** At 200% text in RTL the Save to Gallery entry stays visible, enabled and activatable. */
+    @Test
+    fun saveToGalleryStaysReachableAtLargeTextInRtl() {
+        // The popup window reads the platform font scale, not the composition's density override, so set both.
+        RuntimeEnvironment.setFontScale(2f)
+        mount(largeTextRtl = true)
+        openShareMenu()
+        composeRule.onNodeWithText("Save to Gallery").assertIsDisplayed()
+        composeRule.onNodeWithTag(SAVE_ENTRY).assertIsEnabled().performClick()
         composeRule.runOnIdle { assertEquals(1, saveCount) }
+    }
+
+    /** Opens the Share menu from its top-bar trigger. */
+    private fun openShareMenu() {
+        composeRule.onNodeWithTag("share_connect.share").performClick()
     }
 
     /** Mounts the composable under test. */
@@ -135,25 +208,38 @@ class ShareConnectScreenBehaviorTest {
         scanInvalid: Boolean = false,
         saving: Boolean = false,
         canSave: Boolean = true,
+        largeTextRtl: Boolean = false,
     ) {
+        savingState.value = saving
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
-                ShareConnectContent(
-                    profile = shareConnectFixture,
-                    qrContent = "marmot://profile/${shareConnectFixture.npub}?from=qr",
-                    copied = copied,
-                    scanInvalid = scanInvalid,
-                    pictureSaveInProgress = saving,
-                    canSavePicture = canSave,
-                    onSavePicture = { saveCount++ },
-                    onBack = { backCount++ },
-                    onShareUrl = { urlShareCount++ },
-                    onSharePicture = { pictureShareCount++ },
-                    onCopy = { copyCount++ },
-                    onOpenScanner = { scannerCount++ },
-                )
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, if (largeTextRtl) 2f else 1f),
+                LocalLayoutDirection provides if (largeTextRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = false) {
+                    ShareConnectContent(
+                        profile = shareConnectFixture,
+                        qrContent = "marmot://profile/${shareConnectFixture.npub}?from=qr",
+                        copied = copied,
+                        scanInvalid = scanInvalid,
+                        pictureShareInProgress = sharingState.value,
+                        gallerySaveInProgress = savingState.value,
+                        canSaveToGallery = canSave,
+                        onSaveToGallery = { saveCount++ },
+                        onBack = { backCount++ },
+                        onShareUrl = { urlShareCount++ },
+                        onSharePicture = { pictureShareCount++ },
+                        onCopy = { copyCount++ },
+                        onOpenScanner = { scannerCount++ },
+                    )
+                }
             }
         }
+    }
+
+    private companion object {
+        const val SAVE_ENTRY = "share_connect.save_to_gallery"
     }
 }
 
