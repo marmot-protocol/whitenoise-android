@@ -64,9 +64,13 @@ internal fun formatNativeStartupSnapshot(snapshot: NativeStartupSnapshotFfi): St
     buildString {
         appendLine("native_startup schema=1 enabled=${snapshot.enabled}")
         appendLine("dropped_events=${snapshot.droppedEvents} dropped_scopes=${snapshot.droppedScopes}")
+        appendLine("history_order=newest_first")
         val observations =
             snapshot.active.take(MAX_NATIVE_ACTIVE_SCOPES).map { "active" to it } +
-                snapshot.events.takeLast(MAX_NATIVE_HISTORY_EVENTS).map { "event" to it }
+                snapshot.events
+                    .takeLast(MAX_NATIVE_HISTORY_EVENTS)
+                    .asReversed()
+                    .map { "event" to it }
         for ((kind, observation) in observations) {
             val line =
                 "$kind stage=${observation.stage.name} outcome=${observation.outcome.name} " +

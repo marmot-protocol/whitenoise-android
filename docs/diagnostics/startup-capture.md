@@ -46,4 +46,6 @@ open staging, wait for Retry, tap Copy, then tap Share startup diagnostics and s
 the text file to the investigating developer. A recorded `NATIVE_CONSTRUCT` or
 `MARMOT_START` stall identifies a host boundary, not a native root cause. After native construction, this build also enables MDK’s bounded startup recorder before account/start work. Sharing reads fixed phases and anonymous timings on the existing export IO owner, with a 12 KiB native-detail ceiling inside the whole 32 KiB export ceiling. The source is fenced to the published runtime; native failure retains the host receipt. Construction failures have no native runtime to query. Copy and the retained host file remain independent of native calls. These observations do not repair the underlying failure.
 
+Historical native observations are labelled and emitted newest first, so the byte ceiling preserves the latest completed or failed stage after the active scopes.
+
 An explicit diagnostic archive during an active local performance session also includes selected native process-cumulative counters and duration sums. These are labelled as cumulative, rather than as measurements of only the host session. Native snapshots introduce no polling, uploads or consent changes.

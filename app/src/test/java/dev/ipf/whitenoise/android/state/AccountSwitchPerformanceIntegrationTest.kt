@@ -69,7 +69,7 @@ class AccountSwitchPerformanceIntegrationTest {
                 assertEquals("target profile seeds must be visible at activation", "Alice", profileTitleAtActivation)
                 val switchIdentityPages = fixture.identityProjectionPages.drop(identityReadsBeforeSwitch)
                 assertEquals(1, switchIdentityPages.size)
-                assertTrue(switchIdentityPages.single().containsAll(listOf(ACCOUNT_A_ID, ACCOUNT_B_ID)))
+                assertEquals(listOf(ACCOUNT_A_ID), switchIdentityPages.single())
                 assertEquals(
                     "account activation should need one authoritative row read",
                     directReadsBeforeSwitch + 1,

@@ -129,6 +129,24 @@ class NativeDiagnosticSnapshotTest {
         assertTrue(text.toByteArray().size <= 12 * 1024)
     }
 
+    @Test
+    fun byteCappedHistoryRetainsTheNewestObservation() {
+        val events =
+            List(96) { index ->
+                observation().copy(
+                    elapsedMs = index.toULong(),
+                    stageElapsedMs = ULong.MAX_VALUE,
+                    migrationVersion = UInt.MAX_VALUE,
+                    migrationsCompleted = UInt.MAX_VALUE,
+                )
+            }
+        val text = formatNativeStartupSnapshot(snapshot().copy(active = emptyList(), events = events))
+        assertTrue(text.contains("history_order=newest_first"))
+        assertTrue(text.contains("elapsed_ms=95 stage_elapsed_ms="))
+        assertFalse(text.contains("elapsed_ms=0 stage_elapsed_ms="))
+        assertTrue(text.endsWith("native_startup_records_capped=true\n"))
+    }
+
     private fun snapshot() = NativeStartupSnapshotFfi(true, listOf(observation()), emptyList(), 0uL, 0uL)
 
     private fun observation() =

@@ -11877,8 +11877,7 @@ class ConversationController(
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
-                    val uncertainReply = nativeInvoked && inviteReplyNeedsReconciliation(throwable)
-                    if (uncertainReply && reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore)) {
+                    if (reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore, nativeInvoked, throwable)) {
                         presentConversationTransient(R.string.toast_invite_sent)
                         return@track true
                     }
@@ -11948,10 +11947,13 @@ class ConversationController(
         refs: List<String>,
         admins: List<String>,
         absentBefore: Boolean,
+        nativeInvoked: Boolean,
+        failure: Throwable,
     ): Boolean {
+        val eligible = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
+        if (!eligible) return false
         val beforeRead = groupAuthorityEpoch
         refreshManagementState()
-        if (!absentBefore) return false
         val observedMembers =
             membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
         val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
