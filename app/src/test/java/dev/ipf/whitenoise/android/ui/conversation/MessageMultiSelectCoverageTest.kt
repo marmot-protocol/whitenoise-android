@@ -126,6 +126,7 @@ class MessageMultiSelectCoverageTest {
         )
     }
 
+    /** Batch selection draws a leading gutter and tints behind the bubble content instead of over it. */
     @Test
     fun bubbleSelectionUsesLeadingGutterWithTintBehindContent() {
         val source = source("messages/MessageBubble.kt")
@@ -142,6 +143,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.contains("canSelect = !deleted && !actionsReadOnly && batchSelectable"))
     }
 
+    /** Every action-menu entry point is gated on selection mode and resets the long-press anchor before opening. */
     @Test
     fun selectionModeBlocksEveryMessageActionMenuEntryPoint() {
         val source = source("messages/MessageBubble.kt").replace(Regex("\\s+"), " ")
@@ -156,36 +158,39 @@ class MessageMultiSelectCoverageTest {
         assertTrue(
             source.contains(
                 "if (!selectionMode && !textSelectionMode) { " +
-                    "longPressWindowPosition = null selectionSeedVisibleOffset = null longPressWindowY = null " +
-                    "actionMenuAnchorBounds = messageBoundsInWindow[0] " +
+                    "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
+                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
                     "onActionMenuOpenChange(true)",
             ),
         )
         assertTrue(
             source.contains(
                 "if (!deleted && !selectionMode && !textSelectionMode) { " +
-                    "longPressWindowPosition = null selectionSeedVisibleOffset = null longPressWindowY = null " +
-                    "actionMenuAnchorBounds = messageBoundsInWindow[0] " +
+                    "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
+                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
                     "onActionMenuOpenChange(true)",
             ),
         )
     }
 
+    /** Delete for me and delete for everyone share the bubble's single in-flight guard. */
     @Test
     fun messageBubbleUsesOneGuardForBothDeleteMutations() {
+        val state = source("messages/MessageBubbleState.kt")
         val source =
             source("messages/MessageBubble.kt")
-                .substringAfter("var deleteDialogOpen")
+                .substringAfter("fun requestDelete()")
                 .substringBefore("fun reactWithEmoji")
 
-        assertFalse(source.contains("deleteForMeInFlight"))
-        assertFalse(source.contains("deleteForEveryoneInFlight"))
-        assertTrue(source.contains("var deleteInFlight by remember"))
-        assertTrue(source.split("if (deleteInFlight) return").size - 1 == 2)
-        assertTrue(source.split("deleteInFlight = true").size - 1 == 2)
-        assertTrue(source.split("deleteInFlight = false").size - 1 == 2)
+        assertFalse(state.contains("deleteForMeInFlight") || source.contains("deleteForMeInFlight"))
+        assertFalse(state.contains("deleteForEveryoneInFlight") || source.contains("deleteForEveryoneInFlight"))
+        assertTrue(state.contains("var deleteInFlight by mutableStateOf(false)"))
+        assertTrue(source.split("if (surfaces.deleteInFlight) return").size - 1 == 2)
+        assertTrue(source.split("surfaces.deleteInFlight = true").size - 1 == 2)
+        assertTrue(source.split("surfaces.deleteInFlight = false").size - 1 == 2)
     }
 
+    /** Reads a conversation source file from either the module or the repository working directory. */
     private fun source(relativePath: String): String =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/$relativePath"),

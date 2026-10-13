@@ -32,7 +32,7 @@ class LongMessageFullScreenComposerCoverageTest {
         val fullScreenCall =
             body
                 .substringAfter("MessageFullScreenView(")
-                .substringBefore("if (emojiPickerOpen")
+                .substringBefore("if (surfaces.emojiPickerOpen")
 
         assertTrue(
             "expanded long-message view must keep its absolute clock timestamp instead of the bubble-relative label",
@@ -61,7 +61,7 @@ class LongMessageFullScreenComposerCoverageTest {
                 "composerGate == ComposerGate.COMPOSER"
         assertTrue(
             "expanded reader reply/react actions must require a live message and an active shared composer",
-            "if (expandedFullView && !deleted)" in body &&
+            "if (surfaces.expandedFullView && !deleted)" in body &&
                 expandedComposerGate in body &&
                 "canReply = canUseExpandedComposer" in fullScreenCall &&
                 "canReact = canUseExpandedComposer" in fullScreenCall,

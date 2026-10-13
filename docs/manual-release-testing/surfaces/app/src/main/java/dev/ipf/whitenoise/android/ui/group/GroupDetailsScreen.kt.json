@@ -1124,7 +1124,8 @@
         "anchor": "R.string.confirm_sole_admin_transfer_then_leave_message",
         "test_ids": [
           "GRP-001",
-          "GRP-008"
+          "GRP-008",
+          "GRP-010"
         ]
       },
       {
@@ -1357,7 +1358,8 @@
         "anchor": "R.string.transfer_admin",
         "test_ids": [
           "GRP-001",
-          "GRP-008"
+          "GRP-008",
+          "GRP-010"
         ]
       },
       {
