@@ -15,7 +15,7 @@ internal suspend fun widgetWindowRows(
     val matches = linkedMapOf<String, ConversationWidgetRow>()
     var frame = checkNotNull(handle.snapshot())
     val generation = frame.subscriptionGeneration
-    while (true) {
+    while (matches.size < MAX_WIDGET_ROWS) {
         currentCoroutineContext().ensureActive()
         check(frame.subscriptionGeneration == generation)
         for (presented in frame.rows) {
@@ -31,10 +31,10 @@ internal suspend fun widgetWindowRows(
                         preview = null,
                         activity = row.activitySortAt,
                     )
-                if (matches.size == MAX_WIDGET_ROWS) return matches.values.toList()
+                if (matches.size == MAX_WIDGET_ROWS) break
             }
         }
-        if (!unreadOnly || !frame.hasMoreAfter) return matches.values.toList()
+        if (matches.size == MAX_WIDGET_ROWS || !unreadOnly || !frame.hasMoreAfter) break
         val edge =
             frame.rows
                 .lastOrNull()
@@ -53,6 +53,7 @@ internal suspend fun widgetWindowRows(
             return matches.values.toList()
         }
     }
+    return matches.values.toList()
 }
 
 internal const val WIDGET_NATIVE_PAGE_SIZE = 50u

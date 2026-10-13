@@ -57,16 +57,16 @@ private fun installedTranslatorPackage(manager: PackageManager): PackageInfo =
 
 private fun validateTranslatorPackage(info: PackageInfo) {
     val signers = info.signingInfo?.apkContentsSigners.orEmpty()
-    if (signers.size != 1 || certificateHash(signers.single().toByteArray()) != OFFLINE_TRANSLATOR_SIGNER) {
-        throw TranslationException(TranslationFailure.UNVERIFIED_ENGINE)
-    }
-    if (info.versionName !in setOf("0.8.3", "0.8.4", "0.8.5")) {
-        throw TranslationException(TranslationFailure.INCOMPATIBLE_ENGINE)
-    }
-    // These publisher releases include plaintext logging in the exported Binder service.
-    // No release is privacy-qualified yet. A new signed artifact must be inspected before
-    // adding it here; version names and signer identity alone cannot establish this boundary.
-    throw TranslationException(TranslationFailure.PRIVACY_UNQUALIFIED_ENGINE)
+    val failure =
+        when {
+            signers.size != 1 || certificateHash(signers.single().toByteArray()) != OFFLINE_TRANSLATOR_SIGNER ->
+                TranslationFailure.UNVERIFIED_ENGINE
+            info.versionName !in setOf("0.8.3", "0.8.4", "0.8.5") -> TranslationFailure.INCOMPATIBLE_ENGINE
+            // These publisher releases log private data in the exported service/detector.
+            // A new signed artifact must be qualified before enabling any release.
+            else -> TranslationFailure.PRIVACY_UNQUALIFIED_ENGINE
+        }
+    throw TranslationException(failure)
 }
 
 private fun compatibleTranslatorService(service: ServiceInfo?): Boolean {
