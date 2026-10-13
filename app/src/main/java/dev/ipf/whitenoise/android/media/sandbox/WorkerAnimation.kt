@@ -48,25 +48,23 @@ internal class WorkerAnimation(
                     require(info.size.width in 1..MAX_ANIMATION_SOURCE_EDGE_PX)
                     require(info.size.height in 1..MAX_ANIMATION_SOURCE_EDGE_PX)
                     require(info.size.width.toLong() * info.size.height <= MAX_ANIMATION_SOURCE_CANVAS_PIXELS)
+                    val target = MediaPipeline.targetDimensions(info.size.width, info.size.height, edge)
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    decoder.setTargetSize(target.first, target.second)
                 } as? AnimatedImageDrawable,
             )
-        // API 30's rotated animated WebP decoder can reject frame zero when decoder target-size
-        // scaling is used. Admission already bounds the native canvas to 4 Mi pixels; render
-        // that bounded source into target-sized pixels instead of adding a privileged fallback.
-        val target = MediaPipeline.targetDimensions(drawable.intrinsicWidth, drawable.intrinsicHeight, edge)
         val capacity =
             MediaDecodePolicy.pixelBytes(
-                target.first,
-                target.second,
+                drawable.intrinsicWidth,
+                drawable.intrinsicHeight,
                 edge,
                 output.size,
             )
         require(capacity != null)
         drawable.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
         drawable.callback = this
-        drawable.setBounds(0, 0, target.first, target.second)
-        bitmap = Bitmap.createBitmap(target.first, target.second, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, drawable.intrinsicWidth, drawable.intrinsicHeight)
+        bitmap = Bitmap.createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
         canvas = Canvas(bitmap)
     }
 

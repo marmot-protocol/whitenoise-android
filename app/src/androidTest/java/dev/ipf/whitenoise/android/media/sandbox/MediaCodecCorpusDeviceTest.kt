@@ -124,7 +124,7 @@ class MediaCodecCorpusDeviceTest {
         val fixtures =
             listOf(
                 "aosp-animated.gif.b64" to "eec5e745032b9775d67f040d9ab95ae3dc296100ce0c5d6bf95667bf2d27d2a6",
-                "aosp-animated_webp.webp.b64" to "00a108b42a6877076e96c3cde6d75e03c6eb80639489e05ddcf509867669f666",
+                "aosp-webp_animated.webp.b64" to "292753f066add623af1e30bbeeca58f15b3d6d1052e12b13e30f21f8d3c14505",
             )
         for ((asset, hash) in fixtures) {
             val source =
@@ -155,6 +155,26 @@ class MediaCodecCorpusDeviceTest {
                 )
             assertChangingFrames(animation as IsolatedAnimationDrawable)
         }
+    }
+
+    @Test
+    fun rotatedWebpIsQualifiedOrSafelyRefusedWithoutDisablingOrdinaryAnimation() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        IsolatedMediaDecoder.install(instrumentation.targetContext)
+        val source =
+            android.util.Base64.decode(
+                instrumentation.context.assets
+                    .open("aosp-animated_webp.webp.b64")
+                    .bufferedReader()
+                    .use { it.readText() },
+                android.util.Base64.DEFAULT,
+            )
+        val animation =
+            dev.ipf.whitenoise.android.media.MediaPipeline
+                .decodeAnimatedDrawable(source, 96)
+        println("MEDIA_FORMAT_QUALIFICATION format=rotatedWebP api=${android.os.Build.VERSION.SDK_INT} animation=${animation != null}")
+        if (animation != null) assertChangingFrames(animation as IsolatedAnimationDrawable)
+        requireNotNull(IsolatedMediaDecoder.decode(image(Bitmap.CompressFormat.PNG), 2)).recycle()
     }
 
     private fun assertChangingFrames(animation: IsolatedAnimationDrawable) {

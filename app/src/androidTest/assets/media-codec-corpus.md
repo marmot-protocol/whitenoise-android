@@ -22,3 +22,13 @@ from the same tag's [graphics drawables](https://android.googlesource.com/platfo
 Their unchanged bytes exercise admission and genuinely changing stream pixels.
 They are Apache-2.0 platform fixtures; they do not replace common keyboard,
 GIPHY, messenger or personal-camera qualification.
+
+`animated_webp.webp` is specifically the later CTS EXIF-orientation fixture,
+used by `AnimatedImageDrawableTest.testExif`; that test/fixture is absent from
+Android 11 CTS. API 30 qualification observed native frame-zero refusal with
+both decoder downscaling and full-canvas rendering. Keep that refusal separate
+from successful ordinary playback; do not accept incomplete native frames or
+add a privileged decoder. `webp_animated.webp` is the ordinary animation fixture
+used by CTS encoded-repeat tests (340 bytes, SHA-256
+`292753f066add623af1e30bbeeca58f15b3d6d1052e12b13e30f21f8d3c14505`).
+Its genuinely changing accepted frame sequence is required by the campaign.
