@@ -108,6 +108,9 @@ open class WhiteNoiseApplication :
     /** Attaches process-wide diagnostics, language, playback and transfer-count wiring before any component runs. */
     override fun onCreate() {
         super.onCreate()
+        if (android.os.Process.isIsolated()) return
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .install(this)
         DictationDiagnostics.attach(this)
         DmCreationDiagnostics.attach(this)
         StartupDiagnostics.bind(this)

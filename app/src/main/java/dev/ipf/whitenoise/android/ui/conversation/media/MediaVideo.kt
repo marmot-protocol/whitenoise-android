@@ -394,33 +394,16 @@ internal fun MediaVideoGridTile(
         val needsPoster = posterBitmap == null
         val (frame, duration) =
             withContext(Dispatchers.IO) {
-                val mmr = android.media.MediaMetadataRetriever()
-                // Held so a publication elsewhere in the directory cannot delete the file mid-read.
                 holdCacheFileInUse(f)
                 try {
-                    mmr.setDataSource(f.absolutePath)
-                    val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
-                    val bitmap =
-                        if (needsPoster) {
-                            mmr.getScaledFrameAtTime(
-                                0L,
-                                android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                                edge,
-                                edge,
-                            )
-                        } else {
-                            null
-                        }
-                    bitmap to
-                        (
-                            mmr
-                                .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
-                                ?.toLongOrNull() ?: 0L
+                    val probed =
+                        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.probe(
+                            f,
+                            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                            needsPoster,
                         )
-                } catch (t: Throwable) {
-                    null to 0L
+                    probed?.poster to (probed?.durationMs ?: 0L)
                 } finally {
-                    runCatching { mmr.release() }
                     releaseCacheFileInUse(f)
                 }
             }
@@ -862,35 +845,16 @@ internal fun MediaVideoBubble(
         val needsPoster = posterBitmap == null
         val (bm, dur) =
             withContext(Dispatchers.IO) {
-                val mmr = android.media.MediaMetadataRetriever()
-                // Held so a publication elsewhere in the directory cannot delete the file mid-read.
                 holdCacheFileInUse(f)
                 try {
-                    mmr.setDataSource(f.absolutePath)
-                    val frame =
-                        if (needsPoster) {
-                            // Scale down to bubble preview size so a 4K source doesn't
-                            // hold a ~33 MB ARGB bitmap per visible video bubble.
-                            val edge = MediaPipeline.THUMBNAIL_MAX_EDGE_PX
-                            mmr.getScaledFrameAtTime(
-                                0L,
-                                android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                                edge,
-                                edge,
-                            )
-                        } else {
-                            null
-                        }
-                    val d =
-                        mmr
-                            .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
-                            ?.toLongOrNull() ?: 0L
-                    frame to d
-                } catch (t: Throwable) {
-                    Log.w("MediaVideoBubble", "poster extract failed", t)
-                    null to 0L
+                    val probed =
+                        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.probe(
+                            f,
+                            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                            needsPoster,
+                        )
+                    probed?.poster to (probed?.durationMs ?: 0L)
                 } finally {
-                    runCatching { mmr.release() }
                     releaseCacheFileInUse(f)
                 }
             }
@@ -1558,10 +1522,7 @@ internal fun VideoViewerPage(
                             }
                         },
                     )
-                    setMediaItem(
-                        androidx.media3.common.MediaItem
-                            .fromUri(android.net.Uri.fromFile(file)),
-                    )
+                    setMediaSource(requireNotNull(localVideoSource(context, android.net.Uri.fromFile(file))))
                 }
         }
     DisposableEffect(exo) {

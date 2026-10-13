@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -17,11 +18,16 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,6 +39,164 @@ import org.robolectric.annotation.Config
 class NostrEventCardTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun bodyOnlyImageOffersAnExplicitCardActionWithoutFetching() {
+        val downloads =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+            downloads.incrementAndGet()
+            byteArrayOf()
+        }
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    val state =
+                        rememberNostrEventPreviewState(
+                            NostrEventCardState.Loaded(noteCard().copy(readerBody = "Body with a photo")),
+                            mentionDisplayName = { null },
+                            parseMarkdown = { text -> bodyImageDocument(text) },
+                        )
+                    NostrEventCard(
+                        state = state,
+                        authorDisplayName = { "Alex" },
+                        contentColor = Color.Black,
+                        onRetry = {},
+                        onCopy = {},
+                        onOpen = {},
+                    )
+                }
+            }
+            composeRule.waitUntil(10_000) {
+                composeRule
+                    .onAllNodesWithText(string(R.string.nostr_event_view_image))
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).assertIsDisplayed()
+            composeRule.runOnIdle { assertEquals(0, downloads.get()) }
+        } finally {
+            AvatarImageLoader.resetProfileImageFetcherForTests()
+        }
+    }
+
+    @Test
+    fun bodyVideoFallbackDoesNotInheritAnotherUrlsMimeType() {
+        val fallback = "https://cdn.example/body.mp4"
+        val original =
+            noteCard().copy(
+                readerBody = "A body video",
+                mediaUrl = "http://cdn.example/unsafe.m3u8",
+                mediaMimeType = "application/vnd.apple.mpegurl",
+            )
+        var presented: NostrEventCardModel? = null
+        composeRule.setContent {
+            presented =
+                (
+                    rememberNostrEventPreviewState(
+                        NostrEventCardState.Loaded(original),
+                        mentionDisplayName = { null },
+                        parseMarkdown = {
+                            MarkdownDocumentFfi(
+                                listOf(
+                                    MarkdownBlockFfi.Paragraph(
+                                        listOf(
+                                            MarkdownInlineFfi.Link(
+                                                fallback,
+                                                null,
+                                                listOf(MarkdownInlineFfi.Text("Video")),
+                                                MarkdownLinkDestinationKindFfi.WEB,
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                false,
+                                byteArrayOf(),
+                            )
+                        },
+                    ) as NostrEventCardState.Loaded
+                ).card
+        }
+        composeRule.waitUntil(10_000) { presented?.mediaUrl == fallback }
+        composeRule.runOnIdle { assertNull(presented?.mediaMimeType) }
+    }
+
+    @Test
+    fun longTypedVideoUrlRemainsPlayableWithoutABodyFallback() {
+        val original =
+            noteCard().copy(
+                summary = null,
+                readerBody = null,
+                mediaUrl = "https://cdn.example/video?token=${"x".repeat(3000)}",
+                mediaMimeType = "video/mp4",
+            )
+        var selected: NostrEventCardModel? = null
+        composeRule.setContent {
+            selected =
+                (
+                    rememberNostrEventPreviewState(
+                        NostrEventCardState.Loaded(original),
+                        mentionDisplayName = { null },
+                        parseMarkdown = { error("No body to parse") },
+                    ) as NostrEventCardState.Loaded
+                ).card
+        }
+        composeRule.runOnIdle {
+            assertEquals(original.mediaUrl, selected?.mediaUrl)
+            assertEquals(original.mediaMimeType, selected?.mediaMimeType)
+        }
+    }
+
+    private fun bodyImageDocument(text: String): MarkdownDocumentFfi {
+        val inline =
+            if (text == "Body with a photo") {
+                MarkdownInlineFfi.Image(
+                    dest = "https://images.example/body-only",
+                    title = null,
+                    alt = listOf(MarkdownInlineFfi.Text("Photo")),
+                    classification = MarkdownLinkDestinationKindFfi.WEB,
+                )
+            } else {
+                MarkdownInlineFfi.Text(text)
+            }
+        return MarkdownDocumentFfi(listOf(MarkdownBlockFfi.Paragraph(listOf(inline))), false, byteArrayOf())
+    }
+
+    @Test
+    fun compactCardOffersImageWithoutStartingAPublicImageRequest() {
+        val downloads =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+            downloads.incrementAndGet()
+            byteArrayOf()
+        }
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    NostrEventCard(
+                        state =
+                            NostrEventCardState.Loaded(
+                                noteCard().copy(imageUrls = listOf("https://images.example/manual")),
+                            ),
+                        authorDisplayName = { "Alex" },
+                        contentColor = Color.Black,
+                        onRetry = {},
+                        onCopy = {},
+                        onOpen = {},
+                    )
+                }
+            }
+            composeRule
+                .onNodeWithText(string(R.string.nostr_event_view_image))
+                .assertIsDisplayed()
+                .assertHasClickAction()
+            composeRule.runOnIdle { assertEquals(0, downloads.get()) }
+        } finally {
+            AvatarImageLoader.resetProfileImageFetcherForTests()
+        }
+    }
 
     @Test
     fun verifiedCardKeepsItsReaderActionWhilePreviewParsingIsPending() {

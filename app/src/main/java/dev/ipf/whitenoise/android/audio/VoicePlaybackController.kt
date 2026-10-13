@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.audio
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
-import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.util.Log
 import android.util.LruCache
@@ -202,12 +201,11 @@ object VoicePlaybackController {
         durationCache.get(path)?.let { return it }
         val probed =
             withContext(Dispatchers.IO) {
-                runCatching {
-                    MediaMetadataRetriever().use { mmr ->
-                        mmr.setDataSource(path)
-                        mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toIntOrNull() ?: 0
-                    }
-                }.getOrDefault(0)
+                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                    .probe(file, 1, false)
+                    ?.durationMs
+                    ?.coerceAtMost(Int.MAX_VALUE.toLong())
+                    ?.toInt() ?: 0
             }
         // Only cache a real duration. A transient probe (file still being
         // written, momentary IO error) yields 0; caching that would pin the

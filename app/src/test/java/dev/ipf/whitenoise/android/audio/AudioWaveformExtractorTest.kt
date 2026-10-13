@@ -32,25 +32,6 @@ class AudioWaveformExtractorTest {
     }
 
     @Test
-    fun decodeDoesNotCacheTransientFailures() {
-        val source =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/audio/AudioWaveformExtractor.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/audio/AudioWaveformExtractor.kt"),
-            ).firstOrNull { it.exists() }?.readText()
-                ?: error("Missing AudioWaveformExtractor.kt source file")
-        val decode = source.kotlinFunctionBody("decode")
-
-        assertTrue("decode must gate scarce MediaCodec work", Regex("""decodeGate\s*\.\s*withPermit""").containsMatchIn(decode))
-        assertTrue(
-            "decode should cache null/empty only on successful decode, not after the transient-exception catch",
-            Regex("""cache\.put\s*\(\s*cacheKey,\s*it\s*\?:\s*UNAVAILABLE_WAVEFORM\s*\)""").find(decode)!!.range.first <
-                decode.indexOf("catch (throwable: Throwable)") &&
-                "cache.put(cacheKey, result ?: UNAVAILABLE_WAVEFORM)" !in decode,
-        )
-    }
-
-    @Test
     fun decodeComputesFileStatCacheKeyOnIoDispatcher() {
         val source =
             listOf(

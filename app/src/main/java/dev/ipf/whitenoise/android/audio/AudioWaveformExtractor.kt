@@ -6,7 +6,6 @@ import android.media.MediaFormat
 import android.util.Log
 import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -46,7 +45,6 @@ object AudioWaveformExtractor {
     // internally synchronized, preserving the prior ConcurrentHashMap's
     // thread-safety guarantee.
     private const val CACHE_MAX_ENTRIES = 256
-    private val UNAVAILABLE_WAVEFORM = FloatArray(0)
     private val decodeGate = Semaphore(2)
 
     // android.media.AudioFormat.ENCODING_PCM_* values, redeclared so the pure
@@ -64,12 +62,13 @@ object AudioWaveformExtractor {
         val result =
             withContext(Dispatchers.IO) {
                 val cacheKey = waveformCacheKey(file)
-                cache.get(cacheKey)?.let { return@withContext it.takeIf { cached -> cached.isNotEmpty() } }
+                cache.get(cacheKey)?.let { return@withContext it }
                 try {
                     decodeGate
                         .withPermit {
-                            decodeBlocking(file) { ensureActive() }
-                        }.also { cache.put(cacheKey, it ?: UNAVAILABLE_WAVEFORM) }
+                            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                                .waveform(file)
+                        }.also { waveform -> waveform?.let { cache.put(cacheKey, it) } }
                 } catch (throwable: Throwable) {
                     if (throwable is CancellationException) throw throwable
                     Log.w(TAG, "waveform_decode_failed")
@@ -81,13 +80,13 @@ object AudioWaveformExtractor {
 
     internal fun waveformCacheKey(file: File): String = "${file.absolutePath}:${file.length()}:${file.lastModified()}"
 
-    private fun decodeBlocking(
-        file: File,
-        cancellationCheck: () -> Unit,
+    internal fun decodeFromDescriptor(
+        descriptor: java.io.FileDescriptor,
+        cancellationCheck: () -> Unit = {},
     ): FloatArray? =
         decodeBlocking(
-            filePath = file.absolutePath,
-            resources = AndroidAudioDecoderResources,
+            filePath = "",
+            resources = AndroidAudioDecoderResources(descriptor),
             cancellationCheck = cancellationCheck,
         )
 
@@ -160,7 +159,9 @@ object AudioWaveformExtractor {
                 cancellationCheck()
                 loopIterations++
                 if (loopIterations > maxLoopIterations) {
-                    throw IllegalStateException("audio waveform decode exceeded $maxLoopIterations codec loop iterations")
+                    throw IllegalStateException(
+                        "audio waveform decode exceeded $maxLoopIterations codec loop iterations",
+                    )
                 }
                 if (nanoTime() - startedAtNanos > maxElapsedNanos) {
                     throw IllegalStateException("audio waveform decode exceeded ${maxElapsedNanos / 1_000_000L}ms")
@@ -175,7 +176,13 @@ object AudioWaveformExtractor {
                             activeCodec.queueInputBuffer(inIdx, 0, 0, 0, endOfStream = true)
                             endOfStream = true
                         } else {
-                            activeCodec.queueInputBuffer(inIdx, 0, sampleSize, activeExtractor.sampleTime, endOfStream = false)
+                            activeCodec.queueInputBuffer(
+                                inIdx,
+                                0,
+                                sampleSize,
+                                activeExtractor.sampleTime,
+                                endOfStream = false,
+                            )
                             activeExtractor.advance()
                         }
                     }
@@ -401,20 +408,29 @@ internal interface AudioDecoderCodec<FormatT> {
     fun release()
 }
 
-private object AndroidAudioDecoderResources : AudioDecoderResources<MediaFormat> {
-    override fun createExtractor(): AudioDecoderExtractor<MediaFormat> = AndroidAudioDecoderExtractor(MediaExtractor())
+private class AndroidAudioDecoderResources(
+    private val descriptor: java.io.FileDescriptor,
+) : AudioDecoderResources<MediaFormat> {
+    override fun createExtractor(): AudioDecoderExtractor<MediaFormat> {
+        val extractor = MediaExtractor()
+        return AndroidAudioDecoderExtractor(extractor, descriptor)
+    }
 
-    override fun createCodec(mime: String): AudioDecoderCodec<MediaFormat> = AndroidAudioDecoderCodec(MediaCodec.createDecoderByType(mime))
+    override fun createCodec(mime: String): AudioDecoderCodec<MediaFormat> {
+        val codec = MediaCodec.createDecoderByType(mime)
+        return AndroidAudioDecoderCodec(codec)
+    }
 }
 
 private class AndroidAudioDecoderExtractor(
     private val extractor: MediaExtractor,
+    private val descriptor: java.io.FileDescriptor,
 ) : AudioDecoderExtractor<MediaFormat> {
     override val trackCount: Int get() = extractor.trackCount
     override val sampleTime: Long get() = extractor.sampleTime
 
     override fun setDataSource(filePath: String) {
-        extractor.setDataSource(filePath)
+        extractor.setDataSource(descriptor)
     }
 
     override fun getTrackFormat(index: Int): MediaFormat = extractor.getTrackFormat(index)
@@ -488,7 +504,10 @@ private class AndroidAudioDecoderCodec(
 
     override fun getOutputBuffer(index: Int): ByteBuffer? = codec.getOutputBuffer(index)
 
-    override fun outputChannelCount(): Int = runCatching { codec.outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT) }.getOrDefault(1)
+    override fun outputChannelCount(): Int =
+        runCatching {
+            codec.outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        }.getOrDefault(1)
 
     override fun outputPcmEncoding(): Int =
         runCatching {

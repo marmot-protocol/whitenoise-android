@@ -2314,4 +2314,5 @@
     <string name="group_create_edit_members">Modifier les membres</string>
     <string name="group_create_unattributed_failure">Impossible d’identifier la personne concernée. Réessayez ou modifiez les membres.</string>
     <string name="media_reply_draft_conflict">Votre brouillon a changé. Conservez cette réponse et réessayez, ou annulez la réponse avant l’envoi.</string>
+    <string name="photo_editor_budget_exceeded">Ce recadrage dépasse les limites de traitement sécurisé de l’image ou de la mémoire. Choisissez un recadrage plus large ou une qualité inférieure. La pièce jointe précédente reste inchangée.</string>
 </resources>

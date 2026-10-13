@@ -6511,6 +6511,8 @@ class WhiteNoiseAppState private constructor(
      */
     private fun clearCrossAccountCaches() {
         assertMainThread { "clearCrossAccountCaches" }
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .resetForAccount()
         // Revoke decrypted speech before another identity can use platform Resume.
         stopSpeaking()
         diagnostics.observations.invalidate()

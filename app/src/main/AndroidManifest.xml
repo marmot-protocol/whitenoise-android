@@ -73,6 +73,12 @@
         android:theme="@style/Theme.WhiteNoise">
 
         <service
+            android:name=".media.sandbox.MediaDecodeService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":media_decoder" />
+
+        <service
             android:name=".state.AttachmentUserInitiatedDownloadService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE"

@@ -40,6 +40,41 @@ class PhotoEditorScreenshotTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun budgetRefusalLight() = captureBudgetRefusal(dark = false, suffix = "light")
+
+    @Test
+    fun budgetRefusalDark() = captureBudgetRefusal(dark = true, suffix = "dark")
+
+    private fun captureBudgetRefusal(
+        dark: Boolean,
+        suffix: String,
+    ) {
+        val bitmap = editorSourceBitmap()
+        val size = EditorPixelSize(bitmap.width, bitmap.height)
+        val holder = PhotoEditorStateHolder(PhotoEditRecipe.Original, MediaQuality.High, size)
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        holder.beginSaving()
+        holder.finishSaving(context.getString(R.string.photo_editor_budget_exceeded))
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = dark) {
+                    PhotoEditorScreen(
+                        previewBitmap = bitmap,
+                        sourceInfo = PhotoEditorSourceInfo(size, size, 1, "image/png", false),
+                        stateHolder = holder,
+                        onCancel = {},
+                        onSave = { _, _ -> },
+                    )
+                }
+            }
+            composeRule.onNodeWithText(context.getString(R.string.photo_editor_budget_exceeded)).assertIsDisplayed()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_budget_refusal_$suffix.png")
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    @Test
     fun photoEditorSquareCrop() {
         val bitmap = editorSourceBitmap()
         val source =

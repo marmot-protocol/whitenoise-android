@@ -92,7 +92,7 @@ class AnimationSourceAdmissionDeviceTest {
         mediaType: String,
     ): DecodedAttachmentPresentation? =
         runBlocking {
-            decodeMessageAttachmentImage(bytes, mediaType, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+            decodeMessageAttachmentImage(bytes, mediaType, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, animationAllowed = true)
         }
 
     /**

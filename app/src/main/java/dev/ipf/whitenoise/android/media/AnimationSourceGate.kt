@@ -16,8 +16,9 @@ internal fun <T : Any> decodeAdmittedAttachmentImage(
     bytes: ByteArray,
     decodeAnimated: () -> T?,
     decodeStill: () -> T?,
+    admission: AnimationSourceAdmission = admitAnimationSource(bytes),
 ): T? =
-    when (admitAnimationSource(bytes)) {
+    when (admission) {
         is AnimationSourceAdmission.Refused -> null
         is AnimationSourceAdmission.Admitted -> decodeAnimated() ?: decodeStill()
         AnimationSourceAdmission.NotAnimation -> decodeStill()

@@ -206,16 +206,15 @@ internal class ContactPictureStore(
         internal val lock = Any()
 
         /** Both encoded length and decoded geometry are checked before any image allocation. */
+        @Suppress("ReturnCount") // Byte size and sandbox inspection fail closed before geometry checks.
         private fun validPicture(bytes: ByteArray): Boolean {
             if (bytes.size !in 1..MAX_BYTES) return false
-            val bounds =
-                android.graphics.BitmapFactory
-                    .Options()
-                    .apply { inJustDecodeBounds = true }
-            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            return bounds.outMimeType == "image/png" &&
-                bounds.outWidth == bounds.outHeight &&
-                bounds.outWidth in 1..dev.ipf.whitenoise.android.media.PRIVATE_CONTACT_PICTURE_EDGE
+            val info =
+                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                    .inspect(bytes) ?: return false
+            return info.mime == "image/png" &&
+                info.width == info.height &&
+                info.width in 1..dev.ipf.whitenoise.android.media.PRIVATE_CONTACT_PICTURE_EDGE
         }
 
         /** Identical account/contact normalization to private nickname keys, with filenames containing neither. */

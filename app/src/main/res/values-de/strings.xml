@@ -2331,4 +2331,5 @@
     <string name="group_create_edit_members">Mitglieder bearbeiten</string>
     <string name="group_create_unattributed_failure">Wir konnten keine betroffene Person ermitteln. Versuche es erneut oder bearbeite die Mitglieder.</string>
     <string name="media_reply_draft_conflict">Dein Entwurf wurde geändert. Behalte diese Antwort und versuche es erneut, oder brich die Antwort vor dem Senden ab.</string>
+    <string name="photo_editor_budget_exceeded">Dieser Zuschnitt benötigt mehr Bilddaten oder Arbeitsspeicher, als sicher verarbeitet werden können. Wähle einen größeren Bildausschnitt oder eine niedrigere Qualität. Der bisherige Anhang bleibt unverändert.</string>
 </resources>

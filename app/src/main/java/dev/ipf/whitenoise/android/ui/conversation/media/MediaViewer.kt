@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -1033,6 +1034,13 @@ internal fun ViewerPage(
     // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
     // and retries when the real reference arrives.
     val pageKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
+    val animationsEnabled =
+        dev.ipf.whitenoise.android.ui.common
+            .rememberSystemAnimationsEnabled()
+    val viewerLifecycle by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow
+        .collectAsState()
+    val animateCurrent =
+        isCurrent && animationsEnabled && viewerLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
     val cachedThumbnail =
         remember(pageKey) {
             controller
@@ -1058,12 +1066,14 @@ internal fun ViewerPage(
             is DecodedAttachmentPresentation.Animated -> current.drawable.intrinsicHeight
             null -> 0
         }
-    LaunchedEffect(pageKey, viewerReloadToken, isCurrent) {
+    LaunchedEffect(pageKey, viewerReloadToken, isCurrent, animateCurrent) {
         // Mirror the video page's gating: neighbour pages composed during a
         // swipe must not each run a viewer-resolution decode (with its ~4×
         // transient) concurrently with the current page's. A page decodes
         // once it becomes current; an already-decoded bitmap is kept.
-        if (!isCurrent || presentation != null) return@LaunchedEffect
+        val promoteAnimation =
+            animateCurrent && (presentation as? DecodedAttachmentPresentation.Static)?.animationDeferred == true
+        if (!isCurrent || (presentation != null && !promoteAnimation)) return@LaunchedEffect
         viewerFailed = false
         viewerTooLarge = false
         try {
@@ -1071,20 +1081,21 @@ internal fun ViewerPage(
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,
+                    animationAllowed = animateCurrent,
                     mediaType = reference.mediaType,
                     staticMaxEdgePx = MediaPipeline.VIEWER_MAX_EDGE_PX,
                 )
             if (decoded != null) {
                 presentation = decoded
-            } else {
+            } else if (!promoteAnimation) {
                 viewerFailed = true
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
         } catch (_: AttachmentTooLargeToPresentException) {
-            viewerTooLarge = true
+            viewerTooLarge = !promoteAnimation
         } catch (_: Throwable) {
-            viewerFailed = true
+            viewerFailed = !promoteAnimation
         }
     }
     DisposableEffect(pageKey, presentation) {
@@ -1165,6 +1176,7 @@ internal fun ViewerPage(
             is DecodedAttachmentPresentation.Animated ->
                 AnimatedDrawableAttachmentImage(
                     drawable = current.drawable,
+                    active = animateCurrent,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Fit,
                     modifier = viewerGestureModifier,

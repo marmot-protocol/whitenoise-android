@@ -1,0 +1,32 @@
+{
+  "source": "app/src/main/marmotkit/MARMOT_VERSION",
+  "legacy_sha256": "34ba296d579b46bce19f226604762b538a03618f790ab820d9a072177742f965",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "MarmotKit 0.13.0 immutable SDK pin: in-place upgrade from formal 0.12.0 and snapshot d4e91c8d, payload-preserving migrations 0104/0105 and once-only reopen on completed layouts, schema 0107, retained drafts/attachment bytes, interrupted download recovery, responsive startup, signer/recovery compatibility and exact build provenance",
+        "source": "app/src/main/marmotkit/MARMOT_VERSION",
+        "anchor": "artifact-id=0.13.0",
+        "test_ids": [
+          "INT-010",
+          "INT-003",
+          "INT-004",
+          "INT-008",
+          "ONB-006",
+          "ONB-008",
+          "ONB-012",
+          "SET-019",
+          "ONB-017",
+          "ONB-018",
+          "ONB-020",
+          "SEC-007",
+          "SET-021",
+          "MSG-017",
+          "MED-019",
+          "MED-020"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

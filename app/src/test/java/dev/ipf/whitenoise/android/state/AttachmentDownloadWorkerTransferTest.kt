@@ -28,7 +28,7 @@ import org.robolectric.annotation.Config
 
 /** The WorkManager fallback counts its transfer card while it runs and reports how each run ended. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], application = WhiteNoiseApplication::class)
+@Config(sdk = [36], application = dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTestApplication::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 class AttachmentDownloadWorkerTransferTest {
     private lateinit var appContext: Context

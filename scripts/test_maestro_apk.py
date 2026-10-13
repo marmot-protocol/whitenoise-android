@@ -277,7 +277,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         text = self.workflow.split(f'\n  {name}:\n', 1)[1]
         return re.split(r'\n  [a-z][a-z-]*:\n', text, maxsplit=1)[0]
 
-    def enabled(self, name, event, selected, responsiveness=False):
+    def enabled(self, name, event, selected, responsiveness=False, media_sandbox=False):
         """Evaluate the trusted job condition with restricted event/input fixtures.
 
         Lane narrowing is tested in test_select_instrumented_lanes.py; here the
@@ -287,7 +287,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         lanes = SimpleNamespace(outputs=SimpleNamespace(attachment_fixture='true', connected='true'))
         return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness),
+                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding', responsiveness_only=responsiveness, media_sandbox_only=media_sandbox),
                      'needs': SimpleNamespace(changes=lanes),
                      'startsWith': lambda value, prefix: value.startswith(prefix)})
 
@@ -312,6 +312,14 @@ class MaestroWorkflowTest(unittest.TestCase):
         self.assertIn('inputs.responsiveness_only && inputs.maestro_pilot', instrumented)
         self.assertIn('exit 2', instrumented)
         self.assertIn("inputs.responsiveness_only && 'responsiveness' || 'standard'", self.workflow)
+
+    def test_media_sandbox_selection_excludes_unrelated_jobs(self):
+        """A decoder campaign never silently becomes a Maestro or attachment campaign."""
+        for selected in [False, True]:
+            self.assertTrue(self.enabled('instrumented', 'workflow_dispatch', selected, media_sandbox=True))
+            self.assertFalse(self.enabled('attachment-fixture', 'workflow_dispatch', selected, media_sandbox=True))
+            self.assertFalse(self.enabled('maestro-pilot', 'workflow_dispatch', selected, media_sandbox=True))
+        self.assertIn('inputs.media_sandbox_only && (inputs.maestro_pilot', self.job('instrumented'))
 
     def test_no_pilot_build_secrets_or_cancellation_of_normal_runs(self):
         """Check that the optional pilot cannot build, use secrets or cancel normal CI."""

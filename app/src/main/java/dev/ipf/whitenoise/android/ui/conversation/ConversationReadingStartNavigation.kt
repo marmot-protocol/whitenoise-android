@@ -20,6 +20,8 @@ internal data class ConversationMentionJumpLayout(
     val isNewest: Boolean = false,
     val itemOffsetPx: Int? = null,
     val tailContentHeightPx: Int? = null,
+    val viewportStartOffsetPx: Int = 0,
+    val isAtNaturalTail: Boolean = false,
 ) {
     val isMeasured: Boolean
         get() = viewportEndOffsetPx > 0 && itemHeightPx != null && itemHeightPx > 0
@@ -35,13 +37,22 @@ internal data class ConversationMentionJumpLayout(
 
     val readingStartOffset: Int
         get() = ReplyNavigation.readingStartScrollOffset(viewportEndOffsetPx, itemHeightPx ?: estimatedItemHeightPx)
+
+    /** A clamped notification target is readable without inventing blank space below the newest row. */
+    val isFullyVisibleAtNaturalTail: Boolean
+        get() =
+            isAtNaturalTail &&
+                isMeasured &&
+                itemOffsetPx != null &&
+                itemOffsetPx >= viewportStartOffsetPx &&
+                itemOffsetPx + requireNotNull(itemHeightPx) <= viewportEndOffsetPx
 }
 
 /**
  * The complete measured geometry a reading-start settle needs for [index]: the clear viewport end, the row's size
- * and offset, and the tail extent that decides how much scroll runway to reserve. The mention button and the
- * notification landing both read it here, so a short newest row is reserved and validated against its physical
- * coordinate the same way for both. [cachedItemHeightPx] is a height seen earlier for an unmeasured row.
+ * and offset, and the tail extent that decides how much scroll runway a mention needs. Notifications use the
+ * same physical geometry but accept a fully visible native tail clamp instead of reserving empty runway.
+ * [cachedItemHeightPx] is a height seen earlier for an unmeasured row.
  */
 internal fun ConversationTimelineViewport.readingStartLayout(
     index: Int,
@@ -58,6 +69,8 @@ internal fun ConversationTimelineViewport.readingStartLayout(
         isNewest = isNewest,
         itemOffsetPx = row?.offset,
         tailContentHeightPx = tailContentHeightPx(index),
+        viewportStartOffsetPx = layout.viewportStartOffset,
+        isAtNaturalTail = isAtNaturalTail,
     )
 }
 
@@ -77,6 +90,8 @@ internal data class ConversationReadingStartProbe(
     val readLayout: (Int) -> ConversationMentionJumpLayout,
     val awaitLayout: suspend () -> Unit = { withFrameNanos { } },
     val traceSections: Boolean = true,
+    /** Mention jumps retain their runway; notification opens stay within the real transcript bounds. */
+    val reserveTailSpace: Boolean = true,
 )
 
 /** How a reading-start settle reaches the row before it validates fresh geometry. */
@@ -104,7 +119,8 @@ internal data class ConversationReadingStartResult(
 
 /**
  * The settle core shared by the mention button and notification landing: reach the row, then keep
- * correcting against fresh signed reverse-list geometry until its reading start sits at the top.
+ * correcting against fresh signed reverse-list geometry until its reading start sits at the top,
+ * or a notification target is fully visible at the natural newest boundary without extra padding.
  * One latest-wins command owns the whole sequence under [reason], so a drag or newer navigation
  * cancels it before a stale correction can be written.
  */
@@ -188,6 +204,7 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     index: Int,
     probe: ConversationReadingStartProbe,
 ) {
+    if (!probe.reserveTailSpace) return
     val layout = probe.readLayout(index)
     val height =
         layout.tailContentHeightPx
@@ -202,7 +219,7 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     val measured = resolveMeasuredLayout(probe) ?: return null
     val layout = measured.second
     val height = layout.tailContentHeightPx ?: layout.itemHeightPx.takeIf { layout.isNewest }
-    return if (height != null) {
+    return if (probe.reserveTailSpace && height != null) {
         reserveMentionReadingStart(height, probe.awaitLayout)
         resolveMeasuredLayout(probe)
     } else {
@@ -227,7 +244,16 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     while (attempt <= MAX_READING_START_LAYOUT_CORRECTIONS && !reached) {
         val measured = readLayoutAfterReserve(probe) ?: break
         val (index, layout) = measured
-        if (index == placement.index && layout.readingStartOffset == placement.offsetPx && layout.isAtReadingStart) {
+        if (!probe.reserveTailSpace && layout.isFullyVisibleAtNaturalTail) {
+            // The requested negative offset may have clamped. Keep the actual
+            // coordinate so a resize or saved restore cannot replay the overshoot.
+            placement = ConversationReadingStartPlacement(index, -requireNotNull(layout.itemOffsetPx))
+            reached = true
+        } else if (
+            index == placement.index &&
+            layout.readingStartOffset == placement.offsetPx &&
+            layout.isAtReadingStart
+        ) {
             reached = true
         } else if (attempt < MAX_READING_START_LAYOUT_CORRECTIONS) {
             probe.traced(ConversationMentionJumpTrace.CORRECTION) {

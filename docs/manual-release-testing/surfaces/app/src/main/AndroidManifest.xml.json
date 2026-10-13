@@ -172,6 +172,14 @@
           "MSG-005",
           "CON-005"
         ]
+      },
+      {
+        "surface": "Permissionless multimedia decoder service",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": ".media.sandbox.MediaDecodeService",
+        "test_ids": [
+          "MED-031"
+        ]
       }
     ],
     "manifest_permissions": [
