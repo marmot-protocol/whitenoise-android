@@ -128,6 +128,18 @@ class ForwardEvidenceTest(unittest.TestCase):
         self.assertEqual(expected_uploads(), sum(e["kind"] == "upload" for e in events()))
         self.assertEqual(expected_gets(), sum(e["kind"] == "get" for e in events()))
 
+
+    def test_only_a_passing_run_on_the_authorized_phone_reports_a_physical_qualification(self):
+        """The physical flag follows the run's device and its verdict: a failed physical run never claims the phone."""
+        self.assertTrue(check_forward(metrics(), events(), physical=True)["physical_device_qualified"])
+        self.assertFalse(check_forward(metrics(), events(), physical=False)["physical_device_qualified"])
+        rows = metrics()
+        index = next(i for i, m in enumerate(rows) if m.get("phase") == "forward-sample")
+        failed = check_forward(rows[:index] + rows[index + 1:], events(), physical=True)
+        self.assertFalse(failed["passed"])
+        self.assertFalse(failed["physical_device_qualified"])
+        self.assertFalse(check_forward("not a list", events(), physical=True)["physical_device_qualified"])
+
     def test_every_missing_metric_fails(self):
         """Removing any one measurement, direct row, forward row, timeline row or stage invalidates the run."""
         rows = metrics()

@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.core.QrCodeEncoder
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 
@@ -79,6 +80,22 @@ internal object QrShareCardRenderer {
         drawBranding(canvas)
         return bitmap
     }
+
+    /** Encodes the same card for local gallery export without staging a share-cache file. */
+    suspend fun pngBytes(spec: QrShareCardSpec): ByteArray =
+        withContext(Dispatchers.IO) {
+            val rendered = render(spec)
+            try {
+                ByteArrayOutputStream().use { output ->
+                    if (!rendered.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                        throw IOException("Could not encode share card")
+                    }
+                    output.toByteArray()
+                }
+            } finally {
+                rendered.recycle()
+            }
+        }
 
     /** Encode and stage one generated card without adding EXIF, text chunks, or account-derived file names. */
     suspend fun stage(
