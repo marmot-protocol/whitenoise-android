@@ -7,8 +7,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
@@ -92,9 +94,12 @@ class VoiceAttachmentControlsTest {
         assertEquals("2×", voiceSpeedLabel(2f))
     }
 
-    /** A downloading clip shows real bytes, exposes Cancel as its one 48 dp action and never offers Play. */
+    /**
+     * A downloading clip keeps its real bytes on its one 48 dp Cancel target, never as visible text,
+     * keeps its time label and never offers Play.
+     */
     @Test
-    fun aDownloadingClipOffersCancelAndShowsItsBytes() {
+    fun aDownloadingClipOffersCancelAndKeepsItsBytesOnTheRing() {
         var cancels = 0
         renderTransfer(
             TileTransfer(
@@ -115,12 +120,14 @@ class VoiceAttachmentControlsTest {
 
         composeRule.onNodeWithContentDescription("2.0 MB of 4.0 MB").assertHasClickAction().assertWidthIsAtLeast(48.dp)
         composeRule.onAllNodesWithContentDescription("Play", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("MB", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithText("0:00").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("2.0 MB of 4.0 MB").performClick()
 
         assertEquals(1, cancels)
     }
 
-    /** A cancelled clip offers Download again on one tap instead of Play. */
+    /** A cancelled clip offers Download again on one tap instead of Play, without a visible transfer caption. */
     @Test
     fun aCancelledClipOffersDownloadAgain() {
         var retries = 0
@@ -135,6 +142,7 @@ class VoiceAttachmentControlsTest {
             onRetry = { retries++ },
         )
 
+        composeRule.onAllNodesWithText("Download cancelled", substring = true).assertCountEquals(0)
         composeRule.onNodeWithContentDescription("Download cancelled", substring = true).performClick()
 
         assertEquals(1, retries)
