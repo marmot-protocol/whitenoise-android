@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
@@ -9,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -99,6 +103,9 @@ class ShareConnectScreenBehaviorTest {
     fun savingDisablesExportsAndPreservesScanner() {
         mount(saving = true)
         composeRule.onNodeWithTag("profile.qr.save").assertIsNotEnabled()
+        val saveControl = composeRule.onNodeWithTag("profile.qr.save")
+        val savingState = saveControl.fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+        assertEquals("Saving…", savingState)
         composeRule.onNodeWithTag("share_connect.share").assertIsNotEnabled()
         composeRule.onNodeWithText("Scan QR Code").performClick()
         composeRule.runOnIdle { assertEquals(1, scannerCount) }
@@ -110,6 +117,17 @@ class ShareConnectScreenBehaviorTest {
         mount(canSave = false)
         composeRule.onNodeWithTag("profile.qr.save").assertIsNotEnabled()
         composeRule.runOnIdle { assertEquals(0, saveCount) }
+    }
+
+    /** A captured accessibility action cannot leave an earlier share menu active behind gallery export. */
+    @Test
+    fun saveDismissesTheOpenShareMenu() {
+        mount()
+        composeRule.onNodeWithTag("share_connect.share").performClick()
+        composeRule.onNodeWithText("Share profile URL").assertIsDisplayed()
+        composeRule.onNodeWithTag("profile.qr.save").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        composeRule.onNodeWithText("Share profile URL").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, saveCount) }
     }
 
     /** Mounts the composable under test. */

@@ -41,6 +41,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -286,6 +287,7 @@ internal fun ShareConnectContent(
     onOpenScanner: () -> Unit,
 ) {
     val saveLabel = stringResource(R.string.media_save)
+    val savingLabel = stringResource(R.string.photo_editor_saving_action)
     var shareMenuExpanded by remember { mutableStateOf(false) }
     WhiteNoiseScaffold(
         modifier = Modifier.fillMaxSize().testTag("share_connect.screen"),
@@ -304,9 +306,16 @@ internal fun ShareConnectContent(
                 },
                 actions = {
                     IconButton(
-                        onClick = onSavePicture,
+                        onClick = {
+                            shareMenuExpanded = false
+                            onSavePicture()
+                        },
                         enabled = canSavePicture && !pictureShareInProgress && !pictureSaveInProgress,
-                        modifier = Modifier.testTag("profile.qr.save").semantics { contentDescription = saveLabel },
+                        modifier =
+                            Modifier.testTag("profile.qr.save").semantics {
+                                contentDescription = saveLabel
+                                if (pictureSaveInProgress) stateDescription = savingLabel
+                            },
                     ) {
                         if (pictureSaveInProgress) {
                             CircularProgressIndicator(

@@ -1,13 +1,9 @@
 package dev.ipf.whitenoise.android.ui.profile
 
-import android.content.ContentProvider
-import android.content.ContentValues
 import android.content.Context
-import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.net.Uri
 import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
 import com.google.zxing.BinaryBitmap
@@ -31,11 +27,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowContentResolver
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 @RunWith(RobolectricTestRunner::class)
@@ -57,7 +51,7 @@ class ProfileQrGallerySaveTest {
     @Test
     fun publishedGalleryPngContainsTheProfileQrAndAvatar() =
         runBlocking {
-            val provider = GalleryProvider(context)
+            val provider = ProfileQrGalleryProvider(context)
             ShadowContentResolver.registerProviderInternal(MediaStore.AUTHORITY, provider)
             val avatar = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
             try {
@@ -118,7 +112,7 @@ class ProfileQrGallerySaveTest {
     @Test
     fun queuedStorageRechecksOwnershipBeforeInsertion() =
         runTest {
-            val provider = GalleryProvider(context)
+            val provider = ProfileQrGalleryProvider(context)
             ShadowContentResolver.registerProviderInternal(MediaStore.AUTHORITY, provider)
             val action = ProfileQrGallerySave(StandardTestDispatcher(testScheduler))
             var current = true
@@ -170,52 +164,4 @@ class ProfileQrGallerySaveTest {
             )
             assertFalse(action.inProgress)
         }
-
-    private class GalleryProvider(
-        private val testContext: Context,
-    ) : ContentProvider() {
-        var collection: Uri? = null
-        var values: ContentValues? = null
-        var completed: ContentValues? = null
-        val output = ByteArrayOutputStream()
-
-        override fun onCreate() = true
-
-        override fun getType(uri: Uri): String? = null
-
-        override fun query(
-            uri: Uri,
-            projection: Array<out String>?,
-            selection: String?,
-            selectionArgs: Array<out String>?,
-            sortOrder: String?,
-        ): Cursor? = null
-
-        override fun insert(
-            uri: Uri,
-            values: ContentValues?,
-        ): Uri {
-            collection = uri
-            this.values = values?.let(::ContentValues)
-            val destination = Uri.withAppendedPath(uri, "1")
-            shadowOf(testContext.contentResolver).registerOutputStreamSupplier(destination) { output }
-            return destination
-        }
-
-        override fun update(
-            uri: Uri,
-            values: ContentValues?,
-            selection: String?,
-            selectionArgs: Array<out String>?,
-        ): Int {
-            completed = values?.let(::ContentValues)
-            return 1
-        }
-
-        override fun delete(
-            uri: Uri,
-            selection: String?,
-            selectionArgs: Array<out String>?,
-        ) = 1
-    }
 }
