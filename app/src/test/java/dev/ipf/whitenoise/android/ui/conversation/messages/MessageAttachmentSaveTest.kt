@@ -94,21 +94,23 @@ class MessageAttachmentSaveTest {
         DocumentDestinationCancelledException().rethrowParentCancellation()
     }
 
+    /** A parent cancellation is rethrown so it still cancels the attachment batch. */
     @Test(expected = CancellationException::class)
     fun parentCancellationStillEscapesAttachmentBatch() {
         CancellationException("parent cancelled").rethrowParentCancellation()
     }
 
+    /** Saving attachments needs a live message, outlives navigation and ignores a second launch while one runs. */
     @Test
     fun saveSurvivesNavigationAndRejectsConcurrentLaunches() {
         val saveBody = saveAttachmentsBody()
 
         assertTrue(
             "attachment saves must require a live message, survive navigation, and reject concurrent launches",
-            "if (deleted || mediaReferences.isEmpty() || attachmentSaveInFlight) return" in saveBody &&
-                "attachmentSaveInFlight = true" in saveBody &&
+            "if (deleted || mediaReferences.isEmpty() || surfaces.attachmentSaveInFlight) return" in saveBody &&
+                "surfaces.attachmentSaveInFlight = true" in saveBody &&
                 "appState.launchMutation" in saveBody &&
-                Regex("finally\\s*\\{\\s*attachmentSaveInFlight = false").containsMatchIn(saveBody),
+                Regex("finally\\s*\\{\\s*surfaces\\.attachmentSaveInFlight = false").containsMatchIn(saveBody),
         )
     }
 

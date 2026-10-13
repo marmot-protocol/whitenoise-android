@@ -31,7 +31,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,7 +73,6 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
@@ -88,7 +86,6 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
-import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -122,7 +119,6 @@ import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
-import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
@@ -178,7 +174,6 @@ import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
 import dev.ipf.whitenoise.android.ui.theme.amoledDirectionalAccentColor
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.map
@@ -491,30 +486,17 @@ internal fun MessageBubble(
             }
     val mentionedYouLabel = stringResource(R.string.mentioned_you)
     val context = LocalContext.current
-    // Freeze both the touch point and the selected message's window bounds when
-    // the menu opens. The point seeds partial text selection; the bounds keep
-    // the action surface visually attached to the selected bubble.
-    var longPressWindowPosition by remember(item.presentationId) { mutableStateOf<Offset?>(null) }
-    var longPressTtsStart by remember(item.presentationId) { mutableStateOf<TtsLongPressStart?>(null) }
+    // Per-key state lives in three holders so the bubble stays within ART's compile limit (MessageBubbleState.kt).
+    val pressState = remember(item.presentationId) { MessageBubblePressState() }
+    val surfaces = remember(record.messageIdHex) { MessageBubbleSurfaceState() }
+    val textLayouts = remember(record.messageIdHex) { MessageBubbleTextLayouts() }
     LaunchedEffect(isActionMenuOpen) {
-        if (!isActionMenuOpen) longPressTtsStart = null
+        if (!isActionMenuOpen) pressState.longPressTtsStart = null
     }
-    var selectionSeedVisibleOffset by remember(item.presentationId) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
-    var actionMenuAnchorBounds by remember(item.presentationId) { mutableStateOf<IntRect?>(null) }
-    var initiatingMenuHoldActive by remember(item.presentationId) { mutableStateOf(false) }
-    var reportSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var reportInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     val hasReports = item.projected?.hasReports == true
-    var messageReports by remember(record.messageIdHex) { mutableStateOf<List<ContentReportFfi>?>(null) }
-    var reportsRevision by remember(record.messageIdHex) { mutableIntStateOf(0) }
-    val rowCoordinates = remember(item.presentationId) { arrayOfNulls<LayoutCoordinates>(1) }
-    val messageBoundsInWindow = remember(item.presentationId) { arrayOfNulls<IntRect>(1) }
     val focusedMessageLayer = if (isActionMenuOpen) rememberGraphicsLayer() else null
     var focusedMediaReady by remember(item.presentationId, focusedMessageLayer) { mutableStateOf(false) }
-    var focusedMediaSize by remember(item.presentationId) {
-        mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
-    }
     val focusedWindowWidth =
         LocalWindowInfo.current.containerSize.width
             .takeIf { it > 0 } ?: Int.MAX_VALUE
@@ -528,7 +510,7 @@ internal fun MessageBubble(
                 focused = isActionMenuOpen,
                 maximumPreviewWidth = focusedMediaWidthLimit,
                 mine = mine,
-            ).onSizeChanged { focusedMediaSize = it }
+            ).onSizeChanged { pressState.focusedMediaSize = it }
             .drawWithContent {
                 if (focusedMessageLayer != null) {
                     focusedMessageLayer.record { this@drawWithContent.drawContent() }
@@ -541,7 +523,7 @@ internal fun MessageBubble(
     val actionAnchorBoundsModifier =
         Modifier.onGloballyPositioned { coordinates ->
             val bounds = coordinates.boundsInWindow()
-            messageBoundsInWindow[0] =
+            pressState.messageBoundsInWindow[0] =
                 IntRect(
                     left = bounds.left.roundToInt(),
                     top = bounds.top.roundToInt(),
@@ -578,74 +560,44 @@ internal fun MessageBubble(
     val density = LocalDensity.current
     val messageTextCopy = rememberMessageTextCopy()
     val messageTextSelectionState = rememberSelectionState()
-    val selectableTextLayouts =
-        remember(record.messageIdHex) { SelectableTextLayoutRegistry() }
-    val markdownLinkLayouts =
-        remember(record.messageIdHex) { mutableStateMapOf<Any, MarkdownLinkTextLayout>() }
-    val pendingLongPressLinkDestination = remember(record.messageIdHex) { arrayOfNulls<String>(1) }
-    val markdownLinkLayoutReporter =
-        remember(record.messageIdHex) {
-            {
-                key: Any,
-                text: AnnotatedString,
-                layoutResult: TextLayoutResult?,
-                coordinates: androidx.compose.ui.layout.LayoutCoordinates?,
-                ->
-                if (layoutResult != null && coordinates != null) {
-                    markdownLinkLayouts[key] = MarkdownLinkTextLayout(text, layoutResult, coordinates)
-                } else {
-                    markdownLinkLayouts.remove(key)
-                }
-                Unit
-            }
-        }
-    var textSelectionSeeded by remember(record.messageIdHex) { mutableStateOf(false) }
-    var textSelectionBoundsInWindow by remember(record.messageIdHex) { mutableStateOf<Rect?>(null) }
-    val plainTextLayoutKey = remember(record.messageIdHex) { "plain" }
-    val plainTextLayoutTracker = remember(record.messageIdHex) { SelectableTextLayoutTracker() }
     val textSelectionClipboard =
         rememberExitOnCopyClipboard { onTextSelectionModeChange(false) }
-    val selectableTextLayoutReporter =
-        remember(record.messageIdHex) {
-            { key: Any, layoutResult: TextLayoutResult?, coordinates: androidx.compose.ui.layout.LayoutCoordinates? ->
-                selectableTextLayouts.update(key, layoutResult, coordinates)
-                Unit
-            }
-        }
-    LaunchedEffect(textSelectionMode, longPressWindowPosition) {
-        if (!textSelectionMode || textSelectionSeeded) return@LaunchedEffect
+    LaunchedEffect(textSelectionMode, pressState.longPressWindowPosition) {
+        if (!textSelectionMode || textLayouts.textSelectionSeeded) return@LaunchedEffect
         // Let every Markdown Text leaf report in this frame before calculating
         // the global selection offset across the SelectionContainer.
         withFrameNanos { }
-        textSelectionSeedRange(selectableTextLayouts.snapshot(), longPressWindowPosition)?.let { range ->
+        val renderedLayouts = textLayouts.selectableTextLayouts.snapshot()
+        textSelectionSeedRange(renderedLayouts, pressState.longPressWindowPosition)?.let { range ->
             messageTextSelectionState.select(range)
-            textSelectionSeeded = true
+            textLayouts.textSelectionSeeded = true
         }
     }
     LaunchedEffect(textSelectionMode) {
         if (!textSelectionMode) {
-            textSelectionSeeded = false
-            textSelectionBoundsInWindow = null
+            textLayouts.textSelectionSeeded = false
+            textLayouts.textSelectionBoundsInWindow = null
             onTextSelectionBoundsChange(null)
         }
     }
 
+    /** Registers the plain-text leaf for selection once both its layout and its position are known. */
     fun reportPlainTextLayoutIfReady() {
-        val layoutResult = plainTextLayoutTracker.layoutResult ?: return
-        val coordinates = plainTextLayoutTracker.coordinates ?: return
-        selectableTextLayouts.update(plainTextLayoutKey, layoutResult, coordinates)
+        val layoutResult = textLayouts.plainTextLayoutTracker.layoutResult ?: return
+        val coordinates = textLayouts.plainTextLayoutTracker.coordinates ?: return
+        textLayouts.selectableTextLayouts.update(textLayouts.plainTextLayoutKey, layoutResult, coordinates)
     }
 
     val plainTextSelectionModifier =
         Modifier.onGloballyPositioned { coordinates ->
-            plainTextLayoutTracker.coordinates = coordinates
+            textLayouts.plainTextLayoutTracker.coordinates = coordinates
             reportPlainTextLayoutIfReady()
         }
     val textSelectionBoundsModifier =
         if (textSelectionMode) {
             Modifier.onGloballyPositioned {
                 val bounds = it.boundsInWindow()
-                textSelectionBoundsInWindow = bounds
+                textLayouts.textSelectionBoundsInWindow = bounds
                 onTextSelectionBoundsChange(bounds)
             }
         } else {
@@ -686,27 +638,15 @@ internal fun MessageBubble(
     val editState = controller.editsByTarget[record.messageIdHex]
     val displayedBody =
         remember(item, deleted, messageTextCopy, deletedBodyText, invalidatedBodyText, editState) {
-            when {
-                // Check `deleted` first so the optimistic tombstone (from
-                // controller.deletedMessageIds) renders immediately on tap.
-                deleted -> deletedBodyText
-                persistedFailure -> invalidatedBodyText
-                // Edit overlay wins over both projected and raw plaintext.
-                // We don't go through MessageProjector here — the edit
-                // payload is plain text by spec; markdown re-parse will
-                // happen below if record.contentTokens is populated, but
-                // for kind-9 edits the body is the latest version verbatim.
-                editState != null && record.kind == 9uL -> editState.latestText
-                item.projected != null ->
-                    TimelineProjector.displayBody(
-                        item.projected,
-                        messageTextCopy.copy(
-                            deleted = deletedBodyText,
-                            invalidated = invalidatedBodyText,
-                        ),
-                    )
-                else -> MessageProjector.displayBody(record, messageTextCopy)
-            }
+            messageBubbleDisplayedBody(
+                item = item,
+                deleted = deleted,
+                persistedFailure = persistedFailure,
+                editState = editState,
+                textCopy = messageTextCopy,
+                deletedBodyText = deletedBodyText,
+                invalidatedBodyText = invalidatedBodyText,
+            )
         }
     val canSpeakAloud =
         messageBubbleCanSpeak(
@@ -913,39 +853,16 @@ internal fun MessageBubble(
             isActionMenuOpen,
             forwardNowSeconds,
         ) {
-            val failedCommittedMessage =
-                persistedFailure && !MessageProjector.isPendingMedia(record)
-            if (
-                deleted || invalidated || failedCommittedMessage
-            ) {
-                ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
-            } else if (persistedFailure) {
-                ForwardEligibility.Blocked(ForwardBlockedReason.FailedAttachment)
-            } else if (
-                item.status != dev.ipf.whitenoise.android.state.MessageStatus.Received &&
-                item.status != dev.ipf.whitenoise.android.state.MessageStatus.Sent
-            ) {
-                ForwardEligibility.Blocked(
-                    if (MessageProjector.isPendingMedia(record)) {
-                        ForwardBlockedReason.PendingAttachment
-                    } else {
-                        ForwardBlockedReason.Unsupported
-                    },
-                )
-            } else {
-                MessageProjector.forwardEligibility(
-                    message = record,
-                    mediaReferences = mediaReferences,
-                    editedText = editState?.latestText?.takeIf { record.kind == 9uL },
-                    cachedAttachmentIndices =
-                        messageAttachments.accepted
-                            .map { it.index }
-                            .filterTo(mutableSetOf()) { attachmentIndex ->
-                                controller.hasCachedAttachment(record.messageIdHex, attachmentIndex)
-                            },
-                    nowSeconds = forwardNowSeconds,
-                )
-            }
+            messageBubbleForwardEligibility(
+                item = item,
+                editState = editState,
+                deleted = deleted,
+                invalidated = invalidated,
+                persistedFailure = persistedFailure,
+                attachments = messageAttachments,
+                controller = controller,
+                nowSeconds = forwardNowSeconds,
+            )
         }
     val forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload
     val reserveSenderAvatarSlot =
@@ -962,39 +879,10 @@ internal fun MessageBubble(
         }
     reactionVisibilityState.targetState = showReactionSummary
     val reactionHostPresent = reactionVisibilityState.currentState || reactionVisibilityState.targetState
-    var emojiPickerOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    // A long body clips to a few lines with an inline Read More; opening it
-    // routes through a full-screen view rather than expanding in place, so the
-    // only state to track is whether that view is showing. Resets on re-entry
-    // by keying on the message id (#325).
-    var expandedFullView by remember(record.messageIdHex) { mutableStateOf(false) }
-    var infoSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var forwardSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var editHistoryOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var reactionSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var customizeReactionsOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var configureReactionsDraft by remember(record.messageIdHex) { mutableStateOf<List<String>>(emptyList()) }
-    var configureReactionSlot by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
-    var deleteDialogOpen by remember(record.messageIdHex) { mutableStateOf(false) }
-    var deleteInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
-    var attachmentSaveInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
-    var messageShareInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
-    var messageShareJob by remember(record.messageIdHex) { mutableStateOf<Job?>(null) }
     val messageShareScope = rememberCoroutineScope()
     val ttsLinkTapCoordinator =
         remember(record.messageIdHex, messageShareScope, appState, controller.group.groupIdHex) {
-            TtsLinkTapCoordinator(
-                scope = messageShareScope,
-                isReadAloudActive = {
-                    val state = appState.ttsController.state.value
-                    (state is TtsState.Speaking || state is TtsState.Paused) &&
-                        appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
-                },
-                doubleTapTimeoutMillis =
-                    android.view.ViewConfiguration
-                        .getDoubleTapTimeout()
-                        .toLong(),
-            )
+            messageBubbleTtsLinkTapCoordinator(messageShareScope, appState, controller)
         }
     DisposableEffect(ttsLinkTapCoordinator) {
         onDispose { ttsLinkTapCoordinator.cancelPendingActivation() }
@@ -1021,43 +909,44 @@ internal fun MessageBubble(
     // message is deleted out from under it (optimistic or remote delete).
     LaunchedEffect(deleted) {
         if (deleted) {
-            messageShareJob?.cancel()
-            messageShareJob = null
+            surfaces.messageShareJob?.cancel()
+            surfaces.messageShareJob = null
             onActionMenuOpenChange(false)
             onTextSelectionModeChange(false)
-            emojiPickerOpen = false
-            expandedFullView = false
-            infoSheetOpen = false
-            forwardSheetOpen = false
-            editHistoryOpen = false
-            reactionSheetOpen = false
-            customizeReactionsOpen = false
-            configureReactionSlot = null
-            deleteDialogOpen = false
-            messageShareInFlight = false
+            surfaces.emojiPickerOpen = false
+            surfaces.expandedFullView = false
+            surfaces.infoSheetOpen = false
+            surfaces.forwardSheetOpen = false
+            surfaces.editHistoryOpen = false
+            surfaces.reactionSheetOpen = false
+            surfaces.customizeReactionsOpen = false
+            surfaces.configureReactionSlot = null
+            surfaces.deleteDialogOpen = false
+            surfaces.messageShareInFlight = false
         }
     }
     LaunchedEffect(actionsReadOnly, isPollRecord) {
         if (isPollRecord && actionsReadOnly) {
             if (isActionMenuOpen) onActionMenuOpenChange(false)
-            emojiPickerOpen = false
-            reactionSheetOpen = false
+            surfaces.emojiPickerOpen = false
+            surfaces.reactionSheetOpen = false
             if (controller.replyingTo?.messageIdHex == record.messageIdHex) controller.replyingTo = null
         }
     }
     LaunchedEffect(deleteCapability.canDeleteAtAll) {
-        if (!deleteCapability.canDeleteAtAll) deleteDialogOpen = false
+        if (!deleteCapability.canDeleteAtAll) surfaces.deleteDialogOpen = false
     }
     LaunchedEffect(selectionMode) {
         if (selectionMode) {
             onActionMenuOpenChange(false)
             onTextSelectionModeChange(false)
-            forwardSheetOpen = false
-            infoSheetOpen = false
-            deleteDialogOpen = false
+            surfaces.forwardSheetOpen = false
+            surfaces.infoSheetOpen = false
+            surfaces.deleteDialogOpen = false
         }
     }
 
+    /** Starts a reply to this message, or to the current poll target, unless it is deleted or read-only. */
     fun beginReply() {
         if (deleted || actionsReadOnly) return
         val target = if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else record
@@ -1065,37 +954,41 @@ internal fun MessageBubble(
         onActionMenuOpenChange(false)
     }
 
+    /** Closes the action menu and shows Info, unless the message is already deleted. */
     fun openInfoSheet() {
         if (deleted) return
         onActionMenuOpenChange(false)
-        infoSheetOpen = true
+        surfaces.infoSheetOpen = true
     }
 
+    /** Closes the action menu and asks which delete scope to use, when any scope is offered. */
     fun requestDelete() {
         if (!deleteCapability.canDeleteAtAll) return
         onActionMenuOpenChange(false)
-        deleteDialogOpen = true
+        surfaces.deleteDialogOpen = true
     }
 
+    /** Hides the message on this device only, closing the dialog once the controller confirms the removal. */
     fun performDeleteForMe() {
-        if (deleteInFlight) return
-        deleteInFlight = true
+        if (surfaces.deleteInFlight) return
+        surfaces.deleteInFlight = true
         appState.launchMutation {
             try {
                 val removed = controller.hideMessageForMe(record.messageIdHex)
-                if (removed) deleteDialogOpen = false
+                if (removed) surfaces.deleteDialogOpen = false
             } finally {
-                deleteInFlight = false
+                surfaces.deleteInFlight = false
             }
         }
     }
 
+    /** Deletes the message for every member, keeping the dialog open until the outcome is known. */
     fun performDeleteForEveryone() {
         // The in-flight flag is the repeated-tap guard on top of the
         // controller's own idempotency (a second deleteMessage on an already
         // tombstoned id is a no-op).
-        if (deleteInFlight) return
-        deleteInFlight = true
+        if (surfaces.deleteInFlight) return
+        surfaces.deleteInFlight = true
         // launchMutation so the MLS commit + Nostr publish survive navigating
         // away from the conversation. The dialog stays open with its options
         // disabled until the outcome is known, and stays open on failure so
@@ -1104,11 +997,11 @@ internal fun MessageBubble(
         appState.launchMutation {
             try {
                 val removed = controller.deleteMessage(record, optimisticKeyOverride = item.id)
-                if (removed) deleteDialogOpen = false
+                if (removed) surfaces.deleteDialogOpen = false
             } finally {
                 // Cancellation must not leave the flag stuck true, which would
                 // disable deletion for this bubble's remember scope.
-                deleteInFlight = false
+                surfaces.deleteInFlight = false
             }
         }
     }
@@ -1230,11 +1123,12 @@ internal fun MessageBubble(
         }
     }
 
+    /** Starts read-aloud at the selected sentence, or at the long-pressed text when nothing is selected. */
     fun speakFromHere() {
-        val layouts = selectableTextLayouts.snapshot()
+        val layouts = textLayouts.selectableTextLayouts.snapshot()
         val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
         if (!selectionActive) {
-            startSpeakAloud(longPressTtsStart?.renderedHit, expectedPress = longPressTtsStart)
+            startSpeakAloud(pressState.longPressTtsStart?.renderedHit, expectedPress = pressState.longPressTtsStart)
             return
         }
         val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
@@ -1245,7 +1139,7 @@ internal fun MessageBubble(
                 visibleOffsetFromSelection(
                     layouts = layouts,
                     selectedTexts = messageTextSelectionState.selectedTexts,
-                    preferredVisibleOffset = selectionSeedVisibleOffset,
+                    preferredVisibleOffset = pressState.selectionSeedVisibleOffset,
                 )
             }
         val renderedHit =
@@ -1255,7 +1149,7 @@ internal fun MessageBubble(
                 renderedTextHitFromSelection(
                     layouts = layouts,
                     selectedTexts = messageTextSelectionState.selectedTexts,
-                    preferredVisibleOffset = selectionSeedVisibleOffset,
+                    preferredVisibleOffset = pressState.selectionSeedVisibleOffset,
                 )
             }
         startSpeakAloud(
@@ -1299,6 +1193,7 @@ internal fun MessageBubble(
         }
     }
 
+    /** Seeks read-aloud to a tapped sentence through the history session when this message is not projected. */
     fun seekRenderedSentenceOutsideCurrentProjection(
         hit: RenderedTextHit,
         allowOmittedLinkNeighbor: Boolean,
@@ -1348,10 +1243,11 @@ internal fun MessageBubble(
         if (accepted) ttsLinkTapCoordinator.cancelPendingActivation()
     }
 
+    /** Seeks owned read-aloud to the double-tapped sentence, or starts reading there unless the tap hit a link. */
     @Suppress("ComplexCondition", "ReturnCount")
     fun seekSpeakAloudAt(pressInWindow: Offset) {
         if (deleted || selectionMode || textSelectionMode || !canSpeakAloud) return
-        val layouts = selectableTextLayouts.snapshot()
+        val layouts = textLayouts.selectableTextLayouts.snapshot()
         val activeState = appState.ttsController.state.value
         val ownsActiveSession =
             (activeState is TtsState.Speaking || activeState is TtsState.Paused || activeState is TtsState.Preparing) &&
@@ -1365,7 +1261,7 @@ internal fun MessageBubble(
                         // Retain the established link double-tap coordination during playback.
                         allowOmittedLinkNeighbor =
                             markdownHasLinkAnnotationAt(
-                                markdownLinkLayouts.values,
+                                textLayouts.markdownLinkLayouts.values,
                                 pressInWindow,
                             ),
                     )
@@ -1375,7 +1271,7 @@ internal fun MessageBubble(
             } else if (ttsProjectionResolver == null && hit != null && !record.contentTokens.truncated) {
                 seekRenderedSentenceOutsideCurrentProjection(
                     hit,
-                    markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow),
+                    markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow),
                 )
             }
             // An owned session must never be replaced merely because a hit is
@@ -1385,7 +1281,7 @@ internal fun MessageBubble(
         }
         // Outside playback, links retain their immediate activation and do
         // not become a read-aloud gesture target.
-        if (markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)) return
+        if (markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow)) return
         val renderedHit =
             if (record.contentTokens.truncated) {
                 null
@@ -1441,24 +1337,27 @@ internal fun MessageBubble(
             }
         }
 
+    /** Copies a link destination to the clipboard and closes the action menu. */
     fun copyMarkdownLink(url: String) {
         if (deleted) return
         clipboard.setText(AnnotatedString(url))
         onActionMenuOpenChange(false)
     }
 
+    /** Enters text selection for this message with a cleared layout registry, closing the action menu. */
     fun beginTextSelection() {
         if (deleted) return
-        selectableTextLayouts.clear()
-        textSelectionSeeded = false
+        textLayouts.selectableTextLayouts.clear()
+        textLayouts.textSelectionSeeded = false
         onActionMenuOpenChange(false)
         onTextSelectionModeChange(true)
     }
 
+    /** Opens the forward sheet when the message has a forwardable payload. */
     fun beginForward() {
         if (deleted || actionsReadOnly || forwardPayload == null) return
         onActionMenuOpenChange(false)
-        forwardSheetOpen = true
+        surfaces.forwardSheetOpen = true
     }
 
     val pendingAttachmentsForRecord = controller.pendingAttachmentsList(record.messageIdHex)
@@ -1483,7 +1382,7 @@ internal fun MessageBubble(
             !deleted &&
             !invalidated &&
             !persistedFailure &&
-            !messageShareInFlight &&
+            !surfaces.messageShareInFlight &&
             messageHasShareablePayload(
                 text = outboundShareText,
                 references = mediaReferences,
@@ -1515,8 +1414,10 @@ internal fun MessageBubble(
                         showPendingPlaceholder && pendingAttachmentsForRecord.any(::isPendingGeneralFile)
                     )
             )
+
+    /** Maps a double tap on the message text to window space and seeks or starts read-aloud there. */
     val messageTextDoubleTap: (Offset) -> Unit = { position ->
-        val pressInWindow = rowCoordinates[0]?.localToWindow(position)
+        val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
         if (pressInWindow != null) seekSpeakAloudAt(pressInWindow)
     }
 
@@ -1595,7 +1496,7 @@ internal fun MessageBubble(
                 SwipeAction.Forward -> beginForward()
                 SwipeAction.React -> {
                     onActionMenuOpenChange(false)
-                    emojiPickerOpen = true
+                    surfaces.emojiPickerOpen = true
                 }
                 else -> Unit
             }
@@ -1665,7 +1566,7 @@ internal fun MessageBubble(
                                     haptics.performHapticFeedback(
                                         androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress,
                                     )
-                                    pendingLongPressLinkDestination[0] = null
+                                    textLayouts.pendingLongPressLinkDestination[0] = null
                                     // A tombstone has exactly one action, so it skips
                                     // the menu and opens its confirmation directly.
                                     if (deleted) {
@@ -1673,29 +1574,30 @@ internal fun MessageBubble(
                                         return@longPressOrVerticalDrag
                                     }
                                     val windowPosition =
-                                        rowCoordinates[0]?.let {
+                                        pressState.rowCoordinates[0]?.let {
                                             messageBubbleLongPressPositionInWindow(it, position)
                                         } ?: return@longPressOrVerticalDrag
+                                    val linkLayouts = textLayouts.markdownLinkLayouts.values
                                     val linkDestination =
                                         if (deleted) {
                                             null
                                         } else {
-                                            markdownLinkDestinationAt(markdownLinkLayouts.values, windowPosition)
+                                            markdownLinkDestinationAt(linkLayouts, windowPosition)
                                         }
-                                    pendingLongPressLinkDestination[0] = linkDestination
+                                    textLayouts.pendingLongPressLinkDestination[0] = linkDestination
                                     if (linkDestination == null) {
                                         // Capture the press in window space before
                                         // opening so both the popover and text
                                         // selection seed at the finger (#326, #1370).
-                                        longPressWindowPosition = windowPosition
-                                        longPressTtsStart =
+                                        pressState.longPressWindowPosition = windowPosition
+                                        pressState.longPressTtsStart =
                                             captureTtsLongPressStart(
                                                 hit =
                                                     if (record.contentTokens.truncated) {
                                                         null
                                                     } else {
                                                         renderedTextHitAtWindowPosition(
-                                                            selectableTextLayouts.snapshot(),
+                                                            textLayouts.selectableTextLayouts.snapshot(),
                                                             windowPosition,
                                                             requireTextLineHit = true,
                                                         )
@@ -1704,18 +1606,18 @@ internal fun MessageBubble(
                                                 controller = controller,
                                                 appState = appState,
                                             )
-                                        selectionSeedVisibleOffset =
+                                        pressState.selectionSeedVisibleOffset =
                                             if (record.contentTokens.truncated) {
                                                 null
                                             } else {
                                                 textOffsetAtWindowPosition(
-                                                    selectableTextLayouts.snapshot(),
+                                                    textLayouts.selectableTextLayouts.snapshot(),
                                                     windowPosition,
                                                 )
                                             }
                                         longPressWindowY = windowPosition.y
-                                        actionMenuAnchorBounds = messageBoundsInWindow[0]
-                                        initiatingMenuHoldActive = true
+                                        pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
+                                        pressState.initiatingMenuHoldActive = true
                                         // Freeze the rendered hit now. The bubble
                                         // can move while its popup is open; an old
                                         // window coordinate must never be re-hit-
@@ -1724,26 +1626,26 @@ internal fun MessageBubble(
                                     }
                                 },
                                 onLongPressRelease = {
-                                    initiatingMenuHoldActive = false
-                                    val linkDestination = pendingLongPressLinkDestination[0]
-                                    pendingLongPressLinkDestination[0] = null
+                                    pressState.initiatingMenuHoldActive = false
+                                    val linkDestination = textLayouts.pendingLongPressLinkDestination[0]
+                                    textLayouts.pendingLongPressLinkDestination[0] = null
                                     if (linkDestination != null) copyMarkdownLink(linkDestination)
                                 },
                                 onDragStart = { position ->
-                                    initiatingMenuHoldActive = false
+                                    pressState.initiatingMenuHoldActive = false
                                     if (deleted) return@longPressOrVerticalDrag
                                     // A range gesture begins after the threshold
                                     // action was shown. Hand ownership over without
                                     // leaving a stale popup above selection mode.
-                                    pendingLongPressLinkDestination[0] = null
+                                    textLayouts.pendingLongPressLinkDestination[0] = null
                                     onActionMenuOpenChange(false)
-                                    rowCoordinates[0]
+                                    pressState.rowCoordinates[0]
                                         ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
                                         ?.let(onDragSelectionStart)
                                 },
                                 onDrag = { position ->
                                     if (deleted) return@longPressOrVerticalDrag false
-                                    rowCoordinates[0]
+                                    pressState.rowCoordinates[0]
                                         ?.let { messageBubbleLongPressPositionInWindow(it, position).y }
                                         ?.let(onDragSelection)
                                         ?: false
@@ -1752,8 +1654,8 @@ internal fun MessageBubble(
                                     if (!deleted) onDragSelectionEnd()
                                 },
                                 onGestureCancel = {
-                                    initiatingMenuHoldActive = false
-                                    pendingLongPressLinkDestination[0] = null
+                                    pressState.initiatingMenuHoldActive = false
+                                    textLayouts.pendingLongPressLinkDestination[0] = null
                                     onActionMenuOpenChange(false)
                                     if (!deleted) onDragSelectionCancel()
                                 },
@@ -1779,17 +1681,17 @@ internal fun MessageBubble(
                         Modifier.observeMessageTextDoubleTap(
                             enabled = !deleted && !selectionMode && !textSelectionMode && canSpeakAloud,
                             allowConsumedTapAt = { position ->
-                                rowCoordinates[0]
+                                pressState.rowCoordinates[0]
                                     ?.localToWindow(position)
                                     ?.let { press ->
-                                        markdownHasLinkAnnotationAt(markdownLinkLayouts.values, press)
+                                        markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, press)
                                     } == true
                             },
                             onPointerDown = { position ->
-                                val pressInWindow = rowCoordinates[0]?.localToWindow(position)
+                                val pressInWindow = pressState.rowCoordinates[0]?.localToWindow(position)
                                 if (
                                     pressInWindow != null &&
-                                    markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow)
+                                    markdownHasLinkAnnotationAt(textLayouts.markdownLinkLayouts.values, pressInWindow)
                                 ) {
                                     ttsLinkTapCoordinator.beginPointerActivation()
                                 }
@@ -1816,10 +1718,10 @@ internal fun MessageBubble(
                                 onLongClick(label = messageActionsLabel) {
                                     // Accessibility entry has no touch point;
                                     // anchor to the bubble top and seed the first word.
-                                    longPressWindowPosition = null
-                                    selectionSeedVisibleOffset = null
+                                    pressState.longPressWindowPosition = null
+                                    pressState.selectionSeedVisibleOffset = null
                                     longPressWindowY = null
-                                    actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                    pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                     if (deleted) requestDelete() else onActionMenuOpenChange(true)
                                     true
                                 }
@@ -1828,7 +1730,7 @@ internal fun MessageBubble(
                     )
                     // Keep the row transform itself: clipped bounds are not the
                     // row's local origin when a message is partially off-screen.
-                    .onGloballyPositioned { rowCoordinates[0] = it },
+                    .onGloballyPositioned { pressState.rowCoordinates[0] = it },
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1927,10 +1829,11 @@ internal fun MessageBubble(
                 val pendingVisualRefs = bubbleMedia.pendingVisuals
                 val anyConfirmedMedia = bubbleMedia.hasConfirmedMedia
 
+                /** Saves the message's accepted media, ignoring taps while a save runs, then reports the outcome. */
                 fun saveAttachments() {
-                    if (deleted || mediaReferences.isEmpty() || attachmentSaveInFlight) return
+                    if (deleted || mediaReferences.isEmpty() || surfaces.attachmentSaveInFlight) return
                     onActionMenuOpenChange(false)
-                    attachmentSaveInFlight = true
+                    surfaces.attachmentSaveInFlight = true
                     appState.launchMutation {
                         try {
                             val summary =
@@ -1951,16 +1854,17 @@ internal fun MessageBubble(
                                     },
                             )
                         } finally {
-                            attachmentSaveInFlight = false
+                            surfaces.attachmentSaveInFlight = false
                         }
                     }
                 }
 
+                /** Shares the message text and media through Android Share, one share at a time. */
                 fun shareMessage() {
                     if (!canShareMessage) return
                     onActionMenuOpenChange(false)
-                    messageShareInFlight = true
-                    messageShareJob =
+                    surfaces.messageShareInFlight = true
+                    surfaces.messageShareJob =
                         messageShareScope.launch {
                             try {
                                 runCatchingCancellable {
@@ -1976,8 +1880,8 @@ internal fun MessageBubble(
                                     )
                                 }.onFailure { appState.presentOutboundShareFailure("MESSAGE_SHARE", it) }
                             } finally {
-                                messageShareInFlight = false
-                                messageShareJob = null
+                                surfaces.messageShareInFlight = false
+                                surfaces.messageShareJob = null
                             }
                         }
                 }
@@ -2129,10 +2033,10 @@ internal fun MessageBubble(
                     ) {
                         {
                             if (!selectionMode && !textSelectionMode) {
-                                longPressWindowPosition = null
-                                selectionSeedVisibleOffset = null
+                                pressState.longPressWindowPosition = null
+                                pressState.selectionSeedVisibleOffset = null
                                 longPressWindowY = null
-                                actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                 onActionMenuOpenChange(true)
                             }
                         }
@@ -2234,9 +2138,12 @@ internal fun MessageBubble(
                 // setting disabled never collapse (#325, #1180).
                 val bodyCanCollapse = collapseLongMessages && !deleted && !persistedFailure
                 val collapsible = bodyCanCollapse && !textSelectionMode && !ttsBodyExpanded
-                // The sender-name label (group chats only). Rendered above the
-                // shared media card when media is present, or as the first child
-                // of the text-only bubble otherwise.
+
+                /**
+                 * The sender-name label (group chats only). Rendered above the
+                 * shared media card when media is present, or as the first child
+                 * of the text-only bubble otherwise.
+                 */
                 val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     if (showSenderName) {
                         EmojiLabel(
@@ -2255,10 +2162,10 @@ internal fun MessageBubble(
                                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                                     onLongClick = {
                                         if (!deleted && !selectionMode && !textSelectionMode) {
-                                            longPressWindowPosition = null
-                                            selectionSeedVisibleOffset = null
+                                            pressState.longPressWindowPosition = null
+                                            pressState.selectionSeedVisibleOffset = null
                                             longPressWindowY = null
-                                            actionMenuAnchorBounds = messageBoundsInWindow[0]
+                                            pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
                                             onActionMenuOpenChange(true)
                                         }
                                     },
@@ -2266,9 +2173,12 @@ internal fun MessageBubble(
                         )
                     }
                 }
-                // The reply quote card. Self-contained (own translucent Surface),
-                // so it renders correctly whether inside the text bubble or
-                // standalone above the media card.
+
+                /**
+                 * The reply quote card. Self-contained (own translucent Surface),
+                 * so it renders correctly whether inside the text bubble or
+                 * standalone above the media card.
+                 */
                 val replyPreviewCard: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     replyPreview?.let { preview ->
                         val pairedReplyAccent = bubbleContentColor.takeIf { insideBubble }
@@ -2322,10 +2232,14 @@ internal fun MessageBubble(
                         )
                     }
                 }
+
+                /** Records the plain-text leaf's layout and registers it for selection once positioned. */
                 val onPlainTextLayout: (TextLayoutResult) -> Unit = {
-                    plainTextLayoutTracker.layoutResult = it
+                    textLayouts.plainTextLayoutTracker.layoutResult = it
                     reportPlainTextLayoutIfReady()
                 }
+
+                /** Wraps the message text in a selection container while text selection mode is active. */
                 val selectionWrapper: @Composable (@Composable () -> Unit) -> Unit = { content ->
                     if (textSelectionMode) {
                         val systemReadAloudKeyIds =
@@ -2353,7 +2267,7 @@ internal fun MessageBubble(
                 }
                 val onEditedClick: (() -> Unit)? =
                     if (editState != null && !textSelectionMode) {
-                        { editHistoryOpen = true }
+                        { surfaces.editHistoryOpen = true }
                     } else {
                         null
                     }
@@ -2486,8 +2400,8 @@ internal fun MessageBubble(
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
                                     customBubbleColorActive = customBubbleColorActive,
-                                    selectableTextLayoutReporter = selectableTextLayoutReporter,
-                                    markdownLinkLayoutReporter = markdownLinkLayoutReporter,
+                                    selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                                    markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
@@ -2513,7 +2427,7 @@ internal fun MessageBubble(
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
-                                    onExpand = { if (!deleted) expandedFullView = true },
+                                    onExpand = { if (!deleted) surfaces.expandedFullView = true },
                                 )
                             }
                         } else {
@@ -2576,8 +2490,8 @@ internal fun MessageBubble(
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
                                     customBubbleColorActive = customBubbleColorActive,
-                                    selectableTextLayoutReporter = selectableTextLayoutReporter,
-                                    markdownLinkLayoutReporter = markdownLinkLayoutReporter,
+                                    selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                                    markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                                     plainTextSelectionModifier = plainTextSelectionModifier,
@@ -2603,7 +2517,7 @@ internal fun MessageBubble(
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
-                                    onExpand = { if (!deleted) expandedFullView = true },
+                                    onExpand = { if (!deleted) surfaces.expandedFullView = true },
                                 )
                             }
                         }
@@ -2646,8 +2560,8 @@ internal fun MessageBubble(
                             persistedFailure = persistedFailure,
                             textSelectionMode = textSelectionMode,
                             customBubbleColorActive = customBubbleColorActive,
-                            selectableTextLayoutReporter = selectableTextLayoutReporter,
-                            markdownLinkLayoutReporter = markdownLinkLayoutReporter,
+                            selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                            markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                             onCopyMarkdownLink = ::copyMarkdownLink,
                             deferMarkdownLinkActivation = deferMarkdownLinkActivation,
                             plainTextSelectionModifier = plainTextSelectionModifier,
@@ -2672,7 +2586,7 @@ internal fun MessageBubble(
                             footerOnPendingVisual = footerOnPendingVisual,
                             invalidationWarning = invalidationWarning,
                             mine = mine,
-                            onExpand = { if (!deleted) expandedFullView = true },
+                            onExpand = { if (!deleted) surfaces.expandedFullView = true },
                         )
                     }
                 }
@@ -2680,8 +2594,8 @@ internal fun MessageBubble(
                     // A tombstone gets a focused delete-only menu. Batch or partial
                     // text selection still owns the row interaction completely.
                     expanded = isActionMenuOpen && !selectionMode && !textSelectionMode,
-                    initiatingHoldActive = initiatingMenuHoldActive,
-                    anchorBoundsInWindow = actionMenuAnchorBounds,
+                    initiatingHoldActive = pressState.initiatingMenuHoldActive,
+                    anchorBoundsInWindow = pressState.actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
                     canReply = !deleted && !actionsReadOnly,
                     canReact = !deleted && !actionsReadOnly,
@@ -2714,7 +2628,7 @@ internal fun MessageBubble(
                             !deleted &&
                             !keptMessages.isKept(keptMessageKey),
                     canShare = canShareMessage,
-                    canSave = !deleted && mediaReferences.isNotEmpty() && !attachmentSaveInFlight,
+                    canSave = !deleted && mediaReferences.isNotEmpty() && !surfaces.attachmentSaveInFlight,
                     canInfo = !deleted,
                     canReport =
                         canReportMessage(
@@ -2738,7 +2652,7 @@ internal fun MessageBubble(
                     onOpenEmojiPicker = {
                         if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
-                            emojiPickerOpen = true
+                            surfaces.emojiPickerOpen = true
                         }
                     },
                     onReply = ::beginReply,
@@ -2774,7 +2688,7 @@ internal fun MessageBubble(
                     onInfo = ::openInfoSheet,
                     onReport = {
                         onActionMenuOpenChange(false)
-                        reportSheetOpen = true
+                        surfaces.reportSheetOpen = true
                     },
                     onDelete = ::requestDelete,
                     mine = mine,
@@ -2849,7 +2763,7 @@ internal fun MessageBubble(
                                 {
                                     FocusedRenderedMessagePreview(
                                         layer = checkNotNull(focusedMessageLayer),
-                                        sourceSize = focusedMediaSize,
+                                        sourceSize = pressState.focusedMediaSize,
                                     )
                                 }
                             } else {
@@ -2968,7 +2882,7 @@ internal fun MessageBubble(
                         }
                     },
                 )
-                if (expandedFullView && !deleted) {
+                if (surfaces.expandedFullView && !deleted) {
                     val groupIdHex = controller.group.groupIdHex
                     val editingRecord =
                         controller.editingMessageId?.let { id ->
@@ -3012,8 +2926,8 @@ internal fun MessageBubble(
                         },
                         onReact = {
                             if (canUseExpandedComposer) {
-                                expandedFullView = false
-                                emojiPickerOpen = true
+                                surfaces.expandedFullView = false
+                                surfaces.emojiPickerOpen = true
                             }
                         },
                         onCopy = ::copyMessageText,
@@ -3022,10 +2936,10 @@ internal fun MessageBubble(
                             // delete surface (same handoff the reaction picker
                             // uses) so the sheet never renders behind the
                             // full-screen dialog window.
-                            expandedFullView = false
+                            surfaces.expandedFullView = false
                             requestDelete()
                         },
-                        onDismiss = { expandedFullView = false },
+                        onDismiss = { surfaces.expandedFullView = false },
                         bottomBar = {
                             when (composerGate) {
                                 ComposerGate.PENDING ->
@@ -3113,8 +3027,8 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (emojiPickerOpen && !deleted && !actionsReadOnly) {
-                    val pickingSlot = configureReactionSlot
+                if (surfaces.emojiPickerOpen && !deleted && !actionsReadOnly) {
+                    val pickingSlot = surfaces.configureReactionSlot
                     EmojiPickerSheet(
                         purpose =
                             if (pickingSlot == null) {
@@ -3125,20 +3039,20 @@ internal fun MessageBubble(
                         recentEmojis = recentEmojis,
                         onEmojiUsed = onEmojiUsed,
                         onDismissRequest = {
-                            emojiPickerOpen = false
-                            configureReactionSlot = null
+                            surfaces.emojiPickerOpen = false
+                            surfaces.configureReactionSlot = null
                         },
                         onEmojiPicked = { emoji ->
-                            emojiPickerOpen = false
+                            surfaces.emojiPickerOpen = false
                             if (pickingSlot == null) {
                                 reactWithEmoji(emoji)
                             } else {
-                                configureReactionsDraft =
-                                    configureReactionsDraft.mapIndexed { index, current ->
+                                surfaces.configureReactionsDraft =
+                                    surfaces.configureReactionsDraft.mapIndexed { index, current ->
                                         if (index == pickingSlot) emoji else current
                                     }
-                                configureReactionSlot = null
-                                customizeReactionsOpen = true
+                                surfaces.configureReactionSlot = null
+                                surfaces.customizeReactionsOpen = true
                             }
                         },
                         onConfigure =
@@ -3146,49 +3060,49 @@ internal fun MessageBubble(
                                 null
                             } else {
                                 {
-                                    configureReactionsDraft = quickReactionEmojis
-                                    emojiPickerOpen = false
-                                    customizeReactionsOpen = true
+                                    surfaces.configureReactionsDraft = quickReactionEmojis
+                                    surfaces.emojiPickerOpen = false
+                                    surfaces.customizeReactionsOpen = true
                                 }
                             },
                     )
                 }
-                if (customizeReactionsOpen && !deleted) {
+                if (surfaces.customizeReactionsOpen && !deleted) {
                     ConfigureReactionsSheet(
-                        current = configureReactionsDraft,
-                        onDismiss = { customizeReactionsOpen = false },
+                        current = surfaces.configureReactionsDraft,
+                        onDismiss = { surfaces.customizeReactionsOpen = false },
                         onApply = { choices ->
                             onQuickReactionsSave(choices)
-                            customizeReactionsOpen = false
+                            surfaces.customizeReactionsOpen = false
                         },
                         onPickSlot = { index, draft ->
-                            configureReactionsDraft = draft
-                            configureReactionSlot = index
-                            customizeReactionsOpen = false
-                            emojiPickerOpen = true
+                            surfaces.configureReactionsDraft = draft
+                            surfaces.configureReactionSlot = index
+                            surfaces.customizeReactionsOpen = false
+                            surfaces.emojiPickerOpen = true
                         },
                     )
                 }
-                if (editHistoryOpen && !deleted && editState != null) {
+                if (surfaces.editHistoryOpen && !deleted && editState != null) {
                     EditHistoryDialog(
                         // With an engine edit summary the record's plaintext is already the edited body.
                         original = record.plaintext.takeIf { item.projected?.edit == null },
                         originalTimestamp = record.recordedAt,
                         editState = editState,
-                        onDismissRequest = { editHistoryOpen = false },
+                        onDismissRequest = { surfaces.editHistoryOpen = false },
                         loadAuthoritativeHistory = { controller.authoritativeEditHistory(record.messageIdHex) },
                     )
                 }
-                if (reportSheetOpen) {
+                if (surfaces.reportSheetOpen) {
                     ReportMessageSheet(
-                        onDismissRequest = { reportSheetOpen = false },
-                        sending = reportInFlight,
+                        onDismissRequest = { surfaces.reportSheetOpen = false },
+                        sending = surfaces.reportInFlight,
                         onSubmit = { reason, explanation ->
-                            reportInFlight = true
+                            surfaces.reportInFlight = true
                             appState.launchMutation {
                                 try {
                                     val outcome = controller.reportMessage(record.messageIdHex, reason, explanation)
-                                    reportSheetOpen = false
+                                    surfaces.reportSheetOpen = false
                                     when (outcome) {
                                         ReportOutcome.Sent -> appState.present(R.string.report_message_sent)
                                         ReportOutcome.Queued -> appState.present(R.string.report_message_queued)
@@ -3198,19 +3112,19 @@ internal fun MessageBubble(
                                         ReportOutcome.Failed -> Unit
                                     }
                                 } finally {
-                                    reportInFlight = false
+                                    surfaces.reportInFlight = false
                                 }
                             }
                         },
                     )
                 }
-                if (infoSheetOpen && !deleted) {
-                    LaunchedEffect(hasReports, reportsRevision) {
-                        messageReports = if (hasReports) controller.reportsFor(record.messageIdHex) else null
+                if (surfaces.infoSheetOpen && !deleted) {
+                    LaunchedEffect(hasReports, surfaces.reportsRevision) {
+                        surfaces.messageReports = if (hasReports) controller.reportsFor(record.messageIdHex) else null
                     }
                     MessageDetailsScreen(
                         record = record,
-                        reports = messageReports?.takeIf { hasReports },
+                        reports = surfaces.messageReports?.takeIf { hasReports },
                         reporterName = appState::displayName,
                         canDismissReports = controller.isSelfAdmin && !controller.isDirectConversation,
                         onDismissReport = { report ->
@@ -3218,7 +3132,7 @@ internal fun MessageBubble(
                                 when (controller.dismissReports(listOf(report.reportIdHex), "")) {
                                     ReportOutcome.Sent, ReportOutcome.Queued -> {
                                         appState.present(R.string.report_dismissed)
-                                        reportsRevision += 1
+                                        surfaces.reportsRevision += 1
                                     }
                                     ReportOutcome.NotAllowed -> appState.present(R.string.report_dismiss_failed)
                                     // The controller already presented the failure with its report.
@@ -3234,31 +3148,31 @@ internal fun MessageBubble(
                         reactions = controller.reactions[record.messageIdHex].orEmpty(),
                         recipients = messageDetailsRecipients(controller, appState, mine),
                         attachmentLabels = mediaReferences.map { it.fileName.ifBlank { it.mediaType } },
-                        onDismissRequest = { infoSheetOpen = false },
+                        onDismissRequest = { surfaces.infoSheetOpen = false },
                         onCopy = { value ->
                             clipboard.setText(AnnotatedString(value))
                         },
                     )
                 }
                 val openForwardPayload = forwardPayload
-                if (forwardSheetOpen && !deleted && openForwardPayload != null) {
+                if (surfaces.forwardSheetOpen && !deleted && openForwardPayload != null) {
                     ForwardMessageSheet(
                         appState = appState,
                         payloads = listOf(openForwardPayload),
                         sourceAccountRef = controller.boundAccountRef,
                         originGroupIdHex = record.groupIdHex,
-                        onDismiss = { forwardSheetOpen = false },
+                        onDismiss = { surfaces.forwardSheetOpen = false },
                     )
                 }
-                if (deleteDialogOpen) {
+                if (surfaces.deleteDialogOpen) {
                     MessageDeleteDialog(
                         capability = deleteCapability,
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
-                        deleteInFlight = deleteInFlight,
+                        deleteInFlight = surfaces.deleteInFlight,
                         onDeleteForEveryone = ::performDeleteForEveryone,
                         onDeleteForMe = ::performDeleteForMe,
-                        onDismissRequest = { deleteDialogOpen = false },
+                        onDismissRequest = { surfaces.deleteDialogOpen = false },
                     )
                 }
                 // Keep the host composed through its exit; deleted messages target an empty summary.
@@ -3269,17 +3183,17 @@ internal fun MessageBubble(
                     enabled = !deleted,
                     onClick = {
                         if (!deleted) {
-                            reactionSheetOpen = true
+                            surfaces.reactionSheetOpen = true
                         }
                     },
                 )
-                if (reactionSheetOpen && !deleted) {
+                if (surfaces.reactionSheetOpen && !deleted) {
                     CompleteReactionDetailsSheet(
                         item = item,
                         controller = controller,
                         appState = appState,
                         onRemoveOwnReaction = if (actionsReadOnly || deleted) null else ::reactWithEmoji,
-                        onDismissRequest = { reactionSheetOpen = false },
+                        onDismissRequest = { surfaces.reactionSheetOpen = false },
                     )
                 }
             }
