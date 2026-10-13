@@ -115,18 +115,24 @@ class AnimationSourceAdmissionDeviceTest {
                 }
                 assertTrue("Real isolated frames must change the displayed pixels", colors.size >= 2)
                 instrumentation.runOnMainSync { (animated as Animatable).stop() }
-                Thread.sleep(200L)
+                var stoppedFrame = 0L
                 var stopped = 0
                 instrumentation.runOnMainSync {
+                    stoppedFrame =
+                        (animated as dev.ipf.whitenoise.android.media.sandbox.IsolatedAnimationDrawable).presentedFrame
                     animated.draw(android.graphics.Canvas(pixels))
                     stopped = pixels.getPixel(0, 0)
                 }
                 Thread.sleep(250L)
                 instrumentation.runOnMainSync {
                     animated.draw(android.graphics.Canvas(pixels))
+                    assertEquals(
+                        stoppedFrame,
+                        (animated as dev.ipf.whitenoise.android.media.sandbox.IsolatedAnimationDrawable).presentedFrame,
+                    )
                     assertEquals(stopped, pixels.getPixel(0, 0))
                 }
-                // The healthy paused stream must also survive beyond the image-request watchdog.
+                // Still-image requests retain their separate lane while this animation is paused.
                 val encoded = ByteArrayOutputStream().also { pixels.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 val png = encoded.toByteArray()
                 requireNotNull(MediaPipeline.decodeSampledBitmap(png, 2)).recycle()
