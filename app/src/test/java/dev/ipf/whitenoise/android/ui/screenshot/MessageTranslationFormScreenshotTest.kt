@@ -88,7 +88,11 @@ class MessageTranslationFormScreenshotTest {
 
     @Test fun largeRtl() = capture("translation_form_large_rtl.png", Appearance(scale = 2f, rtl = true))
 
-    @Test fun recovery() = capture("translation_form_recovery.png", Appearance(failure = TranslationFailure.SOURCE_MODEL))
+    @Test fun recovery() =
+        capture(
+            "translation_form_recovery.png",
+            Appearance(failure = TranslationFailure.SOURCE_MODEL),
+        )
 
     private data class Appearance(
         val dark: Boolean = false,

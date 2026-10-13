@@ -11,4 +11,3 @@ internal data class WidgetAccountPresentation(
     val active: Boolean = false,
     val picture: ImageBitmap? = null,
 )
-

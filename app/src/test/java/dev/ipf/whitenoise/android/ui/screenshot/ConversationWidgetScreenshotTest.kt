@@ -54,9 +54,17 @@ class ConversationWidgetScreenshotTest {
 
     @Test fun configurationDark() = configuration("widget_configuration_dark.png", Appearance(dark = true))
 
-    @Test fun configurationAmoled() = configuration("widget_configuration_amoled.png", Appearance(dark = true, amoled = true))
+    @Test fun configurationAmoled() =
+        configuration(
+            "widget_configuration_amoled.png",
+            Appearance(dark = true, amoled = true),
+        )
 
-    @Test fun configurationLargeRtl() = configuration("widget_configuration_large_rtl.png", Appearance(rtl = true, scale = 2f))
+    @Test fun configurationLargeRtl() =
+        configuration(
+            "widget_configuration_large_rtl.png",
+            Appearance(rtl = true, scale = 2f),
+        )
 
     @Test fun configurationUnavailable() = configuration("widget_configuration_unavailable.png", accounts = emptyList())
 
