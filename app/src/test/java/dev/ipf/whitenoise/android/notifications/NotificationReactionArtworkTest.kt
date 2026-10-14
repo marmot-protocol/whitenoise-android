@@ -7,6 +7,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
+import android.view.View
 import android.widget.ImageView
 import androidx.core.app.NotificationManagerCompat
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -15,11 +16,7 @@ import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -73,39 +70,6 @@ class NotificationReactionArtworkTest {
             assertNoArtwork(card.publicVersion)
         }
 
-    /** Rendering copies the source, so successful posts and rejected cards release it immediately. */
-    @Test
-    fun preparedSourceIsReleasedAfterEveryPostOutcome() =
-        runBlocking {
-            for (rejectArtwork in listOf(false, true)) {
-                val source = requireNotNull(notificationReactionEmojiArtwork(context, ":marmot:"))
-                val card =
-                    post(
-                        ":marmot:",
-                        prepare = { source },
-                        poster = { target, tag, id, notification ->
-                            if (rejectArtwork && notification.contentView != null) {
-                                throw IllegalArgumentException("inline rejected")
-                            }
-                            target.notify(tag, id, notification)
-                        },
-                    )
-                assertTrue(source.isRecycled)
-                if (rejectArtwork) assertNoArtwork(card) else assertPicture(card, ":marmot:")
-            }
-            manager.cancelAll()
-            val source = requireNotNull(notificationReactionEmojiArtwork(context, ":marmot:"))
-            val presenter =
-                presenter(
-                    prepare = { source },
-                    poster = { _, _, _, _ -> throw IllegalArgumentException("post rejected") },
-                )
-            presenter.ensureChannels()
-            assertFalse(presenter.show(reactionArtworkUpdate(":marmot:"), shortNpub = { "npub1fixture" }))
-            assertTrue(source.isRecycled)
-            assertTrue(manager.activeNotifications.isEmpty())
-        }
-
     /** Another bundled custom emoji uses its own artwork, including on Android 11. */
     @Test
     @Config(sdk = [30])
@@ -125,20 +89,32 @@ class NotificationReactionArtworkTest {
             )
         }
 
+    /** Reinflate the same posted payload in both directions; only the matching full-color image is visible. */
+    @Test
+    fun postedBodySelectsCurrentThemeWithoutReposting() =
+        runBlocking {
+            val card = post(":marmot:")
+            for (dark in listOf(false, true, false)) {
+                RuntimeEnvironment.setQualifiers(if (dark) "w360dp-h800dp-night-mdpi" else "w360dp-h800dp-notnight-mdpi")
+                val root = requireNotNull(card.contentView).apply(context, null)
+                val light = root.findViewById<ImageView>(R.id.reaction_notification_body_light)
+                val night = root.findViewById<ImageView>(R.id.reaction_notification_body_dark)
+                assertEquals(if (dark) View.GONE else View.VISIBLE, light.visibility)
+                assertEquals(if (dark) View.VISIBLE else View.GONE, night.visibility)
+                val lightBitmap = (light.drawable as BitmapDrawable).bitmap
+                val darkBitmap = (night.drawable as BitmapDrawable).bitmap
+                assertFalse(lightBitmap.sameAs(darkBitmap))
+                assertFalse(lightBitmap.isRecycled)
+                assertFalse(darkBitmap.isRecycled)
+            }
+            assertEquals(1, manager.activeNotifications.size)
+        }
+
     /** Unicode reactions stay ordinary text and never look for custom image files. */
     @Test
-    fun unicodeDoesNotPrepareCustomReactionArtwork() =
+    fun unicodeKeepsNativeTextWithoutCustomViews() =
         runBlocking {
-            var calls = 0
-            val card =
-                post(
-                    "👍",
-                    prepare = {
-                        calls++
-                        null
-                    },
-                )
-            assertEquals(0, calls)
+            val card = post("👍")
             assertNoArtwork(card)
             assertTrue(
                 card.extras
@@ -162,8 +138,8 @@ class NotificationReactionArtworkTest {
             store.save("party", bytes)
             store.save("marmot", bytes)
             try {
-                assertNull(notificationReactionEmojiArtwork(context, ":party:"))
-                val marmot = requireNotNull(notificationReactionEmojiArtwork(context, ":marmot:"))
+                assertNull(notificationBuiltinEmojiBitmap(context, ":party:"))
+                val marmot = requireNotNull(notificationBuiltinEmojiBitmap(context, ":marmot:"))
                 assertFalse(marmot.getPixel(64, 64) == Color.GREEN)
                 val card = post(":party:")
                 assertNoArtwork(card)
@@ -180,65 +156,14 @@ class NotificationReactionArtworkTest {
             }
         }
 
-    /** Optional preparation errors and missing results both preserve accessible reaction text. */
+    /** App-lock redaction and the persisted preview opt-out skip optional artwork entirely. */
     @Test
-    fun unavailableArtworkKeepsTheReactionReadable() =
+    fun hiddenPreviewsNeverExposeArtwork() =
         runBlocking {
-            val preparers =
-                listOf<suspend (String) -> Bitmap?>(
-                    { null },
-                    { throw IllegalStateException("image unavailable") },
-                )
-            for (prepare in preparers) {
-                val card = post(":marmot:", prepare = prepare)
-                assertNoArtwork(card)
-                assertTrue(
-                    card.extras
-                        .getCharSequence(Notification.EXTRA_TEXT)
-                        .toString()
-                        .contains(":marmot:"),
-                )
-            }
-        }
-
-    /** App-lock redaction and the persisted preview opt-out skip preparation entirely. */
-    @Test
-    fun hiddenPreviewsNeverPrepareOrExposeArtwork() =
-        runBlocking {
-            var calls = 0
-            val prepare: suspend (String) -> Bitmap? = {
-                calls++
-                null
-            }
-            assertNoArtwork(post(":marmot:", redacted = true, prepare = prepare))
-            assertEquals(0, calls)
+            assertNoArtwork(post(":marmot:", redacted = true))
             NotificationPreviewPreferences.setEnabled(context, false, scrub = { true })
-            val card = post(":marmot:", prepare = prepare)
-            assertEquals(0, calls)
+            val card = post(":marmot:")
             assertNoArtwork(card)
-            assertFalse(
-                card.extras
-                    .getCharSequence(Notification.EXTRA_TEXT)
-                    .toString()
-                    .contains(":marmot:"),
-            )
-        }
-
-    /** An opt-out that wins while preparation is suspended scrubs the picture, thumbnail and description. */
-    @Test
-    fun previewsDisabledDuringPreparationCannotLeakArtwork() =
-        runBlocking {
-            val card =
-                post(
-                    ":marmot:",
-                    prepare = {
-                        val image = notificationReactionEmojiArtwork(context, it)
-                        NotificationPreviewPreferences.setEnabled(context, false, scrub = { true })
-                        image
-                    },
-                )
-            assertNoArtwork(card)
-            assertNoArtwork(card.publicVersion)
             assertFalse(
                 card.extras
                     .getCharSequence(Notification.EXTRA_TEXT)
@@ -259,53 +184,6 @@ class NotificationReactionArtworkTest {
             assertEquals(card.contentIntent, hidden.contentIntent)
             assertEquals(card.deleteIntent, hidden.deleteIntent)
             assertTrue(hidden.actions.isNullOrEmpty())
-        }
-
-    /** Dismissal ownership is captured before image I/O, preventing a late reaction from replaying. */
-    @Test
-    fun dismissalDuringPreparationRejectsThePost() =
-        runBlocking {
-            val key = LocalNotificationFormatter.reactionDismissalKey("account", "group")
-            val image = requireNotNull(notificationReactionEmojiArtwork(context, ":marmot:"))
-            val presenter =
-                presenter(
-                    prepare = {
-                        ConversationCardPostSynchronizer.markDismissed(key.tag, key.id)
-                        image
-                    },
-                )
-            presenter.ensureChannels()
-            assertFalse(presenter.show(reactionArtworkUpdate(":marmot:"), shortNpub = { "npub1fixture" }))
-            assertTrue(manager.activeNotifications.isEmpty())
-            assertTrue(image.isRecycled)
-        }
-
-    /** A timeout discards and releases even a non-cancellable result; cancellation remains cancellation. */
-    @Test
-    fun timeoutAndCancellationKeepTheirDistinctSemantics() =
-        runBlocking {
-            val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-            assertNull(
-                prepareNotificationReactionArtwork(
-                    prepare = {
-                        withContext(NonCancellable) {
-                            delay(40)
-                            bitmap
-                        }
-                    },
-                    shortcode = ":marmot:",
-                    timeoutMs = 5,
-                ),
-            )
-            assertTrue(bitmap.isRecycled)
-            var cancelled = false
-            try {
-                post(":marmot:", prepare = { throw CancellationException("caller cancelled") })
-            } catch (_: CancellationException) {
-                cancelled = true
-            }
-            assertTrue(cancelled)
-            assertTrue(manager.activeNotifications.isEmpty())
         }
 
     /** Android image rejection gets one text-only retry with the same reaction identity and routing. */
@@ -347,7 +225,6 @@ class NotificationReactionArtworkTest {
             var attempts = 0
             val presenter =
                 presenter(
-                    prepare = { notificationReactionEmojiArtwork(context, it) },
                     poster = { target, tag, id, card ->
                         attempts++
                         if (attempts == 1) throw IllegalArgumentException("picture rejected")
@@ -373,7 +250,6 @@ class NotificationReactionArtworkTest {
             var attempts = 0
             val presenter =
                 presenter(
-                    prepare = { notificationReactionEmojiArtwork(context, it) },
                     poster = { _, _, _, _ ->
                         attempts++
                         throw IllegalArgumentException("post rejected")
@@ -392,7 +268,6 @@ class NotificationReactionArtworkTest {
             var attempts = 0
             val presenter =
                 presenter(
-                    prepare = { notificationReactionEmojiArtwork(context, it) },
                     poster = { _, tag, id, _ ->
                         attempts++
                         ConversationCardPostSynchronizer.markDismissed(tag, id)
@@ -405,18 +280,8 @@ class NotificationReactionArtworkTest {
             assertTrue(manager.activeNotifications.isEmpty())
         }
 
-    /** Only a whole reaction shortcode qualifies, never a shortcode inside its target preview. */
-    @Test
-    fun formatterQualifiesOnlyTheExactReactionToken() {
-        assertEquals(":marmot:", LocalNotificationFormatter.reactionArtworkShortcode(reactionArtworkUpdate(":marmot:")))
-        assertNull(LocalNotificationFormatter.reactionArtworkShortcode(reactionArtworkUpdate("👍")))
-        assertNull(LocalNotificationFormatter.reactionArtworkShortcode(reactionArtworkUpdate("hello :marmot:")))
-        assertNull(LocalNotificationFormatter.reactionArtworkShortcode(reactionArtworkUpdate("`:marmot:`")))
-    }
-
-    /** Inject optional failures without replacing the real platform posting path. */
+    /** Inject platform failures while retaining the actual bundled artwork rendering. */
     private fun presenter(
-        prepare: suspend (String) -> Bitmap?,
         poster: (NotificationManagerCompat, String, Int, Notification) -> Unit = { target, tag, id, card ->
             target.notify(tag, id, card)
         },
@@ -426,7 +291,6 @@ class NotificationReactionArtworkTest {
             groupReconciliation = {},
             enrichmentLauncher = {},
             emojiArtworkTimeoutMs = 5_000L,
-            reactionArtworkPreparer = prepare,
             notificationPoster = poster,
         )
 
@@ -434,13 +298,12 @@ class NotificationReactionArtworkTest {
     private suspend fun post(
         emoji: String,
         redacted: Boolean = false,
-        prepare: suspend (String) -> Bitmap? = { notificationReactionEmojiArtwork(context, it) },
         poster: (NotificationManagerCompat, String, Int, Notification) -> Unit = { target, tag, id, card ->
             target.notify(tag, id, card)
         },
     ): Notification {
         manager.cancelAll()
-        val presenter = presenter(prepare, poster)
+        val presenter = presenter(poster)
         presenter.ensureChannels()
         assertTrue(
             presenter.show(
@@ -455,7 +318,7 @@ class NotificationReactionArtworkTest {
     /** Quoted bundled emoji resolve too, but unavailable and code-literal shortcodes stay authored text. */
     @Test
     fun quotedArtworkUsesOnlySafeBundledImages() {
-        val images = reactionBodyArtwork(context, "Hello :wn: :party: `:marmot:`", null, null)
+        val images = reactionBodyArtwork(context, "Hello :wn: :party: `:marmot:`")
         assertEquals(setOf(":wn:"), images.keys)
         images.values.forEach { it.recycle() }
     }
@@ -464,12 +327,11 @@ class NotificationReactionArtworkTest {
     @Test
     fun rejectedQuotedArtworkRetriesForUnicodeAndUnavailableReactions() =
         runBlocking {
-            for (emoji in listOf("👍", ":party:", ":marmot:")) {
+            for (emoji in listOf("👍", ":party:")) {
                 manager.cancelAll()
                 var attempts = 0
                 val presenter =
                     presenter(
-                        prepare = { null },
                         poster = { target, tag, id, card ->
                             attempts++
                             if (card.contentView != null) throw IllegalArgumentException("inline rejected")
@@ -495,7 +357,7 @@ class NotificationReactionArtworkTest {
         assertNull(card.getLargeIcon())
         assertFalse(card.extras.containsKey(Notification.EXTRA_PICTURE))
         val root = requireNotNull(card.contentView).apply(context, null)
-        val icon = root.findViewById<ImageView>(R.id.reaction_notification_body)
+        val icon = root.findViewById<ImageView>(R.id.reaction_notification_body_light)
         assertNotNull(icon.drawable)
         assertFalse((icon.drawable as BitmapDrawable).bitmap.isRecycled)
         assertTrue(root.contentDescription.toString().contains(shortcode))

@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
 import android.service.notification.StatusBarNotification
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
@@ -285,4 +286,23 @@ private fun notificationEmojiUris(notification: Notification): List<Uri> {
     val style =
         NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification) ?: return emptyList()
     return (style.messages + style.historicMessages).mapNotNull { it.dataUri }
+}
+
+/** Shared static APK artwork rendering; no device-local files or received attachment guesses. */
+internal fun notificationBuiltinEmojiBitmap(
+    context: Context,
+    code: String,
+): Bitmap? {
+    val drawable = EmojiShortcodes.builtinDrawable(code)?.let { AppCompatResources.getDrawable(context, it) }
+    return drawable?.let {
+        Bitmap
+            .createBitmap(
+                NOTIFICATION_EMOJI_TILE_PX,
+                NOTIFICATION_EMOJI_TILE_PX,
+                Bitmap.Config.ARGB_8888,
+            ).also { bitmap ->
+                it.setBounds(0, 0, bitmap.width, bitmap.height)
+                it.draw(Canvas(bitmap))
+            }
+    }
 }

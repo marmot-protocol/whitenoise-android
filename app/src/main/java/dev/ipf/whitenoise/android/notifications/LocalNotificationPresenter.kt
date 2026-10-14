@@ -144,9 +144,6 @@ class LocalNotificationPresenter(
         notificationEmojiArtwork(context, text, source)
     },
     private val emojiArtworkTimeoutMs: Long = NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS,
-    private val reactionArtworkPreparer: suspend (String) -> Bitmap? = { shortcode ->
-        notificationReactionEmojiArtwork(context, shortcode)
-    },
     // First argument is opaque account scope, never the local account label stored in a system payload.
     private val contactAvatarOverride: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
     // Kept last so callers may still pass it as a trailing lambda.
@@ -661,7 +658,6 @@ class LocalNotificationPresenter(
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
-        var reactionArtwork: Bitmap? = null
         var reactionInlineArtwork = false
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
@@ -682,16 +678,6 @@ class LocalNotificationPresenter(
                                 update.previewText,
                                 emojiArtworkTimeoutMs,
                             )
-                    }
-                    if (!redactContent && previewToken.allowed && decision.style == NotificationStyleChoice.Plain) {
-                        LocalNotificationFormatter.reactionArtworkShortcode(update)?.let { shortcode ->
-                            reactionArtwork =
-                                prepareNotificationReactionArtwork(
-                                    reactionArtworkPreparer,
-                                    shortcode,
-                                    emojiArtworkTimeoutMs,
-                                )
-                        }
                     }
                     val showGenerationAllowsPost = {
                         if (replaceCurrentMessage) {
@@ -849,14 +835,15 @@ class LocalNotificationPresenter(
                         NotificationStyleChoice.Plain -> {
                             builder.setContentTitle(notificationContent.title)
                             if (notificationContent.body.isNotBlank()) {
-                                builder.setContentText(notificationContent.body)
+                                builder
+                                    .setContentText(notificationContent.body)
+                                    .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
                                 reactionInlineArtwork =
+                                    previewToken.allowed &&
                                     applyReactionNotificationArtwork(
                                         context,
                                         builder,
                                         notificationContent,
-                                        LocalNotificationFormatter.reactionArtworkShortcode(update),
-                                        reactionArtwork,
                                     )
                             } else {
                                 // Expand the same sentence for long group names without repeating its title.
@@ -1298,8 +1285,6 @@ class LocalNotificationPresenter(
                     true
                 }
         } finally {
-            // RemoteViews owns separate rendered body bitmaps; the prepared source stays local.
-            reactionArtwork?.recycle()
             carriedArtworkLease?.close()
             emojiArtifact?.close()
             // Plain-text cards create no exports; their normal write observer already reconciles the summary.

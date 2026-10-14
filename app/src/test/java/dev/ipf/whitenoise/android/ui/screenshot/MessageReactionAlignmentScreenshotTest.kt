@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageReactionSummar
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderAvatarSlot
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -96,12 +97,33 @@ class MessageReactionAlignmentScreenshotTest {
             translated = true,
         )
 
+    @Test
+    fun reactionAlignmentWithPendingTranslationLight() =
+        captureGallery(
+            name = "message_reaction_alignment_pending_light",
+            dark = false,
+            fontScale = 1f,
+            layoutDirection = LayoutDirection.Ltr,
+            pending = true,
+        )
+
+    @Test
+    fun reactionAlignmentWithPendingTranslationDarkLargeRtl() =
+        captureGallery(
+            name = "message_reaction_alignment_pending_dark_large_rtl",
+            dark = true,
+            fontScale = 1.6f,
+            layoutDirection = LayoutDirection.Rtl,
+            pending = true,
+        )
+
     private fun captureGallery(
         name: String,
         dark: Boolean,
         fontScale: Float,
         layoutDirection: LayoutDirection,
         translated: Boolean = false,
+        pending: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark) {
@@ -109,8 +131,13 @@ class MessageReactionAlignmentScreenshotTest {
                 val scope = rememberCoroutineScope()
                 val session =
                     remember {
-                        ConversationTranslationSession(scope, { error("No translation requested") }, { true }).apply {
+                        ConversationTranslationSession(
+                            scope,
+                            { if (pending) awaitCancellation() else error("No translation requested") },
+                            { true },
+                        ).apply {
                             if (translated) renditions[OUTGOING_SOURCE] = TranslationRendition("Sieht gut aus")
+                            if (pending) request(OUTGOING_SOURCE)
                         }
                     }
                 CompositionLocalProvider(
@@ -128,6 +155,8 @@ class MessageReactionAlignmentScreenshotTest {
                 RuntimeEnvironment.getApplication().getString(R.string.translation_show_original),
             )
         if (translated) control.assertIsDisplayed() else control.assertDoesNotExist()
+        val loading = composeRule.onNodeWithText(RuntimeEnvironment.getApplication().getString(R.string.translation_loading))
+        if (pending) loading.assertIsDisplayed() else loading.assertDoesNotExist()
         composeRule
             .onNodeWithTag(GALLERY_TAG)
             .captureRoboImage("src/test/snapshots/$name.png")
@@ -167,12 +196,12 @@ class MessageReactionAlignmentScreenshotTest {
                 horizontalAlignment = Alignment.Start,
             ) {
                 ReactionBubble(text = "Can you review the file?", mine = false)
-                MessageTranslationRendition(TranslationSource("incoming", "Can you review the file?", "de"))
                 MessageReactionSummary(
                     tallies = listOf(ReactionTally(emoji = "👍", count = 2, mine = true)),
                     mine = false,
                     onClick = {},
                 )
+                MessageTranslationRendition(TranslationSource("incoming", "Can you review the file?", "de"))
             }
         }
     }
@@ -187,12 +216,12 @@ class MessageReactionAlignmentScreenshotTest {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Column(modifier = Modifier.widthIn(max = 220.dp), horizontalAlignment = Alignment.End) {
                 ReactionBubble(text = "Looks good to me", mine = true)
-                MessageTranslationRendition(OUTGOING_SOURCE)
                 MessageReactionSummary(
                     tallies = listOf(ReactionTally(emoji = "❤️", count = 3, mine = false)),
                     mine = true,
                     onClick = {},
                 )
+                MessageTranslationRendition(OUTGOING_SOURCE)
             }
         }
     }

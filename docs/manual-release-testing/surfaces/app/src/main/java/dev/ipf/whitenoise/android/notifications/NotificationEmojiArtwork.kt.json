@@ -15,7 +15,7 @@
       {
         "surface": "shared static bundled emoji rendering",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiArtwork.kt",
-        "anchor": "notificationBuiltinEmojiBitmap(context, code)",
+        "anchor": "internal fun notificationBuiltinEmojiBitmap(",
         "test_ids": [
           "NTF-034",
           "NTF-030"

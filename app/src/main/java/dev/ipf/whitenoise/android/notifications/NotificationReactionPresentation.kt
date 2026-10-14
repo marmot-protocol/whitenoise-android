@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -24,14 +25,11 @@ internal fun applyReactionNotificationArtwork(
     context: Context,
     builder: NotificationCompat.Builder,
     content: LocalNotificationContent,
-    shortcode: String?,
-    artwork: Bitmap?,
 ): Boolean {
-    builder.setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
     if (!content.isReactionPreview) return false
     var images = emptyMap<String, Bitmap>()
     return try {
-        images = reactionBodyArtwork(context, content.body, shortcode, artwork)
+        images = reactionBodyArtwork(context, content.body)
         if (images.isEmpty()) {
             false
         } else {
@@ -54,7 +52,7 @@ internal fun applyReactionNotificationArtwork(
         clearReactionArtwork(builder, content.body)
         false
     } finally {
-        images.values.filter { it !== artwork }.forEach { it.recycle() }
+        images.values.forEach { it.recycle() }
     }
 }
 
@@ -74,18 +72,16 @@ private fun clearReactionArtwork(
 internal fun reactionBodyArtwork(
     context: Context,
     body: String,
-    shortcode: String?,
-    artwork: Bitmap?,
 ): Map<String, Bitmap> =
     EmojiShortcodes
         .presentationShortcodes(body)
         .take(REACTION_BODY_ARTWORK_LIMIT)
         .mapNotNull { code ->
-            val image = if (code == shortcode) artwork else notificationBuiltinEmojiBitmap(context, code)
+            val image = notificationBuiltinEmojiBitmap(context, code)
             image?.let { code to it }
         }.toMap()
 
-/** A standard ImageView carries locally drawn spans; unsupported bitmap spans never cross RemoteViews. */
+/** Resource-selected full-color images follow SystemUI's night mode when the same card re-inflates. */
 private fun reactionInlineView(
     context: Context,
     content: LocalNotificationContent,
@@ -95,8 +91,12 @@ private fun reactionInlineView(
     RemoteViews(context.packageName, R.layout.notification_reaction_inline).apply {
         setTextViewText(R.id.reaction_notification_title, content.title)
         setImageViewBitmap(
-            R.id.reaction_notification_body,
-            reactionBodyBitmap(context, content.body, artwork, expanded),
+            R.id.reaction_notification_body_light,
+            reactionBodyBitmap(context, content.body, artwork, expanded, dark = false),
+        )
+        setImageViewBitmap(
+            R.id.reaction_notification_body_dark,
+            reactionBodyBitmap(context, content.body, artwork, expanded, dark = true),
         )
         setContentDescription(R.id.reaction_notification, "${content.title}, ${content.body}")
     }
@@ -107,20 +107,10 @@ private fun reactionBodyBitmap(
     body: String,
     artwork: Map<String, Bitmap>,
     expanded: Boolean,
+    dark: Boolean,
 ): Bitmap {
     val metrics = context.resources.displayMetrics
-    val appearance =
-        context.obtainStyledAttributes(
-            androidx.core.R.style.TextAppearance_Compat_Notification,
-            intArrayOf(android.R.attr.textColor, android.R.attr.textSize),
-        )
-    val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
-    try {
-        paint.color = appearance.getColor(0, Color.GRAY)
-        paint.textSize = appearance.getDimension(1, REACTION_TEXT_SP * metrics.scaledDensity)
-    } finally {
-        appearance.recycle()
-    }
+    val paint = reactionTextPaint(context, dark)
     val text = SpannableString(body)
     val size = (paint.fontMetrics.descent - paint.fontMetrics.ascent).toInt().coerceAtLeast(1)
     EmojiShortcodes.annotate(AnnotatedString(body)).getStringAnnotations(0, body.length).forEach { token ->
@@ -152,6 +142,33 @@ private fun reactionBodyBitmap(
         bitmap.density = metrics.densityDpi
         layout.draw(Canvas(bitmap))
     }
+}
+
+/** Resolve each palette independently at posting, so reinflation can select either without redrawing. */
+private fun reactionTextPaint(
+    context: Context,
+    dark: Boolean,
+): TextPaint {
+    val themeContext =
+        context.createConfigurationContext(
+            Configuration(context.resources.configuration).apply {
+                uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                    if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+            },
+        )
+    val appearance =
+        themeContext.obtainStyledAttributes(
+            androidx.core.R.style.TextAppearance_Compat_Notification,
+            intArrayOf(android.R.attr.textColor, android.R.attr.textSize),
+        )
+    val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    try {
+        paint.color = appearance.getColor(0, Color.GRAY)
+        paint.textSize = appearance.getDimension(1, REACTION_TEXT_SP * context.resources.displayMetrics.scaledDensity)
+    } finally {
+        appearance.recycle()
+    }
+    return paint
 }
 
 private const val REACTION_EXPANDED_PREVIEW_LINES = 3

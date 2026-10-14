@@ -14,11 +14,27 @@
         android:importantForAccessibility="no"
         android:maxLines="1" />
 
-    <ImageView
+    <FrameLayout
         android:id="@+id/reaction_notification_body"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:adjustViewBounds="true"
-        android:importantForAccessibility="no"
-        android:scaleType="fitStart" />
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/reaction_notification_body_light"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:importantForAccessibility="no"
+            android:scaleType="fitStart"
+            android:visibility="@integer/notification_reaction_light_visibility" />
+
+        <ImageView
+            android:id="@+id/reaction_notification_body_dark"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:importantForAccessibility="no"
+            android:scaleType="fitStart"
+            android:visibility="@integer/notification_reaction_dark_visibility" />
+    </FrameLayout>
 </LinearLayout>

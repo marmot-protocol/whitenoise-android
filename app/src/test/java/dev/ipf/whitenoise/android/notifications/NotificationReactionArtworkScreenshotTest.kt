@@ -56,6 +56,50 @@ class NotificationReactionArtworkScreenshotTest {
     @Config(qualifiers = "w360dp-h800dp-night-mdpi")
     fun whiteNoiseReactionInDarkTheme() = runBlocking { capture(post(":wn:"), "notification_reaction_wn_dark") }
 
+    /** A card posted in light mode re-inflates with dark text colors without replacing the payload. */
+    @Test
+    fun postedLightCardAfterDarkThemeSwitch() =
+        runBlocking {
+            val card = post(":marmot:")
+            RuntimeEnvironment.setQualifiers("w360dp-h800dp-night-mdpi")
+            capture(card, "notification_reaction_posted_light_to_dark")
+        }
+
+    /** The inverse theme switch restores the light palette for the same posted artwork card. */
+    @Test
+    @Config(qualifiers = "w360dp-h800dp-night-mdpi")
+    fun postedDarkCardAfterLightThemeSwitch() =
+        runBlocking {
+            val card = post(":wn:")
+            RuntimeEnvironment.setQualifiers("w360dp-h800dp-notnight-mdpi")
+            capture(card, "notification_reaction_posted_dark_to_light")
+        }
+
+    /** Wide templates retain bounded preview wrapping while metadata keeps the complete long target. */
+    @Test
+    @Config(qualifiers = "w800dp-h360dp-land-mdpi")
+    fun longReactionInWideTemplate() =
+        runBlocking {
+            capture(
+                post(":marmot:", preview = LONG_TARGET),
+                "notification_reaction_wide_bounded_preview",
+                width = 800,
+            )
+        }
+
+    /** Small hosts and large text show the conservative bitmap scaling and ellipsis tradeoff. */
+    @Test
+    @Config(qualifiers = "w240dp-h800dp-mdpi")
+    fun longReactionInNarrowLargeFontTemplate() =
+        runBlocking {
+            RuntimeEnvironment.setFontScale(2f)
+            capture(
+                post(":marmot:", preview = LONG_TARGET),
+                "notification_reaction_narrow_large_bounded_preview",
+                width = 240,
+            )
+        }
+
     /** The large RTL inline card retains readable reaction context. */
     @Test
     @Config(qualifiers = "ldrtl-w360dp-h800dp-night-mdpi")
@@ -104,16 +148,17 @@ class NotificationReactionArtworkScreenshotTest {
     private fun capture(
         notification: Notification,
         name: String,
+        width: Int = 360,
     ) {
         Robolectric.buildActivity(Activity::class.java).setup().use { controller ->
             val activity = controller.get()
             val parent = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
-            activity.setContentView(parent, ViewGroup.LayoutParams(360, ViewGroup.LayoutParams.WRAP_CONTENT))
+            activity.setContentView(parent, ViewGroup.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT))
             val builder = Notification.Builder.recoverBuilder(activity, notification)
             parent.addView(builder.createContentView().apply(activity, parent))
             parent.addView(requireNotNull(builder.createBigContentView()).apply(activity, parent))
             parent.measure(
-                View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(1200, View.MeasureSpec.AT_MOST),
             )
             parent.layout(0, 0, parent.measuredWidth, parent.measuredHeight)
@@ -126,6 +171,7 @@ class NotificationReactionArtworkScreenshotTest {
         emoji: String,
         redacted: Boolean = false,
         rejectPicture: Boolean = false,
+        preview: String? = null,
     ): Notification {
         val presenter =
             LocalNotificationPresenter(
@@ -145,12 +191,22 @@ class NotificationReactionArtworkScreenshotTest {
         check(
             presenter.show(
                 reactionArtworkUpdate(emoji).let {
-                    if (emoji == "👍" || emoji == ":party:") it.copy(reactedToPreview = "Hello") else it
+                    when {
+                        preview != null -> it.copy(reactedToPreview = preview)
+                        emoji == "👍" || emoji == ":party:" -> it.copy(reactedToPreview = "Hello")
+                        else -> it
+                    }
                 },
                 redactContent = redacted,
                 shortNpub = { "npub1fixture" },
             ),
         )
         return manager.activeNotifications.single().notification
+    }
+
+    private companion object {
+        const val LONG_TARGET =
+            "Hello :wn: please review the document and share your notes about the next release, " +
+                "including the updated artwork, privacy settings and notification presentation on different displays."
     }
 }
