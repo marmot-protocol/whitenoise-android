@@ -21,6 +21,37 @@ import org.xmlpull.v1.XmlPullParser
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AndroidManifestShareTargetTest {
+    /** Outbound discovery must cover TXT, general documents and multi-file shares before plaintext staging. */
+    @Test
+    fun outboundShareQueriesCoverBothActionsWithoutQueryAllPackages() {
+        val manifest =
+            listOf(java.io.File("src/main/AndroidManifest.xml"), java.io.File("app/src/main/AndroidManifest.xml"))
+                .first { it.exists() }
+        val root = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(manifest)
+        val intents = root.getElementsByTagName("queries").item(0).childNodes
+        val actions = mutableSetOf<String>()
+        for (index in 0 until intents.length) {
+            val intent = intents.item(index) as? org.w3c.dom.Element ?: continue
+            if (intent.tagName != "intent") continue
+            val data = intent.getElementsByTagName("data")
+            if (data.length != 1) continue
+            val mime = data.item(0) as org.w3c.dom.Element
+            if (mime.getAttribute("android:mimeType") != "*/*" || mime.attributes.length != 1) continue
+            val declared = intent.getElementsByTagName("action")
+            for (actionIndex in 0 until declared.length) {
+                actions += (declared.item(actionIndex) as org.w3c.dom.Element).getAttribute("android:name")
+            }
+        }
+        assertTrue(actions.containsAll(listOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)))
+        val permissions = root.getElementsByTagName("uses-permission")
+        for (index in 0 until permissions.length) {
+            assertNotEquals(
+                "android.permission.QUERY_ALL_PACKAGES",
+                (permissions.item(index) as org.w3c.dom.Element).getAttribute("android:name"),
+            )
+        }
+    }
+
     @Test
     fun mainActivityUsesSingleTaskForExternalEntryPointReuse() {
         val context = RuntimeEnvironment.getApplication()

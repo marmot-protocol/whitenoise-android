@@ -182,6 +182,7 @@ jobs:
       - name: Test instrumented dispatch and required cases
         run: |
           python3 -m unittest scripts/test_run_android_instrumented_dispatch.py
+          python3 -m unittest scripts/test_outbound_share_visibility.py
           python3 -m unittest scripts/test_check_instrumented_required_cases.py
           python3 -m unittest scripts/test_select_instrumented_lanes.py
 

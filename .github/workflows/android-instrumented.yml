@@ -18,6 +18,17 @@ name: Android Instrumented Tests
 on:
   workflow_dispatch:
     inputs:
+      outbound_share_only:
+        description: Run only implicit share discovery and URI grants in primary and secondary users
+        required: false
+        type: boolean
+        default: false
+      outbound_share_api:
+        description: Android API for focused share visibility qualification
+        required: false
+        type: choice
+        options: ['30', '34', '37.0']
+        default: '34'
       media_sandbox_only:
         description: Run only codec isolation and recovery on the selected Android API
         required: false
@@ -95,6 +106,13 @@ on:
       - 'scripts/media-latency.init.gradle'
       - 'app/build.gradle.kts'
       - 'app/src/androidTest/AndroidManifest.xml'
+      - 'app/src/main/AndroidManifest.xml'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/share/OutboundShare.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageOutboundShare.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/share/OutboundShareDeviceContractTest.kt'
+      - 'scripts/outbound-share-fixture/**'
+      - 'scripts/install-outbound-share-fixture.sh'
+      - 'scripts/run-outbound-share-contract.sh'
       # Scroll masks must preserve real IME geometry and Android accessibility export.
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/VerticalEdgeFade.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt'
@@ -174,7 +192,7 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.responsiveness_only && 'responsiveness' || 'standard') }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
   cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}
 
 permissions:
@@ -206,7 +224,7 @@ jobs:
 
   attachment-fixture:
     needs: changes
-    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only))
+    if: needs.changes.outputs.attachment_fixture == 'true' && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only))
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -261,12 +279,18 @@ jobs:
 
   instrumented:
     needs: changes
-    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only)
+    if: needs.changes.outputs.connected == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only)
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
+      - name: Reject incompatible focused share inputs
+        if: inputs.outbound_share_only && (inputs.maestro_pilot || inputs.media_sandbox_only || inputs.responsiveness_only || inputs.review_demo_e2e || inputs.document_provider_matrix)
+        run: |
+          echo "Select one focused instrumented suite per dispatch" >&2
+          exit 2
+
       - name: Reject incompatible manual suites
         if: github.event_name == 'workflow_dispatch' && inputs.responsiveness_only && inputs.maestro_pilot
         run: |
@@ -322,7 +346,7 @@ jobs:
       - name: Run connected Android tests
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          api-level: ${{ inputs.media_sandbox_only && inputs.media_sandbox_api || 34 }}
+          api-level: ${{ inputs.outbound_share_only && inputs.outbound_share_api || inputs.media_sandbox_only && inputs.media_sandbox_api || 34 }}
           target: google_apis
           arch: x86_64
           force-avd-creation: false
@@ -330,7 +354,7 @@ jobs:
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
-          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}"
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}" "${{ inputs.outbound_share_only }}"
 
       - name: Upload instrumented test reports
         if: always()
@@ -344,6 +368,7 @@ jobs:
             cryptoBenchmark/build/reports/androidTests/
             cryptoBenchmark/build/outputs/androidTest-results/
             app/build/reports/document-provider-matrix/
+            app/build/reports/outbound-share-contract/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -364,7 +389,7 @@ jobs:
 
   maestro-pilot:
     name: Optional Maestro onboarding pilot
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && !startsWith(inputs.maestro_suite, 'runtime-')
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !startsWith(inputs.maestro_suite, 'runtime-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -475,7 +500,7 @@ jobs:
 
   maestro-runtime-build:
     name: Build isolated Maestro fixture pair
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && startsWith(inputs.maestro_suite, 'runtime-')
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && startsWith(inputs.maestro_suite, 'runtime-')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -663,7 +688,7 @@ jobs:
 
   maestro-runtime-summary:
     name: Reconcile every selected Maestro runtime case
-    if: always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && startsWith(inputs.maestro_suite, 'runtime-')
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && startsWith(inputs.maestro_suite, 'runtime-')
     needs: [maestro-runtime-build, maestro-runtime]
     runs-on: ubuntu-latest
     timeout-minutes: 5
