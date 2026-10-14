@@ -426,6 +426,29 @@ class NotificationReactionArtworkTest {
         images.values.forEach { it.recycle() }
     }
 
+    /** Quoted artwork also gets the bounded text retry when the reaction has no available bitmap. */
+    @Test
+    fun rejectedQuotedArtworkRetriesForUnicodeAndUnavailableReactions() =
+        runBlocking {
+            for (emoji in listOf("👍", ":party:", ":marmot:")) {
+                manager.cancelAll()
+                var attempts = 0
+                val presenter =
+                    presenter(
+                        prepare = { null },
+                        poster = { target, tag, id, card ->
+                            attempts++
+                            if (card.contentView != null) throw IllegalArgumentException("inline rejected")
+                            target.notify(tag, id, card)
+                        },
+                    )
+                presenter.ensureChannels()
+                assertTrue(presenter.show(reactionArtworkUpdate(emoji), shortNpub = { "npub1fixture" }))
+                assertEquals(2, attempts)
+                assertNoArtwork(manager.activeNotifications.single().notification)
+            }
+        }
+
     /** Verify artwork and every textual representation survive the platform round trip. */
     private fun assertPicture(
         card: Notification,

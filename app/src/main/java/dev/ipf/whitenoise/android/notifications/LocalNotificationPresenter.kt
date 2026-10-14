@@ -662,6 +662,7 @@ class LocalNotificationPresenter(
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
         var reactionArtwork: Bitmap? = null
+        var reactionInlineArtwork = false
         var reactionArtworkPostAttempted = false
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
@@ -850,13 +851,14 @@ class LocalNotificationPresenter(
                             builder.setContentTitle(notificationContent.title)
                             if (notificationContent.body.isNotBlank()) {
                                 builder.setContentText(notificationContent.body)
-                                applyReactionNotificationArtwork(
-                                    context,
-                                    builder,
-                                    notificationContent,
-                                    LocalNotificationFormatter.reactionArtworkShortcode(update),
-                                    reactionArtwork,
-                                )
+                                reactionInlineArtwork =
+                                    applyReactionNotificationArtwork(
+                                        context,
+                                        builder,
+                                        notificationContent,
+                                        LocalNotificationFormatter.reactionArtworkShortcode(update),
+                                        reactionArtwork,
+                                    )
                             } else {
                                 // Expand the same sentence for long group names without repeating its title.
                                 builder.setStyle(
@@ -1220,7 +1222,7 @@ class LocalNotificationPresenter(
                                                     rewriteLease?.dismissed?.get() != true
                                             },
                                         )
-                                    if (postResult == NotificationCardWriteResult.FAILED && reactionArtwork != null) {
+                                    if (postResult == NotificationCardWriteResult.FAILED && reactionInlineArtwork) {
                                         cancelNotification(
                                             notificationManager,
                                             notificationContent.notificationTag,

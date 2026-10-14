@@ -26,13 +26,13 @@ internal fun applyReactionNotificationArtwork(
     content: LocalNotificationContent,
     shortcode: String?,
     artwork: Bitmap?,
-) {
+): Boolean {
     builder.setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
-    if (!content.isReactionPreview) return
+    if (!content.isReactionPreview) return false
     var images = emptyMap<String, Bitmap>()
-    try {
+    return try {
         images = reactionBodyArtwork(context, content.body, shortcode, artwork)
-        if (images.isEmpty()) return
+        if (images.isEmpty()) return false
         val compact = reactionInlineView(context, content, images, expanded = false)
         val expanded = reactionInlineView(context, content, images, expanded = true)
         builder
@@ -40,13 +40,16 @@ internal fun applyReactionNotificationArtwork(
             .setCustomContentView(compact)
             .setCustomBigContentView(expanded)
             .setCustomHeadsUpContentView(compact)
+        true
     } catch (
         @Suppress("TooGenericExceptionCaught")
         _: RuntimeException,
     ) {
         clearReactionArtwork(builder, content.body)
+        false
     } catch (_: OutOfMemoryError) {
         clearReactionArtwork(builder, content.body)
+        false
     } finally {
         images.values.filter { it !== artwork }.forEach { it.recycle() }
     }
