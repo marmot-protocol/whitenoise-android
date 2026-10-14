@@ -273,6 +273,6 @@ class GroupAdvancedSettingsIconsTest {
         const val ADVANCED_GROUP_TAG = "chat_info.actions"
 
         /** Read aloud, notification settings, bubble colors and Add to Home screen expose distinct actions. */
-        const val EXPECTED_BUTTON_ROWS = 4
+        const val EXPECTED_BUTTON_ROWS = 5
     }
 }

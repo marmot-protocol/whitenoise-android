@@ -53,10 +53,10 @@ class FreshSweepCoverageTest {
         )
         assertTrue(
             "convergence-invalidated text must remain unavailable to bulk forward",
-            (
-                "forwardableText = if (invalidated) null else " +
-                    "MessageProjector.forwardableText(record, editedText)"
-            ) in projectionsBlock,
+            Regex(
+                "forwardableText\\s*=\\s*if \\(invalidated\\)\\s*\\{\\s*null\\s*}\\s*else\\s*\\{\\s*" +
+                    "MessageProjector\\.forwardableText\\(\\s*record,\\s*editedText,?\\s*\\)",
+            ).containsMatchIn(projectionsBlock),
         )
         assertFalse("profile changes must not rebuild text projections", "appState.profileRevisionForCompose" in projectionsBlock)
         // The whole-timeline selectable map must never key on the profile

@@ -1,0 +1,23 @@
+<resources>
+    <string name="translation_title">Çevir</string>
+    <string name="translation_automatic">Mesajları otomatik çevir</string>
+    <string name="translation_detect_language">Dili algıla</string>
+    <string name="translation_source_language">Kaynak dil</string>
+    <string name="translation_target_language">Hedef dil</string>
+    <string name="translation_show_original">Orijinali göster</string>
+    <string name="translation_show_result">Çeviriyi göster</string>
+    <string name="translation_loading">Cihazda çevriliyor…</string>
+    <string name="translation_open_engine">Çeviri uygulamasını aç</string>
+    <string name="translation_engine_managed">Önerilen çeviri motoru: Offline Translator. Çeviri cihazınızda yapılır; dil paketlerini bu uygulamada yönetin.</string>
+    <string name="translation_missing_engine">Bu cihazda çeviri için Offline Translator yükleyin.</string>
+    <string name="translation_unverified_engine">Bu çeviri uygulaması doğrulanmamış veya desteklenmiyor. Metin gönderilmedi.</string>
+    <string name="translation_detection_failed">Bir kaynak dil seçip tekrar deneyin.</string>
+    <string name="translation_source_model_missing">Kaynak dil paketini çeviri uygulamasında yükleyin.</string>
+    <string name="translation_engine_failed">Çeviri başarısız. Dil paketlerini kontrol edip tekrar deneyin.</string>
+    <string name="translation_recovery_notice">Çeviri kullanılamıyor. Tekrar denemek veya uygulamayı açmak için Çevir’e dokunun.</string>
+    <string name="translation_inherit">Genel ayarı kullan</string>
+    <string name="translation_on">Açık</string>
+    <string name="translation_off">Kapalı</string>
+    <string name="translation_inherit_language">Genel hedef dili kullan</string>
+    <string name="translation_privacy_warning">Offline Translator, mesaj metinlerini ve çevirileri Android sistem günlüklerine yazabilir. White Noise, başka bir uygulamanın işlediği metnin güvenliğini garanti edemez.</string>
+</resources>

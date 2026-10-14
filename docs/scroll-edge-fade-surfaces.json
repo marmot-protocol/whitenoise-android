@@ -1565,6 +1565,21 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TranslationSettingsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-033"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
       "calls": {
         "fadingVerticalScroll": 2

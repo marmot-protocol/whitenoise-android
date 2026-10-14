@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetProvider.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "R.string.app_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetProvider.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_conversation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetProvider.kt",
+        "anchor": "R.string.widget_conversation",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_open_app",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetProvider.kt",
+        "anchor": "R.string.widget_open_app",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_recent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetProvider.kt",
+        "anchor": "R.string.widget_recent",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetProvider.kt",
+        "anchor": "R.string.widget_unavailable",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetProvider.kt",
+        "anchor": "R.string.widget_unread",
+        "test_ids": [
+          "SET-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -19,6 +19,7 @@
     <string name="poll_cancel_custom_time">Вернуться к прежнему сроку</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Опрос</string>
+    <string name="poll_copy_heading">Опрос: %1$s</string>
     <string name="poll_unsupported">Не удалось показать этот опрос</string>
     <string name="poll_closed">Опрос закрыт</string>
     <string name="poll_vote_failed">Не удалось отправить голос</string>

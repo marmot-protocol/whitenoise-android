@@ -100,6 +100,7 @@ class SettingsHomeStateTest {
                             SettingsHomeRow.ChatFolders,
                             SettingsHomeRow.Notifications,
                             SettingsHomeRow.ReadAloud,
+                            SettingsHomeRow.Translation,
                             SettingsHomeRow.Dictation,
                             SettingsHomeRow.DataUsage,
                             SettingsHomeRow.PrivacySecurity,

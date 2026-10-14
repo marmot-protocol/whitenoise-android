@@ -1,0 +1,105 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationWidgetConfigurationContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "fun ConversationWidgetConfigurationContent(",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "WidgetAccountChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "fun WidgetAccountChoice(",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "R.string.account",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.active",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "R.string.active",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_all_accounts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "R.string.widget_all_accounts",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_open_app",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "R.string.widget_open_app",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "R.string.widget_privacy",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "R.string.widget_title",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "R.string.widget_unread_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "R.string.widget_unread_only",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "WidgetConfigurationAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "fun WidgetConfigurationAction(",
+        "test_ids": [
+          "SET-035"
+        ]
+      },
+      {
+        "surface": "WidgetAccountGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/widget/ConversationWidgetConfigurationScreen.kt",
+        "anchor": "fun WidgetAccountGroup(",
+        "test_ids": [
+          "SET-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

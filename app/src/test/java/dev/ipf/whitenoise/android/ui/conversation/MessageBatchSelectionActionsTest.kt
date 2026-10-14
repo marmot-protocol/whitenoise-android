@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,6 +36,43 @@ class MessageBatchSelectionActionsTest {
         val availability = batchSelectionActionAvailability(items, composerGate = ComposerGate.COMPOSER)
 
         assertFalse(availability.canCopy)
+    }
+
+    /**
+     * Polls are excluded from multi-select rather than silently dropped from its Copy: the selection map takes only
+     * kind-9 chats, and a poll has no batch copy text. Single-message Copy owns poll copying.
+     */
+    @Test
+    fun pollsAreExcludedFromMultiSelectCopy() {
+        val noTokens = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
+        val poll =
+            AppMessageRecordFfi(
+                messageIdHex = "poll",
+                direction = "received",
+                groupIdHex = "group",
+                sender = "alice",
+                plaintext = "[\"poll\",\"Lunch?\"]",
+                contentTokens = noTokens,
+                kind = 1068uL,
+                tags = emptyList(),
+                sourceEpoch = null,
+                retentionSeconds = null,
+                retentionExpiresAt = null,
+                recordedAt = 1uL,
+                receivedAt = 1uL,
+            )
+
+        val selectable =
+            isBatchSelectableMessage(
+                messageId = poll.messageIdHex,
+                userVisibleMessage = MessageProjector.isChatKind(poll.kind),
+                committedMessage = true,
+                projectedDeleted = false,
+                deletedMessageIds = emptySet(),
+            )
+
+        assertFalse(selectable)
+        assertNull(MessageProjector.copyableText(poll))
     }
 
     @Test

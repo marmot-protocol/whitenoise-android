@@ -1,0 +1,23 @@
+<resources>
+    <string name="translation_title">Übersetzen</string>
+    <string name="translation_automatic">Nachrichten automatisch übersetzen</string>
+    <string name="translation_detect_language">Sprache erkennen</string>
+    <string name="translation_source_language">Ausgangssprache</string>
+    <string name="translation_target_language">Zielsprache</string>
+    <string name="translation_show_original">Original anzeigen</string>
+    <string name="translation_show_result">Übersetzung anzeigen</string>
+    <string name="translation_loading">Übersetzung auf dem Gerät…</string>
+    <string name="translation_open_engine">Übersetzungs-App öffnen</string>
+    <string name="translation_engine_managed">Empfohlene Übersetzungs-App: Offline Translator. Die Übersetzung erfolgt auf deinem Gerät; verwalte die Sprachpakete in dieser App.</string>
+    <string name="translation_missing_engine">Installiere Offline Translator für lokale Übersetzungen.</string>
+    <string name="translation_unverified_engine">Diese Übersetzungs-App ist ungeprüft oder nicht unterstützt. Es wurde kein Text gesendet.</string>
+    <string name="translation_detection_failed">Wähle eine Ausgangssprache und versuche es erneut.</string>
+    <string name="translation_source_model_missing">Installiere das Sprachpaket der Ausgangssprache in der Übersetzungs-App.</string>
+    <string name="translation_engine_failed">Übersetzung fehlgeschlagen. Prüfe die Sprachpakete und versuche es erneut.</string>
+    <string name="translation_recovery_notice">Übersetzung nicht verfügbar. Tippe auf Übersetzen, um es erneut zu versuchen oder die App zu öffnen.</string>
+    <string name="translation_inherit">Globale Einstellung verwenden</string>
+    <string name="translation_on">Ein</string>
+    <string name="translation_off">Aus</string>
+    <string name="translation_inherit_language">Globale Zielsprache verwenden</string>
+    <string name="translation_privacy_warning">Offline Translator kann Nachrichtentexte und Übersetzungen in Android-Systemprotokolle schreiben. White Noise kann die Sicherheit von Texten, die eine andere App verarbeitet, nicht garantieren.</string>
+</resources>

@@ -31,6 +31,7 @@ internal enum class SettingsDetail {
     AiAgents,
     Donate,
     TextToSpeech,
+    Translation,
     Dictation,
     ChatFolders,
     Gestures,

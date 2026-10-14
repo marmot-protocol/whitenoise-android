@@ -17,6 +17,7 @@
     <string name="poll_cancel_custom_time">Vorherige Frist verwenden</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">Umfrage</string>
+    <string name="poll_copy_heading">Umfrage: %1$s</string>
     <string name="poll_unsupported">Diese Umfrage kann nicht angezeigt werden</string>
     <string name="poll_closed">Umfrage geschlossen</string>
     <string name="poll_vote_failed">Stimme konnte nicht abgegeben werden</string>

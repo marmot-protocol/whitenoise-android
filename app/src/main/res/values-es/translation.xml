@@ -1,0 +1,23 @@
+<resources>
+    <string name="translation_title">Traducir</string>
+    <string name="translation_automatic">Traducir mensajes automáticamente</string>
+    <string name="translation_detect_language">Detectar idioma</string>
+    <string name="translation_source_language">Idioma de origen</string>
+    <string name="translation_target_language">Idioma de destino</string>
+    <string name="translation_show_original">Mostrar original</string>
+    <string name="translation_show_result">Mostrar traducción</string>
+    <string name="translation_loading">Traduciendo en el dispositivo…</string>
+    <string name="translation_open_engine">Abrir motor</string>
+    <string name="translation_engine_managed">Motor recomendado: Offline Translator. La traducción se realiza en tu dispositivo; administra los paquetes de idiomas en esa aplicación.</string>
+    <string name="translation_missing_engine">Instala Offline Translator para traducir en este dispositivo.</string>
+    <string name="translation_unverified_engine">Este motor no está verificado o no es compatible. No se envió texto.</string>
+    <string name="translation_detection_failed">Elige un idioma de origen y vuelve a intentarlo.</string>
+    <string name="translation_source_model_missing">Instala el paquete del idioma de origen en el motor.</string>
+    <string name="translation_engine_failed">La traducción falló. Revisa los paquetes de idiomas y vuelve a intentarlo.</string>
+    <string name="translation_recovery_notice">Traducción no disponible. Toca Traducir para reintentar o abrir el motor.</string>
+    <string name="translation_inherit">Usar ajuste global</string>
+    <string name="translation_on">Activado</string>
+    <string name="translation_off">Desactivado</string>
+    <string name="translation_inherit_language">Usar idioma de destino global</string>
+    <string name="translation_privacy_warning">Offline Translator puede escribir mensajes y traducciones en los registros del sistema Android. White Noise no puede garantizar la seguridad del texto que procesa otra aplicación.</string>
+</resources>

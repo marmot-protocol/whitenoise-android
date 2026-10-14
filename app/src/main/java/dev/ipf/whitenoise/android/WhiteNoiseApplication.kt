@@ -56,7 +56,10 @@ open class WhiteNoiseApplication :
      */
     private val appStateDelegate =
         lazy {
-            WhiteNoiseAppState(this)
+            WhiteNoiseAppState(this).also {
+                dev.ipf.whitenoise.android.widget.ConversationWidgets
+                    .observe(this, it)
+            }
         }
     open val appState: WhiteNoiseAppState by appStateDelegate
 

@@ -137,6 +137,14 @@
           "SET-001",
           "ONB-009"
         ]
+      },
+      {
+        "surface": "R.string.translation_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-033"
+        ]
       }
     ],
     "settings_controls": [
