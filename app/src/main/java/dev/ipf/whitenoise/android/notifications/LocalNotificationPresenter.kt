@@ -663,7 +663,6 @@ class LocalNotificationPresenter(
         var emojiArtifact: NotificationEmojiArtifact? = null
         var reactionArtwork: Bitmap? = null
         var reactionInlineArtwork = false
-        var reactionArtworkPostAttempted = false
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
         try {
@@ -1206,7 +1205,6 @@ class LocalNotificationPresenter(
                                     ) {
                                         return@withLock false
                                     }
-                                    reactionArtworkPostAttempted = reactionArtwork != null
                                     var postResult =
                                         postNotificationSafely(
                                             notificationManager,
@@ -1300,8 +1298,8 @@ class LocalNotificationPresenter(
                     true
                 }
         } finally {
-            // Rejecting eligibility before a platform attempt leaves no potential OS bitmap owner.
-            if (!reactionArtworkPostAttempted) reactionArtwork?.recycle()
+            // RemoteViews owns separate rendered body bitmaps; the prepared source stays local.
+            reactionArtwork?.recycle()
             carriedArtworkLease?.close()
             emojiArtifact?.close()
             // Plain-text cards create no exports; their normal write observer already reconciles the summary.

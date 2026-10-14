@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.BitmapDrawable
 import android.widget.ImageView
 import androidx.core.app.NotificationManagerCompat
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -70,6 +71,39 @@ class NotificationReactionArtworkTest {
             assertTrue(card.actions.isNullOrEmpty())
             assertPicture(card, ":marmot:")
             assertNoArtwork(card.publicVersion)
+        }
+
+    /** Rendering copies the source, so successful posts and rejected cards release it immediately. */
+    @Test
+    fun preparedSourceIsReleasedAfterEveryPostOutcome() =
+        runBlocking {
+            for (rejectArtwork in listOf(false, true)) {
+                val source = requireNotNull(notificationReactionEmojiArtwork(context, ":marmot:"))
+                val card =
+                    post(
+                        ":marmot:",
+                        prepare = { source },
+                        poster = { target, tag, id, notification ->
+                            if (rejectArtwork && notification.contentView != null) {
+                                throw IllegalArgumentException("inline rejected")
+                            }
+                            target.notify(tag, id, notification)
+                        },
+                    )
+                assertTrue(source.isRecycled)
+                if (rejectArtwork) assertNoArtwork(card) else assertPicture(card, ":marmot:")
+            }
+            manager.cancelAll()
+            val source = requireNotNull(notificationReactionEmojiArtwork(context, ":marmot:"))
+            val presenter =
+                presenter(
+                    prepare = { source },
+                    poster = { _, _, _, _ -> throw IllegalArgumentException("post rejected") },
+                )
+            presenter.ensureChannels()
+            assertFalse(presenter.show(reactionArtworkUpdate(":marmot:"), shortNpub = { "npub1fixture" }))
+            assertTrue(source.isRecycled)
+            assertTrue(manager.activeNotifications.isEmpty())
         }
 
     /** Another bundled custom emoji uses its own artwork, including on Android 11. */
@@ -463,6 +497,7 @@ class NotificationReactionArtworkTest {
         val root = requireNotNull(card.contentView).apply(context, null)
         val icon = root.findViewById<ImageView>(R.id.reaction_notification_body)
         assertNotNull(icon.drawable)
+        assertFalse((icon.drawable as BitmapDrawable).bitmap.isRecycled)
         assertTrue(root.contentDescription.toString().contains(shortcode))
         assertTrue(
             card.extras
