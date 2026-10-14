@@ -15,28 +15,40 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.translation.ConversationTranslationSession
+import dev.ipf.whitenoise.android.translation.LocalConversationTranslation
+import dev.ipf.whitenoise.android.translation.MessageTranslationRendition
+import dev.ipf.whitenoise.android.translation.TranslationRendition
+import dev.ipf.whitenoise.android.translation.TranslationSource
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleBottomAlignmentLine
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageReactionSummary
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderAvatarSlot
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -65,16 +77,72 @@ class MessageReactionAlignmentScreenshotTest {
             layoutDirection = LayoutDirection.Rtl,
         )
 
+    @Test
+    fun reactionAlignmentWithTranslationLight() =
+        captureGallery(
+            name = "message_reaction_alignment_translation_light",
+            dark = false,
+            fontScale = 1f,
+            layoutDirection = LayoutDirection.Ltr,
+            translated = true,
+        )
+
+    @Test
+    fun reactionAlignmentWithTranslationDarkLargeRtl() =
+        captureGallery(
+            name = "message_reaction_alignment_translation_dark_large_rtl",
+            dark = true,
+            fontScale = 1.6f,
+            layoutDirection = LayoutDirection.Rtl,
+            translated = true,
+        )
+
+    @Test
+    fun reactionAlignmentWithPendingTranslationLight() =
+        captureGallery(
+            name = "message_reaction_alignment_pending_light",
+            dark = false,
+            fontScale = 1f,
+            layoutDirection = LayoutDirection.Ltr,
+            pending = true,
+        )
+
+    @Test
+    fun reactionAlignmentWithPendingTranslationDarkLargeRtl() =
+        captureGallery(
+            name = "message_reaction_alignment_pending_dark_large_rtl",
+            dark = true,
+            fontScale = 1.6f,
+            layoutDirection = LayoutDirection.Rtl,
+            pending = true,
+        )
+
+    /** Seed real pending/completed sessions and assert the expected controls before capturing alignment. */
     private fun captureGallery(
         name: String,
         dark: Boolean,
         fontScale: Float,
         layoutDirection: LayoutDirection,
+        translated: Boolean = false,
+        pending: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark) {
                 val density = LocalDensity.current
+                val scope = rememberCoroutineScope()
+                val session =
+                    remember {
+                        ConversationTranslationSession(
+                            scope,
+                            { if (pending) awaitCancellation() else error("No translation requested") },
+                            { true },
+                        ).apply {
+                            if (translated) renditions[OUTGOING_SOURCE] = TranslationRendition("Sieht gut aus")
+                            if (pending) request(OUTGOING_SOURCE)
+                        }
+                    }
                 CompositionLocalProvider(
+                    LocalConversationTranslation provides session,
                     LocalDensity provides Density(density.density, fontScale),
                     LocalLayoutDirection provides layoutDirection,
                 ) {
@@ -83,11 +151,20 @@ class MessageReactionAlignmentScreenshotTest {
             }
         }
 
+        val control =
+            composeRule.onNodeWithText(
+                RuntimeEnvironment.getApplication().getString(R.string.translation_show_original),
+            )
+        if (translated) control.assertIsDisplayed() else control.assertDoesNotExist()
+        val loadingText = RuntimeEnvironment.getApplication().getString(R.string.translation_loading)
+        val loading = composeRule.onNodeWithText(loadingText)
+        if (pending) loading.assertIsDisplayed() else loading.assertDoesNotExist()
         composeRule
             .onNodeWithTag(GALLERY_TAG)
             .captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** Compare both message directions within one fixed viewport under the requested theme and density. */
     @Composable
     private fun ReactionAlignmentGallery() {
         Surface(modifier = Modifier.width(360.dp).testTag(GALLERY_TAG)) {
@@ -101,6 +178,7 @@ class MessageReactionAlignmentScreenshotTest {
         }
     }
 
+    /** Keep the incoming avatar, bubble-bottom alignment and inactive translation in the production order. */
     @Composable
     private fun IncomingReactionExample() {
         Text("Incoming", style = MaterialTheme.typography.labelMedium)
@@ -127,10 +205,12 @@ class MessageReactionAlignmentScreenshotTest {
                     mine = false,
                     onClick = {},
                 )
+                MessageTranslationRendition(TranslationSource("incoming", "Can you review the file?", "de"))
             }
         }
     }
 
+    /** Place the outgoing chips against the bubble, with seeded translation controls beneath them. */
     @Composable
     private fun ColumnScope.OutgoingReactionExample() {
         Text(
@@ -146,10 +226,12 @@ class MessageReactionAlignmentScreenshotTest {
                     mine = true,
                     onClick = {},
                 )
+                MessageTranslationRendition(OUTGOING_SOURCE)
             }
         }
     }
 
+    /** Use the shared bubble frame so background, padding and alignment reflect actual message rendering. */
     @Composable
     private fun ReactionBubble(
         text: String,
@@ -168,5 +250,6 @@ class MessageReactionAlignmentScreenshotTest {
 
     private companion object {
         const val GALLERY_TAG = "message-reaction-alignment-gallery"
+        val OUTGOING_SOURCE = TranslationSource("outgoing", "Looks good to me", "de")
     }
 }

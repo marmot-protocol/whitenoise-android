@@ -9,7 +9,6 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.net.Uri
 import android.service.notification.StatusBarNotification
-import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
@@ -169,6 +168,7 @@ internal fun renderNotificationEmojiArtwork(images: List<Bitmap>): Bitmap {
     return output
 }
 
+/** Ordinary message previews retain their existing device-local then bundled artwork precedence. */
 private suspend fun notificationEmojiBitmap(
     context: Context,
     code: String,
@@ -176,18 +176,7 @@ private suspend fun notificationEmojiBitmap(
 ): Bitmap? {
     val local = localNotificationEmojiBitmap(context, code, readBudget)
     if (local != null) return local
-    val drawable = EmojiShortcodes.builtinDrawable(code)?.let { AppCompatResources.getDrawable(context, it) }
-    return drawable?.let {
-        Bitmap
-            .createBitmap(
-                NOTIFICATION_EMOJI_TILE_PX,
-                NOTIFICATION_EMOJI_TILE_PX,
-                Bitmap.Config.ARGB_8888,
-            ).also { bitmap ->
-                it.setBounds(0, 0, bitmap.width, bitmap.height)
-                it.draw(Canvas(bitmap))
-            }
-    }
+    return notificationBuiltinEmojiBitmap(context, code)
 }
 
 private suspend fun localNotificationEmojiBitmap(

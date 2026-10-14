@@ -7,7 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -68,16 +67,19 @@ internal fun rememberMessageTranslationSource(
     return source
 }
 
+/** Renders only active translation status or result controls without widening the owning message. */
 @Composable
 internal fun MessageTranslationRendition(source: TranslationSource?) {
-    val session = LocalConversationTranslation.current ?: return
-    if (source == null) return
+    val session = LocalConversationTranslation.current
+    if (session == null || source == null) return
     val rendition = session.renditions[source]
+    val pending = session.isPending(source)
+    if (!pending && rendition == null) return
     Column(
-        modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (session.isPending(source)) {
+        if (pending) {
             Text(stringResource(R.string.translation_loading), style = MaterialTheme.typography.labelSmall)
         }
         if (rendition != null) {
