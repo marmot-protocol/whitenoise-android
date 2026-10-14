@@ -355,12 +355,9 @@ jobs:
           set +o pipefail
           yes | "$sdk_root/cmdline-tools/latest/bin/sdkmanager" --install 'cmdline-tools;latest' > /dev/null
           set -o pipefail
-          mapfile -t cmdline_tools_bins < <(
-            find "$sdk_root/cmdline-tools" -mindepth 2 -maxdepth 2 -type d -name bin -path '*/latest*/bin' -print | sort -V
-          )
-          [[ ${#cmdline_tools_bins[@]} -gt 0 ]] || { echo "Updated SDK tools unavailable" >&2; exit 1; }
-          cmdline_tools_bin="${cmdline_tools_bins[${#cmdline_tools_bins[@]} - 1]}"
+          cmdline_tools_bin="$(python3 scripts/select_android_cmdline_tools.py "$sdk_root")"
           "$cmdline_tools_bin/avdmanager" list device > /dev/null
+          cat "$cmdline_tools_bin/../source.properties"
           printf '%s\n' "$cmdline_tools_bin" >> "$GITHUB_PATH"
 
       - name: Retry Android 17 input-service readiness for sharing

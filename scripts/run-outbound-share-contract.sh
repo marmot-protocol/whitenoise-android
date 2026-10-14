@@ -12,6 +12,9 @@ image_fingerprint="$(adb -e shell getprop ro.build.fingerprint | tr -d '\r')"
 printf '%s\n' "$image_fingerprint" > "$report_dir/image-fingerprint.txt"
 printf '%s\n' "$actual_sdk" > "$report_dir/android-sdk.txt"
 if [[ "$actual_sdk" == 37 ]]; then
+  avd_ini="${ANDROID_AVD_HOME:-$HOME/.android/avd}/test.ini"
+  cp "$avd_ini" "$report_dir/android-avd.ini"
+  grep -q '^target=android-37\.0$' "$avd_ini" || { echo "Android 17 AVD target metadata is invalid" >&2; exit 1; }
   expected_token="$(cat "$report_dir/android17-emulator-stabilize.request")"
   [[ -n "$expected_token" ]] || { echo "Missing Android 17 stabilization request" >&2; exit 1; }
   for attempt in {1..60}; do
