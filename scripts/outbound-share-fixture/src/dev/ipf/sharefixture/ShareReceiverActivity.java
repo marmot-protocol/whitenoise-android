@@ -8,6 +8,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.ResultReceiver;
 import android.provider.OpenableColumns;
+import android.view.WindowInsets;
+import android.widget.ScrollView;
+import android.widget.TextView;
 
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -15,7 +18,7 @@ import java.util.ArrayList;
 
 /** Independent APK that observes only streams granted by a real Sharesheet selection. */
 public final class ShareReceiverActivity extends Activity {
-    /** Reports generated-file observations over a binder, without another provider or query grant. */
+    /** Reports granted-file observations over a binder, or displays a receipt for manual device tests. */
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -36,8 +39,32 @@ public final class ShareReceiverActivity extends Activity {
         result.putBoolean("readGrant", (intent.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0);
         result.putBoolean("neighborReadable", readable(intent.getStringExtra("outbound_share_fixture.neighbor")));
         ResultReceiver receiver = extra(intent, "outbound_share_fixture.result", ResultReceiver.class);
-        if (receiver != null) receiver.send(RESULT_OK, result);
-        finish();
+        if (receiver != null) {
+            receiver.send(RESULT_OK, result);
+            finish();
+        } else {
+            showReceipt(result);
+        }
+    }
+
+    /** Displays observations from this UID without logging content or requiring a recipient account. */
+    private void showReceipt(Bundle result) {
+        TextView text = new TextView(this);
+        text.setText("Share receipt\nnames=" + result.getStringArrayList("names")
+                + "\nsha256=" + result.getStringArrayList("hashes")
+                + "\nmime=" + result.getString("mime")
+                + "\ncaption=" + result.getString("caption")
+                + "\nclipCount=" + result.getInt("clipCount")
+                + "\nreadGrant=" + result.getBoolean("readGrant"));
+        text.setTextSize(16);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(text);
+        scroll.setOnApplyWindowInsetsListener((view, insets) -> {
+            android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+            view.setPadding(bars.left + 24, bars.top + 24, bars.right + 24, bars.bottom + 24);
+            return insets;
+        });
+        setContentView(scroll);
     }
 
     /** Reads the single- and multiple-stream contracts without linking the instrumented APK. */
