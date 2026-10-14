@@ -70,8 +70,8 @@ internal fun rememberMessageTranslationSource(
 /** Renders only active translation status or result controls without widening the owning message. */
 @Composable
 internal fun MessageTranslationRendition(source: TranslationSource?) {
-    val session = LocalConversationTranslation.current ?: return
-    if (source == null) return
+    val session = LocalConversationTranslation.current
+    if (session == null || source == null) return
     val rendition = session.renditions[source]
     val pending = session.isPending(source)
     if (!pending && rendition == null) return

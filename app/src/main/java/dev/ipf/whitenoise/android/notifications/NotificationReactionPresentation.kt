@@ -32,15 +32,18 @@ internal fun applyReactionNotificationArtwork(
     var images = emptyMap<String, Bitmap>()
     return try {
         images = reactionBodyArtwork(context, content.body, shortcode, artwork)
-        if (images.isEmpty()) return false
-        val compact = reactionInlineView(context, content, images, expanded = false)
-        val expanded = reactionInlineView(context, content, images, expanded = true)
-        builder
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            .setCustomContentView(compact)
-            .setCustomBigContentView(expanded)
-            .setCustomHeadsUpContentView(compact)
-        true
+        if (images.isEmpty()) {
+            false
+        } else {
+            val compact = reactionInlineView(context, content, images, expanded = false)
+            val expanded = reactionInlineView(context, content, images, expanded = true)
+            builder
+                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                .setCustomContentView(compact)
+                .setCustomBigContentView(expanded)
+                .setCustomHeadsUpContentView(compact)
+            true
+        }
     } catch (
         @Suppress("TooGenericExceptionCaught")
         _: RuntimeException,
