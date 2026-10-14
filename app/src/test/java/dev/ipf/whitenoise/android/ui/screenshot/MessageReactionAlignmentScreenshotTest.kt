@@ -117,6 +117,7 @@ class MessageReactionAlignmentScreenshotTest {
             pending = true,
         )
 
+    /** Seed real pending/completed sessions and assert the expected controls before capturing alignment. */
     private fun captureGallery(
         name: String,
         dark: Boolean,
@@ -163,6 +164,7 @@ class MessageReactionAlignmentScreenshotTest {
             .captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** Compare both message directions within one fixed viewport under the requested theme and density. */
     @Composable
     private fun ReactionAlignmentGallery() {
         Surface(modifier = Modifier.width(360.dp).testTag(GALLERY_TAG)) {
@@ -176,6 +178,7 @@ class MessageReactionAlignmentScreenshotTest {
         }
     }
 
+    /** Keep the incoming avatar, bubble-bottom alignment and inactive translation in the production order. */
     @Composable
     private fun IncomingReactionExample() {
         Text("Incoming", style = MaterialTheme.typography.labelMedium)
@@ -207,6 +210,7 @@ class MessageReactionAlignmentScreenshotTest {
         }
     }
 
+    /** Place the outgoing chips against the bubble, with seeded translation controls beneath them. */
     @Composable
     private fun ColumnScope.OutgoingReactionExample() {
         Text(
@@ -227,6 +231,7 @@ class MessageReactionAlignmentScreenshotTest {
         }
     }
 
+    /** Use the shared bubble frame so background, padding and alignment reflect actual message rendering. */
     @Composable
     private fun ReactionBubble(
         text: String,
