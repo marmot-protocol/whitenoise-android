@@ -106,6 +106,14 @@
         "test_ids": [
           "SET-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "if (!pending && rendition == null) return",
+        "surface": "inactive translation contributes no width to message reaction alignment",
+        "test_ids": [
+          "SET-033"
+        ]
       }
     ]
   }

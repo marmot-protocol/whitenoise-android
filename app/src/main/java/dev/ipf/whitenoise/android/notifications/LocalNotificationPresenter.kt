@@ -658,6 +658,7 @@ class LocalNotificationPresenter(
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
+        var reactionInlineArtwork = false
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
         try {
@@ -829,14 +830,21 @@ class LocalNotificationPresenter(
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
                         // reactions channel, see LocalNotificationFormatter) so they're muted
-                        // independently of messages. They aren't repliable, so no
-                        // MessagingStyle / reply / mark-read — just a plain expandable card.
+                        // independently of messages. Artwork replaces its shortcode in a decorated inline row;
+                        // the card keeps its existing actions and never becomes a conversation.
                         NotificationStyleChoice.Plain -> {
                             builder.setContentTitle(notificationContent.title)
                             if (notificationContent.body.isNotBlank()) {
                                 builder
                                     .setContentText(notificationContent.body)
                                     .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                                reactionInlineArtwork =
+                                    previewToken.allowed &&
+                                    applyReactionNotificationArtwork(
+                                        context,
+                                        builder,
+                                        notificationContent,
+                                    )
                             } else {
                                 // Expand the same sentence for long group names without repeating its title.
                                 builder.setStyle(
@@ -1184,7 +1192,7 @@ class LocalNotificationPresenter(
                                     ) {
                                         return@withLock false
                                     }
-                                    val postResult =
+                                    var postResult =
                                         postNotificationSafely(
                                             notificationManager,
                                             notificationContent.notificationTag,
@@ -1199,6 +1207,38 @@ class LocalNotificationPresenter(
                                                     rewriteLease?.dismissed?.get() != true
                                             },
                                         )
+                                    if (postResult == NotificationCardWriteResult.FAILED && reactionInlineArtwork) {
+                                        cancelNotification(
+                                            notificationManager,
+                                            notificationContent.notificationTag,
+                                            notificationContent.notificationId,
+                                        )
+                                        if (!profileAllowsPost() || !showGenerationAllowsPost()) return@withLock false
+                                        builder
+                                            .setCustomContentView(null)
+                                            .setCustomBigContentView(null)
+                                            .setCustomHeadsUpContentView(null)
+                                            .setStyle(
+                                                NotificationCompat.BigTextStyle().bigText(notificationContent.body),
+                                            )
+                                        postResult =
+                                            postNotificationSafely(
+                                                notificationManager,
+                                                notificationContent.notificationTag,
+                                                notificationContent.notificationId,
+                                                buildSettled(true),
+                                                writeObserver,
+                                                // This attempt owns the cancellation;
+                                                // generation/dismissal gates still apply.
+                                                mustBeLive = false,
+                                                hiddenShortcut = hiddenShortcut,
+                                                finalPostAllowed = {
+                                                    profileAllowsPost() &&
+                                                        showGenerationAllowsPost() &&
+                                                        rewriteLease?.dismissed?.get() != true
+                                                },
+                                            )
+                                    }
                                     if (postResult == NotificationCardWriteResult.WRITTEN) {
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
                                             ConversationCardOp.SHOW_NOTIFY,
