@@ -19,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -43,6 +44,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.security.MessageDigest
+import java.util.regex.Pattern
 
 @RunWith(AndroidJUnit4::class)
 @PullRequestDeviceSmoke
@@ -155,8 +157,7 @@ class OutboundShareDeviceContractTest {
         val device = UiDevice.getInstance(instrumentation)
         try {
             instrumentation.runOnMainSync { context.startActivity(chooser) }
-            val target = device.wait(Until.findObject(By.text("Share visibility fixture")), 10_000)
-            checkNotNull(target) { "Independent receiver missing from the real Sharesheet" }.click()
+            findIndependentReceiver(device).click()
             val (code, observed) = withTimeout(10_000) { result.await() }
             assertEquals(Activity.RESULT_OK, code)
             assertEquals(
@@ -171,6 +172,24 @@ class OutboundShareDeviceContractTest {
             assertFalse(observed?.getBoolean("neighborReadable", true) ?: true)
         } finally {
             if (!result.isCompleted) device.pressBack()
+        }
+    }
+
+    /** Expands and scrolls the actual system sheet when its initial suggested row hides the receiver. */
+    private fun findIndependentReceiver(device: UiDevice): UiObject2 {
+        assertTrue("System Sharesheet did not open", device.wait(Until.hasObject(By.pkg(SYSTEM_CHOOSER)), 10_000))
+        repeat(4) {
+            device.wait(Until.findObject(By.text("Share visibility fixture")), 2_000)?.let { return it }
+            device.swipe(
+                device.displayWidth / 2,
+                device.displayHeight * 3 / 4,
+                device.displayWidth / 2,
+                device.displayHeight / 4,
+                30,
+            )
+        }
+        return checkNotNull(device.wait(Until.findObject(By.text("Share visibility fixture")), 2_000)) {
+            "Independent receiver missing from the expanded Sharesheet"
         }
     }
 
@@ -202,6 +221,7 @@ class OutboundShareDeviceContractTest {
     private companion object {
         const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
         const val FIXTURE_CAPTION = "Visible fixture caption"
+        val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
     }
 
     /** An external receiver reads exactly the generated stream explicitly granted to it. */
@@ -389,7 +409,14 @@ class OutboundShareDeviceContractTest {
                 context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             instrumentation.waitForIdleSync()
-            assertTrue(UiDevice.getInstance(instrumentation).pressBack())
+            val device = UiDevice.getInstance(instrumentation)
+            assertTrue("System Sharesheet did not open", device.wait(Until.hasObject(By.pkg(SYSTEM_CHOOSER)), 10_000))
+            device.pressBack()
+            assertTrue(
+                "Cancellation did not return to the caller",
+                device.wait(Until.gone(By.pkg(SYSTEM_CHOOSER)), 10_000),
+            )
+            assertTrue(device.wait(Until.hasObject(By.pkg(context.packageName)), 10_000))
             instrumentation.waitForIdleSync()
         } finally {
             sent.delete()
