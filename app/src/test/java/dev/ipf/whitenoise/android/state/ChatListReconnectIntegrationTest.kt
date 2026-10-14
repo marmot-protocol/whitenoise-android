@@ -145,7 +145,8 @@ class ChatListReconnectIntegrationTest {
         val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true, pinnedPosition = 0u)
         val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32), pinned = false)
         val subscriptions = DroppedChatSubscriptions(pinned, group)
-        val controller = testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
         val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
         try {

@@ -98,7 +98,9 @@ class ChatListReplacementGuardTest {
     fun anchoredTopWindowKeepsTheNativeTailBoundary() {
         val incoming = listOf(presentedRow(tail.groupIdHex).copy(row = tail))
         val window =
-            topWindow(incoming, hasMoreAfter = true).copy(anchor = ChatListAnchorOutcomeFfi.Retained(tail.groupIdHex, 0u))
+            topWindow(incoming, hasMoreAfter = true).copy(
+                anchor = ChatListAnchorOutcomeFfi.Retained(tail.groupIdHex, 0u),
+            )
         val older = chatRow("older-group").copy(activitySortAt = 10uL)
 
         assertEquals(

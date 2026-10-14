@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.emptyGroupRecord
 import dev.ipf.whitenoise.android.state.emptyTimelinePage
 import dev.ipf.whitenoise.android.state.notificationChatListRow
+import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
@@ -63,7 +64,8 @@ class ChatListConversationReturnRenderingTest {
         val fixture = ReturnFixture()
         val mounted = mutableStateOf(true)
         val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
-        val controller = holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
+        val controller =
+            holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, fixture.appState.runtimeGeneration)
         fixture.appState.setAppInForeground(true)
         composeRule.setContent {
             if (mounted.value) {
@@ -74,6 +76,9 @@ class ChatListConversationReturnRenderingTest {
         }
         try {
             awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
+            // The first live head closes row input during its bounded placement transition.
+            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+            composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").assertIsDisplayed().performClick()
             awaitCondition { holder.selectedChat.value?.id == fixture.target.groupIdHex }
             // Wait for the outgoing list slot to leave composition before mutating the hidden projection.
@@ -81,7 +86,9 @@ class ChatListConversationReturnRenderingTest {
             composeRule.waitForIdle()
             val promoted = fixture.target.copy(activitySortAt = 100uL, updatedAt = 100uL)
             fixture.activeWindow.replaceRows(listOf(promoted) + fixture.rows.dropLast(1))
-            awaitCondition { controller.chatRows.firstOrNull { it.groupIdHex == promoted.groupIdHex }?.activitySortAt == 100uL }
+            awaitCondition {
+                controller.chatRows.firstOrNull { it.groupIdHex == promoted.groupIdHex }?.activitySortAt == 100uL
+            }
             assertEquals(fixture.rows.map { it.groupIdHex }, controller.items.map { it.id })
 
             composeRule.mainClock.autoAdvance = false
@@ -98,7 +105,10 @@ class ChatListConversationReturnRenderingTest {
             assertEquals(expected, controller.items.map { it.id })
             returnFrames.forEachIndexed { frame, bounds ->
                 bounds.forEach { (id, rowBounds) ->
-                    assertTrue("return frame $frame lost row $id from the layout", rowBounds.width > 0f && rowBounds.height > 0f)
+                    assertTrue(
+                        "return frame $frame lost row $id from the layout",
+                        rowBounds.width > 0f && rowBounds.height > 0f,
+                    )
                 }
             }
             fixture.rows.forEach { row -> composeRule.onNodeWithTag("chat.row.${row.groupIdHex}").assertIsDisplayed() }
@@ -115,7 +125,8 @@ class ChatListConversationReturnRenderingTest {
     /** Measures the production lazy items, including animated placement and clipping. */
     private fun rowBounds(rows: List<ChatListRowFfi>): Map<String, Rect> =
         rows.associate { row ->
-            val node = composeRule.onNodeWithTag("chat.row.${row.groupIdHex}", useUnmergedTree = true).fetchSemanticsNode()
+            val node =
+                composeRule.onNodeWithTag("chat.row.${row.groupIdHex}", useUnmergedTree = true).fetchSemanticsNode()
             row.groupIdHex to node.layoutInfo.coordinates.boundsInRoot()
         }
 
@@ -134,7 +145,8 @@ private class ReturnFixture {
     val rows =
         (0..5).map { index ->
             notificationChatListRow().copy(
-                groupIdHex = if (index == 5) ConversationTimelineTestIds.GROUP_ID else "%02x".format(index + 10).repeat(16),
+                groupIdHex =
+                    if (index == 5) ConversationTimelineTestIds.GROUP_ID else "%02x".format(index + 10).repeat(16),
                 title = "Return chat $index",
                 groupName = "Return chat $index",
                 activitySortAt = (10 - index).toULong(),
@@ -166,7 +178,10 @@ private class ReturnFixture {
 
     /** Unexpected native enrichment reads fail explicitly; the shell's ordinary degraded paths handle them. */
     private fun runtime(): MarmotInterface =
-        Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) { proxy, method, args ->
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { proxy, method, args ->
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "onboardingRecoveryRequired" -> false
@@ -234,7 +249,11 @@ private class ReturnWindow(
     override suspend fun next(): ChatListWindowSnapshotFfi? = updates.receiveCatching().getOrNull()
 
     /** This six-row account has no next or previous page. */
-    override suspend fun page(sequence: ULong, direction: ChatListPageDirectionFfi, count: UInt): ChatListWindowSnapshotFfi = frame
+    override suspend fun page(
+        sequence: ULong,
+        direction: ChatListPageDirectionFfi,
+        count: UInt,
+    ): ChatListWindowSnapshotFfi = frame
 
     /** The synthetic viewport retains the same complete window. */
     override suspend fun setVisibleAnchor(sequence: ULong, groupIdHex: String): ChatListWindowSnapshotFfi = frame
