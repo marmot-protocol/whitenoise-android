@@ -122,7 +122,7 @@ private fun reactionBodyBitmap(
     val size = (paint.fontMetrics.descent - paint.fontMetrics.ascent).toInt().coerceAtLeast(1)
     EmojiShortcodes.annotate(AnnotatedString(body)).getStringAnnotations(0, body.length).forEach { token ->
         artwork[token.item]?.let { bitmap ->
-            val span = ImageSpan(context, bitmap, ImageSpan.ALIGN_BASELINE)
+            val span = ImageSpan(context, bitmap, ImageSpan.ALIGN_CENTER)
             span.drawable.setBounds(0, 0, size, size)
             text.setSpan(span, token.start, token.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
