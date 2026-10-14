@@ -2,6 +2,29 @@
 # Exercise real implicit sharing on the current and a fresh secondary emulator user.
 set -euo pipefail
 [[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || { echo "Missing exact source revision" >&2; exit 1; }
+case "${OUTBOUND_SHARE_ANDROID_API:-}" in 30|34|37.0) ;; *) echo "Select a supported share-contract API" >&2; exit 1 ;; esac
+report_dir=app/build/reports/outbound-share-contract
+mkdir -p "$report_dir"
+actual_sdk="$(adb -e shell getprop ro.build.version.sdk | tr -d '\r')"
+[[ "$actual_sdk" == "${OUTBOUND_SHARE_ANDROID_API%.*}" ]] || { echo "Emulator SDK differs from selected API" >&2; exit 1; }
+image_fingerprint="$(adb -e shell getprop ro.build.fingerprint | tr -d '\r')"
+[[ -n "$image_fingerprint" ]] || { echo "Missing emulator image fingerprint" >&2; exit 1; }
+printf '%s\n' "$image_fingerprint" > "$report_dir/image-fingerprint.txt"
+printf '%s\n' "$actual_sdk" > "$report_dir/android-sdk.txt"
+if [[ "$actual_sdk" == 37 ]]; then
+  expected_token="$(cat "$report_dir/android17-emulator-stabilize.request")"
+  [[ -n "$expected_token" ]] || { echo "Missing Android 17 stabilization request" >&2; exit 1; }
+  for attempt in {1..60}; do
+    state="$(cat "$report_dir/android17-emulator-stabilize.status" 2>/dev/null || true)"
+    [[ "$state" != "failure $expected_token" ]] || { echo "Android 17 stabilization failed" >&2; exit 1; }
+    [[ "$state" != "success $expected_token" ]] || break
+    sleep 1
+  done
+  [[ "$state" == "success $expected_token" && "$(adb -e shell getprop debug.sf.luma_sampling | tr -d '\r')" == 0 ]] || {
+    echo "Android 17 stabilization did not complete" >&2
+    exit 1
+  }
+fi
 ./scripts/install-outbound-share-fixture.sh
 ./gradlew :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon --stacktrace
 
@@ -10,6 +33,7 @@ aapt="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name aapt 
 mapfile -t app_apks < <(rg --files --no-ignore app/build/outputs/apk -g '*universal*debug*.apk' | sort)
 mapfile -t test_apks < <(rg --files --no-ignore app/build/outputs/apk -g '*androidTest*.apk' | sort)
 [[ "${#app_apks[@]}" -eq 1 && "${#test_apks[@]}" -eq 1 ]] || { echo "Expected one app and one instrumentation APK" >&2; exit 1; }
+# Read the APK identity before granting either app access to the disposable profile.
 package_name() { "$aapt" dump badging "$1" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1; }
 app_package="$(package_name "${app_apks[0]}")"
 test_package="$(package_name "${test_apks[0]}")"
@@ -19,14 +43,13 @@ test_package="$(package_name "${test_apks[0]}")"
 }
 adb -e install -r -t "${app_apks[0]}"
 adb -e install -r -t "${test_apks[0]}"
-report_dir=app/build/reports/outbound-share-contract
-mkdir -p "$report_dir"
 printf '%s\n' "$GITHUB_SHA" > "$report_dir/source-revision.txt"
 sha256sum "${app_apks[0]}" "${test_apks[0]}" scripts/outbound-share-fixture/build/{fixture,control}.apk > "$report_dir/apk-sha256.txt"
 original_user="$(adb -e shell am get-current-user | tr -d '\r')"
 [[ "$original_user" =~ ^[0-9]+$ ]] || { echo "Unknown emulator user" >&2; exit 1; }
 trap 'adb -e shell am switch-user "$original_user" >/dev/null || true' EXIT
 
+# All declared cases must execute in this user; ignored/assumption-skipped tests cannot qualify it.
 run_user() {
   local user_id="$1"
   local report="$report_dir/user-$user_id.txt"
