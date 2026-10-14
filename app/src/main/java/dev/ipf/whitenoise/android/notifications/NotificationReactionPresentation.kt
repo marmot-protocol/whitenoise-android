@@ -15,6 +15,7 @@ import android.text.TextUtils
 import android.text.style.ImageSpan
 import android.view.View
 import android.widget.RemoteViews
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.ui.text.AnnotatedString
 import androidx.core.app.NotificationCompat
 import dev.ipf.whitenoise.android.R
@@ -177,3 +178,22 @@ private const val REACTION_TEXT_SP = 14f
 private const val REACTION_BODY_INSET_DP = 96
 private const val REACTION_BODY_MIN_WIDTH_DP = 96
 private const val REACTION_BODY_MAX_WIDTH_DP = 280
+
+/** Shared static APK artwork rendering; no device-local files or received attachment guesses. */
+internal fun notificationBuiltinEmojiBitmap(
+    context: Context,
+    code: String,
+): Bitmap? {
+    val drawable = EmojiShortcodes.builtinDrawable(code)?.let { AppCompatResources.getDrawable(context, it) }
+    return drawable?.let {
+        Bitmap
+            .createBitmap(
+                NOTIFICATION_EMOJI_TILE_PX,
+                NOTIFICATION_EMOJI_TILE_PX,
+                Bitmap.Config.ARGB_8888,
+            ).also { bitmap ->
+                it.setBounds(0, 0, bitmap.width, bitmap.height)
+                it.draw(Canvas(bitmap))
+            }
+    }
+}
