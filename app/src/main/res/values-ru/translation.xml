@@ -1,0 +1,23 @@
+<resources>
+    <string name="translation_title">Перевести</string>
+    <string name="translation_automatic">Автоматически переводить сообщения</string>
+    <string name="translation_detect_language">Определить язык</string>
+    <string name="translation_source_language">Исходный язык</string>
+    <string name="translation_target_language">Язык перевода</string>
+    <string name="translation_show_original">Показать оригинал</string>
+    <string name="translation_show_result">Показать перевод</string>
+    <string name="translation_loading">Перевод на устройстве…</string>
+    <string name="translation_open_engine">Открыть переводчик</string>
+    <string name="translation_engine_managed">Рекомендуемый переводчик: Offline Translator. Перевод выполняется на вашем устройстве; языковые пакеты устанавливаются в этом приложении.</string>
+    <string name="translation_missing_engine">Установите Offline Translator для перевода на этом устройстве.</string>
+    <string name="translation_unverified_engine">Переводчик не проверен или не поддерживается. Текст не отправлялся.</string>
+    <string name="translation_detection_failed">Выберите исходный язык и повторите попытку.</string>
+    <string name="translation_source_model_missing">Установите пакет исходного языка в переводчике.</string>
+    <string name="translation_engine_failed">Перевод не удался. Проверьте языковые пакеты и повторите попытку.</string>
+    <string name="translation_recovery_notice">Перевод недоступен. Нажмите «Перевести», чтобы повторить попытку или открыть переводчик.</string>
+    <string name="translation_inherit">Использовать общую настройку</string>
+    <string name="translation_on">Включено</string>
+    <string name="translation_off">Выключено</string>
+    <string name="translation_inherit_language">Использовать общий язык перевода</string>
+    <string name="translation_privacy_warning">Offline Translator может записывать сообщения и переводы в системные журналы Android. White Noise не может гарантировать безопасность текста, который обрабатывает другое приложение.</string>
+</resources>

@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageActionKind
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageActionKinds
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -8,13 +11,21 @@ import java.io.File
 class MessageMultiSelectCoverageTest {
     @Test
     fun longPressMenuOffersSelectEntry() {
-        val menuSource = source("messages/MessageActions.kt")
-        val actionModelSource = source("messages/MessageActionKind.kt")
+        fun actions(canSelect: Boolean) =
+            messageActionKinds(
+                canReply = false,
+                canEdit = false,
+                canSelect = canSelect,
+                canSelectText = false,
+                canCopyText = false,
+                canSpeak = false,
+                canForward = false,
+                canSave = false,
+                canInfo = false,
+            )
 
-        assertTrue(menuSource.contains("canSelect: Boolean"))
-        assertTrue(menuSource.contains("onSelect: () -> Unit"))
-        assertTrue(actionModelSource.contains("if (canSelect) add(MessageActionKind.Select)"))
-        assertTrue(actionModelSource.contains("MessageActionKind.Select -> stringResource(R.string.select)"))
+        assertEquals(listOf(MessageActionKind.Select), actions(canSelect = true))
+        assertTrue(actions(canSelect = false).isEmpty())
     }
 
     /** Selection affordances belong to the revealed transcript and cannot expose a hidden notification route. */

@@ -4,7 +4,13 @@ import dev.ipf.marmotkit.CachedIdentityProjectionFfi
 
 private const val IDENTITY_PAGE_SIZE = 100
 
-/** Local, ordered reads; an unavailable page cannot certify missing or cleared profiles. */
+/**
+ * Reads local profile seeds in request order, using at most 100 identities per native call.
+ *
+ * A missing canonical identity is skipped, but a malformed or failed page discards the entire
+ * preload so earlier pages cannot masquerade as a complete account list. Coroutine cancellation
+ * propagates to the caller. Returned empty profile fields remain authoritative cleared values.
+ */
 internal suspend fun loadAccountSwitchIdentityPages(
     ids: List<String>,
     read: suspend (List<String>) -> List<CachedIdentityProjectionFfi>,

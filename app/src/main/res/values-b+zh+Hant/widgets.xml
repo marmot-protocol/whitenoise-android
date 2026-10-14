@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_title">對話小工具</string>
+    <string name="widget_privacy">請選擇帳號。預設隱藏內容，鎖定或無法使用時清除內容。</string>
+    <string name="widget_all_accounts">包含所有帳號並標示每一列</string>
+    <string name="widget_unread_only">僅顯示最近的未讀對話</string>
+    <string name="widget_unavailable">對話無法使用</string>
+    <string name="widget_open_app">開啟 White Noise</string>
+    <string name="widget_conversation">對話</string>
+    <string name="widget_unread">未讀訊息</string>
+    <string name="widget_recent">最近對話</string>
+</resources>

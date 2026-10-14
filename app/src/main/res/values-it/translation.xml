@@ -1,0 +1,23 @@
+<resources>
+    <string name="translation_title">Traduci</string>
+    <string name="translation_automatic">Traduci automaticamente i messaggi</string>
+    <string name="translation_detect_language">Rileva lingua</string>
+    <string name="translation_source_language">Lingua di origine</string>
+    <string name="translation_target_language">Lingua di destinazione</string>
+    <string name="translation_show_original">Mostra originale</string>
+    <string name="translation_show_result">Mostra traduzione</string>
+    <string name="translation_loading">Traduzione sul dispositivo…</string>
+    <string name="translation_open_engine">Apri motore</string>
+    <string name="translation_engine_managed">Motore consigliato: Offline Translator. La traduzione avviene sul tuo dispositivo; gestisci i pacchetti lingua in quella app.</string>
+    <string name="translation_missing_engine">Installa Offline Translator per tradurre su questo dispositivo.</string>
+    <string name="translation_unverified_engine">Questo motore non è verificato o supportato. Nessun testo è stato inviato.</string>
+    <string name="translation_detection_failed">Scegli una lingua di origine e riprova.</string>
+    <string name="translation_source_model_missing">Installa il pacchetto della lingua di origine nel motore.</string>
+    <string name="translation_engine_failed">Traduzione non riuscita. Controlla i pacchetti linguistici e riprova.</string>
+    <string name="translation_recovery_notice">Traduzione non disponibile. Tocca Traduci per riprovare o aprire il motore.</string>
+    <string name="translation_inherit">Usa impostazione globale</string>
+    <string name="translation_on">Attivo</string>
+    <string name="translation_off">Disattivo</string>
+    <string name="translation_inherit_language">Usa lingua di destinazione globale</string>
+    <string name="translation_privacy_warning">Offline Translator può scrivere messaggi e traduzioni nei registri di sistema Android. White Noise non può garantire la sicurezza del testo elaborato da un’altra app.</string>
+</resources>

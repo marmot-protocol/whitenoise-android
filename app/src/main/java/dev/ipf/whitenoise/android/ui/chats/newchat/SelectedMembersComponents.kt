@@ -153,7 +153,12 @@ internal fun SelectedMemberSummary(
     }
 }
 
-/** Shows the captured selected identities with explicit removal and continue callbacks. */
+/**
+ * Presents a caller-owned recipient selection; callbacks never commit membership themselves.
+ * A non-null [onInitialAdminChange] enables per-person roles, with an empty [initialAdminIds] default
+ * selecting members. Other selection flows omit that callback and show no role controls. [busy]
+ * prevents changes, removal and confirmation while the captured invitation is being submitted.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")

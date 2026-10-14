@@ -1,0 +1,128 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TranslationChatSettingsDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "fun TranslationChatSettingsDialog(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "TranslationGlobalSettingsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "fun TranslationGlobalSettingsContent(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "TranslationLanguagePicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "fun TranslationLanguagePicker(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_automatic",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_detect_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_detect_language",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_engine_managed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_engine_managed",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_inherit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_inherit",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_inherit_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_inherit_language",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_off",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_on",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_open_engine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_open_engine",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_target_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_target_language",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_privacy_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_privacy_warning",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "testTag(\"translation.automatic\")",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "testTag(\"translation.automatic\")",
+        "test_ids": [
+          "SET-033"
+        ]
+      }
+    ]
+  }
+}

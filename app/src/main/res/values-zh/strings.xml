@@ -16,6 +16,7 @@
     <string name="poll_cancel_custom_time">使用之前的截止时间</string>
     <string name="app_name">White Noise</string>
     <string name="poll_preview">投票</string>
+    <string name="poll_copy_heading">投票：%1$s</string>
     <string name="poll_unsupported">无法显示此投票</string>
     <string name="poll_closed">投票已结束</string>
     <string name="poll_vote_failed">无法提交投票</string>

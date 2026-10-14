@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_title">Виджет разговоров</string>
+    <string name="widget_privacy">Выберите аккаунт. Содержание скрыто по умолчанию и удаляется при блокировке или недоступности.</string>
+    <string name="widget_all_accounts">Включить все аккаунты и обозначить каждую строку</string>
+    <string name="widget_unread_only">Только недавние непрочитанные разговоры</string>
+    <string name="widget_unavailable">Разговоры недоступны</string>
+    <string name="widget_open_app">Открыть White Noise</string>
+    <string name="widget_conversation">Разговор</string>
+    <string name="widget_unread">Непрочитанные сообщения</string>
+    <string name="widget_recent">Недавний разговор</string>
+</resources>

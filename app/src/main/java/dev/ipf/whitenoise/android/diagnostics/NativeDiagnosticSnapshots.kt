@@ -23,6 +23,11 @@ internal class NativeStartupDiagnosticCapture(
 
     private val source = AtomicReference<Source?>()
 
+    /**
+     * Retires the outgoing capture before enabling its replacement; rebinding the same owner is inert.
+     * Failed enable/disable callbacks never prevent the app from replacing its runtime. The serialized
+     * transition prevents a concurrent old-owner unbind from disabling the newly published capture.
+     */
     @Synchronized
     fun bind(
         owner: Any,
@@ -40,6 +45,7 @@ internal class NativeStartupDiagnosticCapture(
         }
     }
 
+    /** Disables only the matching runtime owner; a stale teardown cannot retire its replacement. */
     @Synchronized
     fun unbind(owner: Any) {
         val bound = source.get() ?: return
@@ -59,7 +65,12 @@ internal class NativeStartupDiagnosticCapture(
     }
 }
 
-/** Only native enums and anonymous numeric observations cross the diagnostic export boundary. */
+/**
+ * Exports fixed native enums and anonymous numbers, capped at 16 active scopes and 96 recent events.
+ * Native history is chronological, so events are reversed to preserve the newest observations when
+ * the 12 KiB limit is reached. The pinned SDK's enum names and all other fields are ASCII; character
+ * and UTF-8 byte counts therefore agree. Recheck that invariant when adopting another SDK release.
+ */
 internal fun formatNativeStartupSnapshot(snapshot: NativeStartupSnapshotFfi): String =
     buildString {
         appendLine("native_startup schema=1 enabled=${snapshot.enabled}")
@@ -85,7 +96,11 @@ internal fun formatNativeStartupSnapshot(snapshot: NativeStartupSnapshotFfi): St
         }
     }
 
-/** Fixed reviewed operations; neither native operation-name strings nor arbitrary DTO text is exported. */
+/**
+ * Exports only reviewed, process-cumulative operation totals and migration probe counts.
+ * Native operation-name strings, arbitrary DTO text and other counters are deliberately omitted;
+ * this report is neither a per-account measurement nor a delta for the current capture session.
+ */
 internal fun formatNativePerformanceSnapshot(snapshot: AppPerformanceSnapshotFfi): String =
     buildString {
         appendLine("native_performance schema=1 scope=process_cumulative selected_operations=true")

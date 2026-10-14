@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_title">Widget de conversaciones</string>
+    <string name="widget_privacy">Elige una cuenta. El contenido se oculta por defecto y se borra al bloquearse o no estar disponible.</string>
+    <string name="widget_all_accounts">Incluir todas las cuentas y etiquetar cada fila</string>
+    <string name="widget_unread_only">Solo conversaciones recientes no leídas</string>
+    <string name="widget_unavailable">Conversaciones no disponibles</string>
+    <string name="widget_open_app">Abrir White Noise</string>
+    <string name="widget_conversation">Conversación</string>
+    <string name="widget_unread">Mensajes no leídos</string>
+    <string name="widget_recent">Conversación reciente</string>
+</resources>

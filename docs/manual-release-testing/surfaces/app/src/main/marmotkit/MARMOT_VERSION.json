@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "MarmotKit 0.13.0 immutable SDK pin: in-place upgrade from formal 0.12.0 and snapshot d4e91c8d, payload-preserving migrations 0104/0105 and once-only reopen on completed layouts, schema 0107, retained drafts/attachment bytes, interrupted download recovery, responsive startup, signer/recovery compatibility and exact build provenance",
+        "surface": "MarmotKit 0.13.0 immutable SDK pin: in-place upgrade from formal 0.12.0 and snapshot d4e91c8d, payload-preserving migrations 0104/0105 and once-only reopen on completed layouts, schema 0107, retained drafts/attachment bytes, interrupted download recovery, responsive startup, signer/recovery compatibility and exact build provenance; mandatory pre-handoff populated current-runtime upgrade and independent cold-restart smokes",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "artifact-id=0.13.0",
         "test_ids": [

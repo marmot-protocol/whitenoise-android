@@ -688,6 +688,7 @@ internal fun GroupDetailsScreen(
                 ),
             )
         var showAutoReadPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showTranslationPicker by remember(controller) { mutableStateOf(false) }
         var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var pendingDisappearingSecs by remember(controller.group.groupIdHex) { mutableStateOf<Long?>(null) }
         var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -1689,6 +1690,15 @@ internal fun GroupDetailsScreen(
                             )
                         }
                     }
+                    if (controller.boundAccountRef != null) {
+                        row("translation") { rowContext ->
+                            SettingsLink(
+                                context = rowContext,
+                                title = stringResource(R.string.translation_automatic),
+                                onClick = { showTranslationPicker = true },
+                            )
+                        }
+                    }
                     row("notifications") { rowContext ->
                         SettingsLink(
                             context = rowContext,
@@ -1714,6 +1724,18 @@ internal fun GroupDetailsScreen(
                     }
                 }
 
+                if (showTranslationPicker) {
+                    controller.boundAccountRef?.let { account ->
+                        dev.ipf.whitenoise.android.translation.TranslationChatSettingsDialog(
+                            account,
+                            controller.group.groupIdHex,
+                            { showTranslationPicker = false },
+                            ownerCurrent = {
+                                appState.activeAccountRef == account && !appState.appLockScreenVisible
+                            },
+                        )
+                    }
+                }
                 if (showAutoReadPicker) {
                     TtsAutoReadPickerDialog(
                         globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,

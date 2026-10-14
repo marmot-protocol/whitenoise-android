@@ -11128,36 +11128,35 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         @StringRes titleRes: Int,
         detail: AppText? = null,
-    ) {
-        presentConversationTransient(accountRef, groupIdHex, AppText.Resource(titleRes), detail)
-    }
+    ): TransientNotice = presentConversationTransient(accountRef, groupIdHex, AppText.Resource(titleRes), detail)
 
     fun presentConversationTransient(
         accountRef: String,
         groupIdHex: String,
         title: AppText,
         detail: AppText? = null,
-    ) {
+    ): TransientNotice =
         setTransientNotice(
             title = title,
             detail = detail,
             conversation = ConversationNoticeDestination(accountRef, groupIdHex),
         )
-    }
 
     private fun setTransientNotice(
         title: AppText,
         detail: AppText? = null,
         conversation: ConversationNoticeDestination? = null,
-    ) {
+    ): TransientNotice {
         transientNoticeSequence += 1L
-        transientNotice =
+        val notice =
             TransientNotice(
                 id = transientNoticeSequence,
                 title = title,
                 detail = detail,
                 conversation = conversation,
             )
+        transientNotice = notice
+        return notice
     }
 
     fun presentTransient(

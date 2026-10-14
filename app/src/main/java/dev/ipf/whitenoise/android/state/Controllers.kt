@@ -11833,6 +11833,13 @@ class ConversationController(
             GroupAdministrationCommitOutcome.NO_CHANGE -> false
         }
 
+    /**
+     * Invites the captured recipients and their initial admin subset in one native membership commit.
+     * [initialAdminRefs] must be a subset of [memberRefs]; its default preserves the older all-admin
+     * [addAsAdmin] option while ordinary invitations default to members. Authority is rechecked inside
+     * the group commit lock. An uncertain reply may be confirmed by a fresh authoritative read, but
+     * never triggers another invitation or a separate promotion commit.
+     */
     @Suppress("LongMethod") // One captured role selection, native commit and authoritative reconciliation.
     suspend fun inviteMembers(
         memberRefs: List<String>,

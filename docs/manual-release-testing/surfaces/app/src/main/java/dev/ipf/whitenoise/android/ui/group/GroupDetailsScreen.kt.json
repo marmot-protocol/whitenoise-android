@@ -124,6 +124,14 @@
           "GRP-001",
           "GRP-030"
         ]
+      },
+      {
+        "surface": "R.string.translation_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.translation_automatic",
+        "test_ids": [
+          "SET-033"
+        ]
       }
     ],
     "settings_controls": [

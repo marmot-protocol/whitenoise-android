@@ -95,6 +95,7 @@ internal fun MessageActionMenu(
     canCopyText: Boolean,
     canSpeak: Boolean,
     canSpeakCodeLiterally: Boolean = false,
+    canTranslate: Boolean = false,
     canSelectText: Boolean,
     canKeepOnScreen: Boolean = false,
     canShare: Boolean = false,
@@ -113,6 +114,7 @@ internal fun MessageActionMenu(
     onCopyText: () -> Unit,
     onSpeak: () -> Unit,
     onSpeakCodeLiterally: () -> Unit = {},
+    onTranslate: () -> Unit = {},
     onKeepOnScreen: () -> Unit = {},
     onShare: () -> Unit = {},
     onSave: () -> Unit,
@@ -138,6 +140,7 @@ internal fun MessageActionMenu(
             canCopyText,
             canSpeak,
             canSpeakCodeLiterally,
+            canTranslate,
             showForwardAction,
             canKeepOnScreen,
             canShare,
@@ -153,6 +156,7 @@ internal fun MessageActionMenu(
                 canCopyText = canCopyText,
                 canSpeak = canSpeak,
                 canSpeakCodeLiterally = canSpeakCodeLiterally,
+                canTranslate = canTranslate,
                 canForward = showForwardAction,
                 canKeepOnScreen = canKeepOnScreen,
                 canShare = canShare,
@@ -186,6 +190,7 @@ internal fun MessageActionMenu(
                         MessageActionKind.Select -> onSelect()
                         MessageActionKind.SelectText -> onSelectText()
                         MessageActionKind.CopyText -> onCopyText()
+                        MessageActionKind.Translate -> onTranslate()
                         MessageActionKind.Speak -> onSpeak()
                         MessageActionKind.SpeakCodeLiterally -> onSpeakCodeLiterally()
                         MessageActionKind.Forward -> onForward()

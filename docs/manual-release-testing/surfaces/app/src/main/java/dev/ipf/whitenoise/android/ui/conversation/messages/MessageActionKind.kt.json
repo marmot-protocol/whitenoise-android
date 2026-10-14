@@ -1,0 +1,142 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+  "legacy_sha256": "774e043183297da426cfa7668f527e3a230e23d6f601004b6459dac8b90960b6",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Read code literally action label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.read_code_literally",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "R.string.translation_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-033"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "string:floating_keep",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.floating_keep",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "string:info",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.info",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "string:read_aloud",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.read_aloud",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "string:report_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.report_message",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:save_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.save_attachments",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "Message action label: edit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.edit",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Message action label: forward",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.forward",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Message action label: reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.reply",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Message action label: select",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.select",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Message action label: select_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.select_text",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Message action label: shared_media_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "R.string.shared_media_share",
+        "test_ids": [
+          "MSG-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Keep on screen leads the long-press actions and Report closes them",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "internal fun messageActionKinds(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "Distinct translation, text selection and literal-code icons",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActionKind.kt",
+        "anchor": "internal fun messageActionIconRes(kind: MessageActionKind): Int =",
+        "test_ids": [
+          "SET-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

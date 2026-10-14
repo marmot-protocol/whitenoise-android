@@ -1,0 +1,11 @@
+<resources>
+    <string name="widget_title">Unterhaltungs-Widget</string>
+    <string name="widget_privacy">Wähle ein Konto. Inhalte sind standardmäßig verborgen und werden bei Sperre oder fehlender Verfügbarkeit entfernt.</string>
+    <string name="widget_all_accounts">Alle Konten einbeziehen; jede Zeile kennzeichnen</string>
+    <string name="widget_unread_only">Nur ungelesene aktuelle Unterhaltungen</string>
+    <string name="widget_unavailable">Unterhaltungen nicht verfügbar</string>
+    <string name="widget_open_app">White Noise öffnen</string>
+    <string name="widget_conversation">Unterhaltung</string>
+    <string name="widget_unread">Ungelesene Nachrichten</string>
+    <string name="widget_recent">Aktuelle Unterhaltung</string>
+</resources>

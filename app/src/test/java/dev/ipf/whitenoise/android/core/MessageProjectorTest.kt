@@ -6,6 +6,9 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.PollOptionResultFfi
+import dev.ipf.marmotkit.PollProjectionFfi
+import dev.ipf.marmotkit.PollTypeFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -260,6 +263,63 @@ class MessageProjectorTest {
         val poll = message(id = "poll", plaintext = "[\"poll\",\"private question\"]", kind = 1068uL)
         assertEquals("Poll", MessageProjector.previewText(poll, MessageTextCopy.Default))
         assertFalse(MessageProjector.rendersRawBodyPreview(poll.kind))
+    }
+
+    /** Copy carries the question under the localized heading, then every option label numbered in poll order. */
+    @Test
+    fun pollCopyTextListsTheQuestionAndOrderedOptions() {
+        val french = MessageTextCopy.Default.copy(pollCopyHeadingFormat = "Sondage : %1\$s")
+        val lunch = pollProjection("Lunch?", "Soup", "Salad")
+
+        assertEquals(
+            "Poll: Lunch?\n1. Soup\n2. Salad\n3. Noodles",
+            pollCopyText(pollProjection("Lunch?", "Soup", "Salad", "Noodles"), MessageTextCopy.Default),
+        )
+        assertEquals("Sondage : Lunch?\n1. Soup\n2. Salad", pollCopyText(lunch, french))
+        // The bubble, reply previews and Info keep showing only the label.
+        val record = message(id = "poll", plaintext = "[\"poll\",\"private question\"]", kind = 1068uL)
+        assertEquals("Poll", MessageProjector.displayBody(record, MessageTextCopy.Default))
+    }
+
+    /** Tallies, voters, the local selection, the creator and a closed deadline never reach the clipboard. */
+    @Test
+    fun pollCopyTextLeavesOutResultsAndVotingState() {
+        val fresh = pollProjection("Lunch?", "Soup", "Salad")
+        val votedAndClosed =
+            fresh.copy(
+                options = fresh.options.mapIndexed { index, option -> option.copy(votes = (index + 7).toULong()) },
+                pollType = PollTypeFfi.MULTIPLE_CHOICE,
+                participants = 9uL,
+                localSelection = listOf("o1"),
+                creator = "creator-pubkey",
+                endsAt = 1uL,
+                open = false,
+            )
+
+        val copied = pollCopyText(votedAndClosed, MessageTextCopy.Default)
+
+        assertEquals(pollCopyText(fresh, MessageTextCopy.Default), copied)
+        val votingState = listOf("7", "8", "9", "o1", "creator-pubkey")
+        assertTrue(votingState.none { checkNotNull(copied).contains(it) })
+    }
+
+    /** Unicode labels survive exactly, while embedded line breaks fold so each option stays on one numbered line. */
+    @Test
+    fun pollCopyTextKeepsUnicodeAndFoldsLineBreaks() {
+        val poll = pollProjection(" ¿Qué comemos? 🍜 ", "שלום עולם", "寿司", "Cafe\u0301", "Line one\r\n  line two")
+
+        assertEquals(
+            "Poll: ¿Qué comemos? 🍜\n1. שלום עולם\n2. 寿司\n3. Cafe\u0301\n4. Line one line two",
+            pollCopyText(poll, MessageTextCopy.Default),
+        )
+    }
+
+    /** A malformed projection copies nothing rather than a misleading bare label or a gap in the numbering. */
+    @Test
+    fun malformedPollCopiesNothing() {
+        assertNull(pollCopyText(pollProjection("  ", "Soup", "Salad"), MessageTextCopy.Default))
+        assertNull(pollCopyText(pollProjection("Lunch?"), MessageTextCopy.Default))
+        assertNull(pollCopyText(pollProjection("Lunch?", "Soup", " \n "), MessageTextCopy.Default))
     }
 
     @Test
@@ -730,6 +790,21 @@ class MessageProjectorTest {
         kind = 5uL,
         tags = listOf(eventTag(target)),
         at = at,
+    )
+
+    /** An open single-choice poll with no votes, whose options get the ids `o0`, `o1`, … in order. */
+    private fun pollProjection(
+        question: String,
+        vararg labels: String,
+    ) = PollProjectionFfi(
+        question = question,
+        options = labels.mapIndexed { index, label -> PollOptionResultFfi("o$index", label, 0uL) },
+        pollType = PollTypeFfi.SINGLE_CHOICE,
+        participants = 0uL,
+        localSelection = emptyList(),
+        creator = "alice",
+        endsAt = null,
+        open = true,
     )
 
     private fun message(

@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -181,6 +182,13 @@ class MediaPreviewThemeTest {
 
     /** Records the real staging frame after its behavioral and typography preconditions are established. */
     private fun capture(name: String) {
+        // IO decoding is outside Compose idleness; the golden contains the prepared image, not its spinner.
+        rule.waitUntil(10_000) {
+            rule
+                .onAllNodesWithContentDescription(text(R.string.photo_editor_prepared), useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         rule.onNodeWithTag("preview-frame").captureRoboImage("src/test/snapshots/$name.png")
     }
 
