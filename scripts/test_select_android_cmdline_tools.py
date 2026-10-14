@@ -3,7 +3,7 @@ import pathlib
 import tempfile
 import unittest
 
-from scripts.select_android_cmdline_tools import select_tools
+from scripts.select_android_cmdline_tools import activate_latest, select_tools
 
 
 class CommandLineToolsTest(unittest.TestCase):
@@ -44,3 +44,25 @@ class CommandLineToolsTest(unittest.TestCase):
             self.install(root, "latest", "12.0")
             with self.assertRaises(ValueError):
                 select_tools(root)
+
+    def test_action_latest_path_uses_selected_revision_and_preserves_original(self):
+        """The emulator action prepends latest/bin, so PATH selection alone is insufficient."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            self.install(root, "latest", "12.0")
+            updated = self.install(root, "latest-2", "23.0")
+            active = activate_latest(root, select_tools(root))
+            self.assertEqual(active.resolve(), updated.resolve())
+            self.assertEqual((active.parent / "source.properties").read_text(), "Pkg.Revision = 23.0\n")
+            backup = root / "cmdline-tools" / "previous-share-tools" / "source.properties"
+            self.assertEqual(backup.read_text(), "Pkg.Revision = 12.0\n")
+            self.assertEqual(activate_latest(root, select_tools(root)), active)
+
+    def test_current_latest_install_is_retained_without_a_backup(self):
+        """A runner already using current tools needs no path replacement."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            current = self.install(root, "latest", "23.0")
+            self.assertEqual(activate_latest(root, select_tools(root)), current)
+            self.assertFalse((root / "cmdline-tools" / "latest").is_symlink())
+            self.assertFalse((root / "cmdline-tools" / "previous-share-tools").exists())

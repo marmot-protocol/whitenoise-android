@@ -21,5 +21,21 @@ def select_tools(sdk_root: pathlib.Path, minimum_major: int = 22) -> pathlib.Pat
     return pathlib.Path(max(candidates)[1])
 
 
+def activate_latest(sdk_root: pathlib.Path, tools: pathlib.Path) -> pathlib.Path:
+    """Make the action's hard-coded latest path use selected tools, preserving the old install."""
+    latest = sdk_root / "cmdline-tools" / "latest"
+    selected = tools.parent.resolve()
+    if latest.resolve() != selected:
+        backup = latest.with_name("previous-share-tools")
+        if latest.exists() or latest.is_symlink():
+            if backup.exists() or backup.is_symlink():
+                raise ValueError("Previous command-line tools backup already exists")
+            latest.rename(backup)
+        latest.symlink_to(selected, target_is_directory=True)
+    return latest / "bin"
+
+
 if __name__ == "__main__":
-    print(select_tools(pathlib.Path(sys.argv[1])))
+    root = pathlib.Path(sys.argv[1])
+    selected_tools = select_tools(root)
+    print(activate_latest(root, selected_tools) if "--activate-latest" in sys.argv[2:] else selected_tools)

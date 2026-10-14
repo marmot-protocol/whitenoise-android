@@ -355,7 +355,8 @@ jobs:
           set +o pipefail
           yes | "$sdk_root/cmdline-tools/latest/bin/sdkmanager" --install 'cmdline-tools;latest' > /dev/null
           set -o pipefail
-          cmdline_tools_bin="$(python3 scripts/select_android_cmdline_tools.py "$sdk_root")"
+          # The action prepends latest/bin internally, overriding GITHUB_PATH.
+          cmdline_tools_bin="$(python3 scripts/select_android_cmdline_tools.py "$sdk_root" --activate-latest)"
           "$cmdline_tools_bin/avdmanager" list device > /dev/null
           cat "$cmdline_tools_bin/../source.properties"
           printf '%s\n' "$cmdline_tools_bin" >> "$GITHUB_PATH"
