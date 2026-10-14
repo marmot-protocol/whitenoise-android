@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Parcel
 import android.os.ResultReceiver
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
@@ -60,6 +61,7 @@ class OutboundShareDeviceContractTest {
     fun closeForegroundCaller() {
         if (::foregroundActivity.isInitialized) foregroundActivity.close()
     }
+
     /** Real implicit discovery must find an independent receiver before a generated TXT is staged. */
     @Test
     fun implicitTxtChooserTransfersExactBytesNameAndOnlySelectedUri() =
@@ -172,17 +174,30 @@ class OutboundShareDeviceContractTest {
         }
     }
 
-    /** Receives fixture observations on the app looper while the instrumentation thread awaits them. */
-    private fun resultReceiver(result: CompletableDeferred<Pair<Int, Bundle?>>): ResultReceiver =
-        object : ResultReceiver(Handler(Looper.getMainLooper())) {
-            /** Completes the waiting assertion with observations returned by the receiving process. */
-            override fun onReceiveResult(
-                resultCode: Int,
-                resultData: Bundle?,
-            ) {
-                result.complete(resultCode to resultData)
+    /**
+     * Parcels the callback as a framework ResultReceiver so independent APKs need no test-class loader.
+     * The binder still delivers observations to the original receiver on the app looper.
+     */
+    private fun resultReceiver(result: CompletableDeferred<Pair<Int, Bundle?>>): ResultReceiver {
+        val receiver =
+            object : ResultReceiver(Handler(Looper.getMainLooper())) {
+                /** Completes the waiting assertion with observations returned by the receiving process. */
+                override fun onReceiveResult(
+                    resultCode: Int,
+                    resultData: Bundle?,
+                ) {
+                    result.complete(resultCode to resultData)
+                }
             }
+        val parcel = Parcel.obtain()
+        try {
+            receiver.writeToParcel(parcel, 0)
+            parcel.setDataPosition(0)
+            return ResultReceiver.CREATOR.createFromParcel(parcel)
+        } finally {
+            parcel.recycle()
         }
+    }
 
     private companion object {
         const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
