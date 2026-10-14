@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- XML visibility enums use visible=0 and gone=2; SystemUI selects on every inflation. -->
+    <integer name="notification_reaction_light_visibility">0</integer>
+    <integer name="notification_reaction_dark_visibility">2</integer>
+</resources>

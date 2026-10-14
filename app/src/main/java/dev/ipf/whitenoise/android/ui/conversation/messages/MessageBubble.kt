@@ -2636,8 +2636,6 @@ internal fun MessageBubble(
                         )
                     }
                 }
-                dev.ipf.whitenoise.android.translation
-                    .MessageTranslationRendition(translationSource)
                 MessageActionMenu(
                     // A tombstone gets a focused delete-only menu. Batch or partial
                     // text selection still owns the row interaction completely.
@@ -3242,6 +3240,8 @@ internal fun MessageBubble(
                         }
                     },
                 )
+                dev.ipf.whitenoise.android.translation
+                    .MessageTranslationRendition(translationSource)
                 if (surfaces.reactionSheetOpen && !deleted) {
                     CompleteReactionDetailsSheet(
                         item = item,
