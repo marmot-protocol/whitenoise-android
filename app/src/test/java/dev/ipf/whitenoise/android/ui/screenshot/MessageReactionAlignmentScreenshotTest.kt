@@ -15,6 +15,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -27,6 +29,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.translation.ConversationTranslationSession
+import dev.ipf.whitenoise.android.translation.LocalConversationTranslation
+import dev.ipf.whitenoise.android.translation.MessageTranslationRendition
+import dev.ipf.whitenoise.android.translation.TranslationSource
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleBottomAlignmentLine
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageReactionSummary
@@ -74,7 +80,11 @@ class MessageReactionAlignmentScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark) {
                 val density = LocalDensity.current
+                val scope = rememberCoroutineScope()
+                val session =
+                    remember { ConversationTranslationSession(scope, { error("No translation requested") }, { true }) }
                 CompositionLocalProvider(
+                    LocalConversationTranslation provides session,
                     LocalDensity provides Density(density.density, fontScale),
                     LocalLayoutDirection provides layoutDirection,
                 ) {
@@ -122,6 +132,7 @@ class MessageReactionAlignmentScreenshotTest {
                 horizontalAlignment = Alignment.Start,
             ) {
                 ReactionBubble(text = "Can you review the file?", mine = false)
+                MessageTranslationRendition(TranslationSource("incoming", "Can you review the file?", "de"))
                 MessageReactionSummary(
                     tallies = listOf(ReactionTally(emoji = "👍", count = 2, mine = true)),
                     mine = false,
@@ -141,6 +152,7 @@ class MessageReactionAlignmentScreenshotTest {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Column(modifier = Modifier.widthIn(max = 220.dp), horizontalAlignment = Alignment.End) {
                 ReactionBubble(text = "Looks good to me", mine = true)
+                MessageTranslationRendition(TranslationSource("outgoing", "Looks good to me", "de"))
                 MessageReactionSummary(
                     tallies = listOf(ReactionTally(emoji = "❤️", count = 3, mine = false)),
                     mine = true,

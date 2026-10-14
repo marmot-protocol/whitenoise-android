@@ -81,9 +81,9 @@
         ]
       },
       {
-        "surface": "native reaction picture template and privacy fallback",
+        "surface": "decorated inline reaction artwork and privacy fallback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "private fun reactionNotificationStyle(",
+        "anchor": "applyReactionNotificationArtwork(",
         "test_ids": [
           "NTF-034",
           "NTF-030"

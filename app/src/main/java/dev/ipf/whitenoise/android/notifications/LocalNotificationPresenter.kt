@@ -11,7 +11,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
-import android.os.Build
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -845,15 +844,19 @@ class LocalNotificationPresenter(
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
                         // reactions channel, see LocalNotificationFormatter) so they're muted
-                        // independently of messages. Artwork uses the standard picture template;
+                        // independently of messages. Artwork replaces its shortcode in a decorated inline row;
                         // the card keeps its existing actions and never becomes a conversation.
                         NotificationStyleChoice.Plain -> {
                             builder.setContentTitle(notificationContent.title)
                             if (notificationContent.body.isNotBlank()) {
-                                builder
-                                    .setContentText(notificationContent.body)
-                                    .setStyle(reactionNotificationStyle(notificationContent.body, reactionArtwork))
-                                reactionArtwork?.let { builder.setLargeIcon(it) }
+                                builder.setContentText(notificationContent.body)
+                                applyReactionNotificationArtwork(
+                                    context,
+                                    builder,
+                                    notificationContent,
+                                    LocalNotificationFormatter.reactionArtworkShortcode(update),
+                                    reactionArtwork,
+                                )
                             } else {
                                 // Expand the same sentence for long group names without repeating its title.
                                 builder.setStyle(
@@ -1225,7 +1228,9 @@ class LocalNotificationPresenter(
                                         )
                                         if (!profileAllowsPost() || !showGenerationAllowsPost()) return@withLock false
                                         builder
-                                            .setLargeIcon(null as Bitmap?)
+                                            .setCustomContentView(null)
+                                            .setCustomBigContentView(null)
+                                            .setCustomHeadsUpContentView(null)
                                             .setStyle(
                                                 NotificationCompat.BigTextStyle().bigText(notificationContent.body),
                                             )
@@ -1305,20 +1310,6 @@ class LocalNotificationPresenter(
             if (!written) heldAlert?.release()
         }
         return written
-    }
-
-    /** Standard Android artwork with the same readable fallback, summary and accessibility text. */
-    private fun reactionNotificationStyle(
-        body: String,
-        artwork: Bitmap?,
-    ): NotificationCompat.Style {
-        if (artwork == null) return NotificationCompat.BigTextStyle().bigText(body)
-        return NotificationCompat
-            .BigPictureStyle()
-            .bigPicture(artwork)
-            .bigLargeIcon(null as Bitmap?)
-            .setSummaryText(body)
-            .also { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) it.setContentDescription(body) }
     }
 
     private suspend fun dispatchMessagingEnrichment(

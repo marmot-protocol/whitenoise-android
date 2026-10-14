@@ -6,11 +6,13 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.widget.ImageView
 import androidx.core.app.NotificationManagerCompat
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -52,7 +54,7 @@ class NotificationReactionArtworkTest {
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    /** Marmot is a picture with readable fallback and description, while all reaction routing stays intact. */
+    /** Marmot replaces its shortcode inline, with accessible fallback and unchanged reaction routing. */
     @Test
     fun marmotArtworkKeepsReactionIdentityAndActions() =
         runBlocking {
@@ -77,10 +79,10 @@ class NotificationReactionArtworkTest {
         runBlocking {
             val card = post(":wn:")
             assertEquals(
-                "android.app.Notification\$BigPictureStyle",
+                "android.app.Notification\$DecoratedCustomViewStyle",
                 card.extras.getString(Notification.EXTRA_TEMPLATE),
             )
-            assertNotNull(card.getLargeIcon())
+            assertNotNull(card.contentView)
             assertTrue(
                 card.extras
                     .getCharSequence(Notification.EXTRA_TEXT)
@@ -91,7 +93,7 @@ class NotificationReactionArtworkTest {
 
     /** Unicode reactions stay ordinary text and never look for custom image files. */
     @Test
-    fun unicodeDoesNotPrepareArtworkFromTheQuotedMessage() =
+    fun unicodeDoesNotPrepareCustomReactionArtwork() =
         runBlocking {
             var calls = 0
             val card =
@@ -407,9 +409,21 @@ class NotificationReactionArtworkTest {
         val presenter = presenter(prepare, poster)
         presenter.ensureChannels()
         assertTrue(
-            presenter.show(reactionArtworkUpdate(emoji), redactContent = redacted, shortNpub = { "npub1fixture" }),
+            presenter.show(
+                reactionArtworkUpdate(emoji).copy(reactedToPreview = "Hello"),
+                redactContent = redacted,
+                shortNpub = { "npub1fixture" },
+            ),
         )
         return manager.activeNotifications.single().notification
+    }
+
+    /** Quoted bundled emoji resolve too, but unavailable and code-literal shortcodes stay authored text. */
+    @Test
+    fun quotedArtworkUsesOnlySafeBundledImages() {
+        val images = reactionBodyArtwork(context, "Hello :wn: :party: `:marmot:`", null, null)
+        assertEquals(setOf(":wn:"), images.keys)
+        images.values.forEach { it.recycle() }
     }
 
     /** Verify artwork and every textual representation survive the platform round trip. */
@@ -417,30 +431,30 @@ class NotificationReactionArtworkTest {
         card: Notification,
         shortcode: String,
     ) {
-        assertEquals("android.app.Notification\$BigPictureStyle", card.extras.getString(Notification.EXTRA_TEMPLATE))
-        val picture = card.extras.getParcelable<Bitmap>(Notification.EXTRA_PICTURE)
-        assertNotNull(picture)
-        assertFalse(requireNotNull(picture).isRecycled)
-        assertNotNull(card.getLargeIcon())
-        val textKeys =
-            listOf(
-                Notification.EXTRA_TEXT,
-                Notification.EXTRA_SUMMARY_TEXT,
-                Notification.EXTRA_PICTURE_CONTENT_DESCRIPTION,
-            )
-        for (key in textKeys) {
-            assertTrue(
-                card.extras
-                    .getCharSequence(key)
-                    .toString()
-                    .contains(shortcode),
-            )
-        }
+        assertEquals(
+            "android.app.Notification\$DecoratedCustomViewStyle",
+            card.extras.getString(Notification.EXTRA_TEMPLATE),
+        )
+        assertNull(card.getLargeIcon())
+        assertFalse(card.extras.containsKey(Notification.EXTRA_PICTURE))
+        val root = requireNotNull(card.contentView).apply(context, null)
+        val icon = root.findViewById<ImageView>(R.id.reaction_notification_body)
+        assertNotNull(icon.drawable)
+        assertTrue(root.contentDescription.toString().contains(shortcode))
+        assertTrue(
+            card.extras
+                .getCharSequence(Notification.EXTRA_TEXT)
+                .toString()
+                .contains(shortcode),
+        )
     }
 
     /** No private artwork may remain in hidden or public payloads. */
     private fun assertNoArtwork(card: Notification) {
         assertNull(card.getLargeIcon())
+        assertNull(card.contentView)
+        assertNull(card.bigContentView)
+        assertNull(card.headsUpContentView)
         assertFalse(card.extras.containsKey(Notification.EXTRA_PICTURE))
         assertFalse(card.extras.containsKey(Notification.EXTRA_PICTURE_CONTENT_DESCRIPTION))
         assertFalse(card.extras.containsKey(Notification.EXTRA_PICTURE_ICON))

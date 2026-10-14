@@ -42,12 +42,12 @@ class NotificationReactionArtworkScreenshotTest {
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    /** Marmot appears in the native picture template, with reaction text kept in both sizes. */
+    /** Marmot appears in the decorated inline template, with reaction text kept in both sizes. */
     @Test
     fun marmotReactionInLightTheme() =
         runBlocking {
             val card = post(":marmot:")
-            assertNotNull(card.getLargeIcon())
+            assertNotNull(card.contentView)
             capture(card, "notification_reaction_marmot_light")
         }
 
@@ -56,7 +56,7 @@ class NotificationReactionArtworkScreenshotTest {
     @Config(qualifiers = "w360dp-h800dp-night-mdpi")
     fun whiteNoiseReactionInDarkTheme() = runBlocking { capture(post(":wn:"), "notification_reaction_wn_dark") }
 
-    /** The large RTL picture card retains readable reaction context. */
+    /** The large RTL inline card retains readable reaction context. */
     @Test
     @Config(qualifiers = "ldrtl-w360dp-h800dp-night-mdpi")
     fun marmotReactionAtLargeRtlFont() =
@@ -135,14 +135,22 @@ class NotificationReactionArtworkScreenshotTest {
                 enrichmentLauncher = {},
                 emojiArtworkTimeoutMs = 5_000L,
                 notificationPoster = { target, tag, id, card ->
-                    if (rejectPicture && card.extras.containsKey(Notification.EXTRA_PICTURE)) {
+                    if (rejectPicture && card.contentView != null) {
                         throw IllegalArgumentException("picture rejected")
                     }
                     target.notify(tag, id, card)
                 },
             )
         presenter.ensureChannels()
-        check(presenter.show(reactionArtworkUpdate(emoji), redactContent = redacted, shortNpub = { "npub1fixture" }))
+        check(
+            presenter.show(
+                reactionArtworkUpdate(emoji).let {
+                    if (emoji == "👍" || emoji == ":party:") it.copy(reactedToPreview = "Hello") else it
+                },
+                redactContent = redacted,
+                shortNpub = { "npub1fixture" },
+            ),
+        )
         return manager.activeNotifications.single().notification
     }
 }
