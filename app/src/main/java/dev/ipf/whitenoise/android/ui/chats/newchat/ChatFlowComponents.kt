@@ -140,6 +140,8 @@ internal fun ContactRow(
     onLongClick: (() -> Unit)? = null,
     onSubtitleClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    titleMaxLines: Int = 1,
+    secondaryContent: (@Composable () -> Unit)? = null,
 ) {
     val copyLabel = stringResource(R.string.copy)
     val followedStateDescription =
@@ -193,7 +195,7 @@ internal fun ContactRow(
             EmojiLabel(
                 title,
                 style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
+                maxLines = titleMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
             if (subtitle != null) {
@@ -220,6 +222,7 @@ internal fun ContactRow(
                         },
                 )
             }
+            secondaryContent?.invoke()
         }
         trailing?.invoke()
     }

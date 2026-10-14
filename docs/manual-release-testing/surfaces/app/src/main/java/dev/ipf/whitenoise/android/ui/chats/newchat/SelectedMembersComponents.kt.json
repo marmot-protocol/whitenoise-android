@@ -71,6 +71,14 @@
         "test_ids": [
           "NCH-002"
         ]
+      },
+      {
+        "surface": "SelectedMemberRoleMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "fun SelectedMemberRoleMenu(",
+        "test_ids": [
+          "GRP-030"
+        ]
       }
     ]
   },

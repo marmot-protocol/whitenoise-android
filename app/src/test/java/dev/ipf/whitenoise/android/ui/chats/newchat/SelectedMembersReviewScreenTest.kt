@@ -4,8 +4,6 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -174,6 +172,8 @@ class SelectedMembersReviewScreenTest {
     fun inviteRolesDefaultToMemberAndChangeOnlyTheExplicitlyChosenRecipient() {
         val roles = mutableStateListOf<String>()
         var submitted = emptySet<String>()
+        var removed = 0
+        var confirmed = 0
         val state = appState()
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -182,8 +182,14 @@ class SelectedMembersReviewScreenTest {
                     appState = state,
                     busy = false,
                     onBack = {},
-                    onRemove = { roles.remove(it.accountIdHex) },
-                    onConfirm = { submitted = roles.toSet() },
+                    onRemove = {
+                        removed += 1
+                        roles.remove(it.accountIdHex)
+                    },
+                    onConfirm = {
+                        confirmed += 1
+                        submitted = roles.toSet()
+                    },
                     confirmIcon = Icons.Default.Check,
                     confirmLabel = context.getString(R.string.add_member),
                     initialAdminIds = roles.toSet(),
@@ -194,16 +200,45 @@ class SelectedMembersReviewScreenTest {
                 )
             }
         }
+        val memberLabel = context.getString(R.string.member)
         val adminLabel = context.getString(R.string.admin)
-        val first = composeRule.onNodeWithContentDescription("${members.first().displayName}, $adminLabel")
-        val second = composeRule.onNodeWithContentDescription("${members.last().displayName}, $adminLabel")
-        first.assertIsOff().performClick().assertIsOn()
-        second.assertIsOff()
+        composeRule.onNodeWithContentDescription("${members.first().displayName}, $memberLabel").performClick()
+        composeRule.onNodeWithText(members.first().npub).assertIsDisplayed()
+        composeRule.onNodeWithText(adminLabel).performClick()
+        composeRule.onNodeWithContentDescription("${members.first().displayName}, $adminLabel").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("${members.last().displayName}, $memberLabel").assertIsDisplayed()
+        assertEquals(0, removed)
+        assertEquals(0, confirmed)
         composeRule.onNodeWithText(context.getString(R.string.add_member)).performClick()
         assertEquals(setOf(members.first().accountIdHex), submitted)
         val removeLabel = context.getString(R.string.remove_member_named, members.first().displayName)
         composeRule.onNodeWithContentDescription(removeLabel).performClick()
         assertEquals(emptyList<String>(), roles.toList())
+    }
+
+    @Test
+    fun busyRoleMenuCannotChangePrivileges() {
+        var changes = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SelectedMembersReviewScreen(
+                    members = members,
+                    appState = appState(),
+                    busy = true,
+                    onBack = {},
+                    onRemove = {},
+                    onConfirm = {},
+                    confirmIcon = Icons.Default.Check,
+                    confirmLabel = context.getString(R.string.add_member),
+                    onInitialAdminChange = { _, _ -> changes += 1 },
+                )
+            }
+        }
+        val memberLabel = context.getString(R.string.member)
+        composeRule.onNodeWithContentDescription("${members.first().displayName}, $memberLabel")
+            .assertIsNotEnabled().performClick()
+        composeRule.onNodeWithText(context.getString(R.string.admin)).assertDoesNotExist()
+        assertEquals(0, changes)
     }
 
     private fun appState() =
