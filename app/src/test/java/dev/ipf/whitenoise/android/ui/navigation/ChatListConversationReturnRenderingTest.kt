@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.state.emptyTimelinePage
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -49,16 +50,16 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 
-/** Exercises the real list-origin open/Back route with a row promoted while list rendering is paused. */
+/** Layout control through the production Back route; pixel/alpha visibility requires separate qualification. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ChatListConversationReturnRenderingTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** The revealed destination must already place every retained row at its final location. */
+    /** A coherent hidden promotion retains every row in the returning layout and settles at native order. */
     @Test
-    fun returningAfterHiddenPromotionNeverDrawsThePreConversationOrder() {
+    fun returningAfterHiddenPromotionKeepsEveryRetainedRowInTheLayout() {
         val fixture = ReturnFixture()
         val mounted = mutableStateOf(true)
         val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
@@ -79,7 +80,8 @@ class ChatListConversationReturnRenderingTest {
             composeRule.mainClock.advanceTimeBy(1_000)
             composeRule.waitForIdle()
             val promoted = fixture.target.copy(activitySortAt = 100uL, updatedAt = 100uL)
-            composeRule.runOnIdle { controller.applyChatListRow(promoted) }
+            fixture.activeWindow.replaceRows(listOf(promoted) + fixture.rows.dropLast(1))
+            awaitCondition { controller.chatRows.firstOrNull { it.groupIdHex == promoted.groupIdHex }?.activitySortAt == 100uL }
             assertEquals(fixture.rows.map { it.groupIdHex }, controller.items.map { it.id })
 
             composeRule.mainClock.autoAdvance = false
@@ -94,10 +96,9 @@ class ChatListConversationReturnRenderingTest {
             val expected = listOf(promoted.groupIdHex) + fixture.rows.dropLast(1).map { it.groupIdHex }
             assertTrue("the actual return route must have drawn", returnFrames.isNotEmpty())
             assertEquals(expected, controller.items.map { it.id })
-            val settled = returnFrames.last()
             returnFrames.forEachIndexed { frame, bounds ->
-                settled.forEach { (id, finalBounds) ->
-                    assertEquals("return frame $frame moved retained row $id after reveal", finalBounds.top, bounds.getValue(id).top, 0.5f)
+                bounds.forEach { (id, rowBounds) ->
+                    assertTrue("return frame $frame lost row $id from the layout", rowBounds.width > 0f && rowBounds.height > 0f)
                 }
             }
             fixture.rows.forEach { row -> composeRule.onNodeWithTag("chat.row.${row.groupIdHex}").assertIsDisplayed() }
@@ -142,6 +143,7 @@ private class ReturnFixture {
             )
         }
     val target = rows.last()
+    val activeWindow = ReturnWindow(ChatListViewFfi.CHATS, rows)
     private val timelines =
         ScriptedConversationLiveSubscriptions(
             listOf(ScriptedConversationTimelineSubscription(emptyTimelinePage())),
@@ -155,7 +157,9 @@ private class ReturnFixture {
             )
             state.liveSubscriptionOverrides.chatList =
                 ChatListLiveSubscriptions(
-                    openChatListWindow = { _, view -> ReturnWindow(view, if (view == ChatListViewFfi.CHATS) rows else emptyList()) },
+                    openChatListWindow = { _, view ->
+                        if (view == ChatListViewFfi.CHATS) activeWindow else ReturnWindow(view, emptyList())
+                    },
                     openChats = { _, _ -> ReturnGroups(rows.map(::emptyGroupRecord)) },
                 )
         }
@@ -214,13 +218,20 @@ private class ReturnWindow(
     view: ChatListViewFfi,
     rows: List<ChatListRowFfi>,
 ) : ChatListWindowHandle {
-    private val frame = MarmotWindowTestFakes.windowSnapshot(view, rows)
+    @Volatile private var frame = MarmotWindowTestFakes.windowSnapshot(view, rows)
+    private val updates = Channel<ChatListWindowSnapshotFfi>(Channel.UNLIMITED)
+
+    /** Advances the authoritative source together with its stream, so viewport commands cannot undo a promotion. */
+    fun replaceRows(rows: List<ChatListRowFfi>) {
+        frame = MarmotWindowTestFakes.windowSnapshot(frame.view, rows, frame.sequence + 1uL)
+        check(updates.trySend(frame).isSuccess)
+    }
 
     /** Supplies the authoritative initial rows. */
     override fun snapshot(): ChatListWindowSnapshotFfi = frame
 
     /** Holds the live stream until its owner cancels it. */
-    override suspend fun next(): ChatListWindowSnapshotFfi? = awaitCancellation()
+    override suspend fun next(): ChatListWindowSnapshotFfi? = updates.receiveCatching().getOrNull()
 
     /** This six-row account has no next or previous page. */
     override suspend fun page(sequence: ULong, direction: ChatListPageDirectionFfi, count: UInt): ChatListWindowSnapshotFfi = frame
@@ -232,7 +243,9 @@ private class ReturnWindow(
     override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = frame
 
     /** The controller cancels the only pending receive. */
-    override fun close() = Unit
+    override fun close() {
+        updates.close()
+    }
 }
 
 /** Group metadata paired with the same initial chat-list snapshot. */

@@ -139,6 +139,46 @@ class ChatListReconnectIntegrationTest {
         }
     }
 
+    /** Shallow scrolling must not disable recovery while the complete account list is still retained. */
+    @Test
+    fun hiddenAnchoredReplacementCannotDropAnActiveChatOnConversationReturn() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true, pinnedPosition = 0u)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32), pinned = false)
+        val subscriptions = DroppedChatSubscriptions(pinned, group)
+        val controller = testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            val anchor = ChatListAnchorOutcomeFfi.Retained(group.groupIdHex, 1u)
+            subscriptions.first.emitRows(listOf(pinned, group), anchor)
+            awaitChatListCondition {
+                controller.chatListWindows?.installed(ChatListViewFfi.CHATS)?.anchor == anchor
+            }
+            controller.setChatListVisible(false)
+            subscriptions.first.emitRows(listOf(group), ChatListAnchorOutcomeFfi.Retained(group.groupIdHex, 0u))
+            awaitChatListCondition {
+                subscriptions.first.closed || controller.chatRows.map { it.groupIdHex } == listOf(group.groupIdHex)
+            }
+
+            controller.setChatListVisible(true)
+            assertEquals(
+                "return must retain the known active chat while its window is recovered",
+                setOf(pinned.groupIdHex, group.groupIdHex),
+                controller.items.map { it.id }.toSet(),
+            )
+            assertTrue("the incomplete anchored window must retire", subscriptions.first.closed)
+            controller.retryLoad()
+            awaitChatListCondition { subscriptions.second.nextUpdateStarted.isCompleted }
+            assertEquals(setOf(pinned.groupIdHex, group.groupIdHex), controller.items.map { it.id }.toSet())
+        } finally {
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
     /** Closing a set inside a suspending keyed lookup must not publish its rejected rows. */
     @Test
     fun closedWindowDuringValidationKeepsTheLastCoherentFrame() {
@@ -816,9 +856,13 @@ private class ScriptedChatListSubscription(
         emitRows(rows)
     }
 
-    fun emitRows(rows: List<ChatListRowFfi>) {
+    /** Delivers a native frame with either a top or a retained viewport anchor. */
+    fun emitRows(
+        rows: List<ChatListRowFfi>,
+        anchor: ChatListAnchorOutcomeFfi = ChatListAnchorOutcomeFfi.Top,
+    ) {
         sequence += 1uL
-        check(updates.trySend(windowSnapshot(rows, sequence, view)).isSuccess)
+        check(updates.trySend(windowSnapshot(rows, sequence, view).copy(anchor = anchor)).isSuccess)
     }
 
     /** Ends the scripted stream. */

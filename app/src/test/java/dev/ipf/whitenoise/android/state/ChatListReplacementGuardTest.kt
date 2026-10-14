@@ -73,6 +73,41 @@ class ChatListReplacementGuardTest {
         assertTrue(missingActiveTopChatRows(listOf(pinnedDm, group), incoming, shifted).isEmpty())
     }
 
+    /** A viewport anchor does not imply earlier rows were evicted from the retained window. */
+    @Test
+    fun anchoredCompleteWindowStillChecksMissingPinnedAndActiveChats() {
+        val incoming = listOf(presentedRow(tail.groupIdHex).copy(row = tail))
+        val anchors =
+            listOf(
+                ChatListAnchorOutcomeFfi.Retained(tail.groupIdHex, 0u),
+                ChatListAnchorOutcomeFfi.Recovered(tail.groupIdHex, 0u),
+                ChatListAnchorOutcomeFfi.Reset,
+            )
+        anchors.forEach { anchor ->
+            val window = topWindow(incoming).copy(anchor = anchor)
+            assertEquals(
+                "a complete window with $anchor still contains the true head",
+                listOf(pinnedDm.groupIdHex, group.groupIdHex),
+                missingActiveTopChatRows(listOf(pinnedDm, group), incoming, window).map { it.groupIdHex },
+            )
+        }
+    }
+
+    /** Anchored bounded windows may legitimately evict rows below their retained tail. */
+    @Test
+    fun anchoredTopWindowKeepsTheNativeTailBoundary() {
+        val incoming = listOf(presentedRow(tail.groupIdHex).copy(row = tail))
+        val window =
+            topWindow(incoming, hasMoreAfter = true).copy(anchor = ChatListAnchorOutcomeFfi.Retained(tail.groupIdHex, 0u))
+        val older = chatRow("older-group").copy(activitySortAt = 10uL)
+
+        assertEquals(
+            listOf(pinnedDm.groupIdHex, group.groupIdHex),
+            missingActiveTopChatRows(listOf(pinnedDm, group, older), incoming, window).map { it.groupIdHex },
+        )
+        assertFalse(window.copy(hasMoreBefore = true).shouldContain(pinnedDm))
+    }
+
     @Test
     fun authoritativeArchiveAndDepartureAreRealRemovals() {
         assertFalse(pinnedDm.copy(archived = true).belongsInActiveChats())
