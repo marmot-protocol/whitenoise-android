@@ -51,9 +51,12 @@ import java.util.regex.Pattern
 class OutboundShareDeviceContractTest {
     private lateinit var foregroundActivity: ActivityScenario<MainActivity>
 
-    /** Keeps the real caller visible so Android cannot block cross-app launches as background starts. */
+    /** Unlocks the active test user and keeps the real caller visible for cross-app launches. */
     @Before
     fun showForegroundCaller() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.wakeUp()
+        device.executeShellCommand("wm dismiss-keyguard")
         foregroundActivity = ActivityScenario.launch(MainActivity::class.java)
         foregroundActivity.moveToState(Lifecycle.State.RESUMED)
     }
