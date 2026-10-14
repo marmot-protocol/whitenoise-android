@@ -256,7 +256,10 @@ private class ReturnWindow(
     ): ChatListWindowSnapshotFfi = frame
 
     /** The synthetic viewport retains the same complete window. */
-    override suspend fun setVisibleAnchor(sequence: ULong, groupIdHex: String): ChatListWindowSnapshotFfi = frame
+    override suspend fun setVisibleAnchor(
+        sequence: ULong,
+        groupIdHex: String,
+    ): ChatListWindowSnapshotFfi = frame
 
     /** The fixture has no shifted native window. */
     override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi = frame
@@ -268,7 +271,9 @@ private class ReturnWindow(
 }
 
 /** Group metadata paired with the same initial chat-list snapshot. */
-private class ReturnGroups(private val groups: List<AppGroupRecordFfi>) : ChatsSubscriptionHandle {
+private class ReturnGroups(
+    private val groups: List<AppGroupRecordFfi>,
+) : ChatsSubscriptionHandle {
     /** Supplies the native group projection used by the list. */
     override fun snapshot(): List<AppGroupRecordFfi> = groups
 
