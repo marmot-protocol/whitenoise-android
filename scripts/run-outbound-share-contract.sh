@@ -30,8 +30,8 @@ fi
 
 sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 aapt="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name aapt | sort -V | tail -n 1)"
-mapfile -t app_apks < <(rg --files --no-ignore app/build/outputs/apk -g '*universal*debug*.apk' | sort)
-mapfile -t test_apks < <(rg --files --no-ignore app/build/outputs/apk -g '*androidTest*.apk' | sort)
+mapfile -t app_apks < <(find app/build/outputs/apk -type f -name '*universal*debug*.apk' | sort)
+mapfile -t test_apks < <(find app/build/outputs/apk -type f -name '*androidTest*.apk' | sort)
 [[ "${#app_apks[@]}" -eq 1 && "${#test_apks[@]}" -eq 1 ]] || { echo "Expected one app and one instrumentation APK" >&2; exit 1; }
 # Read the APK identity before granting either app access to the disposable profile.
 package_name() { "$aapt" dump badging "$1" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1; }
@@ -53,7 +53,7 @@ trap 'adb -e shell am switch-user "$original_user" >/dev/null || true' EXIT
 run_user() {
   local user_id="$1"
   local report="$report_dir/user-$user_id.txt"
-  timeout --signal=INT --kill-after=30s 10m adb -e shell am instrument --user "$user_id" -w \
+  timeout --signal=INT --kill-after=30s 10m adb -e shell am instrument --user "$user_id" -w -r \
     -e class dev.ipf.whitenoise.android.share.OutboundShareDeviceContractTest \
     -e timeout_msec 120000 "$test_package/androidx.test.runner.AndroidJUnitRunner" > "$report" 2>&1
   if ! grep -q '^OK (5 tests)' "$report" || grep -q 'INSTRUMENTATION_STATUS_CODE: -[34]' "$report"; then

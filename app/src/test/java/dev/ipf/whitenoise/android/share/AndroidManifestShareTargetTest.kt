@@ -30,13 +30,17 @@ class AndroidManifestShareTargetTest {
         val root = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(manifest)
         val intents = root.getElementsByTagName("queries").item(0).childNodes
         val actions = mutableSetOf<String>()
-        for (index in 0 until intents.length) {
-            val intent = intents.item(index) as? org.w3c.dom.Element ?: continue
-            if (intent.tagName != "intent") continue
-            val data = intent.getElementsByTagName("data")
-            if (data.length != 1) continue
-            val mime = data.item(0) as org.w3c.dom.Element
-            if (mime.getAttribute("android:mimeType") != "*/*" || mime.attributes.length != 1) continue
+        val wildcardQueries =
+            (0 until intents.length)
+                .mapNotNull { intents.item(it) as? org.w3c.dom.Element }
+                .filter { it.tagName == "intent" }
+                .filter { intent ->
+                    val data = intent.getElementsByTagName("data")
+                    val mime = data.item(0) as? org.w3c.dom.Element
+                    data.length == 1 && mime != null &&
+                        mime.getAttribute("android:mimeType") == "*/*" && mime.attributes.length == 1
+                }
+        for (intent in wildcardQueries) {
             val declared = intent.getElementsByTagName("action")
             for (actionIndex in 0 until declared.length) {
                 actions += (declared.item(actionIndex) as org.w3c.dom.Element).getAttribute("android:name")

@@ -46,7 +46,9 @@ class OutboundShareDeviceContractTest {
     @Test
     fun implicitTxtChooserTransfersExactBytesNameAndOnlySelectedUri() =
         runBlocking {
-            assertIndependentChooser(listOf(PendingAttachment("TXT fixture".encodeToByteArray(), "text/plain", "story.txt")))
+            assertIndependentChooser(
+                listOf(PendingAttachment("TXT fixture".encodeToByteArray(), "text/plain", "story.txt")),
+            )
         }
 
     /** SEND_MULTIPLE uses the same discovery contract and preserves captions, order and mixed MIME. */
@@ -110,7 +112,10 @@ class OutboundShareDeviceContractTest {
         instrumentation.runOnMainSync { instrumentation.targetContext.startActivity(probe) }
         val (code, observed) = withTimeout(10_000) { result.await() }
         assertEquals(Activity.RESULT_OK, code)
-        assertFalse("Negative control must prove Android package filtering is active", observed?.getBoolean("visible", true) ?: true)
+        assertFalse(
+            "Negative control must prove Android package filtering is active",
+            observed?.getBoolean("visible", true) ?: true,
+        )
     }
 
     /** Clicks the independent target in the real chooser and validates the receiving UID's observations. */
@@ -134,7 +139,10 @@ class OutboundShareDeviceContractTest {
             checkNotNull(target) { "Independent receiver missing from the real Sharesheet" }.click()
             val (code, observed) = withTimeout(10_000) { result.await() }
             assertEquals(Activity.RESULT_OK, code)
-            assertEquals(attachments.map { sha256(checkNotNull(it.inMemoryBytes)) }, observed?.getStringArrayList("hashes"))
+            assertEquals(
+                attachments.map { sha256(checkNotNull(it.inMemoryBytes)) },
+                observed?.getStringArrayList("hashes"),
+            )
             assertEquals(attachments.map { it.fileName }, observed?.getStringArrayList("names"))
             assertEquals(if (attachments.size == 1) "text/plain" else "*/*", observed?.getString("mime"))
             assertEquals(FIXTURE_CAPTION, observed?.getString("caption"))
@@ -149,6 +157,7 @@ class OutboundShareDeviceContractTest {
     /** Receives fixture observations on the app looper while the instrumentation thread awaits them. */
     private fun resultReceiver(result: CompletableDeferred<Pair<Int, Bundle?>>): ResultReceiver =
         object : ResultReceiver(Handler(Looper.getMainLooper())) {
+            /** Completes the waiting assertion with observations returned by the receiving process. */
             override fun onReceiveResult(
                 resultCode: Int,
                 resultData: Bundle?,
@@ -184,15 +193,7 @@ class OutboundShareDeviceContractTest {
             val neighborUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", neighbor)
             val expectedStreamSha256 = sha256(staged.file.readBytes())
             val result = CompletableDeferred<Pair<Int, Bundle?>>()
-            val receiver =
-                object : ResultReceiver(Handler(Looper.getMainLooper())) {
-                    override fun onReceiveResult(
-                        resultCode: Int,
-                        resultData: Bundle?,
-                    ) {
-                        result.complete(resultCode to resultData)
-                    }
-                }
+            val receiver = resultReceiver(result)
             try {
                 val share =
                     outboundShareIntent("https://example.test/profile", listOf(staged.stream))
@@ -278,6 +279,7 @@ class OutboundShareDeviceContractTest {
             }
         }
 
+    /** Reads the granted provider's display name so assertions never depend on private cache paths. */
     private fun displayName(
         context: android.content.Context,
         uri: android.net.Uri,
@@ -289,6 +291,7 @@ class OutboundShareDeviceContractTest {
                 cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
             }
 
+    /** Creates metadata-only sent/received attachment fixtures without requesting remote ciphertext. */
     private fun reference(
         fileName: String,
         mediaType: String,
@@ -305,6 +308,7 @@ class OutboundShareDeviceContractTest {
         thumbhash = null,
     )
 
+    /** Verifies multi-file intent grants and cancellation without opening a receiver or changing message state. */
     @Test
     fun realChooserCarriesSentAndReceivedStreamsThenCancelsWithoutStateMutation() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

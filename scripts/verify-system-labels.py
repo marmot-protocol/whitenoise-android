@@ -83,6 +83,7 @@ def expected_identity(
 
 
 def verify_manifest(path: Path, expected: PackageIdentity) -> PackageIdentity:
+    """Validate packaged identity, exported labels and inbound/outbound share entry contracts."""
     root = ET.parse(path).getroot()
     verify_share_target_visibility(root, str(path))
     application = root.find("application")
