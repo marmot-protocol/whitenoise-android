@@ -27,7 +27,11 @@ class AndroidManifestShareTargetTest {
         val manifest =
             listOf(java.io.File("src/main/AndroidManifest.xml"), java.io.File("app/src/main/AndroidManifest.xml"))
                 .first { it.exists() }
-        val root = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(manifest)
+        val root =
+            javax.xml.parsers.DocumentBuilderFactory
+                .newInstance()
+                .newDocumentBuilder()
+                .parse(manifest)
         val intents = root.getElementsByTagName("queries").item(0).childNodes
         val actions = mutableSetOf<String>()
         val wildcardQueries =
@@ -37,8 +41,10 @@ class AndroidManifestShareTargetTest {
                 .filter { intent ->
                     val data = intent.getElementsByTagName("data")
                     val mime = data.item(0) as? org.w3c.dom.Element
-                    data.length == 1 && mime != null &&
-                        mime.getAttribute("android:mimeType") == "*/*" && mime.attributes.length == 1
+                    data.length == 1 &&
+                        mime != null &&
+                        mime.getAttribute("android:mimeType") == "*/*" &&
+                        mime.attributes.length == 1
                 }
         for (intent in wildcardQueries) {
             val declared = intent.getElementsByTagName("action")

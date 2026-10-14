@@ -47,7 +47,13 @@ printf '%s\n' "$GITHUB_SHA" > "$report_dir/source-revision.txt"
 sha256sum "${app_apks[0]}" "${test_apks[0]}" scripts/outbound-share-fixture/build/{fixture,control}.apk > "$report_dir/apk-sha256.txt"
 original_user="$(adb -e shell am get-current-user | tr -d '\r')"
 [[ "$original_user" =~ ^[0-9]+$ ]] || { echo "Unknown emulator user" >&2; exit 1; }
-trap 'adb -e shell am switch-user "$original_user" >/dev/null || true' EXIT
+collect_runtime_evidence() {
+  local result=$?
+  timeout 15s adb -e logcat -d -v threadtime > "$report_dir/logcat.txt" 2>&1 || true
+  timeout 15s adb -e shell am switch-user "$original_user" >/dev/null || true
+  exit "$result"
+}
+trap collect_runtime_evidence EXIT
 
 # All declared cases must execute in this user; ignored/assumption-skipped tests cannot qualify it.
 run_user() {

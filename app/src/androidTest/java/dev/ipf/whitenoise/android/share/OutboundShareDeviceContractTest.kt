@@ -10,9 +10,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ResultReceiver
 import android.provider.OpenableColumns
-import android.view.KeyEvent
 import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
+import androidx.lifecycle.Lifecycle
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -21,6 +22,7 @@ import androidx.test.uiautomator.Until
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
@@ -31,9 +33,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.stageMessageShareStreams
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -42,6 +46,20 @@ import java.security.MessageDigest
 @RunWith(AndroidJUnit4::class)
 @PullRequestDeviceSmoke
 class OutboundShareDeviceContractTest {
+    private lateinit var foregroundActivity: ActivityScenario<MainActivity>
+
+    /** Keeps the real caller visible so Android cannot block cross-app launches as background starts. */
+    @Before
+    fun showForegroundCaller() {
+        foregroundActivity = ActivityScenario.launch(MainActivity::class.java)
+        foregroundActivity.moveToState(Lifecycle.State.RESUMED)
+    }
+
+    /** Releases the foreground activity after each case without clearing account or attachment data. */
+    @After
+    fun closeForegroundCaller() {
+        if (::foregroundActivity.isInitialized) foregroundActivity.close()
+    }
     /** Real implicit discovery must find an independent receiver before a generated TXT is staged. */
     @Test
     fun implicitTxtChooserTransfersExactBytesNameAndOnlySelectedUri() =
@@ -356,7 +374,7 @@ class OutboundShareDeviceContractTest {
                 context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             instrumentation.waitForIdleSync()
-            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+            assertTrue(UiDevice.getInstance(instrumentation).pressBack())
             instrumentation.waitForIdleSync()
         } finally {
             sent.delete()
