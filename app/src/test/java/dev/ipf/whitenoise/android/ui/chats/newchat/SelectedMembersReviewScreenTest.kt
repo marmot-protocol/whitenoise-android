@@ -235,8 +235,10 @@ class SelectedMembersReviewScreenTest {
             }
         }
         val memberLabel = context.getString(R.string.member)
-        composeRule.onNodeWithContentDescription("${members.first().displayName}, $memberLabel")
-            .assertIsNotEnabled().performClick()
+        composeRule
+            .onNodeWithContentDescription("${members.first().displayName}, $memberLabel")
+            .assertIsNotEnabled()
+            .performClick()
         composeRule.onNodeWithText(context.getString(R.string.admin)).assertDoesNotExist()
         assertEquals(0, changes)
     }
