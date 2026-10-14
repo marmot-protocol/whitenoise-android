@@ -95,7 +95,8 @@ class NotificationReactionArtworkTest {
         runBlocking {
             val card = post(":marmot:")
             for (dark in listOf(false, true, false)) {
-                RuntimeEnvironment.setQualifiers(if (dark) "w360dp-h800dp-night-mdpi" else "w360dp-h800dp-notnight-mdpi")
+                val qualifiers = if (dark) "w360dp-h800dp-night-mdpi" else "w360dp-h800dp-notnight-mdpi"
+                RuntimeEnvironment.setQualifiers(qualifiers)
                 val root = requireNotNull(card.contentView).apply(context, null)
                 val light = root.findViewById<ImageView>(R.id.reaction_notification_body_light)
                 val night = root.findViewById<ImageView>(R.id.reaction_notification_body_dark)

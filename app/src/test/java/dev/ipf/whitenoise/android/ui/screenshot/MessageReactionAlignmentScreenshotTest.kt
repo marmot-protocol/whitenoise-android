@@ -155,7 +155,8 @@ class MessageReactionAlignmentScreenshotTest {
                 RuntimeEnvironment.getApplication().getString(R.string.translation_show_original),
             )
         if (translated) control.assertIsDisplayed() else control.assertDoesNotExist()
-        val loading = composeRule.onNodeWithText(RuntimeEnvironment.getApplication().getString(R.string.translation_loading))
+        val loadingText = RuntimeEnvironment.getApplication().getString(R.string.translation_loading)
+        val loading = composeRule.onNodeWithText(loadingText)
         if (pending) loading.assertIsDisplayed() else loading.assertDoesNotExist()
         composeRule
             .onNodeWithTag(GALLERY_TAG)
