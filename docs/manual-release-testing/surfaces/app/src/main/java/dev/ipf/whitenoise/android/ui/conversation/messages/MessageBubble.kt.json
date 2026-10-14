@@ -157,6 +157,16 @@
           "CON-005"
         ]
       }
+    ],
+    "message_rendering_contracts": [
+      {
+        "surface": "translation status follows the bubble-attached reaction summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": ".MessageTranslationRendition(translationSource)",
+        "test_ids": [
+          "SET-033"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

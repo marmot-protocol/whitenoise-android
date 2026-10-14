@@ -21,6 +21,7 @@ data class LocalNotificationContent(
     val selfKey: String,
     val isGroupConversation: Boolean,
     val conversationTitle: String?,
+    val isReactionPreview: Boolean = false,
 )
 
 data class NotificationDismissalKey(
@@ -189,6 +190,7 @@ object LocalNotificationFormatter {
             selfName = appName,
             selfKey = "",
             conversationTitle = null,
+            isReactionPreview = false,
         )
 
     fun content(
@@ -258,6 +260,7 @@ object LocalNotificationFormatter {
             selfKey = update.receiver.accountIdHex,
             isGroupConversation = !update.isDm,
             conversationTitle = conversationTitle,
+            isReactionPreview = isReaction(update),
         )
     }
 

@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+  "legacy_sha256": "354910ff1a6fc6bf7c3b90d7d259d12758be31e8b7d01a8e8a9e6a7897405b03",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "group-removal concise notification content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "private fun notificationBody(",
+        "test_ids": [
+          "NTF-008",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "reaction qualification and privacy-safe notification content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "fun isReaction(",
+        "test_ids": [
+          "NTF-034",
+          "NTF-030"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
