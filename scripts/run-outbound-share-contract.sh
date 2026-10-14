@@ -62,6 +62,14 @@ trap collect_runtime_evidence EXIT
 run_user() {
   local user_id="$1"
   local report="$report_dir/user-$user_id.txt"
+  local user_state=""
+  # Switching foreground users can finish before credential-encrypted app storage is ready.
+  for attempt in {1..60}; do
+    user_state="$(adb -e shell am get-started-user-state "$user_id" | tr -d '\r')"
+    [[ "$user_state" != RUNNING_UNLOCKED ]] || break
+    sleep 1
+  done
+  [[ "$user_state" == RUNNING_UNLOCKED ]] || { echo "User $user_id never unlocked: $user_state" >&2; exit 1; }
   timeout --signal=INT --kill-after=30s 10m adb -e shell am instrument --user "$user_id" -w -r \
     -e class dev.ipf.whitenoise.android.share.OutboundShareDeviceContractTest \
     -e timeout_msec 120000 "$test_package/androidx.test.runner.AndroidJUnitRunner" > "$report" 2>&1
