@@ -97,6 +97,7 @@ class DependencyInputsTest(unittest.TestCase):
     def test_cross_publication_requires_authenticated_module_mapping(self):
         """Capability aliases need pinned module metadata; arbitrary alternate paths fail."""
         artifact = self.manifest['suppliers'][0]
+        artifact['method'] = 'independent-payload-sha256'
         artifact['source'] = 'https://repo.maven.apache.org/maven2/example/library/2.0/library-2.0.jar'
         self.save()
         with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):

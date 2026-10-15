@@ -1426,7 +1426,7 @@
     "cryptoBenchmark/gradle.lockfile": "e404808c8e655f3a57264cc45e0650433c4fb8e4baf3df89179afdad00434162",
     "fuzz/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "fuzz/gradle.lockfile": "1a058eacc9b9859109a224af8eb8e18d3eb721405af592ec93f9f3e3b81d923a",
-    "gradle/verification-metadata.xml": "f400d979c7508b392b053e99d7943964e1dccf7a7e64e77a9f99a993f00df8cb",
+    "gradle/verification-metadata.xml": "062b54ed0fc9f6b9aaa3400d3db75ccfa55ac1e0020e8f2f5750d745d5245e1b",
     "settings-gradle.lockfile": "e58bb2ed80db9f829601a658d7c33b9802eb7d2191c31e79c28e01f14c225926"
   },
   "post_lock_selection": [
@@ -1452,6 +1452,16 @@
       "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38789928704/job/116611668486",
       "reason": "Normal strict resolution reads parent/BOM metadata not retained by the initial warm-cache capture; each exact missing metadata payload was independently checked against its official supplier.",
       "scope": "plugin"
+    },
+    {
+      "additional_metadata": [
+        "org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.6.4/kotlinx-coroutines-bom-1.6.4.pom",
+        "com.google.guava:guava-parent:33.3.1-android/guava-parent-33.3.1-android.pom"
+      ],
+      "configuration": "app compile and fuzz ktlint",
+      "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38790677001/job/116614185735",
+      "reason": "Normal strict compile/tool resolution also reads exact Guava parent/coroutines BOM POM metadata; supplier bytes independently checked.",
+      "scope": "project"
     }
   ],
   "reviewed_from": {
@@ -6645,6 +6655,13 @@
       "source": "https://repo.maven.apache.org/maven2/com/google/guava/guava-parent/32.0.1-android/guava-parent-32.0.1-android.pom"
     },
     {
+      "coordinate": "com.google.guava:guava-parent:33.3.1-android",
+      "method": "independent-payload-sha256",
+      "name": "guava-parent-33.3.1-android.pom",
+      "sha256": "6e11986ea7250b51f847157e2dc937f32a306804dfce0007a5e81ddb9b95c579",
+      "source": "https://repo.maven.apache.org/maven2/com/google/guava/guava-parent/33.3.1-android/guava-parent-33.3.1-android.pom"
+    },
+    {
       "coordinate": "com.google.guava:guava-parent:33.4.0-android",
       "method": "independent-payload-sha256",
       "name": "guava-parent-33.4.0-android.pom",
@@ -9840,6 +9857,13 @@
       "name": "kotlinx-coroutines-bom-1.11.0.pom",
       "sha256": "f65860bce58a2bfadf05fdc516d38333421f0e387fef87e24449c0394c80d254",
       "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.11.0/kotlinx-coroutines-bom-1.11.0.pom.sha256"
+    },
+    {
+      "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.6.4",
+      "method": "independent-payload-sha256",
+      "name": "kotlinx-coroutines-bom-1.6.4.pom",
+      "sha256": "ab2614855fba66aa8a42514dbe3d5a884315ffe1ed63f5932e710a8006245ce1",
+      "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-bom/1.6.4/kotlinx-coroutines-bom-1.6.4.pom"
     },
     {
       "coordinate": "org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.8.0",

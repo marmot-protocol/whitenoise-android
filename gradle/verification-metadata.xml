@@ -3131,6 +3131,11 @@
             <sha256 value="cddb3a941d71be5e871f39a239ba3bb8883c88c7763d8a3d2d342b09a1d5da30" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
          </artifact>
       </component>
+      <component group="com.google.guava" name="guava-parent" version="33.3.1-android">
+         <artifact name="guava-parent-33.3.1-android.pom">
+            <sha256 value="6e11986ea7250b51f847157e2dc937f32a306804dfce0007a5e81ddb9b95c579" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
+      </component>
       <component group="com.google.guava" name="guava-parent" version="33.4.0-android">
          <artifact name="guava-parent-33.4.0-android.pom">
             <sha256 value="7220ede61026596fbc720ee4b93246fa2d14f328058532b59ef053de397c7d83" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
@@ -4997,6 +5002,11 @@
       <component group="org.jetbrains.kotlinx" name="kotlinx-coroutines-bom" version="1.11.0">
          <artifact name="kotlinx-coroutines-bom-1.11.0.pom">
             <sha256 value="f65860bce58a2bfadf05fdc516d38333421f0e387fef87e24449c0394c80d254" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
+      </component>
+      <component group="org.jetbrains.kotlinx" name="kotlinx-coroutines-bom" version="1.6.4">
+         <artifact name="kotlinx-coroutines-bom-1.6.4.pom">
+            <sha256 value="ab2614855fba66aa8a42514dbe3d5a884315ffe1ed63f5932e710a8006245ce1" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
          </artifact>
       </component>
       <component group="org.jetbrains.kotlinx" name="kotlinx-coroutines-bom" version="1.8.0">
