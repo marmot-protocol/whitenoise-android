@@ -160,6 +160,14 @@ tasks.register('verifySecurityFixture') {
         assert external.id.group == 'org.freemarker'
         assert external.id.module == 'freemarker'
         assert external.id.version == '2.3.35'
+        def producerEdge = projectResolution.allDependencies.find {
+            it instanceof org.gradle.api.artifacts.result.ResolvedDependencyResult &&
+                it.selected.id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier &&
+                it.selected.id.projectPath == ':producer'
+        }
+        assert producerEdge != null
+        new File(rootProject.projectDir, 'expected-project-edge.json').text = groovy.json.JsonOutput.toJson(
+            [from: producerEdge.from.id.displayName, to: producerEdge.selected.id.displayName])
         boolean ambiguousProjectArtifacts = false
         try { configurations.projectVariants.incoming.artifacts.artifacts }
         catch (org.gradle.api.GradleException expected) {
@@ -197,7 +205,8 @@ tasks.register('verifySecurityFixture') {
         project_report = next(r for r in reports if r['configuration'] == 'projectVariants')
         assert project_report['artifact_coverage'] == 'resolved_configuration'
         assert [a['coordinate'] for a in project_report['artifacts']] == ['org.freemarker:freemarker:2.3.35']
-        assert any(edge['to'] == 'project :producer' for edge in project_report['edges'])
+        expected_project_edge = json.loads((project / 'expected-project-edge.json').read_text())
+        assert expected_project_edge in project_report['edges'], project_report['edges']
         print('Gradle fixture PASS: raised exact request, retained newer/dynamic selection, '
               'rejected affected-only range and unsafe Wire alpha/suffixes, plugin/project reports, '
               'external artifacts isolated from ambiguous project variants')
