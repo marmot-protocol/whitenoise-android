@@ -145,9 +145,12 @@ def compare(before, after, before_source, after_source):
         for side, values, other in [("removed", previous, current), ("added", current, previous)]:
             changes[side].extend({**values[c], "configuration": key[2], "project": key[0], "scope": key[1]}
                                  for c in sorted(values.keys() - other.keys()))
-        if old[key]["artifacts"] != new[key]["artifacts"]:
+        identity = ("coordinate", "name", "sha256", "bytes")
+        previous_artifacts = [{k: artifact[k] for k in identity} for artifact in old[key]["artifacts"]]
+        current_artifacts = [{k: artifact[k] for k in identity} for artifact in new[key]["artifacts"]]
+        if previous_artifacts != current_artifacts:
             changes["changed_artifacts"].append({"configuration": key[2], "project": key[0], "scope": key[1],
-                                                  "before": old[key]["artifacts"], "after": new[key]["artifacts"]})
+                                                  "before": previous_artifacts, "after": current_artifacts})
     return changes
 
 

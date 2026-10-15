@@ -81,6 +81,48 @@ class DependencyInventoryTest(unittest.TestCase):
                     self.assertEqual(inventory.main(), 1)
                 self.assertFalse(output.exists())
 
+    def test_release_cli_exports_both_distributions_and_rejects_changed_payload(self):
+        """Exercise the actual release command with the current lock and synthetic packages."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); reports = root / "reports"; reports.mkdir()
+            lock = root / "MARMOT_VERSION"
+            lock.write_bytes((Path(__file__).resolve().parents[1] / "app/src/main/marmotkit/MARMOT_VERSION").read_bytes())
+            properties = inventory.parse_properties(lock)
+            library = b"synthetic JNI bytes"; native_sha = hashlib.sha256(library).hexdigest()
+            abis = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            provenance = {"schema": 1, "lock_sha256": inventory.digest(lock), "source": properties["source"],
+                          "source_sha": properties["mdk-sha"], "artifact_id": properties["artifact-id"],
+                          "artifact_sha256": properties["artifact-sha256"],
+                          "features": {"android_lock": sorted(properties["features"].split(","))},
+                          "libraries": [{"abi": abi, "sha256": native_sha} for abi in abis]}
+            provenance_path = root / "native.json"; provenance_path.write_text(json.dumps(provenance))
+            version = "2026.10.15"; files = {}
+            for distribution, suffix in [("play", "play.aab"), ("zapstore", "arm64-v8a.apk")]:
+                payload = root / f"whitenoise-android-{version}-{suffix}"
+                with zipfile.ZipFile(payload, "w") as archive:
+                    for abi in (abis if distribution == "play" else abis[:1]):
+                        prefix = "base/lib" if distribution == "play" else "lib"
+                        archive.writestr(f"{prefix}/{abi}/libmarmot_uniffi.so", library)
+                mapping = root / f"mapping-{version}-{distribution}.txt"; mapping.write_text("synthetic mapping")
+                for path in (payload, mapping):
+                    files[path.name] = {k: v for k, v in inventory.fingerprint(path).items() if k != "name"}
+                (reports / f"{distribution}.json").write_text(json.dumps(report(f"production{distribution.title()}ReleaseRuntimeClasspath")))
+            manifest = root / "release-manifest.json"
+            manifest.write_text(json.dumps({"schemaVersion": 2, "sourceCommit": SOURCE, "versionName": version,
+                                            "worktreeDirty": False, "files": files}))
+            output = root / "inventory" / "release.json"
+            argv = ["inventory", "release", "--bundle", str(root), "--reports", str(reports),
+                    "--provenance", str(provenance_path), "--lock", str(lock), "--output", str(output)]
+            with mock.patch.object(inventory.subprocess, "check_output", return_value=SOURCE + "\n"), \
+                 mock.patch("sys.argv", argv):
+                self.assertEqual(inventory.main(), 0)
+                exported = inventory.read_json(output)
+                self.assertEqual(set(exported["packaging"]), {"play", "zapstore"})
+                self.assertEqual(len(exported["packaging"]["play"]["native_libraries"]), 4)
+                self.assertEqual(exported["release_manifest"]["sha256"], inventory.digest(manifest))
+                (root / f"whitenoise-android-{version}-play.aab").write_bytes(b"changed")
+                self.assertEqual(inventory.main(), 1)
+
     def test_delta_requires_same_configuration_coverage_and_expected_sources(self):
         """A missing configuration is not evidence that dependencies were removed."""
         before = inventory.selected_inventory([report()], SOURCE)
@@ -97,6 +139,23 @@ class DependencyInventoryTest(unittest.TestCase):
         extra = inventory.selected_inventory([after_report, report("testRuntimeClasspath") | {"source_sha": "c" * 40}], "c" * 40)
         with self.assertRaises(ValueError):
             inventory.compare(before, extra, SOURCE, "c" * 40)
+
+    def test_delta_ignores_cache_only_licence_metadata_when_artifact_bytes_match(self):
+        """Warm POM observations do not imply a changed JAR/AAR payload."""
+        cold = report()
+        warm = report()
+        licence = {"name": "Example", "url": "https://example.invalid/license", "pom_sha256": "d" * 64}
+        warm["components"][0]["licenses"] = [licence]
+        warm["artifacts"][0]["licenses"] = [licence]
+        before = inventory.selected_inventory([cold], SOURCE)
+        after = inventory.selected_inventory([warm], SOURCE)
+        self.assertEqual(inventory.compare(before, after, SOURCE, SOURCE)["changed_artifacts"], [])
+        warm["artifacts"][0]["sha256"] = "f" * 64
+        changed = inventory.selected_inventory([warm], SOURCE)
+        delta = inventory.compare(before, changed, SOURCE, SOURCE)
+        self.assertEqual(len(delta["changed_artifacts"]), 1)
+        self.assertEqual(delta["added"], [])
+        self.assertEqual(delta["removed"], [])
 
     def test_release_inventory_requires_both_exact_runtime_graphs_and_real_payloads(self):
         """Bind release reports to payload, native and mapping bytes without compiling."""
