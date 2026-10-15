@@ -76,18 +76,27 @@ class ConversationDictationCallerAudioReplayTest {
         writes: CopyOnWriteArrayList<ByteArray>,
     ): ConversationDictationCallerAudio =
         ConversationDictationCallerAudio(
-            device = object : ConversationDictationAudioCaptureDevice {
-                override val initialized = true
-                override val recording = true
-                override fun start() = Unit
-                override fun read(target: ShortArray, waitForSamples: Boolean): Int = 0
-                override fun stop() = Unit
-                override fun release() = Unit
-            },
+            device =
+                object : ConversationDictationAudioCaptureDevice {
+                    override val initialized = true
+                    override val recording = true
+
+                    override fun start() = Unit
+
+                    override fun read(
+                        target: ShortArray,
+                        waitForSamples: Boolean,
+                    ): Int = 0
+
+                    override fun stop() = Unit
+
+                    override fun release() = Unit
+                },
             buffer = buffer,
-            pipeWriter = ConversationDictationAudioPipeWriter { _, source, offset, length ->
-                writes += source.copyOfRange(offset, offset + length)
-                length
-            },
+            pipeWriter =
+                ConversationDictationAudioPipeWriter { _, source, offset, length ->
+                    writes += source.copyOfRange(offset, offset + length)
+                    length
+                },
         )
 }

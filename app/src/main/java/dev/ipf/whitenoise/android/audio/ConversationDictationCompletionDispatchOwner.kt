@@ -64,7 +64,10 @@ internal class ConversationDictationCompletionDispatchOwner(
         val onRetained: (ConversationDictationDispatchClaim, Boolean?) -> Unit,
     )
 
-    internal data class DispatchCallbacks(val guards: DispatchGuards, val outcomes: DispatchOutcomes)
+    internal data class DispatchCallbacks(
+        val guards: DispatchGuards,
+        val outcomes: DispatchOutcomes,
+    )
 
     fun cancelBeforeTransport() {
         dispatchClaim = null
@@ -93,15 +96,24 @@ internal class ConversationDictationCompletionDispatchOwner(
                 if (callbacks.guards.currentSessionId() != context.sessionId) return@launch
                 try {
                     val accepted = dispatch(transport.timeoutMillis, guardedRequest, transport.send)
-                    if (dispatchClaim !== claim || callbacks.guards.currentSessionId() != context.sessionId ||
+                    if (dispatchClaim !== claim ||
+                        callbacks.guards.currentSessionId() != context.sessionId ||
                         !callbacks.guards.processing()
-                    ) return@launch
-                    if (accepted == true) callbacks.outcomes.onAccepted(claim)
-                    else callbacks.outcomes.onRetained(claim, accepted)
+                    ) {
+                        return@launch
+                    }
+                    if (accepted == true) {
+                        callbacks.outcomes.onAccepted(claim)
+                    } else {
+                        callbacks.outcomes.onRetained(claim, accepted)
+                    }
                 } finally {
-                    if (dispatchClaim === claim && callbacks.guards.currentSessionId() == context.sessionId &&
+                    if (dispatchClaim === claim &&
+                        callbacks.guards.currentSessionId() == context.sessionId &&
                         callbacks.guards.processing()
-                    ) callbacks.outcomes.onRetained(claim, null)
+                    ) {
+                        callbacks.outcomes.onRetained(claim, null)
+                    }
                 }
             }
         sendJob?.start()
@@ -117,7 +129,8 @@ internal class ConversationDictationCompletionDispatchOwner(
         val admissionTarget = context.admissionTarget
         return request.copy(
             beginDispatch = {
-                if (dispatchClaim !== claim || guards.currentSessionId() != sessionId ||
+                if (dispatchClaim !== claim ||
+                    guards.currentSessionId() != sessionId ||
                     dispatchedSessionId != null
                 ) {
                     false
@@ -134,7 +147,8 @@ internal class ConversationDictationCompletionDispatchOwner(
                 }
             },
             onDispatchRejectedBeforeTransport = {
-                if (dispatchClaim === claim && guards.currentSessionId() == sessionId &&
+                if (dispatchClaim === claim &&
+                    guards.currentSessionId() == sessionId &&
                     dispatchedSessionId == sessionId
                 ) {
                     conversationDictationDiagnostic("event=send_outcome outcome=rejected_before_transport")
@@ -146,7 +160,8 @@ internal class ConversationDictationCompletionDispatchOwner(
                 }
             },
             onPendingShown = {
-                if (dispatchClaim === claim && guards.currentSessionId() == sessionId &&
+                if (dispatchClaim === claim &&
+                    guards.currentSessionId() == sessionId &&
                     dispatchedSessionId == sessionId
                 ) {
                     // Pending transport outlives dictation teardown.

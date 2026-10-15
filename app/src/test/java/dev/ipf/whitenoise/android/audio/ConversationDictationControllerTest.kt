@@ -59,14 +59,27 @@ class ConversationDictationControllerTest {
             assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
             f.platform.listener.onResult("turn left.")
             f.scheduler.runDelay(500L)
-            assertEquals(4L, f.platform.session.callerAudioRequest()?.chunk?.pcm?.size?.toLong())
+            assertEquals(
+                4L,
+                f.platform.session
+                    .callerAudioRequest()
+                    ?.chunk
+                    ?.pcm
+                    ?.size
+                    ?.toLong(),
+            )
             f.controller.send()
             f.platform.listener.onResult(" ")
             assertEquals(12, buffer.bufferedBytes)
             f.scheduler.runDelay(500L)
             val replay = requireNotNull(f.platform.session.callerAudioRequest())
             assertEquals(1, replay.replayParts.size)
-            assertEquals(8, replay.replayParts.single().pcm.size)
+            assertEquals(
+                8,
+                replay.replayParts
+                    .single()
+                    .pcm.size,
+            )
             val staleListener = f.platform.listener
             f.platform.listener.onResult("turn right.")
             assertEquals(12, buffer.bufferedBytes)
@@ -4101,6 +4114,25 @@ class ConversationDictationControllerTest {
             assertEquals("unsaved", (f.controller.state as ConversationDictationState.Failed).retainedTranscript)
             assertFalse(f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key())))
         }
+
+    /** A storage exception leaves Paste's words in fenced recovery instead of completing a partial draft. */
+    @Test
+    fun throwingPasteWriteRetainsRecognizedTranscript() {
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Draft", TextRange(5)),
+                allowDraftWrite = { throw IllegalStateException("draft store unavailable") },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("recognized")
+
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals("recognized", failed.retainedTranscript)
+        assertEquals("Draft", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.hasUnrecoveredTranscript)
+        assertEquals(0, fixture.writes)
+    }
 
     /** A sleeping device cannot reattach expired PCM before its delayed timer is dispatched. */
     @Test
@@ -8563,8 +8595,9 @@ class ConversationDictationControllerTest {
             this.listener = listener
             listeners += listener
             val request = if (useRealAudioSettlements) audioBuffer?.requests?.pollRequest() else null
-            val chunk = (request?.chunk ?: if (useRealAudioSettlements) null else audioBuffer?.poll())
-                ?.also { claimedChunks += it }
+            val chunk =
+                (request?.chunk ?: if (useRealAudioSettlements) null else audioBuffer?.poll())
+                    ?.also { claimedChunks += it }
             session =
                 FakeSession(
                     listener,

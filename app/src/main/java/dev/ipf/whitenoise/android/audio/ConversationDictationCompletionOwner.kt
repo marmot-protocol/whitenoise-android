@@ -8,6 +8,7 @@ internal class ConversationDictationCompletionOwner(
     private val writeDraft: (String, String, Long, TextFieldValue) -> Long?,
 ) {
     internal enum class PasteResult { Accepted, Retained, Abandoned }
+
     internal data class DraftOperation(
         val sessionId: Long,
         val target: ConversationDictationTarget,
@@ -16,6 +17,7 @@ internal class ConversationDictationCompletionOwner(
         val currentSessionId: () -> Long?,
         val validate: () -> ConversationDictationTargetValidation,
     )
+
     var draftRecovery = ConversationDictationDraftRecovery(readDraft, writeDraft)
         private set
     val intent = ConversationDictationCompletionIntent()
@@ -59,9 +61,12 @@ internal class ConversationDictationCompletionOwner(
                 when (val merge = mergeConversationDictationTranscript(target.capturedDraft, current.value, text)) {
                     is ConversationDictationMerge.Applied -> {
                         val accepted =
-                            runCatching {
+                            try {
                                 writeDraft(target.accountRef, target.groupIdHex, current.revision, merge.value)
-                            }.getOrNull()
+                            } catch (_: Throwable) {
+                                result = PasteResult.Retained
+                                null
+                            }
                         if (accepted != null) result = PasteResult.Accepted
                     }
                     ConversationDictationMerge.NeedsAppendFallback -> result = appendLatest(operation)

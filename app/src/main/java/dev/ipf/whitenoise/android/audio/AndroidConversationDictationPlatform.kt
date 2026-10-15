@@ -170,8 +170,7 @@ internal class AndroidConversationDictationPlatform(
         )
     }
 
-    override fun recognitionActivityAvailable(): Boolean =
-        sessionProvider?.activity != null && pinnedProviderAvailable()
+    override fun recognitionActivityAvailable(): Boolean = sessionProvider?.activity != null && pinnedProviderAvailable()
 
     /** Resolves provider UI off the main thread and posts at most one cancellable callback. */
     override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
@@ -192,9 +191,7 @@ internal class AndroidConversationDictationPlatform(
     }
 
     /** Creates one recognizer session pinned to Android's explicit or unambiguous installed service. */
-    override fun createSession(
-        listener: ConversationDictationRecognitionListener,
-    ): ConversationDictationRecognitionSession {
+    override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
         val selected =
             sessionRecognitionService?.takeIf { recognitionAvailable() }
                 ?: throw ConversationDictationProviderUnavailableException()
@@ -212,9 +209,7 @@ internal class AndroidConversationDictationPlatform(
      * microphone capability. Selected and preinstalled providers keep their own capture path.
      */
     @Suppress("MaxLineLength")
-    private fun openCallerAudioStreamIfProviderCannotRecord(
-        listener: ConversationDictationRecognitionListener,
-    ): ConversationDictationCallerAudioStream? {
+    private fun openCallerAudioStreamIfProviderCannotRecord(listener: ConversationDictationRecognitionListener): ConversationDictationCallerAudioStream? {
         val systemSelected = selectedRecognitionService() != null
         val providerRecords = sessionProviderCanRecord
         val supported = conversationDictationAudioSourceSupported()
@@ -285,9 +280,7 @@ internal class AndroidConversationDictationPlatform(
      * Asks the resolved provider build whether it reads a caller-supplied descriptor, records a
      * conclusive answer for that exact build, and reports the answer once on the main thread.
      */
-    override fun probeCallerAudioSupport(
-        callback: (ConversationDictationCallerAudioRequirement) -> Unit,
-    ): ConversationDictationTimeoutHandle {
+    override fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
         val provider = callerAudioProvider()
         val known = knownCallerAudioRequirement(provider)
         if (known != ConversationDictationCallerAudioRequirement.Unknown || provider == null) {
@@ -313,9 +306,7 @@ internal class AndroidConversationDictationPlatform(
      * session cannot supply audio and the provider's own UI is genuinely the only surface that can
      * capture. Otherwise the answer is whatever this provider build has already established.
      */
-    private fun knownCallerAudioRequirement(
-        provider: ConversationDictationCallerAudioProvider?,
-    ): ConversationDictationCallerAudioRequirement =
+    private fun knownCallerAudioRequirement(provider: ConversationDictationCallerAudioProvider?): ConversationDictationCallerAudioRequirement =
         when {
             provider != null && sessionProviderCanRecord -> ConversationDictationCallerAudioRequirement.NotNeeded
             !conversationDictationAudioSourceSupported() -> ConversationDictationCallerAudioRequirement.Unsupported
@@ -355,8 +346,7 @@ internal class AndroidConversationDictationPlatform(
             PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(packageName, 0))
         }.getOrNull()
 
-    private fun callerAudioPreferences() =
-        context.getSharedPreferences(CONVERSATION_DICTATION_PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private fun callerAudioPreferences() = context.getSharedPreferences(CONVERSATION_DICTATION_PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     /** Parses Android's secure setting for the currently selected recognition service. */
     private fun selectedRecognitionService(): ComponentName? =
@@ -721,8 +711,10 @@ private class AndroidConversationDictationRecognitionSession(
 
     override fun callerAudioRequest(): ConversationDictationAudioRequest? = callerAudio?.request()
 
-    override fun acknowledgeCallerAudio(transcript: String): ConversationDictationAudioSettlement? =
-        callerAudio?.acknowledge(transcript)
+    override fun acknowledgeCallerAudio(transcript: String): ConversationDictationAudioSettlement? {
+        val stream = callerAudio
+        return stream?.acknowledge(transcript)
+    }
 
     /** Returns the stable identity of this recognizer generation's exact caller-audio chunk. */
     override fun callerAudioChunkId(): Long? = callerAudio?.chunkId()

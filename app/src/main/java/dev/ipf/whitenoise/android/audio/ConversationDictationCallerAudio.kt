@@ -177,7 +177,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         conversationDictationDiagnostic(
             "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
                 "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-15 " +
-                    "request_seconds=30 buffer_seconds=90",
+                "request_seconds=30 buffer_seconds=90",
         )
         captureThreadStarted.set(true)
         thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
@@ -187,9 +187,7 @@ internal class ConversationDictationCallerAudio internal constructor(
     /** Opens the only serial provider stream. The recorder itself is not restarted. */
     @Synchronized
     @Suppress("MaxLineLength", "ReturnCount")
-    fun openProviderStream(
-        onFailure: (ConversationDictationCallerAudioFailure) -> Unit = {},
-    ): ConversationDictationCallerAudioStream? {
+    fun openProviderStream(onFailure: (ConversationDictationCallerAudioFailure) -> Unit = {}): ConversationDictationCallerAudioStream? {
         if (discarded.get()) return null
         val pipe = openPipe() ?: return null
         val stream = ConversationDictationCallerAudioStream(this, pipe[1], pipe[0], buffer, pipeWriter, onFailure)
@@ -615,7 +613,8 @@ internal class ConversationDictationCallerAudioStream(
     /** Requeues the rejected new input with its immediately preceding recognized PCM. */
     fun retryWithContext(): Boolean {
         val owned = request.get()
-        return if (owned == null || !buffer.requests.canRetryWithContext(owned) ||
+        return if (owned == null ||
+            !buffer.requests.canRetryWithContext(owned) ||
             !settled.compareAndSet(false, true)
         ) {
             false

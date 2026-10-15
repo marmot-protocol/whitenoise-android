@@ -364,17 +364,14 @@ internal interface ConversationDictationPlatform {
      * The default keeps every platform that opens the microphone for the app on the in-app path.
      */
     @Suppress("MaxLineLength")
-    fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement =
-        ConversationDictationCallerAudioRequirement.NotNeeded
+    fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = ConversationDictationCallerAudioRequirement.NotNeeded
 
     /**
      * Establishes an unknown caller-audio answer without opening the microphone, then reports it
      * exactly once. The returned handle prevents both a late callback and a recorded verdict.
      */
     @Suppress("MaxLineLength")
-    fun probeCallerAudioSupport(
-        callback: (ConversationDictationCallerAudioRequirement) -> Unit,
-    ): ConversationDictationTimeoutHandle {
+    fun probeCallerAudioSupport(callback: (ConversationDictationCallerAudioRequirement) -> Unit): ConversationDictationTimeoutHandle {
         callback(callerAudioRequirement())
         return ConversationDictationTimeoutHandle {}
     }
@@ -959,7 +956,11 @@ internal class ConversationDictationController internal constructor(
         val audio = runCatching(platform::parkCallerAudio).getOrNull() ?: return false
         parkedRecoveries[key] =
             ParkedRecovery(
-                failed, audio, completion.parkDraftRecovery(), notificationActionGeneration, recognition.snapshot(),
+                failed,
+                audio,
+                completion.parkDraftRecovery(),
+                notificationActionGeneration,
+                recognition.snapshot(),
             )
         retainedAudioFailure = null
         clearRecognitionSession(cancel = false)
@@ -2578,9 +2579,12 @@ internal class ConversationDictationController internal constructor(
                         }
                         return
                     }
-                    if (error.isEmptyRecognition || error == ConversationDictationFailure.PermissionDenied ||
+                    if (error.isEmptyRecognition ||
+                        error == ConversationDictationFailure.PermissionDenied ||
                         error == ConversationDictationFailure.ProviderDisconnected
-                    ) clearRecognitionGeneration(cancel = false)
+                    ) {
+                        clearRecognitionGeneration(cancel = false)
+                    }
                     when {
                         error.isEmptyRecognition -> restartAfterNoSpeech(sessionId, target, readyAt)
                         error == ConversationDictationFailure.PermissionDenied ->
@@ -3110,8 +3114,8 @@ internal class ConversationDictationController internal constructor(
                 )
             !generation.hasSpeech && accumulatedTranscript.isNotBlank() -> {
                 if (requestedDeliveryMode == null) {
-            completion.intent.choose(target.silenceDeliveryMode, automatic = true)
-        }
+                    completion.intent.choose(target.silenceDeliveryMode, automatic = true)
+                }
                 finishRequested = true
                 cancelPendingRestart()
                 clearRecognitionGeneration(
@@ -3368,9 +3372,12 @@ internal class ConversationDictationController internal constructor(
         failure: ConversationDictationFailure? = null,
     ) {
         if (failure == ConversationDictationFailure.DeliveryUnknown) return
-        if (!explicitSendRequested || transcript.isNullOrBlank() ||
+        if (!explicitSendRequested ||
+            transcript.isNullOrBlank() ||
             !completion.dispatch.shouldNotifyBlocked(sessionId)
-        ) return
+        ) {
+            return
+        }
         runCatching(onSendBlocked)
     }
 
@@ -4287,8 +4294,7 @@ private fun String.occurrenceStarts(needle: String): List<Int> {
 
 /** Reports whether [index] is a legal cursor boundary rather than the middle of a grapheme. */
 @Suppress("MaxLineLength")
-private fun String.isGraphemeBoundary(index: Int): Boolean =
-    index in 0..length && graphemeBoundaryAtOrBefore(index) == index
+private fun String.isGraphemeBoundary(index: Int): Boolean = index in 0..length && graphemeBoundaryAtOrBefore(index) == index
 
 /** Scores matching right-side anchor context starting at [startInclusive]. */
 private fun commonPrefixLengthAt(
@@ -4323,6 +4329,7 @@ private const val MIN_ANCHOR_CONTEXT_CHARS = 3
 private const val MAX_ANCHOR_SCORE_CHARS = 64
 private const val MAX_EMPTY_SELECTION_SCAN_LENGTH = 4_096
 private const val EMPTY_SELECTION_SCAN_RADIUS = 1_024
+
 /** Posts a cancellable main-thread watchdog used to bound recognizer state transitions. */
 private fun scheduleConversationDictationTimeout(
     delayMillis: Long,

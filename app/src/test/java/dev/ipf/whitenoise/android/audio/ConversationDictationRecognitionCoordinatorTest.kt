@@ -52,7 +52,10 @@ class ConversationDictationRecognitionCoordinatorTest {
     fun unchangedContextKeepsExplicitNoncontiguousProvenanceWithinMemoryLimit() {
         val buffer =
             ConversationDictationAudioChunkBuffer(
-                sessionId = 1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24,
+                sessionId = 1L,
+                chunkBytes = 8,
+                requestBytes = 16,
+                maxBufferedBytes = 24,
             )
         val recognition = ConversationDictationRecognitionCoordinator()
         val anchorPcm = byteArrayOf(1, 0, 2, 0, 3, 0, 4, 0)
@@ -84,7 +87,10 @@ class ConversationDictationRecognitionCoordinatorTest {
     fun requestOverflowKeepsUnresolvedChunkAndExistingTranscript() {
         val buffer =
             ConversationDictationAudioChunkBuffer(
-                sessionId = 1L, chunkBytes = 10, requestBytes = 16, maxBufferedBytes = 24,
+                sessionId = 1L,
+                chunkBytes = 10,
+                requestBytes = 16,
+                maxBufferedBytes = 24,
             )
         val recognition = ConversationDictationRecognitionCoordinator()
         assertTrue(buffer.append(ByteArray(10) { 1 }, 10, hasSpeech = true))

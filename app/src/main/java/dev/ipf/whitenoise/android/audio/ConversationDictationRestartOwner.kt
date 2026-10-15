@@ -18,7 +18,10 @@ internal class ConversationDictationRestartOwner {
         return ++restartId
     }
 
-    fun install(id: Long, handle: ConversationDictationTimeoutHandle) {
+    fun install(
+        id: Long,
+        handle: ConversationDictationTimeoutHandle,
+    ) {
         if (id == restartId && reserved) timeout = handle else handle.cancel()
     }
 
@@ -40,7 +43,10 @@ internal class ConversationDictationRestartOwner {
         lastTeardownAtElapsedMillis = now
     }
 
-    fun noteNoSpeech(rapid: Boolean, limit: Int): Boolean {
+    fun noteNoSpeech(
+        rapid: Boolean,
+        limit: Int,
+    ): Boolean {
         consecutiveNoSpeech = if (rapid) consecutiveNoSpeech + 1 else 0
         return consecutiveNoSpeech >= limit
     }
@@ -55,8 +61,11 @@ internal class ConversationDictationRestartOwner {
         return true
     }
 
-    fun nextDisconnectDelay(delays: LongArray): Long? =
-        delays.getOrNull(disconnectRetries)?.also { disconnectRetries += 1 }
+    fun nextDisconnectDelay(delays: LongArray): Long? {
+        val delay = delays.getOrNull(disconnectRetries)
+        if (delay != null) disconnectRetries += 1
+        return delay
+    }
 
     fun resetPolicy() {
         consecutiveNoSpeech = 0
