@@ -111,6 +111,7 @@ val stageMarmotKitApiSignature =
         description = "Stage the inspectable MarmotKit API signature for review and CI"
         dependsOn(prepareMarmotKitArtifact)
         from(marmotKitPreparedDir.resolve("marmotkit-api-signature.txt"))
+        from(marmotKitPreparedDir.resolve("native-provenance.json"))
         into(layout.buildDirectory.dir("reports/marmotkit"))
     }
 

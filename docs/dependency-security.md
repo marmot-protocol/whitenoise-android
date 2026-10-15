@@ -14,6 +14,56 @@ Gradle CI jobs upload their own reports; there is no additional build/test matri
 The report represents resolutions observed by that job, not every configuration
 or the R8-retained APK. Native MarmotKit requires its own target/feature inventory.
 
+## Distribution and native inventories
+
+The same hook fingerprints external module artifacts on each already-selected
+configuration; it adds no configurations or compilation tasks. Cached adjacent
+POMs supply declared licence names/URLs and their POM hashes when available.
+Missing declarations remain `not_observed`; a Maven namespace is a supplier hint,
+not verified legal ownership. These records are observations, not dependency locks
+or a replacement for the existing licence/notices generator.
+
+After the existing security-floor validator succeeds, CI writes
+`build/reports/dependency-security/inventory/selected.json`. The existing
+`dependency-security-*` artifacts retain it alongside the raw observations.
+Only `:app`'s `productionPlayReleaseRuntimeClasspath` and
+`productionZapstoreReleaseRuntimeClasspath` enter `release_runtime`.
+Plugin and named test/analysis configurations enter `tooling_test`; other graphs,
+including debug runtime and compile classpaths, stay in `other_configurations`.
+A job that never resolved a release runtime graph does not claim to have one.
+Reports from another source, failed resolution or conflicting selections for the
+same configuration are rejected before inventory output.
+
+MarmotKit preparation stages `native-provenance.json` with the API signature.
+It binds the complete Android lock hash, upstream source/artifact/manifest hashes,
+ABI/target pairs and verified JNI hashes. Features declared only by the Android
+lock remain distinct from upstream manifest attestation. Workspace Cargo.lock
+identity does **not** establish the Android crate link set or licences; absent
+upstream target-resolved evidence remains explicitly unverified.
+
+The existing production build additionally uploads
+`dependency-inventory-production-<source>-<run>-<attempt>`. Its
+`inventory/release.json` requires both release runtime graphs, matching source and
+lock identities, exact APK/AAB and mapping hashes from the release manifest, and
+matching packaged MarmotKit bytes for the direct APK's one ABI and Play's four.
+Other packaged native libraries are hashed but remain unattributed unless their
+supplier is established. R8 mappings are retained evidence, not proof of retained
+Maven classes. No release payload, signature or distribution permission changes.
+
+To compare two downloaded inventories, identify both expected source commits:
+
+```sh
+python3 scripts/dependency_inventory.py compare \
+  --before before.json --before-source <base-commit> \
+  --after after.json --after-source <candidate-commit> --output delta.json
+```
+
+The delta records selected additions/removals with purpose and supplier namespace,
+plus artifact-byte changes, including changes at the same coordinate. It rejects
+wrong source identities or different observed configuration coverage: an absent
+graph is not evidence of a removal. CI does not manufacture a baseline or claim
+an empty delta when no comparable earlier artifact is available.
+
 ## Reviewed floors
 
 | Module family | Minimum | Advisory |

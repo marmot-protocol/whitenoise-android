@@ -1,7 +1,12 @@
 import copy
+import json
+from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 from scripts.verify_dependency_security import InvalidEvidence, below, unsafe_prerelease, verify
+from scripts import verify_dependency_security as validator
 
 
 class SelectedSecurityEvidenceTest(unittest.TestCase):
@@ -48,6 +53,21 @@ class SelectedSecurityEvidenceTest(unittest.TestCase):
             self.report["components"] = [{"group": "com.squareup.wire", "name": "wire-runtime", "version": version}]
             with self.assertRaises(InvalidEvidence):
                 verify(self.report, {wire: "6.4.5"}, prereleases={wire: "7.0.0-alpha04"})
+
+    def test_inventory_does_not_bypass_security_floor_verification(self):
+        """A usable inventory is not permission to select a vulnerable dependency."""
+        self.report["artifacts"] = []
+        self.report["components"][0]["version"] = "2.3.32"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); reports = root / "reports"; reports.mkdir()
+            (reports / "selected.json").write_text(json.dumps(self.report))
+            policy = root / "policy.json"
+            policy.write_text(json.dumps({"schema": 1, "minimum_versions": self.policy}))
+            output = reports / "inventory" / "selected.json"
+            with mock.patch("sys.argv", ["verify", str(reports), "--policy", str(policy), "--inventory", str(output)]), \
+                 mock.patch.object(validator.subprocess, "check_output", return_value="a" * 40):
+                self.assertEqual(validator.main(), 1)
+            self.assertFalse(output.exists())
 
     def test_does_not_treat_fixed_prerelease_as_stable_fix(self):
         self.assertTrue(below("2.3.35-rc1", "2.3.35"))

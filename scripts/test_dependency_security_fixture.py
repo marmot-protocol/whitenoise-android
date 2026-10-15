@@ -12,16 +12,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def module(repository, artifact, version, group='org.freemarker'):
+    """Create a local Maven dependency with bytes and a declared fixture licence."""
     folder = repository / group.replace('.', '/') / artifact / version
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f'{artifact}-{version}.pom').write_text(
         f'<project><modelVersion>4.0.0</modelVersion><groupId>{group}</groupId>'
-        f'<artifactId>{artifact}</artifactId><version>{version}</version></project>')
+        f'<artifactId>{artifact}</artifactId><version>{version}</version>'
+        '<licenses><license><name>Fixture licence</name><url>https://example.invalid/license</url>'
+        '</license></licenses></project>')
     with zipfile.ZipFile(folder / f'{artifact}-{version}.jar', 'w'):
         pass
 
 
 def main():
+    """Exercise selection, file fingerprints and cached POMs without compiling an app."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--gradle', type=Path, default=ROOT / 'gradlew')
     args = parser.parse_args()
@@ -104,6 +108,10 @@ tasks.register('verifySecurityFixture') {
         reports = [json.loads(path.read_text()) for path in (project / 'build/reports/dependency-security').glob('*.json')]
         assert any(r['scope'] == 'plugin' and r['configuration'] == 'classpath' for r in reports)
         assert any(r['scope'] == 'project' and r['configuration'] == 'belowFloor' for r in reports)
+        selected_report = next(r for r in reports if r['configuration'] == 'belowFloor')
+        assert selected_report['artifacts'][0]['coordinate'] == 'org.freemarker:freemarker:2.3.35'
+        assert len(selected_report['artifacts'][0]['sha256']) == 64
+        assert selected_report['components'][0]['licenses'][0]['name'] == 'Fixture licence'
         print('Gradle fixture PASS: raised exact request, retained newer/dynamic selection, '
               'rejected affected-only range and unsafe Wire alpha/suffixes, plugin/project reports')
 

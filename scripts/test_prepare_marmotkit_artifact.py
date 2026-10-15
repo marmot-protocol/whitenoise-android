@@ -597,6 +597,24 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         self.assertEqual(sleep.call_args_list, [mock.call(1), mock.call(2)])
         self.assertFalse(destination.exists())
 
+    def test_native_provenance_binds_lock_and_verified_libraries_without_reachability_claim(self) -> None:
+        """A warm cache regenerates provenance for the exact lock and native bytes."""
+        self.write_archive()
+        self.write_lock()
+        output = self.prepare()
+        path = output / "native-provenance.json"
+        record = json.loads(path.read_text())
+        self.assertEqual(record["lock_sha256"], PREPARE.sha256(self.lock))
+        self.assertEqual(record["source_sha"], SOURCE_SHA)
+        self.assertEqual(record["artifact_sha256"], PREPARE.sha256(self.archive))
+        self.assertEqual(record["crate_reachability"]["status"], "unverified")
+        self.assertEqual(record["features"]["status"], "unverified")
+        for library in record["libraries"]:
+            self.assertEqual(library["sha256"], PREPARE.sha256(output / "jniLibs" / library["abi"] / "libmarmot_uniffi.so"))
+        path.write_text('{"source_sha":"wrong"}')
+        self.prepare()
+        self.assertEqual(json.loads(path.read_text()), record)
+
     def test_api_signature_count_drift_fails_closed(self) -> None:
         self.write_archive()
         self.write_lock()

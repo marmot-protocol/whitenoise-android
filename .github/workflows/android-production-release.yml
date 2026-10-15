@@ -140,6 +140,20 @@ jobs:
           EXPECTED_VERSION: ${{ inputs.expected_version }}
         run: ./scripts/prepare-production-release.sh --expected-version "$EXPECTED_VERSION"
 
+      - name: Record release dependency and native inventories
+        run: |
+          python3 scripts/verify_dependency_security.py build/reports/dependency-security
+          python3 scripts/dependency_inventory.py release --bundle build/production-release \
+            --output build/reports/dependency-security/inventory/release.json
+
+      - name: Retain release dependency inventory
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-inventory-production-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/reports/dependency-security/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload verified release bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

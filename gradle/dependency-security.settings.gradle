@@ -4,6 +4,49 @@ import org.gradle.api.GradleException
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult
+import java.security.MessageDigest
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
+
+/** Fingerprint selected files and read only already-cached licence declarations. */
+class DependencyInventoryFiles {
+    /** Hash artifact bytes without loading complete archives into the Gradle heap. */
+    static String sha256(File file) {
+        def digest = MessageDigest.getInstance('SHA-256')
+        file.withInputStream { stream ->
+            byte[] buffer = new byte[1024 * 1024]
+            int count
+            while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
+        }
+        return digest.digest().encodeHex().toString()
+    }
+
+    /** Inspect adjacent cached POMs without fetching metadata or resolving another graph. */
+    static List licenses(File artifact, String module, String version) {
+        def parents = [artifact.parentFile]
+        def siblings = artifact.parentFile.parentFile?.listFiles()
+        parents.addAll((siblings ?: []).findAll { it.isDirectory() })
+        def declarations = []
+        parents.unique().each { parent ->
+            def pom = new File(parent, "${module}-${version}.pom")
+            if (pom.isFile() && pom.length() <= 256 * 1024) {
+                def factory = DocumentBuilderFactory.newInstance()
+                factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+                factory.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true)
+                factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, '')
+                factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, '')
+                def nodes = factory.newDocumentBuilder().parse(pom).getElementsByTagName('license')
+                for (int index = 0; index < nodes.length; index++) {
+                    def node = nodes.item(index)
+                    def name = node.getElementsByTagName('name').item(0)?.textContent?.trim() ?: ''
+                    def url = node.getElementsByTagName('url').item(0)?.textContent?.trim() ?: ''
+                    declarations.add([name: name, url: url, pom_sha256: sha256(pom)])
+                }
+            }
+        }
+        return declarations.unique().sort { a, b -> "${a.name}:${a.url}:${a.pom_sha256}" <=> "${b.name}:${b.url}:${b.pom_sha256}" }
+    }
+}
 
 // No dependencies are added here. Only existing requests for affected modules
 // are raised, before metadata is downloaded (including project plugin classpaths).
@@ -88,20 +131,32 @@ gradle.beforeProject { project ->
             }
         }
         configuration.incoming.afterResolve { dependencies ->
+            // Resolve files only on this already-selected configuration; never create a graph.
+            def unresolved = dependencies.resolutionResult.allDependencies
+                .findAll { it instanceof UnresolvedDependencyResult }
+                .collect { it.requested.displayName }.sort()
+            def artifacts = unresolved.isEmpty() ? configuration.incoming.artifacts.artifacts
+                .findAll { it.id.componentIdentifier instanceof ModuleComponentIdentifier }
+                .collect { artifact ->
+                    def id = artifact.id.componentIdentifier
+                    [coordinate: "${id.group}:${id.module}:${id.version}".toString(),
+                     name: artifact.file.name, sha256: DependencyInventoryFiles.sha256(artifact.file),
+                     bytes: artifact.file.length(),
+                     licenses: DependencyInventoryFiles.licenses(artifact.file, id.module, id.version)]
+                }.sort { a, b -> "${a.coordinate}:${a.name}" <=> "${b.coordinate}:${b.name}" } : []
             def components = dependencies.resolutionResult.allComponents
                 .findAll { it.id instanceof ModuleComponentIdentifier }
                 .collect { component ->
                     [group: component.id.group, name: component.id.module,
                      version: component.id.version,
-                     reasons: component.selectionReason.descriptions.collect { it.description }.sort()]
+                     reasons: component.selectionReason.descriptions.collect { it.description }.sort(),
+                     licenses: artifacts.findAll { it.coordinate == "${component.id.group}:${component.id.module}:${component.id.version}" }
+                         .collectMany { it.licenses }.unique()]
                 }.sort { a, b -> "${a.group}:${a.name}:${a.version}" <=> "${b.group}:${b.name}:${b.version}" }
             def edges = dependencies.resolutionResult.allDependencies
                 .findAll { it instanceof ResolvedDependencyResult }
                 .collect { edge -> [from: edge.from.id.displayName, to: edge.selected.id.displayName] }
                 .sort { a, b -> "${a.from}:${a.to}" <=> "${b.from}:${b.to}" }
-            def unresolved = dependencies.resolutionResult.allDependencies
-                .findAll { it instanceof UnresolvedDependencyResult }
-                .collect { it.requested.displayName }.sort()
             def violations = components.findAll { component ->
                 def minimum = minimums["${component.group}:${component.name}".toString()]
                 def coordinate = "${component.group}:${component.name}".toString()
@@ -114,6 +169,7 @@ gradle.beforeProject { project ->
             new File(reportDir, "${name}.json").text = JsonOutput.prettyPrint(JsonOutput.toJson(
                 [schema: 1, source_sha: sourceSha, project: project.path, scope: scope,
                  configuration: configuration.name, components: components,
+                 artifacts: artifacts, artifact_coverage: unresolved.isEmpty() ? 'resolved_configuration' : 'failed',
                  edges: edges, unresolved: unresolved, violations: violations])) + '\n'
             if (!violations.isEmpty()) {
                 throw new GradleException("Vulnerable dependency selected in ${project.path}:${configuration.name}")
