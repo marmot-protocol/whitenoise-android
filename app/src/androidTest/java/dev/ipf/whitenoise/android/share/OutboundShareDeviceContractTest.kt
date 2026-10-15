@@ -39,6 +39,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -160,7 +161,7 @@ class OutboundShareDeviceContractTest {
         val device = UiDevice.getInstance(instrumentation)
         try {
             instrumentation.runOnMainSync { context.startActivity(chooser) }
-            findIndependentReceiver(device).click()
+            tapIndependentReceiver(device)
             val (code, observed) = withTimeout(10_000) { result.await() }
             assertEquals(Activity.RESULT_OK, code)
             assertEquals(
@@ -176,6 +177,19 @@ class OutboundShareDeviceContractTest {
         } finally {
             if (!result.isCompleted) device.pressBack()
         }
+    }
+
+    /**
+     * Taps the receiver until the Sharesheet hands off to it. On the run's first open the sheet can drop a tap
+     * while it is still laying out, which left the receiver unlaunched and its result never sent. Only a sheet
+     * that is still showing is tapped again, so a tap that did launch the receiver is never repeated.
+     */
+    private fun tapIndependentReceiver(device: UiDevice) {
+        repeat(RECEIVER_TAP_ATTEMPTS) {
+            findIndependentReceiver(device).click()
+            if (device.wait(Until.gone(By.pkg(SYSTEM_CHOOSER)), CHOOSER_HANDOFF_MS)) return
+        }
+        fail("System Sharesheet ignored $RECEIVER_TAP_ATTEMPTS taps on the independent receiver")
     }
 
     /** Expands and scrolls the actual system sheet when its initial suggested row hides the receiver. */
@@ -224,6 +238,8 @@ class OutboundShareDeviceContractTest {
     private companion object {
         const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
         const val FIXTURE_CAPTION = "Visible fixture caption"
+        const val RECEIVER_TAP_ATTEMPTS = 3
+        const val CHOOSER_HANDOFF_MS = 3_000L
         val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
     }
 
