@@ -49,6 +49,27 @@ class DependencyInventoryTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 inventory.selected_inventory([candidate], SOURCE)
 
+    def test_non_regular_artifacts_remain_explicit_in_comparison_coverage(self):
+        """Transformed directories cannot abort observations or pretend to be hashed archives."""
+        candidate = report()
+        candidate['artifacts'] = []
+        candidate['artifact_coverage'] = 'partial_non_regular_artifacts'
+        opaque = {'coordinate': 'example:library:1', 'name': 'classes', 'kind': 'directory',
+                  'reason': 'Transformed directory is not a regular archive'}
+        candidate['unfingerprinted_artifacts'] = [opaque]
+        selected = inventory.selected_inventory([candidate], SOURCE)
+        self.assertEqual([opaque], selected['release_runtime']['play']['unfingerprinted_artifacts'])
+        delta = inventory.compare(selected, selected, SOURCE, SOURCE)
+        self.assertEqual(len(delta["artifact_comparison_unavailable"]), 1)
+        self.assertEqual(delta["changed_artifacts"], [])
+        for mutate in [lambda r: r.update(unfingerprinted_artifacts=[]),
+                       lambda r: r['unfingerprinted_artifacts'][0].update(sha256='a' * 64),
+                       lambda r: r['unfingerprinted_artifacts'][0].update(coordinate='example:other:1')]:
+            changed = copy.deepcopy(candidate)
+            mutate(changed)
+            with self.assertRaises(ValueError):
+                inventory.selected_inventory([changed], SOURCE)
+
     def test_rejects_conflicting_observations_for_same_configuration(self):
         """Changed selection cannot be hidden by last-file-wins merging."""
         changed = report(); changed["components"][0]["version"] = "2"
@@ -93,8 +114,9 @@ class DependencyInventoryTest(unittest.TestCase):
             provenance = {"schema": 1, "lock_sha256": inventory.digest(lock), "source": properties["source"],
                           "source_sha": properties["mdk-sha"], "artifact_id": properties["artifact-id"],
                           "artifact_sha256": properties["artifact-sha256"],
-                          "features": {"android_lock": sorted(properties["features"].split(","))},
-                          "libraries": [{"abi": abi, "sha256": native_sha} for abi in abis]}
+                          "features": {"android_lock": sorted(properties["features"].split(",")),
+                                       "upstream_manifest": None, "status": "unverified"},
+                          "libraries": [{"abi": abi, "target": inventory.ABI_TARGETS[abi], "sha256": native_sha} for abi in abis]}
             provenance_path = root / "native.json"; provenance_path.write_text(json.dumps(provenance))
             version = "2026.10.15"; files = {}
             for distribution, suffix in [("play", "play.aab"), ("zapstore", "arm64-v8a.apk")]:
@@ -124,7 +146,7 @@ class DependencyInventoryTest(unittest.TestCase):
                 (root / f"whitenoise-android-{version}-play.aab").write_bytes(b"changed")
                 self.assertEqual(inventory.main(), 1)
 
-    def test_delta_requires_same_configuration_coverage_and_expected_sources(self):
+    def test_delta_compares_shared_coverage_and_requires_expected_sources(self):
         """A missing configuration is not evidence that dependencies were removed."""
         before = inventory.selected_inventory([report()], SOURCE)
         after_report = report(); after_report["source_sha"] = "c" * 40
@@ -138,8 +160,44 @@ class DependencyInventoryTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             inventory.compare(before, after, "d" * 40, "c" * 40)
         extra = inventory.selected_inventory([after_report, report("testRuntimeClasspath") | {"source_sha": "c" * 40}], "c" * 40)
+        delta = inventory.compare(before, extra, SOURCE, "c" * 40)
+        self.assertEqual(delta["coverage"]["newly_observed"][0]["configuration"], "testRuntimeClasspath")
+        self.assertEqual(len(delta["removed"]), 1)
+        reverse = inventory.compare(extra, before, "c" * 40, SOURCE)
+        self.assertEqual(len(reverse["coverage"]["no_longer_observed"]), 1)
+
+    def test_delta_retains_incoming_edges_reasons_and_native_packaging_changes(self):
+        """Graph intent and a native-only bump must remain visible in the delta."""
+        candidate = report()
+        candidate["edges"] = [{"from": "project :app", "to": "example:library:1", "requested": "example:library:1"}]
+        selected = inventory.selected_inventory([candidate], SOURCE)
+        component = selected["release_runtime"]["play"]["components"][0]
+        self.assertEqual(component["selection_reasons"], ["requested"])
+        self.assertEqual(component["requested_by"], candidate["edges"])
+        before = copy.deepcopy(selected)
+        before.update(native={"artifact_sha256": "b" * 64}, packaging={"play": {"sha256": "c" * 64}})
+        after = copy.deepcopy(selected)
+        after.update(native={"artifact_sha256": "d" * 64}, packaging={"play": {"sha256": "e" * 64}})
+        after["release_runtime"]["play"]["edges"].append({"from": "project :other", "to": "project :app"})
+        delta = inventory.compare(before, after, SOURCE, SOURCE)
+        self.assertTrue(delta["native"]["changed"])
+        self.assertTrue(delta["packaging"]["changed"])
+        self.assertEqual(len(delta["changed_edges"]), 1)
+        self.assertEqual(inventory.compare(selected, before, SOURCE, SOURCE)["native"]["status"], "unavailable")
+
+    def test_rejects_malformed_licences_and_unsupported_schema(self):
+        """Invalid attribution and schema identities cannot enter an inventory."""
+        for value in [None, [{}], [{"name": "Example", "url": "url", "pom_sha256": "bad"}]]:
+            candidate = report()
+            candidate["components"][0]["licenses"] = value
+            with self.assertRaises(ValueError):
+                inventory.selected_inventory([candidate], SOURCE)
+        candidate = report(); candidate["schema"] = 2
         with self.assertRaises(ValueError):
-            inventory.compare(before, extra, SOURCE, "c" * 40)
+            inventory.selected_inventory([candidate], SOURCE)
+        selected = inventory.selected_inventory([report()], SOURCE); selected["schema"] = 2
+        with self.assertRaises(ValueError):
+            inventory.compare(selected, selected, SOURCE, SOURCE)
 
     def test_delta_ignores_cache_only_licence_metadata_when_artifact_bytes_match(self):
         """Warm POM observations do not imply a changed JAR/AAR payload."""
@@ -166,8 +224,8 @@ class DependencyInventoryTest(unittest.TestCase):
             native_sha = hashlib.sha256(library).hexdigest()
             provenance = {"schema": 1, "lock_sha256": "d" * 64, "source": "marmot-protocol/mdk",
                           "source_sha": "e" * 40, "artifact_sha256": "f" * 64,
-                          "artifact_id": "1", "features": {"android_lock": ["feature"]},
-                          "libraries": [{"abi": abi, "sha256": native_sha}
+                          "artifact_id": "1", "features": {"android_lock": ["feature"], "upstream_manifest": None, "status": "unverified"},
+                          "libraries": [{"abi": abi, "target": inventory.ABI_TARGETS[abi], "sha256": native_sha}
                                         for abi in ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")]}
             for distribution, suffix, entry in [("zapstore", "apk", "lib/arm64-v8a/libmarmot_uniffi.so"),
                                                   ("play", "aab", "base/lib/arm64-v8a/libmarmot_uniffi.so")]:
@@ -195,9 +253,38 @@ class DependencyInventoryTest(unittest.TestCase):
             lock = {"source": provenance["source"], "mdk-sha": provenance["source_sha"],
                     "artifact-sha256": provenance["artifact_sha256"], "artifact-id": "1", "features": "feature"}
             inventory.release_inventory(selected, provenance, payloads, mappings, "d" * 64, lock)
+            mismatch = copy.deepcopy(provenance)
+            mismatch["features"].update(upstream_manifest=["other"], status="matched_manifest")
+            with self.assertRaisesRegex(ValueError, "manifest features"):
+                inventory.release_inventory(selected, mismatch, payloads, mappings, "d" * 64, lock)
+            for mutate in [lambda p: p["libraries"].pop(),
+                           lambda p: p["libraries"][0].update(target="wrong-target"),
+                           lambda p: p.update(schema=2)]:
+                invalid = copy.deepcopy(provenance); mutate(invalid)
+                with self.assertRaises(ValueError):
+                    inventory.release_inventory(selected, invalid, payloads, mappings, "d" * 64, lock)
             for key, value in [("mdk-sha", "0" * 40), ("artifact-sha256", "0" * 64), ("features", "other")]:
                 with self.assertRaises(ValueError):
                     inventory.release_inventory(selected, provenance, payloads, mappings, "d" * 64, lock | {key: value})
+    def test_native_paths_and_packaged_abi_coverage_fail_closed(self):
+        """Accept standard C++ library names but reject malformed paths and missing ABIs."""
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "fixture.apk"
+            library = b"JNI"
+            provenance = {"libraries": [{"abi": "arm64-v8a", "sha256": hashlib.sha256(library).hexdigest()}]}
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("lib/arm64-v8a/libmarmot_uniffi.so", library)
+                archive.writestr("lib/arm64-v8a/libc++_shared.so", b"C++")
+            self.assertEqual(len(inventory.packaged_native(path, "zapstore", provenance)), 2)
+            with zipfile.ZipFile(path, "a") as archive:
+                archive.writestr("lib/arm64-v8a/nested/bad.so", b"bad")
+            with self.assertRaisesRegex(ValueError, "Malformed packaged native path"):
+                inventory.packaged_native(path, "zapstore", provenance)
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("lib/arm64-v8a/libc++_shared.so", b"C++")
+            with self.assertRaisesRegex(ValueError, "ABI set"):
+                inventory.packaged_native(path, "zapstore", provenance)
+
 
 
 if __name__ == "__main__":

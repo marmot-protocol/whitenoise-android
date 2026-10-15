@@ -69,6 +69,23 @@ class SelectedSecurityEvidenceTest(unittest.TestCase):
                 self.assertEqual(validator.main(), 1)
             self.assertFalse(output.exists())
 
+    def test_inventory_cli_success_retains_verified_plugin_selection(self):
+        """Exercise CI's successful export seam after selected-version validation."""
+        self.report["artifacts"] = [{"coordinate": "org.freemarker:freemarker:2.3.35", "name": "freemarker.jar",
+                                     "sha256": "b" * 64, "bytes": 12}]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); reports = root / "reports"; reports.mkdir()
+            (reports / "selected.json").write_text(json.dumps(self.report))
+            policy = root / "policy.json"
+            policy.write_text(json.dumps({"schema": 1, "minimum_versions": self.policy}))
+            output = reports / "inventory" / "selected.json"
+            with mock.patch("sys.argv", ["verify", str(reports), "--policy", str(policy), "--inventory", str(output)]), \
+                 mock.patch.object(validator.subprocess, "check_output", return_value="a" * 40):
+                self.assertEqual(validator.main(), 0)
+            selected = json.loads(output.read_text())
+            self.assertEqual(selected["source_sha"], "a" * 40)
+            self.assertEqual(selected["tooling_test"][0]["components"][0]["coordinate"], "org.freemarker:freemarker:2.3.35")
+
     def test_does_not_treat_fixed_prerelease_as_stable_fix(self):
         self.assertTrue(below("2.3.35-rc1", "2.3.35"))
         self.assertTrue(below("2.3.9", "2.3.35"))

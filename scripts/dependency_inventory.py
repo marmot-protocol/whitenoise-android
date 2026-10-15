@@ -12,16 +12,12 @@ import zipfile
 
 if __package__:
     from .verify_dependency_security import verify
-    from .prepare_marmotkit_artifact import parse_properties
+    from .prepare_marmotkit_artifact import ABI_TARGETS, parse_properties
+    from .release_bundle import require, sha256 as digest, validate_version
 else:
     from verify_dependency_security import verify
-    from prepare_marmotkit_artifact import parse_properties
-
-
-def require(condition, message):
-    """Reject evidence that cannot support the requested inventory claim."""
-    if not condition:
-        raise ValueError(message)
+    from prepare_marmotkit_artifact import ABI_TARGETS, parse_properties
+    from release_bundle import require, sha256 as digest, validate_version
 
 
 def stream_digest(stream):
@@ -30,12 +26,6 @@ def stream_digest(stream):
     for block in iter(lambda: stream.read(1024 * 1024), b""):
         result.update(block)
     return result.hexdigest()
-
-
-def digest(path):
-    """Hash existing payloads incrementally, including large APKs and native files."""
-    with path.open("rb") as stream:
-        return stream_digest(stream)
 
 
 def fingerprint(path):
@@ -84,6 +74,10 @@ def selected_inventory(reports, source):
             continue
         seen[key] = report
         layer, distribution = purpose(report)
+        edges = report.get("edges", [])
+        require(isinstance(edges, list) and all(isinstance(edge, dict) and
+                isinstance(edge.get("from"), str) and isinstance(edge.get("to"), str) and
+                isinstance(edge.get("requested", ""), str) for edge in edges), "Malformed dependency edges")
         components = []
         coordinates = set()
         for component in report["components"]:
@@ -96,9 +90,15 @@ def selected_inventory(reports, source):
                     isinstance(x.get("name"), str) and isinstance(x.get("url"), str) and
                     re.fullmatch(r"[a-f0-9]{64}", x.get("pom_sha256", "")) for x in licenses),
                     "Malformed licence evidence")
+            reasons = component.get("reasons", [])
+            require(isinstance(reasons, list) and all(isinstance(reason, str) for reason in reasons),
+                    "Malformed selection reasons")
             components.append({"coordinate": coordinate, "supplier": component["group"],
                                "supplier_basis": "Maven namespace, not verified legal ownership",
-                               "purpose": layer, "licenses": licenses,
+                               "purpose": layer, "selection_reasons": sorted(reasons),
+                               "requested_by": sorted([edge for edge in edges if edge["to"] == coordinate],
+                                                      key=lambda edge: json.dumps(edge, sort_keys=True)),
+                               "licenses": licenses,
                                "license_status": "declared_in_cached_pom" if licenses else "not_observed"})
         artifacts = report.get("artifacts")
         require(isinstance(artifacts, list), "Dependency artifact evidence missing")
@@ -112,7 +112,18 @@ def selected_inventory(reports, source):
                  "components": sorted(components, key=lambda x: x["coordinate"]),
                  "artifacts": sorted(artifacts, key=lambda x: (x["coordinate"], x["name"])),
                  "artifact_coverage": report.get("artifact_coverage", "observed"),
-                 "edges": report.get("edges", [])}
+                 "edges": edges}
+        unfingerprinted = report.get("unfingerprinted_artifacts", [])
+        require(isinstance(unfingerprinted, list) and all(isinstance(item, dict) and
+                item.get("coordinate") in coordinates and isinstance(item.get("name"), str) and item["name"] and
+                item.get("kind") in {"directory", "non_regular"} and isinstance(item.get("reason"), str) and
+                item["reason"] and "sha256" not in item and "bytes" not in item for item in unfingerprinted),
+                "Malformed unfingerprinted artifact evidence")
+        require(bool(unfingerprinted) == (entry["artifact_coverage"] == "partial_non_regular_artifacts"),
+                "Partial artifact coverage requires explicit unfingerprinted evidence")
+        if unfingerprinted:
+            entry["unfingerprinted_artifacts"] = sorted(unfingerprinted,
+                                                        key=lambda x: (x["coordinate"], x["name"], x["kind"]))
         if distribution:
             result[layer][distribution] = entry
         else:
@@ -124,41 +135,78 @@ def observations(inventory):
     """Index selections by configuration, preventing cross-scope delta comparisons."""
     require(inventory.get("schema") == 1, "Unsupported inventory schema")
     entries = list(inventory["release_runtime"].values()) + inventory["tooling_test"] + inventory["other_configurations"]
+    # Schema 1 captures made before usage enrichment had no reasons/requesters.
+    entries = [{**entry, "components": [{**component,
+        "selection_reasons": component.get("selection_reasons", []),
+        "requested_by": component.get("requested_by", sorted(
+            [edge for edge in entry["edges"] if edge["to"] == component["coordinate"]],
+            key=lambda edge: json.dumps(edge, sort_keys=True)))} for component in entry["components"]]}
+        for entry in entries]
     reports = []
     for entry in entries:
         components = []
         for component in entry["components"]:
             parts = component["coordinate"].split(":")
             require(len(parts) == 3 and all(parts), "Malformed inventory coordinate")
-            components.append(dict(zip(("group", "name", "version"), parts)) | {"licenses": component["licenses"]})
+            components.append(dict(zip(("group", "name", "version"), parts)) | {"licenses": component["licenses"], "reasons": component.get("selection_reasons", [])})
         reports.append({**entry, "schema": 1, "source_sha": inventory["source_sha"],
                         "components": components, "violations": [], "unresolved": []})
     validated = selected_inventory(reports, inventory["source_sha"])
+    normalized = {(entry["project"], entry["scope"], entry["configuration"]): entry for entry in entries}
     for layer in ("release_runtime", "tooling_test", "other_configurations"):
-        require(validated[layer] == inventory[layer], "Inventory classification or selection metadata mismatch")
+        original = inventory[layer]
+        if isinstance(original, dict):
+            expected = {key: normalized[(row["project"], row["scope"], row["configuration"])]
+                        for key, row in original.items()}
+        else:
+            expected = [normalized[(row["project"], row["scope"], row["configuration"])] for row in original]
+        require(validated[layer] == expected, "Inventory classification or selection metadata mismatch")
     return {(x["project"], x["scope"], x["configuration"]): x for x in entries}
 
 
 def compare(before, after, before_source, after_source):
-    """Return additions/removals only for matching observed configuration coverage."""
+    """Compare shared graphs and report observation gaps separately from removals."""
     require(before.get("source_sha") == before_source and after.get("source_sha") == after_source,
             "Inventory delta source mismatch")
     old, new = observations(before), observations(after)
-    require(old.keys() == new.keys(), "Inventory delta requires identical configuration coverage")
-    changes = {"schema": 1, "before_source": before_source, "after_source": after_source, "added": [], "removed": [],
-               "changed_artifacts": []}
-    for key in sorted(old):
+    def configuration(key):
+        """Keep a configuration's scope attached to every comparison result."""
+        return dict(zip(("project", "scope", "configuration"), key))
+    changes = {"schema": 1, "before_source": before_source, "after_source": after_source,
+               "coverage": {"newly_observed": [configuration(k) for k in sorted(new.keys() - old.keys())],
+                            "no_longer_observed": [configuration(k) for k in sorted(old.keys() - new.keys())]},
+               "added": [], "removed": [], "changed_artifacts": [], "changed_edges": [],
+               "artifact_comparison_unavailable": []}
+    for key in sorted(old.keys() & new.keys()):
         previous = {x["coordinate"]: x for x in old[key]["components"]}
         current = {x["coordinate"]: x for x in new[key]["components"]}
         for side, values, other in [("removed", previous, current), ("added", current, previous)]:
-            changes[side].extend({**values[c], "configuration": key[2], "project": key[0], "scope": key[1]}
+            changes[side].extend({**values[c], **configuration(key)}
                                  for c in sorted(values.keys() - other.keys()))
+        previous_edges = {json.dumps(edge, sort_keys=True) for edge in old[key]["edges"]}
+        current_edges = {json.dumps(edge, sort_keys=True) for edge in new[key]["edges"]}
+        if previous_edges != current_edges:
+            changes["changed_edges"].append({**configuration(key),
+                "added": [json.loads(edge) for edge in sorted(current_edges - previous_edges)],
+                "removed": [json.loads(edge) for edge in sorted(previous_edges - current_edges)]})
+        if old[key].get("unfingerprinted_artifacts") or new[key].get("unfingerprinted_artifacts"):
+            changes["artifact_comparison_unavailable"].append({**configuration(key),
+                "reason": "Artifact delta requires complete regular-file fingerprint coverage"})
+            continue
         identity = ("coordinate", "name", "sha256", "bytes")
         previous_artifacts = [{k: artifact[k] for k in identity} for artifact in old[key]["artifacts"]]
         current_artifacts = [{k: artifact[k] for k in identity} for artifact in new[key]["artifacts"]]
         if previous_artifacts != current_artifacts:
-            changes["changed_artifacts"].append({"configuration": key[2], "project": key[0], "scope": key[1],
-                                                  "before": previous_artifacts, "after": current_artifacts})
+            changes["changed_artifacts"].append({**configuration(key),
+                                                 "before": previous_artifacts, "after": current_artifacts})
+    for layer in ("native", "packaging"):
+        available = layer in before and layer in after
+        changes[layer] = {"status": "compared" if available else "unavailable",
+                          "before_observed": layer in before, "after_observed": layer in after}
+        if available:
+            changes[layer]["changed"] = before[layer] != after[layer]
+            if changes[layer]["changed"]:
+                changes[layer].update(before=before[layer], after=after[layer])
     return changes
 
 
@@ -173,7 +221,7 @@ def packaged_native(path, distribution, provenance):
         for name in sorted(names):
             if not name.startswith(prefix) or not name.endswith(".so"):
                 continue
-            match = re.fullmatch(re.escape(prefix) + r"([A-Za-z0-9_-]+)/([A-Za-z0-9_.-]+\.so)", name)
+            match = re.fullmatch(re.escape(prefix) + r"([A-Za-z0-9_-]+)/([A-Za-z0-9_.+-]+\.so)", name)
             require(match, "Malformed packaged native path")
             with archive.open(name) as stream:
                 sha = stream_digest(stream)
@@ -195,10 +243,20 @@ def release_inventory(selected, provenance, payloads, mappings, lock_sha, lock_p
     require(re.fullmatch(r"[a-f0-9]{40}", provenance.get("source_sha", "")) and
             re.fullmatch(r"[a-f0-9]{64}", provenance.get("artifact_sha256", "")), "Malformed native provenance")
     libraries = provenance.get("libraries")
-    require(isinstance(libraries, list) and len(libraries) == 4 and
+    require(isinstance(libraries, list) and len(libraries) == 4 and all(isinstance(x, dict) for x in libraries) and
             {x.get("abi") for x in libraries} == {"arm64-v8a", "armeabi-v7a", "x86", "x86_64"} and
-            all(re.fullmatch(r"[a-f0-9]{64}", x.get("sha256", "")) for x in libraries),
+            all(isinstance(x, dict) and x.get("target") == ABI_TARGETS.get(x.get("abi")) and
+                re.fullmatch(r"[a-f0-9]{64}", x.get("sha256", "")) for x in libraries),
             "Malformed native target inventory")
+    features = provenance.get("features", {})
+    selected_features = features.get("android_lock")
+    require(isinstance(selected_features, list) and selected_features and
+            all(isinstance(feature, str) and re.fullmatch(r"[A-Za-z0-9_-]+", feature) for feature in selected_features) and
+            selected_features == sorted(set(selected_features)), "Malformed native feature selection")
+    upstream = features.get("upstream_manifest")
+    require((upstream is None and features.get("status") == "unverified") or
+            (upstream == selected_features and features.get("status") == "matched_manifest"),
+            "Native manifest features differ from Android selection")
     if lock_properties is not None:
         for record_key, lock_key in [("source", "source"), ("source_sha", "mdk-sha"),
                                      ("artifact_sha256", "artifact-sha256"), ("artifact_id", "artifact-id")]:
@@ -251,7 +309,7 @@ def main():
             require(manifest.get("sourceCommit") == source and manifest.get("worktreeDirty") is False,
                     "Release source/clean-worktree evidence mismatch")
             version = manifest["versionName"]
-            require(re.fullmatch(r"20\d{2}\.\d{1,2}\.\d{1,2}", version or ""), "Invalid release version")
+            validate_version(version)
             payloads = {"play": args.bundle / f"whitenoise-android-{version}-play.aab",
                         "zapstore": args.bundle / f"whitenoise-android-{version}-arm64-v8a.apk"}
             mappings = {d: args.bundle / f"mapping-{version}-{d}.txt" for d in payloads}

@@ -615,6 +615,21 @@ class MarmotKitArtifactPreparationTest(unittest.TestCase):
         self.prepare()
         self.assertEqual(json.loads(path.read_text()), record)
 
+    def test_native_manifest_features_must_match_android_lock(self) -> None:
+        """Upstream attestation cannot silently disagree with the Android feature pin."""
+        properties = {"features": "alpha,beta"}
+        self.assertEqual(PREPARE.native_features({"features": ["beta", "alpha"]}, properties)["status"], "matched_manifest")
+        for features in [["alpha"], ["alpha", "alpha"], [], "alpha,beta", [None]]:
+            with self.assertRaises(PREPARE.PreparationError):
+                PREPARE.native_features({"features": features}, properties)
+
+    def test_warm_preparation_validates_cached_bytes_once(self) -> None:
+        """Avoid reading every prepared library twice on an unchanged cache hit."""
+        self.write_archive(); self.write_lock(); self.prepare()
+        with mock.patch.object(PREPARE, "validate_prepared", wraps=PREPARE.validate_prepared) as validate:
+            self.prepare()
+        self.assertEqual(validate.call_count, 1)
+
     def test_api_signature_count_drift_fails_closed(self) -> None:
         self.write_archive()
         self.write_lock()

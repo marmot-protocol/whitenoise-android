@@ -39,6 +39,7 @@ def main():
         for version in wire_versions:
             module(repository, 'wire-runtime', version, group='com.squareup.wire')
         module(repository, 'legacy', '1.0')
+        module(repository, 'directory', '1.0', group='example')
         legacy_pom = repository / 'org/freemarker/legacy/1.0/legacy-1.0.pom'
         legacy_pom.write_text('<!DOCTYPE project [<!ELEMENT project ANY>]>' + legacy_pom.read_text())
         (repository / 'com/squareup/wire/wire-runtime/maven-metadata.xml').write_text(
@@ -96,6 +97,22 @@ configurations {
 dependencies { apiElements 'org.freemarker:freemarker:2.3.32' }
 ''')
         (project / 'build.gradle').write_text(r'''
+import org.gradle.api.artifacts.transform.*
+import org.gradle.api.file.FileSystemLocation
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+
+abstract class FixtureDirectoryTransform implements TransformAction<TransformParameters.None> {
+    @InputArtifact @PathSensitive(PathSensitivity.NONE)
+    abstract Provider<FileSystemLocation> getInputArtifact()
+
+    @Override
+    void transform(TransformOutputs outputs) {
+        new File(outputs.dir('transformed-classes'), 'fixture.txt').text = inputArtifact.get().asFile.name
+    }
+}
+
 buildscript {
     repositories { maven { url = uri('maven') } }
     dependencies { classpath 'org.freemarker:freemarker:2.3.32' }
@@ -114,12 +131,20 @@ repositories {
 }
 configurations {
     belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom
+    directoryArtifact {
+        attributes.attribute(Attribute.of('artifactType', String), 'fixture-directory')
+    }
     projectVariants {
         canBeConsumed = false
         attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_API))
     }
 }
 dependencies {
+    registerTransform(FixtureDirectoryTransform) {
+        from.attribute(Attribute.of('artifactType', String), 'jar')
+        to.attribute(Attribute.of('artifactType', String), 'fixture-directory')
+    }
+    directoryArtifact 'example:directory:1.0'
     belowFloor 'org.freemarker:freemarker:2.3.32'
     newer 'org.freemarker:freemarker:2.3.36'
     dynamic 'org.freemarker:freemarker:2.+'
@@ -138,6 +163,8 @@ tasks.register('verifySecurityFixture') {
                 it.id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier
             }.id.version
         }
+        assert configurations.directoryArtifact.resolve().size() == 1
+        assert configurations.directoryArtifact.resolve().first().isDirectory()
         assert selected(configurations.belowFloor) == '2.3.35'
         assert selected(configurations.newer) == '2.3.36'
         assert selected(configurations.dynamic) == '2.3.36'
@@ -202,6 +229,11 @@ tasks.register('verifySecurityFixture') {
         assert len(selected_report['components'][0]['licenses']) == 1
         legacy_report = next(r for r in reports if r['configuration'] == 'legacyPom')
         assert legacy_report['components'][0]['licenses'] == []
+        directory_report = next(r for r in reports if r['configuration'] == 'directoryArtifact')
+        assert directory_report['artifacts'] == []
+        assert directory_report['artifact_coverage'] == 'partial_non_regular_artifacts'
+        assert directory_report['unfingerprinted_artifacts'][0]['coordinate'] == 'example:directory:1.0'
+        assert directory_report['unfingerprinted_artifacts'][0]['kind'] == 'directory'
         project_report = next(r for r in reports if r['configuration'] == 'projectVariants')
         assert project_report['artifact_coverage'] == 'resolved_configuration'
         assert [a['coordinate'] for a in project_report['artifacts']] == ['org.freemarker:freemarker:2.3.35']

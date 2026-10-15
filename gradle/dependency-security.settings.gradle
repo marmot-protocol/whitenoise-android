@@ -11,18 +11,25 @@ import javax.xml.parsers.DocumentBuilderFactory
 /** Fingerprint selected files and read only already-cached licence declarations. */
 class DependencyInventoryFiles {
     /** Hash artifact bytes without loading complete archives into the Gradle heap. */
-    static String sha256(File file) {
+    private final Map<String, String> hashes = [:]
+
+    /** Reuse immutable cache bytes within this settings/build instance only. */
+    synchronized String sha256(File file) {
+        def key = "${file.canonicalPath}:${file.length()}:${file.lastModified()}".toString()
+        if (hashes.containsKey(key)) return hashes[key]
         def digest = MessageDigest.getInstance('SHA-256')
         file.withInputStream { stream ->
             byte[] buffer = new byte[1024 * 1024]
             int count
             while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
         }
-        return digest.digest().encodeHex().toString()
+        def value = digest.digest().encodeHex().toString()
+        hashes[key] = value
+        return value
     }
 
     /** Inspect adjacent cached POMs without fetching metadata or resolving another graph. */
-    static List licenses(File artifact, String module, String version) {
+    List licenses(File artifact, String module, String version) {
         def parents = [artifact.parentFile]
         def siblings = artifact.parentFile.parentFile?.listFiles()
         parents.addAll((siblings ?: []).findAll { it.isDirectory() })
@@ -112,6 +119,8 @@ try {
     // ZIP/source archives and machines without git retain the floor policy.
 }
 
+def inventoryFiles = new DependencyInventoryFiles()
+
 gradle.beforeProject { project ->
     def install = { configuration, scope ->
         configuration.resolutionStrategy.eachDependency { details ->
@@ -143,16 +152,25 @@ gradle.beforeProject { project ->
             def unresolved = dependencies.resolutionResult.allDependencies
                 .findAll { it instanceof UnresolvedDependencyResult }
                 .collect { it.requested.displayName }.sort()
+            def unfingerprinted = []
             def artifacts = unresolved.isEmpty() ? configuration.incoming.artifactView {
                     componentFilter { it instanceof ModuleComponentIdentifier }
                 }.artifacts.artifacts
                 .collect { artifact ->
                     def id = artifact.id.componentIdentifier
+                    if (!artifact.file.isFile()) {
+                        unfingerprinted.add([
+                            coordinate: "${id.group}:${id.module}:${id.version}".toString(), name: artifact.file.name,
+                            kind: artifact.file.isDirectory() ? 'directory' : 'non_regular',
+                            reason: 'Transformed/non-regular artifact has no regular-file fingerprint'])
+                        return null
+                    }
                     [coordinate: "${id.group}:${id.module}:${id.version}".toString(),
-                     name: artifact.file.name, sha256: DependencyInventoryFiles.sha256(artifact.file),
+                     name: artifact.file.name, sha256: inventoryFiles.sha256(artifact.file),
                      bytes: artifact.file.length(),
-                     licenses: DependencyInventoryFiles.licenses(artifact.file, id.module, id.version)]
-                }.sort { a, b -> "${a.coordinate}:${a.name}" <=> "${b.coordinate}:${b.name}" } : []
+                     licenses: inventoryFiles.licenses(artifact.file, id.module, id.version)]
+                }.findAll { it != null }.sort { a, b -> "${a.coordinate}:${a.name}" <=> "${b.coordinate}:${b.name}" } : []
+            unfingerprinted.sort { a, b -> "${a.coordinate}:${a.name}:${a.kind}" <=> "${b.coordinate}:${b.name}:${b.kind}" }
             def components = dependencies.resolutionResult.allComponents
                 .findAll { it.id instanceof ModuleComponentIdentifier }
                 .collect { component ->
@@ -164,7 +182,7 @@ gradle.beforeProject { project ->
                 }.sort { a, b -> "${a.group}:${a.name}:${a.version}" <=> "${b.group}:${b.name}:${b.version}" }
             def edges = dependencies.resolutionResult.allDependencies
                 .findAll { it instanceof ResolvedDependencyResult }
-                .collect { edge -> [from: edge.from.id.displayName, to: edge.selected.id.displayName] }
+                .collect { edge -> [from: edge.from.id.displayName, to: edge.selected.id.displayName, requested: edge.requested.displayName] }
                 .sort { a, b -> "${a.from}:${a.to}" <=> "${b.from}:${b.to}" }
             def violations = components.findAll { component ->
                 def minimum = minimums["${component.group}:${component.name}".toString()]
@@ -178,7 +196,9 @@ gradle.beforeProject { project ->
             new File(reportDir, "${name}.json").text = JsonOutput.prettyPrint(JsonOutput.toJson(
                 [schema: 1, source_sha: sourceSha, project: project.path, scope: scope,
                  configuration: configuration.name, components: components,
-                 artifacts: artifacts, artifact_coverage: unresolved.isEmpty() ? 'resolved_configuration' : 'failed',
+                 artifacts: artifacts, unfingerprinted_artifacts: unfingerprinted,
+                 artifact_coverage: !unresolved.isEmpty() ? 'failed' :
+                     (unfingerprinted.isEmpty() ? 'resolved_configuration' : 'partial_non_regular_artifacts'),
                  edges: edges, unresolved: unresolved, violations: violations])) + '\n'
             if (!violations.isEmpty()) {
                 throw new GradleException("Vulnerable dependency selected in ${project.path}:${configuration.name}")

@@ -76,7 +76,7 @@ jobs:
           ref: ${{ github.sha }}
 
       - name: Test selected dependency evidence validator
-        run: python3 -m unittest scripts/test_verify_dependency_security.py scripts/test_dependency_inventory.py
+        run: python3 -m unittest scripts/test_verify_dependency_security.py scripts/test_dependency_inventory.py scripts/test_compare_ci_dependency_inventory.py
 
       - name: Test manual release guide and viewport coverage validators
         run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py scripts/test_check_scroll_edge_fades.py scripts/test_check_viewport_restoration_coverage.py scripts/test_paging_trace_report.py
@@ -221,6 +221,9 @@ jobs:
           retention-days: 14
 
   build-contracts:
+    permissions:
+      contents: read
+      actions: read
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
     name: Build contracts (${{ matrix.phase }})
@@ -379,6 +382,18 @@ jobs:
       - name: Verify selected dependency security floors
         if: success()
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
+
+      - name: Compare already-observed dependencies with exact PR base
+        if: success() && github.event_name == 'pull_request' && matrix.phase == 'tooling'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_ARTIFACT: dependency-security-build-contracts-0
+        run: |
+          python3 scripts/compare_ci_dependency_inventory.py --base-source "$BASE_SHA" \
+            --artifact-name "$BASE_ARTIFACT" \
+            --after build/reports/dependency-security/inventory/selected.json \
+            --output build/reports/dependency-security/inventory/base-delta.json
 
       - name: Retain selected dependency security evidence
         if: always()

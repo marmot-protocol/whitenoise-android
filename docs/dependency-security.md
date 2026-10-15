@@ -7,7 +7,7 @@ receive the same policy. It does not add a dependency or downgrade a newer
 release. Metadata and version conflicts remain build failures.
 
 Each resolved configuration writes selected coordinates, selection reasons and
-parent edges under `build/reports/dependency-security`. The validator checks the
+parent edges (including requested selectors) under `build/reports/dependency-security`. The validator checks the
 selected versions independently of the hook's violation field, rejects missing
 or unresolved evidence, and does not invoke Gradle or download anything. Existing
 Gradle CI jobs upload their own reports; there is no additional build/test matrix.
@@ -17,7 +17,7 @@ or the R8-retained APK. Native MarmotKit requires its own target/feature invento
 ## Distribution and native inventories
 
 The same hook fingerprints external module artifacts on each already-selected
-configuration using a component-filtered [artifact view](https://docs.gradle.org/current/userguide/artifact_views.html).
+configuration, memoizing file hashes within the build, using a component-filtered [artifact view](https://docs.gradle.org/current/userguide/artifact_views.html).
 Project components remain in graph edges but are excluded before artifact
 selection, so AGP's task-specific project variants are not selected by this hook.
 It adds no configurations or compilation tasks. Cached adjacent
@@ -43,7 +43,8 @@ same configuration are rejected before inventory output.
 MarmotKit preparation stages `native-provenance.json` with the API signature.
 It binds the complete Android lock hash, upstream source/artifact/manifest hashes,
 ABI/target pairs and verified JNI hashes. Features declared only by the Android
-lock remain distinct from upstream manifest attestation. Workspace Cargo.lock
+lock remain distinct from upstream manifest attestation. If upstream declares
+features, preparation and release export require them to equal the Android pin. Workspace Cargo.lock
 identity does **not** establish the Android crate link set or licences; absent
 upstream target-resolved evidence remains explicitly unverified.
 
@@ -54,7 +55,12 @@ lock identities, exact APK/AAB and mapping hashes from the release manifest, and
 matching packaged MarmotKit bytes for the direct APK's one ABI and Play's four.
 Other packaged native libraries are hashed but remain unattributed unless their
 supplier is established. R8 mappings are retained evidence, not proof of retained
-Maven classes. No release payload, signature or distribution permission changes.
+Maven classes. The verified bundle is uploaded first. Inventory generation and
+retention are observational and warn on failure without changing the successful
+release-run conclusion required by the bundle retrieval tool. This production
+export is not yet qualified on a real signed production bundle; that gap is
+explicit until an authorized release runs it. Payload bytes, signatures and
+distribution permissions are unchanged.
 
 To compare two downloaded inventories, identify both expected source commits:
 
@@ -64,11 +70,23 @@ python3 scripts/dependency_inventory.py compare \
   --after after.json --after-source <candidate-commit> --output delta.json
 ```
 
-The delta records selected additions/removals with purpose and supplier namespace,
-plus artifact-byte changes, including changes at the same coordinate. It rejects
-wrong source identities or different observed configuration coverage: an absent
-graph is not evidence of a removal. CI does not manufacture a baseline or claim
-an empty delta when no comparable earlier artifact is available.
+The delta compares shared configurations, listing newly/missing observations
+separately so an absent graph never becomes a dependency removal. Each component
+retains its configuration purpose, selection reasons and incoming edges/requested
+selectors as observed usage evidence, without inventing a semantic purpose or
+legal supplier. Graph-edge, artifact-byte, native-provenance and packaging changes
+are reported, including changes at the same coordinate. Non-regular artifacts
+make only that configuration's artifact comparison unavailable; other evidence
+remains comparable. Native/packaging layers absent from either input are explicit
+coverage gaps, never empty deltas.
+
+The existing tooling lane runs this comparison against the same lane's retained
+successful `master` push at the exact PR base, using its existing artifact. No
+extra Gradle resolution, build, job or matrix is added. The retained
+`inventory/base-delta.json` binds both source SHAs and the baseline run/artifact.
+Missing or expired baseline evidence yields an `unavailable` receipt; malformed
+or wrong-source evidence fails. The first adoption has no historical inventory
+and therefore cannot claim a successful comparison.
 
 ## Reviewed floors
 

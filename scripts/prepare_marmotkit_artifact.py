@@ -704,21 +704,36 @@ def preparation_lock(cache_root: Path, artifact_sha: str):
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
 
 
+ABI_TARGETS = {"arm64-v8a": "aarch64-linux-android", "armeabi-v7a": "armv7-linux-androideabi",
+               "x86": "i686-linux-android", "x86_64": "x86_64-linux-android"}
+
+
+def native_features(manifest: dict, properties: dict[str, str]) -> dict:
+    """Compare a declared upstream feature set with the independently pinned Android selection."""
+    selected = sorted(properties["features"].split(","))
+    upstream = manifest.get("features")
+    if "features" not in manifest:
+        return {"android_lock": selected, "upstream_manifest": None, "status": "unverified"}
+    if (not isinstance(upstream, list) or not upstream or
+            any(not isinstance(feature, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", feature) for feature in upstream) or
+            len(upstream) != len(set(upstream))):
+        raise PreparationError("manifest features must be a unique explicit feature list")
+    if sorted(upstream) != selected:
+        raise PreparationError("manifest features differ from the Android MarmotKit lock")
+    return {"android_lock": selected, "upstream_manifest": sorted(upstream), "status": "matched_manifest"}
+
+
 def native_provenance(output: Path, properties: dict[str, str], lock_sha256: str) -> dict:
     """Describe verified artifact bytes without pretending Cargo.lock is a link set."""
     manifest_path = output / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    targets = {"arm64-v8a": "aarch64-linux-android", "armeabi-v7a": "armv7-linux-androideabi",
-               "x86": "i686-linux-android", "x86_64": "x86_64-linux-android"}
     return {
         "schema": 1, "source": properties["source"], "source_sha": properties["mdk-sha"],
         "lock_sha256": lock_sha256, "artifact_id": properties["artifact-id"],
         "artifact_sha256": properties["artifact-sha256"], "manifest_sha256": sha256(manifest_path),
-        "features": {"android_lock": sorted(properties["features"].split(",")),
-                     "upstream_manifest": manifest.get("features"),
-                     "status": "unverified" if "features" not in manifest else "declared_by_manifest"},
+        "features": native_features(manifest, properties),
         "cargo_lock_sha256": manifest["cargo_lock_sha256"],
-        "libraries": [{"abi": abi, "target": targets[abi],
+        "libraries": [{"abi": abi, "target": ABI_TARGETS[abi],
                        "sha256": sha256(output / "jniLibs" / abi / "libmarmot_uniffi.so")}
                       for abi in sorted(ABI_MACHINES)],
         "licenses": {"status": "unverified", "reason": "Published artifact has no target-resolved crate licence inventory."},
@@ -735,8 +750,8 @@ def prepare(args: argparse.Namespace) -> Path:
         trusted_hashes = archive_payload_hashes(archive, properties)
         if not validate_prepared(output, properties, trusted_hashes):
             extract_atomically(archive, output, properties)
-        if not validate_prepared(output, properties, trusted_hashes):
-            raise PreparationError("prepared artifact failed its final validation")
+            if not validate_prepared(output, properties, trusted_hashes):
+                raise PreparationError("prepared artifact failed its final validation")
         provenance = native_provenance(output, properties, sha256(args.lock))
         pending = output / ".native-provenance.tmp"
         pending.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8")
