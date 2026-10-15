@@ -240,6 +240,14 @@ private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
 private val FocusedStackMaximumWidth = 560.dp
 private val FocusedOverlayShadowSafeInset = 8.dp
 private val FocusedReactionRailInset = 4.dp
+private val FocusedStackHorizontalPadding = 16.dp
+
+// Two rows of 48dp targets: the rail height the overlay's 200dp preview budget was sized around.
+private val FocusedReactionRailBudget = 108.dp
+
+// A frame shorter than this, such as one the keyboard has shortened, keeps the 100% rail.
+private val FocusedReactionGrowthFrameHeight = 480.dp
+private val FocusedReactionSizingStep = 2.dp
 private val FocusedReactionItemSpacing = 4.dp
 private val FocusedReactionTargetSize = 48.dp
 private val FocusedReactionStateLayerSize = 40.dp
@@ -298,9 +306,28 @@ internal fun FocusedMessageActions(
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
             val topInsetPx = WindowInsets.safeDrawing.getTop(LocalDensity.current)
-            // The rail, inter-item gaps and a tappable scroll viewport need roughly 200dp.
-            // On an ordinary full-height frame, the preview keeps its original footprint.
-            val previewHeightLimit = (maxHeight - 200.dp).coerceAtLeast(48.dp)
+            // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
+            val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
+            val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
+            // The rail, inter-item gaps and a tappable scroll viewport need roughly 200dp with two 48dp reaction
+            // rows. A larger text size grows the rail (#3279), but only into height a frame taller than
+            // FocusedReactionGrowthFrameHeight can spare, and that growth comes out of the preview instead of the
+            // action viewport. On an ordinary full-height frame, the preview keeps its original footprint.
+            val railWidth = minOf(maxWidth, FocusedStackMaximumWidth) - FocusedStackHorizontalPadding * 2
+            val railAllowance =
+                FocusedReactionRailBudget + (maxHeight - FocusedReactionGrowthFrameHeight).coerceAtLeast(0.dp)
+            val reactionCount = quickReactions.size + 1
+            val reactionSizing =
+                remember(emojiSize, reactionCount, railWidth, railAllowance) {
+                    FocusedReactionSizing.fitting(emojiSize, reactionCount, railWidth, railAllowance)
+                }
+            val railGrowth =
+                if (canReact) {
+                    reactionSizing.railHeight(reactionCount, railWidth) - FocusedReactionRailBudget
+                } else {
+                    0.dp
+                }
+            val previewHeightLimit = (maxHeight - 200.dp - railGrowth.coerceAtLeast(0.dp)).coerceAtLeast(48.dp)
             var stackHeightPx by remember { mutableIntStateOf(0) }
             var previewCenterInStackPx by remember { mutableStateOf<Int?>(null) }
             val travel =
@@ -326,7 +353,7 @@ internal fun FocusedMessageActions(
                         // Children consume their own taps first, so a tap that reaches the column
                         // landed on empty stack space or its padding and dismisses like the scrim.
                         .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                        .padding(horizontal = 16.dp, vertical = FocusedOverlayShadowSafeInset)
+                        .padding(horizontal = FocusedStackHorizontalPadding, vertical = FocusedOverlayShadowSafeInset)
                         .semantics {
                             paneTitle = title
                             customActions =
@@ -343,6 +370,7 @@ internal fun FocusedMessageActions(
                 if (canReact) {
                     FocusedReactionRail(
                         quickReactions = quickReactions,
+                        sizing = reactionSizing,
                         selectedReactions = selectedReactions,
                         onReact = onReact,
                         onMoreReactions = onMoreReactions,
@@ -440,6 +468,17 @@ internal data class FocusedReactionSizing(
     val selectedFill: Dp,
     val moreIcon: Dp,
 ) {
+    /** The rail's height for [itemCount] targets wrapped across [availableWidth], including its inset. */
+    fun railHeight(
+        itemCount: Int,
+        availableWidth: Dp,
+    ): Dp {
+        val inner = availableWidth - FocusedReactionRailInset * 2
+        val perRow = focusedReactionItemsPerRow(itemCount, inner, target)
+        val rows = ceil(itemCount.toFloat() / perRow).toInt().coerceAtLeast(1)
+        return target * rows + FocusedReactionItemSpacing * (rows - 1) + FocusedReactionRailInset * 2
+    }
+
     companion object {
         /** Sizing for an emoji drawn at [emoji], never smaller than the 100% sizes or larger than double them. */
         fun forEmoji(emoji: Dp): FocusedReactionSizing {
@@ -452,6 +491,23 @@ internal data class FocusedReactionSizing(
                 selectedFill = FocusedReactionSelectedFillSize + growth,
                 moreIcon = FocusedMoreIconSize + growth,
             )
+        }
+
+        /**
+         * The largest sizing up to [emoji] whose rail of [itemCount] targets across [railWidth] stays within
+         * [maxRailHeight]. It never goes below the 100% sizes, so every target keeps at least 48dp.
+         */
+        fun fitting(
+            emoji: Dp,
+            itemCount: Int,
+            railWidth: Dp,
+            maxRailHeight: Dp,
+        ): FocusedReactionSizing {
+            var sizing = forEmoji(emoji)
+            while (sizing.emoji > FocusedReactionEmojiSize && sizing.railHeight(itemCount, railWidth) > maxRailHeight) {
+                sizing = forEmoji(sizing.emoji - FocusedReactionSizingStep)
+            }
+            return sizing
         }
     }
 }
@@ -469,6 +525,7 @@ internal data class FocusedReactionSizing(
 @Composable
 private fun FocusedReactionRail(
     quickReactions: List<String>,
+    sizing: FocusedReactionSizing,
     selectedReactions: Set<String>,
     onReact: (String) -> Unit,
     onMoreReactions: () -> Unit,
@@ -482,10 +539,6 @@ private fun FocusedReactionRail(
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
         BoxWithConstraints(modifier = Modifier.padding(FocusedReactionRailInset)) {
-            // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
-            val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
-            val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
-            val sizing = remember(emojiSize) { FocusedReactionSizing.forEmoji(emojiSize) }
             // The full picker travels with the reactions, so it wraps with them instead of
             // competing with them for one row's worth of width.
             val perRow = focusedReactionItemsPerRow(quickReactions.size + 1, maxWidth, sizing.target)

@@ -112,6 +112,21 @@ class MessageActionReactionRailLayoutTest {
         assertTrue("fewer targets fit on a row", targets.groupBy { it.top }.size >= 3)
     }
 
+    /**
+     * Text-scaled targets grow only into height the frame can spare: a short, keyboard-shortened frame keeps the
+     * 100% rail so the preview and actions stay usable, while a full-height frame gets the larger targets.
+     */
+    @Test
+    fun railGrowthIsLimitedToTheFramesSpareHeight() {
+        val shortFrame = FocusedReactionSizing.fitting(56.dp, itemCount = 7, railWidth = 328.dp, maxRailHeight = 108.dp)
+        val tallFrame = FocusedReactionSizing.fitting(56.dp, itemCount = 7, railWidth = 328.dp, maxRailHeight = 408.dp)
+
+        assertEquals(FocusedReactionSizing.forEmoji(28.dp), shortFrame)
+        assertEquals(108.dp, shortFrame.railHeight(itemCount = 7, availableWidth = 328.dp))
+        assertEquals(FocusedReactionSizing.forEmoji(56.dp), tallFrame)
+        assertEquals(76.dp, tallFrame.target)
+    }
+
     /** The rail stays on one row while everything fits and splits evenly only once it cannot. */
     @Test
     fun reactionRailBalancesItsRowsOnlyWhenTheWidthCannotHoldThemAll() {
