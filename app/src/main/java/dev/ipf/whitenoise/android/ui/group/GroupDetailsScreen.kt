@@ -650,7 +650,8 @@ internal fun GroupDetailsScreen(
         // Observe the native result from the current composition, including after rotation.
         // Optimistic pending rows do not establish that the invitation succeeded.
         val inviteSelectionApplied =
-            rosterReady && addSelection.isNotEmpty() &&
+            rosterReady &&
+                addSelection.isNotEmpty() &&
                 addSelection.all { selected ->
                     controller.members.any { it.memberIdHex.equals(selected.accountIdHex, ignoreCase = true) }
                 } &&
