@@ -138,7 +138,7 @@ the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 `.github/workflows/invariant-gate.yml` runs on every pull request to `master`,
 including description edits, without compiling anything. The checker script runs
 from the base revision, and the pull request's registry is fetched through the API
-as data. The workflow file itself is protected by review and CODEOWNERS, not by the
+as data. The workflow file itself is protected by review, not by the
 check; see the registry page for what is and is not protected. A pull request that closes a bug
 must change, name or exempt a gate from the [invariant-gate registry](docs/invariant-gates.md);
 pull requests that close no bug pass. `InvariantGateRegistryTest` in the unit suite
