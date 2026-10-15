@@ -21,7 +21,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -126,38 +125,30 @@ internal class PhotoEditorRenderer(
                 }
                 val source = (inspected as PhotoEditorInspectResult.Success).source
                 val plan = outputPlan(source, recipe, quality) ?: return@withLock PhotoEditorRenderResult.InvalidRecipe
-                val decodeLongEdge = decodeLongEdge(source, plan.geometry)
-                val decodeCapacity =
-                    dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy
-                        .outputCapacity(decodeLongEdge)
+                val spec =
+                    PhotoEditorDecoder.plan(source, plan.geometry)
                         ?: return@withLock PhotoEditorRenderResult.MemoryLimit
-                val decodedDimensions =
-                    MediaPipeline.targetDimensions(
-                        srcWidth = source.orientedSize.width,
-                        srcHeight = source.orientedSize.height,
-                        maxEdgePx = decodeLongEdge,
-                    )
-                if (!fitsMemoryBudget(sourceBytes.size, decodedDimensions, decodeCapacity, plan)) {
+                if (!fitsMemoryBudget(sourceBytes.size, spec.dimensions, spec.capacity, plan)) {
                     return@withLock PhotoEditorRenderResult.MemoryLimit
                 }
                 currentCoroutineContext().ensureActive()
                 val decoded =
-                    MediaPipeline.decodeSampledBitmap(
-                        bytes = sourceBytes,
-                        maxEdgePx = decodeLongEdge,
-                        honorExifOrientation = true,
-                    ) ?: return@withLock PhotoEditorRenderResult.DecodeFailed
-                currentCoroutineContext().ensureActive()
+                    PhotoEditorDecoder.decode(sourceBytes, spec)
+                        ?: return@withLock PhotoEditorRenderResult.DecodeFailed
                 val rendered =
-                    renderPixels(decoded, plan.geometry)
-                        ?: return@withLock PhotoEditorRenderResult.RenderFailed
-                currentCoroutineContext().ensureActive()
+                    try {
+                        currentCoroutineContext().ensureActive()
+                        renderPixels(decoded, plan.geometry, spec.region)
+                    } finally {
+                        if (!decoded.isRecycled) decoded.recycle()
+                    } ?: return@withLock PhotoEditorRenderResult.RenderFailed
                 val finalized =
-                    MediaPipeline.finalizeRenderedImage(
-                        rendered = rendered,
-                        plan = plan.pipelinePlan,
-                        onEncode = onEncode,
-                    ) ?: return@withLock PhotoEditorRenderResult.EncodeFailed
+                    try {
+                        currentCoroutineContext().ensureActive()
+                        MediaPipeline.finalizeRenderedImage(rendered, plan.pipelinePlan, onEncode)
+                    } finally {
+                        if (!rendered.isRecycled) rendered.recycle()
+                    } ?: return@withLock PhotoEditorRenderResult.EncodeFailed
                 PhotoEditorRenderResult.Success(finalized, plan)
             }
         }
@@ -257,6 +248,7 @@ internal class PhotoEditorRenderer(
     private suspend fun renderPixels(
         decoded: Bitmap,
         geometry: PhotoEditGeometry,
+        region: dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion? = null,
     ): Bitmap? {
         var output: Bitmap? = null
         return try {
@@ -269,7 +261,7 @@ internal class PhotoEditorRenderer(
                     ).apply { setHasAlpha(true) }
             val canvas = Canvas(output)
             canvas.drawColor(android.graphics.Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-            val matrix = photoMatrix(decoded.width, decoded.height, geometry)
+            val matrix = photoMatrix(decoded.width, decoded.height, geometry, region)
             canvas.save()
             canvas.concat(matrix)
             canvas.drawBitmap(
@@ -301,8 +293,14 @@ internal class PhotoEditorRenderer(
         decodedWidth: Int,
         decodedHeight: Int,
         geometry: PhotoEditGeometry,
+        region: dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion?,
     ): Matrix {
-        val affine = geometry.orientedBitmapToOutputAffine(decodedWidth, decodedHeight)
+        val affine =
+            if (region == null) {
+                geometry.orientedBitmapToOutputAffine(decodedWidth, decodedHeight)
+            } else {
+                geometry.regionBitmapToOutputAffine(decodedWidth, decodedHeight, region)
+            }
         return Matrix().apply {
             setValues(
                 floatArrayOf(
@@ -465,25 +463,6 @@ internal class PhotoEditorRenderer(
             sourceBytes + outputPixels * BYTES_PER_PIXEL * outputCopies + estimatedEncoded * 2
         val decodePeak = sourceBytes + decodeCapacity + decodedPixels * BYTES_PER_PIXEL
         return maxOf(renderPeak, encodePeak, decodePeak) <= memoryBudgetBytes()
-    }
-
-    private fun decodeLongEdge(
-        source: PhotoEditorSourceInfo,
-        geometry: PhotoEditGeometry,
-    ): Int {
-        val cropWidth = source.orientedSize.width * geometry.recipe.crop.width
-        val cropHeight = source.orientedSize.height * geometry.recipe.crop.height
-        val naturalWidth = if (geometry.recipe.quarterTurnsClockwise % 2 == 0) cropWidth else cropHeight
-        val naturalHeight = if (geometry.recipe.quarterTurnsClockwise % 2 == 0) cropHeight else cropWidth
-        val scale =
-            min(
-                geometry.outputSize.width / naturalWidth.coerceAtLeast(1f),
-                geometry.outputSize.height / naturalHeight.coerceAtLeast(1f),
-            ).coerceAtMost(1f)
-        return ceil(max(source.orientedSize.width, source.orientedSize.height) * scale)
-            .toInt()
-            .coerceAtLeast(max(geometry.outputSize.width, geometry.outputSize.height))
-            .coerceAtMost(max(source.orientedSize.width, source.orientedSize.height))
     }
 
     private data class RenderedStroke(

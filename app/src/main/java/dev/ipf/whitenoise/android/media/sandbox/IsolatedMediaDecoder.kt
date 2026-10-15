@@ -27,6 +27,7 @@ internal object IsolatedMediaDecoder {
                 result.getBoolean("runtimeInitialized"),
                 result.getBoolean("privateCanaryDenied"),
                 result.getInt("privateCanaryErrno"),
+                result.getInt("inputWriteErrno", -1),
             )
     }
 
@@ -54,6 +55,7 @@ internal object IsolatedMediaDecoder {
     }
 
     fun clear() {
+        IsolatedAnimationSession.retireActive()
         (transport as? java.io.Closeable)?.close()
         (mediaTransport as? java.io.Closeable)?.close()
         transport = null
@@ -91,6 +93,11 @@ internal object IsolatedMediaDecoder {
         safely { it.decode(byteArrayOf(1), 1, false, MediaDecodePolicy.DEBUG_HANG) }
     }
 
+    internal fun exerciseMalformedReplyForTest(mode: Int): Bitmap? {
+        check(dev.ipf.whitenoise.android.BuildConfig.DEBUG && mode in 1..MediaDecodePolicy.DEBUG_REPLY_KINDS)
+        return safely { it.decode(byteArrayOf(1), mode, false, MediaDecodePolicy.DEBUG_BAD_REPLY) }
+    }
+
     fun svg(bytes: ByteArray): Bitmap? =
         safely {
             it.decode(bytes, MediaDecodePolicy.SVG_EDGE, false, MediaDecodePolicy.SVG)
@@ -99,6 +106,24 @@ internal object IsolatedMediaDecoder {
     fun exif(bytes: ByteArray): Int? = safely { it.exif(bytes) }
 
     fun inspect(bytes: ByteArray): ImageInspection? = safely { it.inspect(bytes) }
+
+    fun region(
+        bytes: ByteArray,
+        region: MediaImageRegion,
+        edge: Int,
+    ): Bitmap? = safely { it.region(bytes, region, edge) }
+
+    fun animation(
+        bytes: ByteArray,
+        edge: Int,
+    ): android.graphics.drawable.Drawable? =
+        safely {
+            if (it is IsolatedMediaTransport) {
+                installedContext?.let { context -> IsolatedAnimationSession.create(context, bytes, edge) }
+            } else {
+                it.animation(bytes, edge)
+            }
+        }
 
     fun decodeUri(
         resolver: ContentResolver,
@@ -132,4 +157,5 @@ internal data class WorkerIsolation(
     val runtimeInitialized: Boolean,
     val privateCanaryDenied: Boolean,
     val privateCanaryErrno: Int,
+    val inputWriteErrno: Int = -1,
 )

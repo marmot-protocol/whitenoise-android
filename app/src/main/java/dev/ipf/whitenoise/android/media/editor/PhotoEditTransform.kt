@@ -175,6 +175,55 @@ internal class PhotoEditGeometry private constructor(
         )
     }
 
+    /** Round outwards in encoded coordinates, retaining a pixel for interpolation at crop edges. */
+    fun encodedCropRegion(): dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion {
+        val crop = recipe.crop
+        val corners =
+            listOf(
+                NormalizedPoint(crop.left, crop.top),
+                NormalizedPoint(crop.right, crop.top),
+                NormalizedPoint(crop.left, crop.bottom),
+                NormalizedPoint(crop.right, crop.bottom),
+            ).map(::orientedToEncoded)
+        return dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion(
+            (floor(corners.minOf { it.x }.toDouble() * encodedSize.width).toInt() - 1).coerceAtLeast(0),
+            (floor(corners.minOf { it.y }.toDouble() * encodedSize.height).toInt() - 1).coerceAtLeast(0),
+            (kotlin.math.ceil(corners.maxOf { it.x }.toDouble() * encodedSize.width).toInt() + 1)
+                .coerceAtMost(encodedSize.width),
+            (kotlin.math.ceil(corners.maxOf { it.y }.toDouble() * encodedSize.height).toInt() + 1)
+                .coerceAtMost(encodedSize.height),
+        )
+    }
+
+    /** The decoded subset still has the original encoded origin and all eight EXIF transforms. */
+    fun regionBitmapToOutputAffine(
+        bitmapWidth: Int,
+        bitmapHeight: Int,
+        region: dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion,
+    ): EditorAffineTransform {
+        require(bitmapWidth > 0 && bitmapHeight > 0 && region.validFor(encodedSize.width, encodedSize.height))
+
+        fun mapped(
+            x: Int,
+            y: Int,
+        ) = orientedToOutput(
+            encodedToOriented(
+                NormalizedPoint(x.toFloat() / encodedSize.width, y.toFloat() / encodedSize.height),
+            ),
+        )
+        val origin = mapped(region.left, region.top)
+        val horizontal = mapped(region.right, region.top)
+        val vertical = mapped(region.left, region.bottom)
+        return EditorAffineTransform(
+            (horizontal.x - origin.x) / bitmapWidth,
+            (vertical.x - origin.x) / bitmapHeight,
+            origin.x,
+            (horizontal.y - origin.y) / bitmapWidth,
+            (vertical.y - origin.y) / bitmapHeight,
+            origin.y,
+        )
+    }
+
     companion object {
         const val EXIF_NORMAL = 1
         const val EXIF_FLIP_HORIZONTAL = 2

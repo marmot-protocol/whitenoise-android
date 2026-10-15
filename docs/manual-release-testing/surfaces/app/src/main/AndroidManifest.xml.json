@@ -182,6 +182,14 @@
         ]
       },
       {
+        "surface": "Permissionless explicit animation worker",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": ".media.sandbox.MediaAnimationService",
+        "test_ids": [
+          "MED-032"
+        ]
+      },
+      {
         "surface": "Outbound single- and multi-file receiver discovery",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "The outbound preflight checks for a receiver before staging private",
