@@ -180,6 +180,14 @@
         "test_ids": [
           "MED-031"
         ]
+      },
+      {
+        "surface": "Outbound single- and multi-file receiver discovery",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "The outbound preflight checks for a receiver before staging private",
+        "test_ids": [
+          "MED-016"
+        ]
       }
     ],
     "manifest_permissions": [

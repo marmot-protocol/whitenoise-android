@@ -23,7 +23,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
             failure = 'case "$*" in *:app:connected*) exit 23;; esac\n' if fail_app else ''
             gradle.write_text('#!/bin/sh\n' + failure + 'printf "%s\\n" "$*"\n')
             gradle.chmod(0o755)
-            for name in ("run-review-demo-e2e.sh", "run-document-provider-matrix.sh"):
+            for name in ("run-review-demo-e2e.sh", "run-document-provider-matrix.sh", "run-outbound-share-contract.sh", "install-outbound-share-fixture.sh"):
                 script = root / "scripts" / name
                 script.write_text(f"#!/bin/sh\nprintf '{name}'\n")
                 script.chmod(0o755)
@@ -47,6 +47,16 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertNotIn("PullRequestDeviceSmoke", output)
         with self.assertRaises(subprocess.CalledProcessError):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
+    def test_outbound_share_dispatch_is_focused_and_rejects_overlapping_suites(self):
+        """Real package visibility uses its own emulator users without also running the full suite."""
+        self.assertEqual(
+            self.run_dispatch("workflow_dispatch", "false", "false", "false", "false", "true"),
+            "run-outbound-share-contract.sh",
+        )
+        for flags in (("true", "false", "false", "false"), ("false", "true", "false", "false"), ("false", "false", "true", "false"), ("false", "false", "false", "true")):
+            with self.subTest(flags=flags), self.assertRaises(subprocess.CalledProcessError):
+                self.run_dispatch("workflow_dispatch", *flags, "true")
 
     def test_review_demo_dispatch_remains_available(self):
         """An explicit review-demo dispatch hands off to its isolated runner."""
