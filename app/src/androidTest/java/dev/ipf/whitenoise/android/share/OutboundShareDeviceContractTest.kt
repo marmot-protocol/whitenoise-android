@@ -207,7 +207,8 @@ class OutboundShareDeviceContractTest {
     /**
      * Describes a receiver that never replied. Its stream reads are served on this app's binder threads, so the
      * report lists the busy ones (an idle binder thread has no Java frames) and the main thread, then the
-     * system's provider connections for this app, both apps' process state and the recent process lifecycle.
+     * system's provider connections for this app, both apps' process state, the task and activity stack (where the
+     * receiver's activity sits relative to this app's task) and the recent process lifecycle.
      */
     private fun receiverHangReport(device: UiDevice): String {
         val appPackage = InstrumentationRegistry.getInstrumentation().targetContext.packageName
@@ -234,6 +235,11 @@ class OutboundShareDeviceContractTest {
             "-- provider connections\n" +
                 shellLines(device, "dumpsys activity providers $appPackage").take(40).joinToString("\n"),
             "-- process state\n$processState",
+            "-- task and activity stack\n" +
+                shellLines(device, "dumpsys activity activities")
+                    .filter { line -> ACTIVITY_STACK_KEYS.any { it in line } }
+                    .take(40)
+                    .joinToString("\n"),
             "-- process lifecycle\n" +
                 shellLines(
                     device,
@@ -296,6 +302,7 @@ class OutboundShareDeviceContractTest {
         const val FIXTURE_CAPTION = "Visible fixture caption"
         const val RECEIVER_RESULT_MS = 30_000L
         val PROCESS_STATE_KEYS = listOf("ProcessRecord", "procState", "frozen", "curAdj", "setAdj")
+        val ACTIVITY_STACK_KEYS = listOf("* Task{", "* Hist", "ResumedActivity", "state=", "sharefixture")
         val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
     }
 
