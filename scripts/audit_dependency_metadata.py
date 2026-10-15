@@ -139,6 +139,10 @@ def audit_metadata(metadata, review):
                         node.tag = node.tag.rsplit('}', 1)[-1]
                     poms[coordinate] = root
         references, unresolved = ancestors(poms)
+        missing = {coordinate for coordinate in references
+                   if (coordinate, 'pom') in attempted and coordinate not in poms}
+        if missing:
+            raise ValueError('Missing referenced parent/BOM POM: ' + ', '.join(sorted(missing)))
         pending = references - seeds
         seeds.update(pending)
         checkpoint.write_text(json.dumps(sorted(additions.values(), key=lambda item: (item['coordinate'], item['name'])),

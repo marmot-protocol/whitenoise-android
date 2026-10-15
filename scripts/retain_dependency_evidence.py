@@ -62,4 +62,12 @@ def validate_retained(root, reference, source):
                 not asset.resolve().is_relative_to(root.resolve()) or asset.stat().st_size > 32 * 1024 * 1024 or
                 not re.fullmatch(r'[a-f0-9]{64}', expected) or sha256(asset) != expected):
             raise ValueError('Missing or changed retained dependency evidence asset')
+        if name.endswith('source-inputs.json.gz'):
+            with gzip.open(asset, 'rb') as stream:
+                payload = stream.read(8 * 1024 * 1024 + 1)
+            if len(payload) > 8 * 1024 * 1024:
+                raise ValueError('Oversized retained source snapshot')
+            snapshot = json.loads(payload)
+            if snapshot.get('schema') != 1 or snapshot.get('source_sha') != source:
+                raise ValueError('Wrong-source retained build snapshot')
     return receipt
