@@ -61,7 +61,7 @@ tasks.named("preBuild").configure {
 dependencies {
     implementation("net.java.dev.jna:jna:5.19.1@aar")
     implementation(libs.kotlinx.coroutines.android)
-    implementation("androidx.annotation:annotation:1.9.1")
+    implementation("androidx.annotation:annotation:1.11.0")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation(libs.androidx.tracing)

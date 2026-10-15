@@ -94,8 +94,8 @@ class SettingsScreenScreenshotTest {
     /** Available Settings update row uses the requested green emblem and real release-version wording. */
     @Test
     fun settingsScreenAvailableUpdateLight() {
-        render(darkTheme = false, latestVersion = "2026.10.10")
-        composeRule.onNodeWithText("Version 2026.10.10 is available on Zapstore.").assertIsDisplayed()
+        render(darkTheme = false, latestVersion = "2026.10.20")
+        composeRule.onNodeWithText("Version 2026.10.20 is available on Zapstore.").assertIsDisplayed()
         capture("settings_screen_available_update_light")
     }
 
@@ -124,8 +124,8 @@ class SettingsScreenScreenshotTest {
         render(darkTheme = true)
         composeRule
             .onNode(hasScrollToNodeAction())
-            .performScrollToNode(hasText("Version 2026.10.3"))
-        composeRule.onNodeWithText("Version 2026.10.3").assertIsDisplayed()
+            .performScrollToNode(hasText("Version 2026.10.14"))
+        composeRule.onNodeWithText("Version 2026.10.14").assertIsDisplayed()
         composeRule
             .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
             .captureRoboImage("src/test/snapshots/settings_screen_version_footer_dark.png")
@@ -321,7 +321,7 @@ class SettingsScreenScreenshotTest {
         // the fixture draw the prominent placement above an "Up to date" subtitle.
         val appUpdateInfo =
             AppUpdateInfo(
-                installedVersion = "2026.10.3",
+                installedVersion = "2026.10.14",
                 latestVersion = latestVersion,
                 checkedAtMillis = null,
                 dismissedVersion = null,
@@ -343,7 +343,7 @@ class SettingsScreenScreenshotTest {
                 ),
             profileCount = profileCount,
             appUpdateInfo = appUpdateInfo,
-            versionName = "2026.10.3",
+            versionName = "2026.10.14",
             onBack = {},
             onOpenShareConnect = {},
             onAddProfile = {},

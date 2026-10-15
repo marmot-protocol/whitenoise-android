@@ -20,7 +20,7 @@ composeBom = "2026.10.00"
 # Keep this exact pin while porting screens so Material token/interaction changes do not drift
 # across recorded baselines. The Compose BOM continues to own the other Compose dependencies.
 material3 = "1.5.0-alpha25"
-emoji2 = "1.6.0"
+emoji2 = "1.7.0"
 coroutines = "1.11.0"
 jna = "5.19.1"
 zxing = "3.5.4"
@@ -29,7 +29,7 @@ ktlint = "1.5.0"
 ktlintGradle = "14.2.0"
 # Detekt 2 supports this project's Kotlin 2.4 / AGP 9 built-in Kotlin stack.
 detekt = "2.0.0-alpha.6"
-firebaseBom = "34.19.0"
+firebaseBom = "35.0.0"
 googleServices = "4.5.0"
 playServicesBase = "18.11.0"
 ossLicensesPlugin = "0.13.0"
