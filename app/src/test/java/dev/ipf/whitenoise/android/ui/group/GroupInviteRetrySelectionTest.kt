@@ -29,14 +29,15 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.groupConversationSnapshotFixture
 import dev.ipf.whitenoise.android.ui.chats.newchat.SELECTED_MEMBERS_CONFIRM_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -91,6 +92,11 @@ class GroupInviteRetrySelectionTest {
             restoration.emulateSavedInstanceStateRestore()
             composeRule.runOnIdle { fixture.reply.complete(Unit) }
             composeRule.waitUntil { !fixture.controller.mutationInFlight }
+            composeRule.runOnIdle {
+                assertNull(fixture.controller.lastMutationError)
+                assertEquals(listOf(ConversationTimelineTestIds.ACCOUNT_ID, PEER), fixture.controller.group.admins)
+                assertEquals(2, fixture.controller.members.size)
+            }
             composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().assertIsDisplayed()
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertDoesNotExist()
             assertEquals(listOf(listOf(PEER) to listOf(PEER)), fixture.calls)

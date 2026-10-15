@@ -653,7 +653,10 @@ internal fun GroupDetailsScreen(
             rosterReady && addSelection.isNotEmpty() &&
                 addSelection.all { selected ->
                     controller.members.any { it.memberIdHex.equals(selected.accountIdHex, ignoreCase = true) }
-                } && addAdminSelection.all { admin -> controller.group.admins.any { it.equals(admin, ignoreCase = true) } }
+                } &&
+                addAdminSelection.all { admin ->
+                    controller.group.admins.any { it.equals(admin, ignoreCase = true) }
+                }
         LaunchedEffect(showAddMember, inviteSelectionApplied, controller.mutationInFlight) {
             if (showAddMember && inviteSelectionApplied && !controller.mutationInFlight) {
                 showLargeGroupInviteConfirmation = false

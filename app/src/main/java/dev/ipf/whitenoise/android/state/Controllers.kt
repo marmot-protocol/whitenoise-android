@@ -11927,16 +11927,19 @@ class ConversationController(
         }
     }
 
-    /** Completion can update only the frontier that submitted this one native invitation. */
-    private fun publishInitialAdminInviteResult(
+    /** A newer details read requires a fresh native snapshot after this commit, not its older result. */
+    private suspend fun publishInitialAdminInviteResult(
         account: String,
         result: dev.ipf.marmotkit.GroupMutationResultFfi,
         authorityEpoch: Long,
         runtimeGeneration: Int,
     ) {
-        val sameFrontier = groupAuthorityEpoch == authorityEpoch && appState.runtimeGeneration == runtimeGeneration
-        if (!sameFrontier || controllerCleared || isAccountTeardownRequested()) return
-        applyManagementSnapshot(account, result.details, result.managementState)
+        if (appState.runtimeGeneration != runtimeGeneration || controllerCleared || isAccountTeardownRequested()) return
+        if (groupAuthorityEpoch == authorityEpoch) {
+            applyManagementSnapshot(account, result.details, result.managementState)
+        } else {
+            refreshManagementState()
+        }
     }
 
     /** These typed key/routing rejections happen before the native membership commit. */
