@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify packaged Android system labels for every enabled app variant."""
+"""Verify packaged Android identities and outbound share discovery for every enabled app variant."""
 
 from __future__ import annotations
 
@@ -44,6 +44,23 @@ def android_attribute(element: ET.Element, name: str) -> str | None:
     return element.get(f"{ANDROID_NS}{name}")
 
 
+def verify_share_target_visibility(root: ET.Element, source: str) -> None:
+    """Keep the plaintext preflight reliable for both actions and every supported MIME family."""
+    actions = set()
+    for intent in root.findall("queries/intent"):
+        data = intent.findall("data")
+        if len(data) == 1 and data[0].attrib == {f"{ANDROID_NS}mimeType": "*/*"}:
+            actions.update(android_attribute(action, "name") for action in intent.findall("action"))
+    required = {"android.intent.action.SEND", "android.intent.action.SEND_MULTIPLE"}
+    if missing := required - actions:
+        raise AssertionError(f"{source}: missing outbound share visibility for {sorted(missing)}")
+    if any(
+        android_attribute(permission, "name") == "android.permission.QUERY_ALL_PACKAGES"
+        for permission in root.findall("uses-permission")
+    ):
+        raise AssertionError(f"{source}: outbound sharing must use intent-scoped package visibility")
+
+
 def expected_identity(
     variant: str,
     preview_channel: str,
@@ -66,7 +83,9 @@ def expected_identity(
 
 
 def verify_manifest(path: Path, expected: PackageIdentity) -> PackageIdentity:
+    """Validate packaged identity, exported labels and inbound/outbound share entry contracts."""
     root = ET.parse(path).getroot()
+    verify_share_target_visibility(root, str(path))
     application = root.find("application")
     if application is None:
         raise AssertionError(f"{path}: missing application element")

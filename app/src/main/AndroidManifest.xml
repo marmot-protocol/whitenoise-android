@@ -32,6 +32,16 @@
          queryIntentActivities and the nostrsigner: intents/content providers
          need the signer app to be visible to this package. -->
     <queries>
+        <!-- The outbound preflight checks for a receiver before staging private
+             plaintext. Both actions support arbitrary document MIME families. -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND_MULTIPLE" />
+            <data android:mimeType="*/*" />
+        </intent>
         <package android:name="dev.davidv.translator" />
         <!-- The dictation settings recommend Offline Speech to Text only when
              its production package is not already installed. -->

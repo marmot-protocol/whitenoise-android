@@ -8,6 +8,15 @@ review_demo_e2e="${2:-false}"
 document_provider_matrix="${3:-false}"
 responsiveness_only="${4:-false}"
 media_sandbox_only="${5:-false}"
+outbound_share_only="${6:-false}"
+
+if [[ "$event_name" == "workflow_dispatch" && "$outbound_share_only" == "true" ]]; then
+  if [[ "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$media_sandbox_only" == "true" ]]; then
+    echo "Select one focused instrumented suite per dispatch" >&2
+    exit 2
+  fi
+  exec ./scripts/run-outbound-share-contract.sh
+fi
 
 if [[ "$event_name" == "workflow_dispatch" && "$media_sandbox_only" == "true" ]]; then
   if [[ "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" ]]; then
@@ -66,6 +75,8 @@ fi
 # first comma, so a list silently ran just its first class.
 smoke_annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 manual_fixture_annotation=dev.ipf.whitenoise.android.ManualDeviceFixture
+
+./scripts/install-outbound-share-fixture.sh
 
 if [[ "$event_name" == "pull_request" ]]; then
   ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
