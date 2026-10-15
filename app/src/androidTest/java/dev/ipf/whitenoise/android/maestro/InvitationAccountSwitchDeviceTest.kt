@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.newchat.SELECTED_MEMBERS_CONFIRM_TAG
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -128,11 +129,15 @@ class InvitationAccountSwitchDeviceTest {
             options: CreateGroupOptionsFfi,
         ): String = observe { native.createGroupWithOptions(accountRef, name, memberRefs, options) }
 
-        override suspend fun inviteMembersDetailed(
+        override suspend fun inviteMembersDetailedWithInitialAdmins(
             accountRef: String,
             groupIdHex: String,
             memberRefs: List<String>,
-        ): GroupMutationResultFfi = observe { native.inviteMembersDetailed(accountRef, groupIdHex, memberRefs) }
+            initialAdminRefs: List<String>,
+        ): GroupMutationResultFfi =
+            observe {
+                native.inviteMembersDetailedWithInitialAdmins(accountRef, groupIdHex, memberRefs, initialAdminRefs)
+            }
 
         /** Delegates unchanged native commands while exposing their start and cancellation/completion boundary. */
         private suspend fun <T> observe(block: suspend () -> T): T {
@@ -251,6 +256,10 @@ class InvitationAccountSwitchDeviceTest {
         compose
             .onNodeWithTag(if (group == null) "group_setup.create" else "performance.contact_picker_next")
             .performClick()
+        if (group != null) {
+            waitTag(SELECTED_MEMBERS_CONFIRM_TAG)
+            compose.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+        }
     }
 
     /** Bounds waiting for a production screen rather than assuming animation or native lookup timing. */

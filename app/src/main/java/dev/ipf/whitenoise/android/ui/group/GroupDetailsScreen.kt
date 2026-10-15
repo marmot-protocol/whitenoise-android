@@ -248,6 +248,9 @@ internal val AddMemberSelectionSaver =
         },
     )
 
+private val InitialAdminSelectionSaver =
+    listSaver<SnapshotStateList<String>, String>(save = { it.toList() }, restore = { it.toMutableStateList() })
+
 /** Chat overview that keeps native membership, moderation and notification owners behind its presentation. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -285,11 +288,30 @@ internal fun GroupDetailsScreen(
         var addingDmPeerToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         // A requested picker stays closed until the roster is authoritative. This
         // avoids excluding candidates against a stale or empty member snapshot.
-        var showAddMember by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showAddMember by rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) {
+            mutableStateOf(false)
+        }
         val addSelection =
-            rememberSaveable(controller.group.groupIdHex, saver = AddMemberSelectionSaver) {
+            rememberSaveable(
+                controller.group.groupIdHex,
+                appState.activeAccountRef,
+                saver = AddMemberSelectionSaver,
+            ) {
                 mutableStateListOf<RecipientSearch.Candidate>()
             }
+        val addAdminSelection =
+            rememberSaveable(
+                controller.group.groupIdHex,
+                appState.activeAccountRef,
+                saver = InitialAdminSelectionSaver,
+            ) {
+                mutableStateListOf<String>()
+            }
+        LaunchedEffect(addSelection.map { it.accountIdHex }) {
+            addAdminSelection.removeAll { admin ->
+                addSelection.none { it.accountIdHex.equals(admin, ignoreCase = true) }
+            }
+        }
         var showLargeGroupInviteConfirmation by
             rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
         val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
@@ -313,16 +335,16 @@ internal fun GroupDetailsScreen(
         // engine-authoritative; fetch on entry and again whenever the group
         // record moves, so a remote admin's enable/disband lands here without
         // reopening the screen.
-        LaunchedEffect(controller, controller.group) {
-            controller.refreshManagementState()
-        }
+        GroupManagementSnapshotRefreshEffect(controller)
         var mlsState by remember(controller.group.groupIdHex) { mutableStateOf<AppGroupMlsStateFfi?>(null) }
         var mlsLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var pushDebugInfo by remember(controller.group.groupIdHex) { mutableStateOf<GroupPushDebugInfoFfi?>(null) }
         var pushDebugLoading by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         // Scoped to the visible group; the controller mutation continues on appState
         // if the user switches conversations, but this sheet stops tracking it.
-        var activeMutation by remember(controller.group.groupIdHex) { mutableStateOf<ActiveGroupMutation?>(null) }
+        var activeMutation by remember(controller, appState.activeAccountRef) {
+            mutableStateOf<ActiveGroupMutation?>(null)
+        }
         // Tap-time archive direction, recorded before the mutation coroutine is
         // dispatched so the menu's progress label can never read the pre-intent
         // presented state and show the opposite direction.
@@ -373,6 +395,7 @@ internal fun GroupDetailsScreen(
                 showAddMember = false
                 showLargeGroupInviteConfirmation = false
                 addSelection.clear()
+                addAdminSelection.clear()
             }
         }
         val noShareTargetText = stringResource(R.string.no_share_target_available)
@@ -624,13 +647,22 @@ internal fun GroupDetailsScreen(
             refreshPushDebugInfo()
         }
 
-        // Close the picker only after the controller has accepted the invite and
-        // installed its optimistic row. This avoids dismissing a selection when a
-        // competing mutation won the controller's single-flight guard.
-        LaunchedEffect(showAddMember, controller.pendingInviteMemberRefs) {
-            if (showAddMember && controller.pendingInviteMemberRefs.isNotEmpty()) {
+        // Observe the native result from the current composition, including after rotation.
+        // Optimistic pending rows do not establish that the invitation succeeded.
+        val inviteSelectionApplied =
+            rosterReady &&
+                addSelection.isNotEmpty() &&
+                addSelection.all { selected ->
+                    controller.members.any { it.memberIdHex.equals(selected.accountIdHex, ignoreCase = true) }
+                } &&
+                addAdminSelection.all { admin ->
+                    controller.group.admins.any { it.equals(admin, ignoreCase = true) }
+                }
+        LaunchedEffect(showAddMember, inviteSelectionApplied, controller.mutationInFlight) {
+            if (showAddMember && inviteSelectionApplied && !controller.mutationInFlight) {
                 showLargeGroupInviteConfirmation = false
                 addSelection.clear()
+                addAdminSelection.clear()
                 if (addMemberAutoOpened) onBack() else showAddMember = false
             }
         }
@@ -784,17 +816,10 @@ internal fun GroupDetailsScreen(
             fun submitSelectedInvites() {
                 if (!canAdministerMembers) return
                 val refs = addSelection.map { it.accountIdHex }
-                // Members are added as regular members; admin is granted
-                // per-member afterward from the profile sheet. The old bulk
-                // "add as admin" toggle couldn't express per-member intent for
-                // a multi-select add, so it's gone.
+                val admins = refs.filter { id -> addAdminSelection.any { it.equals(id, ignoreCase = true) } }
                 runGroupMutation(
                     action = GroupMutationAction.InviteMember,
-                    mutation = { controller.inviteMembers(refs, addAsAdmin = false) },
-                    onSuccess = {
-                        addSelection.clear()
-                        if (addMemberAutoOpened) onBack() else showAddMember = false
-                    },
+                    mutation = { controller.inviteMembers(refs, initialAdminRefs = admins) },
                 )
             }
 
@@ -814,6 +839,7 @@ internal fun GroupDetailsScreen(
                     if (!adding) {
                         showLargeGroupInviteConfirmation = false
                         addSelection.clear()
+                        addAdminSelection.clear()
                         if (addMemberAutoOpened) onBack() else showAddMember = false
                     }
                 },
@@ -826,6 +852,19 @@ internal fun GroupDetailsScreen(
                     }
                 },
                 confirmIcon = Icons.Default.Check,
+                initialAdminIds = addAdminSelection.toSet(),
+                onInitialAdminChange = { member, admin ->
+                    if (!adding && canAdministerMembers) {
+                        addAdminSelection.removeAll { it.equals(member.accountIdHex, ignoreCase = true) }
+                        val selected =
+                            addSelection.any {
+                                it.accountIdHex.equals(member.accountIdHex, ignoreCase = true)
+                            }
+                        if (admin && selected) {
+                            addAdminSelection.add(member.accountIdHex)
+                        }
+                    }
+                },
                 confirmLabel = stringResource(R.string.add_member),
                 // The picker opens optimistically from the seed, but the commit
                 // needs the authoritative roster: hold the confirm busy until it
@@ -2526,3 +2565,17 @@ private data class ActiveGroupMutation(
 )
 
 private const val KEY_COPY_FEEDBACK_MILLIS = 2_000L
+
+/** Visible details follow settled membership as well as metadata, without polling equal native records. */
+@Suppress("FunctionNaming") // Compose effect follows the same naming convention as other composables.
+@Composable
+internal fun GroupManagementSnapshotRefreshEffect(controller: ConversationController) {
+    LaunchedEffect(
+        controller,
+        controller.group,
+        controller.members,
+        controller.memberRosterState,
+    ) {
+        controller.refreshManagementState()
+    }
+}

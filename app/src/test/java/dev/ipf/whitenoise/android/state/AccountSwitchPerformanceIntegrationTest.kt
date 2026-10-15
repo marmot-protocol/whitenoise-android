@@ -40,6 +40,7 @@ class AccountSwitchPerformanceIntegrationTest {
             try {
                 fixture.bootstrap()
                 val directReadsBeforeSwitch = fixture.directChatListCalls.get()
+                val identityReadsBeforeSwitch = fixture.identityProjectionPages.size
                 var snapshotAtActivation: AccountSwitchLocalSnapshot? = null
                 var profileTitleAtActivation: String? = null
                 val activated =
@@ -66,6 +67,9 @@ class AccountSwitchPerformanceIntegrationTest {
                     snapshotAtActivation?.rows,
                 )
                 assertEquals("target profile seeds must be visible at activation", "Alice", profileTitleAtActivation)
+                val switchIdentityPages = fixture.identityProjectionPages.drop(identityReadsBeforeSwitch)
+                assertEquals(1, switchIdentityPages.size)
+                assertEquals(listOf(ACCOUNT_A_ID), switchIdentityPages.single())
                 assertEquals(
                     "account activation should need one authoritative row read",
                     directReadsBeforeSwitch + 1,
@@ -123,6 +127,8 @@ class AccountSwitchPerformanceIntegrationTest {
                 assertEquals(150, snapshotAtActivation?.memberIds?.size)
                 assertTrue(snapshotAtActivation?.groups?.isEmpty() == true)
                 assertEquals("Alice", fixture.appState.chatMemberTitleCached(peerId(1)))
+                assertTrue(fixture.identityProjectionPages.any { it.size == 100 })
+                assertTrue(fixture.identityProjectionPages.all { it.size <= 100 })
                 assertTrue(fixture.memberProjectionCalls.get() > 0)
                 assertEquals(0, fixture.localSnapshotGroupSubscriptionCalls.get())
             } finally {

@@ -55,6 +55,35 @@ class AuditLogShareTest {
     }
 
     @Test
+    fun explicitNativeOnlySnapshotIsIncludedOnceWithoutBecomingRetainedCapture() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        DictationDiagnostics.attach(context)
+        try {
+            DictationDiagnostics.setEnabled(false)
+            PerformanceDiagnostics.stop()
+            clearAuditAndDictationLogShares(context.cacheDir)
+            val native = "native_performance schema=1 scope=process_cumulative\n".toByteArray()
+            val archive =
+                requireNotNull(
+                    prepareAuditAndDictationLogArchive(
+                        context,
+                        emptyList(),
+                        performanceLogBytes = null,
+                        nativePerformanceLogBytes = native,
+                    ),
+                )
+            val entries = archive.entries()
+            assertEquals(native.decodeToString(), entries["native-performance-snapshot.txt"])
+            assertEquals(setOf("dictation-manifest.json", "native-performance-snapshot.txt"), entries.keys)
+            assertFalse(JSONObject(entries.getValue("dictation-manifest.json")).getBoolean("collection_enabled"))
+            clearAuditAndDictationLogShares(context.cacheDir)
+            assertNull(prepareAuditAndDictationLogArchive(context, emptyList(), performanceLogBytes = null))
+        } finally {
+            clearAuditAndDictationLogShares(context.cacheDir)
+        }
+    }
+
+    @Test
     fun invalidRetainedFileStillExportsItsRecoveryManifest() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         DictationDiagnostics.attach(context)

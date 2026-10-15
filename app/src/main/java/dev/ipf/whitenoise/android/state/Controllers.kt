@@ -6230,6 +6230,15 @@ class ConversationController(
     private val windowPreparationDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val windowApplyNanoTime: () -> Long = System::nanoTime,
     private val onWindowApplyMeasured: (WindowApplyPerformanceSample) -> Unit = {},
+    private val groupSnapshotReader: suspend (String, String) -> dev.ipf.marmotkit.GroupConversationSnapshotFfi =
+        { account, groupId -> appState.marmotIo { groupConversationSnapshot(account, groupId) } },
+    private val initialAdminInviteWriter:
+        suspend (String, String, List<String>, List<String>) -> dev.ipf.marmotkit.GroupMutationResultFfi =
+        { account, groupId, members, admins ->
+            appState.marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
+                inviteMembersDetailedWithInitialAdmins(account, groupId, members, admins)
+            }
+        },
 ) {
     private val liveSubscriptions = appState.conversationLiveSubscriptions()
 
@@ -11824,10 +11833,18 @@ class ConversationController(
             GroupAdministrationCommitOutcome.NO_CHANGE -> false
         }
 
-    @Suppress("LongMethod") // Invite and optional promotion form one optimistic roster transaction.
+    /**
+     * Invites the captured recipients and their initial admin subset in one native membership commit.
+     * [initialAdminRefs] must be a subset of [memberRefs]; its default preserves the older all-admin
+     * [addAsAdmin] option while ordinary invitations default to members. Authority is rechecked inside
+     * the group commit lock. An uncertain reply may be confirmed by a fresh authoritative read, but
+     * never triggers another invitation or a separate promotion commit.
+     */
+    @Suppress("LongMethod") // One captured role selection, native commit and authoritative reconciliation.
     suspend fun inviteMembers(
         memberRefs: List<String>,
         addAsAdmin: Boolean = false,
+        initialAdminRefs: List<String> = if (addAsAdmin) memberRefs else emptyList(),
     ): Boolean {
         return withMutationLockResult(false) {
             lastMutationError = null
@@ -11837,28 +11854,26 @@ class ConversationController(
             if (refs.isEmpty()) return@withMutationLockResult false
             optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
                 val activityId = pendingMembershipActivity?.id
-                var inviteSent = false
+                var nativeInvoked = false
+                var canonicalAdmins = emptyList<String>()
+                val runtimeGeneration = appState.runtimeGeneration
+                val absentBefore = refs.none { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
                 try {
-                    val adminTargets = if (addAsAdmin) refs else emptyList()
+                    val adminTargets = resolveCanonicalInviteRefs(initialAdminRefs) ?: return@track false
+                    canonicalAdmins = adminTargets
+                    check(adminTargets.all { admin -> refs.any { it.equals(admin, ignoreCase = true) } }) {
+                        "Initial admin selection contains an unselected recipient"
+                    }
                     val outcome =
                         appState.withGroupCommitLock(account, group.groupIdHex) {
                             if (!canAdministerMembersFromAuthoritativeRoster()) {
                                 return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             }
-                            val inviteResult =
-                                appState.marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
-                                    inviteMembersDetailed(account, group.groupIdHex, refs)
-                                }
-                            applyMutationDetails(account, inviteResult.details)
-                            inviteSent = true
+                            val authorityEpoch = groupAuthorityEpoch
+                            nativeInvoked = true
+                            val inviteResult = initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
+                            publishInitialAdminInviteResult(account, inviteResult, authorityEpoch, runtimeGeneration)
                             optimisticGroupRosterMutation.settleMembershipActivity(activityId)
-                            adminTargets.forEach { target ->
-                                val promoteResult =
-                                    appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
-                                        promoteAdminDetailed(account, group.groupIdHex, target)
-                                    }
-                                applyMutationDetails(account, promoteResult.details)
-                            }
                             GroupAdministrationCommitOutcome.COMMITTED
                         }
                     if (outcome == GroupAdministrationCommitOutcome.ROSTER_CHANGED) {
@@ -11869,18 +11884,12 @@ class ConversationController(
                     true
                 } catch (throwable: Throwable) {
                     throwable.rethrowIfCancellation()
+                    if (reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore, nativeInvoked, throwable)) {
+                        presentConversationTransient(R.string.toast_invite_sent)
+                        return@track true
+                    }
                     val rawMessage = throwable.message.orEmpty()
-                    if (inviteSent && addAsAdmin) {
-                        // The invite is already out; keep the UI honest about the
-                        // partial success and leave the row-level Admin switch as the
-                        // retry path once the member appears in details.
-                        recordMutationFailure(
-                            R.string.toast_invite_sent_but_couldnt_add_admin,
-                            "GROUP_INVITE_ADMIN_PROMOTION",
-                            throwable,
-                        )
-                        true
-                    } else if (isDuplicateSignatureKeyError(rawMessage)) {
+                    if (isDuplicateSignatureKeyError(rawMessage)) {
                         // MLS rejected the add commit because the proposed member
                         // already holds a seat (or their signing key collides with
                         // an existing member's). The UI pre-checks membership, but a
@@ -11914,6 +11923,62 @@ class ConversationController(
                         false
                     }
                 }
+            }
+        }
+    }
+
+    /** A newer details read requires a fresh native snapshot after this commit, not its older result. */
+    private suspend fun publishInitialAdminInviteResult(
+        account: String,
+        result: dev.ipf.marmotkit.GroupMutationResultFfi,
+        authorityEpoch: Long,
+        runtimeGeneration: Int,
+    ) {
+        if (appState.runtimeGeneration != runtimeGeneration || controllerCleared || isAccountTeardownRequested()) return
+        if (groupAuthorityEpoch == authorityEpoch) {
+            applyManagementSnapshot(account, result.details, result.managementState)
+        } else {
+            refreshManagementState()
+        }
+    }
+
+    /** These typed key/routing rejections happen before the native membership commit. */
+    private fun inviteReplyNeedsReconciliation(throwable: Throwable): Boolean =
+        when (throwable) {
+            is MarmotKitException.MissingKeyPackage,
+            is MarmotKitException.MissingMemberInboxRoute,
+            is MarmotKitException.InvalidKeyPackageEvent,
+            -> false
+            else -> true
+        }
+
+    /** Read actual membership after an uncertain reply, without issuing a second invitation. */
+    private suspend fun reconcileInitialAdminInvite(
+        refs: List<String>,
+        admins: List<String>,
+        absentBefore: Boolean,
+        nativeInvoked: Boolean,
+        failure: Throwable,
+    ): Boolean {
+        val eligible = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
+        if (!eligible) return false
+        val beforeRead = groupAuthorityEpoch
+        refreshManagementState()
+        val observedMembers =
+            membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
+        val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
+        return groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
+    }
+
+    /** Native capabilities stay unknown when local terminal reconciliation changes their returned group. */
+    private fun applyManagementSnapshot(
+        account: String,
+        details: GroupDetailsFfi,
+        management: GroupManagementStateFfi,
+    ) {
+        androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+            if (applyMutationDetails(account, details)) {
+                managementState = management.takeIf { group == details.group }
             }
         }
     }
@@ -12058,14 +12123,31 @@ class ConversationController(
         private set
     private val managementStateLifetime = StalenessGuard()
 
-    /** Publishes only the newest management-capability request for this conversation. */
+    /** Details and capabilities share one native frontier; later group updates supersede this read. */
     suspend fun refreshManagementState() {
         val account = conversationAccountRef ?: return
         val requestToken = managementStateLifetime.advance()
+        val authorityEpoch = groupAuthorityEpoch
+        val rosterGeneration = memberRosterRefreshGeneration.capture()
+        val runtimeGeneration = appState.runtimeGeneration
+        val groupId = group.groupIdHex
+        val activeAccount = appState.activeAccountRef
+        val startingGroup = group
         runCatchingCancellable {
-            appState.marmotIo { groupManagementState(account, group.groupIdHex) }
+            groupSnapshotReader(account, groupId)
         }.onSuccess { refreshed ->
-            managementStateLifetime.runIfCurrent(requestToken) { managementState = refreshed }
+            managementStateLifetime.runIfCurrent(requestToken) {
+                val staleRead =
+                    !ownsCurrentMemberRead(rosterGeneration, runtimeGeneration) || groupAuthorityEpoch != authorityEpoch
+                val changedOwner = group != startingGroup || appState.activeAccountRef != activeAccount
+                val wrongTarget =
+                    !refreshed.details.group.groupIdHex
+                        .equals(groupId, ignoreCase = true) ||
+                        !refreshed.managementState.myAccountIdHex.equals(conversationAccountIdHex, ignoreCase = true) ||
+                        !matchesConversation(account, groupId)
+                if (staleRead || changedOwner || wrongTarget) return@runIfCurrent
+                applyManagementSnapshot(account, refreshed.details, refreshed.managementState)
+            }
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMConversation", "management state refresh failed", it)
         }

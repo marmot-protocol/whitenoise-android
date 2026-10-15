@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -165,6 +166,81 @@ class SelectedMembersReviewScreenTest {
 
         assertEquals(false, confirmed)
         assertEquals(false, removed)
+    }
+
+    @Test
+    fun inviteRolesDefaultToMemberAndChangeOnlyTheExplicitlyChosenRecipient() {
+        val roles = mutableStateListOf<String>()
+        var submitted = emptySet<String>()
+        var removed = 0
+        var confirmed = 0
+        val state = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SelectedMembersReviewScreen(
+                    members = members,
+                    appState = state,
+                    busy = false,
+                    onBack = {},
+                    onRemove = {
+                        removed += 1
+                        roles.remove(it.accountIdHex)
+                    },
+                    onConfirm = {
+                        confirmed += 1
+                        submitted = roles.toSet()
+                    },
+                    confirmIcon = Icons.Default.Check,
+                    confirmLabel = context.getString(R.string.add_member),
+                    initialAdminIds = roles.toSet(),
+                    onInitialAdminChange = { member, admin ->
+                        roles.remove(member.accountIdHex)
+                        if (admin) roles.add(member.accountIdHex)
+                    },
+                )
+            }
+        }
+        val memberLabel = context.getString(R.string.member)
+        val adminLabel = context.getString(R.string.admin)
+        composeRule.onNodeWithContentDescription("${members.first().displayName}, $memberLabel").performClick()
+        composeRule.onNodeWithText(members.first().npub).assertIsDisplayed()
+        composeRule.onNodeWithText(adminLabel).performClick()
+        composeRule.onNodeWithContentDescription("${members.first().displayName}, $adminLabel").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("${members.last().displayName}, $memberLabel").assertIsDisplayed()
+        assertEquals(0, removed)
+        assertEquals(0, confirmed)
+        composeRule.onNodeWithText(context.getString(R.string.add_member)).performClick()
+        assertEquals(setOf(members.first().accountIdHex), submitted)
+        val removeLabel = context.getString(R.string.remove_member_named, members.first().displayName)
+        composeRule.onNodeWithContentDescription(removeLabel).performClick()
+        assertEquals(emptyList<String>(), roles.toList())
+    }
+
+    @Test
+    fun busyRoleMenuCannotChangePrivileges() {
+        var changes = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SelectedMembersReviewScreen(
+                    members = members,
+                    appState = appState(),
+                    busy = true,
+                    onBack = {},
+                    onRemove = {},
+                    onConfirm = {},
+                    confirmIcon = Icons.Default.Check,
+                    confirmLabel = context.getString(R.string.add_member),
+                    onInitialAdminChange = { _, _ -> changes += 1 },
+                )
+            }
+        }
+        val memberLabel = context.getString(R.string.member)
+        composeRule
+            .onNodeWithContentDescription("${members.first().displayName}, $memberLabel")
+            .assertIsNotEnabled()
+            .performClick()
+        composeRule.onNodeWithText(context.getString(R.string.admin)).assertDoesNotExist()
+        assertEquals(0, changes)
     }
 
     private fun appState() =

@@ -26,6 +26,7 @@ fun WhiteNoiseDropdownMenu(
     onDismissRequest: () -> Unit,
     items: List<WhiteNoiseMenuItem>,
     modifier: Modifier = Modifier,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val menuScrollState = rememberScrollState()
     DropdownMenu(
@@ -37,6 +38,7 @@ fun WhiteNoiseDropdownMenu(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         border = amoledOutlineBorder(),
     ) {
+        header?.invoke()
         items.forEach { item ->
             val contentColor =
                 if (item.destructive) {

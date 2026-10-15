@@ -117,6 +117,15 @@
         ]
       },
       {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "surface": "GroupManagementSnapshotRefreshEffect",
+        "anchor": "fun GroupManagementSnapshotRefreshEffect(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-030"
+        ]
+      },
+      {
         "surface": "R.string.translation_automatic",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.translation_automatic",
@@ -1387,6 +1396,14 @@
         "anchor": "rememberProfileAccountWideGroups(",
         "test_ids": [
           "ACC-021"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "surface": "Invitation retry preserves recipients and roles",
+        "anchor": "fun submitSelectedInvites()",
+        "test_ids": [
+          "GRP-030"
         ]
       }
     ]

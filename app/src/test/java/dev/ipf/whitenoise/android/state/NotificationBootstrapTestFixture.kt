@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
+import dev.ipf.marmotkit.CachedIdentityProjectionFfi
 import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -186,6 +187,7 @@ internal class NotificationBootstrapTestFixture(
         }
 
     val runtimeStartCalls = AtomicInteger(0)
+    val identityProjectionPages = CopyOnWriteArrayList<List<String>>()
     val subscriptionCalls = AtomicInteger(0)
     val localSnapshotSubscriptionCalls = AtomicInteger(0)
     val localSnapshotGroupSubscriptionCalls = AtomicInteger(0)
@@ -496,6 +498,20 @@ internal class NotificationBootstrapTestFixture(
                     onGroupMemberIdsPage?.invoke(groupIds) ?: emptyList<AppGroupMemberIdsFfi>()
                 }
                 "userProfile" -> onUserProfile?.invoke(arguments?.first() as String)
+                "cachedIdentityProjections" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val ids = arguments?.first() as List<String>
+                    identityProjectionPages += ids.toList()
+                    ids.map { id ->
+                        CachedIdentityProjectionFfi(
+                            requestedId = id,
+                            accountIdHex = id.lowercase(),
+                            localLabel = null,
+                            profile = onUserProfile?.invoke(id),
+                            resolvedName = onDisplayName?.invoke(0, id) ?: localDisplayName,
+                        )
+                    }
+                }
                 "downloadProfileImage" -> {
                     val download = profileImageDownload ?: error("Unexpected Marmot call: downloadProfileImage")
                     download(arguments?.get(0) as String, (arguments[1] as Long).toULong())
