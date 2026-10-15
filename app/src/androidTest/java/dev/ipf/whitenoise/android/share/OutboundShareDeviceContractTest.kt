@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.share
 
 import android.app.Activity
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -117,7 +116,7 @@ class OutboundShareDeviceContractTest {
                 }
             try {
                 val neighborUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", neighbor)
-                selectIndependentReceiver(context, staged, attachments, neighborUri)
+                selectIndependentReceiver(staged, attachments, neighborUri)
             } finally {
                 staged.deletePlaintext()
             }
@@ -144,9 +143,13 @@ class OutboundShareDeviceContractTest {
         )
     }
 
-    /** Clicks the independent target in the real chooser and validates the receiving UID's observations. */
+    /**
+     * Opens the real chooser from the foreground activity, as the app does, clicks the independent target and
+     * validates the receiving UID's observations. A chooser started from the application context gets its own
+     * new task; tearing that task down after the selection left the just-launched receiver without an activity,
+     * cached and frozen, on the 2 GB CI emulator.
+     */
     private suspend fun selectIndependentReceiver(
-        context: Context,
         staged: StagedMessageShareStreams,
         attachments: List<PendingAttachment>,
         neighborUri: android.net.Uri,
@@ -157,10 +160,11 @@ class OutboundShareDeviceContractTest {
             outboundShareIntent(FIXTURE_CAPTION, staged.streams)
                 .putExtra("outbound_share_fixture.neighbor", neighborUri.toString())
                 .putExtra("outbound_share_fixture.result", resultReceiver(result))
-        val chooser = outboundShareChooser(context, send, "Share")
         val device = UiDevice.getInstance(instrumentation)
         try {
-            instrumentation.runOnMainSync { context.startActivity(chooser) }
+            foregroundActivity.onActivity { activity ->
+                activity.startActivity(outboundShareChooser(activity, send, "Share"))
+            }
             findIndependentReceiver(device).click()
             val (code, observed) = awaitObservations(result, device)
             assertEquals(Activity.RESULT_OK, code)
