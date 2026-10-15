@@ -24,6 +24,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
@@ -67,8 +68,12 @@ class OutboundShareDeviceContractTest {
         if (::foregroundActivity.isInitialized) foregroundActivity.close()
     }
 
-    /** Real implicit discovery must find an independent receiver before a generated TXT is staged. */
+    /**
+     * Real implicit discovery must find an independent receiver before a generated TXT is staged.
+     * Runs only on the dedicated outbound-share lane while the 2 GB connected lane's receiver hang is open (#3300).
+     */
     @Test
+    @ManualDeviceFixture
     fun implicitTxtChooserTransfersExactBytesNameAndOnlySelectedUri() =
         runBlocking {
             assertIndependentChooser(
@@ -76,8 +81,12 @@ class OutboundShareDeviceContractTest {
             )
         }
 
-    /** SEND_MULTIPLE uses the same discovery contract and preserves captions, order and mixed MIME. */
+    /**
+     * SEND_MULTIPLE uses the same discovery contract and preserves captions, order and mixed MIME.
+     * Runs only on the dedicated outbound-share lane while the 2 GB connected lane's receiver hang is open (#3300).
+     */
     @Test
+    @ManualDeviceFixture
     fun implicitMultiFileChooserPreservesCaptionOrderAndMixedMime() =
         runBlocking {
             assertIndependentChooser(
