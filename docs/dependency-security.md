@@ -19,6 +19,9 @@ or the R8-retained APK. Native MarmotKit requires its own target/feature invento
 The same hook fingerprints external module artifacts on each already-selected
 configuration; it adds no configurations or compilation tasks. Cached adjacent
 POMs supply declared licence names/URLs and their POM hashes when available.
+Only the POM's project-level licence declarations qualify. Unparseable cached
+POMs, including rejected DOCTYPEs, leave licences `not_observed` without changing
+dependency selection; external XML access remains disabled.
 Missing declarations remain `not_observed`; a Maven namespace is a supplier hint,
 not verified legal ownership. These records are observations, not dependency locks
 or a replacement for the existing licence/notices generator.

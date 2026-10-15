@@ -19,7 +19,10 @@ def module(repository, artifact, version, group='org.freemarker'):
         f'<project><modelVersion>4.0.0</modelVersion><groupId>{group}</groupId>'
         f'<artifactId>{artifact}</artifactId><version>{version}</version>'
         '<licenses><license><name>Fixture licence</name><url>https://example.invalid/license</url>'
-        '</license></licenses></project>')
+        '</license></licenses><build><plugins><plugin><artifactId>fixture-not-run</artifactId>'
+        '<configuration><license><name>Plugin option, not a project licence</name>'
+        '<url>https://example.invalid/unused</url></license></configuration>'
+        '</plugin></plugins></build></project>')
     with zipfile.ZipFile(folder / f'{artifact}-{version}.jar', 'w'):
         pass
 
@@ -35,6 +38,9 @@ def main():
         wire_versions = ['7.0.0-alpha03', '7.0.0-alpha04', '7.0.0-alpha04-SNAPSHOT', '7.0.0-alpha05']
         for version in wire_versions:
             module(repository, 'wire-runtime', version, group='com.squareup.wire')
+        module(repository, 'legacy', '1.0')
+        legacy_pom = repository / 'org/freemarker/legacy/1.0/legacy-1.0.pom'
+        legacy_pom.write_text('<!DOCTYPE project [<!ELEMENT project ANY>]>' + legacy_pom.read_text())
         (repository / 'com/squareup/wire/wire-runtime/maven-metadata.xml').write_text(
             '<metadata><groupId>com.squareup.wire</groupId><artifactId>wire-runtime</artifactId>'
             '<versioning><latest>7.0.0-alpha05</latest><release>7.0.0-alpha05</release><versions>'
@@ -68,7 +74,7 @@ buildscript {
     dependencies { classpath 'org.freemarker:freemarker:2.3.32' }
 }
 repositories { maven { url = uri('maven') } }
-configurations { belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic }
+configurations { belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom }
 dependencies {
     belowFloor 'org.freemarker:freemarker:2.3.32'
     newer 'org.freemarker:freemarker:2.3.36'
@@ -77,6 +83,7 @@ dependencies {
     wireAlpha 'com.squareup.wire:wire-runtime:7.0.0-alpha03'
     wireSuffix 'com.squareup.wire:wire-runtime:7.0.0-alpha04-SNAPSHOT'
     wireDynamic 'com.squareup.wire:wire-runtime:7.0.0-alpha04+'
+    legacyPom 'org.freemarker:legacy:1.0'
 }
 tasks.register('verifySecurityFixture') {
     doLast {
@@ -92,6 +99,7 @@ tasks.register('verifySecurityFixture') {
         assert selected(configurations.wireAlpha) == '7.0.0-alpha04'
         assert selected(configurations.wireSuffix) == '7.0.0-alpha04'
         assert selected(configurations.wireDynamic) == '7.0.0-alpha04'
+        assert selected(configurations.legacyPom) == '1.0'
         assert buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts*.moduleVersion*.id*.version == ['2.3.35']
         boolean rejected = false
         try { configurations.affectedRange.resolve() }
@@ -112,6 +120,9 @@ tasks.register('verifySecurityFixture') {
         assert selected_report['artifacts'][0]['coordinate'] == 'org.freemarker:freemarker:2.3.35'
         assert len(selected_report['artifacts'][0]['sha256']) == 64
         assert selected_report['components'][0]['licenses'][0]['name'] == 'Fixture licence'
+        assert len(selected_report['components'][0]['licenses']) == 1
+        legacy_report = next(r for r in reports if r['configuration'] == 'legacyPom')
+        assert legacy_report['components'][0]['licenses'] == []
         print('Gradle fixture PASS: raised exact request, retained newer/dynamic selection, '
               'rejected affected-only range and unsafe Wire alpha/suffixes, plugin/project reports')
 

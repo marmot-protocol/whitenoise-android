@@ -24,10 +24,18 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def stream_digest(stream):
+    """Hash a file or ZIP member incrementally without newer interpreter APIs."""
+    result = hashlib.sha256()
+    for block in iter(lambda: stream.read(1024 * 1024), b""):
+        result.update(block)
+    return result.hexdigest()
+
+
 def digest(path):
     """Hash existing payloads incrementally, including large APKs and native files."""
     with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+        return stream_digest(stream)
 
 
 def fingerprint(path):
@@ -168,7 +176,7 @@ def packaged_native(path, distribution, provenance):
             match = re.fullmatch(re.escape(prefix) + r"([A-Za-z0-9_-]+)/([A-Za-z0-9_.-]+\.so)", name)
             require(match, "Malformed packaged native path")
             with archive.open(name) as stream:
-                sha = hashlib.file_digest(stream, "sha256").hexdigest()
+                sha = stream_digest(stream)
             marmot = match[2] == "libmarmot_uniffi.so"
             require(not marmot or known.get(match[1]) == sha, "Packaged MarmotKit differs from verified artifact")
             records.append({"path": name, "abi": match[1], "sha256": sha,

@@ -35,9 +35,17 @@ class DependencyInventoryFiles {
                 factory.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true)
                 factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, '')
                 factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, '')
-                def nodes = factory.newDocumentBuilder().parse(pom).getElementsByTagName('license')
+                def document
+                try {
+                    document = factory.newDocumentBuilder().parse(pom)
+                } catch (org.xml.sax.SAXException | IOException ignored) {
+                    // Optional cached licence metadata never weakens or blocks dependency selection.
+                    return
+                }
+                def nodes = document.getElementsByTagName('license')
                 for (int index = 0; index < nodes.length; index++) {
                     def node = nodes.item(index)
+                    if (node.parentNode.nodeName != 'licenses' || node.parentNode.parentNode != document.documentElement) continue
                     def name = node.getElementsByTagName('name').item(0)?.textContent?.trim() ?: ''
                     def url = node.getElementsByTagName('url').item(0)?.textContent?.trim() ?: ''
                     declarations.add([name: name, url: url, pom_sha256: sha256(pom)])

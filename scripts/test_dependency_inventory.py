@@ -113,7 +113,8 @@ class DependencyInventoryTest(unittest.TestCase):
             output = root / "inventory" / "release.json"
             argv = ["inventory", "release", "--bundle", str(root), "--reports", str(reports),
                     "--provenance", str(provenance_path), "--lock", str(lock), "--output", str(output)]
-            with mock.patch.object(inventory.subprocess, "check_output", return_value=SOURCE + "\n"), \
+            with mock.patch.object(inventory.hashlib, "file_digest", None, create=True), \
+                 mock.patch.object(inventory.subprocess, "check_output", return_value=SOURCE + "\n"), \
                  mock.patch("sys.argv", argv):
                 self.assertEqual(inventory.main(), 0)
                 exported = inventory.read_json(output)
