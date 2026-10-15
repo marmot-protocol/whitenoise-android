@@ -5,6 +5,7 @@ import android.system.OsConstants
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,6 +45,123 @@ class ConversationDictationCallerAudioPipeFailureTest {
                 if (eagain) throw ErrnoException("write", OsConstants.EAGAIN)
                 0
             }
+        }
+    }
+
+    /** The real feeder's requeue cannot reset the retry budget between pipe and empty failures. */
+    @Test
+    fun mixedPipeAndEmptyFailuresExhaustTheSameChunkRetryBudget() {
+        val buffer = pcmBuffer()
+        val writes = AtomicInteger(0)
+        val capture =
+            sealedCapture(
+                buffer,
+                ConversationDictationAudioPipeWriter { _, _, _, length ->
+                    if (writes.incrementAndGet() == 2) length else throw IOException("pipe disconnected")
+                },
+            ) { 0L }
+        val recognition = ConversationDictationRecognitionCoordinator()
+        val streams = mutableListOf<ConversationDictationCallerAudioStream>()
+        val failures = CopyOnWriteArrayList<ConversationDictationCallerAudioFailure>()
+        val callbackIdentity = CopyOnWriteArrayList<Pair<Long?, String?>>()
+        val callbackRequeued = CopyOnWriteArrayList<Boolean>()
+        val callbackReleased = CopyOnWriteArrayList<Boolean>()
+
+        fun session(stream: ConversationDictationCallerAudioStream) =
+            object : ConversationDictationRecognitionSession {
+                override fun start() = Unit
+
+                override fun stop() = Unit
+
+                override fun cancel() = Unit
+
+                override fun destroy() = Unit
+
+                override fun callerAudioRequest() = stream.request()
+
+                override fun callerAudioRequestVersion() = stream.requestVersion()
+
+                override fun callerAudioChunkId() = stream.chunkId()
+
+                override fun callerAudioContainsSpeech() = stream.containsSpeech()
+
+                override fun callerAudioFullyFed() = stream.fullyFed()
+
+                override fun retryCallerAudio() = stream.retry()
+
+                override fun retryCallerAudioWithFollowingAudio() = stream.retryWithFollowingAudio()
+            }
+
+        fun feed(): ConversationDictationCallerAudioStream {
+            val stream =
+                checkNotNull(
+                    capture.openProviderStream {
+                        failures.add(it)
+                        callbackRequeued.add(buffer.hasPending)
+                        callbackReleased.add(streams.last().request() == null)
+                        callbackIdentity.add(streams.last().chunkId() to streams.last().requestVersion())
+                    },
+                )
+            streams.add(stream)
+            val closed = CountDownLatch(1)
+            stream.onFeedClosed(closed::countDown)
+            assertTrue(stream.start())
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
+            return stream
+        }
+
+        fun resolve(
+            stream: ConversationDictationCallerAudioStream,
+            empty: Boolean,
+        ) = recognition.resolveFailure(
+            ConversationDictationRecognitionCoordinator.FailureInput(
+                session = session(stream),
+                empty = empty,
+                callerAudioPending = true,
+                countInputRetry = true,
+                capacityFailure = false,
+                maxRetries = 2,
+            ),
+        )
+
+        try {
+            val first = feed()
+            assertEquals(listOf(ConversationDictationCallerAudioFailure.PipeFailed), failures)
+            assertNull(first.request())
+            assertEquals(1L, first.chunkId())
+            assertEquals("1:4:0", first.requestVersion())
+            assertEquals(
+                ConversationDictationRecognitionCoordinator.FailureResolution.Retained(false),
+                resolve(first, empty = false),
+            )
+            assertEquals(1, recognition.failureAttempts)
+
+            val second = feed()
+            assertTrue(second.fullyFed())
+            assertEquals(1L, second.chunkId())
+            assertEquals(
+                ConversationDictationRecognitionCoordinator.FailureResolution.Retained(true),
+                resolve(second, empty = true),
+            )
+            assertEquals(2, recognition.failureAttempts)
+
+            val third = feed()
+            assertEquals(2, failures.size)
+            assertEquals(listOf(true, true), callbackRequeued)
+            assertEquals(listOf(true, true), callbackReleased)
+            assertEquals(listOf(1L to "1:4:0", 1L to "1:4:0"), callbackIdentity)
+            assertEquals(
+                ConversationDictationRecognitionCoordinator.FailureResolution.Exhausted,
+                resolve(third, empty = false),
+            )
+            assertEquals(3, recognition.failureAttempts)
+            assertArrayEquals(PCM, checkNotNull(buffer.poll()).pcm)
+        } finally {
+            streams.forEach {
+                it.cancel()
+                it.closeProviderEnd()
+            }
+            capture.discard {}
         }
     }
 

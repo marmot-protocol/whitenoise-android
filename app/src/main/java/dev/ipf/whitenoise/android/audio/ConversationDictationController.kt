@@ -274,6 +274,9 @@ internal interface ConversationDictationRecognitionSession {
     /** Production caller-audio requests carry exact replay and newly covered PCM provenance. */
     fun callerAudioRequest(): ConversationDictationAudioRequest? = null
 
+    /** Retry identity survives a feeder failure that already requeued its PCM. */
+    fun callerAudioRequestVersion(): String? = callerAudioRequest()?.version
+
     /** Accepts only a fully fed request, atomically settling audio and its transcript edit. */
     fun acknowledgeCallerAudio(transcript: String): ConversationDictationAudioSettlement? = null
 

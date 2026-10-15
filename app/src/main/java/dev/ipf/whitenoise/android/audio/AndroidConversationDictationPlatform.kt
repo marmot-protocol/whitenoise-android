@@ -711,6 +711,8 @@ private class AndroidConversationDictationRecognitionSession(
 
     override fun callerAudioRequest(): ConversationDictationAudioRequest? = callerAudio?.request()
 
+    override fun callerAudioRequestVersion(): String? = callerAudio?.requestVersion()
+
     override fun acknowledgeCallerAudio(transcript: String): ConversationDictationAudioSettlement? {
         val stream = callerAudio
         return stream?.acknowledge(transcript)

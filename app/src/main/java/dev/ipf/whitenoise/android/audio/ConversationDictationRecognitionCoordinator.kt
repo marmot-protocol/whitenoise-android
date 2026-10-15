@@ -125,7 +125,7 @@ internal class ConversationDictationRecognitionCoordinator {
             !digitalSilence &&
                 input.callerAudioPending &&
                 input.countInputRetry &&
-                recordFailure(chunkId, request?.version, input.capacityFailure) > input.maxRetries
+                recordFailure(chunkId, session?.callerAudioRequestVersion(), input.capacityFailure) > input.maxRetries
         return when {
             digitalSilence -> {
                 resetFailure()

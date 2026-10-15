@@ -549,6 +549,13 @@ internal class ConversationDictationCallerAudioStream(
     private val chunk = AtomicReference<ConversationDictationAudioChunk?>(null)
     private val request = AtomicReference<ConversationDictationAudioRequest?>(null)
 
+    private data class FailureIdentity(
+        val chunkId: Long,
+        val version: String,
+    )
+
+    private val failureIdentity = AtomicReference<FailureIdentity?>(null)
+
     /** Starts the device or feeder once; a sealed capture may only drain retained PCM. */
     fun start(): Boolean {
         if (!capture.start() || !feeding.compareAndSet(false, true)) return false
@@ -592,6 +599,9 @@ internal class ConversationDictationCallerAudioStream(
 
     fun request(): ConversationDictationAudioRequest? = request.get()
 
+    /** A failed feeder retains only retry identity after relinquishing its PCM request. */
+    fun requestVersion(): String? = request.get()?.version ?: failureIdentity.get()?.version
+
     /** Returns capture-side speech evidence for this generation's exact chunk, when claimed. */
     fun containsSpeech(): Boolean? = chunk.get()?.hasSpeech
 
@@ -599,7 +609,7 @@ internal class ConversationDictationCallerAudioStream(
     fun fullyFed(): Boolean = fullyFed.get()
 
     /** Returns the stable identity of this generation's exact claimed chunk. */
-    fun chunkId(): Long? = chunk.get()?.chunkId
+    fun chunkId(): Long? = chunk.get()?.chunkId ?: failureIdentity.get()?.chunkId
 
     /** Checks sealed final ownership without acknowledging or changing retained PCM. */
     fun isFinalChunk(): Boolean = chunk.get()?.let { buffer.isFinalChunk(it.chunkId) } == true
@@ -680,6 +690,7 @@ internal class ConversationDictationCallerAudioStream(
         conversationDictationDiagnostic(
             "event=caller_audio_feed_failed type=$failureType action=requeue",
         )
+        request.get()?.let { failureIdentity.set(FailureIdentity(it.chunk.chunkId, it.version)) }
         settle(requeue = true) {
             reportFailure(ConversationDictationCallerAudioFailure.PipeFailed)
         }
