@@ -29,8 +29,10 @@ and [foreground-service types](https://developer.android.com/develop/background-
 choice from an explicit gesture and a committed delivery. Silence seals capture
 and selects the configured default. Until delivery commits, the first explicit
 Paste or Send overrides that default; another explicit gesture cannot change
-it. The controller remains the owner of capture/drain barriers, generation
-fences and cancellation. The foreground card and in-app controls read that
+it. The controller owns the capture lease and facade; the recognition coordinator
+owns generation fences, replay provenance, transcript spans and bounded retries.
+The completion owner owns validation, conditional draft writes and one dispatch claim.
+The foreground card and in-app controls read that
 same state; `ConversationDictationNotification` renders the drawer controls
 without owning lifecycle or recognition.
 
@@ -42,7 +44,9 @@ against the unchanged origin without recording again. If the composer has change
 an explicit Paste recovers the transcript into the latest draft for review; Retry
 cannot absorb another writer’s text or attachment generation. A dispatch
 whose acceptance is uncertain remains `DeliveryUnknown` and offers no resend.
-Send never reports success by silently performing Paste. If recognition stopped with only a recognized prefix, Retry Send first requires an explicit choice to send that text or Paste it for review; provider settings remain accessible.
+Send never reports success by silently performing Paste. An incomplete recognition
+retains its unresolved audio for Retry and recovers known text into the origin draft;
+it cannot automatically submit that prefix. Provider settings remain accessible.
 An involuntary abort while recognition is still active retains this incomplete
 status. Completed text awaiting validation is not described as interrupted speech.
 
@@ -66,7 +70,7 @@ acknowledged. A failed transcription retains its bounded volatile PCM and text
 under non-microphone `specialUse` protection for up to 30 minutes, showing only
 “Dictation needs attention” and Open app. Recovery never leaves recording
 Cancel/Paste/Send controls behind. Explicit dismissal, successful delivery,
-Paste recovery or expiry ends that lease and wipes remaining PCM. Expiry leaves
+Paste recovery after all audio is resolved, or expiry ends that lease and wipes remaining PCM. Expiry leaves
 one ordinary dismissible notice. The recovery deadline uses elapsed time, including
 deep sleep. Timer delivery, foreground return, native closure and recovery actions
 check that deadline before reattaching or accessing retained data. Cleanup runs
@@ -74,8 +78,17 @@ when a callback executes; no wake lock or exact-alarm permission is added.
 The deadline limits recovery access, rather than promising an exact-time memory
 wipe while the CPU is asleep. Data cleanup and notification expiry run on the next
 callback after wake; expired data can never be used in that interval.
-Retry transcribes the sealed recording without
-opening a new microphone. When sealed PCM repeatedly fails after a recognized prefix, Send recovery offers an explicit choice: retranscribe the retained audio, Send recognized text after reviewing the incomplete-transcription warning, or Paste the prefix. Paste recovery can also preserve that prefix without restarting recognition. Choosing text keeps the original target and draft fence and gives up the failed audio tail. Send validation can dispose of that PCM before delivery succeeds; if validation or the draft fence blocks it, the already-confirmed prefix remains available as a completed text payload for Retry Send or Paste. Retry of the recording never silently skips a nonzero rejected tail. If Android destroyed the service, a foreground return
+Fresh caller-owned chunks contain at most 15 seconds of PCM. A rejected nonzero
+chunk can be retried with its immediately preceding recognized span when the
+whole request fits the 30-second provider limit. The provider's positive full
+result replaces that span, including corrections or punctuation changes; a
+blank result or NoMatch does not resolve any of the rejected samples. An exactly
+unchanged positive replay retains the earlier context and releases the newly
+covered quiet chunk, with its noncontiguous sample provenance kept explicit.
+Recognized context counts toward the 90-second volatile PCM limit, but is not
+unresolved audio. If context does not fit, is unavailable, or cannot be decoded,
+Retry retains every unresolved sample and does not open a new microphone. A
+foreground return after Android destroyed the service
 can reattach recovery; a rejected reattach preserves the existing failure/data. Every native closure acknowledgment uses the same logical-session fence. Returning before closure defers recovery reattachment and leaves the watchdog armed; leaving the foreground cancels that deferred request.
 
 While an authorized microphone type is active, connection wakes, registration
@@ -125,7 +138,7 @@ Disposal exceptions still release app audio ownership after recognizer teardown;
 they cannot substitute for native closure proof or narrow the microphone type.
 An uncertain dispatch retains its in-app explanation without a
 recovery lease or expiry notice because retrying that dispatch could duplicate it.
-Audio wiping covers current, queued and in-flight arrays held at discard time;
+Audio wiping covers current, queued, in-flight and retained recognized-context arrays held at discard time;
 it does not promise erasure of copies already released to the provider or garbage collector.
 
 ## Special-use declaration

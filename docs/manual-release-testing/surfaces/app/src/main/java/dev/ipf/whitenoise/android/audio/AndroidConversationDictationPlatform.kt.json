@@ -1,0 +1,41 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Dictation global microphone privacy recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
+        "anchor": "override fun microphoneAccess(): ConversationDictationMicrophoneAccess",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation caller-audio capability probe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
+        "anchor": "private class ConversationDictationCallerAudioProbe(",
+        "test_ids": [
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "Dictation platform-error cause mapping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
+        "anchor": "fun Int.toConversationDictationFailure()",
+        "test_ids": [
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "Native capture and pipe failures queue to the owning recognition generation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
+        "anchor": "internal fun mainThreadDictationCallerAudioFailure(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

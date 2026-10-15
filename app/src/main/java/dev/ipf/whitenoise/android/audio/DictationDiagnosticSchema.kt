@@ -117,6 +117,10 @@ internal object DictationDiagnosticSchema {
             "elapsed_ms",
             "delay_ms",
             "bytes",
+            "replay_bytes",
+            "new_bytes",
+            "replay_parts",
+            "request_seconds",
             "buffered",
             "ms",
             "first_sample",
@@ -259,6 +263,7 @@ internal object DictationDiagnosticSchema {
             "write_rejected",
             "write_retries_exhausted",
             "interrupted",
+            "timeout_or_interrupted",
             "timeout",
             "rejected",
             "buffer_full",
@@ -298,6 +303,7 @@ internal object DictationDiagnosticSchema {
             "provider_microphone",
             "pcm16",
             "10-30",
+            "10-15",
         ) + ConversationDictationFailure.entries.map { it.name } +
             ConversationDictationMode.entries.map { it.name } +
             ConversationDictationDeliveryMode.entries.map { it.name } +

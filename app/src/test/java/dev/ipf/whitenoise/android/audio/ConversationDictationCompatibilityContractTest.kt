@@ -101,13 +101,16 @@ class ConversationDictationCompatibilityContractTest {
         val controller =
             projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt")
                 .readText()
+        val platform =
+            projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt")
+                .readText()
 
         assertFalse("DICTATION_START_EXPERIMENT" in activity)
         assertFalse("ConversationDictationStartExperiment" in controller)
         assertFalse("checkRecognitionSupport" in controller)
-        assertTrue("event=platform_start_listening" in controller)
-        val listenerRegistration = controller.indexOf("recognizer.setRecognitionListener(")
-        val platformStart = controller.indexOf("recognizer.startListening(intent)")
+        assertTrue("event=platform_start_listening" in platform)
+        val listenerRegistration = platform.indexOf("recognizer.setRecognitionListener(")
+        val platformStart = platform.indexOf("recognizer.startListening(intent)")
         assertTrue(listenerRegistration >= 0 && platformStart > listenerRegistration)
     }
 
@@ -151,13 +154,13 @@ class ConversationDictationCompatibilityContractTest {
             source.close()
         }
 
-        val controller =
-            projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt")
+        val platform =
+            projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt")
                 .readText()
 
         // Capability detection must never open a recorder: it hands over a descriptor only.
-        assertFalse("AudioRecord(" in controller)
-        assertTrue("ConversationDictationCallerAudioProbe" in controller)
+        assertFalse("AudioRecord(" in platform)
+        assertTrue("ConversationDictationCallerAudioProbe" in platform)
     }
 
     @Test

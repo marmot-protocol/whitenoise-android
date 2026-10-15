@@ -125,8 +125,9 @@ private class AndroidConversationDictationAudioCaptureDevice(
  * Owns one continuous microphone capture for a logical dictation session.
  *
  * Recognition generations attach one provider stream at a time. Capture is split into immutable
- * sentence-aware chunks bounded at 30 seconds. It remains active while the provider returns a
- * final and the next recognizer is created. Queued and in-flight PCM is bounded to 90 seconds;
+ * sentence-aware fresh chunks bounded at 15 seconds. It remains active while the provider returns a
+ * final and the next recognizer is created. Contextual requests may replay up to 30 seconds.
+ * Queued, in-flight and recognized-context PCM is bounded to 90 seconds;
  * overflow stops capture instead of silently dropping a read.
  */
 @Suppress("TooManyFunctions")
@@ -175,7 +176,8 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
         conversationDictationDiagnostic(
             "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
-                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-30 buffer_seconds=90",
+                "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-15 " +
+                    "request_seconds=30 buffer_seconds=90",
         )
         captureThreadStarted.set(true)
         thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
@@ -185,7 +187,9 @@ internal class ConversationDictationCallerAudio internal constructor(
     /** Opens the only serial provider stream. The recorder itself is not restarted. */
     @Synchronized
     @Suppress("MaxLineLength", "ReturnCount")
-    fun openProviderStream(onFailure: (ConversationDictationCallerAudioFailure) -> Unit = {}): ConversationDictationCallerAudioStream? {
+    fun openProviderStream(
+        onFailure: (ConversationDictationCallerAudioFailure) -> Unit = {},
+    ): ConversationDictationCallerAudioStream? {
         if (discarded.get()) return null
         val pipe = openPipe() ?: return null
         val stream = ConversationDictationCallerAudioStream(this, pipe[1], pipe[0], buffer, pipeWriter, onFailure)
@@ -545,6 +549,7 @@ internal class ConversationDictationCallerAudioStream(
     private val captureFailureReported = AtomicBoolean(false)
     private val pipeFailureReported = AtomicBoolean(false)
     private val chunk = AtomicReference<ConversationDictationAudioChunk?>(null)
+    private val request = AtomicReference<ConversationDictationAudioRequest?>(null)
 
     /** Starts the device or feeder once; a sealed capture may only drain retained PCM. */
     fun start(): Boolean {
@@ -572,6 +577,19 @@ internal class ConversationDictationCallerAudioStream(
     /** Releases this generation’s chunk after a final transcript makes its audio expendable. */
     fun acknowledge(): Boolean = settle(requeue = false)
 
+    /** An accepted result covers the entire feed and settles its transcript-span provenance once. */
+    fun acknowledge(transcript: String): ConversationDictationAudioSettlement? {
+        if (!fullyFed.get() || !settled.compareAndSet(false, true)) return null
+        val owned = request.getAndSet(null) ?: return null
+        chunk.set(null)
+        val accepted = buffer.acknowledge(owned, transcript)
+        if (accepted == null) buffer.retry(owned.chunk.chunkId)
+        capture.streamSettled(this)
+        return accepted
+    }
+
+    fun request(): ConversationDictationAudioRequest? = request.get()
+
     /** Returns capture-side speech evidence for this generation's exact chunk, when claimed. */
     fun containsSpeech(): Boolean? = chunk.get()?.hasSpeech
 
@@ -589,6 +607,18 @@ internal class ConversationDictationCallerAudioStream(
 
     /** Extends a no-speech chunk with following audio before returning it to the queue. */
     fun retryWithFollowingAudio(): Boolean = settle(requeue = true, coalesceFollowingAudio = true)
+
+    /** Requeues the rejected new input with its immediately preceding recognized PCM. */
+    fun retryWithContext(): Boolean {
+        val owned = request.get() ?: return false
+        if (!buffer.canRetryWithContext(owned)) return false
+        if (!settled.compareAndSet(false, true)) return false
+        val requeued = buffer.retryWithContext(owned)
+        request.set(null)
+        chunk.set(null)
+        capture.streamSettled(this)
+        return requeued
+    }
 
     /** Closes the feeder and relinquishes its lease, retaining unacknowledged PCM by default. */
     fun cancel(requeue: Boolean = true) {
@@ -611,15 +641,16 @@ internal class ConversationDictationCallerAudioStream(
     /** Claims one chunk, feeds its PCM, and requeues ownership on interruption or provider disconnection. */
     private fun feed() {
         try {
-            var owned: ConversationDictationAudioChunk? = null
+            var owned: ConversationDictationAudioRequest? = null
             while (!cancelled.get() && !settled.get() && owned == null) {
-                owned = buffer.poll()
+                owned = buffer.pollRequest()
                 if (owned == null) Thread.sleep(PIPE_RETRY_MILLIS)
             }
             if (owned == null) return
-            chunk.set(owned)
+            request.set(owned)
+            chunk.set(owned.chunk)
             if (cancelled.get() || settled.get()) {
-                if (chunk.compareAndSet(owned, null)) buffer.retry(owned.chunkId)
+                if (chunk.compareAndSet(owned.chunk, null)) buffer.retry(owned.chunk.chunkId)
                 return
             }
             writeChunk(owned)
@@ -648,39 +679,45 @@ internal class ConversationDictationCallerAudioStream(
     }
 
     /** Feeds an owned chunk until completion, cancellation, or a bounded nonblocking-write stall. */
-    private fun writeChunk(owned: ConversationDictationAudioChunk) {
+    private fun writeChunk(owned: ConversationDictationAudioRequest) {
         val sink = writeEnd.fileDescriptor
-        var offset = 0
+        var totalWritten = 0
         var stalledAt: Long? = null
-        while (!cancelled.get() && !settled.get() && offset < owned.pcm.size) {
-            val written =
-                try {
-                    pipeWriter.write(sink, owned.pcm, offset, owned.pcm.size - offset)
-                } catch (failure: ErrnoException) {
-                    if (failure.errno != OsConstants.EAGAIN) throw failure
-                    0
+        for (part in owned.pcmParts) {
+            var offset = 0
+            while (!cancelled.get() && !settled.get() && offset < part.pcm.size) {
+                val written =
+                    try {
+                        pipeWriter.write(sink, part.pcm, offset, part.pcm.size - offset)
+                    } catch (failure: ErrnoException) {
+                        if (failure.errno != OsConstants.EAGAIN) throw failure
+                        0
+                    }
+                if (written > 0) {
+                    offset += written
+                    totalWritten += written
+                    stalledAt = null
+                } else {
+                    val now = capture.elapsedRealtimeMillis()
+                    val since = stalledAt ?: now.also { stalledAt = it }
+                    if (now - since >= PIPE_STALL_TIMEOUT_MILLIS) {
+                        conversationDictationDiagnostic(
+                            "event=caller_audio_write_stalled chunk=${owned.chunk.chunkId} bytes=$totalWritten",
+                        )
+                        reportFeedFailure("PipeStalled")
+                        return
+                    }
+                    Thread.sleep(PIPE_RETRY_MILLIS)
                 }
-            if (written > 0) {
-                offset += written
-                stalledAt = null
-            } else {
-                val now = capture.elapsedRealtimeMillis()
-                val since = stalledAt ?: now.also { stalledAt = it }
-                if (now - since >= PIPE_STALL_TIMEOUT_MILLIS) {
-                    conversationDictationDiagnostic(
-                        "event=caller_audio_write_stalled chunk=${owned.chunkId} bytes=$offset",
-                    )
-                    reportFeedFailure("PipeStalled")
-                    return
-                }
-                Thread.sleep(PIPE_RETRY_MILLIS)
             }
         }
         conversationDictationDiagnostic(
-            "event=caller_audio_chunk_fed chunk=${owned.chunkId} first_sample=${owned.firstSample} " +
-                "last_sample=${owned.lastSampleExclusive} bytes=$offset",
+            "event=caller_audio_chunk_fed chunk=${owned.chunk.chunkId} first_sample=${owned.chunk.firstSample} " +
+                "last_sample=${owned.chunk.lastSampleExclusive} replay_parts=${owned.replayParts.size} " +
+                "replay_bytes=${owned.replayParts.sumOf { it.pcm.size }} " +
+                "new_bytes=${owned.chunk.pcm.size} bytes=$totalWritten",
         )
-        fullyFed.set(offset == owned.pcm.size && !cancelled.get() && !settled.get())
+        fullyFed.set(totalWritten == owned.pcmParts.sumOf { it.pcm.size } && !cancelled.get() && !settled.get())
     }
 
     /** Releases the active-stream lease exactly once, even before a chunk has been acquired. */
@@ -691,6 +728,7 @@ internal class ConversationDictationCallerAudioStream(
     ): Boolean {
         if (!settled.compareAndSet(false, true)) return false
         val owned = chunk.getAndSet(null)
+        request.set(null)
         val changed =
             when {
                 owned == null -> false
