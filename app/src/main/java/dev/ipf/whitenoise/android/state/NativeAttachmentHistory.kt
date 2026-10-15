@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
 import dev.ipf.marmotkit.AttachmentHistoryCursor
@@ -13,6 +14,8 @@ internal const val NATIVE_ATTACHMENT_HISTORY_PAGE_LIMIT = 100u
 internal data class NativeAttachmentHistoryMatch(
     val target: NativeAttachmentTarget,
     val reference: MediaAttachmentReferenceFfi,
+    /** MDK's parser category, the same one its automatic permission is checked against. */
+    val category: AttachmentCategoryFfi,
 )
 
 /** Returns an accepted history row only when its display, source, and original index agree. */
@@ -32,6 +35,7 @@ internal fun AttachmentEntryFfi.matchingAttachment(
     return NativeAttachmentHistoryMatch(
         target = NativeAttachmentTarget(messageIdHex, sourceMessageIdHex, accepted.attachmentIndex.toInt()),
         reference = accepted.reference,
+        category = category,
     )
 }
 

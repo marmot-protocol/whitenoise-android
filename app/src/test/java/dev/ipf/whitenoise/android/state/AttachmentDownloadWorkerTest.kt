@@ -130,4 +130,11 @@ class AttachmentDownloadWorkerTest {
             ),
         )
     }
+
+    /** A pending approval spends the single transient follow-up, and the spent budget stops it (#3308). */
+    @Test
+    fun pendingPermissionSpendsTheSingleTransientRetry() {
+        assertTrue(shouldRetryAttachmentDownloadWork(false, AttachmentPermissionPendingException()))
+        assertFalse(shouldRetryAttachmentDownloadWork(true, AttachmentPermissionPendingException()))
+    }
 }

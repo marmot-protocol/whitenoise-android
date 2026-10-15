@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
@@ -42,7 +43,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.spec.SecretKeySpec
 
 /** Real host download/cache plumbing with a controllable, network-free native boundary. */
-internal class MediaDownloadIntegrationFixture : AutoCloseable {
+internal class MediaDownloadIntegrationFixture(
+    accounts: List<AccountSummaryFfi> = emptyList(),
+) : AutoCloseable {
     private val root = Files.createTempDirectory("media-host-regression").toFile()
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
     private val diskRoot = java.io.File(root, "encrypted")
@@ -54,6 +57,10 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
     val automaticDemands = AtomicInteger()
     val explicitDemands = AtomicInteger()
     val retryDemands = AtomicInteger()
+
+    /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
+    val automaticPolicyBlocks = AtomicInteger()
+    val permissionApplications = AtomicInteger()
     val active = AtomicInteger()
     val peak = AtomicInteger()
     var onDownload: (Call) -> Unit = {}
@@ -63,7 +70,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
             context = ApplicationProvider.getApplicationContext<Context>(),
             draftStore = DraftStore(DiscardedDrafts),
             accountIdHexResolver = { null },
-            accounts = emptyList(),
+            accounts = accounts,
             activeAccountRef = ACCOUNT,
         ).also {
             field("marmotRuntime").set(it, AppMarmotRuntime("test", nativeBoundary()))
@@ -169,6 +176,13 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                     val retry = method.name.substringBefore('-') == "downloadAttachmentAgain"
                     if (automatic) {
                         automaticDemands.incrementAndGet()
+                        if (automaticPolicyBlocks.getAndUpdate { maxOf(0, it - 1) } > 0) {
+                            val blocked = AttachmentTransferStateFfi.POLICY_BLOCKED
+                            return@newProxyInstance AutomaticAttachmentRequestFfi(
+                                AttachmentTransferStatusFfi(null, blocked, 0u, 0u, null, null),
+                                false,
+                            )
+                        }
                     } else if (retry) {
                         retryDemands.incrementAndGet()
                     } else {
@@ -188,7 +202,10 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                     true
                 }
                 "beginAttachmentPermissionUpdate" -> "fixture-generation"
-                "setAttachmentAutomaticPermission" -> true
+                "setAttachmentAutomaticPermission" -> {
+                    permissionApplications.incrementAndGet()
+                    true
+                }
                 "downloadMedia" -> error("Legacy network fallback is forbidden")
                 "toString" -> "SyntheticMediaBoundary"
                 "hashCode" -> System.identityHashCode(proxy)

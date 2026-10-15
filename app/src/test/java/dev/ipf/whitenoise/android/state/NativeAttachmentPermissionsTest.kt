@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentAutomaticPermissionFfi
 import dev.ipf.marmotkit.MarmotInterface
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,6 +33,46 @@ class NativeAttachmentPermissionsTest {
         assertFalse(permission.audio || permission.videos || permission.files)
         assertEquals(denied, imagesOnly.nativePermission(wifi + MediaAutoDownloadNetwork.Metered, true, false))
     }
+
+    /**
+     * Waiting work is released only once its account's approval is applied for the latest host revision: a
+     * newer event reopens the wait, a failed grant never releases it, and other accounts are independent.
+     */
+    @Test
+    fun appliedApprovalReleasesOnlyItsAccountForTheLatestRevision() =
+        runTest {
+            val owner = NativeAttachmentPermissions()
+            var grant = true
+            val engine =
+                nativeBoundary { method, _ ->
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> "generation"
+                        "setAttachmentAutomaticPermission" -> grant
+                        else -> error(method)
+                    }
+                }
+            val allow = AttachmentAutomaticPermissionFfi(true, true, true, true)
+            val waiting = async(start = CoroutineStart.UNDISPATCHED) { owner.awaitApplied("a") }
+            assertFalse(waiting.isCompleted)
+
+            owner.update(owner.invalidate(engine), engine, engine, listOf("b")) { allow }
+            yield()
+            assertFalse("another account's approval released the wait", waiting.isCompleted)
+
+            grant = false
+            owner.update(owner.invalidate(engine), engine, engine, listOf("a")) { allow }
+            yield()
+            assertFalse("a refused grant released the wait", waiting.isCompleted)
+
+            grant = true
+            owner.update(owner.invalidate(engine), engine, engine, listOf("a")) { allow }
+            waiting.await()
+
+            owner.invalidate(engine)
+            val reopened = async(start = CoroutineStart.UNDISPATCHED) { owner.awaitApplied("a") }
+            assertFalse("a newer host revision kept the old approval", reopened.isCompleted)
+            reopened.cancel()
+        }
 
     /** A newer host event invalidates old evaluation without minting another native generation. */
     @Test
