@@ -16,6 +16,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.PlatformTextInputMethodRequest
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.click
@@ -32,6 +33,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
@@ -105,12 +107,7 @@ class ComposerImeEditSequenceTest {
                 .setPrimaryClip(ClipData.newPlainText("composer test", "first second"))
         }
         val editor = composeRule.onNode(hasSetTextAction())
-        editor.performTouchInput {
-            down(center)
-            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
-            up()
-        }
-        nativeAction("Paste").click()
+        pasteActionAfterLongPress(editor).click()
         composeRule.waitUntil(10_000) { value.text == "first second" }
         editor.assertIsNotFocused()
         assertFalse(imeVisible())
@@ -268,6 +265,23 @@ class ComposerImeEditSequenceTest {
     private fun edit(command: InputConnection.() -> Boolean) {
         composeRule.runOnIdle { assertTrue(checkNotNull(connection.get()).command()) }
         composeRule.waitForIdle()
+    }
+
+    /**
+     * Long-presses the empty editor until the native toolbar offers Paste. A long press lost on a loaded emulator
+     * shows no toolbar, so it is repeated once; on an empty field a second press can only reopen the same toolbar.
+     */
+    private fun pasteActionAfterLongPress(editor: SemanticsNodeInteraction): UiObject2 {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        repeat(2) {
+            editor.performTouchInput {
+                down(center)
+                advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+                up()
+            }
+            device.wait(Until.findObject(By.text("Paste")), 5_000)?.let { return it }
+        }
+        error("Native Paste action was not displayed after two long presses")
     }
 
     private fun nativeAction(label: String) =
