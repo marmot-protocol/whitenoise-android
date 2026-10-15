@@ -244,6 +244,48 @@ class ShellNavigationInterleavingTest {
         assertEquals(groupA, selectedChat)
     }
 
+    /**
+     * A notification route opens early, the reader explicitly opens another chat, and the held account switch
+     * then reports that it never landed. The retired failure must leave the explicit selection alone (#3309).
+     */
+    @Test
+    fun retiredSwitchFailureAfterExplicitOpenKeepsTheNewerSelection() {
+        val notificationChat = "group-notification"
+        val explicitChat = "group-explicit"
+        val routeRequestId = 7L
+        var state = armShellNotificationRequest(ShellNavigationState(), ProfileGroupForegroundState())
+        val routedEvent = ShellNavigationEvent.NotificationRoutedConversationOpened(notificationChat)
+        val routed = reduceAndApply(state, null, routedEvent)
+        state = routed.first
+        var selectedRouteRequestId: Long? = routeRequestId
+        val explicitEvent = ShellNavigationEvent.ExplicitConversationOpened(explicitChat)
+        val explicit = reduceAndApply(state, routed.second, explicitEvent)
+        state = explicit.first
+        selectedRouteRequestId = null
+
+        val closes =
+            notificationSwitchFailureClosesConversation(
+                earlyOpened = true,
+                stillInsideEarlyOpen = selectedRouteRequestId == routeRequestId,
+            )
+
+        assertFalse("a stale failure must not undo explicit navigation", closes)
+        assertEquals(explicitChat, explicit.second)
+        assertNull(state.notificationArmedGeneration)
+    }
+
+    /** A failure while the reader is still inside the early-opened conversation returns to the chat list. */
+    @Test
+    fun switchFailureInsideTheEarlyOpenStillFallsBack() {
+        assertTrue(notificationSwitchFailureClosesConversation(earlyOpened = true, stillInsideEarlyOpen = true))
+    }
+
+    /** A switch that never opened anything falls back as before, whatever is selected now. */
+    @Test
+    fun switchFailureWithoutAnEarlyOpenFallsBack() {
+        assertTrue(notificationSwitchFailureClosesConversation(earlyOpened = false, stillInsideEarlyOpen = false))
+    }
+
     private fun viewedCandidate() =
         dev.ipf.whitenoise.android.core.RecipientSearch.Candidate(
             accountIdHex = "a".repeat(64),

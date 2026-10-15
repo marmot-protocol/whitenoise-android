@@ -95,6 +95,50 @@ class NotificationFirstFramePriorityTest {
         assertTrue(gate.isReleased)
     }
 
+    /** A retired route's owned release ends only its own gate, even when its successor reuses the request id. */
+    @Test
+    fun anOwnedReleaseFromARetiredRouteKeepsASuccessorWithTheSameRequestId() {
+        val retired = NotificationRouteFirstFrameGate(requestId = 5L, accountRef = "account-b")
+        val successor = NotificationRouteFirstFrameGate(requestId = 5L, accountRef = "account-b")
+        priority.begin(retired)
+        priority.begin(successor)
+
+        priority.releaseOwned(retired)
+
+        assertTrue(retired.isReleased)
+        assertFalse("the successor keeps its window", successor.isReleased)
+        assertSame(successor, priority.gate)
+    }
+
+    /** After a runtime replacement, the old runtime's held callback cannot end the new runtime's window. */
+    @Test
+    fun anOwnedReleaseAfterARuntimeReplacementLeavesTheNewRuntimesGate() {
+        val retired = NotificationRouteFirstFrameGate(requestId = 1L, accountRef = "account-b")
+        priority.begin(retired)
+        generation += 1
+        val successor = NotificationRouteFirstFrameGate(requestId = 1L, accountRef = "account-b")
+        priority.begin(successor)
+
+        priority.releaseOwned(retired)
+
+        assertSame(successor, priority.gate)
+        assertEquals(1L, priority.heldRequestId)
+        assertFalse(successor.isReleased)
+    }
+
+    /** An owned release of the gate still held ends the window, as a never-landing switch must. */
+    @Test
+    fun anOwnedReleaseOfTheHeldGateEndsTheWindow() {
+        val gate = NotificationRouteFirstFrameGate(requestId = 3L, accountRef = "account-b")
+        priority.begin(gate)
+
+        priority.releaseOwned(gate)
+        priority.releaseOwned(gate)
+
+        assertNull(priority.gate)
+        assertTrue(gate.isReleased)
+    }
+
     /** The shell stays composed only for a selected, notification-owned conversation whose list is not loaded. */
     @Test
     fun theShellIsOwnedOnlyWhileAnOwnedConversationWaitsForItsChatList() {

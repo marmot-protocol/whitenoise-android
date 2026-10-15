@@ -203,6 +203,36 @@ class NotificationWholeAppRouteTest {
         assertEquals(NotificationScenario.SOURCE_ACCOUNT_REF, harness.app.activeAccountRef)
     }
 
+    /**
+     * The older target tap's exact preload is held while a newer tap for the source account opens its conversation.
+     * Releasing the retired read afterwards must not reopen the target, consume another acknowledgement, move the
+     * selection or claim a first-frame window: the newer route's state stays exactly as it was (#3309).
+     */
+    @Test
+    fun aHeldTargetPreloadReleasedAfterANewerTapLeavesTheNewerRouteUnchanged() {
+        val harness = Harness(preloadFinishesFirst = false)
+        harness.mount()
+        harness.awaitCondition("the target route never started") { harness.gate.preloadStarted.count == 0L }
+
+        harness.tap(NotificationScenario.SOURCE_ACCOUNT_REF)
+        harness.awaitCondition("the newer tap never reached its conversation and released its window") {
+            harness.handledTargets.any { it.startsWith(NotificationScenario.SOURCE_ACCOUNT_REF) } &&
+                harness.transcriptVisible() &&
+                harness.shell.notificationFirstFrame.gate == null
+        }
+        val before = harness.routeSnapshot()
+
+        harness.gate.releasePreload.countDown()
+        harness.awaitCondition("the retired preload never completed") { harness.gate.preloadCompleted.count == 0L }
+
+        repeat(SETTLE_FRAMES) {
+            harness.pumpFrame()
+            assertEquals("a retired callback changed the newer route", before, harness.routeSnapshot())
+            Thread.sleep(POLL_MILLIS)
+        }
+        assertTrue(harness.transcriptVisible())
+    }
+
     /** A tap for an account that does not exist fails the route: it says so and releases the priority window. */
     @Test
     fun aTapForAnUnknownAccountFailsTheRouteAndReleasesTheWindow() {
@@ -327,6 +357,16 @@ class NotificationWholeAppRouteTest {
                 requestId.longValue = routing.notificationRequestId
             }
         }
+
+        /** The selection, its open context, every acknowledgement, the gate owner and the account, read together. */
+        fun routeSnapshot(): List<Any?> =
+            listOf(
+                shell.selectedChat.value?.id,
+                shell.selectedChatOpenContext.value,
+                handledTargets.toList(),
+                shell.notificationFirstFrame.gate?.requestId,
+                app.activeAccountRef,
+            )
 
         /** True while the root's loading surface is on screen, which a stuck route would leave there. */
         private fun startupSurfaceShown(): Boolean {
@@ -475,6 +515,7 @@ class NotificationWholeAppRouteTest {
         const val MESSAGE_COUNT = 12
         const val NOTIFIED_INDEX = 6
         const val POLL_MILLIS = 20L
+        const val SETTLE_FRAMES = 50
         const val ROUTE_TIMEOUT_MILLIS = 30_000L
 
         /** A deterministic 64-hex id for an unnamed message. */

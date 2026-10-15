@@ -70,6 +70,16 @@ internal class NotificationFirstFramePriority(
     }
 
     /**
+     * Releases [gate], the one a process-scoped route began itself, and ends the window only while that same
+     * gate is still held. Request ids restart with a new task and repeat when a remounted shell re-runs a
+     * request, so a route that outlived its pass names its gate by identity and can never end a successor's.
+     */
+    fun releaseOwned(gate: NotificationRouteFirstFrameGate) {
+        gate.release()
+        if (held?.gate === gate) held = null
+    }
+
+    /**
      * Whether a notification-owned retained conversation must keep the shell composed. It does while that
      * conversation is selected and the chat list's local projection is not yet loaded: without the shell the
      * root falls back to a loading surface, and the conversation, which only the shell can build, waits behind
