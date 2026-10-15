@@ -11,11 +11,6 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-buildscript {
-    configurations.named("classpath") {
-        resolutionStrategy.activateDependencyLocking()
-    }
-}
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
@@ -34,4 +29,5 @@ include(":cryptoBenchmark")
 include(":fuzz")
 
 // Install before project evaluation so plugin and tool classpaths receive the same floors.
+apply(from = "gradle/dependency-inputs.settings.gradle")
 apply(from = "gradle/dependency-security.settings.gradle")

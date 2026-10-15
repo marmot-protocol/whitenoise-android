@@ -387,7 +387,11 @@ class AndroidCiGateTest(unittest.TestCase):
                    '- name: Capture dependency-control bootstrap candidates' not in step]
         self.assertEqual(len(tooling), 4)
         capture = self.named_step(self.build_contracts, 'Capture dependency-control bootstrap candidates')
-        self.assertIn("if: matrix.phase == 'tooling'", capture)
+        self.assertIn("if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' "
+                      "&& inputs.capture_dependency_inputs", capture)
+        self.assertNotIn('assemble', capture)
+        retained = self.named_step(self.build_contracts, 'Retain dependency-control bootstrap candidates')
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs", retained)
         self.assertIn('--write-locks --write-verification-metadata sha256', capture)
         self.assertIn('--no-daemon', capture)
         label_step = self.named_step(self.build_contracts,

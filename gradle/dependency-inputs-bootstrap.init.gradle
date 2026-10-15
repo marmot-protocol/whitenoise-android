@@ -1,7 +1,7 @@
 import groovy.json.JsonOutput
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 
-// Temporary hosted bootstrap for #3253/#3255. It records candidates for review;
+// Explicit hosted update capture for #3253/#3255. It records candidates for review;
 // generated files are not an approved trust root until independently checked.
 gradle.beforeProject { project ->
     project.dependencyLocking.lockAllConfigurations()
@@ -14,7 +14,7 @@ gradle.projectsEvaluated {
     def root = gradle.rootProject
     root.tasks.register('captureDependencyInputs') {
         group = 'verification'
-        description = 'Capture candidate dependency locks, checksums and original notices for review'
+        description = 'Capture candidate dependency locks, checksums and source metadata for review'
         doLast {
             assert gradle.startParameter.writeDependencyLocks
             assert !gradle.startParameter.writeDependencyVerifications.isEmpty()
@@ -53,20 +53,6 @@ gradle.projectsEvaluated {
                 [schema: 1, observations: observations])) + '\n'
             new File(directory, 'artifact-paths.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(
                 artifactFiles.values().sort { "${it.coordinate}:${it.path}" })) + '\n'
-            ['productionPlayRelease', 'productionZapstoreRelease'].each { variant ->
-                def task = root.project(':app').tasks.findByName("${variant}OssLicensesTask") ?:
-                    root.project(':app').tasks.named("${variant}LocalNotices").get()
-                root.copy {
-                    from task.generatedDirectory.get().asFile
-                    into new File(directory, "original-notices/${variant}")
-                }
-                if (task.hasProperty('dependenciesJson')) {
-                    root.copy {
-                        from task.dependenciesJson.get().asFile
-                        into new File(directory, "original-notices/${variant}")
-                    }
-                }
-            }
             new File(directory, 'source.txt').text = System.getenv('GITHUB_SHA') + '\n'
             if (observations.any { !it.unresolved.isEmpty() }) {
                 throw new GradleException('Dependency candidate capture contains unresolved configurations')

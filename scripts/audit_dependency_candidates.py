@@ -144,7 +144,10 @@ def main():
     parser.add_argument('--runtime', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     arguments = parser.parse_args()
-    root = ET.fromstring(arguments.metadata.read_bytes())
+    data = arguments.metadata.read_bytes()
+    if len(data) > 8 * 1024 * 1024 or re.search(br'<!\s*(DOCTYPE|ENTITY)\b', data, re.IGNORECASE):
+        raise ValueError('Unsafe candidate verification XML')
+    root = ET.fromstring(data)
     for node in root.iter():
         node.tag = node.tag.rsplit('}', 1)[-1]
     records = []

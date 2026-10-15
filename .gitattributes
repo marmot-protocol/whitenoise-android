@@ -5,3 +5,7 @@ app/src/main/java/dev/ipf/marmotkit/marmot_uniffi.kt -whitespace linguist-genera
 
 # Reviewed upstream licence bytes retain their original whitespace and LF encoding.
 config/licenses/texts/*.txt -whitespace -text
+# File digests in the review manifest remain stable on CRLF-default checkouts.
+**/*gradle.lockfile text eol=lf
+gradle/verification-metadata.xml text eol=lf
+gradle/dependency-inputs.json text eol=lf

@@ -147,3 +147,68 @@ the optional licence reader rather than Gradle's own POM parser.
 Source archives retain enforcement without Git; CI separately requires
 valid commit identity. Detached configurations, settings-plugin classpaths and
 included builds are outside this hook and must keep their own dependency checks.
+
+## Reviewed resolution and byte inputs
+
+`gradle/dependency-inputs.settings.gradle` activates strict dependency locking for
+project configurations and project buildscript classpaths. The separate
+`settings-gradle.lockfile` contains the settings dependency-management/version-
+catalog state. Gradle plugin-DSL resolution in settings (including Foojay) does
+not persist its plugin graph through that classpath lock; its exact marker, POM,
+module and binary checksums remain covered by artifact verification. Do not
+report that settings plugin graph as resolution-locked. `gradle/verification-metadata.xml`
+verifies SHA-256 for dependency binaries and their metadata; normal invocations
+must keep Gradle verification strict. Version/security floors still apply before
+selection. A lock that conflicts with an intentional floor/update must be reviewed
+and updated, rather than weakening that floor or excluding transitives.
+
+The reviewed bootstrap evidence in `gradle/dependency-inputs.json` binds the exact
+lock and verification files to a hosted source revision, observed configuration
+coverage, official HTTPS supplier URLs and independent checksum/payload checks.
+The check rejects missing module locks, stale byte evidence, incomplete app/plugin
+coverage, broad trust exceptions and missing supplier checks. The bootstrap is an
+independent supplier cross-check, not an upstream reproducible-build or signature
+attestation. Preserve this distinction during updates.
+
+Gradle cannot apply the same project lock mechanism to detached configurations,
+its own distribution, SDK manager packages, Robolectric's runtime-fetched SDK
+jars or arbitrary external downloads.
+Artifact verification still covers Maven artifacts resolved by detached/plugin
+configurations. The wrapper distribution hash, pinned Android command-line tools
+and existing MarmotKit source/archive/native hashes retain their separate checks.
+Do not describe those external inputs as covered by a Maven lock. Synthetic Maven
+fixtures deliberately create their own temporary trust roots and never share or
+update the production evidence; source archives consume the checked-in inputs
+without needing Git metadata.
+
+For a dependency update, change the declared versions first, then use the existing
+hosted tooling lane (`gh workflow run android-ci.yml --ref <update-branch>
+-f capture_dependency_inputs=true`) to capture candidate locks and SHA-256 metadata with
+`--write-locks --write-verification-metadata sha256`. Include optional preview-debug
+variants (`-Pwhitenoise.previewE2eTestBuild=true` and
+`-Pwhitenoise.previewProviderMatrixBuild=true`) in that capture. Candidate-generation
+flags are an explicit review operation, not normal CI validation. The explicit capture runs even when an earlier normal build fails against stale
+locks; those failures remain failures, and capture never supplies a successful
+replacement validation result. Keep normal CI
+read-only and never accept an automatically generated trust root merely to make
+an unknown download pass. Retain the complete resolution report and source SHA.
+
+Run `scripts/audit_dependency_candidates.py` against the candidate XML and selected
+runtime artifact list to cross-check every artifact against its official repository.
+It checks published SHA-256 or separately downloads and hashes supplier payloads;
+a mismatch fails, and publication aliases require matching module metadata. Review
+the lock diff, supplier changes and any newly selected transitive/metadata artifacts.
+Update the local notice catalogue for changed runtime bytes and retain all original
+attributions. Record only the matching reviewed supplier records and exact final
+file hashes in the evidence manifest, then validate the normal locked build.
+
+For a missing platform classifier, review that exact supplier artifact and add its
+SHA-256 plus provenance. Do not add a group-wide trusted-artifact rule, turn off
+metadata verification, accept arbitrary alternate checksums or disable verification.
+Any unavoidable exception needs an explicit artifact/metadata identity, owning
+upstream limitation, reviewed evidence and removal condition; broad exceptions are
+not supported by the committed validator. Use the same review process for initial
+bootstrap or recovery of a source archive missing its input files. The hosted
+integration fixture proves that changed transitives and substituted bytes fail and
+that an inspectable, deliberately approved update succeeds without another build
+matrix.

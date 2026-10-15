@@ -26,6 +26,12 @@ on:
   schedule:
     - cron: '43 2 * * *'
   workflow_dispatch:
+    inputs:
+      capture_dependency_inputs:
+        description: Capture unapproved dependency input candidates for independent review
+        required: false
+        default: false
+        type: boolean
 
 # Superseded PR runs retain normal cancellation. Queue integrations use their
 # immutable SHA so a later queue revision cannot cancel a valid integration run.
@@ -75,8 +81,11 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
+      - name: Validate committed dependency locks and supplier evidence
+        run: python3 scripts/check_dependency_inputs.py
+
       - name: Test selected dependency evidence validator
-        run: python3 -m unittest scripts/test_verify_dependency_security.py scripts/test_dependency_inventory.py scripts/test_compare_ci_dependency_inventory.py scripts/test_generate_local_notices.py scripts/test_verify_notice_resources.py
+        run: python3 -m unittest scripts/test_verify_dependency_security.py scripts/test_dependency_inventory.py scripts/test_compare_ci_dependency_inventory.py scripts/test_generate_local_notices.py scripts/test_verify_notice_resources.py scripts/test_check_dependency_inputs.py
 
       - name: Test manual release guide and viewport coverage validators
         run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py scripts/test_check_scroll_edge_fades.py scripts/test_check_viewport_restoration_coverage.py scripts/test_paging_trace_report.py
@@ -380,20 +389,19 @@ jobs:
           python3 scripts/test_dependency_security_fixture.py
           python3 scripts/test_dependency_inputs_fixture.py
 
-      # One-off candidate capture while replacing the generator and bootstrapping
-      # reviewed locks. Remove this step before the combined PR is ready.
+      # Explicit operator mode only: captured downloads remain unapproved candidates.
+      # A capture does not bypass any normal build or aggregate outcome.
       - name: Capture dependency-control bootstrap candidates
-        if: matrix.phase == 'tooling'
+        if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs
         run: |
           ./gradlew -I gradle/dependency-inputs-bootstrap.init.gradle \
-            :app:productionPlayReleaseLocalNotices :app:productionZapstoreReleaseLocalNotices \
             captureDependencyInputs -Pwhitenoise.previewE2eTestBuild=true \
             -Pwhitenoise.previewProviderMatrixBuild=true --write-locks --write-verification-metadata sha256 \
             --no-daemon --stacktrace
           python3 scripts/capture_dependency_candidates.py
 
       - name: Retain dependency-control bootstrap candidates
-        if: always() && matrix.phase == 'tooling'
+        if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: dependency-inputs-bootstrap
