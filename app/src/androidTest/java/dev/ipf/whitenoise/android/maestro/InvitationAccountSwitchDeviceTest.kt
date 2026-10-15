@@ -135,7 +135,9 @@ class InvitationAccountSwitchDeviceTest {
             memberRefs: List<String>,
             initialAdminRefs: List<String>,
         ): GroupMutationResultFfi =
-            observe { native.inviteMembersDetailedWithInitialAdmins(accountRef, groupIdHex, memberRefs, initialAdminRefs) }
+            observe {
+                native.inviteMembersDetailedWithInitialAdmins(accountRef, groupIdHex, memberRefs, initialAdminRefs)
+            }
 
         /** Delegates unchanged native commands while exposing their start and cancellation/completion boundary. */
         private suspend fun <T> observe(block: suspend () -> T): T {
