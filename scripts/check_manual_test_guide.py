@@ -234,6 +234,7 @@ SEMANTIC_OWNER_IDS = {
         "android-direct-share:conversation-shortcuts": {"SYS-011"},
         "Generation-specific notification group dismissal": {"NTF-026"},
         "Permissionless multimedia decoder service": {"MED-031"},
+        "Permissionless explicit animation worker": {"MED-032"},
         "Outbound single- and multi-file receiver discovery": {"MED-016"},
         "MainActivity opts in to Android platform Back callbacks": {"MSG-004", "MSG-005", "CON-005"},
     },

@@ -41,6 +41,36 @@ class MediaDecodeReplyTest {
         }
     }
 
+    @Test
+    fun malformedBooleanFixtureIsOtherwiseACompleteValidReply() {
+        var received = false
+        val target =
+            object : android.os.Binder() {
+                override fun onTransact(
+                    code: Int,
+                    data: Parcel,
+                    reply: Parcel?,
+                    flags: Int,
+                ): Boolean {
+                    data.enforceInterface(MEDIA_REPLY_DESCRIPTOR)
+                    assertEquals(42, data.readInt())
+                    val payloadStart = data.dataPosition()
+                    assertEquals(7, data.readInt())
+                    data.setDataPosition(payloadStart)
+                    assertThrows(IllegalArgumentException::class.java) { readMediaDecodeReply(data) }
+                    // Repair only the boolean: the identical length and every remaining field must pass.
+                    data.setDataPosition(payloadStart)
+                    data.writeInt(0)
+                    data.setDataPosition(payloadStart)
+                    assertEquals(false, readMediaDecodeReply(data).getBoolean("success"))
+                    received = true
+                    return true
+                }
+            }
+        sendMalformedMediaReply(target, 42, 4)
+        assertEquals(true, received)
+    }
+
     private fun roundTrip(result: Bundle): Bundle {
         val target =
             object : android.os.Binder() {

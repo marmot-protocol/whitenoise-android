@@ -7,8 +7,7 @@ Android now checks a GIF or WebP's container from its bytes before
 not validate protocol data or replace MDK media rules.
 
 **Status: provisional.** The limits below have not yet been qualified against an
-ordinary-media corpus or on a physical API 36 device. Keep the pull request in
-draft and the `MED-026` box unchecked until the
+ordinary-media corpus or on a physical API 36 device. Keep the `MED-026` and `MED-032` boxes unchecked until the
 [qualification steps](#qualification-pending) pass.
 
 ## Where admission runs
@@ -16,7 +15,7 @@ draft and the `MED-026` box unchecked until the
 | Entry point | Behaviour |
 |---|---|
 | `admitAnimationSource` (`media/AnimationSourceAdmission.kt`, `AnimationSourceGif.kt`, `AnimationSourceWebp.kt`) | Pure Kotlin with no Android dependencies. It walks container metadata without copying the payload, and it never decodes pixels. |
-| `MediaPipeline.decodeAnimatedDrawable` | The only route to the native animated decoder. It calls `ImageDecoder.createSource` only for an `Admitted` source. Chat attachments, GIPHY cards and animated profile avatars all use this route. |
+| `MediaPipeline.decodeAnimatedDrawable` | Admits an explicit viewer source and opens an isolated animation session. Only the permissionless worker calls `ImageDecoder.createSource`; the app draws copied pixels. Automatic chat, composer and avatar rendering uses isolated still frames. |
 | `decodeMessageAttachmentImage` → `decodeAdmittedAttachmentImage` | Chooses the decoder for chat bubbles, the viewer and GIPHY cards. |
 | `readLocalPreviewSource` (`media/LocalPreviewSource.kt`) | Classifies a picked or shared composer source before the shelf's animated decoder or the staged preview's sampled still decoder sees it. A GIF or WebP signature leads to reading the whole source, never more than 8 MiB, and running `admitAnimationSource` on it; any other format costs a twelve-byte header read, so ordinary photos are not copied. An unreadable source is refused. |
 

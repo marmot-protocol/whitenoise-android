@@ -20,6 +20,7 @@ import java.io.File
 /** Real Binder/descriptor/pixel transport. No account fixture, relay or destructive app reset. */
 @RunWith(AndroidJUnit4::class)
 @PullRequestDeviceSmoke
+@MediaContainmentAcceptance
 class IsolatedMediaDecoderDeviceTest {
     @Test
     fun stillPixelsCrossAnIsolatedUidWithoutNetworkOrRuntimeInitialization() {
@@ -39,6 +40,7 @@ class IsolatedMediaDecoderDeviceTest {
             assertTrue(worker.isolated)
             assertFalse(worker.internetGranted)
             assertFalse(worker.runtimeInitialized)
+            assertEquals(android.system.OsConstants.EBADF, worker.inputWriteErrno)
             assertTrue(canary.isFile)
             assertTrue(
                 "Private canary must stay inaccessible (errno=${worker.privateCanaryErrno})",
@@ -75,6 +77,23 @@ class IsolatedMediaDecoderDeviceTest {
         val decoded = IsolatedMediaDecoder.decode(png(), 128)
         assertNotNull(decoded)
         decoded?.recycle()
+    }
+
+    @Test
+    fun actualWorkerMalformedRepliesAreRejectedAndCannotPoisonRecovery() {
+        IsolatedMediaDecoder.install(InstrumentationRegistry.getInstrumentation().targetContext)
+        val caller = Process.myPid()
+        for (mode in 1..4) {
+            assertNull(IsolatedMediaDecoder.exerciseMalformedReplyForTest(mode))
+            val until = android.os.SystemClock.elapsedRealtime() + 5000L
+            var recovered: Bitmap? = null
+            while (recovered == null && android.os.SystemClock.elapsedRealtime() < until) {
+                recovered = IsolatedMediaDecoder.decode(png(), 2)
+                if (recovered == null) Thread.sleep(25L)
+            }
+            requireNotNull(recovered).recycle()
+            assertEquals(caller, Process.myPid())
+        }
     }
 
     @Test

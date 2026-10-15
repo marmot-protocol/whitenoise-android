@@ -34,6 +34,27 @@ internal object TestMediaDecodeTransport : MediaDecodeTransport {
 
     override fun inspect(bytes: ByteArray): ImageInspection? = PlatformMediaDecoder.inspect(bytes)
 
+    override fun region(
+        bytes: ByteArray,
+        region: MediaImageRegion,
+        edge: Int,
+    ): Bitmap? = PlatformMediaDecoder.region(bytes, region, edge)
+
+    // Explicit JVM fixture only; production animation creates an isolated session, never this decoder.
+    override fun animation(
+        bytes: ByteArray,
+        edge: Int,
+    ): android.graphics.drawable.Drawable? =
+        android.graphics.ImageDecoder.decodeDrawable(
+            android.graphics.ImageDecoder.createSource(java.nio.ByteBuffer.wrap(bytes)),
+        ) { decoder, info, _ ->
+            val target =
+                dev.ipf.whitenoise.android.media.MediaPipeline
+                    .targetDimensions(info.size.width, info.size.height, edge)
+            decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+            decoder.setTargetSize(target.first, target.second)
+        }
+
     override fun decodeUri(
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,

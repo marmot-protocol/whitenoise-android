@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt",
         "anchor": "fun decodeAnimatedDrawable(",
         "test_ids": [
-          "MED-026"
+          "MED-026",
+          "MED-032"
         ]
       },
       {
