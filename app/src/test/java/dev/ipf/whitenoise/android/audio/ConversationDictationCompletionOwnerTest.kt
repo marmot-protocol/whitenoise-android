@@ -4,7 +4,12 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
 class ConversationDictationCompletionOwnerTest {
     /** A thrown draft write is not a CAS conflict and must not trigger repeated writes or append fallback. */
     @Test
