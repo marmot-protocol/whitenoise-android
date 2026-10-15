@@ -48,21 +48,52 @@ class MessageActionReactionRailLayoutTest {
         assertAllQuickReactionsVisible(fontScale = 1.3f, layoutDirection = LayoutDirection.Ltr)
     }
 
+    /** Eight configured reactions and the full picker all keep visible 48dp targets at the compact width (#3279). */
+    @Test
+    fun eightQuickReactionsAreDisplayedAtCompactWidth() {
+        assertAllQuickReactionsVisible(fontScale = 1f, layoutDirection = LayoutDirection.Ltr, emojis = EIGHT_CHOICES)
+    }
+
+    /** Eight configured reactions stay inside the popup when mirrored. */
+    @Test
+    fun eightQuickReactionsAreDisplayedAtCompactWidthInRtl() {
+        assertAllQuickReactionsVisible(fontScale = 1f, layoutDirection = LayoutDirection.Rtl, emojis = EIGHT_CHOICES)
+    }
+
+    /** Eight configured reactions survive a larger font scale. */
+    @Test
+    fun eightQuickReactionsAreDisplayedAtCompactWidthWithLargeFont() {
+        assertAllQuickReactionsVisible(fontScale = 1.3f, layoutDirection = LayoutDirection.Ltr, emojis = EIGHT_CHOICES)
+    }
+
+    /** The rail spans the action stack's full width instead of hugging its reactions as a narrow capsule (#3279). */
+    @Test
+    fun reactionRailSpansTheStackWidth() {
+        renderReactionMenu(fontScale = 1f, layoutDirection = LayoutDirection.Ltr, quickReactionEmojis = SIX_CHOICES)
+
+        // The stack's tag sits inside its horizontal padding, so its bounds are the width the rail may use.
+        val menu = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val rail = composeRule.onNodeWithTag(FOCUSED_REACTION_RAIL_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        assertTrue("the rail fills the stack width", rail.width >= menu.width - TOLERANCE_PX)
+    }
+
     /** The rail stays on one row while everything fits and splits evenly only once it cannot. */
     @Test
     fun reactionRailBalancesItsRowsOnlyWhenTheWidthCannotHoldThemAll() {
         assertEquals(7, focusedReactionItemsPerRow(itemCount = 7, availableWidth = 392.dp))
         assertEquals(4, focusedReactionItemsPerRow(itemCount = 7, availableWidth = 320.dp))
+        assertEquals(5, focusedReactionItemsPerRow(itemCount = 9, availableWidth = 320.dp))
+        assertEquals(9, focusedReactionItemsPerRow(itemCount = 9, availableWidth = 528.dp))
         assertEquals(1, focusedReactionItemsPerRow(itemCount = 1, availableWidth = 320.dp))
         assertEquals(1, focusedReactionItemsPerRow(itemCount = 3, availableWidth = 0.dp))
     }
 
-    /** Renders six distinct choices and asserts each one, and the full picker, is inside the popup. */
+    /** Renders the given distinct choices and asserts each one, and the full picker, is inside the popup. */
     private fun assertAllQuickReactionsVisible(
         fontScale: Float,
         layoutDirection: LayoutDirection,
+        emojis: List<String> = SIX_CHOICES,
     ) {
-        val emojis = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
         renderReactionMenu(fontScale, layoutDirection, emojis)
 
         val menu =
@@ -142,5 +173,7 @@ class MessageActionReactionRailLayoutTest {
     private companion object {
         const val TOUCH_TARGET_PX = 48f
         const val TOLERANCE_PX = 0.5f
+        val SIX_CHOICES = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
+        val EIGHT_CHOICES = SIX_CHOICES + listOf("🚀", "✅")
     }
 }

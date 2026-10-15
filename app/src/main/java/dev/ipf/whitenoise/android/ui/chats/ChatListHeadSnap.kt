@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.state.ChatListItem
+
 /**
  * Snap decision when the active chat-list head identity changes while the
  * user is still on the list (issues #541, #1376). Decided from the scroll
@@ -27,37 +29,58 @@ internal fun shouldSnapChatListForHeadReorder(
 }
 
 /**
+ * Visible active-list head captured when leaving ChatsScreen (issues #1313, #3280).
+ * [headId] is the absolute first row. [activityHeadId] is the first unpinned row —
+ * the slot a sent-to chat is promoted into while pinned chats keep [headId]
+ * unchanged — or null when every visible row is pinned.
+ */
+internal data class ChatListReturnHead(
+    val headId: String,
+    val activityHeadId: String?,
+)
+
+/** Captures the [ChatListReturnHead] of the filtered [visibleItems], or null for an empty list. */
+internal fun chatListReturnHead(visibleItems: List<ChatListItem>): ChatListReturnHead? {
+    val head = visibleItems.firstOrNull() ?: return null
+    return ChatListReturnHead(
+        headId = head.id,
+        activityHeadId = visibleItems.firstOrNull { !it.pinned() }?.id,
+    )
+}
+
+/**
  * Whether the shell may run the one-shot conversation-return snap decision.
  * Returns false while the active list head is unknown or scroll restoration is
  * still in flight so [shouldSnapChatListOnConversationReturn] is not evaluated
  * against a transient snapshot.
  */
 internal fun canDecideConversationReturnHeadSnap(
-    headIdAtConversationOpen: String?,
-    currentHeadId: String?,
+    headAtConversationOpen: ChatListReturnHead?,
+    currentHead: ChatListReturnHead?,
     isScrollInProgress: Boolean,
     isActiveList: Boolean,
 ): Boolean {
-    if (headIdAtConversationOpen == null) return false
+    if (headAtConversationOpen == null) return false
     if (!isActiveList) return true
-    if (currentHeadId == null || isScrollInProgress) return false
+    if (currentHead == null || isScrollInProgress) return false
     return true
 }
 
 /**
- * Snap decision when the shell returns from an in-app conversation and a
- * different chat became head while the list was off-screen (issue #1313).
- * [headIdAtConversationOpen] is the visible active-list head captured when
- * leaving ChatsScreen; [currentHeadId] must be the same visible-head notion.
+ * Snap decision when the shell returns from an in-app conversation and the
+ * list head moved while the list was off-screen: a different chat became the
+ * absolute head (issue #1313), or a chat was promoted to the top of the
+ * unpinned section beneath an unchanged pinned head (issue #3280).
+ * [headAtConversationOpen] is the visible active-list head captured when
+ * leaving ChatsScreen; [currentHead] must be the same visible-head notion.
  * Call only after [canDecideConversationReturnHeadSnap] is true.
  */
 internal fun shouldSnapChatListOnConversationReturn(
-    headIdAtConversationOpen: String?,
-    currentHeadId: String?,
+    headAtConversationOpen: ChatListReturnHead?,
+    currentHead: ChatListReturnHead?,
     isActiveList: Boolean,
 ): Boolean {
     if (!isActiveList) return false
-    if (headIdAtConversationOpen == null || currentHeadId == null) return false
-    if (currentHeadId == headIdAtConversationOpen) return false
-    return true
+    if (headAtConversationOpen == null || currentHead == null) return false
+    return currentHead != headAtConversationOpen
 }

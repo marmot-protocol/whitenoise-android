@@ -418,6 +418,8 @@
     <string name="configure_reactions_guidance">Нажмите на эмодзи, чтобы заменить его.</string>
     <string name="reset">Сбросить</string>
     <string name="reaction_slot_description">Реакция %1$d, %2$s. Нажмите дважды, чтобы заменить.</string>
+    <string name="configure_reactions_add">Добавить реакцию</string>
+    <string name="configure_reactions_remove">Удалить реакцию %1$d, %2$s</string>
     <string name="emoji_search_hint">Поиск эмодзи</string>
     <string name="emoji_search_clear">Очистить поиск эмодзи</string>
     <string name="emoji_search_no_results">Эмодзи не найдены</string>

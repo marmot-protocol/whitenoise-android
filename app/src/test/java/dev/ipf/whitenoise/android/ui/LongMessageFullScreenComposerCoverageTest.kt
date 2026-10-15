@@ -73,6 +73,44 @@ class LongMessageFullScreenComposerCoverageTest {
         )
     }
 
+    /**
+     * The reader's composer hands an accepted send back to the conversation: it closes only its own reader
+     * session, and every row layer forwards the conversation's accepted-send reveal (#3268).
+     */
+    @Test
+    fun expandedReaderSendClosesItsSessionAndRevealsThroughTheConversation() {
+        val body = messageBubbleSource().readText().functionBody("MessageBubble")
+        val fullScreenCall =
+            body
+                .substringAfter("MessageFullScreenView(")
+                .substringBefore("if (surfaces.emojiPickerOpen")
+        assertTrue(
+            "the reader composer must close its own session and reveal after an accepted send",
+            "val readerSession = surfaces.expandedFullViewSession" in body &&
+                "surfaces.finishExpandedReaderSend(readerSession, onReaderSendAccepted)" in fullScreenCall,
+        )
+        assertFalse(
+            "Read more must open a new reader session rather than flipping the flag directly",
+            "surfaces.expandedFullView = true" in body,
+        )
+
+        val timelineRow = conversationSource("TimelineRow.kt").readText()
+        val rowBubble = conversationSource("TimelineRowTtsHighlight.kt").readText()
+        assertTrue(
+            "TimelineRow and its bubble wrapper must forward the accepted-send reveal to MessageBubble",
+            "onReaderSendAccepted = onReaderSendAccepted" in timelineRow &&
+                "onReaderSendAccepted = onReaderSendAccepted" in rowBubble,
+        )
+
+        val screen = conversationSource("ConversationScreen.kt").readText()
+        val readerHandoff = screen.substringAfter("onReaderSendAccepted = {").substringBefore("},")
+        assertTrue(
+            "the conversation must reveal a reader send through the same path as its main composer",
+            "acceptedSendRevealedTranscript = true" in readerHandoff && "revealSentMessage()" in readerHandoff,
+        )
+    }
+
+    /** One composer gate and mention picker feed both the main composer and the reader. */
     @Test
     fun conversationPassesMainComposerGateAndMentionPickerToExpandedReader() {
         val screenBody = conversationSource("ConversationScreen.kt").readText()

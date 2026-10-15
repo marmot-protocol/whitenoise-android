@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
+
 /**
  * One-shot chat-list return-head provenance for issue #1313. The visible filtered
  * active-list head is armed only when leaving ChatsScreen via a list-origin open
@@ -11,25 +13,25 @@ internal sealed class ChatListReturnHeadSnapState {
     data object Unarmed : ChatListReturnHeadSnapState()
 
     data class Profile(
-        val head: String,
+        val head: ChatListReturnHead,
     ) : ChatListReturnHeadSnapState()
 
     data class Conversation(
-        val head: String,
+        val head: ChatListReturnHead,
     ) : ChatListReturnHeadSnapState()
 
     data class Published(
-        val head: String,
+        val head: ChatListReturnHead,
     ) : ChatListReturnHeadSnapState()
 }
 
 /** Profile sheet presented from the chat list; binds the filtered visible head. */
 internal fun presentProfileFromChatList(
     state: ChatListReturnHeadSnapState,
-    visibleActiveListHeadId: String?,
+    visibleActiveListHead: ChatListReturnHead?,
 ): ChatListReturnHeadSnapState =
-    if (visibleActiveListHeadId != null) {
-        ChatListReturnHeadSnapState.Profile(visibleActiveListHeadId)
+    if (visibleActiveListHead != null) {
+        ChatListReturnHeadSnapState.Profile(visibleActiveListHead)
     } else {
         ChatListReturnHeadSnapState.Unarmed
     }
@@ -45,10 +47,10 @@ internal fun dismissChatListProfile(state: ChatListReturnHeadSnapState): ChatLis
 /** Direct conversation open from ChatsScreen with the filtered visible head. */
 internal fun openGroupFromChatList(
     state: ChatListReturnHeadSnapState,
-    visibleActiveListHeadId: String?,
+    visibleActiveListHead: ChatListReturnHead?,
 ): ChatListReturnHeadSnapState =
-    if (visibleActiveListHeadId != null) {
-        ChatListReturnHeadSnapState.Conversation(visibleActiveListHeadId)
+    if (visibleActiveListHead != null) {
+        ChatListReturnHeadSnapState.Conversation(visibleActiveListHead)
     } else {
         ChatListReturnHeadSnapState.Unarmed
     }
@@ -82,4 +84,9 @@ internal fun onConversationReturnHeadHandled(state: ChatListReturnHeadSnapState)
         else -> state
     }
 
-internal fun publishedConversationReturnHead(state: ChatListReturnHeadSnapState): String? = (state as? ChatListReturnHeadSnapState.Published)?.head
+/** The head published once for ChatsScreen's return snap, or null outside the Published state. */
+internal fun publishedConversationReturnHead(state: ChatListReturnHeadSnapState): ChatListReturnHead? =
+    when (state) {
+        is ChatListReturnHeadSnapState.Published -> state.head
+        else -> null
+    }

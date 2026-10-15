@@ -520,6 +520,8 @@
     <string name="configure_reactions_guidance">Tap an emoji to replace it.</string>
     <string name="reset">Reset</string>
     <string name="reaction_slot_description">Reaction %1$d, %2$s. Double tap to replace.</string>
+    <string name="configure_reactions_add">Add a reaction</string>
+    <string name="configure_reactions_remove">Remove reaction %1$d, %2$s</string>
     <string name="emoji_search_hint">Search emoji</string>
     <string name="emoji_search_clear">Clear emoji search</string>
     <string name="emoji_search_no_results">No emoji found</string>

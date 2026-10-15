@@ -396,6 +396,8 @@
     <string name="configure_reactions_guidance">Değiştirmek için bir emojiye dokun.</string>
     <string name="reset">Sıfırla</string>
     <string name="reaction_slot_description">Tepki %1$d, %2$s. Değiştirmek için iki kez dokun.</string>
+    <string name="configure_reactions_add">Tepki ekle</string>
+    <string name="configure_reactions_remove">Tepki %1$d, %2$s öğesini kaldır</string>
     <string name="emoji_search_hint">Emoji ara</string>
     <string name="emoji_search_clear">Emoji aramasını temizle</string>
     <string name="emoji_search_no_results">Emoji bulunamadı</string>

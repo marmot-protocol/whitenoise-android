@@ -235,7 +235,6 @@ private const val FOCUSED_PRESSED_STATE_ALPHA = 0.12f
 private const val FOCUSED_MORE_DISC_ALPHA = 0.08f
 private val FocusedStackMaximumWidth = 560.dp
 private val FocusedOverlayShadowSafeInset = 8.dp
-private val FocusedReactionRailMaximumWidth = 392.dp
 private val FocusedReactionRailInset = 4.dp
 private val FocusedReactionItemSpacing = 4.dp
 private val FocusedReactionTargetSize = 48.dp
@@ -244,6 +243,7 @@ private val FocusedReactionSelectedFillSize = 36.dp
 private val FocusedReactionEmojiSize = 28.dp
 private val FocusedMoreIconSize = 24.dp
 internal const val FOCUSED_ACTION_MENU_SCROLL_TEST_TAG = "focused-action-menu-scroll"
+internal const val FOCUSED_REACTION_RAIL_TEST_TAG = "focused-reaction-rail"
 
 /** Prototype reaction rail, inert real-message preview and grouped command menu; preserves the host IME. */
 @Composable
@@ -426,6 +426,8 @@ internal fun focusedReactionItemsPerRow(
  * Quick reactions on the menu-group surface: 48dp targets, 40dp state layer, 36dp selected disc, 28dp emoji.
  * The rail wraps rather than scrolling horizontally, because a sixth configured reaction used to sit
  * beyond the viewport at the compact 360dp width with no affordance that it was there at all.
+ * It spans the stack's full width and spreads each row across it (#3279), so six to eight choices read as
+ * one bar instead of a narrow capsule hugging two short rows.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -436,7 +438,7 @@ private fun FocusedReactionRail(
     onMoreReactions: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier.widthIn(max = FocusedReactionRailMaximumWidth),
+        modifier = Modifier.fillMaxWidth().testTag(FOCUSED_REACTION_RAIL_TEST_TAG),
         border = amoledOutlineBorder(),
         shape = MaterialTheme.shapes.extraLarge,
         color = MenuDefaults.groupStandardContainerColor,
@@ -448,7 +450,8 @@ private fun FocusedReactionRail(
             // competing with them for one row's worth of width.
             val perRow = focusedReactionItemsPerRow(quickReactions.size + 1, maxWidth)
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing),
                 maxItemsInEachRow = perRow,
             ) {

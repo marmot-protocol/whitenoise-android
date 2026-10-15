@@ -2,8 +2,13 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -30,6 +35,7 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -108,12 +114,73 @@ class ConversationAcceptedSendRouteScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_send_history_tail.png")
     }
 
-    /** Builds one synthetic authoritative window with typed durable acceptance and no relay publication. */
-    private fun createConversation(): ConversationController {
+    /**
+     * Sending from a long message's Read more reader closes the reader once the send is accepted and reveals the
+     * pending bubble above the full conversation's composer, through the same snap the main composer uses (#3268).
+     */
+    @Test
+    fun acceptedSendFromReadMoreReaderClosesItAndRevealsThePendingTail() {
+        val conversation = createConversation(longHistoryMessage = true)
+        val evidence = SendRouteEvidence()
+        mountHistoryConversation(conversation, evidence)
+        composeRule.waitForIdle()
+        composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.ReadingHistory }
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        // The collapsed bubble also lays out a zero-size measurement copy of Read More; tap the visible one.
+        val readMoreId =
+            composeRule
+                .onAllNodesWithText(context.getString(R.string.message_read_more))
+                .fetchSemanticsNodes()
+                .first { it.boundsInRoot.width > 0f }
+                .id
+        composeRule.onNode(SemanticsMatcher("visible Read More") { it.id == readMoreId }).performClick()
+        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertIsDisplayed()
+        evidence.writes.clear()
+
+        composeRule.mainClock.autoAdvance = false
+        composeRule
+            .onNode(
+                hasContentDescription(context.getString(R.string.send)) and
+                    hasAnyAncestor(hasTestTag(MESSAGE_FULL_SCREEN_TAG)),
+            ).performClick()
+        awaitConversationCondition { publishCount == 1 }
+        repeat(30) { composeRule.mainClock.advanceTimeByFrame() }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertDoesNotExist()
+        val sentId =
+            conversation.timeline
+                .single { it.record.plaintext == SENT_TEXT }
+                .record.messageIdHex
+        val bubbleBounds =
+            composeRule
+                .onNodeWithTag(messageBubbleColumnTestTag(sentId), useUnmergedTree = true)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val composerBounds = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+        assertTrue("the pending bubble clears the conversation composer", bubbleBounds.bottom <= composerBounds.top)
+        assertEquals("the reader send publishes exactly once", 1, publishCount)
+        assertTrue("accepted reader sends never animate across history", evidence.writes.none { it.animated })
+        assertTrue(checkNotNull(evidence.viewport).mode is ConversationScrollMode.FollowingTail)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_send_read_more_tail.png")
+    }
+
+    /**
+     * Builds one synthetic authoritative window with typed durable acceptance and no relay publication. With
+     * [longHistoryMessage], the restored history anchor is long enough to collapse behind Read more.
+     */
+    private fun createConversation(longHistoryMessage: Boolean = false): ConversationController {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         val records =
             List(60) { index ->
-                timelineRecord((index + 1).toString(16).padStart(64, '0'), (index + 1).toULong(), "History $index")
+                val text =
+                    if (longHistoryMessage && index == HISTORY_ANCHOR_INDEX) {
+                        List(LONG_MESSAGE_LINES) { line -> "Long history line $line" }.joinToString("\n")
+                    } else {
+                        "History $index"
+                    }
+                timelineRecord((index + 1).toString(16).padStart(64, '0'), (index + 1).toULong(), text)
             }
         val subscriptions =
             ScriptedConversationLiveSubscriptions(
@@ -155,7 +222,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         conversation: ConversationController,
         evidence: SendRouteEvidence,
     ) {
-        val historyId = 11.toString(16).padStart(64, '0')
+        val historyId = (HISTORY_ANCHOR_INDEX + 1).toString(16).padStart(64, '0')
         composeRule.setContent {
             CompositionLocalProvider(LocalConversationScrollEvidenceSink provides evidence) {
                 WhiteNoiseTheme {
@@ -202,5 +269,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
 
     private companion object {
         const val SENT_TEXT = "Accepted send from older history"
+        const val HISTORY_ANCHOR_INDEX = 10
+        const val LONG_MESSAGE_LINES = 70
     }
 }

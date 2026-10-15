@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.state.ChatListItem
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -115,120 +118,222 @@ class ChatListHeadSnapTest {
         )
     }
 
+    /** A different absolute head after the conversation snaps the returning list to the top (#1313). */
     @Test
     fun conversationReturnSnapsWhenHeadChangedWhileAway() {
         assertTrue(
             shouldSnapChatListOnConversationReturn(
-                headIdAtConversationOpen = "a",
-                currentHeadId = "b",
+                headAtConversationOpen = head("a"),
+                currentHead = head("b"),
                 isActiveList = true,
             ),
         )
     }
 
+    /** A send that promotes a lower chat beneath an unchanged pinned head still snaps to the top (#3280). */
+    @Test
+    fun conversationReturnSnapsWhenUnpinnedHeadChangedBeneathUnchangedPinnedHead() {
+        assertTrue(
+            shouldSnapChatListOnConversationReturn(
+                headAtConversationOpen = head("pinned", activity = "a"),
+                currentHead = head("pinned", activity = "c"),
+                isActiveList = true,
+            ),
+        )
+    }
+
+    /** A first unpinned chat arriving below an all-pinned list is a promotion worth returning to (#3280). */
+    @Test
+    fun conversationReturnSnapsWhenUnpinnedChatAppearsBelowAllPinnedList() {
+        assertTrue(
+            shouldSnapChatListOnConversationReturn(
+                headAtConversationOpen = head("pinned", activity = null),
+                currentHead = head("pinned", activity = "c"),
+                isActiveList = true,
+            ),
+        )
+    }
+
+    /** An unchanged pinned head and unpinned head keep the restored viewport. */
+    @Test
+    fun conversationReturnDoesNotSnapWhenPinnedAndUnpinnedHeadsUnchanged() {
+        assertFalse(
+            shouldSnapChatListOnConversationReturn(
+                headAtConversationOpen = head("pinned", activity = "a"),
+                currentHead = head("pinned", activity = "a"),
+                isActiveList = true,
+            ),
+        )
+    }
+
+    /** An unchanged visible head keeps the restored viewport. */
     @Test
     fun conversationReturnDoesNotSnapWhenVisibleHeadUnchanged() {
         assertFalse(
             shouldSnapChatListOnConversationReturn(
-                headIdAtConversationOpen = "filtered-head",
-                currentHeadId = "filtered-head",
+                headAtConversationOpen = head("filtered-head"),
+                currentHead = head("filtered-head"),
                 isActiveList = true,
             ),
         )
     }
 
+    /** A controller-only reorder that leaves the filtered visible head in place does not snap (#1313). */
     @Test
     fun conversationReturnDoesNotSnapWhenVisibleHeadUnchangedDespiteControllerReorder() {
-        // Visible-head capture/compare must not treat a controller-only reorder as
-        // a head change while the filtered visible head stayed the same (#1313).
         assertFalse(
             shouldSnapChatListOnConversationReturn(
-                headIdAtConversationOpen = "filtered-b",
-                currentHeadId = "filtered-b",
+                headAtConversationOpen = head("filtered-b"),
+                currentHead = head("filtered-b"),
                 isActiveList = true,
             ),
         )
     }
 
+    /** Without a head captured at open, an active reader is never yanked. */
     @Test
     fun conversationReturnDoesNotSnapForActiveReaderWithoutOpenSnapshot() {
         assertFalse(
             shouldSnapChatListOnConversationReturn(
-                headIdAtConversationOpen = null,
-                currentHeadId = "b",
+                headAtConversationOpen = null,
+                currentHead = head("b"),
                 isActiveList = true,
             ),
         )
     }
 
+    /** The archived list never snaps on return. */
     @Test
     fun conversationReturnDoesNotSnapOnArchivedList() {
         assertFalse(
             shouldSnapChatListOnConversationReturn(
-                headIdAtConversationOpen = "a",
-                currentHeadId = "b",
+                headAtConversationOpen = head("a"),
+                currentHead = head("b"),
                 isActiveList = false,
             ),
         )
     }
 
+    /** The decision waits while the active list has no head yet. */
     @Test
     fun conversationReturnCannotDecideWithNullCurrentHeadOnActiveList() {
         assertFalse(
             canDecideConversationReturnHeadSnap(
-                headIdAtConversationOpen = "a",
-                currentHeadId = null,
+                headAtConversationOpen = head("a"),
+                currentHead = null,
                 isScrollInProgress = false,
                 isActiveList = true,
             ),
         )
     }
 
+    /** The decision waits while scroll restoration is in flight. */
     @Test
     fun conversationReturnCannotDecideWhileScrollInProgressOnActiveList() {
         assertFalse(
             canDecideConversationReturnHeadSnap(
-                headIdAtConversationOpen = "a",
-                currentHeadId = "b",
+                headAtConversationOpen = head("a"),
+                currentHead = head("b"),
                 isScrollInProgress = true,
                 isActiveList = true,
             ),
         )
     }
 
+    /** The decision runs once scrolling settles on the active list. */
     @Test
     fun conversationReturnCanDecideAfterScrollSettlesOnActiveList() {
         assertTrue(
             canDecideConversationReturnHeadSnap(
-                headIdAtConversationOpen = "a",
-                currentHeadId = "b",
+                headAtConversationOpen = head("a"),
+                currentHead = head("b"),
                 isScrollInProgress = false,
                 isActiveList = true,
             ),
         )
     }
 
+    /** The archived list decides immediately so the one-shot head is cleared. */
     @Test
     fun conversationReturnCanDecideOnArchivedListToClearOneShot() {
         assertTrue(
             canDecideConversationReturnHeadSnap(
-                headIdAtConversationOpen = "a",
-                currentHeadId = null,
+                headAtConversationOpen = head("a"),
+                currentHead = null,
                 isScrollInProgress = true,
                 isActiveList = false,
             ),
         )
     }
 
+    /** No decision runs without a captured head. */
     @Test
     fun conversationReturnCannotDecideWithoutPendingHead() {
         assertFalse(
             canDecideConversationReturnHeadSnap(
-                headIdAtConversationOpen = null,
-                currentHeadId = "b",
+                headAtConversationOpen = null,
+                currentHead = head("b"),
                 isScrollInProgress = false,
                 isActiveList = true,
             ),
+        )
+    }
+
+    /** The captured head records the absolute first row and the first unpinned row beneath the pins. */
+    @Test
+    fun returnHeadCapturesAbsoluteHeadAndFirstUnpinnedRow() {
+        assertEquals(
+            ChatListReturnHead(headId = "pin0", activityHeadId = "a"),
+            chatListReturnHead(listOf(item("pin0", pinned = true), item("pin1", pinned = true), item("a"), item("b"))),
+        )
+        assertEquals(
+            ChatListReturnHead(headId = "a", activityHeadId = "a"),
+            chatListReturnHead(listOf(item("a"), item("b"))),
+        )
+        assertEquals(
+            ChatListReturnHead(headId = "pin0", activityHeadId = null),
+            chatListReturnHead(listOf(item("pin0", pinned = true))),
+        )
+        assertNull(chatListReturnHead(emptyList()))
+    }
+
+    /** Returning after a send promoted lower chat C beneath pinned P snaps; returning unchanged does not (#3280). */
+    @Test
+    fun sendPromotionBeneathPinnedHeadSnapsOnlyWhenTheUnpinnedOrderChanged() {
+        val beforeOpen = listOf(item("p", pinned = true), item("a"), item("b"), item("c"))
+        val afterSend = listOf(item("p", pinned = true), item("c"), item("a"), item("b"))
+
+        assertTrue(
+            shouldSnapChatListOnConversationReturn(
+                headAtConversationOpen = chatListReturnHead(beforeOpen),
+                currentHead = chatListReturnHead(afterSend),
+                isActiveList = true,
+            ),
+        )
+        assertFalse(
+            shouldSnapChatListOnConversationReturn(
+                headAtConversationOpen = chatListReturnHead(beforeOpen),
+                currentHead = chatListReturnHead(beforeOpen),
+                isActiveList = true,
+            ),
+        )
+    }
+
+    /** A captured head whose first unpinned row defaults to the absolute head. */
+    private fun head(
+        id: String,
+        activity: String? = id,
+    ): ChatListReturnHead = ChatListReturnHead(headId = id, activityHeadId = activity)
+
+    /** A projected chat row with the given id and pin state. */
+    private fun item(
+        id: String,
+        pinned: Boolean = false,
+    ): ChatListItem {
+        val base = ChatRowPortFixtures.item()
+        return base.copy(
+            group = base.group.copy(groupIdHex = id),
+            projection = base.projection!!.copy(groupIdHex = id, pinned = pinned),
         )
     }
 }

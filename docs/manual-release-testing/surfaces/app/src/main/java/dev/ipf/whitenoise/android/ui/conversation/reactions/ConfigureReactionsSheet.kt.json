@@ -1,0 +1,114 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+  "legacy_sha256": "18cba496142eea646e0c77964920036c21594e52e27725e8c8ef78788d217d71",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConfigureReactionsSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "fun ConfigureReactionsSheet(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "ReactionSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "fun ReactionSlot(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "OptionalReactionSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "fun OptionalReactionSlot(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "AddReactionSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "fun AddReactionSlot(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:configure_reactions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "R.string.configure_reactions",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:configure_reactions_add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "R.string.configure_reactions_add",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:configure_reactions_guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "R.string.configure_reactions_guidance",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:configure_reactions_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "R.string.configure_reactions_remove",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:reaction_slot_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "R.string.reaction_slot_description",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": "R.string.reset",
+        "test_ids": [
+          "MSG-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: ConfigureReactionsSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

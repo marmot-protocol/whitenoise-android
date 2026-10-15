@@ -12,6 +12,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import dev.ipf.marmotkit.ContentReportFfi
+import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayoutReporter
 import dev.ipf.whitenoise.android.ui.SelectableTextLayoutReporter
@@ -31,6 +32,10 @@ internal class MessageBubbleSurfaceState {
      * view rather than expanding in place, so the only state to track is whether that view is showing (#325).
      */
     var expandedFullView by mutableStateOf(false)
+
+    /** Bumped on every Read more open, so a send accepted from an earlier reader cannot close a newer one (#3268). */
+    var expandedFullViewSession = 0
+        private set
     var infoSheetOpen by mutableStateOf(false)
     var forwardSheetOpen by mutableStateOf(false)
     var editHistoryOpen by mutableStateOf(false)
@@ -47,6 +52,33 @@ internal class MessageBubbleSurfaceState {
     var reportInFlight by mutableStateOf(false)
     var messageReports by mutableStateOf<List<ContentReportFfi>?>(null)
     var reportsRevision by mutableIntStateOf(0)
+
+    /** Puts an emoji picked for configure [slot] in the draft, replacing that slot or appending the next (#3279). */
+    fun pickConfigureReaction(
+        slot: Int,
+        emoji: String,
+    ) {
+        configureReactionsDraft = RecentEmojiList.withQuickChoiceAt(configureReactionsDraft, slot, emoji)
+    }
+
+    /** Opens the Read more reader as a new session. */
+    fun openExpandedFullView() {
+        expandedFullViewSession += 1
+        expandedFullView = true
+    }
+
+    /**
+     * Hands a send accepted from the reader's composer back to the conversation (#3268): closes the reader
+     * and runs [onAccepted] to reveal the outgoing row, only while reader [session] is still the one showing.
+     */
+    fun finishExpandedReaderSend(
+        session: Int,
+        onAccepted: () -> Unit,
+    ) {
+        if (!expandedFullView || session != expandedFullViewSession) return
+        expandedFullView = false
+        onAccepted()
+    }
 }
 
 /**
