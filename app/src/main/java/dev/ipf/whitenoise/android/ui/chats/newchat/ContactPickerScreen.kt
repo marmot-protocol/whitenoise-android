@@ -79,6 +79,8 @@ internal fun ContactPickerScreen(
     autoSelectResolvedIdentifier: Boolean = false,
     excludeAccountIdHexes: Set<String> = emptySet(),
     footer: (@Composable () -> Unit)? = null,
+    initialAdminIds: Set<String> = emptySet(),
+    onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
 ) {
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
@@ -106,12 +108,15 @@ internal fun ContactPickerScreen(
             busy = busy,
             onBack = { reviewingSelection = false },
             onRemove = { member ->
+                onInitialAdminChange?.invoke(member, false)
                 selected.removeAll { it.accountIdHex.equals(member.accountIdHex, ignoreCase = true) }
                 if (selected.isEmpty()) reviewingSelection = false
             },
             onConfirm = onConfirm,
             confirmIcon = confirmIcon,
             confirmLabel = confirmLabel,
+            initialAdminIds = initialAdminIds,
+            onInitialAdminChange = onInitialAdminChange,
         )
         return
     }
@@ -181,7 +186,11 @@ internal fun ContactPickerScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { if (canConfirm) onConfirm() },
+                onClick = {
+                    if (canConfirm) {
+                        if (onInitialAdminChange != null) reviewingSelection = true else onConfirm()
+                    }
+                },
                 modifier = Modifier.performanceTestTag(PerformanceTestTags.CONTACT_PICKER_NEXT),
                 containerColor =
                     if (canConfirm) {

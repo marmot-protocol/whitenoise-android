@@ -548,16 +548,6 @@
         ]
       },
       {
-        "surface": "R.string.toast_invite_sent_but_couldnt_add_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
-        "anchor": "R.string.toast_invite_sent_but_couldnt_add_admin",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.toast_keep_one_admin",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_keep_one_admin",
@@ -742,6 +732,23 @@
         "anchor": "private suspend fun runConversationSubscriptionIteration(",
         "test_ids": [
           "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Atomic initial admin invitation",
+        "anchor": "initialAdminInviteWriter(account",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Coherent group details refresh",
+        "anchor": "groupSnapshotReader(account",
+        "test_ids": [
+          "GRP-001",
+          "GRP-030"
         ]
       }
     ]

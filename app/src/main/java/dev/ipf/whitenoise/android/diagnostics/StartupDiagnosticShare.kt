@@ -58,7 +58,13 @@ internal suspend fun shareStartupDiagnostics(
     canPresent: () -> Boolean,
 ) {
     val snapshot = StartupDiagnostics.snapshot() ?: return
-    val result = startupExport.export { createStartupDiagnosticShareIntent(context.applicationContext, snapshot) }
+    val result =
+        startupExport.export {
+            createStartupDiagnosticShareIntent(
+                context.applicationContext,
+                withNativeStartupSnapshot(snapshot, StartupDiagnostics.nativeSnapshot()),
+            )
+        }
     if (!canPresent()) return
     when (result) {
         is StartupDiagnosticExportResult.Ready -> {

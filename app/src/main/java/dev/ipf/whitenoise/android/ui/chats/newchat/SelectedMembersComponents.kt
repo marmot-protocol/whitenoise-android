@@ -11,20 +11,25 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,13 +45,17 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
+import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
 
@@ -152,7 +161,12 @@ internal fun SelectedMemberSummary(
     }
 }
 
-/** Shows the captured selected identities with explicit removal and continue callbacks. */
+/**
+ * Presents a caller-owned recipient selection; callbacks never commit membership themselves.
+ * A non-null [onInitialAdminChange] enables per-person roles, with an empty [initialAdminIds] default
+ * selecting members. Other selection flows omit that callback and show no role controls. [busy]
+ * prevents changes, removal and confirmation while the captured invitation is being submitted.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -165,6 +179,8 @@ internal fun SelectedMembersReviewScreen(
     onConfirm: () -> Unit,
     confirmIcon: ImageVector,
     confirmLabel: String,
+    initialAdminIds: Set<String> = emptySet(),
+    onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
 ) {
     Scaffold(
         topBar = {
@@ -225,8 +241,25 @@ internal fun SelectedMembersReviewScreen(
                     subtitle = appState.shortNpub(member.accountIdHex).takeIf { it.isNotBlank() },
                     avatarSeed = member.accountIdHex,
                     avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
+                    titleMaxLines = Int.MAX_VALUE,
+                    secondaryContent = {
+                        onInitialAdminChange?.let { change ->
+                            SelectedMemberRoleMenu(
+                                name = memberName,
+                                identifier =
+                                    presentationNpubFromReference(
+                                        member.npub,
+                                        member.accountIdHex,
+                                        appState::npubForDisplay,
+                                    ),
+                                admin = initialAdminIds.any { it.equals(member.accountIdHex, ignoreCase = true) },
+                                enabled = !busy,
+                                onChange = { change(member, it) },
+                            )
+                        }
+                    },
                     trailing = {
-                        FilledTonalIconButton(
+                        IconButton(
                             onClick = { onRemove(member) },
                             enabled = !busy,
                             modifier = Modifier.size(48.dp),
@@ -240,6 +273,48 @@ internal fun SelectedMembersReviewScreen(
                 )
             }
         }
+    }
+}
+
+/** Keeps the privilege choice beside the full identity without consuming the name column. */
+@Composable
+@Suppress("FunctionNaming")
+private fun SelectedMemberRoleMenu(
+    name: String,
+    identifier: String,
+    admin: Boolean,
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val memberLabel = stringResource(R.string.member)
+    val adminLabel = stringResource(R.string.admin)
+    val role = if (admin) adminLabel else memberLabel
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            enabled = enabled,
+            contentPadding = PaddingValues(horizontal = Dimens.spaceSm),
+            modifier = Modifier.semantics { contentDescription = "$name, $role" },
+        ) {
+            Text(role)
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
+        }
+        WhiteNoiseDropdownMenu(
+            expanded = expanded && enabled,
+            onDismissRequest = { expanded = false },
+            header = {
+                Column(Modifier.widthIn(max = 280.dp).padding(Dimens.spaceLg)) {
+                    EmojiLabel(name, style = MaterialTheme.typography.bodyLarge)
+                    Text(identifier, style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            items =
+                listOf(
+                    WhiteNoiseMenuItem(memberLabel, { onChange(false) }, enabled = enabled),
+                    WhiteNoiseMenuItem(adminLabel, { onChange(true) }, enabled = enabled),
+                ),
+        )
     }
 }
 

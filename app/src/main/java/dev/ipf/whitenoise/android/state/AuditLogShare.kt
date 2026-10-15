@@ -98,6 +98,7 @@ internal fun prepareAuditLogArchive(
                             "dm-create-current.jsonl",
                             "dm-create-previous.jsonl",
                             "dm-create-manifest.json",
+                            "native-performance-snapshot.txt",
                         ),
                 )
                 require(bytes.size <= MAX_DICTATION_EXPORT_ENTRY_BYTES)

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.SystemClock
 import androidx.core.content.FileProvider
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import java.io.File
@@ -23,6 +24,20 @@ internal object StartupDiagnostics {
     private var header = ""
 
     val enabled: Boolean get() = BuildConfig.STARTUP_DIAGNOSTICS_ENABLED
+    private val nativeCapture by lazy { NativeStartupDiagnosticCapture(enabled) }
+
+    fun bindNative(runtime: MarmotInterface) {
+        nativeCapture.bind(
+            owner = runtime,
+            enable = { runtime.setStartupDiagnosticsEnabled(true) },
+            read = { runtime.startupDiagnosticsSnapshot() },
+            disable = { runtime.setStartupDiagnosticsEnabled(false) },
+        )
+    }
+
+    fun unbindNative(runtime: MarmotInterface) = nativeCapture.unbind(runtime)
+
+    fun nativeSnapshot(): String? = nativeCapture.snapshot()
 
     /** Attaches a bounded private writer without waiting for disk or native initialization. */
     fun bind(context: Context) {

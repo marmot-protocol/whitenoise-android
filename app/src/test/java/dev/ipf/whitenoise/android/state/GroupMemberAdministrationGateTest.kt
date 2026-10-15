@@ -289,7 +289,9 @@ class GroupMemberAdministrationGateTest {
                 if (resource != R.string.error_try_again) state.setContactNickname(invitee, "Carol")
                 val controller = readyController(state)
                 assertFalse(controller.inviteMembers(listOf(invitee)))
-                assertEquals(1, calls)
+                val expectedCalls = if (resource == R.string.error_try_again) 2 else 1
+                // Unknown native replies get one read-only reconciliation, never another invitation.
+                assertEquals(expectedCalls, calls)
                 assertEquals(expectedInviteDetail(state, resource), controller.lastMutationError?.message)
                 assertEquals(AppText.Resource(R.string.toast_couldnt_add_members), state.toast?.title)
                 assertEquals(expectedInviteDetail(state, resource), state.toast?.detail)

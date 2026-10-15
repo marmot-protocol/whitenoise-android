@@ -19,6 +19,9 @@ class InstrumentedDispatchTest(unittest.TestCase):
             (root / "config/instrumented-required-cases.txt").write_text(
                 (ROOT / "config/instrumented-required-cases.txt").read_text()
             )
+            (root / "config/mdk-adoption-required-cases.txt").write_text(
+                (ROOT / "config/mdk-adoption-required-cases.txt").read_text()
+            )
             gradle = root / "gradlew"
             failure = 'case "$*" in *:app:connected*) exit 23;; esac\n' if fail_app else ''
             gradle.write_text('#!/bin/sh\n' + failure + 'printf "%s\\n" "$*"\n')
@@ -38,6 +41,30 @@ class InstrumentedDispatchTest(unittest.TestCase):
                 cwd=root, text=True, capture_output=True, check=True,
             )
             return result.stdout
+
+    def test_mdk_adoption_explicitly_enables_diagnostics_and_requires_native_cases(self):
+        output = self.run_dispatch("workflow_dispatch", "false", "false", "false", "false", "false", "true")
+        self.assertIn("-PstartupDiagnostics=true", output)
+        self.assertIn("MdkAdoptionDeviceAcceptance", output)
+        self.assertIn("--required config/mdk-adoption-required-cases.txt", output)
+        self.assertNotIn("notAnnotation", output)
+        self.assertNotIn("install-outbound-share-fixture", output)
+        self.assertNotIn(":cryptoBenchmark:", output)
+        for options in ({"fail_app": True}, {"fail_required": True}):
+            with self.subTest(options=options), self.assertRaises(subprocess.CalledProcessError):
+                self.run_dispatch("workflow_dispatch", "false", "false", "false", "false", "false", "true", **options)
+
+    def test_mdk_adoption_rejects_other_focused_suites(self):
+        for index in range(5):
+            flags = ["false"] * 5
+            flags[index] = "true"
+            with self.subTest(index=index), self.assertRaises(subprocess.CalledProcessError):
+                self.run_dispatch("workflow_dispatch", *flags, "true")
+
+    def test_mdk_diagnostics_never_enable_from_a_pull_request_flag(self):
+        output = self.run_dispatch("pull_request", "false", "false", "false", "false", "false", "true")
+        self.assertNotIn("startupDiagnostics", output)
+        self.assertIn("PullRequestDeviceSmoke", output)
 
     def test_media_sandbox_dispatch_is_focused_and_requires_every_case(self):
         output = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
