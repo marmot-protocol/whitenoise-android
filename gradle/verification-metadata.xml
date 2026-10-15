@@ -3136,6 +3136,11 @@
             <sha256 value="7220ede61026596fbc720ee4b93246fa2d14f328058532b59ef053de397c7d83" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
          </artifact>
       </component>
+      <component group="com.google.guava" name="guava-parent" version="33.4.0-jre">
+         <artifact name="guava-parent-33.4.0-jre.pom">
+            <sha256 value="3a499ed34a0d9ee0f1bcc39230021a1cd4e2f7dd0426ab6844f585465d41dcd7" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
+      </component>
       <component group="com.google.guava" name="listenablefuture" version="1.0">
          <artifact name="listenablefuture-1.0.jar">
             <sha256 value="e4ad7607e5c0477c6f890ef26a49cb8d1bb4dffb650bab4502afee64644e3069" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
@@ -5333,16 +5338,25 @@
          </artifact>
       </component>
       <component group="org.junit" name="junit-bom" version="5.10.2">
+         <artifact name="junit-bom-5.10.2.module">
+            <sha256 value="de23b114b3e4119a8fe6eb17bed5a3852816698bace67071579d6d927ebb080a" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
          <artifact name="junit-bom-5.10.2.pom">
             <sha256 value="169dd904a4b0f6520cffe658cc62292bfe9f3c14a989fa92120724cde43a9968" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
          </artifact>
       </component>
       <component group="org.junit" name="junit-bom" version="5.11.0-M2">
+         <artifact name="junit-bom-5.11.0-M2.module">
+            <sha256 value="86477abcf490d6ca059aa9973cb108d22a506f49d1a5569bb32cc6cbf43c2cce" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
          <artifact name="junit-bom-5.11.0-M2.pom">
             <sha256 value="4a3ffc4a4edcfec2cb5d619922706a9407161798571939f854dfda73e4e17cc8" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
          </artifact>
       </component>
       <component group="org.junit" name="junit-bom" version="5.13.1">
+         <artifact name="junit-bom-5.13.1.module">
+            <sha256 value="33c07ab9724790a6e5859ba07d69117ac530439724545a81c4179e3272c75de8" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
          <artifact name="junit-bom-5.13.1.pom">
             <sha256 value="fa68451ea830572ed43ffe51d75b6a05f7a5e665a602a51f49d6be02063a65f3" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
          </artifact>

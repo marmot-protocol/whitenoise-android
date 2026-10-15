@@ -111,6 +111,49 @@ def unique_object(pairs):
     return value
 
 
+
+def payload_url(item):
+    """Resolve the artifact URL represented by a supplier checksum or payload read."""
+    url = item['source']
+    if item['method'] == 'published-sha256':
+        if not url.endswith('.sha256'):
+            raise ValueError('Supplier checksum URL is malformed')
+        return url[:-len('.sha256')]
+    return url
+
+
+def validate_publication_mapping(item, records, suppliers, root):
+    """Rederive exceptional artifact URLs from retained authenticated module bytes."""
+    group, module, version = item['coordinate'].split(':')
+    mapping = item.get('publication_metadata', {})
+    key = (item['coordinate'], module + '-' + version + '.module')
+    sha = records.get(key)
+    expected_path = 'publication-metadata/' + str(sha) + '.module'
+    if (sha is None or mapping.get('coordinate') != key[0] or mapping.get('name') != key[1] or
+            mapping.get('sha256') != sha or mapping.get('path') != expected_path):
+        raise ValueError('Artifact supplier refers to another publication without authenticated mapping')
+    path = root / 'gradle' / expected_path
+    if (not path.is_file() or path.is_symlink() or path.stat().st_size > 2 * 1024 * 1024 or
+            not path.resolve().is_relative_to((root / 'gradle').resolve())):
+        raise ValueError('Missing or unsafe publication metadata source')
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != sha:
+        raise ValueError('Changed or truncated publication metadata source')
+    metadata = json.loads(data.decode('utf-8'), object_pairs_hook=unique_object)
+    sources = [s for s in suppliers if (s.get('coordinate'), s.get('name')) == key]
+    if len(sources) != 1:
+        raise ValueError('Missing unique publication metadata supplier')
+    locations = set()
+    for variant in metadata.get('variants', []):
+        for file in variant.get('files', []):
+            if file.get('name') == item['name']:
+                if file.get('sha256') not in [None, item['sha256']]:
+                    raise ValueError('Publication metadata artifact digest differs')
+                locations.add(urllib.parse.urljoin(payload_url(sources[0]), file['url']))
+    if locations != {payload_url(item)}:
+        raise ValueError('Artifact supplier URL is not authenticated by publication metadata')
+
+
 def validate_bundle(root):
     """Bind complete lock/checksum coverage to independently checked supplier records."""
     manifest_path = root / 'gradle/dependency-inputs.json'
@@ -178,13 +221,7 @@ def validate_bundle(root):
         group, module, version = item['coordinate'].split(':')
         publication = '/' + '/'.join([*group.split('.'), module, version]) + '/'
         if publication not in urllib.parse.unquote(url.path):
-            # Authenticated Gradle module metadata can deliberately publish a
-            # selected capability using another version's archive (notably Guava).
-            mapping = item.get('publication_metadata', {})
-            metadata_key = (item['coordinate'], module + '-' + version + '.module')
-            if (mapping.get('coordinate') != metadata_key[0] or mapping.get('name') != metadata_key[1] or
-                    metadata_key not in records or mapping.get('sha256') != records[metadata_key]):
-                raise ValueError('Artifact supplier refers to another publication without authenticated mapping')
+            validate_publication_mapping(item, records, manifest['suppliers'], root)
         suppliers[key] = item
     if set(suppliers) != set(records):
         raise ValueError('Missing independent artifact supplier checks')

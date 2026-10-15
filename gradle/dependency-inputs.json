@@ -1426,7 +1426,7 @@
     "cryptoBenchmark/gradle.lockfile": "e404808c8e655f3a57264cc45e0650433c4fb8e4baf3df89179afdad00434162",
     "fuzz/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "fuzz/gradle.lockfile": "1a058eacc9b9859109a224af8eb8e18d3eb721405af592ec93f9f3e3b81d923a",
-    "gradle/verification-metadata.xml": "668a50a66f37cd4f28424262a8a0c74dfacb401e6ba561cb5e8d610f4858dc50",
+    "gradle/verification-metadata.xml": "f400d979c7508b392b053e99d7943964e1dccf7a7e64e77a9f99a993f00df8cb",
     "settings-gradle.lockfile": "e58bb2ed80db9f829601a658d7c33b9802eb7d2191c31e79c28e01f14c225926"
   },
   "post_lock_selection": [
@@ -1439,6 +1439,18 @@
       "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38772291546/artifacts/11991348367",
       "project": ":",
       "reason": "Normal locked resolution introduces a root lock-constraint path through roborazzi-core/core-jvm, outside roborazzi-gradle-plugin's edge-specific JUnit exclusion. Preserve the exact observed tooling-only JUnit/Hamcrest selections; their artifact checksums were already independently verified.",
+      "scope": "plugin"
+    },
+    {
+      "additional_metadata": [
+        "com.google.guava:guava-parent:33.4.0-jre/guava-parent-33.4.0-jre.pom",
+        "org.junit:junit-bom:5.10.2/junit-bom-5.10.2.module",
+        "org.junit:junit-bom:5.11.0-M2/junit-bom-5.11.0-M2.module",
+        "org.junit:junit-bom:5.13.1/junit-bom-5.13.1.module"
+      ],
+      "configuration": "classpath",
+      "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38789928704/job/116611668486",
+      "reason": "Normal strict resolution reads parent/BOM metadata not retained by the initial warm-cache capture; each exact missing metadata payload was independently checked against its official supplier.",
       "scope": "plugin"
     }
   ],
@@ -6640,6 +6652,13 @@
       "source": "https://repo.maven.apache.org/maven2/com/google/guava/guava-parent/33.4.0-android/guava-parent-33.4.0-android.pom"
     },
     {
+      "coordinate": "com.google.guava:guava-parent:33.4.0-jre",
+      "method": "independent-payload-sha256",
+      "name": "guava-parent-33.4.0-jre.pom",
+      "sha256": "3a499ed34a0d9ee0f1bcc39230021a1cd4e2f7dd0426ab6844f585465d41dcd7",
+      "source": "https://repo.maven.apache.org/maven2/com/google/guava/guava-parent/33.4.0-jre/guava-parent-33.4.0-jre.pom"
+    },
+    {
       "coordinate": "com.google.guava:guava:32.0.1-android",
       "method": "independent-payload-sha256",
       "name": "guava-32.0.1-android.pom",
@@ -6667,6 +6686,7 @@
       "publication_metadata": {
         "coordinate": "com.google.guava:guava:33.3.1-android",
         "name": "guava-33.3.1-android.module",
+        "path": "publication-metadata/6971614ddeee003e54d2b69c6b0c94ce8a5b5eba980d16455c81df9089a7acb7.module",
         "sha256": "6971614ddeee003e54d2b69c6b0c94ce8a5b5eba980d16455c81df9089a7acb7"
       },
       "sha256": "4bf0e2c5af8e4525c96e8fde17a4f7307f97f8478f11c4c8e35a0e3298ae4e90",
@@ -6693,6 +6713,7 @@
       "publication_metadata": {
         "coordinate": "com.google.guava:guava:33.6.0-jre",
         "name": "guava-33.6.0-jre.module",
+        "path": "publication-metadata/2baf73ce839ae48e4b9e0083e256b0e58fc3bf8fc78fc3fbe797bbc89011216e.module",
         "sha256": "2baf73ce839ae48e4b9e0083e256b0e58fc3bf8fc78fc3fbe797bbc89011216e"
       },
       "sha256": "9532ca9ba8aceb4cd2067171f981c799988b7f5844e3e274811a3bb757034bc4",
@@ -10543,6 +10564,13 @@
     },
     {
       "coordinate": "org.junit:junit-bom:5.10.2",
+      "method": "independent-payload-sha256",
+      "name": "junit-bom-5.10.2.module",
+      "sha256": "de23b114b3e4119a8fe6eb17bed5a3852816698bace67071579d6d927ebb080a",
+      "source": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.10.2/junit-bom-5.10.2.module"
+    },
+    {
+      "coordinate": "org.junit:junit-bom:5.10.2",
       "method": "published-sha256",
       "name": "junit-bom-5.10.2.pom",
       "sha256": "169dd904a4b0f6520cffe658cc62292bfe9f3c14a989fa92120724cde43a9968",
@@ -10550,10 +10578,24 @@
     },
     {
       "coordinate": "org.junit:junit-bom:5.11.0-M2",
+      "method": "independent-payload-sha256",
+      "name": "junit-bom-5.11.0-M2.module",
+      "sha256": "86477abcf490d6ca059aa9973cb108d22a506f49d1a5569bb32cc6cbf43c2cce",
+      "source": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.11.0-M2/junit-bom-5.11.0-M2.module"
+    },
+    {
+      "coordinate": "org.junit:junit-bom:5.11.0-M2",
       "method": "published-sha256",
       "name": "junit-bom-5.11.0-M2.pom",
       "sha256": "4a3ffc4a4edcfec2cb5d619922706a9407161798571939f854dfda73e4e17cc8",
       "source": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.11.0-M2/junit-bom-5.11.0-M2.pom.sha256"
+    },
+    {
+      "coordinate": "org.junit:junit-bom:5.13.1",
+      "method": "independent-payload-sha256",
+      "name": "junit-bom-5.13.1.module",
+      "sha256": "33c07ab9724790a6e5859ba07d69117ac530439724545a81c4179e3272c75de8",
+      "source": "https://repo.maven.apache.org/maven2/org/junit/junit-bom/5.13.1/junit-bom-5.13.1.module"
     },
     {
       "coordinate": "org.junit:junit-bom:5.13.1",

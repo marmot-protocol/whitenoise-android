@@ -226,4 +226,8 @@ checksums were independently checked with the other test/tooling inputs. A bulk
 evidence during updates; never repair it with a global exclusion or unlocked
 classpath. Guava's two cross-version Android/JRE publications similarly retain
 explicit references to their authenticated Gradle module metadata rather than
-loosening supplier-path checks for unrelated artifacts.
+loosening supplier-path checks for unrelated artifacts. The two exact module JSON
+files are retained under `gradle/publication-metadata/`; normal offline validation
+checks their SHA-256 and rederives each selected artifact name, digest and unique
+resolved URL. Keeping a valid metadata anchor while changing the supplier URL
+therefore fails qualification.

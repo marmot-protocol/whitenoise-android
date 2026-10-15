@@ -97,6 +97,7 @@ def verify_one(record, output, retain, module_hashes):
                 if response[0] != module_sha or response[2] > 2 * 1024 * 1024:
                     raise ValueError('Publication metadata differs: ' + coordinate)
                 metadata = json.loads(temporary.read_text())
+                (output / 'downloads' / module_sha).write_bytes(temporary.read_bytes())
             finally:
                 temporary.unlink(missing_ok=True)
             locations = set()

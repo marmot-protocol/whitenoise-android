@@ -9,3 +9,5 @@ config/licenses/texts/*.txt -whitespace -text
 **/*gradle.lockfile text eol=lf
 gradle/verification-metadata.xml text eol=lf
 gradle/dependency-inputs.json text eol=lf
+# Retained publisher metadata is authenticated byte-for-byte.
+gradle/publication-metadata/*.module -text
