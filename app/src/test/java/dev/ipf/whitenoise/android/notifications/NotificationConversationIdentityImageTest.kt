@@ -1,0 +1,304 @@
+package dev.ipf.whitenoise.android.notifications
+
+import android.Manifest
+import android.app.Notification
+import android.app.NotificationManager
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
+import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/**
+ * #3311: the bitmap each rich message card carries in its primary identity slot, across the conversation template,
+ * the first long message, accumulated history, late enrichment, private contact pictures and live-card rewrites.
+ * Builder extras alone cannot prove SystemUI's rendering, which `NotificationConversationAvatarAndroidTest` covers.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class NotificationConversationIdentityImageTest {
+    private val context: Context
+        get() = RuntimeEnvironment.getApplication()
+
+    private val manager: NotificationManager
+        get() = context.getSystemService(NotificationManager::class.java)
+
+    /** Starts every scenario from an empty tray and shortcut inventory with notifications allowed. */
+    @Before
+    fun setUp() {
+        manager.cancelAll()
+        ShortcutManagerCompat.removeAllDynamicShortcuts(context)
+        Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    /** A warm direct chat shows the peer's picture in its first card, not only through a later shortcut. */
+    @Test
+    fun dmFirstCardCarriesTheWarmPeerPictureAsItsIdentityImage() {
+        val posts = mutableListOf<Notification>()
+        val presenter = presenter(posts)
+        show(presenter, dm(), conversation = solid(Color.RED), sender = solid(Color.RED))
+
+        assertEquals("the first payload already carries the picture", 1, posts.size)
+        assertEquals(Color.RED, identityPixel(posts.single()))
+        assertEquals(DEFAULT_SENDER, identityExtras(posts.single())?.getString("contact"))
+    }
+
+    /** A group card shows the group picture while the message keeps the sender's own face. */
+    @Test
+    fun groupCardShowsTheGroupPictureAndKeepsTheSenderInTheMessage() {
+        val presenter = presenter()
+        show(presenter, group(), conversation = solid(Color.BLUE), sender = solid(Color.GREEN))
+
+        val card = liveCard()
+        assertEquals(Color.BLUE, identityPixel(card))
+        assertEquals(Color.GREEN, pixel(lastMessagePerson(card)))
+        assertNull("a group identity is never a member's private contact", identityExtras(card)?.getString("contact"))
+    }
+
+    /** Missing pictures fall back to the conversation shortcut's monogram, never the app icon or a member's face. */
+    @Test
+    fun missingPicturesFallBackToTheConversationMonogram() {
+        val presenter = presenter()
+        show(presenter, group(), conversation = null, sender = solid(Color.GREEN))
+        val seed = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        assertEquals(notificationMonogramBackgroundColor(seed), identityPixel(liveCard()))
+
+        manager.cancelAll()
+        show(presenter, dm(), conversation = null, sender = null)
+        assertEquals(notificationMonogramBackgroundColor(seed), identityPixel(liveCard()))
+    }
+
+    /** The first long message's text block keeps the picture, and the next message keeps it in history. */
+    @Test
+    fun longFirstMessageAndTheFollowingHistoryKeepTheIdentityImage() {
+        val presenter = presenter()
+        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val red = solid(Color.RED)
+        show(presenter, dm(messageId = "first"), conversation = red, sender = red, body = long)
+        val textBlock = liveCard()
+        assertNotNull(textBlock.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        assertEquals(Color.RED, identityPixel(textBlock))
+
+        show(presenter, dm(messageId = "second"), conversation = red, sender = red)
+        val history = liveCard()
+        assertNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(history))
+        assertEquals(Color.RED, identityPixel(history))
+    }
+
+    /** A cold picture starts as the monogram and replaces it silently on the long-message text block too. */
+    @Test
+    fun latePictureReplacesTheMonogramSilentlyOnTheTextBlock() {
+        val posts = mutableListOf<Notification>()
+        var enrichment: (suspend () -> Unit)? = null
+        val presenter =
+            presenter(
+                posts,
+                resolver = ::latePicture,
+                launcher = { enrichment = it },
+            )
+        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        show(presenter, dm(), senderUrl = "https://example.com/alice.png", body = long)
+        val seed = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        assertEquals(notificationMonogramBackgroundColor(seed), identityPixel(posts.single()))
+
+        runBlocking { checkNotNull(enrichment).invoke() }
+
+        assertEquals(2, posts.size)
+        val enriched = posts.last()
+        assertEquals(Color.MAGENTA, identityPixel(enriched))
+        assertTrue(enriched.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        val bigText = enriched.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+        assertNotNull("the text block survives enrichment", bigText)
+    }
+
+    /** A dismissal while the picture loads keeps the long-message card dismissed. */
+    @Test
+    fun dismissedTextBlockIsNotResurrectedByALatePicture() {
+        val posts = mutableListOf<Notification>()
+        var enrichment: (suspend () -> Unit)? = null
+        val presenter = presenter(posts, resolver = ::latePicture, launcher = { enrichment = it })
+        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        show(presenter, dm(), senderUrl = "https://example.com/alice.png", body = long)
+        runBlocking {
+            presenter.dismissConversationMessages(ACCOUNT, GROUP)
+            checkNotNull(enrichment).invoke()
+        }
+
+        assertEquals(1, posts.size)
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    /** The account-scoped private picture wins at the final write, and Clear falls back to the monogram. */
+    @Test
+    fun privateContactPictureWinsAndClearFallsBackToTheMonogram() =
+        runBlocking {
+            var pixels: Bitmap? = solid(Color.RED)
+            val scopes = mutableSetOf<String>()
+            val presenter =
+                presenter(
+                    contactAvatar = { scope, contact ->
+                        scopes += scope
+                        if (contact == DEFAULT_SENDER) true to pixels else false to null
+                    },
+                )
+            show(presenter, dm(), conversation = solid(Color.BLUE), sender = solid(Color.BLUE))
+            assertEquals(Color.RED, identityPixel(liveCard()))
+
+            pixels = null
+            presenter.refreshContactSenderName(ACCOUNT, DEFAULT_SENDER, "Maya")
+            val seed = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+            assertEquals(notificationMonogramBackgroundColor(seed), identityPixel(liveCard()))
+            assertEquals("only this card's own account scope is consulted", setOf(scope(ACCOUNT)), scopes)
+        }
+
+    /** Rewriting a live group card for a member's private picture keeps the group's own identity image. */
+    @Test
+    fun liveGroupRewriteKeepsTheGroupIdentityImage() =
+        runBlocking {
+            val presenter = presenter(contactAvatar = { _, contact -> (contact == DEFAULT_SENDER) to solid(Color.RED) })
+            show(presenter, group(), conversation = solid(Color.BLUE), sender = solid(Color.GREEN))
+            presenter.refreshContactSenderName(ACCOUNT, DEFAULT_SENDER, "Maya")
+
+            val card = liveCard()
+            assertEquals(Color.BLUE, identityPixel(card))
+            assertEquals(Color.RED, pixel(lastMessagePerson(card)))
+        }
+
+    /** App-lock redaction never carries an identity picture or its contact key. */
+    @Test
+    fun redactedCardCarriesNoIdentityImage() {
+        val presenter = presenter()
+        runBlocking {
+            presenter.show(
+                dm(),
+                conversationAvatarBitmap = solid(Color.RED),
+                senderAvatarBitmap = solid(Color.RED),
+                redactContent = true,
+                shortNpub = { "npub1test" },
+            )
+        }
+        val card = liveCard()
+        assertNull(card.getLargeIcon())
+        assertNull(identityExtras(card))
+        assertFalse(card.extras.keySet().any { it.contains("identity") })
+    }
+
+    /** Builds a presenter whose posts, avatar resolution and contact pictures the scenario controls. */
+    private fun presenter(
+        posts: MutableList<Notification> = mutableListOf(),
+        resolver: suspend (String?) -> Bitmap? = { null },
+        launcher: (suspend () -> Unit) -> Unit = { error("ready pictures must not launch enrichment") },
+        contactAvatar: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
+    ): LocalNotificationPresenter =
+        LocalNotificationPresenter(
+            context = context,
+            groupReconciliation = {},
+            shortcutPublisher = { ShortcutManagerCompat.pushDynamicShortcut(context, it) },
+            notificationPoster = { notificationManager, tag, id, notification ->
+                posts += notification
+                notificationManager.notify(tag, id, notification)
+            },
+            cachedAvatarBitmap = { null },
+            avatarBitmapResolver = resolver,
+            enrichmentLauncher = launcher,
+            contactAvatarOverride = contactAvatar,
+        ).also { it.ensureChannels() }
+
+    /** Posts one message with the given ready pictures, cold picture URL and body. */
+    @Suppress("LongParameterList") // Mirrors the presenter's optional picture inputs by name.
+    private fun show(
+        presenter: LocalNotificationPresenter,
+        update: dev.ipf.marmotkit.NotificationUpdateFfi,
+        conversation: Bitmap? = null,
+        sender: Bitmap? = null,
+        senderUrl: String? = null,
+        body: String = "hi",
+    ) {
+        assertTrue(
+            runBlocking {
+                presenter.show(
+                    update,
+                    previewTextOverride = body,
+                    conversationAvatarBitmap = conversation,
+                    senderAvatarBitmap = sender,
+                    senderAvatarUrl = senderUrl,
+                    shortNpub = { "npub1test" },
+                )
+            },
+        )
+    }
+
+    /** The only live message card, ignoring the group summary. */
+    private fun liveCard(): Notification =
+        manager.activeNotifications
+            .single { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 }
+            .notification
+
+    /** The identity snapshot's recorded inputs, or null when the card carries none. */
+    private fun identityExtras(card: Notification) = card.extras.getBundle(EXTRA_IDENTITY_IMAGE)
+
+    /** The top-left pixel of the card's primary identity picture. */
+    private fun identityPixel(card: Notification): Int {
+        val drawable = checkNotNull(card.getLargeIcon()?.loadDrawable(context)) { "the card has no identity picture" }
+        return drawable.toBitmap().getPixel(0, 0)
+    }
+
+    /** Resolves any requested picture URL to the late magenta picture, and nothing for an absent URL. */
+    private suspend fun latePicture(url: String?): Bitmap? = url?.let { solid(Color.MAGENTA) }
+
+    /** The newest message's sender. */
+    private fun lastMessagePerson(card: Notification): Person =
+        checkNotNull(
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(card)
+                ?.messages
+                ?.last()
+                ?.person,
+        )
+
+    /** The top-left pixel of a Person icon. */
+    private fun pixel(person: Person): Int = checkNotNull(person.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0)
+
+    /** A direct-chat message for the fixture account and conversation. */
+    private fun dm(messageId: String = "message") =
+        notificationUpdate(isDm = true, messageIdHex = messageId, notificationKey = KEY, conversationKey = CONVERSATION)
+
+    /** A group message for the fixture account and conversation. */
+    private fun group() = notificationUpdate(isDm = false, notificationKey = KEY, conversationKey = CONVERSATION)
+
+    /** A small single-color bitmap whose pixels identify which picture reached the card. */
+    private fun solid(color: Int): Bitmap {
+        val bitmap = Bitmap.createBitmap(PICTURE_PX, PICTURE_PX, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(color)
+        return bitmap
+    }
+
+    /** The opaque account scope the presenter hands to the contact-picture lookup. */
+    private fun scope(account: String): String = checkNotNull(conversationShortcutAccountScope(account))
+
+    private companion object {
+        const val ACCOUNT = NotificationFixtureDefaults.ACCOUNT_REF
+        const val GROUP = NotificationFixtureDefaults.GROUP_ID_HEX
+        const val DEFAULT_SENDER = NotificationFixtureDefaults.SENDER_ACCOUNT_ID_HEX
+        const val KEY = "key"
+        const val CONVERSATION = "conv"
+        const val PICTURE_PX = 8
+    }
+}

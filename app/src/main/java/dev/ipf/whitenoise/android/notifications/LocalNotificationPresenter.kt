@@ -879,10 +879,19 @@ class LocalNotificationPresenter(
                                             )
                                         },
                                 )
-                            // Supply the group fallback icon in the first payload; shortcut publication
-                            // stays off the initial-post path and must not be needed to complete its image.
-                            if (notificationContent.isGroupConversation && !redactContent) {
-                                builder.setLargeIcon(resolvedConversationAvatarBitmap)
+                            // #3311: every rich card carries its conversation identity picture in the first
+                            // payload, for a direct chat as well as a group, and the long-message text block keeps
+                            // it. Shortcut publication stays off the initial-post path and is never the only route
+                            // to the picture. Redacted cards get none.
+                            if (!redactContent) {
+                                builder.setConversationIdentityImage(
+                                    notificationContent.identityImage(
+                                        seed = messagingShortcutId ?: notificationContent.notificationTag,
+                                        titleOverride = conversationTitleOverride,
+                                        conversationAvatar = resolvedConversationAvatarBitmap,
+                                        senderAvatar = resolvedSenderAvatarBitmap,
+                                    ),
+                                )
                             }
                             if (!redactContent && messagingShortcutId != null) {
                                 val locusId = LocusIdCompat(messagingShortcutId)
@@ -1462,18 +1471,27 @@ class LocalNotificationPresenter(
                 conversationAvatarBitmap !== messaging.conversationAvatarBitmap ||
                     senderAvatarBitmap !== messaging.senderAvatarBitmap
             if (!avatarChanged) return@withLock
-            postEnrichedAvatarCard(content, active, enrichedSender, showToken)
+            // The late picture replaces the identity image and the sender together, for either card template.
+            val identity =
+                content.identityImage(
+                    seed = messaging.shortcutId ?: content.notificationTag,
+                    titleOverride = messaging.conversationTitleOverride,
+                    conversationAvatar = conversationAvatarBitmap,
+                    senderAvatar = senderAvatarBitmap,
+                )
+            postEnrichedAvatarCard(content, active, enrichedSender, identity, showToken)
         }
     }
 
+    /** Writes the late sender and identity picture to the still-live card, keeping its dismissal ownership. */
     private fun postEnrichedAvatarCard(
         content: LocalNotificationContent,
         active: Notification,
         sender: Person,
+        identity: NotificationIdentityImage,
         showToken: ConversationCardShowToken,
     ) {
-        val enrichedStyle = enrichedMessagingStyle(active, sender) ?: return
-        val enriched = buildEnrichedMessagingNotification(active, enrichedStyle)
+        val enriched = enrichedIdentityNotification(active, sender, identity) ?: return
         val manager = NotificationManagerCompat.from(context)
         if (
             postNotificationSafely(
@@ -1493,17 +1511,30 @@ class LocalNotificationPresenter(
         }
     }
 
-    /** Keeps the active card's grouping eligible for heads-up while suppressing repeat alerts for its avatar update. */
-    private fun buildEnrichedMessagingNotification(
+    /**
+     * Rewrites the live card with the enriched sender and identity picture, for the conversation template and the
+     * long-message text block alike. It keeps the card's grouping eligible for heads-up while suppressing a repeat
+     * alert, and leaves any other card shape untouched.
+     */
+    private fun enrichedIdentityNotification(
         active: Notification,
-        enrichedStyle: NotificationCompat.MessagingStyle,
-    ): Notification =
-        NotificationCompat
-            .Builder(context, active)
-            .setGroupAlertBehavior(active.groupAlertBehavior)
-            .setOnlyAlertOnce(true)
-            .setStyle(enrichedStyle)
-            .build()
+        sender: Person,
+        identity: NotificationIdentityImage,
+    ): Notification? {
+        val builder =
+            NotificationCompat
+                .Builder(context, active)
+                .setGroupAlertBehavior(active.groupAlertBehavior)
+                .setOnlyAlertOnce(true)
+        val enrichedStyle = enrichedMessagingStyle(active, sender)
+        when {
+            enrichedStyle != null -> builder.setStyle(enrichedStyle)
+            active.extras?.containsKey(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER) == true ->
+                builder.addExtras(Bundle().apply { putBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER, sender.toBundle()) })
+            else -> return null
+        }
+        return builder.setConversationIdentityImage(identity).build()
+    }
 
     /** Copies an active MessagingStyle while replacing the matching sender's rich Person metadata. */
     private fun enrichedMessagingStyle(
@@ -1673,6 +1704,17 @@ class LocalNotificationPresenter(
             ).build()
     }
 
+    /** Refreshes the sender Person and a direct chat's identity picture from the current private contact choice. */
+    private fun withCurrentContactPictures(notification: Notification): Notification {
+        val people = withCurrentContactAvatars(notification)
+        val account = people.extras?.getString(CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA)
+        return if (account == null || people.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) {
+            people
+        } else {
+            withCurrentIdentityContact(context, people) { contact -> contactAvatarOverride(account, contact) }
+        }
+    }
+
     /** Writes one card and reports success without allowing observer failures to alter delivery. */
     private fun postNotificationSafely(
         manager: NotificationManagerCompat,
@@ -1715,7 +1757,7 @@ class LocalNotificationPresenter(
                         }
                     },
                 ) {
-                    val payload = previewPayload(withCurrentContactAvatars(notification), tag, id, hiddenShortcut)
+                    val payload = previewPayload(withCurrentContactPictures(notification), tag, id, hiddenShortcut)
                     notificationPoster(manager, tag, id, payload)
                 }
             if (written) {

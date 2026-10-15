@@ -48,10 +48,11 @@
       {
         "surface": "same-card avatar enrichment preserves heads-up eligibility without repeat alerts",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "private fun buildEnrichedMessagingNotification(",
+        "anchor": "private fun enrichedIdentityNotification(",
         "test_ids": [
           "NTF-006",
-          "NTF-010"
+          "NTF-010",
+          "NTF-042"
         ]
       },
       {
@@ -87,6 +88,25 @@
         "test_ids": [
           "NTF-034",
           "NTF-030"
+        ]
+      },
+      {
+        "surface": "conversation identity picture on rich message cards",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "builder.setConversationIdentityImage(",
+        "test_ids": [
+          "NTF-042",
+          "NTF-006",
+          "NTF-036"
+        ]
+      },
+      {
+        "surface": "private contact picture on a direct message's identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private fun withCurrentContactPictures(",
+        "test_ids": [
+          "NTF-042",
+          "NTF-025"
         ]
       }
     ],
