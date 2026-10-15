@@ -180,26 +180,60 @@ class OutboundShareDeviceContractTest {
     }
 
     /**
-     * Waits for the receiving process's observations. The class's first chooser case cold-starts the receiver
-     * process, which has missed a 10 s budget on the CI emulator after the Sharesheet launched it, so the wait
-     * allows [RECEIVER_RESULT_MS]. A miss fails with timestamped activity starts, process starts and deaths,
-     * low-memory kills and crashes, so it shows whether the receiver was slow or killed.
+     * Waits for the receiving process's observations. On the 2 GB CI emulator the receiver has started and then
+     * stayed silent for longer than [RECEIVER_RESULT_MS] while reading the shared streams, so a miss fails with
+     * [receiverHangReport] instead of a bare timeout.
      */
     private suspend fun awaitObservations(
         result: CompletableDeferred<Pair<Int, Bundle?>>,
         device: UiDevice,
     ): Pair<Int, Bundle?> =
         withTimeoutOrNull(RECEIVER_RESULT_MS) { result.await() }
-            ?: error(
-                "No receiver result within $RECEIVER_RESULT_MS ms; foreground ${device.currentPackageName}\n" +
-                    device
-                        .executeShellCommand(
-                            "logcat -d -v time ActivityManager:I ActivityTaskManager:I AndroidRuntime:E " +
-                                "lowmemorykiller:I *:S",
-                        ).lines()
-                        .takeLast(60)
-                        .joinToString("\n"),
-            )
+            ?: error("No receiver result within $RECEIVER_RESULT_MS ms\n${receiverHangReport(device)}")
+
+    /**
+     * Describes a receiver that never replied. Its stream reads are served on this app's binder threads, so the
+     * report lists the busy ones (an idle binder thread has no Java frames) and the main thread, then the
+     * system's provider connections for this app, both apps' process state and the recent process lifecycle.
+     */
+    private fun receiverHangReport(device: UiDevice): String {
+        val appPackage = InstrumentationRegistry.getInstrumentation().targetContext.packageName
+        val threads =
+            Thread
+                .getAllStackTraces()
+                .filter { (thread, frames) ->
+                    val busyBinder = thread.name.startsWith("binder", ignoreCase = true) && frames.isNotEmpty()
+                    thread.name == "main" || busyBinder
+                }.entries
+                .joinToString("\n") { (thread, frames) ->
+                    "${thread.name} ${thread.state}\n" + frames.take(8).joinToString("\n") { "    at $it" }
+                }
+        val processState =
+            listOf(appPackage, FIXTURE_PACKAGE).joinToString("\n") { pkg ->
+                shellLines(device, "dumpsys activity processes $pkg")
+                    .filter { line -> PROCESS_STATE_KEYS.any { line.contains(it, ignoreCase = true) } }
+                    .take(20)
+                    .joinToString("\n")
+            }
+        return listOf(
+            "foreground ${device.currentPackageName}",
+            "-- busy app threads\n$threads",
+            "-- provider connections\n" +
+                shellLines(device, "dumpsys activity providers $appPackage").take(40).joinToString("\n"),
+            "-- process state\n$processState",
+            "-- process lifecycle\n" +
+                shellLines(
+                    device,
+                    "logcat -d -v time ActivityManager:I ActivityTaskManager:I AndroidRuntime:E lowmemorykiller:I *:S",
+                ).takeLast(30).joinToString("\n"),
+        ).joinToString("\n")
+    }
+
+    /** Runs a shell command through UiAutomation and returns its non-blank output lines. */
+    private fun shellLines(
+        device: UiDevice,
+        command: String,
+    ): List<String> = device.executeShellCommand(command).lines().filter(String::isNotBlank)
 
     /** Expands and scrolls the actual system sheet when its initial suggested row hides the receiver. */
     private fun findIndependentReceiver(device: UiDevice): UiObject2 {
@@ -248,6 +282,7 @@ class OutboundShareDeviceContractTest {
         const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
         const val FIXTURE_CAPTION = "Visible fixture caption"
         const val RECEIVER_RESULT_MS = 30_000L
+        val PROCESS_STATE_KEYS = listOf("ProcessRecord", "procState", "frozen", "curAdj", "setAdj")
         val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
     }
 
