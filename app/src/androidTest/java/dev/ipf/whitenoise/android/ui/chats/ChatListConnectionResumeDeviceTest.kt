@@ -100,7 +100,9 @@ class ChatListConnectionResumeDeviceTest {
             fixture.connection = fixture.connection.copy(phase = ChatListConnectionPhase.Ready)
         }
         composeRule.waitUntil { ConnectivityBannerState.JustConnected in fixture.frames }
-        composeRule.waitUntil { fixture.frames.lastOrNull() == ConnectivityBannerState.Hidden }
+        // Drive the production flash timer separately from the wall-clock budget for Android's draw.
+        composeRule.mainClock.advanceTimeBy(CONNECTIVITY_BANNER_FLASH_MILLIS)
+        composeRule.waitUntil(timeoutMillis = 5_000) { fixture.frames.lastOrNull() == ConnectivityBannerState.Hidden }
         val distinct = fixture.frames.distinct()
         val offline = distinct.indexOf(ConnectivityBannerState.Offline)
         val connecting = distinct.indexOf(ConnectivityBannerState.Connecting)

@@ -140,6 +140,16 @@ class AnimationSourceAdmissionDeviceTest {
                     (animated as Animatable).start()
                     assertTrue(animated.isRunning)
                 }
+                colors.clear()
+                val resumedDeadline = android.os.SystemClock.elapsedRealtime() + 3000L
+                while (colors.size < 2 && android.os.SystemClock.elapsedRealtime() < resumedDeadline) {
+                    instrumentation.runOnMainSync {
+                        animated.draw(android.graphics.Canvas(pixels))
+                        colors.add(pixels.getPixel(0, 0))
+                    }
+                    Thread.sleep(25L)
+                }
+                assertTrue("Resuming must deliver changing isolated pixels, not just set isRunning", colors.size >= 2)
             } finally {
                 instrumentation.runOnMainSync { (animated as java.io.Closeable).close() }
                 pixels.recycle()
