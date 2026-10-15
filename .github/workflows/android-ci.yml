@@ -376,7 +376,9 @@ jobs:
 
       - name: Verify dependency security resolution fixture
         if: matrix.phase == 'tooling'
-        run: python3 scripts/test_dependency_security_fixture.py
+        run: |
+          python3 scripts/test_dependency_security_fixture.py
+          python3 scripts/test_dependency_inputs_fixture.py
 
       # One-off candidate capture while replacing the generator and bootstrapping
       # reviewed locks. Remove this step before the combined PR is ready.

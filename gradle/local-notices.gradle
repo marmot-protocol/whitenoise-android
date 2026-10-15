@@ -19,7 +19,7 @@ abstract class GenerateLocalLicenseResources extends DefaultTask {
 
     /** Runtime paths are internal; file contents and coordinate keys are tracked separately. */
     @Internal
-    abstract MapProperty<String, File> getArtifactFilesByIdentity()
+    abstract MapProperty<String, List<File>> getArtifactFilesByIdentity()
 
     /** Include coordinate/name changes in cache identity even when archive bytes are identical. */
     @Input
@@ -48,16 +48,20 @@ abstract class GenerateLocalLicenseResources extends DefaultTask {
     /** Fingerprint actual selected bytes before invoking the deterministic, network-free generator. */
     @TaskAction
     void generateResources() {
-        def selected = artifactFilesByIdentity.get().collect { identity, file ->
+        def selected = artifactFilesByIdentity.get().collect { identity, files ->
             def separator = identity.lastIndexOf('/')
-            def digest = MessageDigest.getInstance('SHA-256')
-            file.withInputStream { stream ->
-                byte[] buffer = new byte[1024 * 1024]
-                int count
-                while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
-            }
+            def hashes = files.collect { file ->
+                def digest = MessageDigest.getInstance('SHA-256')
+                file.withInputStream { stream ->
+                    byte[] buffer = new byte[1024 * 1024]
+                    int count
+                    while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
+                }
+                digest.digest().encodeHex().toString()
+            }.toSet()
+            if (hashes.size() != 1) throw new GradleException("Conflicting notice artifact bytes: ${identity}")
             [coordinate: identity.substring(0, separator), name: identity.substring(separator + 1),
-             sha256: digest.digest().encodeHex().toString()]
+             sha256: hashes.first()]
         }.sort { "${it.coordinate}:${it.name}" }
         def input = new File(temporaryDir, 'selected-artifacts.json')
         input.text = JsonOutput.toJson(selected)
@@ -81,8 +85,10 @@ components.onVariants(components.selector().all()) { variant ->
         resolved.each { artifact ->
             def id = artifact.id.componentIdentifier
             def key = "${id.group}:${id.module}:${id.version}/${artifact.file.name}".toString()
-            if (files.containsKey(key)) throw new GradleException("Duplicate notice artifact: ${key}")
-            files[key] = artifact.file
+            // Several selected capabilities can refer to the same archive. Keep all
+            // paths as inputs and require identical bytes before emitting one identity.
+            if (!files.containsKey(key)) files[key] = []
+            files[key].add(artifact.file)
         }
         files
     }
