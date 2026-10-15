@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.Parcel
 import android.os.ResultReceiver
 import android.provider.OpenableColumns
@@ -178,20 +180,24 @@ class OutboundShareDeviceContractTest {
     }
 
     /**
-     * Waits for the receiving process's observations. A miss fails with the foreground package and the recent
-     * activity starts and crashes, so it shows whether the receiver ran rather than only that time ran out.
+     * Waits for the receiving process's observations. The class's first chooser case cold-starts the receiver
+     * process, which has missed a 10 s budget on the CI emulator after the Sharesheet launched it, so the wait
+     * allows [RECEIVER_RESULT_MS]. A miss fails with timestamped activity starts, process starts and deaths,
+     * low-memory kills and crashes, so it shows whether the receiver was slow or killed.
      */
     private suspend fun awaitObservations(
         result: CompletableDeferred<Pair<Int, Bundle?>>,
         device: UiDevice,
     ): Pair<Int, Bundle?> =
-        withTimeoutOrNull(10_000) { result.await() }
+        withTimeoutOrNull(RECEIVER_RESULT_MS) { result.await() }
             ?: error(
-                "No receiver result within 10 s; foreground ${device.currentPackageName}\n" +
+                "No receiver result within $RECEIVER_RESULT_MS ms; foreground ${device.currentPackageName}\n" +
                     device
-                        .executeShellCommand("logcat -d -v brief ActivityTaskManager:I AndroidRuntime:E *:S")
-                        .lines()
-                        .takeLast(40)
+                        .executeShellCommand(
+                            "logcat -d -v time ActivityManager:I ActivityTaskManager:I AndroidRuntime:E " +
+                                "lowmemorykiller:I *:S",
+                        ).lines()
+                        .takeLast(60)
                         .joinToString("\n"),
             )
 
@@ -215,12 +221,11 @@ class OutboundShareDeviceContractTest {
 
     /**
      * Parcels the callback as a framework ResultReceiver so independent APKs need no test-class loader.
-     * Observations arrive on the binder thread, not the app's main looper, so main-thread work while the app
-     * is in the background cannot hold them past the wait.
+     * The binder still delivers observations to the original receiver on the app looper.
      */
     private fun resultReceiver(result: CompletableDeferred<Pair<Int, Bundle?>>): ResultReceiver {
         val receiver =
-            object : ResultReceiver(null) {
+            object : ResultReceiver(Handler(Looper.getMainLooper())) {
                 /** Completes the waiting assertion with observations returned by the receiving process. */
                 override fun onReceiveResult(
                     resultCode: Int,
@@ -242,6 +247,7 @@ class OutboundShareDeviceContractTest {
     private companion object {
         const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
         const val FIXTURE_CAPTION = "Visible fixture caption"
+        const val RECEIVER_RESULT_MS = 30_000L
         val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
     }
 
