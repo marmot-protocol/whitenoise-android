@@ -202,6 +202,16 @@ Update the local notice catalogue for changed runtime bytes and retain all origi
 attributions. Record only the matching reviewed supplier records and exact final
 file hashes in the evidence manifest, then validate the normal locked build.
 
+A warm Gradle cache can omit previously read parent POMs, imported BOMs or the
+POM/module counterpart from newly written verification metadata. Before qualifying
+a candidate, inspect the selected coordinates' exact supplier metadata and follow
+literal parent/import references, resolving inherited properties from the checked
+POMs. Independently hash each additional metadata payload from its official HTTPS
+repository and retain its exact coordinate, filename, digest and supplier URL.
+These metadata-only entries do not authorize a new binary or relax a resolution
+lock. Record the supplemental review separately from the hosted capture; a normal
+strict build remains necessary to expose any other task-specific inputs.
+
 For a missing platform classifier, review that exact supplier artifact and add its
 SHA-256 plus provenance. Do not add a group-wide trusted-artifact rule, turn off
 metadata verification, accept arbitrary alternate checksums or disable verification.
@@ -212,7 +222,6 @@ bootstrap or recovery of a source archive missing its input files. The hosted
 integration fixture proves that changed transitives and substituted bytes fail and
 that an inspectable, deliberately approved update succeeds without another build
 matrix.
-
 
 Qualify the generated locks with a normal strict invocation before accepting them.
 Gradle's lock constraints can introduce additional paths to an already selected
@@ -232,10 +241,16 @@ checks their SHA-256 and rederives each selected artifact name, digest and uniqu
 resolved URL. Keeping a valid metadata anchor while changing the supplier URL
 therefore fails qualification.
 
-
 AGP creates `androidApis` lazily when resource tasks need local SDK jars. Its
 empty Maven lock state is committed for all three Android modules, and candidate
 capture predeclares that known `maybeCreate` configuration so regeneration keeps
 it. Strict locking remains active: adding a Maven module to that SDK-only path
 fails instead of becoming an unreviewed exception. The hosted fixture resolves a
 late local-file configuration and exercises that negative case.
+
+External artifacts transformed into directories are reported under
+`unfingerprinted_artifacts` with an explicit kind/reason and partial fingerprint
+coverage. The collector never opens such a directory as an archive or invents a
+binary checksum. Selected components/security floors remain checked; comparisons
+reject that incomplete fingerprint coverage. A hosted real directory-transform
+fixture exercises this reporting seam.
