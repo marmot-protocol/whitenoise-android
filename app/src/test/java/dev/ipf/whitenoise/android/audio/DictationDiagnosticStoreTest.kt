@@ -68,6 +68,17 @@ class DictationDiagnosticStoreTest {
                     mapOf("failure" to "NoMatch", "generation" to 2L),
                 "event=caller_audio_retry_exhausted attempts=3 action=retain" to
                     mapOf("attempts" to 3L, "action" to "retain"),
+                "event=caller_audio_chunk_fed chunk=5 first_sample=120 last_sample=140 " +
+                    "replay_parts=1 replay_bytes=320000 new_bytes=93436 bytes=413436" to
+                    mapOf(
+                        "chunk" to 5L,
+                        "first_sample" to 120L,
+                        "last_sample" to 140L,
+                        "replay_parts" to 1L,
+                        "replay_bytes" to 320000L,
+                        "new_bytes" to 93436L,
+                        "bytes" to 413436L,
+                    ),
                 "event=caller_audio_silence_acknowledged action=advance" to
                     mapOf("action" to "advance"),
                 "event=silence_check_complete silence_ms=1000 speech_seen=false" to
@@ -89,6 +100,24 @@ class DictationDiagnosticStoreTest {
             expected.forEach { (key, value) -> assertEquals(event, value, parsed.fields[key]) }
             assertEquals(event, 0L, parsed.filteredFields)
         }
+    }
+
+    @Test
+    fun callerAudioProvenanceSurvivesWithoutTranscriptOrProviderIdentity() {
+        val parsed =
+            requireNotNull(
+                DictationDiagnosticSchema.parse(
+                    "event=caller_audio_chunk_fed chunk=5 first_sample=120 last_sample=140 " +
+                        "replay_parts=1 replay_bytes=320000 new_bytes=93436 bytes=413436 " +
+                        "transcript=PRIVATE_WORDS provider=PRIVATE_PROVIDER",
+                ),
+            )
+        assertEquals(2L, parsed.filteredFields)
+        assertEquals(1L, parsed.fields["replay_parts"])
+        assertEquals(320000L, parsed.fields["replay_bytes"])
+        assertEquals(93436L, parsed.fields["new_bytes"])
+        assertEquals(413436L, parsed.fields["bytes"])
+        assertFalse(parsed.fields.toString().contains("PRIVATE"))
     }
 
     @Test

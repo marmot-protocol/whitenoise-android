@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationRecognitionCoordinator.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Dictation no-speech retries are bounded to the exact speech-bearing caller-audio chunk",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationRecognitionCoordinator.kt",
+        "anchor": "fun resolveFailure(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Contextual final replaces the complete recognized span, including corrections and punctuation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationRecognitionCoordinator.kt",
+        "anchor": "fun accept(settlement: ConversationDictationAudioSettlement)",
+        "test_ids": [
+          "DIC-002",
+          "DIC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

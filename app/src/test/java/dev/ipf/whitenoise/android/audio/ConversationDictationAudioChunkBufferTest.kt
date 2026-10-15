@@ -37,7 +37,7 @@ class ConversationDictationAudioChunkBufferTest {
         assertFalse(buffer.hasPending)
     }
 
-    /** The hard 30-second maximum also leaves a useful final request instead of a tiny remainder. */
+    /** The 15-second fresh maximum also leaves a useful final request instead of a tiny remainder. */
     @Test
     fun fullChunkAndShortFinalTailAreRebalancedWithinTheProviderCeiling() {
         val buffer =
@@ -47,17 +47,20 @@ class ConversationDictationAudioChunkBufferTest {
             )
         val input = ByteArray(970_236) { (it % 127).toByte() }
         assertTrue(buffer.append(input, input.size, hasSpeech = true))
-        assertNull(buffer.poll())
-        buffer.finish()
         val first = checkNotNull(buffer.poll())
-        assertEquals(906_236, first.pcm.size)
+        assertEquals(480_000, first.pcm.size)
+        buffer.finish()
         assertArrayEquals(input.copyOf(first.pcm.size), first.pcm)
         assertFalse(buffer.isFinalChunk(first.chunkId))
         assertTrue(buffer.acknowledge(first.chunkId))
+        val second = checkNotNull(buffer.poll())
+        assertEquals(426_236, second.pcm.size)
+        assertArrayEquals(input.copyOfRange(first.pcm.size, first.pcm.size + second.pcm.size), second.pcm)
+        assertTrue(buffer.acknowledge(second.chunkId))
         val last = checkNotNull(buffer.poll())
         assertEquals(CALLER_AUDIO_MINIMUM_TAIL_BYTES, last.pcm.size)
-        assertArrayEquals(input.copyOfRange(first.pcm.size, input.size), last.pcm)
-        assertEquals(first.lastSampleExclusive, last.firstSample)
+        assertArrayEquals(input.copyOfRange(input.size - last.pcm.size, input.size), last.pcm)
+        assertEquals(second.lastSampleExclusive, last.firstSample)
         assertEquals(input.size / 2L, last.lastSampleExclusive)
         assertTrue(buffer.acknowledge(last.chunkId))
         assertEquals(0, buffer.bufferedBytes)
@@ -157,7 +160,7 @@ class ConversationDictationAudioChunkBufferTest {
             buffer.poll()?.let { chunk ->
                 assertEquals(nextSample, chunk.firstSample)
                 assertEquals((nextSample / 16_000).toByte(), chunk.pcm.first())
-                assertTrue(chunk.pcm.size <= 960_000)
+                assertTrue(chunk.pcm.size <= 480_000)
                 nextSample = chunk.lastSampleExclusive
                 assertTrue(buffer.acknowledge(chunk.chunkId))
             }

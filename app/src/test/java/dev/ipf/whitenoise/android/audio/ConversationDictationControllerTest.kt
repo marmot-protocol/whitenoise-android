@@ -29,6 +29,126 @@ import org.robolectric.shadows.ShadowLog
 @Config(sdk = [36])
 @Suppress("LargeClass")
 class ConversationDictationControllerTest {
+    /** The controller must replace the whole acknowledged span before sending at the original target. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun contextualCorrectionSettlesRealBufferAndSendsOriginalTargetOnlyOnce() =
+        runTest {
+            val sent = mutableListOf<Triple<String, String, String>>()
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        it.beginDispatch().also { accepted ->
+                            if (accepted) {
+                                sent += Triple(it.accountRef, it.groupIdHex, it.payload)
+                                it.onPendingShown()
+                            }
+                        }
+                    },
+                )
+            val buffer =
+                ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24)
+            assertTrue(buffer.append(ByteArray(8) { 1 }, 8, hasSpeech = true))
+            assertTrue(buffer.append(ByteArray(4) { 2 }, 4, hasSpeech = true))
+            buffer.finish()
+            f.platform.audioBuffer = buffer
+            f.platform.pendingCallerAudio = true
+            f.platform.useRealAudioSettlements = true
+            assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
+            f.platform.listener.onResult("turn left.")
+            f.scheduler.runDelay(500L)
+            assertEquals(
+                4L,
+                f.platform.session
+                    .callerAudioRequest()
+                    ?.chunk
+                    ?.pcm
+                    ?.size
+                    ?.toLong(),
+            )
+            f.controller.send()
+            f.platform.listener.onResult(" ")
+            assertEquals(12, buffer.bufferedBytes)
+            f.scheduler.runDelay(500L)
+            val replay = requireNotNull(f.platform.session.callerAudioRequest())
+            assertEquals(1, replay.replayParts.size)
+            assertEquals(
+                8,
+                replay.replayParts
+                    .single()
+                    .pcm.size,
+            )
+            val staleListener = f.platform.listener
+            f.platform.listener.onResult("turn right.")
+            assertEquals(12, buffer.bufferedBytes)
+            advanceUntilIdle()
+            assertEquals(listOf(Triple(ACCOUNT, GROUP, "turn right.")), sent)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
+            staleListener.onResult("duplicate")
+            f.controller.send()
+            advanceUntilIdle()
+            assertEquals(listOf(Triple(ACCOUNT, GROUP, "turn right.")), sent)
+        }
+
+    /** Blank finals and provider no-match share one budget for the same unresolved PCM in both modes. */
+    @Test
+    fun blankAndNoMatchExhaustSameRealBufferInputInLiveAndFinishModes() {
+        listOf(false, true).forEach { finishBeforeFailure ->
+            val f = fixture(draft = TextFieldValue(""))
+            val buffer =
+                ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24)
+            assertTrue(buffer.append(ByteArray(8) { 1 }, 8, hasSpeech = true))
+            buffer.finish()
+            f.platform.audioBuffer = buffer
+            f.platform.pendingCallerAudio = true
+            f.platform.useRealAudioSettlements = true
+            assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
+            if (finishBeforeFailure) f.controller.send()
+            f.platform.listener.onResult(" ")
+            f.scheduler.runDelay(500L)
+            f.platform.listener.onError(ConversationDictationFailure.NoMatch)
+            f.scheduler.runDelay(500L)
+            f.platform.listener.onResult(null)
+            assertTrue("finish=$finishBeforeFailure", f.controller.state is ConversationDictationState.Failed)
+            assertEquals(8, buffer.bufferedBytes)
+            assertTrue(buffer.hasPending)
+        }
+    }
+
+    /** A positive but partly supplied tail can inform draft recovery without settling PCM or sending a prefix. */
+    @Test
+    fun partialFeedPositiveRetainsPcmAndProvisionalWordsForDraftRecovery() {
+        val sent = mutableListOf<String>()
+        val f =
+            fixture(
+                draft = TextFieldValue(""),
+                sendTranscriptIfOriginUnchanged = {
+                    sent += it.payload
+                    true
+                },
+            )
+        val buffer = ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24)
+        assertTrue(buffer.append(ByteArray(8) { 1 }, 8, hasSpeech = true))
+        assertTrue(buffer.append(ByteArray(4) { 2 }, 4, hasSpeech = true))
+        buffer.finish()
+        f.platform.audioBuffer = buffer
+        f.platform.pendingCallerAudio = true
+        f.platform.useRealAudioSettlements = true
+        assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
+        f.platform.listener.onResult("hello")
+        f.scheduler.runDelay(500L)
+        f.controller.send()
+        f.platform.session.callerAudioFeedComplete = false
+        f.platform.listener.onResult("world")
+        assertTrue(f.controller.state is ConversationDictationState.Failed)
+        assertEquals("hello world", f.drafts.getValue(key()).text)
+        assertEquals(12, buffer.bufferedBytes)
+        assertTrue(buffer.hasPending)
+        assertTrue(sent.isEmpty())
+    }
+
     /** The reported whole seven-second empty decode can recover from exact closed PCM before warning. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -3276,9 +3396,9 @@ class ConversationDictationControllerTest {
         assertEquals(1, fixture.platform.session.retriedCallerAudio)
     }
 
-    /** Recording retries cannot spend the independent retry budget reserved for explicit completion. */
+    /** Recording and explicit completion share one retry budget for the same unresolved input. */
     @Test
-    fun recordingRetriesDoNotConsumeExplicitCompletionRetryBudget() {
+    fun recordingRetriesConsumeTheSameInputBudgetDuringExplicitCompletion() {
         val fixture = fixture(draft = TextFieldValue(""))
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -3287,14 +3407,14 @@ class ConversationDictationControllerTest {
         fixture.scheduler.runLatest()
         fixture.controller.paste()
 
-        repeat(2) {
-            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
-            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
-            fixture.scheduler.runDelay(500L)
-        }
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        fixture.scheduler.runDelay(500L)
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
 
         assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+        assertTrue(fixture.controller.canRetryRetainedAudio)
+        assertEquals(0, fixture.writes)
     }
 
     /** Capture-confirmed silence advances immediately instead of spending the speech retry budget. */
@@ -3374,7 +3494,7 @@ class ConversationDictationControllerTest {
 
             assertEquals("first", fixture.drafts.getValue(key()).text)
             assertEquals(
-                3,
+                2,
                 fixture.platform.sessions
                     .drop(1)
                     .sumOf { it.retriedCallerAudio },
@@ -3620,14 +3740,24 @@ class ConversationDictationControllerTest {
             assertFalse(f.controller.hasDurableSession)
             f.controller.retryComposerAudio(f.controller.composerAccess(ACCOUNT, GROUP))
             f.scheduler.runDelay(500L)
-            val retried = f.platform.claimedChunks.last()
-            assertEquals(160_000L, retried.firstSample)
-            assertEquals(160_000L + tailBytes / 2, retried.lastSampleExclusive)
-            assertArrayEquals(tail, retried.pcm)
-            assertTrue(f.controller.hasDurableSession)
-            f.platform.listener.onResult("tail")
+            var offset = 0
+            var part = 0
+            while (offset < tailBytes) {
+                val retried = f.platform.claimedChunks.last()
+                assertEquals(160_000L + offset / 2, retried.firstSample)
+                assertEquals(retried.firstSample + retried.pcm.size / 2, retried.lastSampleExclusive)
+                assertTrue(retried.pcm.size in 1..minOf(480_000, tailBytes - offset))
+                assertArrayEquals(tail.copyOfRange(offset, offset + retried.pcm.size), retried.pcm)
+                assertTrue(f.controller.hasDurableSession)
+                offset += retried.pcm.size
+                part += 1
+                f.platform.listener.onResult("tail$part")
+                if (offset < tailBytes) f.scheduler.runDelay(500L)
+            }
+            assertEquals(tailBytes, offset)
             assertEquals(0, buffer.bufferedBytes)
-            assertEquals("first tail", f.drafts.getValue(key()).text)
+            val expected = "first " + (1..part).joinToString(" ") { "tail$it" }
+            assertEquals(expected, f.drafts.getValue(key()).text)
             assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
     }
@@ -3984,6 +4114,25 @@ class ConversationDictationControllerTest {
             assertEquals("unsaved", (f.controller.state as ConversationDictationState.Failed).retainedTranscript)
             assertFalse(f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key())))
         }
+
+    /** A storage exception leaves Paste's words in fenced recovery instead of completing a partial draft. */
+    @Test
+    fun throwingPasteWriteRetainsRecognizedTranscript() {
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Draft", TextRange(5)),
+                allowDraftWrite = { throw IllegalStateException("draft store unavailable") },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.paste()
+        fixture.platform.listener.onResult("recognized")
+
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals("recognized", failed.retainedTranscript)
+        assertEquals("Draft", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.hasUnrecoveredTranscript)
+        assertEquals(0, fixture.writes)
+    }
 
     /** A sleeping device cannot reattach expired PCM before its delayed timer is dispatched. */
     @Test
@@ -8300,6 +8449,7 @@ class ConversationDictationControllerTest {
             private set
         var pendingCallerAudio = false
         var audioBuffer: ConversationDictationAudioChunkBuffer? = null
+        var useRealAudioSettlements = false
         val claimedChunks = mutableListOf<ConversationDictationAudioChunk>()
         var sessionCallerAudioOwnedOverride: Boolean? = null
         var currentCallerAudioChunkId = 1L
@@ -8444,7 +8594,10 @@ class ConversationDictationControllerTest {
             createFailure?.let { throw it }
             this.listener = listener
             listeners += listener
-            val chunk = audioBuffer?.poll()?.also { claimedChunks += it }
+            val request = if (useRealAudioSettlements) audioBuffer?.requests?.pollRequest() else null
+            val chunk =
+                (request?.chunk ?: if (useRealAudioSettlements) null else audioBuffer?.poll())
+                    ?.also { claimedChunks += it }
             session =
                 FakeSession(
                     listener,
@@ -8456,6 +8609,9 @@ class ConversationDictationControllerTest {
                         currentCallerAudioChunkId += 1L
                         chunk?.let { audioBuffer?.acknowledge(it.chunkId) }
                     },
+                    audioRequest = request,
+                    settleAudio = { text -> request?.let { audioBuffer?.requests?.acknowledge(it, text) } },
+                    retryAudioWithContext = { request?.let { audioBuffer?.requests?.retryWithContext(it) } == true },
                 )
             session.onAudioRetry = { chunk?.let { audioBuffer?.retry(it.chunkId) } }
             sessions += session
@@ -8470,6 +8626,9 @@ class ConversationDictationControllerTest {
         private val callerAudioOwned: Boolean = false,
         private val callerAudioChunkId: Long? = null,
         private val onCallerAudioAcknowledged: () -> Unit = {},
+        private val audioRequest: ConversationDictationAudioRequest? = null,
+        private val settleAudio: (String) -> ConversationDictationAudioSettlement? = { null },
+        private val retryAudioWithContext: () -> Boolean = { false },
     ) : ConversationDictationRecognitionSession {
         var started = false
         var stopped = false
@@ -8569,6 +8728,11 @@ class ConversationDictationControllerTest {
 
         override fun callerAudioChunkId(): Long? = callerAudioChunkId.takeIf { callerAudioOwned }
 
+        override fun callerAudioRequest(): ConversationDictationAudioRequest? = audioRequest
+
+        override fun acknowledgeCallerAudio(transcript: String): ConversationDictationAudioSettlement? =
+            if (callerAudioFeedComplete) settleAudio(transcript) else null
+
         /** Reports deterministic capture-side speech metadata for the owned caller-audio chunk. */
         override fun callerAudioContainsSpeech(): Boolean? = callerAudioHasSpeech.takeIf { callerAudioOwned }
 
@@ -8589,6 +8753,8 @@ class ConversationDictationControllerTest {
             retriedCallerAudioWithFollowingAudio += 1
             return retryCallerAudio()
         }
+
+        override fun retryCallerAudioWithContext(): Boolean = retryAudioWithContext()
 
         /** Mirrors whether this fake generation successfully owns White Noise-captured audio. */
         override fun usesCallerAudioCapture(): Boolean = callerAudioOwned

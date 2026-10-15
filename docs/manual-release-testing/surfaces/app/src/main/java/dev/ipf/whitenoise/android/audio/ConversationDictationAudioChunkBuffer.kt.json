@@ -7,7 +7,9 @@
         "surface": "Short final PCM coalescing preserves context, sample order and provider size limits",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationAudioChunkBuffer.kt",
         "anchor": "private fun coalesceFinalTail()",
-        "test_ids": ["DIC-009"]
+        "test_ids": [
+          "DIC-009"
+        ]
       }
     ]
   },

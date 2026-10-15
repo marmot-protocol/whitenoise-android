@@ -2,7 +2,8 @@ package dev.ipf.whitenoise.android.audio
 
 import java.util.ArrayDeque
 
-private const val DEFAULT_DICTATION_CHUNK_BYTES = 960_000
+private const val DEFAULT_DICTATION_CHUNK_BYTES = 480_000
+private const val DEFAULT_DICTATION_REQUEST_BYTES = 960_000
 private const val DEFAULT_DICTATION_BUFFER_BYTES = 2_880_000
 
 /** One immutable, non-overlapping caller-audio segment owned by a logical dictation session. */
@@ -15,6 +16,23 @@ internal data class ConversationDictationAudioChunk(
     val pcm: ByteArray,
 )
 
+/** A provider request distinguishes newly owned samples from previously recognized context. */
+internal data class ConversationDictationAudioRequest(
+    val chunk: ConversationDictationAudioChunk,
+    val replayParts: List<ConversationDictationAudioChunk> = emptyList(),
+    val replacedSpanId: Long? = null,
+) {
+    val pcmParts: List<ConversationDictationAudioChunk> get() = replayParts + chunk
+    val version: String get() = "${chunk.chunkId}:${chunk.pcm.size}:${replacedSpanId ?: 0L}"
+}
+
+/** The only transcript edit permitted by an acknowledged, fully supplied request. */
+internal data class ConversationDictationAudioSettlement(
+    val spanId: Long,
+    val replacedSpanId: Long?,
+    val transcript: String,
+)
+
 /**
  * Thread-safe bounded storage between continuous microphone capture and serial provider requests.
  *
@@ -25,26 +43,29 @@ internal data class ConversationDictationAudioChunk(
 internal class ConversationDictationAudioChunkBuffer(
     private val sessionId: Long,
     private val chunkBytes: Int = DEFAULT_DICTATION_CHUNK_BYTES,
+    internal val requestBytes: Int = DEFAULT_DICTATION_REQUEST_BYTES,
     private val maxBufferedBytes: Int = DEFAULT_DICTATION_BUFFER_BYTES,
     private val minimumTailBytes: Int = 0,
 ) {
     private val queued = ArrayDeque<ConversationDictationAudioChunk>()
-    private val inFlight = mutableMapOf<Long, ConversationDictationAudioChunk>()
+    internal val inFlight = mutableMapOf<Long, ConversationDictationAudioChunk>()
     private var current = ByteArray(chunkBytes)
     private var currentSize = 0
     private var currentHasSpeech = false
     private var nextChunkId = 0L
     private var nextSample = 0L
     private var finished = false
+    val requests = ConversationDictationAudioRequestLedger(this)
 
     var bufferedBytes: Int = 0
-        private set
+        internal set
 
     val hasPending: Boolean
         @Synchronized get() = currentSize > 0 || queued.isNotEmpty() || inFlight.isNotEmpty()
 
     init {
         require(chunkBytes > 0 && chunkBytes % 2 == 0)
+        require(requestBytes >= chunkBytes && requestBytes % 2 == 0)
         require(maxBufferedBytes >= chunkBytes && maxBufferedBytes % 2 == 0)
         require(minimumTailBytes in 0..chunkBytes && minimumTailBytes % 2 == 0)
     }
@@ -113,6 +134,7 @@ internal class ConversationDictationAudioChunkBuffer(
     @Synchronized
     fun acknowledge(chunkId: Long): Boolean {
         val chunk = inFlight.remove(chunkId) ?: return false
+        requests.cancelContext(chunkId)
         bufferedBytes -= chunk.pcm.size
         return true
     }
@@ -135,6 +157,7 @@ internal class ConversationDictationAudioChunkBuffer(
     @Synchronized
     fun retryWithFollowingAudio(chunkId: Long): Boolean {
         val original = inFlight.remove(chunkId) ?: return false
+        requests.cancelContext()
         if (currentSize > 0 && !finished) sealCurrent()
         var merged = original
         while (merged.pcm.size < chunkBytes && queued.isNotEmpty()) {
@@ -169,6 +192,7 @@ internal class ConversationDictationAudioChunkBuffer(
     /** Clears volatile audio after cancellation or an unrecoverable provider failure. */
     @Synchronized
     fun discard() {
+        requests.discard()
         queued.forEach { it.pcm.fill(0) }
         inFlight.values.forEach { it.pcm.fill(0) }
         current.fill(0)
