@@ -144,7 +144,9 @@ class AnimationSourceAdmissionDeviceTest {
         animated: Drawable,
         pixels: Bitmap,
     ) {
-        val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        val instrumentation =
+            androidx.test.platform.app.InstrumentationRegistry
+                .getInstrumentation()
         val colors = HashSet<Int>()
         val deadline = android.os.SystemClock.elapsedRealtime() + 3000L
         while (colors.size < 2 && android.os.SystemClock.elapsedRealtime() < deadline) {
