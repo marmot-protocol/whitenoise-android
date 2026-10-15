@@ -79,6 +79,7 @@ def verify_one(record, output, retain, module_hashes):
     suffix = '/'.join(urllib.parse.quote(part, safe='-._') for part in segments)
     for repository in REPOSITORIES:
         url = repository + suffix
+        publication_evidence = {}
         if not name.startswith(module + '-' + version):
             # Gradle module metadata can publish a display name such as
             # animation-core.aar under a different repository filename.
@@ -111,6 +112,9 @@ def verify_one(record, output, retain, module_hashes):
             if len(locations) != 1:
                 raise ValueError('Ambiguous publication filename: ' + coordinate + '/' + name)
             url = locations.pop()
+            publication_evidence = {'publication_metadata': {
+                'coordinate': coordinate, 'name': module + '-' + version + '.module',
+                'sha256': module_sha}}
         if not retain:
             checksum = download(url + '.sha256')
             if checksum is not None:
@@ -118,7 +122,7 @@ def verify_one(record, output, retain, module_hashes):
                 if not re.fullmatch(r'[a-f0-9]{64}', value) or value != expected:
                     raise ValueError('Published SHA-256 differs: ' + coordinate + '/' + name)
                 return {'coordinate': coordinate, 'name': name, 'sha256': expected,
-                        'source': url + '.sha256', 'method': 'published-sha256'}
+                        'source': url + '.sha256', 'method': 'published-sha256', **publication_evidence}
         with tempfile.NamedTemporaryFile(dir=output / 'downloads', prefix='candidate-', delete=False) as stream:
             temporary = Path(stream.name)
         try:
@@ -133,7 +137,7 @@ def verify_one(record, output, retain, module_hashes):
             temporary.unlink(missing_ok=True)
         return {'coordinate': coordinate, 'name': name, 'sha256': expected,
                 'source': url, 'method': 'independent-payload-sha256', 'bytes': payload[2],
-                'retained': retain}
+                'retained': retain, **publication_evidence}
     raise ValueError('No declared official supplier: ' + coordinate + '/' + name)
 
 

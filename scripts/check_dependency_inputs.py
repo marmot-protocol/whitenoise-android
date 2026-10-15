@@ -178,7 +178,13 @@ def validate_bundle(root):
         group, module, version = item['coordinate'].split(':')
         publication = '/' + '/'.join([*group.split('.'), module, version]) + '/'
         if publication not in urllib.parse.unquote(url.path):
-            raise ValueError('Artifact supplier refers to another publication')
+            # Authenticated Gradle module metadata can deliberately publish a
+            # selected capability using another version's archive (notably Guava).
+            mapping = item.get('publication_metadata', {})
+            metadata_key = (item['coordinate'], module + '-' + version + '.module')
+            if (mapping.get('coordinate') != metadata_key[0] or mapping.get('name') != metadata_key[1] or
+                    metadata_key not in records or mapping.get('sha256') != records[metadata_key]):
+                raise ValueError('Artifact supplier refers to another publication without authenticated mapping')
         suppliers[key] = item
     if set(suppliers) != set(records):
         raise ValueError('Missing independent artifact supplier checks')

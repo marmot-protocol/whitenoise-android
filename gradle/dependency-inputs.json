@@ -1421,7 +1421,7 @@
     "app/gradle.lockfile": "94a19f13c02d3027c22b0dd1e51901dd2a3356361b72348637891f64be0bdd16",
     "benchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "benchmark/gradle.lockfile": "c84e3b08b0f289923cd19b89238d4c90e6cf4765d495ff3286f0e94414055d37",
-    "buildscript-gradle.lockfile": "18a85d6f2f43dad5e918b58656066b536803b1fe1351aed572e8c6aefc427038",
+    "buildscript-gradle.lockfile": "372f4c86a0256c61f27b2ec649f2e891f53d71e0d2115cc7ab4bc4ec5d7de6bb",
     "cryptoBenchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "cryptoBenchmark/gradle.lockfile": "e404808c8e655f3a57264cc45e0650433c4fb8e4baf3df89179afdad00434162",
     "fuzz/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
@@ -1429,6 +1429,19 @@
     "gradle/verification-metadata.xml": "668a50a66f37cd4f28424262a8a0c74dfacb401e6ba561cb5e8d610f4858dc50",
     "settings-gradle.lockfile": "e58bb2ed80db9f829601a658d7c33b9802eb7d2191c31e79c28e01f14c225926"
   },
+  "post_lock_selection": [
+    {
+      "additional_coordinates": [
+        "junit:junit:4.13.2",
+        "org.hamcrest:hamcrest-core:1.3"
+      ],
+      "configuration": "classpath",
+      "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38772291546/artifacts/11991348367",
+      "project": ":",
+      "reason": "Normal locked resolution introduces a root lock-constraint path through roborazzi-core/core-jvm, outside roborazzi-gradle-plugin's edge-specific JUnit exclusion. Preserve the exact observed tooling-only JUnit/Hamcrest selections; their artifact checksums were already independently verified.",
+      "scope": "plugin"
+    }
+  ],
   "reviewed_from": {
     "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38770501965/artifacts/11991143259",
     "repository": "marmot-protocol/whitenoise-android",
@@ -6651,6 +6664,11 @@
       "coordinate": "com.google.guava:guava:33.3.1-android",
       "method": "independent-payload-sha256",
       "name": "guava-33.3.1-jre.jar",
+      "publication_metadata": {
+        "coordinate": "com.google.guava:guava:33.3.1-android",
+        "name": "guava-33.3.1-android.module",
+        "sha256": "6971614ddeee003e54d2b69c6b0c94ce8a5b5eba980d16455c81df9089a7acb7"
+      },
       "sha256": "4bf0e2c5af8e4525c96e8fde17a4f7307f97f8478f11c4c8e35a0e3298ae4e90",
       "source": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.3.1-jre/guava-33.3.1-jre.jar"
     },
@@ -6672,6 +6690,11 @@
       "coordinate": "com.google.guava:guava:33.6.0-jre",
       "method": "published-sha256",
       "name": "guava-33.6.0-android.jar",
+      "publication_metadata": {
+        "coordinate": "com.google.guava:guava:33.6.0-jre",
+        "name": "guava-33.6.0-jre.module",
+        "sha256": "2baf73ce839ae48e4b9e0083e256b0e58fc3bf8fc78fc3fbe797bbc89011216e"
+      },
       "sha256": "9532ca9ba8aceb4cd2067171f981c799988b7f5844e3e274811a3bb757034bc4",
       "source": "https://repo.maven.apache.org/maven2/com/google/guava/guava/33.6.0-android/guava-33.6.0-android.jar.sha256"
     },

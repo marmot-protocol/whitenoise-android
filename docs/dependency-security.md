@@ -212,3 +212,18 @@ bootstrap or recovery of a source archive missing its input files. The hosted
 integration fixture proves that changed transitives and substituted bytes fail and
 that an inspectable, deliberately approved update succeeds without another build
 matrix.
+
+
+Qualify the generated locks with a normal strict invocation before accepting them.
+Gradle's lock constraints can introduce additional paths to an already selected
+plugin component that bypass an edge-specific exclusion. This bootstrap observed
+that with Roborazzi: its core/core-jvm lock constraints expose the upstream JUnit
+4.13.2 → Hamcrest 1.3 runtime dependency despite the plugin edge's JUnit exclusion.
+Those exact tooling-only selections are retained in the root classpath lock, with
+the normal-resolution graph artifact recorded under `post_lock_selection`. Their
+checksums were independently checked with the other test/tooling inputs. A bulk
+`--write-locks` capture can omit that path, so preserve/requalify this normal-graph
+evidence during updates; never repair it with a global exclusion or unlocked
+classpath. Guava's two cross-version Android/JRE publications similarly retain
+explicit references to their authenticated Gradle module metadata rather than
+loosening supplier-path checks for unrelated artifacts.

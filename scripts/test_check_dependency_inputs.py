@@ -94,6 +94,30 @@ class DependencyInputsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'supplier evidence'):
             inputs.validate_bundle(self.root)
 
+    def test_cross_publication_requires_authenticated_module_mapping(self):
+        """Capability aliases need pinned module metadata; arbitrary alternate paths fail."""
+        artifact = self.manifest['suppliers'][0]
+        artifact['source'] = 'https://repo.maven.apache.org/maven2/example/library/2.0/library-2.0.jar'
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
+            inputs.validate_bundle(self.root)
+        metadata_name = 'library-1.0.module'
+        self.metadata.write_text(XML.replace('</component>', '<artifact name="' + metadata_name +
+                                            '"><sha256 value="' + 'b' * 64 + '"/></artifact></component>'))
+        self.manifest['files']['gradle/verification-metadata.xml'] = hashlib.sha256(self.metadata.read_bytes()).hexdigest()
+        artifact['publication_metadata'] = {'coordinate': 'example:library:1.0',
+                                            'name': metadata_name, 'sha256': 'b' * 64}
+        self.manifest['suppliers'].append({
+            'coordinate': 'example:library:1.0', 'name': metadata_name, 'sha256': 'b' * 64,
+            'source': 'https://repo.maven.apache.org/maven2/example/library/1.0/' + metadata_name,
+            'method': 'independent-payload-sha256'})
+        self.save()
+        self.assertEqual((10, 2), inputs.validate_bundle(self.root))
+        artifact['publication_metadata']['sha256'] = 'c' * 64
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
+            inputs.validate_bundle(self.root)
+
     def test_metadata_bypasses_and_malformed_records_fail(self):
         """Verification cannot be disabled, broadly trusted, entity-expanded or ambiguous."""
         for text in [XML.replace('true', 'false'),
