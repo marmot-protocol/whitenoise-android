@@ -67,14 +67,40 @@ def main():
                                             'com.squareup.wire:wire-runtime': '6.4.5'},
             'fixed_prerelease_versions': {'com.squareup.wire:wire-runtime': '7.0.0-alpha04'}}))
         (project / 'settings.gradle').write_text(
-            "rootProject.name='security-fixture'\napply from: 'gradle/dependency-security.settings.gradle'\n")
+            "rootProject.name='security-fixture'\ninclude ':producer'\n"
+            "apply from: 'gradle/dependency-security.settings.gradle'\n")
+        producer = project / 'producer'
+        producer.mkdir()
+        for name in ('classes.jar', 'metadata.jar'):
+            with zipfile.ZipFile(producer / name, 'w'):
+                pass
+        (producer / 'build.gradle').write_text(r'''
+repositories { maven { url = uri('../maven') } }
+configurations {
+    apiElements {
+        canBeConsumed = true
+        canBeResolved = false
+        outgoing.variants {
+            classes {
+                attributes.attribute(Attribute.of('artifactType', String), 'fixture-classes')
+                artifact(file('classes.jar'))
+            }
+            metadata {
+                attributes.attribute(Attribute.of('artifactType', String), 'fixture-metadata')
+                artifact(file('metadata.jar'))
+            }
+        }
+    }
+}
+dependencies { apiElements 'org.freemarker:freemarker:2.3.32' }
+''')
         (project / 'build.gradle').write_text(r'''
 buildscript {
     repositories { maven { url = uri('maven') } }
     dependencies { classpath 'org.freemarker:freemarker:2.3.32' }
 }
 repositories { maven { url = uri('maven') } }
-configurations { belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom }
+configurations { belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom; projectVariants }
 dependencies {
     belowFloor 'org.freemarker:freemarker:2.3.32'
     newer 'org.freemarker:freemarker:2.3.36'
@@ -84,6 +110,7 @@ dependencies {
     wireSuffix 'com.squareup.wire:wire-runtime:7.0.0-alpha04-SNAPSHOT'
     wireDynamic 'com.squareup.wire:wire-runtime:7.0.0-alpha04+'
     legacyPom 'org.freemarker:legacy:1.0'
+    projectVariants project(':producer')
 }
 tasks.register('verifySecurityFixture') {
     doLast {
@@ -100,6 +127,21 @@ tasks.register('verifySecurityFixture') {
         assert selected(configurations.wireSuffix) == '7.0.0-alpha04'
         assert selected(configurations.wireDynamic) == '7.0.0-alpha04'
         assert selected(configurations.legacyPom) == '1.0'
+        // Graph resolution and external-module observations must not select project artifacts.
+        def projectGraph = configurations.projectVariants.incoming.resolutionResult.allComponents
+        assert projectGraph.find {
+            it.id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier
+        }.id.version == '2.3.35'
+        boolean ambiguousProjectArtifacts = false
+        try { configurations.projectVariants.incoming.artifacts.artifacts }
+        catch (org.gradle.api.GradleException expected) {
+            def failure = expected
+            while (failure != null) {
+                if (failure.message?.contains('cannot choose between')) ambiguousProjectArtifacts = true
+                failure = failure.cause
+            }
+        }
+        assert ambiguousProjectArtifacts
         assert buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts*.moduleVersion*.id*.version == ['2.3.35']
         boolean rejected = false
         try { configurations.affectedRange.resolve() }
@@ -123,8 +165,13 @@ tasks.register('verifySecurityFixture') {
         assert len(selected_report['components'][0]['licenses']) == 1
         legacy_report = next(r for r in reports if r['configuration'] == 'legacyPom')
         assert legacy_report['components'][0]['licenses'] == []
+        project_report = next(r for r in reports if r['configuration'] == 'projectVariants')
+        assert project_report['artifact_coverage'] == 'resolved_configuration'
+        assert [a['coordinate'] for a in project_report['artifacts']] == ['org.freemarker:freemarker:2.3.35']
+        assert any(edge['to'] == 'project :producer' for edge in project_report['edges'])
         print('Gradle fixture PASS: raised exact request, retained newer/dynamic selection, '
-              'rejected affected-only range and unsafe Wire alpha/suffixes, plugin/project reports')
+              'rejected affected-only range and unsafe Wire alpha/suffixes, plugin/project reports, '
+              'external artifacts isolated from ambiguous project variants')
 
 
 if __name__ == '__main__':

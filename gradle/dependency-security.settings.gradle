@@ -139,12 +139,13 @@ gradle.beforeProject { project ->
             }
         }
         configuration.incoming.afterResolve { dependencies ->
-            // Resolve files only on this already-selected configuration; never create a graph.
+            // Filter before artifact selection: AGP project variants need task-specific attributes.
             def unresolved = dependencies.resolutionResult.allDependencies
                 .findAll { it instanceof UnresolvedDependencyResult }
                 .collect { it.requested.displayName }.sort()
-            def artifacts = unresolved.isEmpty() ? configuration.incoming.artifacts.artifacts
-                .findAll { it.id.componentIdentifier instanceof ModuleComponentIdentifier }
+            def artifacts = unresolved.isEmpty() ? configuration.incoming.artifactView {
+                    componentFilter { it instanceof ModuleComponentIdentifier }
+                }.artifacts.artifacts
                 .collect { artifact ->
                     def id = artifact.id.componentIdentifier
                     [coordinate: "${id.group}:${id.module}:${id.version}".toString(),

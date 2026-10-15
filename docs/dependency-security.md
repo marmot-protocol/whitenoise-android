@@ -17,7 +17,10 @@ or the R8-retained APK. Native MarmotKit requires its own target/feature invento
 ## Distribution and native inventories
 
 The same hook fingerprints external module artifacts on each already-selected
-configuration; it adds no configurations or compilation tasks. Cached adjacent
+configuration using a component-filtered [artifact view](https://docs.gradle.org/current/userguide/artifact_views.html).
+Project components remain in graph edges but are excluded before artifact
+selection, so AGP's task-specific project variants are not selected by this hook.
+It adds no configurations or compilation tasks. Cached adjacent
 POMs supply declared licence names/URLs and their POM hashes when available.
 Only the POM's project-level licence declarations qualify. Unparseable cached
 POMs, including rejected DOCTYPEs, leave licences `not_observed` without changing
@@ -96,7 +99,8 @@ the requested range.
 
 The graph-only fixture runs in the existing tooling job using a temporary local
 Maven repository and no app compilation. It checks exact lower/newer requests,
-dynamic selectors, affected-only range rejection and plugin/project report
-coverage. Source archives retain enforcement withoutGit; CI separately requires
+dynamic selectors, affected-only range rejection, plugin/project report coverage
+and external artifacts alongside ambiguous project artifact variants.
+Source archives retain enforcement withoutGit; CI separately requires
 valid commit identity. Detached configurations, settings-plugin classpaths and
 included builds are outside this hook and must keep their own dependency checks.
