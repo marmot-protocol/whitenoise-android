@@ -9,9 +9,9 @@ import subprocess
 import zipfile
 
 if __package__:
-    from .dependency_inventory import compare, observations, read_json, require
+    from .dependency_inventory import compare, decode_json, observations, read_json, require
 else:
-    from dependency_inventory import compare, observations, read_json, require
+    from dependency_inventory import compare, decode_json, observations, read_json, require
 
 REPOSITORY = 'marmot-protocol/whitenoise-android'
 
@@ -45,8 +45,9 @@ def baseline(source, artifact_name):
                 continue  # Legacy security-report artifacts predate inventory export.
             require(len(entries) == 1 and entries[0].file_size <= 32 * 1024 * 1024,
                     'Missing or oversized baseline inventory')
-            inventory = json.loads(archive.read(entries[0]))
+            inventory = decode_json(archive.read(entries[0]))
             require(inventory.get('source_sha') == source, 'Stale baseline inventory source')
+            observations(inventory)
             return inventory, {'run_id': run['id'], 'artifact_id': artifact['id']}
     return None, {'reason': 'No retained successful exact-base artifact for this lane'}
 

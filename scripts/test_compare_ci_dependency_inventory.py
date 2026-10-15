@@ -58,6 +58,23 @@ class CiInventoryComparisonTest(unittest.TestCase):
         with mock.patch.object(ci, 'api', side_effect=responses):
             self.assertIsNone(ci.baseline(SOURCE, 'fixture')[0])
 
+    def test_baseline_duplicate_keys_are_rejected_before_returning_evidence(self):
+        """Neither a shadow source identity nor a shadow graph can survive artifact decoding."""
+        value = json.dumps(selected_inventory([report()], SOURCE))
+        run = {'id': 1, 'head_sha': SOURCE, 'head_branch': 'master', 'event': 'push', 'conclusion': 'success',
+               'path': '.github/workflows/android-ci.yml', 'repository': {'full_name': ci.REPOSITORY},
+               'head_repository': {'full_name': ci.REPOSITORY}}
+        for raw in [value.replace('{', '{"source_sha": "' + 'b' * 40 + '", ', 1),
+                    value.replace('"release_runtime": {', '"release_runtime": {}, "release_runtime": {', 1)]:
+            stream = io.BytesIO()
+            with zipfile.ZipFile(stream, 'w') as archive:
+                archive.writestr('inventory/selected.json', raw)
+            responses = [{'workflow_runs': [run]}, {'artifacts': [
+                {'id': 2, 'name': 'fixture', 'expired': False, 'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
+            with self.subTest(raw=raw[:80]), mock.patch.object(ci, 'api', side_effect=responses):
+                with self.assertRaisesRegex(ValueError, 'Duplicate inventory/evidence key'):
+                    ci.baseline(SOURCE, 'fixture')
+
     def test_candidate_is_validated_even_when_no_baseline_is_available(self):
         """Candidate source and graph validity are independent of historical coverage."""
         with tempfile.TemporaryDirectory() as temporary:

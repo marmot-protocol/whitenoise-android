@@ -34,8 +34,8 @@ def fingerprint(path):
     return {"name": path.name, "sha256": digest(path), "bytes": path.stat().st_size}
 
 
-def read_json(path):
-    """Reject ambiguous keys rather than accepting last-value-wins evidence."""
+def decode_json(data):
+    """Reject ambiguous keys in local files and retained artifact bytes alike."""
     def unique(pairs):
         """Require exactly one value per key in every nested record."""
         result = {}
@@ -43,7 +43,12 @@ def read_json(path):
             require(key not in result, "Duplicate inventory/evidence key")
             result[key] = value
         return result
-    return json.loads(path.read_text(), object_pairs_hook=unique)
+    return json.loads(data, object_pairs_hook=unique)
+
+
+def read_json(path):
+    """Read an existing inventory using the shared duplicate-key rejection boundary."""
+    return decode_json(path.read_bytes())
 
 
 def purpose(report):
