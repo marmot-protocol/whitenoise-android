@@ -130,6 +130,9 @@ tasks.register('resolveFixture') {
             if checksum is None:
                 raise RuntimeError('Fixture POM metadata was not verified')
             checksum.set('value', hashlib.sha256(pom.read_bytes()).hexdigest())
+            # Keep Gradle's default namespace: prefixed element names hide the existing
+            # plugin checksums and mask the transitive lock assertion below.
+            ET.register_namespace('', ns['v'])
             tree.write(metadata, encoding='utf-8', xml_declaration=True)
             invoke(args.gradle, project, '--refresh-dependencies', expect_failure=['lock state', 'locked', 'strictly'])
             invoke(args.gradle, project, '--refresh-dependencies', '--write-locks',
