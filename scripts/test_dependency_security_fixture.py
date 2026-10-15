@@ -137,7 +137,8 @@ tasks.register('verifySecurityFixture') {
         catch (org.gradle.api.GradleException expected) {
             def failure = expected
             while (failure != null) {
-                if (failure.message?.contains('cannot choose between')) ambiguousProjectArtifacts = true
+                if (failure.message?.contains('cannot choose between') ||
+                        failure.message?.contains('More than one variant')) ambiguousProjectArtifacts = true
                 failure = failure.cause
             }
         }
