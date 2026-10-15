@@ -38,7 +38,7 @@ internal class MessageBubbleSurfaceState {
     var expandedFullView by mutableStateOf(false)
 
     /** Bumped on every Read more open, so a send accepted from an earlier reader cannot close a newer one (#3268). */
-    var expandedFullViewSession = 0
+    var expandedFullViewSession by mutableIntStateOf(0)
         private set
 
     /** The reader session whose composer send was accepted and is waiting for [ReaderSendDismissal] to close it. */
