@@ -194,7 +194,8 @@ tasks.register('verifySecurityFixture') {
         }
         assert producerEdge != null
         new File(rootProject.projectDir, 'expected-project-edge.json').text = groovy.json.JsonOutput.toJson(
-            [from: producerEdge.from.id.displayName, to: producerEdge.selected.id.displayName])
+            [from: producerEdge.from.id.displayName, to: producerEdge.selected.id.displayName,
+             requested: producerEdge.requested.displayName])
         boolean ambiguousProjectArtifacts = false
         try { configurations.projectVariants.incoming.artifacts.artifacts }
         catch (org.gradle.api.GradleException expected) {
@@ -227,6 +228,9 @@ tasks.register('verifySecurityFixture') {
         assert len(selected_report['artifacts'][0]['sha256']) == 64
         assert selected_report['components'][0]['licenses'][0]['name'] == 'Fixture licence'
         assert len(selected_report['components'][0]['licenses']) == 1
+        assert any(edge['to'] == 'org.freemarker:freemarker:2.3.35' and
+                   edge['requested'] == 'org.freemarker:freemarker:2.3.32'
+                   for edge in selected_report['edges'])
         legacy_report = next(r for r in reports if r['configuration'] == 'legacyPom')
         assert legacy_report['components'][0]['licenses'] == []
         directory_report = next(r for r in reports if r['configuration'] == 'directoryArtifact')
