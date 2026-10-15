@@ -86,11 +86,10 @@ class PhotoEditorRegionDecodeTest {
                 )
             try {
                 for (orientation in 1..8) {
+                    val inspection = ImageInspection(5000, 200, "image/png", orientation)
                     IsolatedMediaDecoder.installTestTransport(
                         object : MediaDecodeTransport by TestMediaDecodeTransport {
-                            override fun inspect(bytes: ByteArray): ImageInspection {
-                                return ImageInspection(5000, 200, "image/png", orientation)
-                            }
+                            override fun inspect(bytes: ByteArray) = inspection
                         },
                     )
                     val result =
