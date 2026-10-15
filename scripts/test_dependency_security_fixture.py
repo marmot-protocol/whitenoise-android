@@ -80,6 +80,7 @@ configurations {
     apiElements {
         canBeConsumed = true
         canBeResolved = false
+        attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_API))
         outgoing.variants {
             classes {
                 attributes.attribute(Attribute.of('artifactType', String), 'fixture-classes')
@@ -111,7 +112,13 @@ repositories {
         content { excludeModule('org.freemarker', 'legacy') }
     }
 }
-configurations { belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom; projectVariants }
+configurations {
+    belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom
+    projectVariants {
+        canBeConsumed = false
+        attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_API))
+    }
+}
 dependencies {
     belowFloor 'org.freemarker:freemarker:2.3.32'
     newer 'org.freemarker:freemarker:2.3.36'
@@ -141,10 +148,18 @@ tasks.register('verifySecurityFixture') {
         def legacyArtifact = configurations.legacyPom.incoming.artifacts.artifacts.first().file
         assert new File(legacyArtifact.parentFile, 'legacy-1.0.pom').text.contains('<!DOCTYPE project')
         // Graph resolution and external-module observations must not select project artifacts.
-        def projectGraph = configurations.projectVariants.incoming.resolutionResult.allComponents
-        assert projectGraph.find {
+        def projectResolution = configurations.projectVariants.incoming.resolutionResult
+        def unresolvedProjects = projectResolution.allDependencies.findAll {
+            it instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult
+        }
+        assert unresolvedProjects.empty : unresolvedProjects.collect { it.failure.message }.join('\n')
+        def external = projectResolution.allComponents.find {
             it.id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier
-        }.id.version == '2.3.35'
+        }
+        assert external != null
+        assert external.id.group == 'org.freemarker'
+        assert external.id.module == 'freemarker'
+        assert external.id.version == '2.3.35'
         boolean ambiguousProjectArtifacts = false
         try { configurations.projectVariants.incoming.artifacts.artifacts }
         catch (org.gradle.api.GradleException expected) {
