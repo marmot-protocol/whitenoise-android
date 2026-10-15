@@ -20,7 +20,7 @@ def digest(path):
 def capture(root):
     """Copy lock candidates after Gradle exits and retain exact notice source bytes."""
     output = root / 'build/dependency-inputs-bootstrap'
-    for path in [*root.rglob('gradle.lockfile'), *root.rglob('buildscript-gradle.lockfile'),
+    for path in [*root.rglob('*gradle.lockfile'),
                  root / 'gradle/verification-metadata.xml']:
         relative = path.relative_to(root)
         if path.is_file() and 'build' not in relative.parts and '.gradle' not in relative.parts:
@@ -41,7 +41,7 @@ def capture(root):
 
         def retain(name, data):
             """Keep bounded inputs under their content digest, without archive path traversal."""
-            if not 0 < len(data) <= 16 * 1024 * 1024:
+            if len(data) > 16 * 1024 * 1024:
                 raise ValueError('Invalid notice input size: ' + name)
             sha = hashlib.sha256(data).hexdigest()
             destination = directory / sha
@@ -54,6 +54,8 @@ def capture(root):
         for parent in parents:
             pom = parent / pom_name
             if pom.is_file():
+                if pom.stat().st_size > 16 * 1024 * 1024:
+                    raise ValueError('Oversized POM source: ' + pom_name)
                 retain(pom_name, pom.read_bytes())
         if zipfile.is_zipfile(artifact):
             with zipfile.ZipFile(artifact) as archive:

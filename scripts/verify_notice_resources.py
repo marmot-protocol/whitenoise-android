@@ -1,13 +1,43 @@
 #!/usr/bin/env python3
 """Check real packaged notices in an existing optimized APK; never compile it."""
 import argparse
+import hashlib
+import json
 from pathlib import Path
 import re
 import subprocess
 import zipfile
 
 
-def packaged_notices(apk, aapt2):
+def require_baseline(metadata, texts, icons, baseline):
+    """Keep every original notice identity and the exact local copyright attribution."""
+    expected = json.loads(baseline.read_text(encoding='utf-8'))
+    if (type(expected.get('schema')) is not int or expected['schema'] != 1 or
+            not re.fullmatch(r'[a-f0-9]{40}', expected.get('source_sha', '')) or
+            not isinstance(expected.get('required_notices'), list) or not expected['required_notices']):
+        raise ValueError('missing source-bound notice baseline')
+    actual = set()
+    for line in metadata.decode('utf-8').splitlines():
+        if not line.strip():
+            continue
+        extent, name = line.split(' ', 1)
+        offset, length = map(int, extent.split(':'))
+        if not name.strip() or offset < 0 or length <= 0 or offset + length > len(texts):
+            raise ValueError('packaged notice index is malformed or truncated')
+        text = texts[offset:offset + length]
+        if not text.decode('utf-8').strip():
+            raise ValueError('packaged notice text is empty')
+        actual.add((name, hashlib.sha256(text).hexdigest()))
+    required = {(item['name'], item['text_sha256']) for item in expected['required_notices']}
+    missing = required - actual
+    if missing:
+        raise ValueError('original notices were lost or changed: ' + ', '.join(sorted(name for name, _ in missing)))
+    if hashlib.sha256(icons).hexdigest() != expected.get('material_icons_sha256'):
+        raise ValueError('local icon copyright/provenance attribution changed')
+
+
+def packaged_notices(apk, aapt2, baseline=None):
+    """Read actual retained resources through aapt2, then check bounds and equivalence."""
     dump = subprocess.check_output([str(aapt2), 'dump', 'resources', str(apk)],
                                    text=True, timeout=60)
     resources = {}
@@ -27,6 +57,8 @@ def packaged_notices(apk, aapt2):
     with zipfile.ZipFile(apk) as archive:
         data = {}
         for name in required:
+            if archive.namelist().count(resources[name]) != 1:
+                raise ValueError('notice resource ZIP entry is missing or duplicated')
             member = archive.getinfo(resources[name])
             if not 0 < member.file_size <= 16_777_216:
                 raise ValueError('notice resource missing, empty or oversized')
@@ -48,6 +80,9 @@ def packaged_notices(apk, aapt2):
         count += 1
     if not 0 < count <= 4096 or not data['material_icons_notice'].decode('utf-8').strip():
         raise ValueError('packaged dependency or local attribution is empty')
+    if baseline is None:
+        baseline = Path(__file__).resolve().parent.parent / 'config/licenses/baseline.json'
+    require_baseline(data['third_party_license_metadata'], text, data['material_icons_notice'], baseline)
     print(f'Packaged notice resources verified: {count} generated notices and local icon attribution')
 
 

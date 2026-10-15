@@ -16,9 +16,16 @@ data has narrow formatter/static-analysis/coverage exclusions; app-owned readers
 scanner owners and lifecycle code remain checked.
 
 ML Kit and Google's runtime licence activities are removed. ZXing already
-encoded QR data and now decodes bounded CameraX luminance crops. The existing
-Google build-time notice generator is retained until a replacement can preserve
-all notices. ExifInterface 1.4.2 remains explicitly test-only for privacy fixtures.
+encoded QR data and now decodes bounded CameraX luminance crops. The local build-time notice generator consumes exact runtime artifact fingerprints
+and reviewed attribution in `config/licenses/`. It preserves the original 197
+production notice name/text pairs and the separate local Material icon notice.
+The baseline and catalogue record their source revision and hosted capture.
+Additional inherited POM attributions, debug dependencies and the full alternate
+Dagger licence are retained too. J2ObjC uses the complete original notice, which
+includes the copyright and embedded native/source notices present in the shorter
+SDK variants. No new claim of complete MDK Rust-crate attribution is made: a
+reviewed native crate/feature-to-notice attestation remains an upstream prerequisite
+for expanding that coverage. ExifInterface 1.4.2 remains explicitly test-only for privacy fixtures.
 Security Crypto remains for legacy skipped-version imports. This is a reduction
 of shipped stacks, not a claim that every tool/test dependency is unnecessary.
 
@@ -26,3 +33,18 @@ The reader references generated raw resource IDs directly. Reflective name looku
 lost those resources in an optimized preview after the runtime licence SDK was
 removed. Existing release runtime verification now checks the APK's actual index,
 text and local attribution before installation, without another build or matrix.
+
+
+The generator runs without network access and rejects unreviewed artifact bytes,
+missing attribution, changed/truncated text and invalid UTF-8. It emits the same
+`third_party_license_metadata` / `third_party_licenses` raw resources with byte
+ranges consumed by the existing reader. New dependency bytes require a reviewed
+catalogue update; do not reuse an old dependency's notice merely because its name
+matches. Record supplier/POM/embedded-notice provenance, pin the text digest and
+preserve every baseline attribution. An intentional baseline change requires an
+explicit attribution review rather than regenerating the baseline from a candidate.
+
+`verify_notice_resources.py` follows the optimized APK's resource table to the
+actual ZIP entries, validates every UTF-8 range, checks the baseline's full notice
+set and compares the local icon copyright bytes. Existing Zapstore ART lanes and
+the Play preview staging step use this check without another build matrix.

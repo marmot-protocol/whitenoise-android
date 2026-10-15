@@ -54,17 +54,23 @@ gradle.projectsEvaluated {
             new File(directory, 'artifact-paths.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(
                 artifactFiles.values().sort { "${it.coordinate}:${it.path}" })) + '\n'
             ['productionPlayRelease', 'productionZapstoreRelease'].each { variant ->
-                def task = root.project(':app').tasks.named("${variant}OssLicensesTask").get()
+                def task = root.project(':app').tasks.findByName("${variant}OssLicensesTask") ?:
+                    root.project(':app').tasks.named("${variant}LocalNotices").get()
                 root.copy {
                     from task.generatedDirectory.get().asFile
                     into new File(directory, "original-notices/${variant}")
                 }
-                root.copy {
-                    from task.dependenciesJson.get().asFile
-                    into new File(directory, "original-notices/${variant}")
+                if (task.hasProperty('dependenciesJson')) {
+                    root.copy {
+                        from task.dependenciesJson.get().asFile
+                        into new File(directory, "original-notices/${variant}")
+                    }
                 }
             }
             new File(directory, 'source.txt').text = System.getenv('GITHUB_SHA') + '\n'
+            if (observations.any { !it.unresolved.isEmpty() }) {
+                throw new GradleException('Dependency candidate capture contains unresolved configurations')
+            }
         }
     }
 }

@@ -1,0 +1,98 @@
+import groovy.json.JsonOutput
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.MapProperty
+import org.gradle.api.tasks.*
+import org.gradle.process.ExecOperations
+import java.security.MessageDigest
+import javax.inject.Inject
+
+/** Preserve the existing raw-resource names while requiring reviewed, local attribution inputs. */
+@CacheableTask
+abstract class GenerateLocalLicenseResources extends DefaultTask {
+    /** Archive contents participate in task caching independently of machine-local paths. */
+    @InputFiles @PathSensitive(PathSensitivity.NONE)
+    abstract ConfigurableFileCollection getRuntimeArtifacts()
+
+    /** Runtime paths are internal; file contents and coordinate keys are tracked separately. */
+    @Internal
+    abstract MapProperty<String, File> getArtifactFilesByIdentity()
+
+    /** Include coordinate/name changes in cache identity even when archive bytes are identical. */
+    @Input
+    abstract ListProperty<String> getArtifactIdentities()
+
+    /** Reviewed attribution associates each exact artifact digest with its notice identities. */
+    @InputFile @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getCatalog()
+
+    /** Track checked-in text bytes so a changed or truncated input cannot reuse old outputs. */
+    @InputDirectory @PathSensitive(PathSensitivity.RELATIVE)
+    abstract DirectoryProperty getNoticeTexts()
+
+    /** Generator implementation changes invalidate the cached resource output. */
+    @InputFile @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getGeneratorScript()
+
+    /** AGP supplies this directory and consumes its raw resources for this variant only. */
+    @OutputDirectory
+    abstract DirectoryProperty getGeneratedDirectory()
+
+    /** Use Gradle's injected execution service without retaining a Project in task state. */
+    @Inject
+    abstract ExecOperations getExecOperations()
+
+    /** Fingerprint actual selected bytes before invoking the deterministic, network-free generator. */
+    @TaskAction
+    void generateResources() {
+        def selected = artifactFilesByIdentity.get().collect { identity, file ->
+            def separator = identity.lastIndexOf('/')
+            def digest = MessageDigest.getInstance('SHA-256')
+            file.withInputStream { stream ->
+                byte[] buffer = new byte[1024 * 1024]
+                int count
+                while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
+            }
+            [coordinate: identity.substring(0, separator), name: identity.substring(separator + 1),
+             sha256: digest.digest().encodeHex().toString()]
+        }.sort { "${it.coordinate}:${it.name}" }
+        def input = new File(temporaryDir, 'selected-artifacts.json')
+        input.text = JsonOutput.toJson(selected)
+        execOperations.exec {
+            commandLine 'python3', generatorScript.get().asFile.absolutePath,
+                '--catalog', catalog.get().asFile.absolutePath,
+                '--selected', input.absolutePath,
+                '--output', new File(generatedDirectory.get().asFile, 'raw').absolutePath
+        }.assertNormalExitValue()
+    }
+}
+
+def root = project.rootDir
+def components = extensions.getByName('androidComponents')
+components.onVariants(components.selector().all()) { variant ->
+    def artifacts = variant.runtimeConfiguration.incoming.artifactView {
+        componentFilter { it instanceof ModuleComponentIdentifier }
+    }.artifacts.resolvedArtifacts
+    def byIdentity = artifacts.map { resolved ->
+        def files = [:]
+        resolved.each { artifact ->
+            def id = artifact.id.componentIdentifier
+            def key = "${id.group}:${id.module}:${id.version}/${artifact.file.name}".toString()
+            if (files.containsKey(key)) throw new GradleException("Duplicate notice artifact: ${key}")
+            files[key] = artifact.file
+        }
+        files
+    }
+    def task = tasks.register("${variant.name}LocalNotices", GenerateLocalLicenseResources) {
+        runtimeArtifacts.from(artifacts.map { it.collect { artifact -> artifact.file } })
+        artifactFilesByIdentity.set(byIdentity)
+        artifactIdentities.set(byIdentity.map { it.keySet().toList().sort() })
+        catalog.set(new File(root, 'config/licenses/catalog.json'))
+        noticeTexts.set(new File(root, 'config/licenses/texts'))
+        generatorScript.set(new File(root, 'scripts/generate_local_notices.py'))
+    }
+    variant.sources.res.addGeneratedSourceDirectory(task, GenerateLocalLicenseResources::getGeneratedDirectory)
+}

@@ -76,7 +76,7 @@ jobs:
           ref: ${{ github.sha }}
 
       - name: Test selected dependency evidence validator
-        run: python3 -m unittest scripts/test_verify_dependency_security.py scripts/test_dependency_inventory.py scripts/test_compare_ci_dependency_inventory.py
+        run: python3 -m unittest scripts/test_verify_dependency_security.py scripts/test_dependency_inventory.py scripts/test_compare_ci_dependency_inventory.py scripts/test_generate_local_notices.py scripts/test_verify_notice_resources.py
 
       - name: Test manual release guide and viewport coverage validators
         run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py scripts/test_check_scroll_edge_fades.py scripts/test_check_viewport_restoration_coverage.py scripts/test_paging_trace_report.py
@@ -384,8 +384,9 @@ jobs:
         if: matrix.phase == 'tooling'
         run: |
           ./gradlew -I gradle/dependency-inputs-bootstrap.init.gradle \
-            :app:productionPlayReleaseOssLicensesTask :app:productionZapstoreReleaseOssLicensesTask \
-            captureDependencyInputs --write-locks --write-verification-metadata sha256 \
+            :app:productionPlayReleaseLocalNotices :app:productionZapstoreReleaseLocalNotices \
+            captureDependencyInputs -Pwhitenoise.previewE2eTestBuild=true \
+            -Pwhitenoise.previewProviderMatrixBuild=true --write-locks --write-verification-metadata sha256 \
             --no-daemon --stacktrace
           python3 scripts/capture_dependency_candidates.py
 

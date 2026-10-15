@@ -383,8 +383,13 @@ class AndroidCiGateTest(unittest.TestCase):
         invocations = self.gradle_steps(self.tests_job)
         self.assertGreaterEqual(len(invocations), 3)
         tooling = [step for step in self.gradle_steps(self.build_contracts)
-                   if "if: matrix.phase == 'tooling'" in step]
+                   if "if: matrix.phase == 'tooling'" in step and
+                   '- name: Capture dependency-control bootstrap candidates' not in step]
         self.assertEqual(len(tooling), 4)
+        capture = self.named_step(self.build_contracts, 'Capture dependency-control bootstrap candidates')
+        self.assertIn("if: matrix.phase == 'tooling'", capture)
+        self.assertIn('--write-locks --write-verification-metadata sha256', capture)
+        self.assertIn('--no-daemon', capture)
         label_step = self.named_step(self.build_contracts,
                                      'Verify packaged system labels for every app variant')
         self.assertIn('./scripts/test-system-labels.sh', label_step)
