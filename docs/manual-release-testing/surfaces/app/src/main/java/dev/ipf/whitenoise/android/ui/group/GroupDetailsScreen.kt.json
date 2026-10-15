@@ -1397,6 +1397,14 @@
         "test_ids": [
           "ACC-021"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "surface": "Invitation retry preserves recipients and roles",
+        "anchor": "fun submitSelectedInvites()",
+        "test_ids": [
+          "GRP-030"
+        ]
       }
     ]
   },

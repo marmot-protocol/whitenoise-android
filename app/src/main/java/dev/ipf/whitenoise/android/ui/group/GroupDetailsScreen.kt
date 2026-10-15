@@ -658,18 +658,6 @@ internal fun GroupDetailsScreen(
             refreshPushDebugInfo()
         }
 
-        // Close the picker only after the controller has accepted the invite and
-        // installed its optimistic row. This avoids dismissing a selection when a
-        // competing mutation won the controller's single-flight guard.
-        LaunchedEffect(showAddMember, controller.pendingInviteMemberRefs) {
-            if (showAddMember && controller.pendingInviteMemberRefs.isNotEmpty()) {
-                showLargeGroupInviteConfirmation = false
-                addSelection.clear()
-                addAdminSelection.clear()
-                if (addMemberAutoOpened) onBack() else showAddMember = false
-            }
-        }
-
         val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
         var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
         var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
