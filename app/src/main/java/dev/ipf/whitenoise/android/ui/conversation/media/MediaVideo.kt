@@ -1381,11 +1381,13 @@ internal fun VideoViewerPage(
     mine: Boolean,
     onPlayerChanged: (androidx.media3.exoplayer.ExoPlayer?) -> Unit = {},
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
+    onControllerVisibilityChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val latestReference by rememberUpdatedState(reference)
     val latestOnPlayerChanged by rememberUpdatedState(onPlayerChanged)
+    val latestOnControllerVisibilityChange by rememberUpdatedState(onControllerVisibilityChange)
     val contentKey = videoAttachmentContentKey(messageIdHex, attachmentIndex, reference)
     val playbackRecoveryJob =
         remember(contentKey) {
@@ -1433,6 +1435,9 @@ internal fun VideoViewerPage(
     }
     val file = localFile
     if (file == null) {
+        // Without a player there is no controller to reveal hidden chrome, so a page that loads or loses its
+        // player restores the chrome rather than stranding Close behind a retry state.
+        LaunchedEffect(contentKey) { latestOnControllerVisibilityChange(true) }
         VideoViewerUnavailable(
             cacheInvalidating = cacheInvalidating,
             playbackInvalidated = playbackInvalidated,
@@ -1550,17 +1555,54 @@ internal fun VideoViewerPage(
     }
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = Modifier.fillMaxSize().background(Color.Black),
-        factory = { ctx ->
-            androidx.media3.ui.PlayerView(ctx).apply {
-                player = exo
-                useController = true
-                setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                controllerShowTimeoutMs = 2500
-            }
-        },
+        factory = { ctx -> viewerPlayerView(ctx, exo) { visible -> latestOnControllerVisibilityChange(visible) } },
         onRelease = { playerView -> playerView.player = null },
     )
 }
+
+/**
+ * Builds the viewer's Media3 surface. The whole decoded frame fits the page with letterboxing, honouring rotation
+ * and pixel aspect ratio, and the native controller owns play/pause, elapsed/total time and seeking. Every
+ * controller reveal or hide is reported so the viewer chrome follows it. The controller switches without its
+ * staged fade, so it and the chrome appear and disappear in the same frame instead of leaving a minimized time
+ * bar behind. The listener is attached before the player so the reveal that attaching a player triggers is
+ * reported too.
+ */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+internal fun viewerPlayerView(
+    context: Context,
+    player: androidx.media3.common.Player,
+    onControllerVisibilityChange: (Boolean) -> Unit,
+): androidx.media3.ui.PlayerView =
+    androidx.media3.ui.PlayerView(context).apply {
+        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+        useController = true
+        setControllerAnimationEnabled(false)
+        setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+        controllerShowTimeoutMs = viewerControllerTimeoutMs(context)
+        setControllerVisibilityListener(
+            androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
+                onControllerVisibilityChange(visibility == android.view.View.VISIBLE)
+            },
+        )
+        this.player = player
+    }
+
+/** Keeps playback controls up for at least the user's accessibility "time to take action" setting. */
+private fun viewerControllerTimeoutMs(context: Context): Int =
+    context
+        .getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+        ?.getRecommendedTimeoutMillis(VIDEO_VIEWER_CONTROLS_TIMEOUT_MS, VIDEO_VIEWER_CONTROLS_CONTENT)
+        ?: VIDEO_VIEWER_CONTROLS_TIMEOUT_MS
+
+/** How long the viewer's playback controls and chrome stay up during playback after the last touch. */
+private const val VIDEO_VIEWER_CONTROLS_TIMEOUT_MS = 2_500
+
+/** The controller shows icons, time text and interactive controls. */
+private const val VIDEO_VIEWER_CONTROLS_CONTENT =
+    android.view.accessibility.AccessibilityManager.FLAG_CONTENT_CONTROLS or
+        android.view.accessibility.AccessibilityManager.FLAG_CONTENT_ICONS or
+        android.view.accessibility.AccessibilityManager.FLAG_CONTENT_TEXT
 
 /** Placeholder when a video cannot play: invalidated cache, invalidated playback or load failure. */
 @Composable
