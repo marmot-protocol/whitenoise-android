@@ -31,7 +31,7 @@ class CiInventoryComparisonTest(unittest.TestCase):
             after.write_text(json.dumps(inventory))
             with mock.patch.object(ci, 'api', side_effect=responses), mock.patch('sys.argv', [
                     'compare', '--base-source', SOURCE, '--artifact-name', 'fixture',
-                    '--after', str(after), '--output', str(output)]):
+                    '--after', str(after), '--after-source', SOURCE, '--output', str(output)]):
                 ci.main()
             delta = json.loads(output.read_text())
             self.assertEqual(delta['status'], 'compared')
@@ -45,6 +45,33 @@ class CiInventoryComparisonTest(unittest.TestCase):
         with mock.patch.object(ci, 'api', return_value={'workflow_runs': [{'head_sha': 'b' * 40}]}):
             with self.assertRaisesRegex(ValueError, 'Wrong-source'):
                 ci.baseline(SOURCE, 'fixture')
+    def test_legacy_raw_report_artifact_is_an_unavailable_baseline(self):
+        """Pre-inventory CI artifacts retain their valid old contract without failing adoption."""
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, 'w') as archive:
+            archive.writestr('_app-project-runtime.json', '{}')
+        run = {'id': 1, 'head_sha': SOURCE, 'head_branch': 'master', 'event': 'push', 'conclusion': 'success',
+               'path': '.github/workflows/android-ci.yml', 'repository': {'full_name': ci.REPOSITORY},
+               'head_repository': {'full_name': ci.REPOSITORY}}
+        responses = [{'workflow_runs': [run]}, {'artifacts': [
+            {'id': 2, 'name': 'fixture', 'expired': False, 'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
+        with mock.patch.object(ci, 'api', side_effect=responses):
+            self.assertIsNone(ci.baseline(SOURCE, 'fixture')[0])
+
+    def test_candidate_is_validated_even_when_no_baseline_is_available(self):
+        """Candidate source and graph validity are independent of historical coverage."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); path = root / 'after.json'
+            value = selected_inventory([report()], SOURCE)
+            for mutate in [lambda v: v.update(source_sha='b' * 40), lambda v: v.update(schema=2)]:
+                candidate = dict(value); mutate(candidate); path.write_text(json.dumps(candidate))
+                with mock.patch.object(ci, 'baseline') as baseline, mock.patch('sys.argv', [
+                        'compare', '--base-source', SOURCE, '--artifact-name', 'fixture',
+                        '--after', str(path), '--after-source', SOURCE, '--output', str(root / 'delta.json')]):
+                    with self.assertRaises(ValueError):
+                        ci.main()
+                    baseline.assert_not_called()
+
 
 
 if __name__ == '__main__':

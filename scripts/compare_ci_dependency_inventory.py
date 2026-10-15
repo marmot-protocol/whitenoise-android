@@ -9,9 +9,9 @@ import subprocess
 import zipfile
 
 if __package__:
-    from .dependency_inventory import compare, read_json, require
+    from .dependency_inventory import compare, observations, read_json, require
 else:
-    from dependency_inventory import compare, read_json, require
+    from dependency_inventory import compare, observations, read_json, require
 
 REPOSITORY = 'marmot-protocol/whitenoise-android'
 
@@ -41,6 +41,8 @@ def baseline(source, artifact_name):
         require(0 < artifact['size_in_bytes'] <= 64 * 1024 * 1024, 'Oversized baseline artifact')
         with zipfile.ZipFile(io.BytesIO(api(f"actions/artifacts/{artifact['id']}/zip", binary=True))) as archive:
             entries = [info for info in archive.infolist() if info.filename == 'inventory/selected.json']
+            if not entries:
+                continue  # Legacy security-report artifacts predate inventory export.
             require(len(entries) == 1 and entries[0].file_size <= 32 * 1024 * 1024,
                     'Missing or oversized baseline inventory')
             inventory = json.loads(archive.read(entries[0]))
@@ -55,15 +57,18 @@ def main():
     parser.add_argument('--base-source', required=True)
     parser.add_argument('--artifact-name', required=True)
     parser.add_argument('--after', type=Path, required=True)
+    parser.add_argument('--after-source', required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     after = read_json(args.after)
+    require(after.get('source_sha') == args.after_source, 'Stale candidate inventory source')
+    observations(after)
     before, evidence = baseline(args.base_source, args.artifact_name)
     result = {'status': 'unavailable', **evidence, 'before_source': args.base_source,
-              'after_source': after['source_sha']}
+              'after_source': args.after_source}
     if before is not None:
         result = {'status': 'compared', 'baseline': evidence,
-                  **compare(before, after, args.base_source, after['source_sha'])}
+                  **compare(before, after, args.base_source, args.after_source)}
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
     print('Dependency comparison: ' + result['status'])
 
