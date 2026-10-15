@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationAudioRequestLedger.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Bounded recognized PCM context stays accounted and claims exact replay parts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationAudioRequestLedger.kt",
+        "anchor": "fun pollRequest(): ConversationDictationAudioRequest?",
+        "test_ids": [
+          "DIC-002",
+          "DIC-009"
+        ]
+      },
+      {
+        "surface": "Fully covered contextual result settles one whole transcript span",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationAudioRequestLedger.kt",
+        "anchor": "fun acknowledge(\n        request: ConversationDictationAudioRequest,",
+        "test_ids": [
+          "DIC-002",
+          "DIC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -2540,7 +2540,9 @@ internal class ConversationDictationController internal constructor(
                                 session = currentSession,
                                 empty = error.isEmptyRecognition,
                                 callerAudioPending = callerAudioPending,
-                                canRetry = failure.canRetryRetainedCallerAudio,
+                                countInputRetry =
+                                    (finishRequested || error.isEmptyRecognition) &&
+                                        failure.canRetryRetainedCallerAudio,
                                 capacityFailure = failure.hasProviderCapacityBackoff,
                                 maxRetries = MAX_RETAINED_CALLER_AUDIO_RETRIES,
                             ),
@@ -2548,7 +2550,9 @@ internal class ConversationDictationController internal constructor(
                     if (resolution ==
                         ConversationDictationRecognitionCoordinator.FailureResolution.ConfirmedDigitalSilence
                     ) {
-                        unresolvedRecognitionFailure = null
+                        if (unresolvedRecognitionFailure?.isEmptyRecognition == true) {
+                            unresolvedRecognitionFailure = null
+                        }
                         clearRecognitionGeneration(cancel = false)
                         advancePastConfirmedSilentCallerAudio(sessionId, target)
                         return
@@ -3070,7 +3074,7 @@ internal class ConversationDictationController internal constructor(
         silenceTimeoutHandle?.cancel()
         conversationDictationDiagnostic(
             "event=silence_check_armed delay_ms=$remainingMillis " +
-                "caller_audio=$generation.callerAudioEndpointingActive speech_seen=${capturedSilence != null}",
+                "caller_audio=${generation.callerAudioEndpointingActive} speech_seen=${capturedSilence != null}",
         )
         silenceTimeoutHandle =
             scheduleTimeout(remainingMillis) {

@@ -580,12 +580,16 @@ internal class ConversationDictationCallerAudioStream(
     /** An accepted result covers the entire feed and settles its transcript-span provenance once. */
     fun acknowledge(transcript: String): ConversationDictationAudioSettlement? {
         if (!fullyFed.get() || !settled.compareAndSet(false, true)) return null
-        val owned = request.getAndSet(null) ?: return null
-        chunk.set(null)
-        val accepted = buffer.acknowledge(owned, transcript)
-        if (accepted == null) buffer.retry(owned.chunk.chunkId)
-        capture.streamSettled(this)
-        return accepted
+        val owned = request.getAndSet(null)
+        return if (owned == null) {
+            null
+        } else {
+            chunk.set(null)
+            val accepted = buffer.requests.acknowledge(owned, transcript)
+            if (accepted == null) buffer.retry(owned.chunk.chunkId)
+            capture.streamSettled(this)
+            accepted
+        }
     }
 
     fun request(): ConversationDictationAudioRequest? = request.get()
@@ -610,14 +614,18 @@ internal class ConversationDictationCallerAudioStream(
 
     /** Requeues the rejected new input with its immediately preceding recognized PCM. */
     fun retryWithContext(): Boolean {
-        val owned = request.get() ?: return false
-        if (!buffer.canRetryWithContext(owned)) return false
-        if (!settled.compareAndSet(false, true)) return false
-        val requeued = buffer.retryWithContext(owned)
-        request.set(null)
-        chunk.set(null)
-        capture.streamSettled(this)
-        return requeued
+        val owned = request.get()
+        return if (owned == null || !buffer.requests.canRetryWithContext(owned) ||
+            !settled.compareAndSet(false, true)
+        ) {
+            false
+        } else {
+            val requeued = buffer.requests.retryWithContext(owned)
+            request.set(null)
+            chunk.set(null)
+            capture.streamSettled(this)
+            requeued
+        }
     }
 
     /** Closes the feeder and relinquishes its lease, retaining unacknowledged PCM by default. */
@@ -643,7 +651,7 @@ internal class ConversationDictationCallerAudioStream(
         try {
             var owned: ConversationDictationAudioRequest? = null
             while (!cancelled.get() && !settled.get() && owned == null) {
-                owned = buffer.pollRequest()
+                owned = buffer.requests.pollRequest()
                 if (owned == null) Thread.sleep(PIPE_RETRY_MILLIS)
             }
             if (owned == null) return

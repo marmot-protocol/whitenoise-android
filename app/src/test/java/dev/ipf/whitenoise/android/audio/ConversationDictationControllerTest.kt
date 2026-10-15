@@ -48,7 +48,8 @@ class ConversationDictationControllerTest {
                         }
                     },
                 )
-            val buffer = ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24)
+            val buffer =
+                ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24)
             assertTrue(buffer.append(ByteArray(8) { 1 }, 8, hasSpeech = true))
             assertTrue(buffer.append(ByteArray(4) { 2 }, 4, hasSpeech = true))
             buffer.finish()
@@ -83,7 +84,8 @@ class ConversationDictationControllerTest {
     fun blankAndNoMatchExhaustSameRealBufferInputInLiveAndFinishModes() {
         listOf(false, true).forEach { finishBeforeFailure ->
             val f = fixture(draft = TextFieldValue(""))
-            val buffer = ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24)
+            val buffer =
+                ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, requestBytes = 16, maxBufferedBytes = 24)
             assertTrue(buffer.append(ByteArray(8) { 1 }, 8, hasSpeech = true))
             buffer.finish()
             f.platform.audioBuffer = buffer
@@ -3381,9 +3383,9 @@ class ConversationDictationControllerTest {
         assertEquals(1, fixture.platform.session.retriedCallerAudio)
     }
 
-    /** Recording retries cannot spend the independent retry budget reserved for explicit completion. */
+    /** Recording and explicit completion share one retry budget for the same unresolved input. */
     @Test
-    fun recordingRetriesDoNotConsumeExplicitCompletionRetryBudget() {
+    fun recordingRetriesConsumeTheSameInputBudgetDuringExplicitCompletion() {
         val fixture = fixture(draft = TextFieldValue(""))
         fixture.platform.pendingCallerAudio = true
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
@@ -3392,14 +3394,14 @@ class ConversationDictationControllerTest {
         fixture.scheduler.runLatest()
         fixture.controller.paste()
 
-        repeat(2) {
-            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
-            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
-            fixture.scheduler.runDelay(500L)
-        }
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        fixture.scheduler.runDelay(500L)
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
 
         assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+        assertTrue(fixture.controller.canRetryRetainedAudio)
+        assertEquals(0, fixture.writes)
     }
 
     /** Capture-confirmed silence advances immediately instead of spending the speech retry budget. */
@@ -3479,7 +3481,7 @@ class ConversationDictationControllerTest {
 
             assertEquals("first", fixture.drafts.getValue(key()).text)
             assertEquals(
-                3,
+                2,
                 fixture.platform.sessions
                     .drop(1)
                     .sumOf { it.retriedCallerAudio },
@@ -3725,14 +3727,24 @@ class ConversationDictationControllerTest {
             assertFalse(f.controller.hasDurableSession)
             f.controller.retryComposerAudio(f.controller.composerAccess(ACCOUNT, GROUP))
             f.scheduler.runDelay(500L)
-            val retried = f.platform.claimedChunks.last()
-            assertEquals(160_000L, retried.firstSample)
-            assertEquals(160_000L + tailBytes / 2, retried.lastSampleExclusive)
-            assertArrayEquals(tail, retried.pcm)
-            assertTrue(f.controller.hasDurableSession)
-            f.platform.listener.onResult("tail")
+            var offset = 0
+            var part = 0
+            while (offset < tailBytes) {
+                val retried = f.platform.claimedChunks.last()
+                assertEquals(160_000L + offset / 2, retried.firstSample)
+                assertEquals(retried.firstSample + retried.pcm.size / 2, retried.lastSampleExclusive)
+                assertTrue(retried.pcm.size in 1..minOf(480_000, tailBytes - offset))
+                assertArrayEquals(tail.copyOfRange(offset, offset + retried.pcm.size), retried.pcm)
+                assertTrue(f.controller.hasDurableSession)
+                offset += retried.pcm.size
+                part += 1
+                f.platform.listener.onResult("tail$part")
+                if (offset < tailBytes) f.scheduler.runDelay(500L)
+            }
+            assertEquals(tailBytes, offset)
             assertEquals(0, buffer.bufferedBytes)
-            assertEquals("first tail", f.drafts.getValue(key()).text)
+            val expected = "first " + (1..part).joinToString(" ") { "tail$it" }
+            assertEquals(expected, f.drafts.getValue(key()).text)
             assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
     }
@@ -8550,7 +8562,7 @@ class ConversationDictationControllerTest {
             createFailure?.let { throw it }
             this.listener = listener
             listeners += listener
-            val request = if (useRealAudioSettlements) audioBuffer?.pollRequest() else null
+            val request = if (useRealAudioSettlements) audioBuffer?.requests?.pollRequest() else null
             val chunk = (request?.chunk ?: if (useRealAudioSettlements) null else audioBuffer?.poll())
                 ?.also { claimedChunks += it }
             session =
@@ -8565,8 +8577,8 @@ class ConversationDictationControllerTest {
                         chunk?.let { audioBuffer?.acknowledge(it.chunkId) }
                     },
                     audioRequest = request,
-                    settleAudio = { text -> request?.let { audioBuffer?.acknowledge(it, text) } },
-                    retryAudioWithContext = { request?.let { audioBuffer?.retryWithContext(it) } == true },
+                    settleAudio = { text -> request?.let { audioBuffer?.requests?.acknowledge(it, text) } },
+                    retryAudioWithContext = { request?.let { audioBuffer?.requests?.retryWithContext(it) } == true },
                 )
             session.onAudioRetry = { chunk?.let { audioBuffer?.retry(it.chunkId) } }
             sessions += session

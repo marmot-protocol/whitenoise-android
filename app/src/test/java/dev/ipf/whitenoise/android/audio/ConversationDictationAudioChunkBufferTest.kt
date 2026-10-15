@@ -47,10 +47,9 @@ class ConversationDictationAudioChunkBufferTest {
             )
         val input = ByteArray(970_236) { (it % 127).toByte() }
         assertTrue(buffer.append(input, input.size, hasSpeech = true))
-        assertNull(buffer.poll())
-        buffer.finish()
         val first = checkNotNull(buffer.poll())
         assertEquals(480_000, first.pcm.size)
+        buffer.finish()
         assertArrayEquals(input.copyOf(first.pcm.size), first.pcm)
         assertFalse(buffer.isFinalChunk(first.chunkId))
         assertTrue(buffer.acknowledge(first.chunkId))

@@ -72,11 +72,14 @@ internal class ConversationDictationRecognitionCoordinator {
     val failureAttempts: Int get() = retry?.attempts ?: 0
 
     fun tryContextOnce(chunkId: Long, action: () -> Boolean): Boolean {
-        val current = retry?.takeIf { it.chunkId == chunkId } ?: return false
-        if (current.contextAttempted) return false
-        val started = action()
-        if (started) current.contextAttempted = true
-        return started
+        val current = retry?.takeIf { it.chunkId == chunkId }
+        return if (current == null || current.contextAttempted) {
+            false
+        } else {
+            val started = action()
+            if (started) current.contextAttempted = true
+            started
+        }
     }
 
     /** One normalized policy for blank finals, NoMatch, NoSpeech, and retryable provider faults. */
@@ -84,7 +87,7 @@ internal class ConversationDictationRecognitionCoordinator {
         val session: ConversationDictationRecognitionSession?,
         val empty: Boolean,
         val callerAudioPending: Boolean,
-        val canRetry: Boolean,
+        val countInputRetry: Boolean,
         val capacityFailure: Boolean,
         val maxRetries: Int,
     )
@@ -96,7 +99,7 @@ internal class ConversationDictationRecognitionCoordinator {
             session?.callerAudioFullyFed() == true && session?.acknowledgeCallerAudio() == true
         val chunkId = session?.callerAudioChunkId()
         val request = session?.callerAudioRequest()
-        val exhausted = !digitalSilence && input.callerAudioPending && input.canRetry &&
+        val exhausted = !digitalSilence && input.callerAudioPending && input.countInputRetry &&
             recordFailure(chunkId, request?.version, input.capacityFailure) > input.maxRetries
         return when {
             digitalSilence -> {

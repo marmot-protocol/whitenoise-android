@@ -47,30 +47,24 @@ internal class ConversationDictationCompletionOwner(
     fun paste(operation: DraftOperation): PasteResult {
         val (sessionId, target, text) = operation
         var result: PasteResult? = null
-        for (ignored in 0 until operation.attempts) {
+        var remaining = operation.attempts
+        while (remaining > 0 && result == null) {
+            remaining -= 1
             if (operation.currentSessionId() != sessionId) {
                 result = PasteResult.Abandoned
-                break
-            }
-            if (operation.validate() != ConversationDictationTargetValidation.Available) {
+            } else if (operation.validate() != ConversationDictationTargetValidation.Available) {
                 result = PasteResult.Retained
-                break
-            }
-            val current = readDraft(target.accountRef, target.groupIdHex)
-            when (val merge = mergeConversationDictationTranscript(target.capturedDraft, current.value, text)) {
-                is ConversationDictationMerge.Applied -> {
-                    val accepted =
-                        runCatching {
-                            writeDraft(target.accountRef, target.groupIdHex, current.revision, merge.value)
-                        }.getOrNull()
-                    if (accepted != null) {
-                        result = PasteResult.Accepted
-                        break
+            } else {
+                val current = readDraft(target.accountRef, target.groupIdHex)
+                when (val merge = mergeConversationDictationTranscript(target.capturedDraft, current.value, text)) {
+                    is ConversationDictationMerge.Applied -> {
+                        val accepted =
+                            runCatching {
+                                writeDraft(target.accountRef, target.groupIdHex, current.revision, merge.value)
+                            }.getOrNull()
+                        if (accepted != null) result = PasteResult.Accepted
                     }
-                }
-                ConversationDictationMerge.NeedsAppendFallback -> {
-                    result = appendLatest(operation)
-                    break
+                    ConversationDictationMerge.NeedsAppendFallback -> result = appendLatest(operation)
                 }
             }
         }
@@ -80,27 +74,26 @@ internal class ConversationDictationCompletionOwner(
     fun appendLatest(operation: DraftOperation): PasteResult {
         val (sessionId, target, text) = operation
         var result: PasteResult? = null
-        for (ignored in 0 until operation.attempts) {
+        var remaining = operation.attempts
+        while (remaining > 0 && result == null) {
+            remaining -= 1
             if (operation.currentSessionId() != sessionId) {
                 result = PasteResult.Abandoned
-                break
-            }
-            if (operation.validate() != ConversationDictationTargetValidation.Available) {
+            } else if (operation.validate() != ConversationDictationTargetValidation.Available) {
                 result = PasteResult.Retained
-                break
-            }
-            val current = readDraft(target.accountRef, target.groupIdHex)
-            val merged = appendConversationDictationTranscript(current.value, text)
-            val accepted =
-                try {
-                    writeDraft(target.accountRef, target.groupIdHex, current.revision, merged)
-                } catch (_: Throwable) {
-                    result = PasteResult.Retained
-                    break
+            } else {
+                val current = readDraft(target.accountRef, target.groupIdHex)
+                val merged = appendConversationDictationTranscript(current.value, text)
+                val accepted =
+                    try {
+                        writeDraft(target.accountRef, target.groupIdHex, current.revision, merged)
+                    } catch (_: Throwable) {
+                        result = PasteResult.Retained
+                        null
+                    }
+                if (accepted != null) {
+                    result = PasteResult.Accepted
                 }
-            if (accepted != null) {
-                result = PasteResult.Accepted
-                break
             }
         }
         return result ?: PasteResult.Retained
