@@ -23,6 +23,16 @@ class CiChangesTest(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertFalse(docs_only_diff(entry('README.md') + entry(path)))
 
+    def test_registry_only_changes_run_the_invariant_validator(self):
+        """Registry edits cannot skip their Kotlin validator or its test-input campaigns."""
+        for status, old, new in [('A', '000000', '100644'), ('M', '100644', '100644'),
+                                 ('D', '100644', '000000')]:
+            with self.subTest(status=status):
+                raw = entry('docs/invariant-gates.md', old=old, new=new, status=status)
+                self.assertFalse(docs_only_diff(raw))
+                self.assertTrue(supplemental_campaigns_diff(raw))
+                self.assertFalse(docs_only_diff(entry('README.md') + raw))
+
     def test_renamed_or_deleted_code_cannot_be_hidden_as_docs(self):
         self.assertFalse(docs_only_diff(
             entry('app/src/main/Source.kt', new='000000', status='D') +
