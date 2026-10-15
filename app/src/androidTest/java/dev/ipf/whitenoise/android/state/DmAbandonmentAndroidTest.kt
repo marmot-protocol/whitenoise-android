@@ -33,7 +33,8 @@ import java.util.UUID
  * MDK state, and it checks that the abandonment itself published nothing to the relay.
  *
  * Both identities live in one runtime behind an in-process loopback relay, so no external relay or account is
- * needed. It stays a manual fixture until its first green device run is recorded for this MarmotKit pin.
+ * needed, and drafts stay in memory. Run it on an emulator or a disposable profile: it stays a manual fixture until
+ * its first green device run is recorded for this MarmotKit pin.
  */
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
@@ -138,13 +139,23 @@ class DmAbandonmentAndroidTest {
         peer: AccountSummaryFfi,
     ) = WhiteNoiseAppState(
         context = context,
-        draftStore = DraftStore.forContext(context),
+        draftStore = DraftStore(NoDrafts),
         accountIdHexResolver = { owner.accountIdHex },
         accounts = listOf(owner, peer),
         activeAccountRef = owner.label,
         initialMarmotRuntime = AppMarmotRuntime(root.absolutePath, native),
         preferences = context.getSharedPreferences(root.name, Context.MODE_PRIVATE),
     )
+
+    /** Keeps the fixture's draft cleanup in memory instead of the installed app's draft store. */
+    private object NoDrafts : DraftPersistence {
+        override fun read(): Map<String, String> = emptyMap()
+
+        override fun write(
+            key: String,
+            value: String?,
+        ) = Unit
+    }
 
     /** Loopback relays are allowed only in this fixture's native configuration. */
     private fun loopbackOptions() = MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS)
