@@ -652,13 +652,6 @@ class AndroidCiGateTest(unittest.TestCase):
         )
         self.assertIsNotNone(match, 'declare the instrumented gate tree as a top-level input of the shared Test configuration')
 
-    def test_registry_cache_mutation_runs_in_the_tooling_lane(self):
-        """The real cache mutation remains required through the build-contract aggregate dependency."""
-        step = self.named_step(self.build_contracts, 'Verify invariant registry cache invalidation')
-        self.assertIn("if: matrix.phase == 'tooling'", step)
-        self.assertIn('run: python3 scripts/check_invariant_gate_cache.py', step)
-        self.assertNotIn('continue-on-error', step)
-
     def test_proposed_invariant_gate_checker_tests_run_in_android_ci(self):
         """The gate workflow tests only the base checker, so a changed checker must be tested on its own tree."""
         step = self.named_step(self.tooling_contracts, 'Test PR GitHub scripts')

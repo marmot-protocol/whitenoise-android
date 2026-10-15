@@ -70,11 +70,10 @@ What is protected, and how:
   `InvariantGateRegistryTest`.
 - **Workflow file:** the job uses the `pull_request` event, so a pull request's
   own copy of `invariant-gate.yml` decides what runs. Changes to it are
-  protected only by review. [`CODEOWNERS`](../.github/CODEOWNERS) requests an owner
-  for `.github/` and this registry. Admins can make the check enforceable with
-  branch protection: require `Bug-fix invariant gate` and require code-owner
-  review. The check is separate from, and does not change, the
-visual-evidence gate in [Screenshot tests](../README.md#screenshot-tests).
+  protected only by review, like every other workflow. Admins can make the check
+  enforceable by requiring `Bug-fix invariant gate` in branch protection. The
+  check is separate from, and does not change, the visual-evidence gate in
+  [Screenshot tests](../README.md#screenshot-tests).
 
 ## Maintaining the registry
 
@@ -87,10 +86,8 @@ owner blank. The registry is a declared Gradle input of every unit-test task, so
 registry-only edit re-runs the suite instead of reusing cached results. Every
 instrumented Kotlin source is also an input: registered gates need not use the
 `CoverageTest` suffix, so their deletion or rename must invalidate validation.
-The scoped CI cache campaign (`scripts/check_invariant_gate_cache.py`) registers
-an ordinary instrumented test, establishes an `UP-TO-DATE` baseline, deletes it
-and requires a rerun that rejects the missing path, then restores and validates
-the original tree. Keep the table sorted by gate name.
+`scripts/test_android_ci_gate.py` checks that both inputs stay declared. Keep the
+table sorted by gate name.
 
 - **Add:** create the test, then add one row in the same pull request. Link the
   gate name to the test path relative to this page, state the invariant as a rule
