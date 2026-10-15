@@ -42,7 +42,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -291,16 +290,6 @@ internal fun GroupDetailsScreen(
         // avoids excluding candidates against a stale or empty member snapshot.
         var showAddMember by rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) {
             mutableStateOf(false)
-        }
-        val invitationAccount = appState.activeAccountRef
-        val invitationRuntime = appState.runtimeGeneration
-        val invitationSurface =
-            remember(controller, invitationAccount, invitationRuntime) {
-                java.util.concurrent.atomic
-                    .AtomicBoolean(true)
-            }
-        DisposableEffect(invitationSurface) {
-            onDispose { invitationSurface.set(false) }
         }
         val addSelection =
             rememberSaveable(
@@ -658,6 +647,22 @@ internal fun GroupDetailsScreen(
             refreshPushDebugInfo()
         }
 
+        // Observe the native result from the current composition, including after rotation.
+        // Optimistic pending rows do not establish that the invitation succeeded.
+        val inviteSelectionApplied =
+            rosterReady && addSelection.isNotEmpty() &&
+                addSelection.all { selected ->
+                    controller.members.any { it.memberIdHex.equals(selected.accountIdHex, ignoreCase = true) }
+                } && addAdminSelection.all { admin -> controller.group.admins.any { it.equals(admin, ignoreCase = true) } }
+        LaunchedEffect(showAddMember, inviteSelectionApplied, controller.mutationInFlight) {
+            if (showAddMember && inviteSelectionApplied && !controller.mutationInFlight) {
+                showLargeGroupInviteConfirmation = false
+                addSelection.clear()
+                addAdminSelection.clear()
+                if (addMemberAutoOpened) onBack() else showAddMember = false
+            }
+        }
+
         val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
         var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
         var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -811,17 +816,6 @@ internal fun GroupDetailsScreen(
                 runGroupMutation(
                     action = GroupMutationAction.InviteMember,
                     mutation = { controller.inviteMembers(refs, initialAdminRefs = admins) },
-                    onSuccess = {
-                        val currentSurface = invitationSurface.get() && appState.runtimeGeneration == invitationRuntime
-                        val currentAccount =
-                            appState.activeAccountRef == invitationAccount &&
-                                controller.boundAccountRef == invitationAccount
-                        if (currentSurface && currentAccount) {
-                            addSelection.clear()
-                            addAdminSelection.clear()
-                            if (addMemberAutoOpened) onBack() else showAddMember = false
-                        }
-                    },
                 )
             }
 
