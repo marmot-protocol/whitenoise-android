@@ -10,12 +10,14 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -30,6 +32,12 @@ import org.robolectric.annotation.GraphicsMode
 class MessageActionReactionRailLayoutTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** Restores the platform font scale that the system-text case raises. */
+    @After
+    fun restorePlatformFontScale() {
+        RuntimeEnvironment.setFontScale(1f)
+    }
 
     /** Every configured reaction is on screen at the compact width, not behind a horizontal scroll. */
     @Test
@@ -86,30 +94,35 @@ class MessageActionReactionRailLayoutTest {
     fun everyRowOfEightReactionsFillsTheRailWidth() {
         renderReactionMenu(fontScale = 1f, layoutDirection = LayoutDirection.Ltr, quickReactionEmojis = EIGHT_CHOICES)
 
-        val rail = composeRule.onNodeWithTag(FOCUSED_REACTION_RAIL_TEST_TAG).fetchSemanticsNode().boundsInRoot
-        val rows =
-            targetBounds(EIGHT_CHOICES)
-                .groupBy { it.top }
-                .toSortedMap()
-                .values
-                .toList()
-        assertEquals("eight reactions and the picker wrap into two rows at 360 dp", 2, rows.size)
-        rows.forEach { row ->
-            assertTrue("a row starts at the rail edge", row.minOf { it.left } - rail.left <= RAIL_EDGE_PX)
-            assertTrue("a row ends at the rail edge", rail.right - row.maxOf { it.right } <= RAIL_EDGE_PX)
-            val gaps = row.sortedBy { it.left }.zipWithNext { a, b -> b.left - a.right }
-            assertTrue("gaps stay compact", gaps.all { it <= COMPACT_GAP_PX })
-        }
+        assertTwoFullRows()
     }
 
-    /** A larger app text size grows every target and lets fewer fit on a row, so the reactions wrap sooner. */
+    /** On a wider 480 dp phone both rows, the four-target second row included, reach the rail's inner edges. */
     @Test
-    fun largerAppTextSizeGrowsTargetsAndWrapsSooner() {
+    @Config(qualifiers = "w480dp-h780dp-mdpi")
+    fun everyRowFillsTheRailOnAWiderPhone() {
+        renderReactionMenu(fontScale = 1f, layoutDirection = LayoutDirection.Ltr, quickReactionEmojis = EIGHT_CHOICES)
+
+        assertTwoFullRows()
+    }
+
+    /** A 150% app text size grows every target, but only as far as eight choices and the picker still fill two rows. */
+    @Test
+    fun largerAppTextSizeGrowsTargetsWithinTwoRows() {
         renderReactionMenu(fontScale = 1.5f, layoutDirection = LayoutDirection.Ltr, quickReactionEmojis = EIGHT_CHOICES)
 
-        val targets = targetBounds(EIGHT_CHOICES)
-        assertTrue("targets grow with the text size", targets.all { it.height >= LARGE_TEXT_TARGET_PX })
-        assertTrue("fewer targets fit on a row", targets.groupBy { it.top }.size >= 3)
+        assertTrue("targets grow with the text size", targetBounds(EIGHT_CHOICES).all { it.height > TOUCH_TARGET_PX })
+        assertTwoFullRows()
+    }
+
+    /** A larger system font, alone or on top of the largest app text size, keeps two full rows of 48 dp targets. */
+    @Test
+    fun largerSystemAndAppTextKeepTwoFullRows() {
+        RuntimeEnvironment.setFontScale(LARGE_SYSTEM_FONT_SCALE)
+        renderReactionMenu(fontScale = 2f, layoutDirection = LayoutDirection.Ltr, quickReactionEmojis = EIGHT_CHOICES)
+
+        assertTrue("targets keep their minimum", targetBounds(EIGHT_CHOICES).all { it.height >= TOUCH_TARGET_PX })
+        assertTwoFullRows()
     }
 
     /**
@@ -125,6 +138,11 @@ class MessageActionReactionRailLayoutTest {
         assertEquals(108.dp, shortFrame.railHeight(itemCount = 7, availableWidth = 328.dp))
         assertEquals(FocusedReactionSizing.forEmoji(56.dp), tallFrame)
         assertEquals(76.dp, tallFrame.target)
+
+        // Nine targets at 76 dp would need three rows, so growth stops where two rows still hold them.
+        val nine = FocusedReactionSizing.fitting(56.dp, itemCount = 9, railWidth = 328.dp, maxRailHeight = 408.dp)
+        assertEquals(60.dp, nine.target)
+        assertEquals(2, nine.rows(itemCount = 9, availableWidth = 328.dp))
     }
 
     /** The rail stays on one row while everything fits and splits evenly only once it cannot. */
@@ -174,6 +192,24 @@ class MessageActionReactionRailLayoutTest {
         assertTrue(picker.right <= menu.right + TOLERANCE_PX)
         assertTrue(picker.width >= TOUCH_TARGET_PX)
         assertTrue(picker.height >= TOUCH_TARGET_PX)
+    }
+
+    /** Asserts eight choices and the picker sit in two rows that each span the rail with compact gaps. */
+    private fun assertTwoFullRows() {
+        val rail = composeRule.onNodeWithTag(FOCUSED_REACTION_RAIL_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val rows =
+            targetBounds(EIGHT_CHOICES)
+                .groupBy { it.top }
+                .toSortedMap()
+                .values
+                .toList()
+        assertEquals("eight reactions and the picker wrap into two rows", 2, rows.size)
+        rows.forEach { row ->
+            assertTrue("a row starts at the rail edge", row.minOf { it.left } - rail.left <= RAIL_EDGE_PX)
+            assertTrue("a row ends at the rail edge", rail.right - row.maxOf { it.right } <= RAIL_EDGE_PX)
+            val gaps = row.sortedBy { it.left }.zipWithNext { a, b -> b.left - a.right }
+            assertTrue("gaps stay compact", gaps.all { it <= COMPACT_GAP_PX })
+        }
     }
 
     /** Root bounds of each reaction target and the full-picker target. */
@@ -235,8 +271,7 @@ class MessageActionReactionRailLayoutTest {
         const val RAIL_EDGE_PX = 5f
         const val COMPACT_GAP_PX = 4.5f
 
-        // At 150% text the 28 dp emoji grows by 14 dp, and every target with it.
-        const val LARGE_TEXT_TARGET_PX = 61f
+        const val LARGE_SYSTEM_FONT_SCALE = 1.3f
         val SIX_CHOICES = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
         val EIGHT_CHOICES = SIX_CHOICES + listOf("🚀", "✅")
     }

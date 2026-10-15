@@ -248,6 +248,9 @@ private val FocusedReactionRailBudget = 108.dp
 // A frame shorter than this, such as one the keyboard has shortened, keeps the 100% rail.
 private val FocusedReactionGrowthFrameHeight = 480.dp
 private val FocusedReactionSizingStep = 2.dp
+
+// The requested quick-reaction layout: at most two rows of buttons (#3279).
+private const val FOCUSED_REACTION_MAX_ROWS = 2
 private val FocusedReactionItemSpacing = 4.dp
 private val FocusedReactionTargetSize = 48.dp
 private val FocusedReactionStateLayerSize = 40.dp
@@ -473,11 +476,27 @@ internal data class FocusedReactionSizing(
         itemCount: Int,
         availableWidth: Dp,
     ): Dp {
-        val inner = availableWidth - FocusedReactionRailInset * 2
-        val perRow = focusedReactionItemsPerRow(itemCount, inner, target)
-        val rows = ceil(itemCount.toFloat() / perRow).toInt().coerceAtLeast(1)
+        val rows = rows(itemCount, availableWidth)
         return target * rows + FocusedReactionItemSpacing * (rows - 1) + FocusedReactionRailInset * 2
     }
+
+    /** How many rows [itemCount] targets wrap into across a rail [availableWidth] wide, including its inset. */
+    fun rows(
+        itemCount: Int,
+        availableWidth: Dp,
+    ): Int {
+        val perRow = focusedReactionItemsPerRow(itemCount, availableWidth - FocusedReactionRailInset * 2, target)
+        return ceil(itemCount.toFloat() / perRow).toInt().coerceAtLeast(1)
+    }
+
+    /** Whether [itemCount] targets fit [railWidth] in at most two rows and within [maxRailHeight]. */
+    fun fits(
+        itemCount: Int,
+        railWidth: Dp,
+        maxRailHeight: Dp,
+    ): Boolean =
+        rows(itemCount, railWidth) <= FOCUSED_REACTION_MAX_ROWS &&
+            railHeight(itemCount, railWidth) <= maxRailHeight
 
     companion object {
         /** Sizing for an emoji drawn at [emoji], never smaller than the 100% sizes or larger than double them. */
@@ -494,8 +513,9 @@ internal data class FocusedReactionSizing(
         }
 
         /**
-         * The largest sizing up to [emoji] whose rail of [itemCount] targets across [railWidth] stays within
-         * [maxRailHeight]. It never goes below the 100% sizes, so every target keeps at least 48dp.
+         * The largest sizing up to [emoji] whose rail of [itemCount] targets across [railWidth] keeps to two rows
+         * and stays within [maxRailHeight] (#3279). A larger text size grows the targets only while every choice
+         * still fits on two rows. It never goes below the 100% sizes, so every target keeps at least 48dp.
          */
         fun fitting(
             emoji: Dp,
@@ -504,7 +524,7 @@ internal data class FocusedReactionSizing(
             maxRailHeight: Dp,
         ): FocusedReactionSizing {
             var sizing = forEmoji(emoji)
-            while (sizing.emoji > FocusedReactionEmojiSize && sizing.railHeight(itemCount, railWidth) > maxRailHeight) {
+            while (sizing.emoji > FocusedReactionEmojiSize && !sizing.fits(itemCount, railWidth, maxRailHeight)) {
                 sizing = forEmoji(sizing.emoji - FocusedReactionSizingStep)
             }
             return sizing
@@ -518,8 +538,8 @@ internal data class FocusedReactionSizing(
  * beyond the viewport at the compact 360dp width with no affordance that it was there at all.
  * It spans the stack's full width (#3279). Every row, the last included, divides that width into equal
  * targets with compact gaps, so each button is wider than its glyph instead of floating in empty space.
- * A target never grows past twice its height: a sparse rail stays a centered cluster of compact buttons
- * rather than two far-apart glyphs, which only a few choices on a wide stack would otherwise produce.
+ * A rail that fits on one row caps each button at twice its height, so a sparse rail stays a centered
+ * cluster of compact buttons rather than two far-apart glyphs. Once the choices wrap, every row fills.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -542,14 +562,20 @@ private fun FocusedReactionRail(
             // The full picker travels with the reactions, so it wraps with them instead of
             // competing with them for one row's worth of width.
             val perRow = focusedReactionItemsPerRow(quickReactions.size + 1, maxWidth, sizing.target)
+            val wraps = quickReactions.size + 1 > perRow
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing, Alignment.CenterHorizontally),
                 verticalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing),
                 maxItemsInEachRow = perRow,
             ) {
-                // A fixed weighted width would ignore the cap, so each target fills its share up to it instead.
-                val cell = Modifier.weight(1f, fill = false).widthIn(max = sizing.target * 2).fillMaxWidth()
+                // A fixed weighted width would ignore the cap, so a single-row target fills its share up to it.
+                val cell =
+                    if (wraps) {
+                        Modifier.weight(1f)
+                    } else {
+                        Modifier.weight(1f, fill = false).widthIn(max = sizing.target * 2).fillMaxWidth()
+                    }
                 quickReactions.forEach { emoji ->
                     FocusedReactionTarget(
                         emoji = emoji,
