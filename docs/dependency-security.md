@@ -101,6 +101,8 @@ The graph-only fixture runs in the existing tooling job using a temporary local
 Maven repository and no app compilation. It checks exact lower/newer requests,
 dynamic selectors, affected-only range rejection, plugin/project report coverage
 and external artifacts alongside ambiguous project artifact variants.
+The DOCTYPE fixture resolves its JAR using artifact-only metadata so it exercises
+the optional licence reader rather than Gradle's own POM parser.
 Source archives retain enforcement without Git; CI separately requires
 valid commit identity. Detached configurations, settings-plugin classpaths and
 included builds are outside this hook and must keep their own dependency checks.

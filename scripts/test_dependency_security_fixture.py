@@ -99,7 +99,18 @@ buildscript {
     repositories { maven { url = uri('maven') } }
     dependencies { classpath 'org.freemarker:freemarker:2.3.32' }
 }
-repositories { maven { url = uri('maven') } }
+repositories {
+    // Keep Gradle's POM parser out of the optional licence-reader rejection case.
+    maven {
+        url = uri('maven')
+        metadataSources { artifact() }
+        content { includeModule('org.freemarker', 'legacy') }
+    }
+    maven {
+        url = uri('maven')
+        content { excludeModule('org.freemarker', 'legacy') }
+    }
+}
 configurations { belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom; projectVariants }
 dependencies {
     belowFloor 'org.freemarker:freemarker:2.3.32'
@@ -127,6 +138,8 @@ tasks.register('verifySecurityFixture') {
         assert selected(configurations.wireSuffix) == '7.0.0-alpha04'
         assert selected(configurations.wireDynamic) == '7.0.0-alpha04'
         assert selected(configurations.legacyPom) == '1.0'
+        def legacyArtifact = configurations.legacyPom.incoming.artifacts.artifacts.first().file
+        assert new File(legacyArtifact.parentFile, 'legacy-1.0.pom').text.contains('<!DOCTYPE project')
         // Graph resolution and external-module observations must not select project artifacts.
         def projectGraph = configurations.projectVariants.incoming.resolutionResult.allComponents
         assert projectGraph.find {
