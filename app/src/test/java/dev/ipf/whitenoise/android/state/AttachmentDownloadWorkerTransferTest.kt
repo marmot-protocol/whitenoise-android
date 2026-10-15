@@ -108,6 +108,29 @@ class AttachmentDownloadWorkerTransferTest {
             assertEquals(listOf("0", "1"), lines.beginAttempts())
         }
 
+    /** Automatic work the live policy now holds back finishes as success, so nothing retries it (#3308). */
+    @Test
+    fun automaticWorkDeferredByLivePolicyFinishesWithoutRetry() =
+        runTest {
+            val download: PerformDurableAttachmentDownload = { _, _, _ ->
+                throw AttachmentAutomaticPolicyDeferredException(MediaAutoDownloadType.Video)
+            }
+
+            assertEquals(Result.success(), worker(0, request, download).doWork())
+            assertFalse(attachmentIntentStore(appContext).hasSpentTransientRetry(request))
+            assertTrue(lines.isEmpty())
+        }
+
+    /** An approval the runtime had not applied yet earns the one follow-up run, then fails (#3308). */
+    @Test
+    fun pendingPermissionRetriesOnceThenFails() =
+        runTest {
+            val download: PerformDurableAttachmentDownload = { _, _, _ -> throw AttachmentPermissionPendingException() }
+
+            assertEquals(Result.retry(), worker(0, request, download).doWork())
+            assertEquals(Result.failure(), worker(1, request, download).doWork())
+        }
+
     /** A body that is not retained ends the run as failed without leaving a live entry. */
     @Test
     fun aBodyThatWasNotRetainedIsReportedAsFailed() =

@@ -160,6 +160,24 @@
         ]
       },
       {
+        "surface": "incoming-attachment-receipt-scheduling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun scheduleIncomingAttachmentDownloads(",
+        "test_ids": [
+          "MED-034",
+          "SET-011"
+        ]
+      },
+      {
+        "surface": "durable-automatic-attachment-admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun awaitAutomaticAttachmentAdmission(",
+        "test_ids": [
+          "MED-034",
+          "MED-022"
+        ]
+      },
+      {
         "surface": "Account teardown notification lifecycle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "internal suspend fun stopNotificationListenerForAccountTeardown()",

@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -113,7 +114,6 @@ import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
-import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -238,6 +238,13 @@ import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as 
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
+
+/** How long durable automatic work waits for the native runtime to apply the live approval before retrying. */
+internal const val NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS = 10_000L
+
+/** Automatic requests made per durable run before a policy-blocked refusal becomes a retryable failure. */
+private const val AUTOMATIC_POLICY_BLOCK_ATTEMPTS = 2
+private const val INCOMING_ATTACHMENT_TAG = "DMAttachmentReceipt"
 
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
@@ -4758,20 +4765,67 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Ensures durable work consumes large cache hits as leases instead of full heap copies. */
+    /**
+     * Ensures durable work consumes large cache hits as leases instead of full heap copies. Automatic work is
+     * first held to the live policy for its type, since the network or settings may have changed since it was
+     * queued, and waits for the native runtime to hold that approval (#3308).
+     */
     internal suspend fun downloadAttachmentForDurableWork(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
     ): Boolean {
         val match = findNativeAttachment(request) ?: throw AttachmentReferenceNotReadyException()
         val resolved = request.copy(sourceMessageIdHex = match.target.sourceMessageIdHex)
-        downloadAttachmentPlaintextSource(
-            request = resolved,
-            reference = match.reference,
-            priority = priority,
-            demandIntent = AttachmentDemandIntent.Observe,
-        ).use { }
+        val download =
+            suspend {
+                downloadAttachmentPlaintextSource(
+                    request = resolved,
+                    reference = match.reference,
+                    priority = priority,
+                    demandIntent = AttachmentDemandIntent.Observe,
+                ).use { }
+            }
+        if (priority == AttachmentDownloadPriority.Automatic) {
+            downloadAutomaticAttachment(resolved.accountRef, match.category.autoDownloadType(), download)
+        } else {
+            download()
+        }
         return hasCachedAttachmentAfterHydration(resolved)
+    }
+
+    /**
+     * Runs automatic [download] once the live policy allows [type] and the native runtime holds that approval. A
+     * network change revokes approval before re-evaluating it, and a request that lands in that window is refused
+     * without recording demand, so a refusal is asked again under the fresh approval instead of failing.
+     */
+    private suspend fun downloadAutomaticAttachment(
+        accountRef: String,
+        type: MediaAutoDownloadType?,
+        download: suspend () -> Unit,
+    ) {
+        repeat(AUTOMATIC_POLICY_BLOCK_ATTEMPTS) {
+            awaitAutomaticAttachmentAdmission(accountRef, type)
+            try {
+                download()
+                return
+            } catch (blocked: NativeAttachmentTerminalException) {
+                if (blocked.state != AttachmentTransferStateFfi.POLICY_BLOCKED) throw blocked
+            }
+        }
+        throw AttachmentPermissionPendingException()
+    }
+
+    /** Holds automatic work to the live policy for [type], then waits for the native runtime to apply it. */
+    private suspend fun awaitAutomaticAttachmentAdmission(
+        accountRef: String,
+        type: MediaAutoDownloadType?,
+    ) {
+        if (type == null || type !in automaticAttachmentTypesAllowed(accountRef)) {
+            throw AttachmentAutomaticPolicyDeferredException(type)
+        }
+        withTimeoutOrNull(NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS) {
+            nativeAttachmentPermissions.awaitApplied(accountRef)
+        } ?: throw AttachmentPermissionPendingException()
     }
 
     /**
@@ -11244,47 +11298,53 @@ class WhiteNoiseAppState private constructor(
         }
 
     /**
-     * Start document policy downloads from the receipt pipeline rather than
-     * waiting for a Compose bubble to become visible. The worker persists only
-     * the lookup identity and resolves the authoritative reference from MDK.
+     * Queues durable automatic downloads for every attachment a received message carries, from the receipt
+     * pipeline rather than a Compose bubble, so media is locally ready before the reader returns (#3308). Each
+     * slot is held to its own type's policy for the receiving account, which need not be the active one. The
+     * worker persists only the lookup identity and re-checks policy against MDK's reference when it runs.
      */
-    private suspend fun scheduleIncomingDocumentDownloads(update: NotificationUpdateFfi) {
+    private suspend fun scheduleIncomingAttachmentDownloads(update: NotificationUpdateFfi) {
         val messageIdHex = update.messageIdHex
-        val isIncomingMessage = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !update.isFromSelf
-        if (
-            isIncomingMessage &&
-            messageIdHex != null &&
-            !attachmentDownloadIntents.isAutomaticPaused(update.accountRef)
-        ) {
-            val matrix = loadMediaAutoDownloadMatrix(update.accountRef)
-            if (matrix.shouldAutoDownload(MediaAutoDownloadType.Document, activeNetworkTypes())) {
-                val records =
-                    runCatchingCancellable {
-                        marmotIo(MarmotTraceSection.MEDIA_LIST) {
-                            listMedia(update.accountRef, update.groupIdHex, null)
-                        }
-                    }.getOrNull()
-                        .orEmpty()
-                records
-                    .asSequence()
-                    .filter { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
-                    .filter { record ->
-                        val reference = record.reference
-                        reference.sourceEpoch != 0uL &&
-                            !MediaReferenceSupport.isImageMedia(reference) &&
-                            !MediaReferenceSupport.isVideoMedia(reference) &&
-                            !MediaReferenceSupport.isAudioMedia(reference)
-                    }.forEach { record ->
-                        enqueueAttachmentDownload(
-                            AttachmentTransferRequest(
-                                accountRef = update.accountRef,
-                                groupIdHex = update.groupIdHex,
-                                messageIdHex = record.messageIdHex,
-                                attachmentIndex = record.attachmentIndex.toInt(),
-                            ),
-                        )
-                    }
-            }
+        if (update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isFromSelf || messageIdHex == null) return
+        val allowed = automaticAttachmentTypesAllowed(update.accountRef)
+        if (allowed.isEmpty()) return
+        val attachments =
+            runCatchingCancellable {
+                receivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex)
+            }.onFailure {
+                Log.w(INCOMING_ATTACHMENT_TAG, "attachment_receipt_lookup_failed type=${it.javaClass.simpleName}")
+            }.getOrNull()
+                .orEmpty()
+        val (eligible, held) = attachments.partition { it.type in allowed }
+        eligible.forEach { enqueueAttachmentDownload(it.request) }
+        if (attachments.isNotEmpty()) {
+            Log.i(
+                INCOMING_ATTACHMENT_TAG,
+                "attachment_receipt_scheduled queued=${eligible.size} held=${held.size} " +
+                    "held_types=${held.map { it.type.preferenceKey }.distinct().sorted().joinToString(",")}",
+            )
+        }
+    }
+
+    /**
+     * The attachment types [accountRef]'s automatic policy allows on the live network right now: none while
+     * the account is signed out, its backlog is stopped, or the connection is unvalidated, exactly as the
+     * native permission is evaluated. Receipt scheduling and durable work both decide with this.
+     */
+    internal fun automaticAttachmentTypesAllowed(accountRef: String): Set<MediaAutoDownloadType> {
+        val signedOut = accounts.any { it.label == accountRef && it.signedOut }
+        if (signedOut) return emptySet()
+        val permission =
+            loadMediaAutoDownloadMatrix(accountRef).nativePermission(
+                activeNetworkTypes(),
+                hasValidatedInternet(),
+                attachmentDownloadIntents.isAutomaticPaused(accountRef),
+            )
+        return buildSet {
+            if (permission.images) add(MediaAutoDownloadType.Image)
+            if (permission.videos) add(MediaAutoDownloadType.Video)
+            if (permission.audio) add(MediaAutoDownloadType.Audio)
+            if (permission.files) add(MediaAutoDownloadType.Document)
         }
     }
 
@@ -11638,9 +11698,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private fun scheduleIncomingDocumentDownloadMaintenance(update: NotificationUpdateFfi) {
+    /** Runs receipt scheduling beside the first post, so queueing media never delays the notification. */
+    private fun scheduleIncomingAttachmentDownloadMaintenance(update: NotificationUpdateFfi) {
         notificationScope.launch(notificationDispatcher) {
-            scheduleIncomingDocumentDownloads(update)
+            scheduleIncomingAttachmentDownloads(update)
         }
     }
 
@@ -11701,7 +11762,7 @@ class WhiteNoiseAppState private constructor(
             outcome = "observed",
         )
         applyNotificationDisplayNameHint(update)
-        scheduleIncomingDocumentDownloadMaintenance(update)
+        scheduleIncomingAttachmentDownloadMaintenance(update)
         val postEpoch = notificationPostEpoch.capture()
         val accountCacheEpoch = profileCacheLifetime.capture()
         val engineMuted = engineNotificationMuted(update)
@@ -11732,6 +11793,11 @@ class WhiteNoiseAppState private constructor(
     /** Exercises the exact typed-update production path from JVM or instrumentation acceptance tests. */
     internal suspend fun processNotificationUpdateForTest(update: NotificationUpdateFfi) {
         withContext(Dispatchers.Main.immediate) { processNotificationUpdate(update) }
+    }
+
+    /** Runs receipt scheduling to completion, so a test can assert that a receipt queued nothing. */
+    internal suspend fun scheduleIncomingAttachmentDownloadsForTest(update: NotificationUpdateFfi) {
+        scheduleIncomingAttachmentDownloads(update)
     }
 
     /** Resolves all first-write content under the coordinator's one absolute budget. */

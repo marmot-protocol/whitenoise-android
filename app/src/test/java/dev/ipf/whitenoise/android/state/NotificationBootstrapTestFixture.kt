@@ -11,6 +11,12 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
+import dev.ipf.marmotkit.AttachmentEntryFfi
+import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
+import dev.ipf.marmotkit.AttachmentHistoryCursor
+import dev.ipf.marmotkit.AttachmentHistoryVersion
+import dev.ipf.marmotkit.AttachmentPageFfi
+import dev.ipf.marmotkit.AttachmentPageReadFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarBytesFfi
@@ -153,6 +159,8 @@ internal class NotificationBootstrapTestFixture(
     private val profileRefreshRequest: (suspend (String) -> Unit)? = null,
     private val timelinePage: TimelinePageFfi? = null,
     private val messageRecords: List<AppMessageRecordFfi> = emptyList(),
+    // Newest-first attachment history the receipt scheduler pages through (#3308).
+    private val attachmentHistory: List<AttachmentEntryFfi> = emptyList(),
     private val profileImageDownload: ((url: String, maxBytes: ULong) -> ByteArray)? = null,
     notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)? = null,
     notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -210,6 +218,8 @@ internal class NotificationBootstrapTestFixture(
     val notificationTimelineCalls = AtomicInteger(0)
     val notificationMessageHistoryCalls = AtomicInteger(0)
     val notificationGroupDetailsCalls = AtomicInteger(0)
+    val attachmentHistoryPageCalls = AtomicInteger(0)
+    val listMediaCalls = AtomicInteger(0)
 
     @Volatile
     var receiverWasAttachedAtPostStartEmission = false
@@ -446,6 +456,26 @@ internal class NotificationBootstrapTestFixture(
                 "setAttachmentDownloadPolicy" -> Unit
                 "beginAttachmentPermissionUpdate" -> "fixture-permission-generation"
                 "setAttachmentAutomaticPermission" -> true
+                "attachmentHistoryVersion" -> allocateWithoutConstructor(FixtureHistoryVersion::class.java)
+                "attachmentHistoryPage" -> {
+                    attachmentHistoryPageCalls.incrementAndGet()
+                    val limit = (arguments!![2] as Number).toInt()
+                    val start = (arguments[3] as? FixtureHistoryCursor)?.offset ?: 0
+                    val end = minOf(attachmentHistory.size, start + limit)
+                    val more = end < attachmentHistory.size
+                    AttachmentPageReadFfi.Page(
+                        AttachmentPageFfi(
+                            entries = attachmentHistory.subList(start, end),
+                            version = allocateWithoutConstructor(FixtureHistoryVersion::class.java),
+                            nextCursor = if (more) historyCursor(end) else null,
+                            hasMore = more,
+                        ),
+                    )
+                }
+                "listMedia" -> {
+                    listMediaCalls.incrementAndGet()
+                    emptyList<Any>()
+                }
                 "openChatListWindow" -> {
                     val view = arguments?.get(1) as ChatListViewFfi
                     if (view == ChatListViewFfi.CHATS) localSnapshotSubscriptionCalls.incrementAndGet()
@@ -627,6 +657,30 @@ internal class NotificationBootstrapTestFixture(
         val field = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }
         val unsafe = field.get(null)
         return unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, type) as T
+    }
+
+    /** One immutable attachment history generation that owns no native handle. */
+    private class FixtureHistoryVersion : AttachmentHistoryVersion(NoPointer) {
+        /** Every page of this fixture reads the same generation. */
+        override fun changeSince(previous: AttachmentHistoryVersion) = AttachmentHistoryChangeFfi.UNCHANGED
+
+        /** The fixture version owns no native handle. */
+        override fun close() = Unit
+    }
+
+    /** Allocates a page boundary at [offset] without a native handle. */
+    private fun historyCursor(offset: Int): AttachmentHistoryCursor {
+        val cursor = allocateWithoutConstructor(FixtureHistoryCursor::class.java)
+        cursor.offset = offset
+        return cursor
+    }
+
+    /** A page boundary into [attachmentHistory], allocated without a native handle. */
+    private class FixtureHistoryCursor : AttachmentHistoryCursor(NoPointer) {
+        var offset = 0
+
+        /** The fixture cursor owns no native handle. */
+        override fun close() = Unit
     }
 
     private class EmptyChatListWindow : ChatListWindowSubscription(NoPointer) {

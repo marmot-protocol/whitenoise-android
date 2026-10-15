@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.Executor
@@ -199,6 +200,17 @@ internal fun attachmentDownloadWorkState(
 
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 
+/**
+ * Automatic work whose type the live policy no longer allows when it runs, after a network or settings change
+ * since it was queued. It finishes without a fetch; the attachment's bubble still offers it on demand.
+ */
+internal class AttachmentAutomaticPolicyDeferredException(
+    val type: MediaAutoDownloadType?,
+) : IllegalStateException("automatic attachment policy does not allow this download now")
+
+/** The native runtime does not hold the live automatic approval yet, so the work retries after its backoff. */
+internal class AttachmentPermissionPendingException : IOException("automatic attachment permission is not applied yet")
+
 internal typealias PerformDurableAttachmentDownload = suspend (
     WhiteNoiseApplication,
     AttachmentTransferRequest,
@@ -321,6 +333,11 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 intentStore.resetTransientRetry(request)
                 Result.success()
             }
+        } catch (deferred: AttachmentAutomaticPolicyDeferredException) {
+            // Not a failure: the live policy holds this type back, and no network work was started.
+            Log.i(TAG, "attachment_work_policy_deferred type=${deferred.type?.preferenceKey ?: "unknown"}")
+            intentStore.resetTransientRetry(request)
+            Result.success()
         } catch (cancel: CancellationException) {
             // A cancelled shared fetch does not mean WorkManager stopped this
             // worker. Finish that transfer so its foreground notification and
