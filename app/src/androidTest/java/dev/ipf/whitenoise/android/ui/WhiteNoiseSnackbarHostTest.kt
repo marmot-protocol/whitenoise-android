@@ -30,19 +30,20 @@ class WhiteNoiseSnackbarHostTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** In its top region the snackbar keeps a visible margin from the bars above it (#3312). */
     @Test
-    fun snackbarKeepsAVisibleGapAboveBottomEdge() {
+    fun snackbarKeepsAVisibleGapBelowTheTopEdge() {
         composeRule.setContent {
             WhiteNoiseTheme {
                 val hostState = remember { SnackbarHostState() }
                 LaunchedEffect(Unit) {
-                    hostState.showSnackbar("Lifted snackbar")
+                    hostState.showSnackbar("Top snackbar")
                 }
 
                 Box(Modifier.fillMaxSize()) {
                     WhiteNoiseSnackbarHost(
                         hostState = hostState,
-                        modifier = Modifier.align(Alignment.BottomCenter),
+                        modifier = Modifier.align(Alignment.TopCenter),
                         snackbar = { data ->
                             Snackbar(
                                 snackbarData = data,
@@ -54,14 +55,14 @@ class WhiteNoiseSnackbarHostTest {
             }
         }
 
-        composeRule.onNodeWithText("Lifted snackbar").assertExists()
+        composeRule.onNodeWithText("Top snackbar").assertExists()
 
-        val rootBottom = composeRule.onRoot().getUnclippedBoundsInRoot().bottom
-        val snackbarBottom = composeRule.onNodeWithTag("snackbar").getUnclippedBoundsInRoot().bottom
+        val rootTop = composeRule.onRoot().getUnclippedBoundsInRoot().top
+        val snackbarTop = composeRule.onNodeWithTag("snackbar").getUnclippedBoundsInRoot().top
 
         assertTrue(
-            "Expected snackbar to be lifted above the bottom edge",
-            rootBottom - snackbarBottom >= 16.dp,
+            "Expected the snackbar to keep a gap below the top edge",
+            snackbarTop - rootTop >= 4.dp,
         )
     }
 
@@ -93,7 +94,7 @@ class WhiteNoiseSnackbarHostTest {
                     // Default snackbar slot — exercises SwipeDismissibleSnackbar.
                     WhiteNoiseSnackbarHost(
                         hostState = hostState,
-                        modifier = Modifier.testTag("host").align(Alignment.BottomCenter),
+                        modifier = Modifier.testTag("host").align(Alignment.TopCenter),
                     )
                 }
             }

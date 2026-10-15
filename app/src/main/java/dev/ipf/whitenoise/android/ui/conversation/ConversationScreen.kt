@@ -172,8 +172,6 @@ import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
-import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
-import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
@@ -353,16 +351,6 @@ private fun rememberConversationNavigationState(
 // Maximum images per multi-pick. The Android Photo Picker enforces this
 // cap on the system dialog side; 10 keeps the album payload bounded
 // (10 * 1920px JPEG ≈ a few MB encrypted) without feeling artificially low.
-// Approximate clearance the conversation composer occupies above the
-// navigation bar. Used by ConversationScreen to push the global
-// snackbar host above the composer so toasts don't intercept touches
-// on the message input — see [LocalSnackbarBottomInset] + issue #122.
-// 72.dp covers the single-line composer plus its vertical padding.
-// Only a seed for the first frames: the bottom bar's measured height
-// replaces it as soon as layout runs (#796), so multi-line composers,
-// reply/edit banners, and the invite bar stay cleared exactly.
-private val COMPOSER_SNACKBAR_INSET = 72.dp
-
 private const val MEDIA_PICKER_MAX_ITEMS = 10
 
 /** Maps recorder failures to localized, privacy-safe user presentation. */
@@ -672,22 +660,6 @@ internal fun ConversationScreen(
                 chatId = chat.id,
                 runtimeGeneration = appState.runtimeGeneration,
             )
-    // Push the global snackbar host above the conversation composer so
-    // a toast (e.g. the post-invite-accept confirmation) doesn't
-    // overlap and intercept touches on the message input. Resets to
-    // zero on dispose so other surfaces aren't affected. Issue #122.
-    val snackbarBottomInset = LocalSnackbarBottomInset.current
-    val snackbarContentInset = LocalSnackbarContentInset.current
-    // Keyed on chat.id so that a back-to-back conversation push (Compose
-    // reusing the same node across nav) re-runs the effect: the
-    // previous chat's onDispose may not have fired before the next
-    // enters, leaving the inset at zero on a stale snackbar host.
-    // Seeds the resting-composer estimate; the bottom bar's measured
-    // height takes over on first layout (#796).
-    DisposableEffect(chat.id) {
-        snackbarBottomInset.value = COMPOSER_SNACKBAR_INSET
-        onDispose { snackbarBottomInset.value = 0.dp }
-    }
     // Capture the unread boundary at chat open. Stays fixed for this controller
     // so the divider doesn't move as messages are marked read. A new controller
     // or a fresh notification-open request starts a distinct entry session.
@@ -3856,6 +3828,8 @@ internal fun ConversationScreen(
         // owner of keyboard padding so the reply-preview chip and input row move
         // as one cluster (#895, #1109).
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+        // The transcript's own notice row is this screen's banner slot (#3312).
+        topNoticeSlot = false,
         topBar = {
             ConversationHeaderFrame(
                 header = {
@@ -4190,14 +4164,12 @@ internal fun ConversationScreen(
                 recentEmojis = recentEmojiRecentsOwner.recents,
                 onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
                 onTimelineComposerMeasured = timelineViewport::onComposerMeasured,
-                onBottomChromeMeasured = { heightPx, chromeBottomPx ->
+                onBottomChromeMeasured = { heightPx, _ ->
                     timelineViewport.onBottomChromeMeasured(heightPx)
                     bottomChromeHeightObserver.onMeasured(heightPx)
                     if (measuredBottomChromeHeightPx != heightPx) {
                         measuredBottomChromeHeightPx = heightPx
                     }
-                    snackbarBottomInset.value =
-                        with(density) { (heightPx - chromeBottomPx).coerceAtLeast(0).toDp() }
                 },
             )
         },
@@ -4338,7 +4310,7 @@ internal fun ConversationScreen(
                                         .fillMaxSize()
                                         .measureConversationTimelinePadding(
                                             timelineViewport,
-                                            CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset.value,
+                                            CONVERSATION_TIMELINE_TAIL_GAP,
                                             overlayPadding,
                                             timelinePublication,
                                         ).trackWhiteNoiseHeader(listState)
@@ -4381,16 +4353,13 @@ internal fun ConversationScreen(
                                 // corrected after it settles (#2621).
                                 reverseLayout = true,
                                 verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-                                // Content padding owns the final composer interval
-                                // and temporary notice clearance. Keeping spacing
-                                // out of a lazy sentinel leaves the real last row as
-                                // the stable tail anchor.
+                                // Content padding owns the final composer interval. Temporary
+                                // notices sit in the top row, so no bottom clearance is added.
+                                // Keeping spacing out of a lazy sentinel leaves the real last
+                                // row as the stable tail anchor.
                                 contentPadding =
-                                    remember(snackbarContentInset.value, overlayPadding) {
-                                        conversationTimelineContentPadding(
-                                            snackbarContentInset.value,
-                                            overlayPadding,
-                                        )
+                                    remember(overlayPadding) {
+                                        conversationTimelineContentPadding(0.dp, overlayPadding)
                                     },
                             ) {
                                 // The list is reversed, so the first item emitted

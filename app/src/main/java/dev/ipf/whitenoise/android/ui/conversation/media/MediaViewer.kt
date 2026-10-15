@@ -440,10 +440,8 @@ internal fun FullScreenMediaViewer(
             controller.group.groupIdHex,
             appState.runtimeGeneration,
         )
-    var pictureNotice by remember(actionOwner) {
-        mutableStateOf<dev.ipf.whitenoise.android.state.ToastMessage?>(null)
-    }
-    ViewerGroupPictureFailureNotice(pictureNotice, snackbarHostState)
+    // Group-image failures are app toasts. The viewer's modal claims the app's banner slot, so they show in
+    // this window above the viewer, once, with their Copy and dismiss actions (#3312).
     val pictureFailures =
         remember(actionOwner) {
             GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
@@ -476,7 +474,6 @@ internal fun FullScreenMediaViewer(
         if (!pictureSession.isCurrent()) {
             pictureSession.close()
             pictureFailures.clear()
-            pictureNotice = null
         }
     }
 
@@ -495,9 +492,7 @@ internal fun FullScreenMediaViewer(
 
         if (!updated && controller.lastMutationError != null && pictureSession.isCurrent()) {
             pictureFailures.captureFailure(attempt)
-            pictureNotice = appState.toast
         }
-        if (updated) pictureNotice = null
         return updated
     }
 
@@ -512,7 +507,6 @@ internal fun FullScreenMediaViewer(
             detail = groupImageFailureDetail(error),
         )
         pictureFailures.captureFailure(attempt)
-        pictureNotice = appState.toast
     }
     actionGate.currentPage = currentPage
     DisposableEffect(actionGate) { onDispose { actionGate.close() } }
@@ -592,7 +586,6 @@ internal fun FullScreenMediaViewer(
                     {
                         actionGate.dispatch(currentPage, currentActionOwner()) { page ->
                             scope.launch {
-                                pictureNotice = null
                                 pictureSession.choose(page, read = { selected ->
                                     val bytes =
                                         attachmentBytes(
@@ -776,7 +769,6 @@ internal fun FullScreenMediaViewer(
             onDismiss = {
                 pictureSession.cancel()
                 pictureFailures.clear()
-                pictureNotice = null
             },
             onConfirm = { crop ->
                 scope.launch {
@@ -796,7 +788,19 @@ internal fun FullScreenMediaViewer(
             onDismiss = {
                 pictureSession.cancel()
                 pictureFailures.clear()
-                pictureNotice = null
+            },
+            title = { Text(stringResource(R.string.toast_couldnt_update_group)) },
+            text = { Text(stringResource(R.string.error_try_again)) },
+            confirmButton = {
+                TextButton(onClick = { scope.launch { pictureSession.retry(::commitPicture) } }) {
+                    Text(stringResource(R.string.retry))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pictureSession.cancel()
+                    pictureFailures.clear()
+                }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -829,15 +833,14 @@ internal fun MediaViewerFrame(
     body: @Composable BoxScope.() -> Unit,
 ) {
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
-    var bottomChromeHeight by remember { mutableStateOf(0.dp) }
+    var topChromeHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
-    // An open overflow menu keeps its chrome until dismissed, even when a video's controls time out under it.
-    val chromeShown = chromeVisible || moreExpanded
+    // The viewer's own snackbars sit below its top chrome, like every temporary banner (#3312).
     val snackbarInsetSides =
         if (chromeShown) {
             WindowInsetsSides.Horizontal
         } else {
-            WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
+            WindowInsetsSides.Top + WindowInsetsSides.Horizontal
         }
     val topChrome: @Composable () -> Unit = {
         if (chromeShown) {
@@ -845,6 +848,8 @@ internal fun MediaViewerFrame(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .onSizeChanged { topChromeHeight = with(density) { it.height.toDp() } }
                         .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
                 color = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
@@ -949,8 +954,8 @@ internal fun MediaViewerFrame(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .testTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG)
-                        .onSizeChanged { bottomChromeHeight = with(density) { it.height.toDp() } },
+                        .align(Alignment.BottomCenter)
+                        .testTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG),
                 color = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
             ) {
@@ -1010,8 +1015,8 @@ internal fun MediaViewerFrame(
             hostState = snackbarHostState,
             modifier =
                 Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = if (chromeShown) bottomChromeHeight else 0.dp)
+                    .align(Alignment.TopCenter)
+                    .padding(top = if (chromeVisible) topChromeHeight else 0.dp)
                     .windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )

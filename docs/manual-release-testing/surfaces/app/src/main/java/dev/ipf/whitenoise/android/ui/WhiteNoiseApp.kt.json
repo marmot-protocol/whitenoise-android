@@ -13,12 +13,35 @@
         ]
       },
       {
-        "surface": "GlobalTransientNotice",
+        "surface": "Offline speech disclosure title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "fun GlobalTransientNotice(",
+        "anchor": "R.string.dictation_disclosure_offline_title",
         "test_ids": [
-          "INT-004",
-          "SET-023"
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Offline speech disclosure message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_offline_message",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Speech disclosure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_title",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Speech disclosure message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.dictation_disclosure_message",
+        "test_ids": [
+          "DIC-001"
         ]
       },
       {
@@ -27,16 +50,8 @@
         "anchor": "fun ShellTransientNoticeLayout(",
         "test_ids": [
           "INT-004",
-          "SET-023"
-        ]
-      },
-      {
-        "surface": "Global transient notice bottom obstruction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "val globalTransientNoticeInsets: WindowInsets",
-        "test_ids": [
-          "PRO-001",
-          "SET-023"
+          "SET-023",
+          "CON-034"
         ]
       },
       {
@@ -111,11 +126,20 @@
         ]
       },
       {
-        "surface": "Shared modal presentation: DictationDisclosureDialog",
+        "surface": "App root banner slot for surfaces without their own",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "DictationDisclosureDialog(",
+        "anchor": "TopNoticeSlot(Modifier.zIndex(1f)",
         "test_ids": [
-          "DIC-001"
+          "CON-034",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "App lock hides every temporary banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "presentationAllowed = { !appState.appLockScreenVisible }",
+        "test_ids": [
+          "CON-034"
         ]
       }
     ]

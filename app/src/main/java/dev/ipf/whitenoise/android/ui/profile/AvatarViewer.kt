@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -344,6 +343,10 @@ private fun BoxScope.AvatarViewerImageContent(
     }
 }
 
+/**
+ * Full-screen avatar chrome over [body]: drag-down dismissal, the close and actions row, and the viewer's own
+ * snackbars directly below that row (#3312).
+ */
 @Composable
 internal fun AvatarViewerFrame(
     scale: Float,
@@ -448,12 +451,14 @@ internal fun AvatarViewerFrame(
                 }
             }
         }
+        // The viewer's own snackbars sit below its top controls, like every temporary banner (#3312).
         SnackbarHost(
             hostState = snackbarHostState,
             modifier =
                 Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding(),
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = AVATAR_VIEWER_TOP_CONTROLS_HEIGHT),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
     }
@@ -603,3 +608,6 @@ internal sealed interface AvatarViewerImageState {
         val bitmap: Bitmap,
     ) : AvatarViewerImageState
 }
+
+/** The viewer's top control row: 8 dp of padding around 48 dp touch targets. */
+private val AVATAR_VIEWER_TOP_CONTROLS_HEIGHT = 64.dp

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -49,6 +50,7 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
@@ -69,6 +71,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.rememberConversationControllerCopy
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
@@ -1839,34 +1842,137 @@ internal fun MainShell(
                             committer = notificationReadThroughCommitter,
                             onCommit = commitNotificationReadThrough,
                         )
-                        ConversationScreen(
-                            appState = appState,
-                            chat = chat,
-                            controller = content.controller,
-                            surfaceState = content.surfaceState,
-                            searchChatsController = chatsController,
-                            onBroadenSearch = { request ->
-                                if (content.accountRef == appState.activeAccountRef &&
-                                    selectedChat?.id == chat.id &&
-                                    globalSearch.beginConversationSearch(chat.id, request, selectedChatListFolderId)
-                                ) {
-                                    notificationReadThroughCommitter.commit(commitNotificationReadThrough)
-                                    // The global surface now owns this request. Returning to the origin
-                                    // must not revive a broad request in the single-chat navigator.
-                                    content.surfaceState?.let { origin ->
-                                        origin.searchOpen.value = false
-                                        origin.searchState.value =
-                                            dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
-                                                .closeSearch(request)
+                        // Banners scoped to this conversation render only in slots inside it, including the
+                        // group details and modals it opens (#3312).
+                        CompositionLocalProvider(
+                            LocalTopNoticeScope provides
+                                ConversationNoticeDestination(content.accountRef, chat.group.groupIdHex),
+                        ) {
+                            ConversationScreen(
+                                appState = appState,
+                                chat = chat,
+                                controller = content.controller,
+                                surfaceState = content.surfaceState,
+                                searchChatsController = chatsController,
+                                onBroadenSearch = { request ->
+                                    if (content.accountRef == appState.activeAccountRef &&
+                                        selectedChat?.id == chat.id &&
+                                        globalSearch.beginConversationSearch(chat.id, request, selectedChatListFolderId)
+                                    ) {
+                                        notificationReadThroughCommitter.commit(commitNotificationReadThrough)
+                                        // The global surface now owns this request. Returning to the origin
+                                        // must not revive a broad request in the single-chat navigator.
+                                        content.surfaceState?.let { origin ->
+                                            origin.searchOpen.value = false
+                                            origin.searchState.value =
+                                                dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
+                                                    .closeSearch(request)
+                                        }
+                                        selectedChatListFolderId = null
+                                        appState.clearActiveConversation()
+                                        chatsController.setChatListVisible(true)
+                                        shellNavState =
+                                            reduceShellNavigation(
+                                                shellNavState,
+                                                ShellNavigationEvent.ConversationBackedOut,
+                                            ).state
+                                        content.openContext.notificationRouteTraceRequestId?.let {
+                                            releaseNotificationFirstFrameGate(it)
+                                            NotificationRouteTrace.finishRequest(it)
+                                        }
+                                        exitingConversationContent = content
+                                        selectedChat = null
+                                        selectedChatOpenContext = ConversationOpenContext()
+                                        selectedChatJustCreated = false
+                                        selectedChatOpenedAsDmHint = false
                                     }
-                                    selectedChatListFolderId = null
+                                },
+                                playbackTransport = {
+                                    // Match released read-aloud: retain this screen's chrome until its Back
+                                    // animation disposes it. Route deselection must not collapse the outgoing header.
+                                    if (navAccountStable && !appState.appLockScreenVisible) {
+                                        dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar(
+                                            appState,
+                                            onBodyClick = guardedPlaybackSourceOpen,
+                                        )
+                                    }
+                                },
+                                dictationControlsVisible =
+                                    dictationControlOwner == ConversationDictationControlOwner.Composer &&
+                                        content.controller === selectedOrPendingConversationController &&
+                                        selectedChat?.id == chat.id,
+                                focusMessageId = content.openContext.focusMessageId,
+                                focusMessageRequestId = content.openContext.focusMessageRequestId,
+                                ttsFocusSessionId = content.openContext.ttsFocusSessionId,
+                                notificationOpenRequestId = content.openContext.notificationOpenRequestId,
+                                notificationReadThroughMessageId = content.openContext.notificationReadThroughMessageId,
+                                notificationLandingTarget = content.openContext.notificationTarget,
+                                onNotificationUnreadBoundaryCaptured = {
+                                    notificationReadThroughCommitter.commit(commitNotificationReadThrough)
+                                },
+                                onNotificationTimelineVisibilityChanged = { visible ->
+                                    conversationTimelineVisibility.reportIfCurrent(
+                                        owner = content.controller,
+                                        notificationOpenRequestId = content.openContext.notificationOpenRequestId,
+                                        visible = visible,
+                                        selectedOwner = currentConversationTimelineOwner,
+                                        selectedNotificationOpenRequestId = currentConversationTimelineRequestId,
+                                    )
+                                },
+                                onFirstFrameCommitted = {
+                                    content.openContext.notificationRouteTraceRequestId?.let { requestId ->
+                                        releaseNotificationFirstFrameGate(requestId)
+                                        NotificationRouteTrace.endPhase(
+                                            requestId = requestId,
+                                            sectionName = NotificationRouteTraceSection.INITIAL_ANCHOR,
+                                        )
+                                        NotificationRouteTrace.endPhase(
+                                            requestId = requestId,
+                                            sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
+                                        )
+                                        NotificationRouteTrace.finishRequest(requestId)
+                                    }
+                                },
+                                justCreated = content.justCreated,
+                                openedAsDmHint = content.openedAsDmHint,
+                                routeTransitionInProgress =
+                                    !conversationRouteTransitionComplete(
+                                        currentStateMatchesTarget =
+                                            routeTransition.currentState == routeTransition.targetState,
+                                        transitionRunning = routeTransition.isRunning,
+                                    ),
+                                restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
+                                onSaveScrollSnapshot = { snapshot ->
+                                    if (snapshot == null) {
+                                        conversationScrollSnapshots.remove(scrollKey)
+                                    } else {
+                                        conversationScrollSnapshots[scrollKey] = snapshot
+                                    }
+                                },
+                                onStartGroupWithPeer = profileGroupForegroundState::open,
+                                onBack = {
+                                    // A very quick Back can leave before the provisional
+                                    // open receives its chat-list projection. The entry
+                                    // divider no longer matters once the route is closed,
+                                    // so durably commit the tap's read cursor here (#1016).
+                                    notificationReadThroughCommitter.commit(commitNotificationReadThrough)
+                                    // Invalidate notification ownership before retaining
+                                    // the outgoing screen for its Back animation. That
+                                    // retained screen must never republish its account.
                                     appState.clearActiveConversation()
+                                    // Flush the hidden list before exposing it, so the first
+                                    // drawn return frame already has the optimistic preview
+                                    // in its final recency slot (#900).
                                     chatsController.setChatListVisible(true)
                                     shellNavState =
                                         reduceShellNavigation(
                                             shellNavState,
                                             ShellNavigationEvent.ConversationBackedOut,
                                         ).state
+                                    // Backing out before the first frame committed abandons
+                                    // the trace's owner; finish it here or TOTAL stays open
+                                    // until the next notification. finishRequest is a no-op
+                                    // for an already-finished request.
                                     content.openContext.notificationRouteTraceRequestId?.let {
                                         releaseNotificationFirstFrameGate(it)
                                         NotificationRouteTrace.finishRequest(it)
@@ -1876,105 +1982,9 @@ internal fun MainShell(
                                     selectedChatOpenContext = ConversationOpenContext()
                                     selectedChatJustCreated = false
                                     selectedChatOpenedAsDmHint = false
-                                }
-                            },
-                            playbackTransport = {
-                                // Match released read-aloud: retain this screen's chrome until its Back
-                                // animation disposes it. Route deselection must not collapse the outgoing header.
-                                if (navAccountStable && !appState.appLockScreenVisible) {
-                                    dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar(
-                                        appState,
-                                        onBodyClick = guardedPlaybackSourceOpen,
-                                    )
-                                }
-                            },
-                            dictationControlsVisible =
-                                dictationControlOwner == ConversationDictationControlOwner.Composer &&
-                                    content.controller === selectedOrPendingConversationController &&
-                                    selectedChat?.id == chat.id,
-                            focusMessageId = content.openContext.focusMessageId,
-                            focusMessageRequestId = content.openContext.focusMessageRequestId,
-                            ttsFocusSessionId = content.openContext.ttsFocusSessionId,
-                            notificationOpenRequestId = content.openContext.notificationOpenRequestId,
-                            notificationReadThroughMessageId = content.openContext.notificationReadThroughMessageId,
-                            notificationLandingTarget = content.openContext.notificationTarget,
-                            onNotificationUnreadBoundaryCaptured = {
-                                notificationReadThroughCommitter.commit(commitNotificationReadThrough)
-                            },
-                            onNotificationTimelineVisibilityChanged = { visible ->
-                                conversationTimelineVisibility.reportIfCurrent(
-                                    owner = content.controller,
-                                    notificationOpenRequestId = content.openContext.notificationOpenRequestId,
-                                    visible = visible,
-                                    selectedOwner = currentConversationTimelineOwner,
-                                    selectedNotificationOpenRequestId = currentConversationTimelineRequestId,
-                                )
-                            },
-                            onFirstFrameCommitted = {
-                                content.openContext.notificationRouteTraceRequestId?.let { requestId ->
-                                    releaseNotificationFirstFrameGate(requestId)
-                                    NotificationRouteTrace.endPhase(
-                                        requestId = requestId,
-                                        sectionName = NotificationRouteTraceSection.INITIAL_ANCHOR,
-                                    )
-                                    NotificationRouteTrace.endPhase(
-                                        requestId = requestId,
-                                        sectionName = NotificationRouteTraceSection.FIRST_CONVERSATION_FRAME,
-                                    )
-                                    NotificationRouteTrace.finishRequest(requestId)
-                                }
-                            },
-                            justCreated = content.justCreated,
-                            openedAsDmHint = content.openedAsDmHint,
-                            routeTransitionInProgress =
-                                !conversationRouteTransitionComplete(
-                                    currentStateMatchesTarget =
-                                        routeTransition.currentState == routeTransition.targetState,
-                                    transitionRunning = routeTransition.isRunning,
-                                ),
-                            restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
-                            onSaveScrollSnapshot = { snapshot ->
-                                if (snapshot == null) {
-                                    conversationScrollSnapshots.remove(scrollKey)
-                                } else {
-                                    conversationScrollSnapshots[scrollKey] = snapshot
-                                }
-                            },
-                            onStartGroupWithPeer = profileGroupForegroundState::open,
-                            onBack = {
-                                // A very quick Back can leave before the provisional
-                                // open receives its chat-list projection. The entry
-                                // divider no longer matters once the route is closed,
-                                // so durably commit the tap's read cursor here (#1016).
-                                notificationReadThroughCommitter.commit(commitNotificationReadThrough)
-                                // Invalidate notification ownership before retaining
-                                // the outgoing screen for its Back animation. That
-                                // retained screen must never republish its account.
-                                appState.clearActiveConversation()
-                                // Flush the hidden list before exposing it, so the first
-                                // drawn return frame already has the optimistic preview
-                                // in its final recency slot (#900).
-                                chatsController.setChatListVisible(true)
-                                shellNavState =
-                                    reduceShellNavigation(
-                                        shellNavState,
-                                        ShellNavigationEvent.ConversationBackedOut,
-                                    ).state
-                                // Backing out before the first frame committed abandons
-                                // the trace's owner; finish it here or TOTAL stays open
-                                // until the next notification. finishRequest is a no-op
-                                // for an already-finished request.
-                                content.openContext.notificationRouteTraceRequestId?.let {
-                                    releaseNotificationFirstFrameGate(it)
-                                    NotificationRouteTrace.finishRequest(it)
-                                }
-                                exitingConversationContent = content
-                                selectedChat = null
-                                selectedChatOpenContext = ConversationOpenContext()
-                                selectedChatJustCreated = false
-                                selectedChatOpenedAsDmHint = false
-                            },
-                        )
+                                },
+                            )
+                        }
                     }
                     MainShellContentRoute.NotificationLoading -> {
                         // A notification tap on a non-active account resolves in steps

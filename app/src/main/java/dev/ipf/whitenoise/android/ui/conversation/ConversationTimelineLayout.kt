@@ -23,8 +23,9 @@ internal val CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT =
     Arrangement.spacedBy(CONVERSATION_TIMELINE_ROW_SPACING, Alignment.Bottom)
 
 /**
- * Applies the resting tail gap and any temporary snackbar clearance at the
- * content edge, where Compose can keep the real final row as the scroll anchor.
+ * Applies the resting tail gap and any extra bottom clearance a caller reserves at the
+ * content edge, where Compose can keep the real final row as the scroll anchor. The
+ * conversation reserves none for temporary notices, which sit in its top row (#3312).
  */
 internal fun conversationTimelineContentPadding(
     snackbarContentInset: Dp,

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
@@ -27,7 +28,13 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 @OptIn(ExperimentalMaterial3Api::class)
 val LocalWhiteNoiseHeaderScroll = staticCompositionLocalOf<TopAppBarScrollBehavior?> { null }
 
-/** Material scaffold whose top bar receives the content's scroll so it can tint when content moves under it. */
+/**
+ * Material scaffold whose top bar receives the content's scroll so it can tint when content moves under it.
+ *
+ * With [topNoticeSlot] the scaffold also hosts the screen's temporary-banner slot directly below [topBar], so app
+ * confirmations and snackbars land below this screen's bars and its content absorbs their height (#3312). A
+ * screen that already places its own slot below its bars, as the conversation does, turns this one off.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -35,21 +42,25 @@ fun WhiteNoiseScaffold(
     modifier: Modifier = Modifier,
     topBar: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
-    snackbarHost: @Composable () -> Unit = {},
     floatingActionButton: @Composable () -> Unit = {},
     floatingActionButtonPosition: FabPosition = FabPosition.End,
     containerColor: Color = MaterialTheme.colorScheme.background,
     contentColor: Color = MaterialTheme.colorScheme.onBackground,
     contentWindowInsets: WindowInsets = WindowInsets.safeDrawing,
+    topNoticeSlot: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     CompositionLocalProvider(LocalWhiteNoiseHeaderScroll provides scrollBehavior) {
         Scaffold(
             modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-            topBar = topBar,
+            topBar = {
+                Column {
+                    topBar()
+                    if (topNoticeSlot) TopNoticeSlot()
+                }
+            },
             bottomBar = bottomBar,
-            snackbarHost = snackbarHost,
             floatingActionButton = floatingActionButton,
             floatingActionButtonPosition = floatingActionButtonPosition,
             containerColor = containerColor,

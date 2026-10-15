@@ -27,8 +27,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.GLOBAL_TRANSIENT_NOTICE_TAG
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
+import dev.ipf.whitenoise.android.ui.common.GLOBAL_TRANSIENT_NOTICE_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertTrue
