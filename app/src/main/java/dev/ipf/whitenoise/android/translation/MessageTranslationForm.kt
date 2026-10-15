@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,9 +26,11 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import java.util.Locale
 
-/** One primary action; engine management appears only when a request needs recovery. */
+/**
+ * One primary action; engine management appears only when a request needs recovery. [onOpenEngine] reports
+ * whether any app could open the engine or its install route, so a failed hand-off stays visible.
+ */
 @Suppress("LongParameterList")
 @Composable
 internal fun MessageTranslationForm(
@@ -41,7 +42,7 @@ internal fun MessageTranslationForm(
     onTargetChange: (String) -> Unit,
     onTranslate: () -> Unit,
     onDismiss: () -> Unit,
-    onOpenEngine: () -> Unit,
+    onOpenEngine: () -> Boolean,
 ) {
     Column(Modifier.fillMaxWidth()) {
         WhiteNoiseSheetHeader(stringResource(R.string.translation_title), onClose = onDismiss)
@@ -85,7 +86,7 @@ internal fun MessageTranslationForm(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    TextButton(onClick = onOpenEngine) { Text(stringResource(R.string.translation_open_engine)) }
+                    OfflineTranslatorEngineAction(onOpen = onOpenEngine)
                 }
             }
         }
@@ -111,6 +112,7 @@ private fun TranslationConfirmation(
     ) { Text(stringResource(R.string.translation_title)) }
 }
 
+/** A source row offers detection plus catalog sources; a target row offers only catalog targets. */
 @Suppress("LongParameterList")
 @Composable
 private fun TranslationLanguageRow(
@@ -121,15 +123,14 @@ private fun TranslationLanguageRow(
     allowDetection: Boolean = false,
 ) {
     var open by remember { mutableStateOf(false) }
-    val detection = stringResource(R.string.translation_detect_language)
-    val label: (String) -> String = { if (it.isEmpty()) detection else Locale.forLanguageTag(it).displayLanguage }
-    SettingsLink(context, title, onClick = { open = true }, value = label(selected))
+    val choices = rememberTranslationLanguageChoices(allowDetection)
+    SettingsLink(context, title, onClick = { open = true }, value = choices.label(selected))
     if (open) {
         ChoiceDialog(
             title = title,
-            values = if (allowDetection) listOf("") + offlineTranslatorLanguages else offlineTranslatorLanguages,
+            values = choices.codes,
             selected = selected,
-            label = label,
+            label = choices.label,
             onDismiss = { open = false },
             onSelect = {
                 onSelected(it)

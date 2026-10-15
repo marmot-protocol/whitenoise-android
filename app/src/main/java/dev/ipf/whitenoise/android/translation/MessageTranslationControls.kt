@@ -2,9 +2,6 @@
 
 package dev.ipf.whitenoise.android.translation
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +26,11 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 
+/**
+ * The message's translation identity for its current text and target, or null when it cannot be translated.
+ * An unusable saved target leaves the target empty, so the manual sheet asks for a language and automatic
+ * translation waits for an explicit choice instead of substituting one.
+ */
 @Composable
 internal fun rememberMessageTranslationSource(
     messageId: String,
@@ -48,7 +50,7 @@ internal fun rememberMessageTranslationSource(
         remember(messageId, text, target, sourceRevision, account, group, choice != null) {
             choice
                 ?.takeIf { text.isNotBlank() && text.length <= MAX_TRANSLATION_TEXT }
-                ?.let { TranslationSource(messageId, text, target ?: it.target, sourceRevision) }
+                ?.let { TranslationSource(messageId, text, target.orEmpty(), sourceRevision) }
         }
     LaunchedEffect(
         source,
@@ -59,7 +61,8 @@ internal fun rememberMessageTranslationSource(
         session?.capacityRevision,
         automaticEligible,
     ) {
-        if (source != null && automaticEligible && choice?.enabled == true) {
+        val enabled = automaticEligible && choice?.enabled == true
+        if (source != null && enabled && OfflineTranslatorLanguageCatalog.supportsTarget(source.target)) {
             session?.request(source, automatic = true)
         }
     }
@@ -98,6 +101,7 @@ internal fun MessageTranslationRendition(source: TranslationSource?) {
     }
 }
 
+/** The manual sheet: submits only a catalog pair, then replaces any earlier work for this message and target. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MessageTranslationDialog(
@@ -118,10 +122,7 @@ internal fun MessageTranslationDialog(
             from = from,
             target = target,
             failure = session.failure,
-            enabled =
-                source != null &&
-                    target in offlineTranslatorLanguages &&
-                    (from.isEmpty() || from in offlineTranslatorLanguages),
+            enabled = source != null && OfflineTranslatorLanguageCatalog.supportsRequest(from, target),
             onFromChange = { from = it },
             onTargetChange = { target = it },
             onTranslate = {
@@ -140,6 +141,7 @@ internal fun MessageTranslationDialog(
     }
 }
 
+/** Sanitized, localized recovery copy for a failure; engine messages and languages are never shown. */
 internal fun translationFailureResource(failure: TranslationFailure): Int {
     val unverified = R.string.translation_unverified_engine
     return when (failure) {
@@ -147,20 +149,7 @@ internal fun translationFailureResource(failure: TranslationFailure): Int {
         TranslationFailure.UNVERIFIED_ENGINE, TranslationFailure.INCOMPATIBLE_ENGINE -> unverified
         TranslationFailure.DETECTION -> R.string.translation_detection_failed
         TranslationFailure.SOURCE_MODEL -> R.string.translation_source_model_missing
+        TranslationFailure.ENGINE_UPDATE_REQUIRED -> R.string.translation_engine_update_required
         else -> R.string.translation_engine_failed
-    }
-}
-
-internal fun openOfflineTranslator(context: Context) {
-    val launch =
-        runCatching {
-            // Opening the app shares no message text and must also work for unsupported versions.
-            context.packageManager.getLaunchIntentForPackage(OFFLINE_TRANSLATOR_PACKAGE)
-        }.getOrNull()
-    runCatching {
-        context.startActivity(
-            (launch ?: Intent(Intent.ACTION_VIEW, Uri.parse(OFFLINE_TRANSLATOR_INSTALL)))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
     }
 }

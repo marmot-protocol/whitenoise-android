@@ -18,6 +18,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -31,6 +32,7 @@ class TranslationSettingsWarningTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    /** Automatic translation stays off until switched on beside the provider warning. */
     @Test
     fun automaticTranslationRequiresANewChoiceBesideTheWarning() {
         val preferences = TranslationPreferences(context)
@@ -46,11 +48,12 @@ class TranslationSettingsWarningTest {
         preferences.close()
     }
 
+    /** The chat opt-in shows the same provider warning before enabling automatic translation. */
     @Test
     fun chatOptInAlsoShowsTheProviderWarning() {
         val preferences = TranslationPreferences(context)
         preferences.setGlobal(false, "en")
-        preferences.setOverride("account", "group", TranslationOverride.OFF, null)
+        preferences.setOverride("account", "group", TranslationOverride.OFF)
         composeRule.setContent {
             WhiteNoiseTheme { TranslationChatSettingsDialog("account", "group", {}) }
         }
@@ -60,6 +63,7 @@ class TranslationSettingsWarningTest {
         preferences.close()
     }
 
+    /** At double font size the engine route and automatic switch remain reachable by scrolling. */
     @Test
     fun largeTextSettingsCanScrollToTheEngineAndAutomaticControls() {
         val preferences = TranslationPreferences(context)
@@ -74,7 +78,7 @@ class TranslationSettingsWarningTest {
             }
         }
         composeRule
-            .onNodeWithText(context.getString(R.string.translation_open_engine))
+            .onNodeWithTag("translation.engine")
             .performScrollTo()
             .assertIsDisplayed()
         composeRule
@@ -84,6 +88,74 @@ class TranslationSettingsWarningTest {
             .performClick()
             .assertIsOn()
         assertTrue(preferences.global().enabled)
+        preferences.close()
+    }
+
+    /** The global target picker offers Slovak and saves the engine's own `sk` code. */
+    @Test
+    fun globalTargetPickerOffersSlovakAndSavesItsEngineCode() {
+        val preferences = TranslationPreferences(context)
+        preferences.setGlobal(true, "es")
+        composeRule.setContent { WhiteNoiseTheme { TranslationGlobalSettingsContent(preferences) } }
+        composeRule.onNodeWithText("Target language: Spanish").performClick()
+        composeRule.onNodeWithText("Slovak").performScrollTo().performClick()
+        composeRule.onNodeWithText("Target language: Slovak").assertIsDisplayed()
+        assertEquals(TranslationChoice(true, "sk"), preferences.global())
+        preferences.close()
+    }
+
+    /** An unsupported saved global target shows recovery, not English, until a catalog language replaces it. */
+    @Test
+    fun unsupportedGlobalTargetAsksForANewLanguage() {
+        context
+            .getSharedPreferences("translation_choices", 0)
+            .edit()
+            .putString("target", "xx")
+            .commit()
+        val preferences = TranslationPreferences(context)
+        composeRule.setContent { WhiteNoiseTheme { TranslationGlobalSettingsContent(preferences) } }
+        composeRule.onNodeWithTag("translation.target_recovery").assertIsDisplayed()
+        composeRule.onNodeWithText("Target language: English").assertDoesNotExist()
+        composeRule.onNodeWithText("Target language: Choose a language").performClick()
+        composeRule.onNodeWithText("Chinese (Traditional)").performScrollTo().performClick()
+        composeRule.onNodeWithTag("translation.target_recovery").assertDoesNotExist()
+        assertEquals("zh_hant", preferences.global().target)
+        preferences.close()
+    }
+
+    /** A chat's unsupported saved target needs recovery, and choosing Slovak saves `sk` for that chat only. */
+    @Test
+    fun chatTargetRecoveryReplacesAnUnsupportedOverrideWithSlovak() {
+        val preferences = TranslationPreferences(context)
+        preferences.setGlobal(true, "de")
+        context
+            .getSharedPreferences("translation_choices", 0)
+            .edit()
+            .putString("chat:7:account:group:target", "zh-Hant")
+            .commit()
+        composeRule.setContent { WhiteNoiseTheme { TranslationChatSettingsDialog("account", "group", {}) } }
+        composeRule.onNodeWithTag("translation.target_recovery").assertIsDisplayed()
+        composeRule.onNodeWithText("Target language: Choose a language").performClick()
+        composeRule.onNodeWithText("Slovak").performScrollTo().performClick()
+        composeRule.onNodeWithTag("translation.target_recovery").assertDoesNotExist()
+        assertEquals(TranslationChoice(true, "sk"), preferences.effective("account", "group"))
+        assertEquals(TranslationChoice(true, "de"), preferences.effective("account", "other"))
+        preferences.close()
+    }
+
+    /** Target pickers omit into-English-only languages and label Chinese and Norwegian variants distinctly. */
+    @Test
+    fun targetPickerListsOnlyTargetsWithDistinctVariantLabels() {
+        val preferences = TranslationPreferences(context)
+        preferences.setGlobal(false, "en")
+        composeRule.setContent { WhiteNoiseTheme { TranslationGlobalSettingsContent(preferences) } }
+        composeRule.onNodeWithText("Target language: English").performClick()
+        for (label in listOf("Chinese (Simplified)", "Chinese (Traditional)", "Norwegian", "Norwegian Bokmål")) {
+            composeRule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
+        }
+        for (sourceOnly in listOf("Belarusian", "Marathi", "Norwegian Nynorsk", "Urdu")) {
+            composeRule.onNodeWithText(sourceOnly).assertDoesNotExist()
+        }
         preferences.close()
     }
 }

@@ -171,6 +171,52 @@ class MessageTranslationStateTest {
             assertEquals("explicit source rendition", session.renditions[source]?.text)
         }
 
+    /** Automatic and manual requests carry Slovak and variant engine codes to the engine exactly as chosen. */
+    @Test
+    fun automaticAndManualRequestsSubmitCatalogCodesUnchanged() =
+        runTest {
+            val pairs = mutableListOf<Pair<String, String>>()
+            val session =
+                ConversationTranslationSession(backgroundScope, {
+                    object : TranslationEngine {
+                        override val identity = TranslationEngineIdentity("local", "verified", 1)
+                        override val trust = TranslationTrust.LOCAL
+
+                        override suspend fun translate(
+                            text: String,
+                            source: String,
+                            target: String,
+                        ): String {
+                            pairs += source to target
+                            return "rendition"
+                        }
+                    }
+                }, { true })
+            session.request(source.copy(messageId = "automatic", target = "sk"), automatic = true)
+            session.request(source.copy(messageId = "manual", target = "en"), from = "sk")
+            session.request(source.copy(messageId = "variant", target = "zh_hant"), automatic = true)
+            runCurrent()
+            assertEquals(listOf("" to "sk", "sk" to "en", "" to "zh_hant"), pairs)
+            assertEquals("rendition", session.renditions[source.copy(messageId = "automatic", target = "sk")]?.text)
+        }
+
+    /** A target awaiting an explicit choice is rejected before the engine, rather than replaced by a default. */
+    @Test
+    fun emptyTargetIsRejectedBeforeTheEngine() =
+        runTest {
+            var requests = 0
+            val session =
+                session(backgroundScope) {
+                    requests += 1
+                    "unexpected"
+                }
+            session.request(source.copy(target = ""), from = "en")
+            runCurrent()
+            assertEquals(0, requests)
+            assertEquals(TranslationFailure.INVALID_REQUEST, session.failure)
+        }
+
+    /** Builds a session over an engine whose every translation runs [translate]. */
     private fun session(
         scope: CoroutineScope,
         current: () -> Boolean = { true },

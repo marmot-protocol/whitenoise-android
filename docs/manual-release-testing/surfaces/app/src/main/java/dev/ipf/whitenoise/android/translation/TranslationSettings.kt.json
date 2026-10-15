@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
         "anchor": "fun TranslationChatSettingsDialog(",
         "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-036"
         ]
       },
       {
@@ -16,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
         "anchor": "fun TranslationGlobalSettingsContent(",
         "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-036"
         ]
       },
       {
@@ -24,7 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
         "anchor": "fun TranslationLanguagePicker(",
         "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-036"
         ]
       },
       {
@@ -92,19 +95,12 @@
         ]
       },
       {
-        "surface": "R.string.translation_open_engine",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
-        "anchor": "R.string.translation_open_engine",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
         "surface": "R.string.translation_target_language",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
         "anchor": "R.string.translation_target_language",
         "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-036"
         ]
       },
       {
@@ -121,6 +117,64 @@
         "anchor": "testTag(\"translation.automatic\")",
         "test_ids": [
           "SET-033"
+        ]
+      },
+      {
+        "surface": "TranslationOverrideOptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "private fun TranslationOverrideOptions(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "TranslationChatTargetControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "private fun TranslationChatTargetControls(",
+        "test_ids": [
+          "SET-033",
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "TranslationTargetRecovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "private fun TranslationTargetRecovery(",
+        "test_ids": [
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "Catalog-backed language choices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "fun rememberTranslationLanguageChoices(",
+        "test_ids": [
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "R.string.translation_choose_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_choose_language",
+        "test_ids": [
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "R.string.translation_unsupported_target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "R.string.translation_unsupported_target",
+        "test_ids": [
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "Settings engine install route",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+        "anchor": "OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })",
+        "test_ids": [
+          "SET-033",
+          "SET-037"
         ]
       }
     ]

@@ -20,4 +20,11 @@
     <string name="translation_off">Kapalı</string>
     <string name="translation_inherit_language">Genel hedef dili kullan</string>
     <string name="translation_privacy_warning">Offline Translator, mesaj metinlerini ve çevirileri Android sistem günlüklerine yazabilir. White Noise, başka bir uygulamanın işlediği metnin güvenliğini garanti edemez.</string>
+    <string name="translation_choose_language">Bir dil seçin</string>
+    <string name="translation_unsupported_target">Kayıtlı hedef dil Offline Translator içinde kullanılamıyor. Başka bir dil seçin.</string>
+    <string name="translation_engine_update_required">Bu dil için daha yeni bir Offline Translator sürümü gerekiyor. Uygulamayı güncelleyip tekrar deneyin.</string>
+    <string name="translation_install_zapstore">Zapstore’dan yükle</string>
+    <string name="translation_install_release">GitHub’dan yükle</string>
+    <string name="translation_install_release_reason">Zapstore şu anda White Noise’un kullanamadığı Offline Translator %1$s sürümünü sunuyor, bu nedenle yayıncının GitHub’daki %2$s sürümü açılır.</string>
+    <string name="translation_install_open_failed">Hiçbir uygulama Offline Translator’ı veya indirme sayfasını açamadı. Bir web tarayıcısı yükleyip tekrar deneyin.</string>
 </resources>

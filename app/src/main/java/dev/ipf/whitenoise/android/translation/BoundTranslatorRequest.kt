@@ -6,16 +6,22 @@ import dev.davidv.translator.ITranslationService
 import dev.davidv.translator.TranslationError
 import kotlinx.coroutines.CompletableDeferred
 
-/** Catalog initialization stays on the verified binding and within the caller's overall deadline. */
+/**
+ * Catalog initialization stays on the verified binding and within the caller's overall deadline. Before
+ * either submission, the pair must be one that [engineVersion]'s own bundled catalog lists, because the
+ * engine replaces an unresolved code with its default instead of failing.
+ */
+@Suppress("LongParameterList") // The engine version travels with the request it gates, not with the binding.
 internal suspend fun translateOnBoundTranslator(
     service: ITranslationService,
+    engineVersion: String,
     text: String,
     source: String,
     target: String,
     prepareSubmission: suspend (CompletableDeferred<String>) -> Unit,
 ): String {
-    if (target !in offlineTranslatorLanguages || (source.isNotEmpty() && source !in offlineTranslatorLanguages)) {
-        throw TranslationException(TranslationFailure.INVALID_REQUEST)
+    OfflineTranslatorLanguageCatalog.requestFailure(engineVersion, source, target)?.let { failure ->
+        throw TranslationException(failure)
     }
     val ready = CompletableDeferred<String>()
     try {
