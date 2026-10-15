@@ -30,9 +30,10 @@ internal fun shouldSnapChatListForHeadReorder(
 
 /**
  * Visible active-list head captured when leaving ChatsScreen (issues #1313, #3280).
- * [headId] is the absolute first row. [activityHeadId] is the first unpinned row —
- * the slot a sent-to chat is promoted into while pinned chats keep [headId]
- * unchanged — or null when every visible row is pinned.
+ * [headId] is the absolute first row. [activityHeadId] is the first row of the
+ * activity-ordered section, below pinned chats and pending invitations — the slot
+ * a sent-to chat is promoted into while that priority block keeps [headId]
+ * unchanged — or null when every visible row belongs to the priority block.
  */
 internal data class ChatListReturnHead(
     val headId: String,
@@ -44,7 +45,7 @@ internal fun chatListReturnHead(visibleItems: List<ChatListItem>): ChatListRetur
     val head = visibleItems.firstOrNull() ?: return null
     return ChatListReturnHead(
         headId = head.id,
-        activityHeadId = visibleItems.firstOrNull { !it.pinned() }?.id,
+        activityHeadId = visibleItems.firstOrNull { !it.pinned() && !it.group.pendingConfirmation }?.id,
     )
 }
 

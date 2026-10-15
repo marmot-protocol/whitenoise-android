@@ -2939,6 +2939,7 @@ internal fun MessageBubble(
                 )
                 if (surfaces.expandedFullView && !deleted) {
                     val readerSession = surfaces.expandedFullViewSession
+                    ReaderSendDismissal(surfaces, onReaderSendAccepted)
                     val groupIdHex = controller.group.groupIdHex
                     val editingRecord =
                         controller.editingMessageId?.let { id ->
@@ -3077,9 +3078,7 @@ internal fun MessageBubble(
                                             enterKeyBehavior = appState.enterKeyBehavior,
                                             recentEmojis = recentEmojis,
                                             onEmojiUsed = onEmojiUsed,
-                                            onAfterSend = {
-                                                surfaces.finishExpandedReaderSend(readerSession, onReaderSendAccepted)
-                                            },
+                                            onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) },
                                         )
                                     }
                             }

@@ -75,7 +75,8 @@ class LongMessageFullScreenComposerCoverageTest {
 
     /**
      * The reader's composer hands an accepted send back to the conversation: it closes only its own reader
-     * session, and every row layer forwards the conversation's accepted-send reveal (#3268).
+     * session, after the cleared composer reached the keyboard, and every row layer forwards the conversation's
+     * accepted-send reveal (#3268).
      */
     @Test
     fun expandedReaderSendClosesItsSessionAndRevealsThroughTheConversation() {
@@ -85,9 +86,19 @@ class LongMessageFullScreenComposerCoverageTest {
                 .substringAfter("MessageFullScreenView(")
                 .substringBefore("if (surfaces.emojiPickerOpen")
         assertTrue(
-            "the reader composer must close its own session and reveal after an accepted send",
+            "the reader composer must mark its own session when a send is accepted",
             "val readerSession = surfaces.expandedFullViewSession" in body &&
-                "surfaces.finishExpandedReaderSend(readerSession, onReaderSendAccepted)" in fullScreenCall,
+                "onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) }" in fullScreenCall,
+        )
+        assertTrue(
+            "the reader must close through the deferred dismissal that reveals through the conversation",
+            "ReaderSendDismissal(surfaces, onReaderSendAccepted)" in body,
+        )
+        val state = messageBubbleSource().resolveSibling("MessageBubbleState.kt").readText()
+        val dismissal = state.substringAfter("internal fun ReaderSendDismissal(").substringBefore("\n}\n")
+        assertTrue(
+            "closing in the clearing frame lets the keyboard's composing word restore the sent text",
+            "withFrameNanos" in dismissal && "closeReaderAfterAcceptedSend(session)" in dismissal,
         )
         assertFalse(
             "Read more must open a new reader session rather than flipping the flag directly",

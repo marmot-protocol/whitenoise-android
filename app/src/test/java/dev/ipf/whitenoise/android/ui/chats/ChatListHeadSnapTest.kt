@@ -297,6 +297,22 @@ class ChatListHeadSnapTest {
         assertNull(chatListReturnHead(emptyList()))
     }
 
+    /** A pending invitation shares the priority block with pins, so the activity head is the first chat below both. */
+    @Test
+    fun returnHeadSkipsPendingInvitationsAbovePins() {
+        val beforeOpen = listOf(item("invite", pending = true), item("p", pinned = true), item("a"), item("c"))
+        val afterSend = listOf(item("invite", pending = true), item("p", pinned = true), item("c"), item("a"))
+
+        assertEquals(ChatListReturnHead(headId = "invite", activityHeadId = "a"), chatListReturnHead(beforeOpen))
+        assertTrue(
+            shouldSnapChatListOnConversationReturn(
+                headAtConversationOpen = chatListReturnHead(beforeOpen),
+                currentHead = chatListReturnHead(afterSend),
+                isActiveList = true,
+            ),
+        )
+    }
+
     /** Returning after a send promoted lower chat C beneath pinned P snaps; returning unchanged does not (#3280). */
     @Test
     fun sendPromotionBeneathPinnedHeadSnapsOnlyWhenTheUnpinnedOrderChanged() {
@@ -325,15 +341,16 @@ class ChatListHeadSnapTest {
         activity: String? = id,
     ): ChatListReturnHead = ChatListReturnHead(headId = id, activityHeadId = activity)
 
-    /** A projected chat row with the given id and pin state. */
+    /** A projected chat row with the given id, pin state and pending-invitation state. */
     private fun item(
         id: String,
         pinned: Boolean = false,
+        pending: Boolean = false,
     ): ChatListItem {
         val base = ChatRowPortFixtures.item()
         return base.copy(
-            group = base.group.copy(groupIdHex = id),
-            projection = base.projection!!.copy(groupIdHex = id, pinned = pinned),
+            group = base.group.copy(groupIdHex = id, pendingConfirmation = pending),
+            projection = base.projection!!.copy(groupIdHex = id, pinned = pinned, pendingConfirmation = pending),
         )
     }
 }
