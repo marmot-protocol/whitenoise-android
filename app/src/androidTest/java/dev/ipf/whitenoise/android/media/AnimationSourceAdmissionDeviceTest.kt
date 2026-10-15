@@ -3,9 +3,11 @@ package dev.ipf.whitenoise.android.media
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.Animatable
+import android.graphics.drawable.Drawable
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedAnimationDrawable
 import dev.ipf.whitenoise.android.ui.conversation.media.DecodedAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.decodeMessageAttachmentImage
 import kotlinx.coroutines.runBlocking
@@ -102,18 +104,8 @@ class AnimationSourceAdmissionDeviceTest {
                 val worker = requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation)
                 assertTrue(worker.isolated && !worker.internetGranted && !worker.runtimeInitialized)
                 assertTrue(worker.uid != android.os.Process.myUid())
-                val colors = HashSet<Int>()
                 instrumentation.runOnMainSync { (animated as Animatable).start() }
-                val deadline = android.os.SystemClock.elapsedRealtime() + 3000L
-                while (colors.size < 2 && android.os.SystemClock.elapsedRealtime() < deadline) {
-                    instrumentation.runOnMainSync {
-                        animated.setBounds(0, 0, pixels.width, pixels.height)
-                        animated.draw(android.graphics.Canvas(pixels))
-                        colors.add(pixels.getPixel(0, 0))
-                    }
-                    Thread.sleep(25L)
-                }
-                assertTrue("Real isolated frames must change the displayed pixels", colors.size >= 2)
+                assertChangingPixels(animated, pixels)
                 instrumentation.runOnMainSync { (animated as Animatable).stop() }
                 var stoppedFrame = 0L
                 var stopped = 0
@@ -140,21 +132,30 @@ class AnimationSourceAdmissionDeviceTest {
                     (animated as Animatable).start()
                     assertTrue(animated.isRunning)
                 }
-                colors.clear()
-                val resumedDeadline = android.os.SystemClock.elapsedRealtime() + 3000L
-                while (colors.size < 2 && android.os.SystemClock.elapsedRealtime() < resumedDeadline) {
-                    instrumentation.runOnMainSync {
-                        animated.draw(android.graphics.Canvas(pixels))
-                        colors.add(pixels.getPixel(0, 0))
-                    }
-                    Thread.sleep(25L)
-                }
-                assertTrue("Resuming must deliver changing isolated pixels, not just set isRunning", colors.size >= 2)
+                assertChangingPixels(animated, pixels)
             } finally {
                 instrumentation.runOnMainSync { (animated as java.io.Closeable).close() }
                 pixels.recycle()
             }
         }
+    }
+
+    private fun assertChangingPixels(
+        animated: Drawable,
+        pixels: Bitmap,
+    ) {
+        val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        val colors = HashSet<Int>()
+        val deadline = android.os.SystemClock.elapsedRealtime() + 3000L
+        while (colors.size < 2 && android.os.SystemClock.elapsedRealtime() < deadline) {
+            instrumentation.runOnMainSync {
+                animated.setBounds(0, 0, pixels.width, pixels.height)
+                animated.draw(android.graphics.Canvas(pixels))
+                colors.add(pixels.getPixel(0, 0))
+            }
+            Thread.sleep(25L)
+        }
+        assertTrue("Playing animation must deliver changing isolated pixels, not just set isRunning", colors.size >= 2)
     }
 
     @Test
@@ -165,12 +166,15 @@ class AnimationSourceAdmissionDeviceTest {
         dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
             .install(instrumentation.targetContext)
         val old = requireNotNull(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()))
+        val oldAnimation = old as IsolatedAnimationDrawable
         val oldUid = requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation).uid
+        var retiredFrame = 0L
         try {
             instrumentation.runOnMainSync {
                 (old as Animatable).start()
                 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
                     .resetForAccount()
+                retiredFrame = oldAnimation.presentedFrame
             }
             val replacement = requireNotNull(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()))
             try {
@@ -179,6 +183,7 @@ class AnimationSourceAdmissionDeviceTest {
                         dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation,
                     )
                 assertTrue(oldUid != current.uid)
+                instrumentation.runOnMainSync { assertEquals(retiredFrame, oldAnimation.presentedFrame) }
             } finally {
                 instrumentation.runOnMainSync { (replacement as java.io.Closeable).close() }
             }
