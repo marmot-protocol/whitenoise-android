@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -77,6 +78,40 @@ class MessageActionReactionRailLayoutTest {
         assertTrue("the rail fills the stack width", rail.width >= menu.width - TOLERANCE_PX)
     }
 
+    /**
+     * Both rows of eight reactions and the picker divide the full rail width into equal targets: the first target
+     * of each row starts at the rail's inner edge and the last ends at the other, with only compact gaps between.
+     */
+    @Test
+    fun everyRowOfEightReactionsFillsTheRailWidth() {
+        renderReactionMenu(fontScale = 1f, layoutDirection = LayoutDirection.Ltr, quickReactionEmojis = EIGHT_CHOICES)
+
+        val rail = composeRule.onNodeWithTag(FOCUSED_REACTION_RAIL_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val rows =
+            targetBounds(EIGHT_CHOICES)
+                .groupBy { it.top }
+                .toSortedMap()
+                .values
+                .toList()
+        assertEquals("eight reactions and the picker wrap into two rows at 360 dp", 2, rows.size)
+        rows.forEach { row ->
+            assertTrue("a row starts at the rail edge", row.minOf { it.left } - rail.left <= RAIL_EDGE_PX)
+            assertTrue("a row ends at the rail edge", rail.right - row.maxOf { it.right } <= RAIL_EDGE_PX)
+            val gaps = row.sortedBy { it.left }.zipWithNext { a, b -> b.left - a.right }
+            assertTrue("gaps stay compact", gaps.all { it <= COMPACT_GAP_PX })
+        }
+    }
+
+    /** A larger app text size grows every target and lets fewer fit on a row, so the reactions wrap sooner. */
+    @Test
+    fun largerAppTextSizeGrowsTargetsAndWrapsSooner() {
+        renderReactionMenu(fontScale = 1.5f, layoutDirection = LayoutDirection.Ltr, quickReactionEmojis = EIGHT_CHOICES)
+
+        val targets = targetBounds(EIGHT_CHOICES)
+        assertTrue("targets grow with the text size", targets.all { it.height >= LARGE_TEXT_TARGET_PX })
+        assertTrue("fewer targets fit on a row", targets.groupBy { it.top }.size >= 3)
+    }
+
     /** The rail stays on one row while everything fits and splits evenly only once it cannot. */
     @Test
     fun reactionRailBalancesItsRowsOnlyWhenTheWidthCannotHoldThemAll() {
@@ -84,6 +119,7 @@ class MessageActionReactionRailLayoutTest {
         assertEquals(4, focusedReactionItemsPerRow(itemCount = 7, availableWidth = 320.dp))
         assertEquals(5, focusedReactionItemsPerRow(itemCount = 9, availableWidth = 320.dp))
         assertEquals(9, focusedReactionItemsPerRow(itemCount = 9, availableWidth = 528.dp))
+        assertEquals(3, focusedReactionItemsPerRow(itemCount = 9, availableWidth = 320.dp, targetSize = 62.dp))
         assertEquals(1, focusedReactionItemsPerRow(itemCount = 1, availableWidth = 320.dp))
         assertEquals(1, focusedReactionItemsPerRow(itemCount = 3, availableWidth = 0.dp))
     }
@@ -124,6 +160,12 @@ class MessageActionReactionRailLayoutTest {
         assertTrue(picker.width >= TOUCH_TARGET_PX)
         assertTrue(picker.height >= TOUCH_TARGET_PX)
     }
+
+    /** Root bounds of each reaction target and the full-picker target. */
+    private fun targetBounds(emojis: List<String>): List<Rect> =
+        emojis.map { emoji ->
+            composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji").fetchSemanticsNode().boundsInRoot
+        } + composeRule.onNodeWithContentDescription("Open emoji picker").fetchSemanticsNode().boundsInRoot
 
     /** Composes a reaction-capable action menu with the given quick reactions. */
     private fun renderReactionMenu(
@@ -173,6 +215,13 @@ class MessageActionReactionRailLayoutTest {
     private companion object {
         const val TOUCH_TARGET_PX = 48f
         const val TOLERANCE_PX = 0.5f
+
+        // The rail's 4 dp inset plus rounding at mdpi.
+        const val RAIL_EDGE_PX = 5f
+        const val COMPACT_GAP_PX = 4.5f
+
+        // At 150% text the 28 dp emoji grows by 14 dp, and every target with it.
+        const val LARGE_TEXT_TARGET_PX = 61f
         val SIX_CHOICES = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
         val EIGHT_CHOICES = SIX_CHOICES + listOf("🚀", "✅")
     }

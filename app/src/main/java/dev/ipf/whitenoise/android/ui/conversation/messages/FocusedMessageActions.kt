@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -38,6 +39,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -77,11 +79,13 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
+import dev.ipf.whitenoise.android.ui.theme.Typography
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
 import kotlinx.coroutines.launch
@@ -404,18 +408,19 @@ internal fun FocusedMessageActions(
 
 /**
  * Balances the reaction rail over as few rows as the width allows, so every configured choice keeps
- * its 48dp target instead of being pushed past a scrolling edge that announces nothing.
+ * at least its [targetSize] instead of being pushed past a scrolling edge that announces nothing.
  *
  * A width that fits everything keeps the single row the rail has always been. Otherwise the items
  * are spread evenly — six reactions plus the full picker become 4 and 3 rather than 6 and a lone
- * trailing button.
+ * trailing button. A larger app text size grows [targetSize], so fewer fit on each row.
  */
 internal fun focusedReactionItemsPerRow(
     itemCount: Int,
     availableWidth: Dp,
+    targetSize: Dp = FocusedReactionTargetSize,
 ): Int {
     if (itemCount <= 1) return itemCount.coerceAtLeast(1)
-    val step = FocusedReactionTargetSize + FocusedReactionItemSpacing
+    val step = targetSize + FocusedReactionItemSpacing
     val fitting = ((availableWidth + FocusedReactionItemSpacing) / step).toInt().coerceAtLeast(1)
     // A width that holds everything leaves one row, and the even split then returns every item.
     val rows = ceil(itemCount.toFloat() / fitting).toInt()
@@ -423,11 +428,42 @@ internal fun focusedReactionItemsPerRow(
 }
 
 /**
- * Quick reactions on the menu-group surface: 48dp targets, 40dp state layer, 36dp selected disc, 28dp emoji.
+ * Sizes for the reaction rail at the current text size. At 100% they are the 28dp emoji, 48dp target, 40dp
+ * state layer, 36dp selected disc and 24dp picker icon, and a larger app or system text size grows each of
+ * them by the same amount as the emoji, so the space around every glyph stays compact (#3279).
+ */
+@Immutable
+internal data class FocusedReactionSizing(
+    val emoji: Dp,
+    val target: Dp,
+    val stateLayer: Dp,
+    val selectedFill: Dp,
+    val moreIcon: Dp,
+) {
+    companion object {
+        /** Sizing for an emoji drawn at [emoji], never smaller than the 100% sizes or larger than double them. */
+        fun forEmoji(emoji: Dp): FocusedReactionSizing {
+            val clamped = emoji.coerceIn(FocusedReactionEmojiSize, FocusedReactionEmojiSize * 2)
+            val growth = clamped - FocusedReactionEmojiSize
+            return FocusedReactionSizing(
+                emoji = clamped,
+                target = FocusedReactionTargetSize + growth,
+                stateLayer = FocusedReactionStateLayerSize + growth,
+                selectedFill = FocusedReactionSelectedFillSize + growth,
+                moreIcon = FocusedMoreIconSize + growth,
+            )
+        }
+    }
+}
+
+/**
+ * Quick reactions on the menu-group surface, sized by [FocusedReactionSizing] from the app's text size.
  * The rail wraps rather than scrolling horizontally, because a sixth configured reaction used to sit
  * beyond the viewport at the compact 360dp width with no affordance that it was there at all.
- * It spans the stack's full width and spreads each row across it (#3279), so six to eight choices read as
- * one bar instead of a narrow capsule hugging two short rows.
+ * It spans the stack's full width (#3279). Every row, the last included, divides that width into equal
+ * targets with compact gaps, so each button is wider than its glyph instead of floating in empty space.
+ * A target never grows past twice its height: a sparse rail stays a centered cluster of compact buttons
+ * rather than two far-apart glyphs, which only a few choices on a wide stack would otherwise produce.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -446,41 +482,51 @@ private fun FocusedReactionRail(
         shadowElevation = MenuDefaults.ShadowElevation,
     ) {
         BoxWithConstraints(modifier = Modifier.padding(FocusedReactionRailInset)) {
+            // The theme scales its typography by the app's text-size setting; sp also carries the system scale.
+            val textScale = MaterialTheme.typography.bodyLarge.fontSize.value / Typography.bodyLarge.fontSize.value
+            val emojiSize = with(LocalDensity.current) { (FocusedReactionEmojiSize.value * textScale).sp.toDp() }
+            val sizing = remember(emojiSize) { FocusedReactionSizing.forEmoji(emojiSize) }
             // The full picker travels with the reactions, so it wraps with them instead of
             // competing with them for one row's worth of width.
-            val perRow = focusedReactionItemsPerRow(quickReactions.size + 1, maxWidth)
+            val perRow = focusedReactionItemsPerRow(quickReactions.size + 1, maxWidth, sizing.target)
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing, Alignment.CenterHorizontally),
                 verticalArrangement = Arrangement.spacedBy(FocusedReactionItemSpacing),
                 maxItemsInEachRow = perRow,
             ) {
+                // A fixed weighted width would ignore the cap, so each target fills its share up to it instead.
+                val cell = Modifier.weight(1f, fill = false).widthIn(max = sizing.target * 2).fillMaxWidth()
                 quickReactions.forEach { emoji ->
                     FocusedReactionTarget(
                         emoji = emoji,
                         selected = emoji in selectedReactions,
+                        sizing = sizing,
+                        modifier = cell,
                         onClick = { onReact(emoji) },
                     )
                 }
-                FocusedMoreReactionsTarget(onClick = onMoreReactions)
+                FocusedMoreReactionsTarget(sizing = sizing, modifier = cell, onClick = onMoreReactions)
             }
         }
     }
 }
 
-/** One quick-reaction emoji target. */
+/** One quick-reaction emoji target, as wide as its share of the row and [sizing]'s target tall. */
 @Composable
 private fun FocusedReactionTarget(
     emoji: String,
     selected: Boolean,
+    sizing: FocusedReactionSizing,
+    modifier: Modifier,
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     Box(
         modifier =
-            Modifier
-                .size(FocusedReactionTargetSize)
+            modifier
+                .height(sizing.target)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -495,7 +541,7 @@ private fun FocusedReactionTarget(
         Box(
             modifier =
                 Modifier
-                    .size(FocusedReactionStateLayerSize)
+                    .size(sizing.stateLayer)
                     .clip(CircleShape)
                     .background(
                         if (pressed) {
@@ -507,7 +553,7 @@ private fun FocusedReactionTarget(
             contentAlignment = Alignment.Center,
         ) {
             Surface(
-                modifier = Modifier.size(FocusedReactionSelectedFillSize),
+                modifier = Modifier.size(sizing.selectedFill),
                 shape = CircleShape,
                 color =
                     if (selected) {
@@ -517,23 +563,27 @@ private fun FocusedReactionTarget(
                     },
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    EmojiGlyph(emoji, size = FocusedReactionEmojiSize)
+                    EmojiGlyph(emoji, size = sizing.emoji)
                 }
             }
         }
     }
 }
 
-/** The target that opens the full emoji picker. */
+/** The target that opens the full emoji picker, sized like the reaction targets beside it. */
 @Composable
-private fun FocusedMoreReactionsTarget(onClick: () -> Unit) {
+private fun FocusedMoreReactionsTarget(
+    sizing: FocusedReactionSizing,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
     val moreReactions = stringResource(R.string.open_emoji_picker)
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     Box(
         modifier =
-            Modifier
-                .size(FocusedReactionTargetSize)
+            modifier
+                .height(sizing.target)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -545,7 +595,7 @@ private fun FocusedMoreReactionsTarget(onClick: () -> Unit) {
         Box(
             modifier =
                 Modifier
-                    .size(FocusedReactionStateLayerSize)
+                    .size(sizing.stateLayer)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.onSurface.copy(alpha = FOCUSED_MORE_DISC_ALPHA))
                     .background(
@@ -560,7 +610,7 @@ private fun FocusedMoreReactionsTarget(onClick: () -> Unit) {
             Icon(
                 painter = painterResource(R.drawable.ic_more_horiz),
                 contentDescription = null,
-                modifier = Modifier.size(FocusedMoreIconSize),
+                modifier = Modifier.size(sizing.moreIcon),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
