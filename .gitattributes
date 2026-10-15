@@ -11,3 +11,8 @@ gradle/verification-metadata.xml text eol=lf
 gradle/dependency-inputs.json text eol=lf
 # Retained publisher metadata is authenticated byte-for-byte.
 gradle/publication-metadata/*.module -text
+# Original notice/capture evidence is authenticated byte-for-byte, including whitespace.
+config/licenses/evidence/** -text -whitespace
+gradle/dependency-evidence/** -text -whitespace
+config/licenses/baseline.json text eol=lf
+config/licenses/catalog.json text eol=lf

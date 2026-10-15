@@ -48,6 +48,15 @@ class DependencyInputsTest(unittest.TestCase):
                                          for name in names)
         for path in [self.metadata, *self.root.rglob('*gradle.lockfile')]:
             self.manifest['files'][str(path.relative_to(self.root))] = hashlib.sha256(path.read_bytes()).hexdigest()
+        folder = self.root / 'gradle/dependency-evidence'
+        folder.mkdir()
+        asset = folder / 'source-inputs.json'
+        asset.write_text(json.dumps({'source_sha': 'b' * 40}))
+        receipt = folder / 'capture.json'
+        receipt.write_text(json.dumps({'schema': 1, 'source_sha': 'b' * 40,
+                           'files': {'gradle/dependency-evidence/source-inputs.json': hashlib.sha256(asset.read_bytes()).hexdigest()}}))
+        self.manifest['reviewed_from']['retained'] = {
+            'path': 'gradle/dependency-evidence/capture.json', 'sha256': hashlib.sha256(receipt.read_bytes()).hexdigest()}
         self.save()
 
     def save(self):
@@ -57,6 +66,46 @@ class DependencyInputsTest(unittest.TestCase):
     def test_complete_reviewed_bundle_passes_without_git_or_network(self):
         """Source archives retain the same committed evidence boundary."""
         self.assertEqual((10, 1), inputs.validate_bundle(self.root))
+
+    def test_retained_capture_survives_without_hosted_artifact_and_rejects_changed_source(self):
+        """The original URL is historical context; committed receipt bytes remain verifiable."""
+        self.assertEqual((10, 1), inputs.validate_bundle(self.root))
+        receipt = self.root / self.manifest['reviewed_from']['retained']['path']
+        value = json.loads(receipt.read_text()); value['source_sha'] = 'c' * 40
+        receipt.write_text(json.dumps(value))
+        self.manifest['reviewed_from']['retained']['sha256'] = hashlib.sha256(receipt.read_bytes()).hexdigest()
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'Wrong-source retained'):
+            inputs.validate_bundle(self.root)
+
+    def test_audited_capture_assembles_a_complete_staged_candidate(self):
+        """Exercise the maintainer's actual capture-to-assembly contract with isolated bytes."""
+        from scripts.assemble_dependency_inputs import assemble
+        from scripts.audit_dependency_candidates import runtime_identities
+        import shutil
+        capture = self.root / 'capture'; capture.mkdir()
+        candidate = capture / 'candidate-inputs'
+        for relative in self.manifest['files']:
+            destination = candidate / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(self.root / relative, destination)
+        (capture / 'source.txt').write_text('b' * 40 + '\n')
+        (capture / 'source-inputs.json').write_text(json.dumps({'schema': 1, 'source_sha': 'b' * 40, 'files': {}}))
+        (capture / 'resolution.json').write_text(json.dumps({'schema': 1, 'observations': self.manifest['coverage']}))
+        runtime = capture / 'artifact-evidence.json'
+        runtime.write_text(json.dumps({'schema': 1, 'artifacts': [{
+            'coordinate': 'example:library:1.0', 'name': 'library-1.0.jar', 'sha256': 'a' * 64}]}))
+        self.assertEqual(runtime_identities(runtime), {('example:library:1.0', 'library-1.0.jar')})
+        review = self.root / 'review'; review.mkdir()
+        (review / 'provenance.json').write_text(json.dumps(self.manifest['suppliers']))
+        destination = self.root / 'staged-candidate'
+        result = assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
+        self.assertEqual(result['reviewed_from']['source_sha'], 'b' * 40)
+        self.assertEqual((10, 1), inputs.validate_bundle(destination))
+        self.assertEqual(self.metadata.read_text(), XML)
+        runtime.write_text('[]')
+        with self.assertRaisesRegex(ValueError, 'Expected captured'):
+            runtime_identities(runtime)
 
     def test_changed_bytes_and_missing_module_lock_fail(self):
         """A validly formatted changed lock is still stale evidence."""
@@ -152,6 +201,28 @@ class DependencyInputsTest(unittest.TestCase):
             path.write_text(text)
             with self.subTest(text=text), self.assertRaises(ValueError):
                 inputs.validate_lock(path)
+
+    def test_all_xml_sections_and_options_are_validated(self):
+        """A second section or scalar cannot hide a Gradle trust bypass from review."""
+        variants = [
+            XML.replace('</configuration>', '</configuration><configuration><trusted-artifacts>'
+                        '<trust group="^.*$" regex="true"/></trusted-artifacts></configuration>'),
+            XML.replace('</verify-metadata>', '</verify-metadata><verify-metadata>false</verify-metadata>'),
+            XML.replace('</components>', '</components><components><component group="example" '
+                        'name="library" version="1.0"><artifact name="library-1.0.jar">'
+                        '<sha256 value="' + 'b' * 64 + '"><also-trust value="' + 'c' * 64 + '"/>'
+                        '</sha256></artifact></component></components>'),
+            XML.replace('<configuration>', '<configuration trust="all">'),
+            XML.replace('<verify-metadata>true', '<verify-metadata/><verify-metadata>true'),
+            XML.replace('<verify-signatures>false</verify-signatures>', '<unknown-option>true</unknown-option>'),
+            XML.replace('</configuration>', '<trusted-artifacts/></configuration>'),
+            XML.replace('name="library-1.0.jar"', 'name="library-1.0.jar" trust="true"'),
+            XML.replace('</verification-metadata>', '<unknown-section/></verification-metadata>'),
+        ]
+        for text in variants:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                self.metadata.write_text(text)
+                inputs.validate_verification(self.metadata)
 
 
 if __name__ == '__main__':

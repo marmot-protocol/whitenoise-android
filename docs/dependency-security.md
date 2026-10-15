@@ -181,36 +181,72 @@ fixtures deliberately create their own temporary trust roots and never share or
 update the production evidence; source archives consume the checked-in inputs
 without needing Git metadata.
 
-For a dependency update, change the declared versions first, then use the existing
-hosted tooling lane (`gh workflow run android-ci.yml --ref <update-branch>
--f capture_dependency_inputs=true`) to capture candidate locks and SHA-256 metadata with
-`--write-locks --write-verification-metadata sha256`. Include optional preview-debug
-variants (`-Pwhitenoise.previewE2eTestBuild=true` and
-`-Pwhitenoise.previewProviderMatrixBuild=true`) in that capture. Candidate-generation
-flags are an explicit review operation, not normal CI validation. The explicit capture runs even when an earlier normal build fails against stale
-locks; those failures remain failures, and capture never supplies a successful
-replacement validation result. Keep normal CI
-read-only and never accept an automatically generated trust root merely to make
-an unknown download pass. Retain the complete resolution report and source SHA.
+Dependency updates, including Dependabot PRs, intentionally remain blocked until a
+maintainer reviews their new selections and supplier evidence. Dependabot does
+not approve a checksum or repin evidence automatically. Its version-change PR is
+the starting point; finish the following procedure on that same branch/PR before
+merge. This adds a required maintainer review step to Gradle updates.
 
-Run `scripts/audit_dependency_candidates.py` against the candidate XML and selected
-runtime artifact list to cross-check every artifact against its official repository.
-It checks published SHA-256 or separately downloads and hashes supplier payloads;
-a mismatch fails, and publication aliases require matching module metadata. Review
-the lock diff, supplier changes and any newly selected transitive/metadata artifacts.
-Update the local notice catalogue for changed runtime bytes and retain all original
-attributions. Record only the matching reviewed supplier records and exact final
-file hashes in the evidence manifest, then validate the normal locked build.
+1. Change declared versions, commit the candidate branch, then request the existing
+   hosted tooling lane with `gh workflow run android-ci.yml --ref <update-branch>
+   -f capture_dependency_inputs=true`. The explicit capture uses
+   `--refresh-dependencies --write-locks --write-verification-metadata sha256`,
+   including optional preview-debug variants. It runs even after an earlier normal
+   build fails against stale inputs, and never turns that failure into a pass.
+   Download its `dependency-inputs-bootstrap` artifact into `<capture>`.
+2. Cross-check the captured runtime evidence and checksum candidates:
 
-A warm Gradle cache can omit previously read parent POMs, imported BOMs or the
-POM/module counterpart from newly written verification metadata. Before qualifying
-a candidate, inspect the selected coordinates' exact supplier metadata and follow
-literal parent/import references, resolving inherited properties from the checked
-POMs. Independently hash each additional metadata payload from its official HTTPS
-repository and retain its exact coordinate, filename, digest and supplier URL.
-These metadata-only entries do not authorize a new binary or relax a resolution
-lock. Record the supplemental review separately from the hosted capture; a normal
-strict build remains necessary to expose any other task-specific inputs.
+   ```sh
+   python3 scripts/audit_dependency_candidates.py \
+     --metadata <capture>/candidate-inputs/gradle/verification-metadata.xml \
+     --runtime <capture>/artifact-evidence.json --output <review>
+   python3 scripts/audit_dependency_metadata.py \
+     --metadata <capture>/candidate-inputs/gradle/verification-metadata.xml --review <review>
+   ```
+
+   The runtime input is the capture's `{schema, artifacts}` object. The audit
+   checks published SHA-256 or independently downloaded official payloads; it
+   retains runtime and publication-mapping bytes. The second command follows
+   POM/module counterparts, parent properties and imported BOMs, retaining exact
+   supplemental metadata. Unresolved references fail for explicit review. This
+   handles metadata missed by a warm Gradle cache without hand-writing records.
+3. Assemble a staged candidate, without editing the active checkout:
+
+   ```sh
+   python3 scripts/assemble_dependency_inputs.py --capture <capture> --review <review> \
+     --supplemental <review>/metadata-closure.json --output <staged> \
+     --evidence-url https://github.com/marmot-protocol/whitenoise-android/actions/runs/<run>/artifacts/<artifact>
+   ```
+
+   This generates the lock/checksum manifest, exact coverage, retained compressed
+   capture/build inputs and authenticated publication paths. It requires every
+   candidate byte to have independent supplier evidence and validates the staged
+   bundle. Inspect the complete diff before copying its files into the branch;
+   assembly is not approval. Additional exact platform/tool records can be passed
+   as another `--supplemental` file after independent review.
+4. Review changed transitive selections, supplier URLs and runtime notices. Update
+   the local catalogue for changed runtime bytes while preserving the pinned
+   original notice baseline. Run normal hosted strict CI on the final candidate.
+   If normal lock constraints expose another plugin path, retain that evidence
+   and reassemble using `--inputs <normal-qualified-lock-and-xml-directory>`.
+   Never repair an unknown download with broad trust, a global exclusion or an
+   unlocked classpath. Keep any failed candidate's evidence for diagnosis.
+
+`gradle/dependency-evidence/` retains the original captured reports, original
+candidate inputs and build-source snapshots as deterministic gzip with a pinned
+source-bound receipt. `config/licenses/evidence/` retains the original plugin's
+actual notice index/text and its source snapshot. Historical CI links are context;
+validation no longer depends on those artifacts or temporary merge commits being
+reachable. The original source identity is preserved rather than relabelled as a
+later revision. The supplier audit remains a cross-check, not a reproducible-build
+or upstream signature attestation.
+
+Dependency submission pins graph plugin 1.5.0 and independently checked POM/module/
+shadow JAR hashes. Both its master action and the PR tooling qualification override
+the action's default verification-off flag with strict verification. The PR step
+runs the same pinned action's generate-and-upload mode, without permission to
+submit to GitHub's dependency API; only the master workflow publishes the graph.
+The plugin's detached init-script classpath is checksum-verified, not project-locked.
 
 For a missing platform classifier, review that exact supplier artifact and add its
 SHA-256 plus provenance. Do not add a group-wide trusted-artifact rule, turn off

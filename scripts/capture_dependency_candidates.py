@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import zipfile
 
 
@@ -27,6 +28,21 @@ def capture(root):
             destination = output / 'candidate-inputs' / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, destination)
+    source = (output / 'source.txt').read_text().strip()
+    actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip()
+    if source != actual:
+        raise ValueError('Captured resolution source differs from checkout')
+    names = subprocess.check_output(['git', 'ls-files'], cwd=root, text=True).splitlines()
+    inputs = {}
+    for name in names:
+        if (name.endswith(('.gradle', '.gradle.kts', '.versions.toml')) or
+                name in ['scripts/capture_dependency_candidates.py', '.github/workflows/android-ci.yml']):
+            data = subprocess.check_output(['git', 'show', 'HEAD:' + name], cwd=root)
+            if len(data) > 2 * 1024 * 1024:
+                raise ValueError('Oversized captured build input')
+            inputs[name] = data.decode('utf-8')
+    (output / 'source-inputs.json').write_text(json.dumps(
+        {'schema': 1, 'source_sha': source, 'files': inputs}, indent=2, sort_keys=True) + '\n')
     records = []
     paths = json.loads((output / 'artifact-paths.json').read_text())
     for item in paths:

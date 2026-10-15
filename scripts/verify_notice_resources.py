@@ -8,6 +8,11 @@ import re
 import subprocess
 import zipfile
 
+if __package__:
+    from .retain_dependency_evidence import validate_retained
+else:
+    from retain_dependency_evidence import validate_retained
+
 
 def require_baseline(metadata, texts, icons, baseline):
     """Keep every original notice identity and the exact local copyright attribution."""
@@ -16,6 +21,8 @@ def require_baseline(metadata, texts, icons, baseline):
             not re.fullmatch(r'[a-f0-9]{40}', expected.get('source_sha', '')) or
             not isinstance(expected.get('required_notices'), list) or not expected['required_notices']):
         raise ValueError('missing source-bound notice baseline')
+    if 'retained' in expected:
+        validate_retained(baseline.resolve().parents[2], expected['retained'], expected['source_sha'])
     actual = set()
     for line in metadata.decode('utf-8').splitlines():
         if not line.strip():

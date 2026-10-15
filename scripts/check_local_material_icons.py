@@ -19,6 +19,10 @@ def main():
         for path in (ROOT / f'app/src/{source_set}/java').rglob('*.kt'):
             if re.search(r'^import androidx[.]compose[.]material[.]icons[.]', path.read_text(), re.M):
                 raise ValueError(f'old icon import remains: {path.relative_to(ROOT)}')
+    baseline = json.loads((ROOT / 'config/licenses/baseline.json').read_text())
+    notice = ROOT / 'app/src/main/res/raw/material_icons_notice.txt'
+    if hashlib.sha256(notice.read_bytes()).hexdigest() != baseline['material_icons_sha256']:
+        raise ValueError('local icon attribution differs from the retained notice baseline')
     build = (ROOT / 'app/build.gradle.kts').read_text()
     if 'implementation(libs.androidx.compose.material.icons.extended)' in build:
         raise ValueError('extended icon runtime reintroduced')

@@ -11,7 +11,10 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import xml.etree.ElementTree as ET
+if __package__:
+    from .check_dependency_inputs import validate_verification, unique_object
+else:
+    from check_dependency_inputs import validate_verification, unique_object
 
 REPOSITORIES = ('https://dl.google.com/dl/android/maven2/',
                 'https://repo.maven.apache.org/maven2/', 'https://plugins.gradle.org/m2/')
@@ -115,7 +118,7 @@ def verify_one(record, output, retain, module_hashes):
             url = locations.pop()
             publication_evidence = {'publication_metadata': {
                 'coordinate': coordinate, 'name': module + '-' + version + '.module',
-                'sha256': module_sha}}
+                'sha256': module_sha, 'path': 'publication-metadata/' + module_sha + '.module'}}
         if not retain:
             checksum = download(url + '.sha256')
             if checksum is not None:
@@ -142,6 +145,21 @@ def verify_one(record, output, retain, module_hashes):
     raise ValueError('No declared official supplier: ' + coordinate + '/' + name)
 
 
+def runtime_identities(path):
+    """Consume the capture's schema-tagged artifact evidence, rejecting ambiguous identities."""
+    evidence = json.loads(path.read_text(), object_pairs_hook=unique_object)
+    if not isinstance(evidence, dict) or evidence.get('schema') != 1 or not isinstance(evidence.get('artifacts'), list):
+        raise ValueError('Expected captured {schema: 1, artifacts: [...]} runtime evidence')
+    result = set()
+    for item in evidence['artifacts']:
+        key = (item.get('coordinate'), item.get('name'))
+        if (not all(isinstance(value, str) and value for value in key) or key in result or
+                not re.fullmatch(r'[a-f0-9]{64}', item.get('sha256', ''))):
+            raise ValueError('Malformed or duplicate captured runtime identity')
+        result.add(key)
+    return result
+
+
 def main():
     """Audit every candidate identity, retaining runtime payloads for attribution review."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -149,27 +167,11 @@ def main():
     parser.add_argument('--runtime', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     arguments = parser.parse_args()
-    data = arguments.metadata.read_bytes()
-    if len(data) > 8 * 1024 * 1024 or re.search(br'<!\s*(DOCTYPE|ENTITY)\b', data, re.IGNORECASE):
-        raise ValueError('Unsafe candidate verification XML')
-    root = ET.fromstring(data)
-    for node in root.iter():
-        node.tag = node.tag.rsplit('}', 1)[-1]
-    records = []
-    for component in root.find('components'):
-        coordinate = ':'.join(component.get(key) for key in ['group', 'name', 'version'])
-        if not re.fullmatch(r'[A-Za-z0-9_.+-]+:[A-Za-z0-9_.+-]+:[A-Za-z0-9_.+-]+', coordinate):
-            raise ValueError('Invalid candidate coordinate')
-        for artifact in component:
-            name = artifact.get('name')
-            sha = artifact.find('sha256').get('value')
-            if not re.fullmatch(r'[A-Za-z0-9_.+-]+', name) or not re.fullmatch(r'[a-f0-9]{64}', sha):
-                raise ValueError('Invalid candidate artifact')
-            records.append((coordinate, name, sha))
+    records = [(coordinate, name, sha) for (coordinate, name), sha
+               in validate_verification(arguments.metadata).items()]
     module_hashes = {coordinate: sha for coordinate, name, sha in records
                      if name == coordinate.split(':')[1] + '-' + coordinate.split(':')[2] + '.module'}
-    runtime = json.loads(arguments.runtime.read_text())
-    retained = {(item['coordinate'], item['name']) for item in runtime}
+    retained = runtime_identities(arguments.runtime)
     arguments.output.mkdir(parents=True, exist_ok=True)
     (arguments.output / 'downloads').mkdir(exist_ok=True)
     manifest = arguments.output / 'provenance.json'

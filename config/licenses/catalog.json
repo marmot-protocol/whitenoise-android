@@ -1539,6 +1539,10 @@
       "sha256": "2cbec2a2a1a671a76849897748080079a3158a7a4c8554b86f2c75860f91046a"
     }
   ],
+  "baseline": {
+    "sha256": "f928b2f1e7b9fbe1cfda41795c9bce1e21f18ee56c29b224395f4c458621de86",
+    "source_sha": "a14aa1a41bfb72d6933b1bb584823eec513125ec"
+  },
   "notices": [
     {
       "id": "02015f9dc2b9d3ea1a7958ab20631e961cab828a0492ebf184fcfb0f04408654",
@@ -2978,6 +2982,10 @@
   ],
   "reviewed_from": {
     "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38764302223/artifacts/11989365775",
+    "retained": {
+      "path": "config/licenses/evidence/capture.json",
+      "sha256": "187493d8a0cb4e37d0c83a09c5498fce1ae4577bcb80c893a5dc209d1522316b"
+    },
     "source_sha": "a14aa1a41bfb72d6933b1bb584823eec513125ec"
   },
   "schema": 1

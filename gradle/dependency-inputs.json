@@ -1441,7 +1441,7 @@
     "cryptoBenchmark/gradle.lockfile": "926b0215be2465e8b6f2aaff84e074ce5154b281ced6b7e183ba4a8e5eb9494a",
     "fuzz/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "fuzz/gradle.lockfile": "1a058eacc9b9859109a224af8eb8e18d3eb721405af592ec93f9f3e3b81d923a",
-    "gradle/verification-metadata.xml": "45dc683a6121eecc1a4304c837f18a80277cc91e68c8d87b67b15638a0f73617",
+    "gradle/verification-metadata.xml": "df1ab0cbb23022513285ddcb21191c950af138eed82cb43fe381203c3aab4d28",
     "settings-gradle.lockfile": "e58bb2ed80db9f829601a658d7c33b9802eb7d2191c31e79c28e01f14c225926"
   },
   "post_lock_selection": [
@@ -1971,11 +1971,20 @@
   "reviewed_from": {
     "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38770501965/artifacts/11991143259",
     "repository": "marmot-protocol/whitenoise-android",
+    "retained": {
+      "path": "gradle/dependency-evidence/capture.json",
+      "sha256": "e34891c96e2bf528d6ac757ca610651a6f92c231af18f24dbc137a64811833b4"
+    },
     "source_sha": "140b0790ea2c923841b38672f56a4d3504c4119f"
   },
   "schema": 1,
   "supplemental_tools": {
-    "aapt2": "9.4.1-15978811 matches the independently checked AGP 9.4.1 aapt2_version.properties; Linux, macOS and Windows classifiers"
+    "aapt2": "9.4.1-15978811 matches the independently checked AGP 9.4.1 aapt2_version.properties; Linux, macOS and Windows classifiers",
+    "dependency_submission": {
+      "plugin": "org.gradle:github-dependency-graph-gradle-plugin:1.5.0",
+      "qualification": "PR generate-and-upload uses the same pinned action and plugin; master alone submits",
+      "verification": "strict"
+    }
   },
   "suppliers": [
     {
@@ -11845,6 +11854,30 @@
       "name": "foojay-resolver-1.0.0.pom",
       "sha256": "9bc48b49e422d9edabc396ac18d8b041dfc22212d7fae8e35667d285d481029a",
       "source": "https://plugins.gradle.org/m2/org/gradle/toolchains/foojay-resolver/1.0.0/foojay-resolver-1.0.0.pom"
+    },
+    {
+      "bytes": 2506446,
+      "coordinate": "org.gradle:github-dependency-graph-gradle-plugin:1.5.0",
+      "method": "independent-payload-sha256",
+      "name": "github-dependency-graph-gradle-plugin-1.5.0.jar",
+      "sha256": "b9f22fb63fcf0e06d0b16c2446ea32442e1fdf7ec2570fe41439c5c8ccc2c1c8",
+      "source": "https://plugins.gradle.org/m2/org/gradle/github-dependency-graph-gradle-plugin/1.5.0/github-dependency-graph-gradle-plugin-1.5.0.jar"
+    },
+    {
+      "bytes": 2857,
+      "coordinate": "org.gradle:github-dependency-graph-gradle-plugin:1.5.0",
+      "method": "independent-payload-sha256",
+      "name": "github-dependency-graph-gradle-plugin-1.5.0.module",
+      "sha256": "4a7e577689dba205833b01ad8ab90d44ff585b0ced280fc662a1e4a00ecca63b",
+      "source": "https://plugins.gradle.org/m2/org/gradle/github-dependency-graph-gradle-plugin/1.5.0/github-dependency-graph-gradle-plugin-1.5.0.module"
+    },
+    {
+      "bytes": 774,
+      "coordinate": "org.gradle:github-dependency-graph-gradle-plugin:1.5.0",
+      "method": "independent-payload-sha256",
+      "name": "github-dependency-graph-gradle-plugin-1.5.0.pom",
+      "sha256": "f8555d200cfcebb55af5d6c9222d8b228d06f7a8b8de6dff3fde0c131a120337",
+      "source": "https://plugins.gradle.org/m2/org/gradle/github-dependency-graph-gradle-plugin/1.5.0/github-dependency-graph-gradle-plugin-1.5.0.pom"
     },
     {
       "coordinate": "org.hamcrest:hamcrest-core:1.3",

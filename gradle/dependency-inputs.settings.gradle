@@ -14,6 +14,8 @@ if (!writingCandidates && !new File(settingsDir, 'gradle/verification-metadata.x
 gradle.beforeProject { project ->
     project.dependencyLocking.lockAllConfigurations()
     project.dependencyLocking.lockMode = LockMode.STRICT
+    project.buildscript.dependencyLocking.lockAllConfigurations()
+    project.buildscript.dependencyLocking.lockMode = LockMode.STRICT
     project.buildscript.configurations.configureEach {
         resolutionStrategy.activateDependencyLocking()
     }

@@ -7194,5 +7194,16 @@
             <sha256 value="2773b0e948964d21e37b0e1dcf39025e627b873e0ce6aa2a47e23c374303e0c4" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
          </artifact>
       </component>
+      <component group="org.gradle" name="github-dependency-graph-gradle-plugin" version="1.5.0">
+         <artifact name="github-dependency-graph-gradle-plugin-1.5.0.jar">
+            <sha256 value="b9f22fb63fcf0e06d0b16c2446ea32442e1fdf7ec2570fe41439c5c8ccc2c1c8" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
+         <artifact name="github-dependency-graph-gradle-plugin-1.5.0.module">
+            <sha256 value="4a7e577689dba205833b01ad8ab90d44ff585b0ced280fc662a1e4a00ecca63b" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
+         <artifact name="github-dependency-graph-gradle-plugin-1.5.0.pom">
+            <sha256 value="f8555d200cfcebb55af5d6c9222d8b228d06f7a8b8de6dff3fde0c131a120337" origin="Independently checked official HTTPS supplier; see dependency-inputs.json"/>
+         </artifact>
+      </component>
    </components>
 </verification-metadata>

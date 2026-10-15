@@ -19,7 +19,10 @@ ML Kit and Google's runtime licence activities are removed. ZXing already
 encoded QR data and now decodes bounded CameraX luminance crops. The local build-time notice generator consumes exact runtime artifact fingerprints
 and reviewed attribution in `config/licenses/`. It preserves the original 197
 production notice name/text pairs and the separate local Material icon notice.
-The baseline and catalogue record their source revision and hosted capture.
+The baseline and catalogue pin their source revision and original capture.
+The original index/text and build inputs are retained in `config/licenses/evidence/`
+so attribution remains auditable after hosted artifact expiry. Every variant
+generation checks the pinned baseline and icon copyright before writing resources.
 Additional inherited POM attributions, debug dependencies and the full alternate
 Dagger licence are retained too. J2ObjC uses the complete original notice, which
 includes the copyright and embedded native/source notices present in the shorter

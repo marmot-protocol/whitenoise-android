@@ -4,7 +4,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -28,18 +31,23 @@ class OpenSourceLicensesScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Preserve the light-theme list hierarchy. */
     @Test
     fun listLight() = capture("list_light", dark = false)
 
+    /** Preserve contrast for the dark-theme list. */
     @Test
     fun listDark() = capture("list_dark", dark = true)
 
+    /** Preserve the full-text reader on the AMOLED surface. */
     @Test
     fun selectedAmoled() = capture("text_amoled", dark = true, selected = true)
 
+    /** Keep retry legible with large RTL text. */
     @Test
     fun failureLargeRtl() = capture("failure_large_rtl", dark = true, failed = true, largeRtl = true)
 
+    /** Verify the intended reader state before comparing its existing rendering baseline. */
     private fun capture(
         suffix: String,
         dark: Boolean,
@@ -72,6 +80,11 @@ class OpenSourceLicensesScreenshotTest {
                     }
                 }
             }
+        }
+        when {
+            failed -> composeRule.onNodeWithTag("licenses.failed").assertIsDisplayed()
+            selected -> composeRule.onNodeWithTag("licenses.text").assertTextEquals(notice.text)
+            else -> composeRule.onNodeWithTag("licenses.list").assertIsDisplayed()
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/licenses_$suffix.png")
     }

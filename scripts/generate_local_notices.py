@@ -6,6 +6,11 @@ import json
 from pathlib import Path
 import re
 
+if __package__:
+    from .verify_notice_resources import require_baseline
+else:
+    from verify_notice_resources import require_baseline
+
 
 def unique_object(pairs):
     """Reject duplicate JSON keys rather than trusting an overwritten declaration."""
@@ -89,7 +94,7 @@ def read_catalog(path):
     return artifacts, notices
 
 
-def generate(catalog_path, selected, output):
+def generate(catalog_path, selected, output, baseline_path=None, icons_path=None):
     """Require complete artifact attribution and emit deterministic UTF-8 byte offsets."""
     artifacts, notices = read_catalog(catalog_path)
     if not isinstance(selected, list) or not selected:
@@ -118,6 +123,16 @@ def generate(catalog_path, selected, output):
     index = ''.join(metadata).encode('utf-8')
     if len(index) > 1_048_576 or len(content) > 16_777_216 or len(entries) > 4096:
         raise ValueError('Generated notices exceed Android reader bounds')
+    baseline_path = baseline_path or catalog_path.parent / 'baseline.json'
+    icons_path = icons_path or catalog_path.parents[2] / 'app/src/main/res/raw/material_icons_notice.txt'
+    baseline = read_json(baseline_path)
+    pin = read_json(catalog_path).get('baseline', {})
+    if (pin.get('sha256') != hashlib.sha256(baseline_path.read_bytes()).hexdigest() or
+            pin.get('source_sha') != baseline.get('source_sha')):
+        raise ValueError('Wrong-source or changed notice baseline')
+    if not icons_path.is_file() or icons_path.is_symlink() or not 0 < icons_path.stat().st_size <= 16_777_216:
+        raise ValueError('Missing or unsafe icon attribution')
+    require_baseline(index, bytes(content), icons_path.read_bytes(), baseline_path)
     output.mkdir(parents=True, exist_ok=True)
     (output / 'third_party_license_metadata').write_bytes(index)
     (output / 'third_party_licenses').write_bytes(content)
@@ -130,8 +145,11 @@ def main():
     parser.add_argument('--catalog', required=True, type=Path)
     parser.add_argument('--selected', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--baseline', type=Path)
+    parser.add_argument('--icons-notice', type=Path)
     arguments = parser.parse_args()
-    count = generate(arguments.catalog, read_json(arguments.selected), arguments.output)
+    count = generate(arguments.catalog, read_json(arguments.selected), arguments.output,
+                     arguments.baseline, arguments.icons_notice)
     print(f'Generated {count} reviewed notices')
 
 

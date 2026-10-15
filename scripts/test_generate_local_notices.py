@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import copy
 
 from scripts import generate_local_notices as notices
 
@@ -15,8 +16,8 @@ class LocalNoticesTest(unittest.TestCase):
         """Create two binary identities sharing one non-ASCII licence text."""
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
-        (self.root / 'texts').mkdir()
+        self.root = Path(self.temporary.name) / 'config/licenses'
+        (self.root / 'texts').mkdir(parents=True)
         self.text = 'Copyright Café\n许可文本\n'.encode('utf-8')
         sha = hashlib.sha256(self.text).hexdigest()
         (self.root / 'texts/notice.txt').write_bytes(self.text)
@@ -35,6 +36,17 @@ class LocalNoticesTest(unittest.TestCase):
             ],
         }
         self.path = self.root / 'catalog.json'
+        icons = self.root.parents[1] / 'app/src/main/res/raw/material_icons_notice.txt'
+        icons.parent.mkdir(parents=True)
+        icons.write_bytes(b'Synthetic icon attribution')
+        self.baseline = {'schema': 1, 'source_sha': 'c' * 40,
+                         'material_icons_sha256': hashlib.sha256(icons.read_bytes()).hexdigest(),
+                         'required_notices': [{'name': n['name'], 'text_sha256': n['sha256']}
+                                              for n in self.catalog['notices']]}
+        baseline = self.root / 'baseline.json'
+        baseline.write_text(json.dumps(self.baseline))
+        self.catalog['baseline'] = {'source_sha': 'c' * 40,
+                                    'sha256': hashlib.sha256(baseline.read_bytes()).hexdigest()}
 
     def write_catalog(self):
         """Persist the case's independent inputs before invoking the production generator."""
@@ -124,6 +136,52 @@ class LocalNoticesTest(unittest.TestCase):
         self.path.write_text('{"schema":1,"schema":2}', encoding='utf-8')
         with self.assertRaisesRegex(ValueError, 'Duplicate JSON key'):
             notices.read_catalog(self.path)
+
+    def test_catalogue_cannot_drop_an_original_notice(self):
+        """A valid remaining assignment cannot silently remove a Firebase/other baseline notice."""
+        self.catalog['artifacts'][1]['notice_ids'] = ['0']
+        self.write_catalog()
+        with self.assertRaisesRegex(ValueError, 'original notices were lost or changed'):
+            notices.generate(self.path, self.selected, self.root / 'output')
+        self.assertFalse((self.root / 'output').exists())
+
+    def test_wrong_source_baseline_and_icon_loss_fail_generation(self):
+        """Source and icon retention qualify generation before any APK workflow runs."""
+        self.write_catalog()
+        baseline = self.root / 'baseline.json'
+        original = baseline.read_bytes()
+        changed = dict(self.baseline, source_sha='d' * 40)
+        baseline.write_text(json.dumps(changed))
+        with self.assertRaisesRegex(ValueError, 'Wrong-source or changed'):
+            notices.generate(self.path, self.selected, self.root / 'output')
+        baseline.write_bytes(original)
+        (self.root.parents[1] / 'app/src/main/res/raw/material_icons_notice.txt').write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError, 'icon copyright'):
+            notices.generate(self.path, self.selected, self.root / 'output')
+
+    def test_committed_catalogue_preserves_every_baseline_notice(self):
+        """Use real reviewed inputs and prove a valid Firebase attribution deletion is rejected."""
+        root = Path(__file__).resolve().parents[1]
+        path = root / 'config/licenses/catalog.json'
+        catalog = json.loads(path.read_text())
+        output = self.root / 'real-output'
+        notices.generate(path, catalog['artifacts'], output)
+        changed = copy.deepcopy(catalog)
+        removed = next(n for n in changed['notices'] if n['name'] == 'Firebase')
+        replacement = next(n['id'] for n in changed['notices'] if n['id'] != removed['id'])
+        for artifact in changed['artifacts']:
+            artifact['notice_ids'] = list(dict.fromkeys(replacement if i == removed['id'] else i
+                                                       for i in artifact['notice_ids']))
+        changed_path = self.root / 'changed-catalog.json'
+        # Retain real reviewed text paths beside the edited catalogue, with pinned bytes.
+        for notice in changed['notices']:
+            target = self.root / notice['text']
+            target.write_bytes((path.parent / notice['text']).read_bytes())
+        changed_path.write_text(json.dumps(changed))
+        with self.assertRaisesRegex(ValueError, 'original notices were lost or changed'):
+            notices.generate(changed_path, changed['artifacts'], self.root / 'changed-output',
+                             root / 'config/licenses/baseline.json',
+                             root / 'app/src/main/res/raw/material_icons_notice.txt')
 
 
 if __name__ == '__main__':

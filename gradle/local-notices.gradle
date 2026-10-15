@@ -25,9 +25,33 @@ abstract class GenerateLocalLicenseResources extends DefaultTask {
     @Input
     abstract ListProperty<String> getArtifactIdentities()
 
+    /** Respect the same Python executable override and Windows convention as MarmotKit preparation. */
+    @Input
+    abstract org.gradle.api.provider.Property<String> getPythonExecutable()
+
     /** Reviewed attribution associates each exact artifact digest with its notice identities. */
     @InputFile @PathSensitive(PathSensitivity.NONE)
     abstract RegularFileProperty getCatalog()
+
+    /** Every variant must preserve the source-bound original attribution baseline. */
+    @InputFile @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getBaseline()
+
+    /** Local icon attribution is checked alongside dependency notice retention. */
+    @InputFile @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getIconNotice()
+
+    /** The shared packaged-resource validator also enforces generated notice equivalence. */
+    @InputFile @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getBaselineValidator()
+
+    /** Retained original attribution and source receipts are part of baseline validation. */
+    @InputDirectory @PathSensitive(PathSensitivity.RELATIVE)
+    abstract DirectoryProperty getBaselineEvidence()
+
+    /** Track the source-receipt helper imported by baseline validation. */
+    @InputFile @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getEvidenceValidator()
 
     /** Track checked-in text bytes so a changed or truncated input cannot reuse old outputs. */
     @InputDirectory @PathSensitive(PathSensitivity.RELATIVE)
@@ -66,9 +90,11 @@ abstract class GenerateLocalLicenseResources extends DefaultTask {
         def input = new File(temporaryDir, 'selected-artifacts.json')
         input.text = JsonOutput.toJson(selected)
         execOperations.exec {
-            commandLine 'python3', generatorScript.get().asFile.absolutePath,
+            commandLine pythonExecutable.get(), generatorScript.get().asFile.absolutePath,
                 '--catalog', catalog.get().asFile.absolutePath,
                 '--selected', input.absolutePath,
+                '--baseline', baseline.get().asFile.absolutePath,
+                '--icons-notice', iconNotice.get().asFile.absolutePath,
                 '--output', new File(generatedDirectory.get().asFile, 'raw').absolutePath
         }.assertNormalExitValue()
     }
@@ -93,10 +119,17 @@ components.onVariants(components.selector().all()) { variant ->
         files
     }
     def task = tasks.register("${variant.name}LocalNotices", GenerateLocalLicenseResources) {
+        pythonExecutable.set(providers.environmentVariable('WHITENOISE_PYTHON').orElse(
+            System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('windows') ? 'python' : 'python3'))
         runtimeArtifacts.from(artifacts.map { it.collect { artifact -> artifact.file } })
         artifactFilesByIdentity.set(byIdentity)
         artifactIdentities.set(byIdentity.map { it.keySet().toList().sort() })
         catalog.set(new File(root, 'config/licenses/catalog.json'))
+        baseline.set(new File(root, 'config/licenses/baseline.json'))
+        iconNotice.set(new File(root, 'app/src/main/res/raw/material_icons_notice.txt'))
+        baselineValidator.set(new File(root, 'scripts/verify_notice_resources.py'))
+        baselineEvidence.set(new File(root, 'config/licenses/evidence'))
+        evidenceValidator.set(new File(root, 'scripts/retain_dependency_evidence.py'))
         noticeTexts.set(new File(root, 'config/licenses/texts'))
         generatorScript.set(new File(root, 'scripts/generate_local_notices.py'))
     }

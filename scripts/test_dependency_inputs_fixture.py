@@ -67,6 +67,7 @@ def main():
         repository = project / 'repository'
         publish(repository, 'first')
         publish(repository, 'second')
+        publish(repository, 'tool')
         pom, _ = publish(repository, 'root', dependency='first')
         (project / 'android-sdk.jar').write_bytes(b'Synthetic SDK file input')
         server = ThreadingHTTPServer(('127.0.0.1', 0), partial(FixtureRepository, directory=str(repository)))
@@ -80,6 +81,13 @@ def main():
                 "rootProject.name='archive-with-reviewed-inputs'\n"
                 "apply from: 'gradle/dependency-inputs.settings.gradle'\n")
             (project / 'build.gradle').write_text('''
+buildscript {
+    repositories { maven {
+        url = uri('http://127.0.0.1:PORT/')
+        allowInsecureProtocol = true
+    } }
+    dependencies { classpath 'fixture:tool:1.0' }
+}
 repositories { maven {
     url = uri('http://127.0.0.1:PORT/')
     allowInsecureProtocol = true // Synthetic loopback repository, never a production supplier.
@@ -104,6 +112,12 @@ tasks.register('resolveFixture') {
             invoke(args.gradle, project, task='resolveLateSdkFixture')
             invoke(args.gradle, project, '-PfixtureUnreviewedSdkModule=true', task='resolveLateSdkFixture',
                    expect_failure=['lock state', 'locked', 'strictly'])
+            invoke(args.gradle, project)
+            plugin_lock = project / 'buildscript-gradle.lockfile'
+            plugin_bytes = plugin_lock.read_bytes()
+            plugin_lock.unlink()
+            invoke(args.gradle, project, expect_failure=['lock state', 'locked', 'strictly'])
+            plugin_lock.write_bytes(plugin_bytes)
             invoke(args.gradle, project)
             lock = project / 'gradle.lockfile'
             before = lock.read_bytes()

@@ -8,6 +8,11 @@ import re
 import urllib.parse
 import xml.etree.ElementTree as ET
 
+if __package__:
+    from .retain_dependency_evidence import validate_retained
+else:
+    from retain_dependency_evidence import validate_retained
+
 
 def validate_verification(path):
     """Require SHA-256 for every exact artifact and metadata, with no trust bypasses."""
@@ -15,25 +20,33 @@ def validate_verification(path):
     if len(data) > 8 * 1024 * 1024 or re.search(br'<!\s*(DOCTYPE|ENTITY)\b', data, re.IGNORECASE):
         raise ValueError('Unsafe dependency verification XML')
     root = ET.fromstring(data)
-    for node in root.iter():
-        node.tag = node.tag.rsplit('}', 1)[-1]
-    if root.tag != 'verification-metadata':
+    namespace = '{https://schema.gradle.org/dependency-verification}' if root.tag.startswith('{') else ''
+    if root.tag != namespace + 'verification-metadata':
         raise ValueError('Unsupported dependency verification root')
-    config = root.find('configuration')
-    if config is None or config.findtext('verify-metadata', '').strip() != 'true':
-        raise ValueError('Dependency metadata must be verified')
-    for forbidden in ['trusted-artifacts', 'ignored-keys', 'trusted-keys']:
-        section = config.find(forbidden)
-        if section is not None and len(section):
-            raise ValueError('Unreviewed verification bypass: ' + forbidden)
-    components = root.find('components')
-    if components is None or not len(components):
+    for node in root.iter():
+        if namespace and not node.tag.startswith(namespace):
+            raise ValueError('Unexpected verification XML namespace')
+        node.tag = node.tag[len(namespace):]
+    allowed_root_attributes = {'{http://www.w3.org/2001/XMLSchema-instance}schemaLocation'}
+    if (set(root.attrib) - allowed_root_attributes or
+            [node.tag for node in root] != ['configuration', 'components'] or (root.text or '').strip() or
+            any((node.tail or '').strip() for node in root)):
+        raise ValueError('Unexpected or duplicate verification section')
+    config, components = list(root)
+    if (config.attrib or [node.tag for node in config] != ['verify-metadata', 'verify-signatures'] or
+            any(node.attrib or len(node) for node in config) or (config.text or '').strip() or
+            any((node.tail or '').strip() for node in config)):
+        raise ValueError('Unreviewed verification bypass or duplicate configuration entry')
+    if (config[0].text or '').strip() != 'true' or (config[1].text or '').strip() != 'false':
+        raise ValueError('Dependency metadata must be verified with the reviewed checksum policy')
+    if components.attrib or not len(components) or (components.text or '').strip():
         raise ValueError('Missing dependency checksums')
     observed = set()
     records = {}
     for component in components:
         identity = tuple(component.get(k, '') for k in ['group', 'name', 'version'])
-        if (component.tag != 'component' or identity in observed or
+        if (component.tag != 'component' or set(component.attrib) != {'group', 'name', 'version'} or
+                (component.text or '').strip() or (component.tail or '').strip() or identity in observed or
                 not all(re.fullmatch(r'[A-Za-z0-9_.+-]+', part) for part in identity)):
             raise ValueError('Invalid or duplicate verification component')
         observed.add(identity)
@@ -41,9 +54,12 @@ def validate_verification(path):
         for artifact in component:
             name = artifact.get('name', '')
             checksums = list(artifact)
-            if (artifact.tag != 'artifact' or name in names or
+            if (artifact.tag != 'artifact' or set(artifact.attrib) != {'name'} or name in names or
+                    (artifact.text or '').strip() or (artifact.tail or '').strip() or
                     not re.fullmatch(r'[A-Za-z0-9_.+-]+', name) or
                     len(checksums) != 1 or checksums[0].tag != 'sha256' or len(checksums[0]) or
+                    set(checksums[0].attrib) - {'value', 'origin'} or
+                    (checksums[0].text or '').strip() or (checksums[0].tail or '').strip() or
                     not re.fullmatch(r'[a-f0-9]{64}', checksums[0].get('value', ''))):
                 raise ValueError('Missing or ambiguous SHA-256: ' + str(identity) + ':' + name)
             names.add(name)
@@ -167,6 +183,7 @@ def validate_bundle(root):
             not re.fullmatch(r'https://github.com/' + REPOSITORY +
                              r'/actions/runs/[0-9]+/artifacts/[0-9]+', source.get('evidence', ''))):
         raise ValueError('Missing or wrong-source dependency evidence')
+    validate_retained(root, source.get('retained', {}), source['source_sha'])
     files = manifest.get('files', {})
     allowed_locks = REQUIRED_LOCKS | {'gradle.lockfile', 'settings-gradle.lockfile', 'settings-buildscript-gradle.lockfile'}
     if (not REQUIRED_LOCKS <= set(files) or 'gradle/verification-metadata.xml' not in files or
