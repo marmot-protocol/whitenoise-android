@@ -6,8 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.os.Parcel
 import android.os.ResultReceiver
 import android.provider.OpenableColumns
@@ -35,11 +33,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.stageMessageShareStreams
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -161,8 +159,8 @@ class OutboundShareDeviceContractTest {
         val device = UiDevice.getInstance(instrumentation)
         try {
             instrumentation.runOnMainSync { context.startActivity(chooser) }
-            tapIndependentReceiver(device)
-            val (code, observed) = withTimeout(10_000) { result.await() }
+            findIndependentReceiver(device).click()
+            val (code, observed) = awaitObservations(result, device)
             assertEquals(Activity.RESULT_OK, code)
             assertEquals(
                 attachments.map { sha256(checkNotNull(it.inMemoryBytes)) },
@@ -180,17 +178,22 @@ class OutboundShareDeviceContractTest {
     }
 
     /**
-     * Taps the receiver until the Sharesheet hands off to it. On the run's first open the sheet can drop a tap
-     * while it is still laying out, which left the receiver unlaunched and its result never sent. Only a sheet
-     * that is still showing is tapped again, so a tap that did launch the receiver is never repeated.
+     * Waits for the receiving process's observations. A miss fails with the foreground package and the recent
+     * activity starts and crashes, so it shows whether the receiver ran rather than only that time ran out.
      */
-    private fun tapIndependentReceiver(device: UiDevice) {
-        repeat(RECEIVER_TAP_ATTEMPTS) {
-            findIndependentReceiver(device).click()
-            if (device.wait(Until.gone(By.pkg(SYSTEM_CHOOSER)), CHOOSER_HANDOFF_MS)) return
-        }
-        fail("System Sharesheet ignored $RECEIVER_TAP_ATTEMPTS taps on the independent receiver")
-    }
+    private suspend fun awaitObservations(
+        result: CompletableDeferred<Pair<Int, Bundle?>>,
+        device: UiDevice,
+    ): Pair<Int, Bundle?> =
+        withTimeoutOrNull(10_000) { result.await() }
+            ?: error(
+                "No receiver result within 10 s; foreground ${device.currentPackageName}\n" +
+                    device
+                        .executeShellCommand("logcat -d -v brief ActivityTaskManager:I AndroidRuntime:E *:S")
+                        .lines()
+                        .takeLast(40)
+                        .joinToString("\n"),
+            )
 
     /** Expands and scrolls the actual system sheet when its initial suggested row hides the receiver. */
     private fun findIndependentReceiver(device: UiDevice): UiObject2 {
@@ -212,11 +215,12 @@ class OutboundShareDeviceContractTest {
 
     /**
      * Parcels the callback as a framework ResultReceiver so independent APKs need no test-class loader.
-     * The binder still delivers observations to the original receiver on the app looper.
+     * Observations arrive on the binder thread, not the app's main looper, so main-thread work while the app
+     * is in the background cannot hold them past the wait.
      */
     private fun resultReceiver(result: CompletableDeferred<Pair<Int, Bundle?>>): ResultReceiver {
         val receiver =
-            object : ResultReceiver(Handler(Looper.getMainLooper())) {
+            object : ResultReceiver(null) {
                 /** Completes the waiting assertion with observations returned by the receiving process. */
                 override fun onReceiveResult(
                     resultCode: Int,
@@ -238,8 +242,6 @@ class OutboundShareDeviceContractTest {
     private companion object {
         const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
         const val FIXTURE_CAPTION = "Visible fixture caption"
-        const val RECEIVER_TAP_ATTEMPTS = 3
-        const val CHOOSER_HANDOFF_MS = 3_000L
         val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
     }
 
