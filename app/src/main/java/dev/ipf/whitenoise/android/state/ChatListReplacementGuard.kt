@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -9,16 +8,17 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import java.util.Locale
 
 /**
- * Rows worth checking against MDK before a top-of-list replacement removes them.
- * A shifted or paged window may legitimately omit older rows; only rows that
- * still rank inside its retained top window are candidates in that case.
+ * Rows worth checking against MDK before a window containing the list head removes them.
+ * A retained/recovered viewport anchor can still have the true head loaded; only
+ * [ChatListWindowSnapshotFfi.hasMoreBefore] means earlier rows were evicted. A bounded
+ * top window may omit older rows only when they rank beyond its retained tail.
  */
 internal fun missingActiveTopChatRows(
     previous: Collection<ChatListRowFfi>,
     incoming: List<PresentedChatRowFfi>,
     activeWindow: ChatListWindowSnapshotFfi?,
 ): List<ChatListRowFfi> {
-    if (activeWindow == null || activeWindow.hasMoreBefore || activeWindow.anchor != ChatListAnchorOutcomeFfi.Top) {
+    if (activeWindow == null || activeWindow.hasMoreBefore) {
         return emptyList()
     }
     val incomingIds = incoming.mapTo(HashSet()) { it.row.groupIdHex.lowercase() }
@@ -38,11 +38,11 @@ internal fun ChatListRowFfi.belongsInActiveChats(): Boolean =
         !disbanding &&
         lifecycleState != GroupLifecycleStateFfi.DISBANDED
 
-/** Match MDK's pin, activity, and group-ID page order when deciding whether a row can fall off. */
+/** Uses true-head containment and MDK's pin, activity, and group-ID order to check the retained tail. */
 internal fun ChatListWindowSnapshotFfi.shouldContain(row: ChatListRowFfi): Boolean {
     val last = rows.lastOrNull()?.row
     return when {
-        hasMoreBefore || anchor != ChatListAnchorOutcomeFfi.Top -> false
+        hasMoreBefore -> false
         !hasMoreAfter || last == null -> true
         row.pinned != last.pinned -> row.pinned
         row.pinned && last.pinned && row.pinnedPosition != last.pinnedPosition ->
