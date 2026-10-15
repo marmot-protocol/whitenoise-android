@@ -35,11 +35,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.stageMessageShareStreams
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -161,8 +161,8 @@ class OutboundShareDeviceContractTest {
         val device = UiDevice.getInstance(instrumentation)
         try {
             instrumentation.runOnMainSync { context.startActivity(chooser) }
-            tapIndependentReceiver(device)
-            val (code, observed) = withTimeout(10_000) { result.await() }
+            findIndependentReceiver(device).click()
+            val (code, observed) = awaitObservations(result, device)
             assertEquals(Activity.RESULT_OK, code)
             assertEquals(
                 attachments.map { sha256(checkNotNull(it.inMemoryBytes)) },
@@ -180,17 +180,26 @@ class OutboundShareDeviceContractTest {
     }
 
     /**
-     * Taps the receiver until the Sharesheet hands off to it. On the run's first open the sheet can drop a tap
-     * while it is still laying out, which left the receiver unlaunched and its result never sent. Only a sheet
-     * that is still showing is tapped again, so a tap that did launch the receiver is never repeated.
+     * Waits for the receiving process's observations. The class's first chooser case cold-starts the receiver
+     * process, which has missed a 10 s budget on the CI emulator after the Sharesheet launched it, so the wait
+     * allows [RECEIVER_RESULT_MS]. A miss fails with timestamped activity starts, process starts and deaths,
+     * low-memory kills and crashes, so it shows whether the receiver was slow or killed.
      */
-    private fun tapIndependentReceiver(device: UiDevice) {
-        repeat(RECEIVER_TAP_ATTEMPTS) {
-            findIndependentReceiver(device).click()
-            if (device.wait(Until.gone(By.pkg(SYSTEM_CHOOSER)), CHOOSER_HANDOFF_MS)) return
-        }
-        fail("System Sharesheet ignored $RECEIVER_TAP_ATTEMPTS taps on the independent receiver")
-    }
+    private suspend fun awaitObservations(
+        result: CompletableDeferred<Pair<Int, Bundle?>>,
+        device: UiDevice,
+    ): Pair<Int, Bundle?> =
+        withTimeoutOrNull(RECEIVER_RESULT_MS) { result.await() }
+            ?: error(
+                "No receiver result within $RECEIVER_RESULT_MS ms; foreground ${device.currentPackageName}\n" +
+                    device
+                        .executeShellCommand(
+                            "logcat -d -v time ActivityManager:I ActivityTaskManager:I AndroidRuntime:E " +
+                                "lowmemorykiller:I *:S",
+                        ).lines()
+                        .takeLast(60)
+                        .joinToString("\n"),
+            )
 
     /** Expands and scrolls the actual system sheet when its initial suggested row hides the receiver. */
     private fun findIndependentReceiver(device: UiDevice): UiObject2 {
@@ -238,8 +247,7 @@ class OutboundShareDeviceContractTest {
     private companion object {
         const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
         const val FIXTURE_CAPTION = "Visible fixture caption"
-        const val RECEIVER_TAP_ATTEMPTS = 3
-        const val CHOOSER_HANDOFF_MS = 3_000L
+        const val RECEIVER_RESULT_MS = 30_000L
         val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
     }
 
