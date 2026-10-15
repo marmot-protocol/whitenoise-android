@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListReplacementGuard.kt",
+  "legacy_sha256": "329a0f0ee5ec85e569e7b52a03219f7a27f53ebba03a43fad2a32312a47b178f",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Incomplete top-containing windows retain active chats across viewport anchoring and conversation return until authoritative reopen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListReplacementGuard.kt",
+        "anchor": "internal fun missingActiveTopChatRows(",
+        "test_ids": [
+          "CHL-016"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
