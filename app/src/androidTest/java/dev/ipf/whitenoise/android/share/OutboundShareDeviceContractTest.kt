@@ -243,9 +243,20 @@ class OutboundShareDeviceContractTest {
             "-- process lifecycle\n" +
                 shellLines(
                     device,
-                    "logcat -d -v time ActivityManager:I ActivityTaskManager:I AndroidRuntime:E lowmemorykiller:I *:S",
-                ).takeLast(30).joinToString("\n"),
+                    "logcat -d -T ${logcatWindowStart()} -v time " +
+                        "ActivityManager:I ActivityTaskManager:I AndroidRuntime:E lowmemorykiller:I *:S",
+                ).takeLast(60).joinToString("\n"),
         ).joinToString("\n")
+    }
+
+    /**
+     * The `logcat -T` start of the hang window in epoch seconds: the wait plus [LOGCAT_LEAD_MS] before it, which
+     * covers the chooser and the receiver's launch. The device reads only that window rather than the whole buffer,
+     * and a line-count bound (`-t`) would not do, because it applies before the tag filters.
+     */
+    private fun logcatWindowStart(): String {
+        val start = System.currentTimeMillis() - RECEIVER_RESULT_MS - LOGCAT_LEAD_MS
+        return "${start / 1_000}.${(start % 1_000).toString().padStart(3, '0')}"
     }
 
     /** Runs a shell command through UiAutomation and returns its non-blank output lines. */
@@ -301,6 +312,7 @@ class OutboundShareDeviceContractTest {
         const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
         const val FIXTURE_CAPTION = "Visible fixture caption"
         const val RECEIVER_RESULT_MS = 30_000L
+        const val LOGCAT_LEAD_MS = 15_000L
         val PROCESS_STATE_KEYS = listOf("ProcessRecord", "procState", "frozen", "curAdj", "setAdj")
         val ACTIVITY_STACK_KEYS = listOf("* Task{", "* Hist", "ResumedActivity", "state=", "sharefixture")
         val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
