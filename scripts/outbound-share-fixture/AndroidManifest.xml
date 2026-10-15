@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.ipf.sharefixture">
+    <!-- No launcher, provider, permission or instrumentation relationship makes
+         this package automatically visible to the app under test. -->
+    <application android:label="Share visibility fixture" android:allowBackup="false">
+        <activity android:name=".ShareReceiverActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

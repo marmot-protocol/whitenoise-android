@@ -2,20 +2,30 @@ package dev.ipf.whitenoise.android.share
 
 import android.app.Activity
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Parcel
 import android.os.ResultReceiver
 import android.provider.OpenableColumns
-import android.view.KeyEvent
 import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
+import androidx.lifecycle.Lifecycle
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.UiObject2
+import androidx.test.uiautomator.Until
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -25,16 +35,198 @@ import dev.ipf.whitenoise.android.ui.conversation.media.stageMessageShareStreams
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.security.MessageDigest
+import java.util.regex.Pattern
 
 @RunWith(AndroidJUnit4::class)
+@PullRequestDeviceSmoke
 class OutboundShareDeviceContractTest {
+    private lateinit var foregroundActivity: ActivityScenario<MainActivity>
+
+    /** Unlocks the active test user and keeps the real caller visible for cross-app launches. */
+    @Before
+    fun showForegroundCaller() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.wakeUp()
+        device.executeShellCommand("wm dismiss-keyguard")
+        foregroundActivity = ActivityScenario.launch(MainActivity::class.java)
+        foregroundActivity.moveToState(Lifecycle.State.RESUMED)
+    }
+
+    /** Releases the foreground activity after each case without clearing account or attachment data. */
+    @After
+    fun closeForegroundCaller() {
+        if (::foregroundActivity.isInitialized) foregroundActivity.close()
+    }
+
+    /** Real implicit discovery must find an independent receiver before a generated TXT is staged. */
+    @Test
+    fun implicitTxtChooserTransfersExactBytesNameAndOnlySelectedUri() =
+        runBlocking {
+            assertIndependentChooser(
+                listOf(PendingAttachment("TXT fixture".encodeToByteArray(), "text/plain", "story.txt")),
+            )
+        }
+
+    /** SEND_MULTIPLE uses the same discovery contract and preserves captions, order and mixed MIME. */
+    @Test
+    fun implicitMultiFileChooserPreservesCaptionOrderAndMixedMime() =
+        runBlocking {
+            assertIndependentChooser(
+                listOf(
+                    PendingAttachment("TXT fixture".encodeToByteArray(), "text/plain", "story.txt"),
+                    PendingAttachment("binary fixture".encodeToByteArray(), "application/octet-stream", "data.bin"),
+                ),
+            )
+        }
+
+    /** Selects through the system chooser without an explicit receiving component or prior receiver interaction. */
+    @Suppress("DEPRECATION")
+    private suspend fun assertIndependentChooser(attachments: List<PendingAttachment>) {
+        assertHiddenWithoutQueries()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val sources = messageShareAttachmentSources(emptyList(), attachments)
+        val probe =
+            outboundShareIntent(
+                FIXTURE_CAPTION,
+                sources.map {
+                    OutboundShareStream(android.net.Uri.parse("content://${context.packageName}/probe"), it.mediaType)
+                },
+            )
+        val matches = context.packageManager.queryIntentActivities(probe, PackageManager.MATCH_DEFAULT_ONLY)
+        assertTrue(
+            "Independent receiver must be implicitly visible before staging",
+            matches.any { it.activityInfo.packageName == FIXTURE_PACKAGE },
+        )
+        outboundShareChooser(context, probe, "Share")
+        val directory = File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
+        val neighbor = File(directory, "unshared-neighbor.txt").apply { writeText("not shared") }
+        try {
+            val staged =
+                stageMessageShareStreams(context, sources) { source ->
+                    AttachmentPlaintext.Bytes(checkNotNull(attachments[source.attachmentIndex].inMemoryBytes))
+                }
+            try {
+                val neighborUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", neighbor)
+                selectIndependentReceiver(context, staged, attachments, neighborUri)
+            } finally {
+                staged.deletePlaintext()
+            }
+        } finally {
+            neighbor.delete()
+        }
+    }
+
+    /** A different caller UID with the old manifest must fail discovery of this exact independent receiver. */
+    private suspend fun assertHiddenWithoutQueries() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val result = CompletableDeferred<Pair<Int, Bundle?>>()
+        val probe =
+            Intent()
+                .setComponent(ComponentName("dev.ipf.sharecontrol", "dev.ipf.sharefixture.VisibilityControlActivity"))
+                .putExtra("outbound_share_fixture.result", resultReceiver(result))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.runOnMainSync { instrumentation.targetContext.startActivity(probe) }
+        val (code, observed) = withTimeout(10_000) { result.await() }
+        assertEquals(Activity.RESULT_OK, code)
+        assertFalse(
+            "Negative control must prove Android package filtering is active",
+            observed?.getBoolean("visible", true) ?: true,
+        )
+    }
+
+    /** Clicks the independent target in the real chooser and validates the receiving UID's observations. */
+    private suspend fun selectIndependentReceiver(
+        context: Context,
+        staged: StagedMessageShareStreams,
+        attachments: List<PendingAttachment>,
+        neighborUri: android.net.Uri,
+    ) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val result = CompletableDeferred<Pair<Int, Bundle?>>()
+        val send =
+            outboundShareIntent(FIXTURE_CAPTION, staged.streams)
+                .putExtra("outbound_share_fixture.neighbor", neighborUri.toString())
+                .putExtra("outbound_share_fixture.result", resultReceiver(result))
+        val chooser = outboundShareChooser(context, send, "Share")
+        val device = UiDevice.getInstance(instrumentation)
+        try {
+            instrumentation.runOnMainSync { context.startActivity(chooser) }
+            findIndependentReceiver(device).click()
+            val (code, observed) = withTimeout(10_000) { result.await() }
+            assertEquals(Activity.RESULT_OK, code)
+            assertEquals(
+                attachments.map { sha256(checkNotNull(it.inMemoryBytes)) },
+                observed?.getStringArrayList("hashes"),
+            )
+            assertEquals(attachments.map { it.fileName }, observed?.getStringArrayList("names"))
+            assertEquals(if (attachments.size == 1) "text/plain" else "*/*", observed?.getString("mime"))
+            assertEquals(FIXTURE_CAPTION, observed?.getString("caption"))
+            assertEquals(attachments.size, observed?.getInt("clipCount"))
+            assertTrue(observed?.getBoolean("readGrant") == true)
+            assertFalse(observed?.getBoolean("neighborReadable", true) ?: true)
+        } finally {
+            if (!result.isCompleted) device.pressBack()
+        }
+    }
+
+    /** Expands and scrolls the actual system sheet when its initial suggested row hides the receiver. */
+    private fun findIndependentReceiver(device: UiDevice): UiObject2 {
+        assertTrue("System Sharesheet did not open", device.wait(Until.hasObject(By.pkg(SYSTEM_CHOOSER)), 10_000))
+        repeat(4) {
+            device.wait(Until.findObject(By.text("Share visibility fixture")), 2_000)?.let { return it }
+            device.swipe(
+                device.displayWidth / 2,
+                device.displayHeight * 3 / 4,
+                device.displayWidth / 2,
+                device.displayHeight / 4,
+                30,
+            )
+        }
+        return checkNotNull(device.wait(Until.findObject(By.text("Share visibility fixture")), 2_000)) {
+            "Independent receiver missing from the expanded Sharesheet"
+        }
+    }
+
+    /**
+     * Parcels the callback as a framework ResultReceiver so independent APKs need no test-class loader.
+     * The binder still delivers observations to the original receiver on the app looper.
+     */
+    private fun resultReceiver(result: CompletableDeferred<Pair<Int, Bundle?>>): ResultReceiver {
+        val receiver =
+            object : ResultReceiver(Handler(Looper.getMainLooper())) {
+                /** Completes the waiting assertion with observations returned by the receiving process. */
+                override fun onReceiveResult(
+                    resultCode: Int,
+                    resultData: Bundle?,
+                ) {
+                    result.complete(resultCode to resultData)
+                }
+            }
+        val parcel = Parcel.obtain()
+        try {
+            receiver.writeToParcel(parcel, 0)
+            parcel.setDataPosition(0)
+            return ResultReceiver.CREATOR.createFromParcel(parcel)
+        } finally {
+            parcel.recycle()
+        }
+    }
+
+    private companion object {
+        const val FIXTURE_PACKAGE = "dev.ipf.sharefixture"
+        const val FIXTURE_CAPTION = "Visible fixture caption"
+        val SYSTEM_CHOOSER: Pattern = Pattern.compile("android|com\\.android\\.intentresolver")
+    }
+
     /** An external receiver reads exactly the generated stream explicitly granted to it. */
     @Test
     fun generatedQrCardIsReadableButItsCacheNeighborIsNot() =
@@ -57,15 +249,7 @@ class OutboundShareDeviceContractTest {
             val neighborUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", neighbor)
             val expectedStreamSha256 = sha256(staged.file.readBytes())
             val result = CompletableDeferred<Pair<Int, Bundle?>>()
-            val receiver =
-                object : ResultReceiver(Handler(Looper.getMainLooper())) {
-                    override fun onReceiveResult(
-                        resultCode: Int,
-                        resultData: Bundle?,
-                    ) {
-                        result.complete(resultCode to resultData)
-                    }
-                }
+            val receiver = resultReceiver(result)
             try {
                 val share =
                     outboundShareIntent("https://example.test/profile", listOf(staged.stream))
@@ -151,6 +335,7 @@ class OutboundShareDeviceContractTest {
             }
         }
 
+    /** Reads the granted provider's display name so assertions never depend on private cache paths. */
     private fun displayName(
         context: android.content.Context,
         uri: android.net.Uri,
@@ -162,6 +347,7 @@ class OutboundShareDeviceContractTest {
                 cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
             }
 
+    /** Creates metadata-only sent/received attachment fixtures without requesting remote ciphertext. */
     private fun reference(
         fileName: String,
         mediaType: String,
@@ -178,6 +364,7 @@ class OutboundShareDeviceContractTest {
         thumbhash = null,
     )
 
+    /** Verifies multi-file intent grants and cancellation without opening a receiver or changing message state. */
     @Test
     fun realChooserCarriesSentAndReceivedStreamsThenCancelsWithoutStateMutation() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -225,7 +412,14 @@ class OutboundShareDeviceContractTest {
                 context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             instrumentation.waitForIdleSync()
-            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+            val device = UiDevice.getInstance(instrumentation)
+            assertTrue("System Sharesheet did not open", device.wait(Until.hasObject(By.pkg(SYSTEM_CHOOSER)), 10_000))
+            device.pressBack()
+            assertTrue(
+                "Cancellation did not return to the caller",
+                device.wait(Until.gone(By.pkg(SYSTEM_CHOOSER)), 10_000),
+            )
+            assertTrue(device.wait(Until.hasObject(By.pkg(context.packageName)), 10_000))
             instrumentation.waitForIdleSync()
         } finally {
             sent.delete()

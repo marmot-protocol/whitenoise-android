@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.ipf.sharecontrol">
+    <!-- Deliberately mirrors the pre-fix caller: no SEND visibility queries. -->
+    <application android:label="Share visibility negative control" android:allowBackup="false">
+        <activity android:name="dev.ipf.sharefixture.VisibilityControlActivity" android:exported="true" />
+    </application>
+</manifest>
