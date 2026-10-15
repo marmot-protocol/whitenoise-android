@@ -100,3 +100,5 @@ dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#audioWav
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#blockedParsersDoNotHoldProviderAdmission
 
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#interruptedImageRequestRetiresOnlyItsWorkerAndCanRecover
+
+dev.ipf.whitenoise.android.state.DiscoveryInvitationFfiIntegrationTest#initialAdminRolesSurviveWelcomeForBothRecipients

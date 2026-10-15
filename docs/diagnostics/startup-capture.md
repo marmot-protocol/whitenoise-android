@@ -15,6 +15,11 @@ The version name ends in `-startup-diagnostics`; package and versionCode stay on
 the staging update track. Do not substitute a dev/preview APK for an update to
 an affected staging installation.
 
+For isolated native acceptance, dispatch **Android Instrumented Tests** with
+`mdk_adoption_only` enabled. It builds a diagnostic Dev APK on the existing
+API-34 emulator and requires every Welcome-role and diagnostic-export fixture
+to execute. This test APK is not an update for a staging installation.
+
 Before delivery compare the candidate with the affected signed APK: package,
 certificate digest, acceptable versionCode, and the exact MarmotKit archive/native
 libraries. Check Android migration changes separately. Never infer compatibility

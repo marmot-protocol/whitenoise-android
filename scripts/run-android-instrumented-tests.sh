@@ -9,6 +9,23 @@ document_provider_matrix="${3:-false}"
 responsiveness_only="${4:-false}"
 media_sandbox_only="${5:-false}"
 outbound_share_only="${6:-false}"
+mdk_adoption_only="${7:-false}"
+
+if [[ "$event_name" == "workflow_dispatch" && "$mdk_adoption_only" == "true" ]]; then
+  if [[ "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$media_sandbox_only" == "true" || "$outbound_share_only" == "true" ]]; then
+    echo "Select one focused instrumented suite per dispatch" >&2
+    exit 2
+  fi
+  timeout --signal=INT --kill-after=30s 25m ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+    -PstartupDiagnostics=true \
+    -Pandroid.testInstrumentationRunnerArguments.annotation=dev.ipf.whitenoise.android.MdkAdoptionDeviceAcceptance \
+    -Pandroid.testInstrumentationRunnerArguments.timeout_msec=120000 \
+    -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+    --no-daemon --stacktrace
+  python3 scripts/check_instrumented_required_cases.py app/build/outputs/androidTest-results/connected \
+    --required config/mdk-adoption-required-cases.txt
+  exit 0
+fi
 
 if [[ "$event_name" == "workflow_dispatch" && "$outbound_share_only" == "true" ]]; then
   if [[ "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$media_sandbox_only" == "true" ]]; then
