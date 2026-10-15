@@ -162,6 +162,17 @@
     <string name="toast_group_reset_done">Группа сброшена. Она появится снова, когда придёт новое приглашение.</string>
     <string name="toast_group_reset_already_waiting">Эта группа уже ждёт новое приглашение.</string>
     <string name="toast_couldnt_reset_group">Не удалось сбросить группу. Попробуйте ещё раз.</string>
+    <string name="chat_abandon_action">Покинуть чат на этом устройстве</string>
+    <string name="chat_abandon_dialog_title">Покинуть этот чат на этом устройстве?</string>
+    <string name="chat_abandon_dialog_message">White Noise удалит историю и состояние шифрования этого чата для этой учётной записи на этом устройстве, и это устройство перестанет его получать. Ничего не отправляется: собеседник может по-прежнему видеть вас в чате, а ваши другие устройства сохранят свою копию. Чтобы снова переписываться, начните новый чат или примите новое приглашение.</string>
+    <string name="chat_abandon_confirm">Покинуть</string>
+    <string name="abandon_identity_chat">Чат: %1$s</string>
+    <string name="abandon_identity_group">Группа: %1$s</string>
+    <string name="abandon_identity_account">Ваша учётная запись: %1$s</string>
+    <string name="toast_chat_abandoned">Чат покинут на этом устройстве.</string>
+    <string name="toast_couldnt_abandon_chat">Не удалось покинуть чат на этом устройстве. Попробуйте ещё раз.</string>
+    <string name="leave_blocked_abandon_hint_dm">Выход не завершился. Вместо этого можно покинуть этот чат только на этом устройстве. Собеседнику ничего не отправляется.</string>
+    <string name="leave_blocked_abandon_hint_group">Выход не завершился. Вместо этого можно сбросить эту группу на этом устройстве. В группу ничего не отправляется.</string>
     <string name="key_package_relay_history">История релеев</string>
     <string name="key_package_current">Текущий</string>
     <string name="key_package_superseded">Заменён</string>

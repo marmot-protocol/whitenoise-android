@@ -369,6 +369,84 @@ class LocalGroupDeleteControllerTest {
             }
         }
 
+    /** #3310: a newly started DM is abandoned through the journaled forget with no leave or admin mutation. */
+    @Test
+    fun dmAbandonmentFromDetailsForgetsOnceWithoutAnyDepartureMutation() =
+        runTest {
+            val fixture = fixture()
+            val conversation = dmConversation(fixture)
+            assertTrue(conversation.forgetGroupLocal())
+            assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
+            assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
+            assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+            assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
+        }
+
+    /** A committed DM forget whose Android cleanup fails still closes the chat and repairs from the journal only. */
+    @Test
+    fun dmAbandonmentCleanupFailureClosesTheChatAndNeverReplaysTheForget() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture("selectedMessageDraft")
+                val conversation = dmConversation(fixture)
+                assertTrue("a committed forget must close the old conversation", conversation.forgetGroupLocal())
+                assertTrue(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                fixture.failureMethod.set(null)
+                fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                // A repeated confirm reads the absent row and reports the reset instead of forgetting again.
+                assertTrue(conversation.forgetGroupLocal())
+                assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
+                assertEquals(
+                    AppText.Resource(R.string.toast_group_reset_already_waiting),
+                    fixture.state.transientNotice?.title,
+                )
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** The chat-list row action uses the same forget and journal, removing the row without any departure. */
+    @Test
+    fun chatListAbandonmentForgetsTheReviewedRowOnceAndReportsIt() =
+        runTest {
+            val fixture = fixture()
+            assertTrue(fixture.controller.abandonChatFromList(GROUP, isDm = true))
+            flushChatRows()
+            assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
+            assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
+            assertTrue(fixture.controller.items.none { it.id == GROUP })
+            assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
+        }
+
+    /** A failed forget restores the row with the abandonment wording, and a later confirm forgets exactly once. */
+    @Test
+    fun chatListAbandonmentFailureRestoresTheRowAndARetryForgetsOnce() =
+        runTest {
+            val fixture = fixture("forgetGroupLocal")
+            assertFalse(fixture.controller.abandonChatFromList(GROUP, isDm = true))
+            flushChatRows()
+            assertTrue(fixture.controller.items.any { it.id == GROUP })
+            val failure = requireNotNull(fixture.state.toast)
+            assertEquals(AppText.Resource(R.string.toast_couldnt_abandon_chat), failure.title)
+            assertNotNull("the failure keeps a scoped retry", failure.localDeleteNotice?.retry)
+            fixture.failureMethod.set(null)
+            val forgetsBefore = fixture.calls.count { it == "forgetGroupLocal" }
+            assertTrue(fixture.controller.abandonChatFromList(GROUP, isDm = true))
+            assertEquals(forgetsBefore + 1, fixture.calls.count { it == "forgetGroupLocal" })
+            assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
+            assertEquals(null, fixture.state.toast)
+        }
+
+    /** A Group Details controller for the fixture row presented as a freshly started direct chat. */
+    private fun dmConversation(fixture: Fixture): ConversationController =
+        ConversationController(
+            appState = fixture.state,
+            initialGroup = chatListItemFromProjection(chatRow(GROUP)).group,
+            initialIsDm = true,
+        ).also { assertTrue(it.isDm) }
+
     private fun TestScope.fixture(
         failing: String? = null,
         onRowRead: () -> Unit = {},
@@ -462,6 +540,8 @@ class LocalGroupDeleteControllerTest {
 
     private companion object {
         const val ACCOUNT = "local-delete-account"
+        val DEPARTURE_MUTATIONS =
+            setOf("leaveGroup", "selfDemoteAdmin", "selfDemoteAdminDetailed", "promoteAdmin", "promoteAdminDetailed")
         val ACCOUNT_ID = "a1".repeat(32)
         val GROUP = "b1".repeat(16)
     }

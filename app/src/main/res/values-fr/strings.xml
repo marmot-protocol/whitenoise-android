@@ -154,6 +154,17 @@
     <string name="toast_group_reset_done">Groupe réinitialisé. Il réapparaîtra à l’arrivée d’une nouvelle invitation.</string>
     <string name="toast_group_reset_already_waiting">Ce groupe attend déjà une nouvelle invitation.</string>
     <string name="toast_couldnt_reset_group">Impossible de réinitialiser le groupe. Réessayez.</string>
+    <string name="chat_abandon_action">Abandonner la conversation sur cet appareil</string>
+    <string name="chat_abandon_dialog_title">Abandonner cette conversation sur cet appareil ?</string>
+    <string name="chat_abandon_dialog_message">White Noise efface l’historique et l’état de chiffrement de cette conversation pour ce compte sur cet appareil, et cet appareil cesse de la recevoir. Rien n’est envoyé : l’autre personne peut encore vous voir dans la conversation, et vos autres appareils conservent leur copie. Pour échanger à nouveau, lancez une nouvelle conversation ou acceptez une nouvelle invitation.</string>
+    <string name="chat_abandon_confirm">Abandonner</string>
+    <string name="abandon_identity_chat">Conversation : %1$s</string>
+    <string name="abandon_identity_group">Groupe : %1$s</string>
+    <string name="abandon_identity_account">Votre compte : %1$s</string>
+    <string name="toast_chat_abandoned">Conversation abandonnée sur cet appareil.</string>
+    <string name="toast_couldnt_abandon_chat">Impossible d’abandonner la conversation. Réessayez.</string>
+    <string name="leave_blocked_abandon_hint_dm">Le départ n’a pas abouti. Vous pouvez plutôt abandonner cette conversation sur cet appareil. Rien n’est envoyé à l’autre personne.</string>
+    <string name="leave_blocked_abandon_hint_group">Le départ n’a pas abouti. Vous pouvez plutôt réinitialiser ce groupe sur cet appareil. Rien n’est envoyé au groupe.</string>
     <string name="key_package_relay_history">Historique des relais</string>
     <string name="key_package_current">Actuel</string>
     <string name="key_package_superseded">Remplacé</string>

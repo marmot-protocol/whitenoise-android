@@ -1,0 +1,202 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+  "legacy_sha256": "a67be556c68933e1594e1c23209d7eb77e477837c469b10034ae631c85c25898",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "group reset action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.group_reset_action",
+        "test_ids": [
+          "GRP-021",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "group reset confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.group_reset_confirm",
+        "test_ids": [
+          "GRP-021",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "group reset dialog message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.group_reset_dialog_message",
+        "test_ids": [
+          "GRP-021",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "group reset dialog title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.group_reset_dialog_title",
+        "test_ids": [
+          "GRP-021",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "GroupDetailsResetControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "fun GroupDetailsResetControl(",
+        "test_ids": [
+          "GRP-021",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "GroupAbandonmentDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "fun GroupAbandonmentDialog(",
+        "test_ids": [
+          "GRP-031",
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "GroupAbandonmentBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "fun GroupAbandonmentBody(",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "GroupAbandonmentFailure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "fun GroupAbandonmentFailure(",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "GroupLeaveBlockedNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "fun GroupLeaveBlockedNotice(",
+        "test_ids": [
+          "GRP-031",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "chat abandon action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.chat_abandon_action",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "chat abandon dialog title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.chat_abandon_dialog_title",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "chat abandon dialog message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.chat_abandon_dialog_message",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "chat abandon confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.chat_abandon_confirm",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "abandon identity chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.abandon_identity_chat",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "abandon identity group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.abandon_identity_group",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "abandon identity account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.abandon_identity_account",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "toast couldnt abandon chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.toast_couldnt_abandon_chat",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "toast couldnt reset group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.toast_couldnt_reset_group",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "leave blocked abandon hint dm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.leave_blocked_abandon_hint_dm",
+        "test_ids": [
+          "GRP-031",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "leave blocked abandon hint group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.leave_blocked_abandon_hint_group",
+        "test_ids": [
+          "GRP-031",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-031"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

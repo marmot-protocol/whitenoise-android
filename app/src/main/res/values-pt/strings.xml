@@ -154,6 +154,17 @@
     <string name="toast_group_reset_done">Grupo redefinido. Ele reaparecerá quando chegar um novo convite.</string>
     <string name="toast_group_reset_already_waiting">Este grupo já está aguardando um novo convite.</string>
     <string name="toast_couldnt_reset_group">Não foi possível redefinir o grupo. Tente novamente.</string>
+    <string name="chat_abandon_action">Abandonar a conversa neste dispositivo</string>
+    <string name="chat_abandon_dialog_title">Abandonar esta conversa neste dispositivo?</string>
+    <string name="chat_abandon_dialog_message">O White Noise apaga o histórico e o estado de criptografia desta conversa para esta conta neste dispositivo, e este dispositivo deixa de recebê-la. Nada é enviado: a outra pessoa ainda pode ver você na conversa, e seus outros dispositivos mantêm a cópia deles. Para conversar de novo, inicie uma nova conversa ou aceite um novo convite.</string>
+    <string name="chat_abandon_confirm">Abandonar</string>
+    <string name="abandon_identity_chat">Conversa: %1$s</string>
+    <string name="abandon_identity_group">Grupo: %1$s</string>
+    <string name="abandon_identity_account">Sua conta: %1$s</string>
+    <string name="toast_chat_abandoned">Conversa abandonada neste dispositivo.</string>
+    <string name="toast_couldnt_abandon_chat">Não foi possível abandonar a conversa. Tente novamente.</string>
+    <string name="leave_blocked_abandon_hint_dm">A saída não foi concluída. Em vez disso, você pode abandonar esta conversa neste dispositivo. Nada é enviado à outra pessoa.</string>
+    <string name="leave_blocked_abandon_hint_group">A saída não foi concluída. Em vez disso, você pode redefinir este grupo neste dispositivo. Nada é enviado ao grupo.</string>
     <string name="key_package_relay_history">Histórico de relays</string>
     <string name="key_package_current">Atual</string>
     <string name="key_package_superseded">Substituído</string>

@@ -228,6 +228,9 @@ internal fun ChatsScreen(
         remember(appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateSetOf<String>()
         }
+    var pendingAbandonment by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<PendingChatAbandonment?>(null)
+    }
     val selectionMode = selectedChatIds.isNotEmpty()
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
@@ -1553,6 +1556,11 @@ internal fun ChatsScreen(
                                 } else {
                                     null
                                 },
+                            onAbandon =
+                                ChatAbandonMenuAction(item.isDm()) {
+                                    pendingAbandonment =
+                                        PendingChatAbandonment.capture(item, controller, appState, groupTitleCopy)
+                                }.takeUnless { item.group.pendingConfirmation },
                             onDismiss = {
                                 if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
                                     actionSheetChatId = null
@@ -2079,6 +2087,16 @@ internal fun ChatsScreen(
                 clearSelection()
             },
             onDismiss = { folderHandoff.pickerChatIds = null },
+        )
+    }
+
+    pendingAbandonment?.let { request ->
+        ChatAbandonmentHost(
+            request = request,
+            appState = appState,
+            controller = controller,
+            busyChats = leavingAndDeleting,
+            onDismiss = { pendingAbandonment = null },
         )
     }
 

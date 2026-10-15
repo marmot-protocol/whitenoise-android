@@ -154,6 +154,17 @@
     <string name="toast_group_reset_done">Grupo restablecido. Reaparecerá cuando llegue una nueva invitación.</string>
     <string name="toast_group_reset_already_waiting">Este grupo ya está esperando una nueva invitación.</string>
     <string name="toast_couldnt_reset_group">No se pudo restablecer el grupo. Inténtalo de nuevo.</string>
+    <string name="chat_abandon_action">Abandonar el chat en este dispositivo</string>
+    <string name="chat_abandon_dialog_title">¿Abandonar este chat en este dispositivo?</string>
+    <string name="chat_abandon_dialog_message">White Noise borra el historial y el estado de cifrado de este chat para esta cuenta en este dispositivo, y este dispositivo deja de recibirlo. No se envía nada: la otra persona puede seguir viéndote en el chat y tus otros dispositivos conservan su copia. Para volver a hablar, inicia un chat nuevo o acepta una nueva invitación.</string>
+    <string name="chat_abandon_confirm">Abandonar</string>
+    <string name="abandon_identity_chat">Chat: %1$s</string>
+    <string name="abandon_identity_group">Grupo: %1$s</string>
+    <string name="abandon_identity_account">Tu cuenta: %1$s</string>
+    <string name="toast_chat_abandoned">Chat abandonado en este dispositivo.</string>
+    <string name="toast_couldnt_abandon_chat">No se pudo abandonar el chat. Inténtalo de nuevo.</string>
+    <string name="leave_blocked_abandon_hint_dm">No se completó la salida. En su lugar, puedes abandonar este chat en este dispositivo. No se envía nada a la otra persona.</string>
+    <string name="leave_blocked_abandon_hint_group">No se completó la salida. En su lugar, puedes restablecer este grupo en este dispositivo. No se envía nada al grupo.</string>
     <string name="key_package_relay_history">Historial de relés</string>
     <string name="key_package_current">Actual</string>
     <string name="key_package_superseded">Sustituido</string>

@@ -154,6 +154,17 @@
     <string name="toast_group_reset_done">Grup sıfırlandı. Yeni bir davet geldiğinde yeniden görünecek.</string>
     <string name="toast_group_reset_already_waiting">Bu grup zaten yeni bir davet bekliyor.</string>
     <string name="toast_couldnt_reset_group">Grup sıfırlanamadı. Tekrar deneyin.</string>
+    <string name="chat_abandon_action">Sohbeti bu cihazda bırak</string>
+    <string name="chat_abandon_dialog_title">Bu sohbet bu cihazda bırakılsın mı?</string>
+    <string name="chat_abandon_dialog_message">White Noise bu sohbetin geçmişini ve şifreleme durumunu bu hesap için bu cihazda siler ve bu cihaz artık sohbeti almaz. Hiçbir şey gönderilmez: diğer kişi sizi sohbette görmeye devam edebilir ve diğer cihazlarınız kendi kopyalarını korur. Yeniden konuşmak için yeni bir sohbet başlatın veya yeni bir daveti kabul edin.</string>
+    <string name="chat_abandon_confirm">Bırak</string>
+    <string name="abandon_identity_chat">Sohbet: %1$s</string>
+    <string name="abandon_identity_group">Grup: %1$s</string>
+    <string name="abandon_identity_account">Hesabınız: %1$s</string>
+    <string name="toast_chat_abandoned">Sohbet bu cihazda bırakıldı.</string>
+    <string name="toast_couldnt_abandon_chat">Sohbet bırakılamadı. Tekrar deneyin.</string>
+    <string name="leave_blocked_abandon_hint_dm">Ayrılma tamamlanmadı. Bunun yerine bu sohbeti bu cihazda bırakabilirsiniz. Diğer kişiye hiçbir şey gönderilmez.</string>
+    <string name="leave_blocked_abandon_hint_group">Ayrılma tamamlanmadı. Bunun yerine bu grubu bu cihazda sıfırlayabilirsiniz. Gruba hiçbir şey gönderilmez.</string>
     <string name="key_package_relay_history">Relay geçmişi</string>
     <string name="key_package_current">Güncel</string>
     <string name="key_package_superseded">Değiştirildi</string>

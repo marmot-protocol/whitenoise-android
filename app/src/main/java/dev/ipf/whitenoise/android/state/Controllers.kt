@@ -11511,12 +11511,29 @@ class ConversationController(
             R.string.toast_chat_deleted_local
         }
 
-    /** MDK 0.10.0 local reset: erase this device's state and wait for a Welcome newer than the reset. */
-    suspend fun forgetGroupLocal(): Boolean =
-        runLocalGroupRemoval(R.string.toast_couldnt_reset_group, "GROUP_LOCAL_RESET") { account ->
-            val reset = appState.forgetGroupLocalWithClientCleanup(account, group.groupIdHex)
-            if (reset) R.string.toast_group_reset_done else R.string.toast_group_reset_already_waiting
+    /**
+     * Confirmed local abandonment (#3310) of this DM or group: MDK 0.10.0's forget behind the durable cleanup
+     * journal. It sends no leave, admin change or disband, so a refused handover or an absent peer cannot block it.
+     */
+    suspend fun forgetGroupLocal(): Boolean {
+        val dm = isDm
+        val failure = if (dm) R.string.toast_couldnt_abandon_chat else R.string.toast_couldnt_reset_group
+        return runLocalGroupRemoval(failure, "GROUP_LOCAL_RESET") { account ->
+            val runtime = appState.runtimeGeneration
+            val reset =
+                appState.forgetGroupLocalWithClientCleanup(account, group.groupIdHex) {
+                    conversationAccountRef == account &&
+                        appState.runtimeGeneration == runtime &&
+                        !appState.signOutInProgress &&
+                        !appState.wipeInProgress
+                }
+            when {
+                !reset -> R.string.toast_group_reset_already_waiting
+                dm -> R.string.toast_chat_abandoned
+                else -> R.string.toast_group_reset_done
+            }
         }
+    }
 
     /** Shared shape of the two local removals: one mutation slot, a success toast chosen by the removal itself. */
     private suspend fun runLocalGroupRemoval(

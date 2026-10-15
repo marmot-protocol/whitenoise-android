@@ -150,7 +150,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_reset_group",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-031"
         ]
       },
       {
@@ -158,7 +159,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_group_reset_already_waiting",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-031"
         ]
       },
       {
@@ -166,7 +168,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_group_reset_done",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-031"
         ]
       },
       {
@@ -259,6 +262,22 @@
         "anchor": "R.string.media_file_too_large",
         "test_ids": [
           "MED-030"
+        ]
+      },
+      {
+        "surface": "toast chat abandoned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_chat_abandoned",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "toast couldnt abandon chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_abandon_chat",
+        "test_ids": [
+          "GRP-031"
         ]
       }
     ],
