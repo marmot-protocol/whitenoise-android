@@ -5,16 +5,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ImageDecoder
 import android.graphics.Matrix
-import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Drawable
 import android.media.ExifInterface
 import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
-import java.nio.ByteBuffer
 
 internal enum class ImageAnimationStatus {
     STATIC,
@@ -474,10 +471,8 @@ object MediaPipeline {
     }
 
     /**
-     * Decode animated GIF/WebP bytes to an [AnimatedImageDrawable], downscaling
-     * so the longer edge is ≈ [maxEdgePx]. Returns null for static images,
-     * undecodable payloads, and any source [admitAnimationSource] does not admit;
-     * refused bytes never reach [ImageDecoder].
+     * Open an isolated GIF/WebP frame stream. The returned drawable contains owned pixels only.
+     * Static, unreadable and unadmitted sources never reach the native animated decoder.
      */
     fun decodeAnimatedDrawable(
         bytes: ByteArray,
@@ -485,28 +480,8 @@ object MediaPipeline {
     ): Drawable? {
         if (bytes.isEmpty()) return null
         return decodeAdmittedNativeAnimation(bytes) {
-            try {
-                val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
-                val drawable =
-                    ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
-                        val width = info.size.width
-                        val height = info.size.height
-                        if (width <= 0 || height <= 0) return@decodeDrawable
-                        val maxDim = maxOf(width, height)
-                        if (maxDim > maxEdgePx) {
-                            val scale = maxEdgePx.toFloat() / maxDim
-                            decoder.setTargetSize(
-                                (width * scale).toInt().coerceAtLeast(1),
-                                (height * scale).toInt().coerceAtLeast(1),
-                            )
-                        }
-                    }
-                drawable as? AnimatedImageDrawable
-            } catch (_: OutOfMemoryError) {
-                null
-            } catch (_: Exception) {
-                null
-            }
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .animation(bytes, maxEdgePx)
         }
     }
 

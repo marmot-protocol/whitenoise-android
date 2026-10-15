@@ -628,6 +628,36 @@ class AndroidCiGateTest(unittest.TestCase):
                 self.assertIn(f'"--add-opens={module}=ALL-UNNAMED"', test_tasks)
         self.assertIn('    jvmArgs(\n', test_tasks)
 
+    def test_invariant_gate_registry_is_an_input_of_every_test_task(self):
+        """A registry-only edit must re-run InvariantGateRegistryTest instead of reusing cached test results."""
+        test_tasks = self.app_build.split('tasks.withType<Test>().configureEach {', 1)[1]
+        test_tasks = test_tasks.split('\ntasks.register<Test>', 1)[0]
+        match = re.search(
+            r'\n    inputs\s*\.file\(rootProject\.file\("docs/invariant-gates\.md"\)\)'
+            r'\s*\.withPropertyName\("invariantGateRegistry"\)'
+            r'\s*\.withPathSensitivity\(PathSensitivity\.RELATIVE\)',
+            test_tasks,
+        )
+        self.assertIsNotNone(match, 'declare the registry as a top-level input of the shared Test configuration')
+
+    def test_instrumented_invariant_gates_are_an_input_of_every_test_task(self):
+        """Every instrumented Kotlin path can be registered, so deletions must invalidate cached validation."""
+        test_tasks = self.app_build.split('tasks.withType<Test>().configureEach {', 1)[1]
+        test_tasks = test_tasks.split('\ntasks.register<Test>', 1)[0]
+        match = re.search(
+            r'\n    inputs\s*\.files\(rootProject\.fileTree\("app/src/androidTest"\) \{ include\("\*\*/\*\.kt"\) \}\)'
+            r'\s*\.withPropertyName\("instrumentedInvariantGates"\)'
+            r'\s*\.withPathSensitivity\(PathSensitivity\.RELATIVE\)',
+            test_tasks,
+        )
+        self.assertIsNotNone(match, 'declare the instrumented gate tree as a top-level input of the shared Test configuration')
+
+    def test_proposed_invariant_gate_checker_tests_run_in_android_ci(self):
+        """The gate workflow tests only the base checker, so a changed checker must be tested on its own tree."""
+        step = self.named_step(self.tooling_contracts, 'Test PR GitHub scripts')
+        self.assertIn('.github/scripts/check-invariant-gate.test.js', step)
+        self.assertNotIn('continue-on-error', step)
+
     def test_missing_result_is_rejected(self):
         """An unexpected dependency schema fails closed."""
         outcomes = self.successful_outcomes()

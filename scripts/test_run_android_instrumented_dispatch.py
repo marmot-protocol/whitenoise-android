@@ -41,7 +41,8 @@ class InstrumentedDispatchTest(unittest.TestCase):
 
     def test_media_sandbox_dispatch_is_focused_and_requires_every_case(self):
         output = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
-        self.assertIn("media.sandbox.IsolatedMediaDecoderDeviceTest", output)
+        self.assertIn("media.sandbox.MediaContainmentAcceptance", output)
+        self.assertNotIn("RunnerArguments.class=", output)
         self.assertIn("required-cases", output)
         self.assertNotIn(":cryptoBenchmark:", output)
         self.assertNotIn("PullRequestDeviceSmoke", output)

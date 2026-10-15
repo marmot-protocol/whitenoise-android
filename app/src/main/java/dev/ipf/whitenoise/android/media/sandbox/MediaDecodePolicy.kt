@@ -9,7 +9,7 @@ internal object MediaDecodePolicy {
     const val MAX_SOURCE_PIXELS = 200_000_000L
     const val DEADLINE_MS = 8000L
     const val WATCHDOG_MS = 6000L
-    const val VERSION = 1
+    const val VERSION = 2
     const val DECODE = 1
     const val INSPECT = 2
     const val SVG = 3
@@ -19,6 +19,10 @@ internal object MediaDecodePolicy {
     const val DEBUG_HANG = 7
     const val EXIF = 8
     const val RETIRE = 9
+    const val REGION = 10
+    const val DEBUG_BAD_REPLY = 11
+    const val DEBUG_REPLY_KINDS = 4
+    const val MAX_REGION_DECODE_PIXELS = 16_777_216L
     const val WAVEFORM_DEADLINE_MS = 40000L
     const val REFUSAL_TTL_MS = 60000L
     const val MAX_REFUSALS = 64
@@ -41,6 +45,18 @@ internal object MediaDecodePolicy {
         width in 1..MAX_SOURCE_EDGE &&
             height in 1..MAX_SOURCE_EDGE &&
             width.toLong() * height <= MAX_SOURCE_PIXELS
+
+    /** Sampling for an admitted edge and source-bounded region, without lowering requested quality. */
+    fun regionSampleSize(
+        region: MediaImageRegion,
+        edge: Int,
+    ): Int? {
+        var sample = 1
+        while (maxOf(region.width, region.height) / (sample * 2) >= edge) sample *= 2
+        val width = (region.width.toLong() + sample - 1) / sample
+        val height = (region.height.toLong() + sample - 1) / sample
+        return sample.takeIf { width * height <= MAX_REGION_DECODE_PIXELS }
+    }
 
     fun pixelBytes(
         width: Int,

@@ -8,6 +8,14 @@ import org.junit.Test
 
 class MediaDecodePolicyTest {
     @Test
+    fun regionSamplingPreservesQualityAndBoundsItsRoundedIntermediate() {
+        assertNull(MediaDecodePolicy.regionSampleSize(MediaImageRegion(0, 0, 7200, 5400), 4096))
+        assertEquals(2, MediaDecodePolicy.regionSampleSize(MediaImageRegion(0, 0, 7200, 5400), 2048))
+        assertEquals(2, MediaDecodePolicy.regionSampleSize(MediaImageRegion(0, 0, 8192, 8192), 4096))
+        assertNull(MediaDecodePolicy.regionSampleSize(MediaImageRegion(0, 0, 8193, 8192), 4096))
+    }
+
+    @Test
     fun pixelCapacityRejectsOverflowAndWorkerChosenDimensions() {
         assertEquals(1048576, MediaDecodePolicy.outputCapacity(512))
         assertNull(MediaDecodePolicy.outputCapacity(Int.MAX_VALUE))

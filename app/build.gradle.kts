@@ -1194,6 +1194,18 @@ tasks.withType<Test>().configureEach {
     // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
     // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
     maxHeapSize = "1g"
+    // InvariantGateRegistryTest reads the registry from disk, so a registry-only edit must invalidate cached test
+    // results (CI restores the build cache) instead of leaving every unit-test variant UP-TO-DATE.
+    inputs
+        .file(rootProject.file("docs/invariant-gates.md"))
+        .withPropertyName("invariantGateRegistry")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    // Any instrumented Kotlin test can be registered, even without the CoverageTest suffix. Unit-test tasks do
+    // not compile these sources, so their additions, deletions and renames must invalidate cached validation.
+    inputs
+        .files(rootProject.fileTree("app/src/androidTest") { include("**/*.kt") })
+        .withPropertyName("instrumentedInvariantGates")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     // CI verifies goldens in the complete variant test suites; these inputs also
     // keep focused local verifyRoborazzi tasks correct.
     // Include the custom baseline directory in Gradle's input fingerprint so a
