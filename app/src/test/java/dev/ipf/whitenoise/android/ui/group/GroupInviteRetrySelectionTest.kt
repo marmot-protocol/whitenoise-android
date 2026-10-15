@@ -114,7 +114,9 @@ class GroupInviteRetrySelectionTest {
         composeRule.onNodeWithText(context.getString(R.string.admin)).performClick()
     }
 
-    private class Fixture(succeed: Boolean = false) {
+    private class Fixture(
+        succeed: Boolean = false,
+    ) {
         val reply = CompletableDeferred<Unit>()
         val calls = CopyOnWriteArrayList<Pair<List<String>, List<String>>>()
         val state =
