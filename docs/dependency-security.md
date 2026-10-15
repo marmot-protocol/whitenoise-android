@@ -231,3 +231,11 @@ files are retained under `gradle/publication-metadata/`; normal offline validati
 checks their SHA-256 and rederives each selected artifact name, digest and unique
 resolved URL. Keeping a valid metadata anchor while changing the supplier URL
 therefore fails qualification.
+
+
+AGP creates `androidApis` lazily when resource tasks need local SDK jars. Its
+empty Maven lock state is committed for all three Android modules, and candidate
+capture predeclares that known `maybeCreate` configuration so regeneration keeps
+it. Strict locking remains active: adding a Maven module to that SDK-only path
+fails instead of becoming an unreviewed exception. The hosted fixture resolves a
+late local-file configuration and exercises that negative case.

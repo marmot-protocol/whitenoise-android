@@ -44,10 +44,10 @@ def publish(repository, name, dependency=None, payload=b'original'):
     return pom, jar
 
 
-def invoke(gradle, project, *options, expect_failure=None):
+def invoke(gradle, project, *options, expect_failure=None, task='resolveFixture'):
     """Require Gradle's actual resolution outcome and a relevant failure diagnostic."""
     result = subprocess.run([str(gradle.resolve()), '--project-dir', str(project), '--console=plain',
-                             '--no-configuration-cache', 'resolveFixture', *options], cwd=ROOT,
+                             '--no-configuration-cache', task, *options], cwd=ROOT,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=180)
     if expect_failure is None:
         if result.returncode:
@@ -68,6 +68,7 @@ def main():
         publish(repository, 'first')
         publish(repository, 'second')
         pom, _ = publish(repository, 'root', dependency='first')
+        (project / 'android-sdk.jar').write_bytes(b'Synthetic SDK file input')
         server = ThreadingHTTPServer(('127.0.0.1', 0), partial(FixtureRepository, directory=str(repository)))
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -85,11 +86,24 @@ repositories { maven {
 } }
 configurations { fixtureRuntime }
 dependencies { fixtureRuntime 'fixture:root:1.0' }
+tasks.register('resolveLateSdkFixture') {
+    doLast {
+        def sdk = configurations.maybeCreate('androidApis')
+        dependencies.add('androidApis', files('android-sdk.jar'))
+        if (project.findProperty('fixtureUnreviewedSdkModule') == 'true') {
+            dependencies.add('androidApis', 'fixture:second:1.0')
+        }
+        assert sdk.resolve() == [file('android-sdk.jar')].toSet()
+    }
+}
 tasks.register('resolveFixture') {
     doLast { assert configurations.fixtureRuntime.resolve().size() == 2 }
 }
 '''.replace('PORT', str(server.server_port)))
-            invoke(args.gradle, project, '--write-locks', '--write-verification-metadata', 'sha256')
+            invoke(args.gradle, project, 'resolveLateSdkFixture', '--write-locks', '--write-verification-metadata', 'sha256')
+            invoke(args.gradle, project, task='resolveLateSdkFixture')
+            invoke(args.gradle, project, '-PfixtureUnreviewedSdkModule=true', task='resolveLateSdkFixture',
+                   expect_failure=['lock state', 'locked', 'strictly'])
             invoke(args.gradle, project)
             lock = project / 'gradle.lockfile'
             before = lock.read_bytes()
@@ -116,7 +130,7 @@ tasks.register('resolveFixture') {
             invoke(args.gradle, project, '--refresh-dependencies')
             invoke(args.gradle, project, '--dependency-verification', 'off', expect_failure=['must remain strict'])
             print('Gradle input fixture PASS: source archive, transitive drift rejected, reviewed update '
-                  'accepted, substituted bytes rejected, verification bypass rejected')
+                  'accepted, substituted bytes rejected, verification bypass rejected, late SDK-file lock enforced')
         finally:
             server.shutdown()
             server.server_close()

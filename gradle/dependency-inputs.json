@@ -1414,16 +1414,31 @@
       "configuration": "classpath",
       "project": ":fuzz",
       "scope": "plugin"
+    },
+    {
+      "configuration": "androidApis",
+      "project": ":app",
+      "scope": "project"
+    },
+    {
+      "configuration": "androidApis",
+      "project": ":benchmark",
+      "scope": "project"
+    },
+    {
+      "configuration": "androidApis",
+      "project": ":cryptoBenchmark",
+      "scope": "project"
     }
   ],
   "files": {
     "app/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "app/gradle.lockfile": "94a19f13c02d3027c22b0dd1e51901dd2a3356361b72348637891f64be0bdd16",
+    "app/gradle.lockfile": "b07d7ede71b1a2171b603b3344b609e0a16ea8bac6088510e97992a43a47b12e",
     "benchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "benchmark/gradle.lockfile": "c84e3b08b0f289923cd19b89238d4c90e6cf4765d495ff3286f0e94414055d37",
+    "benchmark/gradle.lockfile": "2a536efb9b0ee0ff5744636dad83d3ce53a6f4b923aa2f0e4131744fb22fff17",
     "buildscript-gradle.lockfile": "372f4c86a0256c61f27b2ec649f2e891f53d71e0d2115cc7ab4bc4ec5d7de6bb",
     "cryptoBenchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "cryptoBenchmark/gradle.lockfile": "e404808c8e655f3a57264cc45e0650433c4fb8e4baf3df89179afdad00434162",
+    "cryptoBenchmark/gradle.lockfile": "926b0215be2465e8b6f2aaff84e074ce5154b281ced6b7e183ba4a8e5eb9494a",
     "fuzz/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "fuzz/gradle.lockfile": "1a058eacc9b9859109a224af8eb8e18d3eb721405af592ec93f9f3e3b81d923a",
     "gradle/verification-metadata.xml": "062b54ed0fc9f6b9aaa3400d3db75ccfa55ac1e0020e8f2f5750d745d5245e1b",
@@ -1461,6 +1476,17 @@
       "configuration": "app compile and fuzz ktlint",
       "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38790677001/job/116614185735",
       "reason": "Normal strict compile/tool resolution also reads exact Guava parent/coroutines BOM POM metadata; supplier bytes independently checked.",
+      "scope": "project"
+    },
+    {
+      "configuration": "androidApis",
+      "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38791108139/job/116615684385",
+      "projects": [
+        ":app",
+        ":benchmark",
+        ":cryptoBenchmark"
+      ],
+      "reason": "AGP9.4.1 BootClasspathConfigImpl lazily maybeCreates androidApis and adds project.files(SDK android.jar). Record an empty Maven state for every Android module; this does not exempt the configuration from strict locking. The hosted fixture verifies local-file resolution and rejects a new Maven dependency on this late path.",
       "scope": "project"
     }
   ],

@@ -21,6 +21,11 @@ gradle.projectsEvaluated {
             def observations = []
             def artifactFiles = [:]
             root.allprojects.each { project ->
+                // AGP's BootClasspathConfigImpl lazily uses maybeCreate for this
+                // SDK-file-only configuration. Include its empty Maven state.
+                if (['com.android.application', 'com.android.library', 'com.android.test'].any {
+                    project.plugins.hasPlugin(it)
+                }) project.configurations.maybeCreate('androidApis')
                 [project: project.configurations, plugin: project.buildscript.configurations].each { scope, configurations ->
                     configurations.findAll { it.canBeResolved }.sort { it.name }.each { configuration ->
                         def resolution = configuration.incoming.resolutionResult
