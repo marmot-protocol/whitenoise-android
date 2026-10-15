@@ -55,11 +55,7 @@ internal object PlatformMediaDecoder {
         }
         // Choose sampling without reducing the crop below its requested resolution. A codec's
         // power-of-two intermediate is independently bounded, then scaled down exactly.
-        var sample = 1
-        while (maxOf(region.width, region.height) / (sample * 2) >= edge) sample *= 2
-        val width = (region.width.toLong() + sample - 1) / sample
-        val height = (region.height.toLong() + sample - 1) / sample
-        if (width * height > MediaDecodePolicy.MAX_REGION_DECODE_PIXELS) return null
+        val sample = MediaDecodePolicy.regionSampleSize(region, edge) ?: return null
         val decoder = android.graphics.BitmapRegionDecoder.newInstance(bytes, 0, bytes.size, false)
         try {
             val options =

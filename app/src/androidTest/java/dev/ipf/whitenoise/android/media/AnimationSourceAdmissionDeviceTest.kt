@@ -169,14 +169,19 @@ class AnimationSourceAdmissionDeviceTest {
             .install(instrumentation.targetContext)
         val old = requireNotNull(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()))
         val oldAnimation = old as IsolatedAnimationDrawable
+        val pixels = Bitmap.createBitmap(old.intrinsicWidth, old.intrinsicHeight, Bitmap.Config.ARGB_8888)
         val oldUid = requireNotNull(dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation).uid
         var retiredFrame = 0L
+        var retiredPixel = 0
         try {
             instrumentation.runOnMainSync {
                 (old as Animatable).start()
                 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
                     .resetForAccount()
                 retiredFrame = oldAnimation.presentedFrame
+                old.setBounds(0, 0, pixels.width, pixels.height)
+                old.draw(android.graphics.Canvas(pixels))
+                retiredPixel = pixels.getPixel(0, 0)
             }
             val replacement = requireNotNull(MediaPipeline.decodeAnimatedDrawable(ordinaryGif()))
             try {
@@ -185,12 +190,18 @@ class AnimationSourceAdmissionDeviceTest {
                         dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder.lastIsolation,
                     )
                 assertTrue(oldUid != current.uid)
-                instrumentation.runOnMainSync { assertEquals(retiredFrame, oldAnimation.presentedFrame) }
+                instrumentation.runOnMainSync {
+                    assertEquals(retiredFrame, oldAnimation.presentedFrame)
+                    pixels.eraseColor(Color.TRANSPARENT)
+                    old.draw(android.graphics.Canvas(pixels))
+                    assertEquals(retiredPixel, pixels.getPixel(0, 0))
+                }
             } finally {
                 instrumentation.runOnMainSync { (replacement as java.io.Closeable).close() }
             }
         } finally {
             instrumentation.runOnMainSync { (old as java.io.Closeable).close() }
+            pixels.recycle()
         }
     }
 

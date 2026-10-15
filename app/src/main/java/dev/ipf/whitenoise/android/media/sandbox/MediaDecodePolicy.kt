@@ -46,6 +46,18 @@ internal object MediaDecodePolicy {
             height in 1..MAX_SOURCE_EDGE &&
             width.toLong() * height <= MAX_SOURCE_PIXELS
 
+    /** Sampling for an admitted edge and source-bounded region, without lowering requested quality. */
+    fun regionSampleSize(
+        region: MediaImageRegion,
+        edge: Int,
+    ): Int? {
+        var sample = 1
+        while (maxOf(region.width, region.height) / (sample * 2) >= edge) sample *= 2
+        val width = (region.width.toLong() + sample - 1) / sample
+        val height = (region.height.toLong() + sample - 1) / sample
+        return sample.takeIf { width * height <= MAX_REGION_DECODE_PIXELS }
+    }
+
     fun pixelBytes(
         width: Int,
         height: Int,

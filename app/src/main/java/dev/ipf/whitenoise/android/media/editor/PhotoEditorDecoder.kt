@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media.editor
 
 import android.graphics.Bitmap
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -21,15 +22,17 @@ internal object PhotoEditorDecoder {
     ): DecodeSpec? {
         val fullEdge = decodeLongEdge(source, geometry)
         val region =
-            if (fullEdge > dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy.MAX_EDGE) {
+            if (fullEdge > MediaDecodePolicy.MAX_EDGE) {
                 geometry.encodedCropRegion()
             } else {
                 null
             }
         val edge = if (region == null) fullEdge else max(geometry.outputSize.width, geometry.outputSize.height)
         val capacity =
-            dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy
-                .outputCapacity(edge) ?: return null
+            MediaDecodePolicy
+                .outputCapacity(edge)
+                ?.takeIf { region == null || MediaDecodePolicy.regionSampleSize(region, edge) != null }
+                ?: return null
         return DecodeSpec(
             region,
             edge,
