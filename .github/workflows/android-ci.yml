@@ -378,6 +378,26 @@ jobs:
         if: matrix.phase == 'tooling'
         run: python3 scripts/test_dependency_security_fixture.py
 
+      # One-off candidate capture while replacing the generator and bootstrapping
+      # reviewed locks. Remove this step before the combined PR is ready.
+      - name: Capture dependency-control bootstrap candidates
+        if: matrix.phase == 'tooling'
+        run: |
+          ./gradlew -I gradle/dependency-inputs-bootstrap.init.gradle \
+            :app:productionPlayReleaseOssLicensesTask :app:productionZapstoreReleaseOssLicensesTask \
+            captureDependencyInputs --write-locks --write-verification-metadata sha256 \
+            --no-daemon --stacktrace
+          python3 scripts/capture_dependency_candidates.py
+
+      - name: Retain dependency-control bootstrap candidates
+        if: always() && matrix.phase == 'tooling'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dependency-inputs-bootstrap
+          path: build/dependency-inputs-bootstrap/
+          if-no-files-found: error
+          retention-days: 14
+
       # Read existing resolutions only; retain proof without a second build.
       - name: Verify selected dependency security floors
         if: success()
