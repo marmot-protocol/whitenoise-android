@@ -70,8 +70,10 @@ class DiscoveryInvitationFfiIntegrationTest {
                                     requireNotNull(peer.npub(admin.accountIdHex)),
                                     requireNotNull(peer.npub(member.accountIdHex)),
                                 )
-                            assertEquals(expectedMembers, adminView.details.members.map { it.npub }.toSet())
-                            assertEquals(expectedMembers, memberView.details.members.map { it.npub }.toSet())
+                            val adminMembers = adminView.details.members.map { it.npub }.toSet()
+                            val memberMembers = memberView.details.members.map { it.npub }.toSet()
+                            assertEquals(expectedMembers, adminMembers)
+                            assertEquals(expectedMembers, memberMembers)
                         }
                     } finally {
                         try {

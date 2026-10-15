@@ -76,7 +76,7 @@ class NativeStartupDiagnosticDeviceTest {
     @Test
     @Suppress("LongMethod") // One held attempt proves Retry, Copy and share without constructing another runtime.
     fun copyAndShareFinishWhileNativeConstructionIsHeld() =
-        runBlocking {
+        runBlocking<Unit> {
             val entered = CountDownLatch(1)
             val release = CountDownLatch(1)
             val calls = AtomicInteger()
@@ -112,7 +112,11 @@ class NativeStartupDiagnosticDeviceTest {
                 compose.waitUntil(10_000) { fixture.app.phase is AppPhase.Failed }
                 compose.onNodeWithTag(STARTUP_COPY_TEST_TAG).performClick()
                 val clipboard = requireNotNull(context.getSystemService(ClipboardManager::class.java))
-                val copied = clipboard.primaryClip?.getItemAt(0)?.text.toString()
+                val copied =
+                    clipboard.primaryClip
+                        ?.getItemAt(0)
+                        ?.text
+                        .toString()
                 assertTrue(copied.contains("ROOT_LEASE"))
                 compose.onNodeWithTag(STARTUP_SHARE_TEST_TAG).performClick()
                 compose.waitUntil(10_000) { capture.started.get() != null }
@@ -133,7 +137,7 @@ class NativeStartupDiagnosticDeviceTest {
     @Test
     @Suppress("LongMethod") // Actual native work, immutable share files and active/inactive archives form one flow.
     fun publishedNativeRuntimeFeedsSharesAndOnlyActivePerformanceArchives() =
-        runBlocking {
+        runBlocking<Unit> {
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             val fixture =
@@ -170,7 +174,10 @@ class NativeStartupDiagnosticDeviceTest {
                 assertEquals(3, copies.count { it.name.startsWith("startup-") })
 
                 assertTrue(PerformanceDiagnostics.start().active)
-                val expected = fixture.native.appPerformanceSnapshot().appStart.attempts
+                val expected =
+                    fixture.native
+                        .appPerformanceSnapshot()
+                        .appStart.attempts
                 assertTrue(expected > 0uL)
                 val archive = requireNotNull(fixture.app.prepareAuditLogArchiveForExport())
                 ZipFile(archive).use { zip ->
@@ -194,7 +201,7 @@ class NativeStartupDiagnosticDeviceTest {
 
     @Test
     fun failedStartClosesAndUnbindsNativeCaptureBeforeSharingTheHostFailure() =
-        runBlocking {
+        runBlocking<Unit> {
             val fixture = Fixture(failStart = true)
             try {
                 fixture.app.bootstrap()
@@ -212,7 +219,7 @@ class NativeStartupDiagnosticDeviceTest {
 
     @Test
     fun constructionFailureStillSharesHostEvidenceWithoutANativeHandle() =
-        runBlocking {
+        runBlocking<Unit> {
             val fixture = Fixture { error(PRIVATE_FAILURE) }
             try {
                 fixture.app.bootstrap()
