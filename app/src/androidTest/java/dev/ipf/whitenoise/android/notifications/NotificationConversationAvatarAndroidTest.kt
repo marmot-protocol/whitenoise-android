@@ -36,8 +36,8 @@ import kotlin.math.abs
  * alone cannot prove what the visible circle shows, so this inspects the rendered conversation icon, the long-message
  * card's picture and the small app icon, and saves shade screenshots for before/after review.
  *
- * Opt in with `-e allowShadeProbe true` on a disposable, unlocked device with its screen on. It posts synthetic
- * cards for a fixture account only and removes them, and their shortcuts, afterwards.
+ * Opt in with `-e allowShadeProbe true` on an emulator or a disposable, unlocked device with its screen on. It posts
+ * synthetic cards for a fixture account only and removes just those cards and their shortcuts afterwards.
  */
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
@@ -58,16 +58,24 @@ class NotificationConversationAvatarAndroidTest {
         assertTrue("screen must be on", context.getSystemService(PowerManager::class.java).isInteractive)
         assertFalse("device must be unlocked", context.getSystemService(KeyguardManager::class.java).isKeyguardLocked)
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
-        manager.cancelAll()
+        removeFixtureCards()
         device.pressHome()
     }
 
-    /** Leaves no synthetic card, shortcut or open shade behind. */
+    /** Leaves no synthetic card, fixture shortcut or open shade behind, and touches nothing else. */
     @After
     fun cleanUp() {
-        manager.cancelAll()
-        ShortcutManagerCompat.removeAllDynamicShortcuts(context)
+        removeFixtureCards()
         device.pressHome()
+    }
+
+    /** Cancels only this fixture's cards and removes only its own conversation shortcuts. */
+    private fun removeFixtureCards() {
+        val ids = names.keys.mapNotNull { conversationShortcutId(NotificationFixtureDefaults.ACCOUNT_REF, it) }.toSet()
+        manager.activeNotifications
+            .filter { it.notification.shortcutId in ids }
+            .forEach { manager.cancel(it.tag, it.id) }
+        ShortcutManagerCompat.removeDynamicShortcuts(context, ids.toList())
     }
 
     /** The direct chat's circle shows the peer, the group's shows the group, and the long card keeps its picture. */
