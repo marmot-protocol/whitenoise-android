@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -743,6 +744,9 @@ internal fun FullScreenMediaViewer(
                         mine = pageDescriptor.mine,
                         onPlayerChanged = onVideoPlayerChanged,
                         videoFileResolver = videoFileResolver,
+                        // One tap reveals or hides Media3's controls and the viewer chrome together, and they
+                        // time out together while playing, so the frame and time bar are never covered.
+                        onControllerVisibilityChange = { visible -> if (isCurrent) chromeVisible = visible },
                     )
                 } else {
                     ViewerPage(
@@ -809,7 +813,11 @@ internal fun FullScreenMediaViewer(
     }
 }
 
-/** Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. */
+/**
+ * Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. The media
+ * [body] gets only the space the visible chrome and safe insets leave free, so opaque bars never cover the frame
+ * or a player's time bar, and hiding the chrome gives that space back to the media.
+ */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun MediaViewerFrame(
@@ -834,38 +842,20 @@ internal fun MediaViewerFrame(
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
     var bottomChromeHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
+    // An open overflow menu keeps its chrome until dismissed, even when a video's controls time out under it.
+    val chromeShown = chromeVisible || moreExpanded
     val snackbarInsetSides =
-        if (chromeVisible) {
+        if (chromeShown) {
             WindowInsetsSides.Horizontal
         } else {
             WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
         }
-    LaunchedEffect(chromeVisible) {
-        if (!chromeVisible) moreExpanded = false
-    }
-    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        body()
-        if (groupPictureBusy) {
-            Surface(
-                Modifier.align(Alignment.Center).testTag("conversation.media.viewer.group-picture-progress"),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Column(
-                    Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator()
-                    Text(stringResource(R.string.group_preparing_photo))
-                }
-            }
-        }
-        if (chromeVisible) {
+    val topChrome: @Composable () -> Unit = {
+        if (chromeShown) {
             Surface(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
                         .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
                 color = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
@@ -950,11 +940,26 @@ internal fun MediaViewerFrame(
                     }
                 }
             }
+        }
+    }
+    // The body keeps one composition slot whether or not chrome shows, so toggling chrome resizes the pager
+    // and player instead of recreating them.
+    val content: @Composable () -> Unit = {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(contentWindowInsets.only(mediaViewerContentInsetSides(chromeShown)))
+                    .testTag(MEDIA_VIEWER_CONTENT_TAG),
+            content = body,
+        )
+    }
+    val bottomChrome: @Composable () -> Unit = {
+        if (chromeShown) {
             Surface(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
                         .testTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG)
                         .onSizeChanged { bottomChromeHeight = with(density) { it.height.toDp() } },
                 color = MaterialTheme.colorScheme.background,
@@ -990,12 +995,34 @@ internal fun MediaViewerFrame(
                 }
             }
         }
+    }
+    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Layout(
+            contents = listOf(topChrome, content, bottomChrome),
+            modifier = Modifier.fillMaxSize(),
+            measurePolicy = mediaViewerChromeMeasurePolicy,
+        )
+        if (groupPictureBusy) {
+            Surface(
+                Modifier.align(Alignment.Center).testTag("conversation.media.viewer.group-picture-progress"),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Column(
+                    Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.group_preparing_photo))
+                }
+            }
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = if (chromeVisible) bottomChromeHeight else 0.dp)
+                    .padding(bottom = if (chromeShown) bottomChromeHeight else 0.dp)
                     .windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
