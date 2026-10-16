@@ -21,6 +21,32 @@
           "RDR-002"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventReaderEmoji.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventReaderEmoji.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.not_copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventReaderEmoji.kt",
+        "anchor": "R.string.not_copied",
+        "test_ids": [
+          "RDR-002"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []
