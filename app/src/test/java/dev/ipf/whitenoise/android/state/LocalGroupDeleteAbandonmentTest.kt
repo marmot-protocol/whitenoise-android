@@ -39,12 +39,25 @@ class LocalGroupDeleteAbandonmentTest {
     fun dmAbandonmentFromDetailsForgetsOnceWithoutAnyDepartureMutation() =
         runTest {
             val fixture = fixture()
-            val conversation = dmConversation(fixture)
+            val conversation = conversation(fixture, isDm = true)
             assertTrue(conversation.forgetGroupLocal())
             assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
             assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
             assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
-            assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
+            assertGlobalNotice(fixture, R.string.toast_chat_abandoned)
+        }
+
+    /** A group reset and a local delete from Group Details confirm app-wide, since both close the conversation. */
+    @Test
+    fun detailsRemovalsConfirmOutsideTheClosedConversation() =
+        runTest {
+            val fixture = fixture()
+            assertTrue(conversation(fixture, isDm = false).forgetGroupLocal())
+            assertGlobalNotice(fixture, R.string.toast_group_reset_done)
+            val deleting = localGroupDeleteFixture(controllers)
+            assertTrue(conversation(deleting, isDm = false).deleteGroupLocal())
+            assertEquals(1, deleting.calls.count { it == "deleteGroupLocal" })
+            assertGlobalNotice(deleting, R.string.toast_chat_deleted_local)
         }
 
     /** A committed DM forget whose Android cleanup fails still closes the chat and repairs from the journal only. */
@@ -54,7 +67,7 @@ class LocalGroupDeleteAbandonmentTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             try {
                 val fixture = fixture("selectedMessageDraft")
-                val conversation = dmConversation(fixture)
+                val conversation = conversation(fixture, isDm = true)
                 assertTrue("a committed forget must close the old conversation", conversation.forgetGroupLocal())
                 assertTrue(fixture.state.localGroupDeleteCleanupJournal.hasPending())
                 fixture.failureMethod.set(null)
@@ -63,10 +76,7 @@ class LocalGroupDeleteAbandonmentTest {
                 // A repeated confirm reads the absent row and reports the reset instead of forgetting again.
                 assertTrue(conversation.forgetGroupLocal())
                 assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
-                assertEquals(
-                    AppText.Resource(R.string.toast_group_reset_already_waiting),
-                    fixture.state.transientNotice?.title,
-                )
+                assertGlobalNotice(fixture, R.string.toast_chat_already_abandoned)
             } finally {
                 Dispatchers.resetMain()
             }
@@ -165,13 +175,26 @@ class LocalGroupDeleteAbandonmentTest {
             ?.forEach { it.join() }
     }
 
-    /** A Group Details controller for the fixture row presented as a freshly started direct chat. */
-    private fun dmConversation(fixture: LocalGroupDeleteFixture): ConversationController =
+    /** A Group Details controller for the fixture row, presented as a direct chat when [isDm]. */
+    private fun conversation(
+        fixture: LocalGroupDeleteFixture,
+        isDm: Boolean,
+    ): ConversationController =
         ConversationController(
             appState = fixture.state,
             initialGroup = chatListItemFromProjection(chatRow(GROUP)).group,
-            initialIsDm = true,
-        ).also { assertTrue(it.isDm) }
+            initialIsDm = isDm,
+        ).also { assertEquals(isDm, it.isDm) }
+
+    /** The confirmation is app-wide, not scoped to the conversation the removal just closed. */
+    private fun assertGlobalNotice(
+        fixture: LocalGroupDeleteFixture,
+        title: Int,
+    ) {
+        val notice = requireNotNull(fixture.state.transientNotice) { "the removal must confirm itself" }
+        assertEquals(AppText.Resource(title), notice.title)
+        assertEquals("a closed conversation's scope could never show it", null, notice.conversation)
+    }
 
     /** The shared fake-native fixture, cleared with this test's controllers. */
     private fun TestScope.fixture(

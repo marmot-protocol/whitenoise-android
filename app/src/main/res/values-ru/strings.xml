@@ -170,6 +170,7 @@
     <string name="abandon_identity_group">Группа: %1$s</string>
     <string name="abandon_identity_account">Ваша учётная запись: %1$s</string>
     <string name="toast_chat_abandoned">Чат покинут на этом устройстве.</string>
+    <string name="toast_chat_already_abandoned">Этот чат уже покинут на этом устройстве.</string>
     <string name="toast_couldnt_abandon_chat">Не удалось покинуть чат на этом устройстве. Попробуйте ещё раз.</string>
     <string name="leave_blocked_abandon_hint_dm">Выход не завершился. Вместо этого можно покинуть этот чат только на этом устройстве. Собеседнику ничего не отправляется.</string>
     <string name="leave_blocked_abandon_hint_group">Выход не завершился. Вместо этого можно сбросить эту группу на этом устройстве. В группу ничего не отправляется.</string>

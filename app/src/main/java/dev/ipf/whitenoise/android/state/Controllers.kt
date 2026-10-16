@@ -11532,6 +11532,7 @@ class ConversationController(
                         !appState.wipeInProgress
                 }
             when {
+                !reset && dm -> R.string.toast_chat_already_abandoned
                 !reset -> R.string.toast_group_reset_already_waiting
                 dm -> R.string.toast_chat_abandoned
                 else -> R.string.toast_group_reset_done
@@ -11539,7 +11540,11 @@ class ConversationController(
         }
     }
 
-    /** Shared shape of the two local removals: one mutation slot, a success toast chosen by the removal itself. */
+    /**
+     * Shared shape of the two local removals: one mutation slot, a success notice chosen by the removal itself. Both
+     * close this conversation, so the notice is app-wide instead of scoped to the closed route (#3310), and like a
+     * failure it is not shown on a replacement account or runtime.
+     */
     private suspend fun runLocalGroupRemoval(
         failureToast: Int,
         operationCode: String,
@@ -11549,7 +11554,9 @@ class ConversationController(
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
-                presentConversationTransient(removal(account))
+                val success = removal(account)
+                val sameRuntime = appState.runtimeGeneration == conversationRuntimeGeneration
+                if (sameRuntime && appState.activeAccountRef == account) appState.presentTransient(success)
                 true
             }.onFailure { recordMutationFailure(failureToast, operationCode, it) }.getOrDefault(false)
         }
