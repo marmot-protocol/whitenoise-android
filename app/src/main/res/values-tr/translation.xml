@@ -25,6 +25,6 @@
     <string name="translation_engine_update_required">Bu dil için daha yeni bir Offline Translator sürümü gerekiyor. Uygulamayı güncelleyip tekrar deneyin.</string>
     <string name="translation_install_zapstore">Zapstore’dan yükle</string>
     <string name="translation_install_release">GitHub’dan yükle</string>
-    <string name="translation_install_release_reason">Zapstore şu anda White Noise’un kullanamadığı Offline Translator %1$s sürümünü sunuyor, bu nedenle yayıncının GitHub’daki %2$s sürümü açılır.</string>
+    <string name="translation_install_release_reason">Zapstore henüz White Noise’un kullanabileceği bir sürüm sunmuyor, bu nedenle yayıncının GitHub’daki %1$s sürümü açılır.</string>
     <string name="translation_install_open_failed">Hiçbir uygulama Offline Translator’ı veya indirme sayfasını açamadı. Bir web tarayıcısı yükleyip tekrar deneyin.</string>
 </resources>

@@ -126,7 +126,7 @@ class MessageTranslationFormScreenshotTest {
         composeRule.onNodeWithText("Install from GitHub").assertIsDisplayed()
         composeRule
             .onNodeWithText(
-                "Zapstore currently offers Offline Translator 0.8.2, which White Noise cannot use, " +
+                "Zapstore does not offer a version White Noise can use yet, " +
                     "so this opens version 0.8.5 from the publisher on GitHub.",
             ).assertIsDisplayed()
         composeRule.onNodeWithTag("translation.engine").performClick()

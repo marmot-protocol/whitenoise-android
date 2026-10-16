@@ -58,17 +58,24 @@ class OfflineTranslatorAcquisitionCoverageTest {
         val settings = source("TranslationSettings.kt")
         for (entry in listOf("TranslationGlobalSettingsContent", "TranslationChatSettingsDialog")) {
             val body = settings.functionBody(entry)
-            assertTrue(entry, "OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })" in body)
+            val call = "OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })"
+            assertTrue(entry, body.mentions(call))
         }
         val form = source("MessageTranslationForm.kt").functionBody("MessageTranslationForm")
-        assertTrue("OfflineTranslatorEngineAction(onOpen = onOpenEngine)" in form)
+        assertTrue(form.mentions("OfflineTranslatorEngineAction(onOpen = onOpenEngine)"))
         val dialog = source("MessageTranslationControls.kt").functionBody("MessageTranslationDialog")
-        assertTrue("onOpenEngine = { openOfflineTranslator(context) }" in dialog)
+        assertTrue(dialog.mentions("onOpenEngine = { openOfflineTranslator(context) }"))
         for (file in translationSources().filter { it.name != "OfflineTranslatorAcquisition.kt" }) {
             val text = file.readText()
             assertFalse("${file.name} opens its own route", "ACTION_VIEW" in text || "startActivity(" in text)
             assertFalse("${file.name} names a store page", Regex("""https://(?!github\.com/)""").containsMatchIn(text))
         }
+    }
+
+    /** Whether this source contains [call], ignoring whitespace so a reformat cannot fail the gate. */
+    private fun String.mentions(call: String): Boolean {
+        val compact = filterNot(Char::isWhitespace)
+        return call.filterNot(Char::isWhitespace) in compact
     }
 
     /** Decodes a NIP-19 `naddr` into its type-length-value fields, verifying the bech32 checksum. */

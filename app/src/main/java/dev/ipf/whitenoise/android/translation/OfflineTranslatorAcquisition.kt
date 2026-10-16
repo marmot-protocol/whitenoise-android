@@ -109,7 +109,8 @@ internal fun openOfflineTranslator(
 /**
  * The one engine control shared by global settings, chat settings and message recovery. An installed engine
  * opens for language packs; otherwise the label names the reviewed acquisition route, and the GitHub fallback
- * says why Zapstore is not offered. Installation state refreshes whenever the screen resumes.
+ * says why Zapstore is not offered, without naming the store's version, which would go stale once the
+ * publisher updates it. Installation state refreshes whenever the screen resumes.
  */
 @Composable
 internal fun OfflineTranslatorEngineAction(
@@ -142,7 +143,6 @@ internal fun OfflineTranslatorEngineAction(
             Text(
                 stringResource(
                     R.string.translation_install_release_reason,
-                    offlineTranslatorZapstoreRelease.versionName,
                     OfflineTranslatorLanguageCatalog.engineVersions.last(),
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

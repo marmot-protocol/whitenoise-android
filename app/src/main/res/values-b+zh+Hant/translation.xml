@@ -25,6 +25,6 @@
     <string name="translation_engine_update_required">此語言需要較新版本的 Offline Translator。請更新翻譯引擎後重試。</string>
     <string name="translation_install_zapstore">從 Zapstore 安裝</string>
     <string name="translation_install_release">從 GitHub 安裝</string>
-    <string name="translation_install_release_reason">Zapstore 目前提供的 Offline Translator %1$s 無法用於 White Noise，因此將開啟發布者在 GitHub 上的 %2$s 版本。</string>
+    <string name="translation_install_release_reason">Zapstore 尚未提供 White Noise 可用的版本，因此將開啟發布者在 GitHub 上的 %1$s 版本。</string>
     <string name="translation_install_open_failed">沒有應用程式能開啟 Offline Translator 或其下載頁面。請安裝網頁瀏覽器後重試。</string>
 </resources>
