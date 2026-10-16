@@ -32,7 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
-import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
+import dev.ipf.whitenoise.android.ui.MarkdownLinkLayoutRegistry
 import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
 import dev.ipf.whitenoise.android.ui.TtsSentenceActions
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
@@ -51,7 +51,7 @@ internal class ReaderTextSelectionController(
     // keep those updates out of snapshot state; only a pending activation
     // advances [layoutRevision] so the delayed native-selection seed retries.
     private val selectableLayouts = linkedMapOf<Any, SelectableTextLayout>()
-    private val markdownLinkLayouts = linkedMapOf<Any, MarkdownLinkTextLayout>()
+    private val markdownLinkLayouts = MarkdownLinkLayoutRegistry()
 
     var layoutRevision by mutableIntStateOf(0)
         private set
@@ -75,11 +75,7 @@ internal class ReaderTextSelectionController(
     val markdownLinkLayoutReporter:
         (Any, AnnotatedString, TextLayoutResult?, LayoutCoordinates?) -> Unit =
         { key, text, layoutResult, coordinates ->
-            if (layoutResult != null && coordinates != null) {
-                markdownLinkLayouts[key] = MarkdownLinkTextLayout(text, layoutResult, coordinates)
-            } else {
-                markdownLinkLayouts.remove(key)
-            }
+            markdownLinkLayouts.report(key, text, layoutResult, coordinates)
             if (active && pendingPosition != null) layoutRevision++
         }
 

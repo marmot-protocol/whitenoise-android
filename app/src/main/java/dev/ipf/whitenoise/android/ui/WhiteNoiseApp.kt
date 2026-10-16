@@ -577,7 +577,7 @@ internal fun WhiteNoiseApp(
                             WarmResumeUsefulSurface {
                                 dev.ipf.whitenoise.android.ui.onboarding.SignUpScreen(
                                     controller = checkNotNull(appState.profileSignUpForPresentation),
-                                    hasValidatedInternet = appState::hasValidatedInternet,
+                                    hasActiveNetwork = appState::hasActiveNetwork,
                                     randomName = appState::randomProfilePseudonym,
                                     onBack = { appState.dismissProfileSignUp() },
                                 )

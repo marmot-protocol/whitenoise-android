@@ -29,23 +29,23 @@ internal enum class OnboardingActionDecision { Start, ShowOffline, IgnoreBusy }
 
 internal fun onboardingActionDecision(
     inFlightAction: OnboardingAction,
-    hasValidatedInternet: Boolean,
+    hasActiveNetwork: Boolean,
 ): OnboardingActionDecision =
     when {
         inFlightAction != OnboardingAction.Idle -> OnboardingActionDecision.IgnoreBusy
-        !hasValidatedInternet -> OnboardingActionDecision.ShowOffline
+        !hasActiveNetwork -> OnboardingActionDecision.ShowOffline
         else -> OnboardingActionDecision.Start
     }
 
 internal fun dispatchOnboardingAction(
     inFlightAction: OnboardingAction,
-    hasValidatedInternet: Boolean,
+    hasActiveNetwork: Boolean,
     requestedAction: OnboardingAction,
     onOffline: (OnboardingAction) -> Unit,
     onStart: () -> Unit,
 ) {
     val identityOnly = requestedAction != OnboardingAction.Creating
-    when (onboardingActionDecision(inFlightAction, hasValidatedInternet || identityOnly)) {
+    when (onboardingActionDecision(inFlightAction, hasActiveNetwork || identityOnly)) {
         OnboardingActionDecision.IgnoreBusy -> Unit
         OnboardingActionDecision.ShowOffline -> onOffline(requestedAction)
         OnboardingActionDecision.Start -> onStart()
@@ -65,7 +65,7 @@ internal val OnboardingMaxContentWidth = 520.dp
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod") // Owns the short-lived sign-in state machine.
 internal fun OnboardingScreen(
     appState: WhiteNoiseAppState,
-    hasValidatedInternet: () -> Boolean = appState::hasValidatedInternet,
+    hasActiveNetwork: () -> Boolean = appState::hasActiveNetwork,
 ) {
     androidx.compose.runtime.LaunchedEffect(Unit) {
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.ONBOARDING)
@@ -124,7 +124,7 @@ internal fun OnboardingScreen(
         if (appState.retainedAccountReactivationRef != null) return
         dispatchOnboardingAction(
             inFlightAction = inFlightAction,
-            hasValidatedInternet = hasValidatedInternet(),
+            hasActiveNetwork = hasActiveNetwork(),
             requestedAction = action,
             onOffline = { offlineRetryAction = it },
             onStart = {
@@ -164,7 +164,7 @@ internal fun OnboardingScreen(
     if (signUp != null) {
         SignUpScreen(
             signUp,
-            hasValidatedInternet,
+            hasActiveNetwork,
             randomName = appState::randomProfilePseudonym,
             onBack = { appState.dismissProfileSignUp() },
         )

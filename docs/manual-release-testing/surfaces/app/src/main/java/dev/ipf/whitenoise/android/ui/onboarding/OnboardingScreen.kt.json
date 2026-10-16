@@ -1,0 +1,171 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+  "legacy_sha256": "a1017a3d533d67e7eebda31a79574cd8b032ac25fc6d44541c7f0a502d5d837a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "OnboardingScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "fun OnboardingScreen(",
+        "test_ids": [
+          "ONB-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.identity_entry_error_import_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.identity_entry_error_import_failed",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.identity_entry_error_invalid_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.identity_entry_error_invalid_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.onboarding_recover_setup_failed",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "setting:onboarding_recover_setup_success",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.onboarding_recover_setup_success",
+        "test_ids": [
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_public_key",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_key_package_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_key_package_retry",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_recovery_declined",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_recovery_declined",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_recovery_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_recovery_failed",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_recovery_unexpected_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_recovery_unexpected_state",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_retry",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      },
+      {
+        "surface": "R.string.sign_in_error_setup_unexpected_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "R.string.sign_in_error_setup_unexpected_state",
+        "test_ids": [
+          "ONB-001",
+          "ONB-004",
+          "ONB-005",
+          "ONB-008",
+          "ONB-009",
+          "ONB-011",
+          "ONB-024"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Offline identity-only import and creation connectivity gate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "val identityOnly = requestedAction != OnboardingAction.Creating",
+        "test_ids": [
+          "ONB-022"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

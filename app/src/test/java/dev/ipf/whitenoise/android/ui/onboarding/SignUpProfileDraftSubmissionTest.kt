@@ -44,7 +44,7 @@ class SignUpProfileDraftSubmissionTest {
                 activeAccountRef = "",
                 marmotAccessObserver = { nativeAccess++ },
             )
-        composeRule.setContent { WhiteNoiseTheme { OnboardingScreen(app, hasValidatedInternet = { true }) } }
+        composeRule.setContent { WhiteNoiseTheme { OnboardingScreen(app, hasActiveNetwork = { true }) } }
         composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
         composeRule.runOnIdle { assertNotNull(app.pendingProfileSignUp) }
         composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Local name")
@@ -59,7 +59,7 @@ class SignUpProfileDraftSubmissionTest {
     }
 
     /** Native field text at the explicit tap is published to the one returned account. */
-    @Test fun submitUsesCurrentFieldValuesExactlyOnce() {
+    @Test fun activeRouteWithoutOsValidationSubmitsCurrentFieldsExactlyOnce() {
         var owner = SignUpOwner(1, null)
         var creations = 0
         val publications = mutableListOf<UserProfileMetadataFfi>()
@@ -146,7 +146,7 @@ class SignUpProfileDraftSubmissionTest {
     }
 
     /** The new form remains editable offline; neither its primary action nor Retry creates an identity. */
-    @Test fun offlineSubmitRetainsDraftAndStartsNoNativeOperation() {
+    @Test fun missingActiveRouteRetainsDraftAndStartsNoNativeOperation() {
         var creations = 0
         composeRule.setContent {
             val scope = rememberCoroutineScope()

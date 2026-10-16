@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -36,6 +38,74 @@ import org.robolectric.annotation.Config
 class NostrEventReaderTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun readerLongPressCopiesDestinationAndRetainsTapConfirmation() {
+        val destination = "https://example.com/path?q=value#section"
+        val label = "other.example"
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventReaderBlock(
+                    block =
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.Link(
+                                    destination,
+                                    null,
+                                    listOf(MarkdownInlineFfi.Text(label)),
+                                    MarkdownLinkDestinationKindFfi.WEB,
+                                ),
+                            ),
+                        ),
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText(label).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            up()
+        }
+        composeRule.waitForIdle()
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>()
+                .getSystemService(ClipboardManager::class.java)
+        composeRule.runOnIdle { assertEquals(destination, clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
+        composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
+        composeRule.onNodeWithText(label).performClick()
+        composeRule.onNodeWithText(destination).assertIsDisplayed()
+    }
+
+    @Test
+    fun readerAccessibilityCopiesWwwDestination() {
+        val typed = "www.example.com/path?q=value#section"
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventReaderBlock(
+                    block =
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.Autolink(
+                                    typed,
+                                    dev.ipf.marmotkit.MarkdownAutolinkKindFfi.WWW,
+                                    MarkdownLinkDestinationKindFfi.WEB,
+                                ),
+                            ),
+                        ),
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                )
+            }
+        }
+        val actions = composeRule.onNodeWithText(typed).fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        composeRule.runOnIdle { assertTrue(actions.single().action()) }
+        composeRule.waitForIdle()
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>()
+                .getSystemService(ClipboardManager::class.java)
+        composeRule.runOnIdle { assertEquals("https://$typed", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
+    }
 
     @Test
     fun readerDiscoversBodyImagesWithoutAnInitialPublicImageFetch() {
