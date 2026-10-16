@@ -14,7 +14,7 @@ else:
     from retain_dependency_evidence import retain_capture, sha256
 
 
-def assemble(capture, review, output, evidence_url, supplements=(), inputs=None):
+def assemble(capture, review, output, evidence_url, supplements=(), inputs=None, carry_forward=None):
     """Stage files and provenance for review; never alter the current checkout or approve a supplier."""
     if output.exists():
         raise ValueError('Candidate output must not already exist')
@@ -90,6 +90,17 @@ def assemble(capture, review, output, evidence_url, supplements=(), inputs=None)
     manifest = {'schema': 1, 'reviewed_from': {'repository': 'marmot-protocol/whitenoise-android',
                 'source_sha': (capture / 'source.txt').read_text().strip(), 'evidence': evidence_url,
                 'retained': retained}, 'files': files, 'coverage': coverage, 'suppliers': suppliers}
+    if carry_forward is not None:
+        # Reviewed exceptions outlive one capture; reviewers prune entries the new graph no longer needs.
+        reviewed = json.loads(carry_forward.read_text(), object_pairs_hook=unique_object)
+        for key in ['post_lock_selection', 'supplemental_tools']:
+            if key in reviewed:
+                manifest[key] = reviewed[key]
+        for item in manifest.get('post_lock_selection', []):
+            if 'retained' in item:
+                destination = output / item['retained']['path']
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(carry_forward.resolve().parents[1] / item['retained']['path'], destination)
     (output / 'gradle/dependency-inputs.json').write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n')
     validate_bundle(output)
     return manifest
@@ -104,8 +115,11 @@ def main():
     parser.add_argument('--evidence-url', required=True)
     parser.add_argument('--supplemental', type=Path, action='append', default=[])
     parser.add_argument('--inputs', type=Path, help='Explicit normal-build-qualified lock/XML directory, if different from capture')
+    parser.add_argument('--carry-forward', type=Path,
+                        help='Committed gradle/dependency-inputs.json whose reviewed exceptions remain required')
     args = parser.parse_args()
-    assemble(args.capture, args.review, args.output, args.evidence_url, args.supplemental, args.inputs)
+    assemble(args.capture, args.review, args.output, args.evidence_url, args.supplemental, args.inputs,
+             args.carry_forward)
     print('Staged dependency input candidate: ' + str(args.output))
 
 

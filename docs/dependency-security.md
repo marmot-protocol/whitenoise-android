@@ -215,14 +215,17 @@ merge. This adds a required maintainer review step to Gradle updates.
    ```sh
    python3 scripts/assemble_dependency_inputs.py --capture <capture> --review <review> \
      --supplemental <review>/metadata-closure.json --output <staged> \
+     --carry-forward gradle/dependency-inputs.json \
      --evidence-url https://github.com/marmot-protocol/whitenoise-android/actions/runs/<run>/artifacts/<artifact>
    ```
 
    This generates the lock/checksum manifest, exact coverage, retained compressed
    capture/build inputs and authenticated publication paths. It requires every
    candidate byte to have independent supplier evidence and validates the staged
-   bundle. Inspect the complete diff before copying its files into the branch;
-   assembly is not approval. Additional exact platform/tool records can be passed
+   bundle. `--carry-forward` keeps the reviewed `post_lock_selection` and
+   `supplemental_tools` records and their retained evidence; remove an entry
+   only after the new graph no longer needs it. Inspect the complete diff before
+   copying `<staged>`'s files into the branch; assembly is not approval. Additional exact platform/tool records can be passed
    as another `--supplemental` file after independent review.
 4. Review changed transitive selections, supplier URLs and runtime notices. Update
    the local catalogue for changed runtime bytes while preserving the pinned
@@ -231,6 +234,16 @@ merge. This adds a required maintainer review step to Gradle updates.
    and reassemble using `--inputs <normal-qualified-lock-and-xml-directory>`.
    Never repair an unknown download with broad trust, a global exclusion or an
    unlocked classpath. Keep any failed candidate's evidence for diagnosis.
+
+Land Gradle dependency updates one at a time. Each assembly rewrites
+`reviewed_from` and the retained `gradle/dependency-evidence/` files, so two update
+branches always conflict; rebase the next one onto the merged update and capture
+it again. Grouping a week's Dependabot bumps into one branch keeps that to one
+review. Pushing evidence commits to a Dependabot branch stops Dependabot from
+rebasing it, and `@dependabot recreate` or `@dependabot rebase` discards those
+commits, so finish the update by hand once the evidence is pushed. Gradle only
+adds checksum entries; records for versions the build no longer reads stay in
+the XML until a reviewed cleanup removes them, and the locks keep them unselected.
 
 `gradle/dependency-evidence/` retains the original captured reports, original
 candidate inputs and build-source snapshots as deterministic gzip with a pinned
@@ -265,7 +278,10 @@ plugin component that bypass an edge-specific exclusion. This bootstrap observed
 that with Roborazzi: its core/core-jvm lock constraints expose the upstream JUnit
 4.13.2 → Hamcrest 1.3 runtime dependency despite the plugin edge's JUnit exclusion.
 Those exact tooling-only selections are retained in the root classpath lock, with
-the normal-resolution graph artifact recorded under `post_lock_selection`. Their
+the normal-resolution graph report recorded under `post_lock_selection` and
+retained in `gradle/dependency-evidence/post-lock-selection/`. The validator
+requires each exception's coordinates in a committed lock, its metadata in the
+checksum records and any retained copy to match its pinned SHA-256. Their
 checksums were independently checked with the other test/tooling inputs. A bulk
 `--write-locks` capture can omit that path, so preserve/requalify this normal-graph
 evidence during updates; never repair it with a global exclusion or unlocked
@@ -288,5 +304,6 @@ External artifacts transformed into directories are reported under
 `unfingerprinted_artifacts` with an explicit kind/reason and partial fingerprint
 coverage. The collector never opens such a directory as an archive or invents a
 binary checksum. Selected components/security floors remain checked; comparisons
-reject that incomplete fingerprint coverage. A hosted real directory-transform
-fixture exercises this reporting seam.
+report that configuration's artifact comparison as unavailable while its other
+evidence stays comparable. A hosted real directory-transform fixture exercises
+this reporting seam.

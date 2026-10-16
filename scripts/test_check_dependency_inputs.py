@@ -107,6 +107,56 @@ class DependencyInputsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Expected captured'):
             runtime_identities(runtime)
 
+    def test_assembly_carries_reviewed_exceptions_and_their_retained_evidence(self):
+        """A new capture keeps reviewed post-lock exceptions instead of silently dropping them."""
+        from scripts.assemble_dependency_inputs import assemble
+        import shutil
+        retained = self.root / 'gradle/dependency-evidence/post-lock-selection/report.json.gz'
+        retained.parent.mkdir(parents=True)
+        retained.write_bytes(b'retained report')
+        self.manifest['post_lock_selection'] = [{
+            'scope': 'plugin', 'configuration': 'classpath', 'project': ':',
+            'additional_coordinates': [], 'additional_metadata': ['example:library:1.0/library-1.0.jar'],
+            'reason': 'Reviewed fixture exception',
+            'evidence': 'https://github.com/marmot-protocol/whitenoise-android/actions/runs/1/artifacts/2',
+            'retained': {'path': str(retained.relative_to(self.root)),
+                         'sha256': hashlib.sha256(retained.read_bytes()).hexdigest()}}]
+        self.manifest['supplemental_tools'] = {'fixture': 'reviewed'}
+        self.save()
+        self.assertEqual((10, 1), inputs.validate_bundle(self.root))
+        capture = self.root / 'capture'; capture.mkdir()
+        for relative in self.manifest['files']:
+            destination = capture / 'candidate-inputs' / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(self.root / relative, destination)
+        (capture / 'source.txt').write_text('b' * 40 + '\n')
+        for name in ['source-inputs.json', 'artifact-evidence.json']:
+            (capture / name).write_text(json.dumps({'schema': 1, 'source_sha': 'b' * 40, 'artifacts': []}))
+        (capture / 'resolution.json').write_text(json.dumps({'schema': 1, 'observations': self.manifest['coverage']}))
+        review = self.root / 'review'; review.mkdir()
+        (review / 'provenance.json').write_text(json.dumps(self.manifest['suppliers']))
+        destination = self.root / 'staged-candidate'
+        result = assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'],
+                          carry_forward=self.root / 'gradle/dependency-inputs.json')
+        self.assertEqual(self.manifest['post_lock_selection'], result['post_lock_selection'])
+        self.assertEqual({'fixture': 'reviewed'}, result['supplemental_tools'])
+        self.assertTrue((destination / retained.relative_to(self.root)).is_file())
+
+    def test_exceptions_must_name_locked_coordinates_and_checked_metadata(self):
+        """Free-text exceptions cannot claim selections or metadata the trust root lacks."""
+        base = {'scope': 'plugin', 'configuration': 'classpath', 'reason': 'Reviewed fixture exception',
+                'evidence': 'https://github.com/marmot-protocol/whitenoise-android/actions/runs/1/job/2'}
+        for item, message in [
+                (dict(base, additional_coordinates=['example:unlocked:1.0']), 'absent from committed locks'),
+                (dict(base, additional_metadata=['example:library:1.0/library-1.0.pom']), 'without a checksum'),
+                (dict(base, reason=' '), 'lacks scope, reason or evidence'),
+                (dict(base, retained={'path': 'gradle/dependency-evidence/missing.gz', 'sha256': 'a' * 64}),
+                 'retained dependency exception evidence')]:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                self.manifest['post_lock_selection'] = [item]
+                self.save()
+                inputs.validate_bundle(self.root)
+
     def test_changed_bytes_and_missing_module_lock_fail(self):
         """A validly formatted changed lock is still stale evidence."""
         path = self.root / 'fuzz/gradle.lockfile'
@@ -218,6 +268,23 @@ class DependencyInputsTest(unittest.TestCase):
             XML.replace('</configuration>', '<trusted-artifacts/></configuration>'),
             XML.replace('name="library-1.0.jar"', 'name="library-1.0.jar" trust="true"'),
             XML.replace('</verification-metadata>', '<unknown-section/></verification-metadata>'),
+        ]
+        for text in variants:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                self.metadata.write_text(text)
+                inputs.validate_verification(self.metadata)
+
+    def test_scalar_text_must_match_what_gradle_parses(self):
+        """Text Gradle reads as false or ignores cannot pass after ElementTree normalization."""
+        variants = [
+            XML.replace('>true<', '>true <'),
+            XML.replace('>true<', '>\n  true\n<'),
+            XML.replace('>true<', '>true<!-- reviewed --> <'),
+            XML.replace('>true<', '>tru&#101;<'),
+            XML.replace('>true<', '><![CDATA[true]]><'),
+            XML.replace('>false<', '>false <'),
+            XML.replace('<component ', '<g:component xmlns:g="urn:example" ').replace(
+                '</component>', '</g:component>'),
         ]
         for text in variants:
             with self.subTest(text=text), self.assertRaises(ValueError):

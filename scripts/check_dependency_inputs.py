@@ -19,6 +19,15 @@ def validate_verification(path):
     data = path.read_bytes()
     if len(data) > 8 * 1024 * 1024 or re.search(br'<!\s*(DOCTYPE|ENTITY)\b', data, re.IGNORECASE):
         raise ValueError('Unsafe dependency verification XML')
+    # Gradle parses each raw text chunk of these scalars, so whitespace, comments or
+    # character references that ElementTree would normalize can disable verification.
+    if (data.count(b'<configuration') != 1 or not re.search(
+            rb'<configuration>\s*<verify-metadata>true</verify-metadata>\s*'
+            rb'<verify-signatures>false</verify-signatures>\s*</configuration>', data)):
+        raise ValueError('Dependency metadata must be verified with the reviewed checksum policy')
+    # Gradle matches unprefixed element names only, so a prefixed record is invisible to it.
+    if re.search(rb'</?[A-Za-z_][\w.-]*:', data):
+        raise ValueError('Unexpected verification XML namespace')
     root = ET.fromstring(data)
     namespace = '{https://schema.gradle.org/dependency-verification}' if root.tag.startswith('{') else ''
     if root.tag != namespace + 'verification-metadata':
@@ -37,7 +46,7 @@ def validate_verification(path):
             any(node.attrib or len(node) for node in config) or (config.text or '').strip() or
             any((node.tail or '').strip() for node in config)):
         raise ValueError('Unreviewed verification bypass or duplicate configuration entry')
-    if (config[0].text or '').strip() != 'true' or (config[1].text or '').strip() != 'false':
+    if config[0].text != 'true' or config[1].text != 'false':
         raise ValueError('Dependency metadata must be verified with the reviewed checksum policy')
     if components.attrib or not len(components) or (components.text or '').strip():
         raise ValueError('Missing dependency checksums')
@@ -242,7 +251,35 @@ def validate_bundle(root):
         suppliers[key] = item
     if set(suppliers) != set(records):
         raise ValueError('Missing independent artifact supplier checks')
+    validate_exceptions(manifest, records, root, actual_locks)
     return len(locks), len(records)
+
+
+def validate_exceptions(manifest, records, root, lock_names):
+    """Tie each reviewed post-lock exception to committed locks, checksums and evidence."""
+    exceptions = manifest.get('post_lock_selection', [])
+    if not isinstance(exceptions, list) or not isinstance(manifest.get('supplemental_tools', {}), dict):
+        raise ValueError('Malformed reviewed dependency exceptions')
+    locked = {line.split('=', 1)[0] for name in lock_names
+              for line in (root / name).read_text(encoding='utf-8').splitlines()
+              if '=' in line and not line.startswith(('#', 'empty='))}
+    for item in exceptions:
+        if (not isinstance(item, dict) or item.get('scope') not in ['project', 'plugin', 'metadata'] or
+                not isinstance(item.get('reason'), str) or not item['reason'].strip() or
+                not str(item.get('evidence', '')).startswith('https://github.com/' + REPOSITORY + '/actions/runs/')):
+            raise ValueError('Reviewed dependency exception lacks scope, reason or evidence')
+        if any(coordinate not in locked for coordinate in item.get('additional_coordinates', [])):
+            raise ValueError('Dependency exception names a coordinate absent from committed locks')
+        if any(tuple(entry.split('/', 1)) not in records for entry in item.get('additional_metadata', [])):
+            raise ValueError('Dependency exception names metadata without a checksum record')
+        if 'retained' in item:
+            # Hosted evidence expires; a retained copy keeps the exception auditable.
+            relative = item['retained'].get('path', '')
+            path = root / relative
+            if (not relative.startswith('gradle/dependency-evidence/') or '..' in Path(relative).parts or
+                    not path.is_file() or path.is_symlink() or
+                    hashlib.sha256(path.read_bytes()).hexdigest() != item['retained'].get('sha256')):
+                raise ValueError('Missing or changed retained dependency exception evidence')
 
 
 def main():

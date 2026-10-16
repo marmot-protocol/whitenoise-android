@@ -36,7 +36,8 @@ def capture(root):
     inputs = {}
     for name in names:
         if (name.endswith(('.gradle', '.gradle.kts', '.versions.toml')) or
-                name in ['scripts/capture_dependency_candidates.py', '.github/workflows/android-ci.yml']):
+                name in ['scripts/capture_dependency_candidates.py', '.github/workflows/android-ci.yml',
+                         'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties']):
             data = subprocess.check_output(['git', 'show', 'HEAD:' + name], cwd=root)
             if len(data) > 2 * 1024 * 1024:
                 raise ValueError('Oversized captured build input')
@@ -51,6 +52,9 @@ def capture(root):
         if len(segments) != 3 or not all(re.fullmatch(r'[A-Za-z0-9_.-]+', p) for p in segments):
             raise ValueError('Unsafe artifact coordinate: ' + coordinate)
         artifact = Path(item['path'])
+        if not artifact.is_file():
+            # A transformed directory has no archive bytes to review or attribute.
+            raise ValueError('Capture needs a regular artifact file: ' + coordinate + ' ' + artifact.name)
         directory = output / 'notice-inputs' / Path(*segments)
         directory.mkdir(parents=True, exist_ok=True)
         sources = []

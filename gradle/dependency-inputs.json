@@ -1454,6 +1454,10 @@
       "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38772291546/artifacts/11991348367",
       "project": ":",
       "reason": "Normal locked resolution introduces a root lock-constraint path through roborazzi-core/core-jvm, outside roborazzi-gradle-plugin's edge-specific JUnit exclusion. Preserve the exact observed tooling-only JUnit/Hamcrest selections; their artifact checksums were already independently verified.",
+      "retained": {
+        "path": "gradle/dependency-evidence/post-lock-selection/root-plugin-classpath.json.gz",
+        "sha256": "75c007bfab3bd107e50cc19ab5d28246769fe1da1c1084d8cd348c69cb6797b1"
+      },
       "scope": "plugin"
     },
     {
