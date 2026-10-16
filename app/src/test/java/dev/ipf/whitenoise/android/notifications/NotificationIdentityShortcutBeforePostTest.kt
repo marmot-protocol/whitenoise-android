@@ -94,6 +94,42 @@ class NotificationIdentityShortcutBeforePostTest {
         assertEquals(listOf("shortcut", "post", "post"), recorder.events)
     }
 
+    /**
+     * A conversation removed on this device and joined again under the same group id publishes its shortcut again
+     * before its next first card, instead of only reporting use of the shortcut the removal deleted.
+     */
+    @Test
+    fun forgottenConversationPublishesItsShortcutAgainBeforeItsNextFirstPost() {
+        val recorder = Recorder()
+        val presenter = presenter(recorder)
+        val picture = solid(Color.BLUE)
+        post(presenter, update(isDm = false), picture = picture)
+        manager.cancelAll()
+        val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(shortcutId))
+        presenter.forgetConversationShortcut(ACCOUNT, GROUP)
+
+        post(presenter, update(isDm = false, messageIdHex = "after-reset"), picture = picture)
+
+        assertEquals(listOf("shortcut", "post", "shortcut", "post"), recorder.events)
+        assertEquals(listOf(shortcutId), ShortcutManagerCompat.getDynamicShortcuts(context).map { it.id })
+    }
+
+    /** Forgetting one conversation leaves another conversation's snapshot, so that one is not published again. */
+    @Test
+    fun forgettingOneConversationKeepsAnotherConversationsSnapshot() {
+        val recorder = Recorder()
+        val presenter = presenter(recorder)
+        val picture = solid(Color.BLUE)
+        post(presenter, update(isDm = false, groupIdHex = OTHER_GROUP), picture = picture)
+        manager.cancelAll()
+        presenter.forgetConversationShortcut(ACCOUNT, GROUP)
+
+        post(presenter, update(isDm = false, groupIdHex = OTHER_GROUP, messageIdHex = "second"), picture = picture)
+
+        assertEquals(listOf("shortcut", "post", "post"), recorder.events)
+    }
+
     /** App lock never publishes a shortcut, and its card carries none. */
     @Test
     fun appLockPublishesNoShortcut() {

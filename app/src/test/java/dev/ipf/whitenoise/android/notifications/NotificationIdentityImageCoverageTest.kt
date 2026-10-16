@@ -99,6 +99,22 @@ class NotificationIdentityImageCoverageTest {
         assertFalse("the lock-screen version stays generic", "LargeIcon" in redacted || "IdentityImage" in redacted)
     }
 
+    /**
+     * Local removal drops the presenter's snapshot of the removed conversation shortcut on both removal paths, so a
+     * conversation joined again under the same group id publishes its shortcut before its first card.
+     */
+    @Test
+    fun localRemovalForgetsTheConversationShortcutSnapshot() {
+        val lifecycle = File(notificationsRoot().parentFile, "state/PinnedShortcutLifecycle.kt").readText()
+        listOf("removePinnedConversationShortcuts", "removeRevokedPinnedConversationShortcuts").forEach { name ->
+            val body = lifecycle.extensionBody(name)
+            assertTrue("$name forgets the snapshot", "forgetNotificationConversationShortcut(" in body)
+        }
+        val forget = source("LocalNotificationPresenter.kt").functionBody("forgetConversationShortcut")
+        assertTrue("the snapshot goes", "shortcutSnapshots.remove(" in forget)
+        assertTrue("and so does its recency", "shortcutLastUsed.remove(" in forget)
+    }
+
     /** Body of an extension function such as `fun Receiver.name(...)`, which [functionBody] does not match. */
     private fun String.extensionBody(name: String): String {
         val start =

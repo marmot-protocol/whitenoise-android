@@ -8623,6 +8623,14 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Drops the notification presenter's shortcut snapshot for a conversation whose shortcut was just removed. */
+    internal fun forgetNotificationConversationShortcut(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        localNotificationPresenter.forgetConversationShortcut(accountRef, groupIdHex)
+    }
+
     /** Reuses the live native client for a retention preflight when one already exists. */
     internal fun retentionSweepRuntimeOrNull(): MarmotInterface? = marmotRuntime?.marmot
 

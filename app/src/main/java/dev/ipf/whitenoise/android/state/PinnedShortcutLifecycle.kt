@@ -25,17 +25,28 @@ internal fun WhiteNoiseAppState.pinnedShortcutTargetIsCurrent(target: Notificati
     )
 }
 
-/** Confirmed local removal invalidates pending launcher requests as well as already-visible pins. */
+/**
+ * Confirmed local removal invalidates pending launcher requests as well as already-visible pins. The notification
+ * presenter's snapshot of the removed conversation shortcut is dropped too, so a new conversation under the same
+ * group id publishes its shortcut again before its first card.
+ */
 internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
     accountRef: String,
     groupIdHex: String,
 ) {
-    withContext(Dispatchers.IO) {
-        PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex)
+    try {
+        withContext(Dispatchers.IO) {
+            PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex)
+        }
+    } finally {
+        forgetNotificationConversationShortcut(accountRef, groupIdHex)
     }
 }
 
-/** Platform failure cannot undo native removal after durable revocation; later refresh retries presentation cleanup. */
+/**
+ * Platform failure cannot undo native removal after durable revocation; later refresh retries presentation cleanup.
+ * The notification presenter's snapshot of the removed conversation shortcut is dropped either way.
+ */
 internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts(
     accountRef: String,
     groupIdHex: String,
@@ -44,6 +55,7 @@ internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts
         runCatching { PinnedConversationShortcuts(appContext).removeRevokedGroup(accountRef, groupIdHex) }
             .onFailure { appStateDebug(it) { "revoked launcher presentation cleanup deferred" } }
     }
+    forgetNotificationConversationShortcut(accountRef, groupIdHex)
 }
 
 /** Persist credential revocation before a native deletion, reset or account sign-out can become durable. */

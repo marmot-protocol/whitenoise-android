@@ -198,6 +198,23 @@ class LocalNotificationPresenter(
             }
     }
 
+    /**
+     * Forgets the published-shortcut snapshot of one locally removed conversation (abandon, reset or local delete),
+     * after its launcher cleanup removed the platform shortcut. A new conversation under the same group id then
+     * publishes its identity shortcut again before its first card, instead of only reporting use of a shortcut that
+     * no longer exists.
+     */
+    internal fun forgetConversationShortcut(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        val shortcutId = conversationShortcutId(accountRef, groupIdHex) ?: return
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            shortcutSnapshots.remove(shortcutId)
+            shortcutLastUsed.remove(shortcutId)
+        }
+    }
+
     fun canPostNotifications(): Boolean = notificationPermissionGranted(context)
 
     /**
