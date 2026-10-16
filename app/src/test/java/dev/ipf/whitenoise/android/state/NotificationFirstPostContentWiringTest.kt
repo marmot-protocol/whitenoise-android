@@ -45,7 +45,10 @@ class NotificationFirstPostContentWiringTest {
         )
     }
 
-    /** Requires content correction to consume the shared permit before avatar work. */
+    /**
+     * Requires content correction to consume the shared permit before avatar work, and the avatar prewarm to run
+     * before the single late-picture refresh it feeds (#3311).
+     */
     @Test
     fun lateContentCorrectionRunsBeforeAvatarWorkAndKeepsOneWrite() {
         val source = appStateSource().readText()
@@ -60,8 +63,8 @@ class NotificationFirstPostContentWiringTest {
         val contentCorrection = source.functionBody("postNotificationContentCorrection")
         val firstResolve =
             enrichment.indexOf("notificationContentResolution.firstPost.resolve(update, localOnly = false)")
-        val avatarPreWarm =
-            contentCorrection.indexOf("notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)")
+        val avatarPreWarm = contentCorrection.indexOf("refreshLateNotificationIdentity(")
+        val pictureRefresh = source.functionBody("refreshLateNotificationIdentity")
 
         assertTrue("late text must resolve before routing correction work", firstResolve >= 0)
         assertTrue(
@@ -83,7 +86,14 @@ class NotificationFirstPostContentWiringTest {
         )
         assertTrue(
             "avatar lookup must remain behind the content-routing decision",
-            "notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)" in routing,
+            "refreshLateNotificationIdentity(" in routing,
+        )
+        val preWarm = pictureRefresh.indexOf("notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)")
+        assertTrue(
+            "the prewarm runs before the late-picture refresh it feeds, under the late-correction fences",
+            preWarm >= 0 &&
+                preWarm < pictureRefresh.indexOf("refreshLateIdentityImage(") &&
+                "isNotificationEnrichmentAllowed(update, firstPost)" in pictureRefresh,
         )
     }
 

@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
+import dev.ipf.whitenoise.android.notifications.LocalNotificationContent
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
@@ -11416,8 +11417,10 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Publishes at most one silent text correction. Imagery is fixed on first
-     * publication so a completed card never repaints solely for an avatar.
+     * Publishes at most one silent text correction. A card first drawn without
+     * its conversation or sender picture then gets at most one silent picture
+     * rewrite once the avatar prewarm has made that picture available (#3311),
+     * and a card that already showed its pictures is never repainted for imagery.
      */
     private suspend fun enrichPostedNotificationUpdate(
         update: NotificationUpdateFfi,
@@ -11459,28 +11462,55 @@ class WhiteNoiseAppState private constructor(
                 resolvedPresentation = resolvedPresentation,
             ) == NotificationLateCorrectionPlan.Content
         ) {
-            postNotificationContentCorrection(update, firstPost, content)
+            postNotificationContentCorrection(update, firstPost, content, resolvedPresentation.content)
         } else {
-            notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+            refreshLateNotificationIdentity(update, firstPost, resolvedPresentation.content)
             NotificationLateCorrectionOutcome.Unchanged
         }
     }
 
-    /** Posts corrected text and primes imagery without spending another write. */
+    /** Posts corrected text, then primes imagery and gives the corrected card a picture it was drawn without. */
     private suspend fun postNotificationContentCorrection(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: NotificationFirstPostContent,
+        correctedContent: LocalNotificationContent?,
     ): NotificationLateCorrectionOutcome {
         val posted = postNotificationLateCorrection(update, firstPost, content)
         return if (posted) {
-            // Prime future cards only after the text correction is visible. A
-            // fallback receives at most one replacement for this message.
-            notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+            // Prime imagery only after the text correction is visible. A
+            // fallback receives at most one text replacement for this message.
+            refreshLateNotificationIdentity(update, firstPost, correctedContent)
             NotificationLateCorrectionOutcome.ContentPosted
         } else {
             NotificationLateCorrectionOutcome.Stale
         }
+    }
+
+    /**
+     * #3311: runs the post-write avatar prewarm, then gives a card first drawn
+     * without its conversation or sender picture the picture that has since
+     * become available, as one silent rewrite of the same live card under
+     * every fence a late correction obeys. [content] is what the card shows.
+     * App lock, a switched account, a newer epoch, or a dismissed, read or
+     * replaced card stop it here or at the write, and the presenter leaves
+     * redacted and hidden-preview cards alone.
+     */
+    private suspend fun refreshLateNotificationIdentity(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        content: LocalNotificationContent?,
+    ) {
+        val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+        val sources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        if (content == null || !sources.hasMissingPicture || !isNotificationEnrichmentAllowed(update, firstPost)) return
+        localNotificationPresenter.refreshLateIdentityImage(
+            update = update,
+            content = content,
+            pictures = sources,
+            directShareEligible = update.accountRef == activeAccountRef,
+            isRefreshCurrent = { isNotificationEnrichmentAllowed(update, firstPost) },
+        )
     }
 
     /** Posts either the resolved first-draw value or the existing safe fallback. */

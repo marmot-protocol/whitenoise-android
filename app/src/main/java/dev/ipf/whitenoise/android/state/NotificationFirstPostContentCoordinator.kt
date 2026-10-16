@@ -104,13 +104,16 @@ internal fun NotificationFirstPostContentResult<*>.timingOutcome(): String =
         NotificationFirstPostContentResult.Busy -> "busy_fallback"
     }
 
-/** The sole optional write permitted after a notification's first successful post. */
+/**
+ * The sole optional text correction permitted after a notification's first successful post. A card drawn without its
+ * picture has a separate, single silent picture rewrite (#3311).
+ */
 internal enum class NotificationLateCorrectionPlan {
     Content,
     None,
 }
 
-/** Allows a late write only when user-visible text changed, never for cosmetic imagery. */
+/** Allows a late text write only when user-visible text changed, and imagery never triggers a text correction. */
 internal fun notificationLateCorrectionPlan(
     firstPresentation: NotificationContentPresentation,
     resolvedPresentation: NotificationContentPresentation,

@@ -46,6 +46,32 @@ internal fun LocalNotificationContent.identityImage(
     )
 }
 
+/**
+ * Where a card's two picture slots may still come from after its first post (#3311): the bitmap the first post drew,
+ * authoritative when present, and the URL a missing one may resolve from. A present bitmap's URL is never fetched.
+ */
+internal data class NotificationIdentityPictureSources(
+    val conversationBitmap: Bitmap?,
+    val conversationUrl: String?,
+    val senderBitmap: Bitmap?,
+    val senderUrl: String?,
+) {
+    /** True when the card was drawn without a picture that a URL may still supply. */
+    val hasMissingPicture: Boolean
+        get() =
+            (conversationBitmap == null && !conversationUrl.isNullOrBlank()) ||
+                (senderBitmap == null && !senderUrl.isNullOrBlank())
+}
+
+/**
+ * The title and monogram seed a live card's identity snapshot recorded, so a late picture redraws the same snapshot
+ * with only its pixels changed. Null for a card that carries no identity, such as a redacted or generic one.
+ */
+internal fun Notification.recordedIdentityInputs(): Pair<String, String>? =
+    extras?.getBundle(EXTRA_IDENTITY_IMAGE)?.let { inputs ->
+        inputs.getString(IDENTITY_TITLE).orEmpty() to inputs.getString(IDENTITY_SEED).orEmpty()
+    }
+
 /** Puts [image] in the card's primary picture slot and records what a final-write refresh needs to redraw it. */
 internal fun NotificationCompat.Builder.setConversationIdentityImage(image: NotificationIdentityImage) =
     setLargeIcon(image.bitmap).addExtras(Bundle().apply { putBundle(EXTRA_IDENTITY_IMAGE, image.refreshInputs()) })

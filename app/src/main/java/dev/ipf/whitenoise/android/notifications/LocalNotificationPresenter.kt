@@ -1464,19 +1464,24 @@ class LocalNotificationPresenter(
         )
     }
 
+    /** Resolves the post's picture inputs, fetching only a slot that has a URL and no bitmap. */
     private suspend fun resolveMessagingAvatars(messaging: MessagingPostContext): Pair<Bitmap?, Bitmap?> =
+        resolveAvatars(
+            NotificationIdentityPictureSources(
+                conversationBitmap = messaging.conversationAvatarBitmap,
+                conversationUrl = messaging.conversationAvatarUrl,
+                senderBitmap = messaging.senderAvatarBitmap,
+                senderUrl = messaging.senderAvatarUrl,
+            ),
+        )
+
+    /** Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it. */
+    private suspend fun resolveAvatars(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?> =
         withContext(Dispatchers.Default) {
             coroutineScope {
                 val conversationAvatar =
-                    async {
-                        messaging.conversationAvatarBitmap
-                            ?: avatarBitmapResolver(messaging.conversationAvatarUrl)
-                    }
-                val senderAvatar =
-                    async {
-                        messaging.senderAvatarBitmap
-                            ?: avatarBitmapResolver(messaging.senderAvatarUrl)
-                    }
+                    async { sources.conversationBitmap ?: avatarBitmapResolver(sources.conversationUrl) }
+                val senderAvatar = async { sources.senderBitmap ?: avatarBitmapResolver(sources.senderUrl) }
                 conversationAvatar.await() to senderAvatar.await()
             }
         }
@@ -1569,6 +1574,148 @@ class LocalNotificationPresenter(
             )
         }
     }
+
+    /**
+     * #3311: gives a card first drawn without its conversation or sender picture the picture that became available
+     * after the post, as one silent rewrite of the same live card. AppState calls this once the post-write avatar
+     * prewarm has run. Only a still-live, rich, preview-allowed card for this message, and the app's latest write
+     * for its key, is rewritten, through the same enrichment rewrite a late picture uses, so the card keeps its key,
+     * text, history, timestamp and actions and alerts only once. The conversation shortcut is republished with the
+     * picture on the same path. Dismissed, read, replaced, redacted and hidden-preview cards are left alone, and
+     * [isRefreshCurrent] carries the caller's account, lock and post fences up to the platform write. Returns
+     * whether the card was rewritten.
+     */
+    internal suspend fun refreshLateIdentityImage(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        pictures: NotificationIdentityPictureSources,
+        directShareEligible: Boolean,
+        isRefreshCurrent: () -> Boolean,
+    ): Boolean =
+        withContext(Dispatchers.Default) {
+            val arrived = arrivedPictures(pictures)?.takeIf { isRefreshCurrent() }
+            if (arrived == null) {
+                false
+            } else {
+                // A late picture is another platform write for the same card, so it takes a slot like the first.
+                postPacer.awaitSlot()
+                ConversationCardPostSynchronizer.withLock(
+                    content.notificationTag,
+                    content.notificationId,
+                    ConversationCardOp.SHOW_ENRICH,
+                ) {
+                    val refresh = LateIdentityRefresh(update, content, arrived, directShareEligible, isRefreshCurrent)
+                    refreshableIdentityCard(update, content)
+                        ?.takeIf { isRefreshCurrent() }
+                        ?.let { live -> rewriteWithLatePictures(refresh, live) } == true
+                }
+            }
+        }
+
+    /**
+     * The card's final pictures once at least one it was drawn without has arrived, or null when none has. Nothing is
+     * fetched while previews are hidden, and a picture the card already showed is never fetched again.
+     */
+    private suspend fun arrivedPictures(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?>? =
+        if (!sources.hasMissingPicture || !NotificationPreviewPreferences.capture(context).allowed) {
+            null
+        } else {
+            resolveAvatars(sources).takeIf { (conversation, sender) ->
+                conversation !== sources.conversationBitmap || sender !== sources.senderBitmap
+            }
+        }
+
+    /**
+     * The live card a late picture may rewrite: this message's card, the app's latest write for its key and not
+     * dismissed, carrying an identity snapshot, and still allowed to show its preview. A redacted or hidden-preview
+     * card fails [NotificationPreviewPreferences.canExpose], and a replaced or dismissed one fails the rest.
+     */
+    private fun refreshableIdentityCard(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+    ): StatusBarNotification? {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return null
+        val expectedMessageId = update.messageIdHex?.takeIf(String::isNotBlank)
+        return activeNotification(manager, content.notificationTag, content.notificationId)?.takeIf { live ->
+            val card = live.notification
+            val generation = card.extras.getString(EXTRA_GENERATION)
+            val latestWrite =
+                generation != null &&
+                    !NotificationCardGenerations.isDismissed(generation) &&
+                    ConversationCardPostedRegistry.latestGeneration(live.tag.orEmpty(), live.id) == generation
+            val sameMessage = expectedMessageId != null && conversationCardMessageIdHex(card) == expectedMessageId
+            sameMessage &&
+                latestWrite &&
+                card.recordedIdentityInputs() != null &&
+                NotificationPreviewPreferences.canExpose(context, card, card)
+        }
+    }
+
+    /**
+     * Republishes the conversation shortcut with the late pictures and rewrites [live] through the enrichment rewrite.
+     * The card keeps its own sender Person, so a sender renamed since the post keeps the new name, and its recorded
+     * identity title and monogram seed, so only the pictures change.
+     */
+    private fun rewriteWithLatePictures(
+        refresh: LateIdentityRefresh,
+        live: StatusBarNotification,
+    ): Boolean {
+        val card = live.notification
+        val inputs = card.recordedIdentityInputs()
+        val livePerson = liveSenderPerson(card, refresh.content.senderKey)
+        if (inputs == null || livePerson == null) return false
+        val (conversation, senderPicture) = refresh.pictures
+        val sender =
+            senderPicture?.let { livePerson.toBuilder().setIcon(IconCompat.createWithBitmap(it)).build() } ?: livePerson
+        val (title, seed) = inputs
+        val identity =
+            refresh.content.identityImage(
+                seed = seed,
+                titleOverride = title,
+                conversationAvatar = conversation,
+                senderAvatar = senderPicture,
+            )
+        card.shortcutId?.let { shortcutId ->
+            publishConversationShortcut(
+                update = refresh.update,
+                content = refresh.content,
+                shortcutId = shortcutId,
+                locusId = LocusIdCompat(shortcutId),
+                conversationAvatarUrl = null,
+                conversationAvatarBitmap = conversation,
+                senderAvatarUrl = null,
+                senderAvatarBitmap = senderPicture,
+                sender = sender,
+                directShareEligible = refresh.directShareEligible,
+                isPublishAllowed = { refresh.isCurrent() && canPublishPreviewShortcut(refresh.content, card) },
+            )
+        }
+        return enrichedIdentityNotification(card, sender, identity)?.let { rewritten ->
+            postNotificationSafely(
+                NotificationManagerCompat.from(context),
+                live.tag.orEmpty(),
+                live.id,
+                rewritten,
+                recordedAtMs = dismissalTime(live),
+                mustBeLive = true,
+                finalPostAllowed = refresh.isCurrent,
+            ) == NotificationCardWriteResult.WRITTEN
+        } == true
+    }
+
+    /** The live card's own Person for [senderKey], from the conversation template or the long-message text block. */
+    private fun liveSenderPerson(
+        card: Notification,
+        senderKey: String,
+    ): Person? =
+        NotificationCompat.MessagingStyle
+            .extractMessagingStyleFromNotification(card)
+            ?.let { style -> style.messages + style.historicMessages }
+            ?.firstNotNullOfOrNull { message -> message.person?.takeIf { it.key == senderKey } }
+            ?: card.extras
+                ?.getBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER)
+                ?.let(Person::fromBundle)
+                ?.takeIf { it.key == senderKey }
 
     /**
      * Rewrites the live card with the enriched sender and identity picture, for the conversation template and the
@@ -2633,6 +2780,15 @@ private data class MessagingPostContext(
             (!conversationAvatarUrl.isNullOrBlank() && conversationAvatarBitmap == null) ||
                 (!senderAvatarUrl.isNullOrBlank() && senderAvatarBitmap == null)
 }
+
+/** One late identity-picture rewrite (#3311): the message, its posted content and the card's final pictures. */
+private data class LateIdentityRefresh(
+    val update: NotificationUpdateFfi,
+    val content: LocalNotificationContent,
+    val pictures: Pair<Bitmap?, Bitmap?>,
+    val directShareEligible: Boolean,
+    val isCurrent: () -> Boolean,
+)
 
 /** Pixel generations invalidate image-only changes without retaining another copy of bitmap memory. */
 private data class ConversationShortcutSnapshot(

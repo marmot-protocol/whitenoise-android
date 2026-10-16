@@ -117,6 +117,15 @@
           "NTF-042",
           "NTF-006"
         ]
+      },
+      {
+        "surface": "late picture silently rewrites a card first drawn without it",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "internal suspend fun refreshLateIdentityImage(",
+        "test_ids": [
+          "NTF-042",
+          "NTF-036"
+        ]
       }
     ],
     "source_coverage": [

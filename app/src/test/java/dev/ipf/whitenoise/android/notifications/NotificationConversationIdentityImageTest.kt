@@ -200,6 +200,95 @@ class NotificationConversationIdentityImageTest {
         assertFalse(card.extras.keySet().any { it.contains("identity") })
     }
 
+    /**
+     * A picture that arrives after the post rewrites the live card once and silently, and the card keeps the sender
+     * name it shows now rather than the one it was first posted with.
+     */
+    @Test
+    fun lateIdentityRefreshRewritesTheLiveCardAndKeepsItsCurrentSenderName() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            show(presenter, dm())
+            presenter.refreshContactSenderName(ACCOUNT, DEFAULT_SENDER, "Maya")
+            val before = posts.size
+
+            assertTrue(refreshLateIdentity(presenter, dm()))
+
+            assertEquals(before + 1, posts.size)
+            val card = liveCard()
+            assertEquals(Color.MAGENTA, identityPixel(card))
+            assertEquals(Color.MAGENTA, pixel(lastMessagePerson(card)))
+            assertEquals("Maya", lastMessagePerson(card).name.toString())
+            assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        }
+
+    /** A redacted card is never given a late picture, and nothing is written. */
+    @Test
+    fun lateIdentityRefreshLeavesARedactedCardAlone() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            presenter.show(dm(), redactContent = true, shortNpub = { "npub1test" })
+
+            assertFalse(refreshLateIdentity(presenter, dm()))
+
+            assertEquals(1, posts.size)
+            assertNull(liveCard().getLargeIcon())
+        }
+
+    /** A card that now shows a newer message is not rewritten for the older message's picture. */
+    @Test
+    fun lateIdentityRefreshLeavesANewerMessageAlone() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            show(presenter, dm(messageId = "first"))
+            show(presenter, dm(messageId = "second"))
+
+            assertFalse(refreshLateIdentity(presenter, dm(messageId = "first")))
+
+            assertEquals(2, posts.size)
+        }
+
+    /** A card whose pictures were all in hand at its post is never refreshed or fetched for again. */
+    @Test
+    fun lateIdentityRefreshSkipsACardThatAlreadyShowedItsPictures() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = { error("a shown picture is never fetched again") })
+            show(presenter, dm(), conversation = solid(Color.RED), sender = solid(Color.RED))
+            val shown = solid(Color.RED)
+            val sources = NotificationIdentityPictureSources(shown, PICTURE_URL, shown, PICTURE_URL)
+
+            assertFalse(refreshLateIdentity(presenter, dm(), sources))
+
+            assertEquals(1, posts.size)
+        }
+
+    /** Runs the late-picture refresh for [update] as AppState does, with every caller fence open. */
+    private suspend fun refreshLateIdentity(
+        presenter: LocalNotificationPresenter,
+        update: dev.ipf.marmotkit.NotificationUpdateFfi,
+        sources: NotificationIdentityPictureSources =
+            NotificationIdentityPictureSources(null, PICTURE_URL, null, PICTURE_URL),
+    ): Boolean =
+        presenter.refreshLateIdentityImage(
+            update = update,
+            content =
+                checkNotNull(
+                    LocalNotificationFormatter.content(
+                        update,
+                        context,
+                        previewTextOverride = "hi",
+                        shortNpub = { "npub1test" },
+                    ),
+                ),
+            pictures = sources,
+            directShareEligible = false,
+            isRefreshCurrent = { true },
+        )
+
     /** Builds a presenter whose posts, avatar resolution and contact pictures the scenario controls. */
     private fun presenter(
         posts: MutableList<Notification> = mutableListOf(),
@@ -300,5 +389,6 @@ class NotificationConversationIdentityImageTest {
         const val KEY = "key"
         const val CONVERSATION = "conv"
         const val PICTURE_PX = 8
+        const val PICTURE_URL = "https://example.com/alice.png"
     }
 }

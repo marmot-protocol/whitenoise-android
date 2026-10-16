@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.graphics.Bitmap
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.notifications.NotificationIdentityPictureSources
 
 /** Avatar warmup metadata or exact ready-local bitmaps retained across first publication and correction. */
 internal data class PreWarmedNotificationAvatars(
@@ -14,6 +15,22 @@ internal data class PreWarmedNotificationAvatars(
     /** Chooses the card image from the same immutable snapshot as the sender image. */
     fun conversationBitmap(isDm: Boolean): Bitmap? = if (isDm) senderAvatarBitmap else groupAvatarBitmap
 }
+
+/**
+ * #3311: where a card first drawn from this ready snapshot may still get a missing picture, using the URLs the
+ * post-write prewarm resolved in [warmed]. A direct chat's identity picture is its sender's, so both slots follow
+ * the sender URL, and a group's identity comes only from the group URL. A picture the card already showed is kept.
+ */
+internal fun PreWarmedNotificationAvatars.lateIdentitySources(
+    warmed: PreWarmedNotificationAvatars,
+    isDm: Boolean,
+): NotificationIdentityPictureSources =
+    NotificationIdentityPictureSources(
+        conversationBitmap = conversationBitmap(isDm),
+        conversationUrl = if (isDm) warmed.senderAvatarUrl else warmed.groupAvatarUrl,
+        senderBitmap = senderAvatarBitmap,
+        senderUrl = warmed.senderAvatarUrl,
+    )
 
 /** Snapshots only decoded cache hits; no URL reaches a presenter that could start enrichment. */
 internal fun readyNotificationAvatarSnapshot(
