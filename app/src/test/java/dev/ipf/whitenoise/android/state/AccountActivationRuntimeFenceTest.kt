@@ -114,7 +114,10 @@ class AccountActivationRuntimeFenceTest {
         runBlocking {
             withDelayedSettingsRead { state ->
                 assertTrue(
-                    state.setActiveAccount("other", preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST),
+                    state.setActiveAccount(
+                        "other",
+                        preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
+                    ),
                 )
             }
         }
@@ -125,10 +128,16 @@ class AccountActivationRuntimeFenceTest {
         runBlocking {
             withDelayedSettingsRead { state ->
                 assertTrue(
-                    state.setActiveAccount("other", preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST),
+                    state.setActiveAccount(
+                        "other",
+                        preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
+                    ),
                 )
                 assertTrue(
-                    state.setActiveAccount("self", preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST),
+                    state.setActiveAccount(
+                        "self",
+                        preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
+                    ),
                 )
             }
         }

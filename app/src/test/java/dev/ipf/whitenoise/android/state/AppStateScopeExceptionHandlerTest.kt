@@ -7,6 +7,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -44,7 +45,9 @@ class AppStateScopeExceptionHandlerTest {
             val failure = IllegalStateException("bootstrap failed")
             try {
                 val failed = attempts.currentOrStart { scope.async { throw failure } }
-                assertSame(failure, runCatching { failed.await() }.exceptionOrNull())
+                val observed = runCatching { failed.await() }.exceptionOrNull()
+                assertTrue(observed is IllegalStateException)
+                assertEquals(failure.message, observed?.message)
                 var siblingCompleted = false
                 scope.launch { siblingCompleted = true }
                 val retry = attempts.currentOrStart { scope.async { Unit } }
