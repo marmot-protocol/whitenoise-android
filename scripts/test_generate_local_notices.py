@@ -42,9 +42,7 @@ class LocalNoticesTest(unittest.TestCase):
         icons.parent.mkdir(parents=True)
         icons.write_bytes(b'Synthetic icon attribution')
         self.baseline = {'schema': 1, 'source_sha': 'c' * 40,
-                         'material_icons_sha256': hashlib.sha256(icons.read_bytes()).hexdigest(),
-                         'required_notices': [{'name': n['name'], 'text_sha256': n['sha256']}
-                                              for n in self.catalog['notices']]}
+                         'material_icons_sha256': hashlib.sha256(icons.read_bytes()).hexdigest()}
         original = ''.join(f"0:{len(self.text)} {n['name']}\n" for n in self.catalog['notices']).encode('utf-8')
         baseline = fixtures.write_retained_baseline(self.root.parents[1], self.baseline, original, self.text + b'\n')
         self.catalog['baseline'] = {'source_sha': 'c' * 40,
@@ -197,8 +195,8 @@ class LocalNoticesTest(unittest.TestCase):
                              root / 'config/licenses/baseline.json',
                              root / 'app/src/main/res/raw/material_icons_notice.txt')
 
-    def test_committed_baseline_cannot_drop_a_notice_with_its_pin(self):
-        """Removing Firebase from the real baseline and re-pinning it still fails generation."""
+    def test_committed_evidence_cannot_drop_a_notice_with_its_pins(self):
+        """Removing Firebase from the real retained index and re-pinning the receipt chain still fails."""
         root = Path(__file__).resolve().parents[1]
         repository = self.root.parents[1] / 'committed'
         licenses = repository / 'config/licenses'
@@ -206,17 +204,24 @@ class LocalNoticesTest(unittest.TestCase):
         icons = repository / 'app/src/main/res/raw/material_icons_notice.txt'
         icons.parent.mkdir(parents=True)
         icons.write_bytes((root / 'app/src/main/res/raw/material_icons_notice.txt').read_bytes())
+        index = licenses / 'evidence/third_party_license_metadata'
+        index.write_text(''.join(line for line in index.read_text().splitlines(keepends=True)
+                                 if not line.rstrip().endswith(' Firebase')))
+        receipt_path = licenses / 'evidence/capture.json'
+        receipt = json.loads(receipt_path.read_text())
+        receipt['files']['config/licenses/evidence/third_party_license_metadata'] = hashlib.sha256(
+            index.read_bytes()).hexdigest()
+        receipt_path.write_text(json.dumps(receipt))
         baseline_path = licenses / 'baseline.json'
         baseline = json.loads(baseline_path.read_text())
-        baseline['required_notices'] = [n for n in baseline['required_notices'] if n['name'] != 'Firebase']
+        baseline['retained']['sha256'] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
         baseline_path.write_text(json.dumps(baseline))
         catalog_path = licenses / 'catalog.json'
         catalog = json.loads(catalog_path.read_text())
         catalog['baseline']['sha256'] = hashlib.sha256(baseline_path.read_bytes()).hexdigest()
         catalog_path.write_text(json.dumps(catalog))
-        with self.assertRaisesRegex(ValueError, 'differs from the retained original'):
+        with self.assertRaisesRegex(ValueError, 'do not match the baseline'):
             notices.generate(catalog_path, catalog['artifacts'], self.root / 'committed-output')
-
 
 if __name__ == '__main__':
     unittest.main()

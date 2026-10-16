@@ -2,7 +2,7 @@
   "files": {
     "config/licenses/evidence/source-inputs.json.gz": "6ec70939173a30a63c0ad90bc5a555277c1eaacdba309651675a7ae0e1894704",
     "config/licenses/evidence/third_party_license_metadata": "21e1f84533ea2ff5ebf079795681dc4a8521ad8916c01bd32d46afe228a2ff43",
-    "config/licenses/evidence/third_party_licenses": "efbb64c3f61f06abbad17bb534894bb6605e8e39050e77af2421211971e0b718"
+    "config/licenses/evidence/third_party_licenses.gz": "eba4c7cbfb4d9de92ed17bd27351cb2395f42ced4d428374996f84cff5907d31"
   },
   "original_evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38764302223/artifacts/11989365775",
   "schema": 1,

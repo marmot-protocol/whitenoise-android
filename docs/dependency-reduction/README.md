@@ -21,9 +21,11 @@ and reviewed attribution in `config/licenses/`. It preserves the original 197
 production notice rows (196 distinct name/text pairs) and the separate local
 Material icon notice.
 The baseline and catalogue pin their source revision and original capture.
-The original index/text and build inputs are retained in `config/licenses/evidence/`
-so attribution remains auditable after hosted artifact expiry. Every variant
-generation checks the pinned baseline and icon copyright before writing resources.
+The original index, its gzip-compressed text and the build inputs are retained in
+`config/licenses/evidence/` so attribution remains auditable after hosted artifact
+expiry. The required notices are the rows of that retained original output, bound
+by the baseline's resource hashes. Every variant generation checks them and the
+icon copyright before writing resources.
 Additional inherited POM attributions, debug dependencies and the full alternate
 Dagger licence are retained too. J2ObjC uses the complete original notice, which
 includes the copyright and embedded native/source notices present in the shorter
@@ -52,9 +54,9 @@ A failed generation lists every unreviewed artifact with its observed SHA-256 an
 whether it is new or changed. For each one, add or update the exact
 `artifacts[]` entry in `catalog.json` (`coordinate`, file `name`, `sha256` and
 the `notice_ids` it ships). A new licence text goes in `texts/<sha256>.txt` with
-a `notices[]` entry (`id`, `name`, `text`, `sha256`, `source`). The baseline must
-equal the retained original plugin output in `config/licenses/evidence/`, so a
-catalogue edit cannot drop an original notice.
+a `notices[]` entry (`id`, `name`, `text`, `sha256`, `source`). Keep one artifact
+or notice per line. The required notices come from the retained original plugin
+output in `config/licenses/evidence/`, so a catalogue edit cannot drop one.
 
 `verify_notice_resources.py` follows the optimized APK's resource table to the
 actual ZIP entries, validates every UTF-8 range, checks the baseline's full notice
