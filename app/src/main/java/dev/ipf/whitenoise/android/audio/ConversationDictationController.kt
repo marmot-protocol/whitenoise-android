@@ -577,7 +577,7 @@ internal class ConversationDictationController internal constructor(
     private val pendingSendRevisions = mutableStateMapOf<ConversationDictationKey, Int>()
     private var nextSessionId = 0L
     private val notificationInstanceId = UUID.randomUUID().toString()
-    private var sessionTimeoutHandle: ConversationDictationTimeoutHandle? = null
+    private val recognitionDeadlines = ConversationDictationRecognitionDeadlines()
     private var captureClosureTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var captureClosureGeneration = 0L
     private var pendingCaptureLeaseReleaseGeneration: Long? = null
@@ -623,7 +623,7 @@ internal class ConversationDictationController internal constructor(
     var foregroundRefreshRevision by mutableLongStateOf(0L)
         private set
     private val recognition = ConversationDictationRecognitionCoordinator()
-    private val generation = ConversationDictationGenerationOwner()
+    private val generation = ConversationDictationGenerationOwner(recognitionDeadlines::cancelGeneration)
     private val restart = ConversationDictationRestartOwner()
     private val accumulatedTranscript: String get() = recognition.transcript
 
@@ -1420,7 +1420,12 @@ internal class ConversationDictationController internal constructor(
             return
         }
         state = ConversationDictationState.Processing(sessionId, target)
-        armGenerationTimeout(sessionId, generationId, PROCESSING_TIMEOUT_MILLIS, "processing") {
+        armGenerationTimeout(
+            sessionId,
+            generationId,
+            PROCESSING_TIMEOUT_MILLIS,
+            ConversationDictationRecognitionDeadlines.GenerationPhase.Processing,
+        ) {
             failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
         }
         runCatching {
@@ -1467,8 +1472,13 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
     ) {
-        armSessionTimeout(sessionId, CALLER_AUDIO_DRAIN_TIMEOUT_MILLIS, "caller_audio_drain") {
-            if (finishRequested && state.sessionId == sessionId) {
+        recognitionDeadlines.beginCallerAudioDrain(sessionId) {
+            diagnosticTimeout(
+                sessionId,
+                CALLER_AUDIO_DRAIN_TIMEOUT_MILLIS,
+                "caller_audio_drain",
+                isCurrent = { finishRequested && state.sessionId == sessionId },
+            ) {
                 failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
             }
         }
@@ -2159,8 +2169,7 @@ internal class ConversationDictationController internal constructor(
         val checking = state as? ConversationDictationState.CheckingProvider
         if (checking?.sessionId != sessionId) return
         pendingCallerAudioProbeId = null
-        sessionTimeoutHandle?.cancel()
-        sessionTimeoutHandle = null
+        recognitionDeadlines.clearSession()
         readinessHandle?.cancel()
         readinessHandle = null
         conversationDictationDiagnostic("event=caller_audio_probe_result requirement=${requirement.name}")
@@ -2188,8 +2197,7 @@ internal class ConversationDictationController internal constructor(
                 conversationDictationDiagnostic("event=provider_activity_check_result available=$available")
                 val checking = state as? ConversationDictationState.CheckingProvider
                 if (checking?.sessionId != sessionId) return@checkRecognitionActivity
-                sessionTimeoutHandle?.cancel()
-                sessionTimeoutHandle = null
+                recognitionDeadlines.clearSession()
                 readinessHandle = null
                 if (!available) {
                     emitReadiness(ConversationDictationReadinessPhase.ProviderUnavailable)
@@ -2371,7 +2379,12 @@ internal class ConversationDictationController internal constructor(
         val generationStartedAtElapsedMillis = elapsedRealtime()
         conversationDictationDiagnostic("event=recognizer_generation_start generation=$generationId")
         state = ConversationDictationState.Starting(sessionId, target)
-        armGenerationTimeout(sessionId, generationId, STARTING_TIMEOUT_MILLIS, "recognizer_start") {
+        armGenerationTimeout(
+            sessionId,
+            generationId,
+            STARTING_TIMEOUT_MILLIS,
+            ConversationDictationRecognitionDeadlines.GenerationPhase.Startup,
+        ) {
             conversationDictationDiagnostic(
                 "event=recognizer_start_timeout generation=$generationId " +
                     "elapsed_ms=${elapsedRealtime() - generationStartedAtElapsedMillis}",
@@ -2386,10 +2399,14 @@ internal class ConversationDictationController internal constructor(
                         "event=callback_ready generation=$generationId " +
                             "elapsed_ms=${elapsedRealtime() - generationStartedAtElapsedMillis}",
                     )
-                    if (
-                        !owns(sessionId, generationId, callback = true) ||
-                        state !is ConversationDictationState.Starting
-                    ) {
+                    if (!owns(sessionId, generationId, callback = true)) return
+                    if (state is ConversationDictationState.Processing && recognitionDeadlines.isDraining(sessionId)) {
+                        // Send can seal capture before provider readiness; keep draining after its acknowledgment.
+                        unresolvedRecognitionFailure = null
+                        generation.ready(elapsedRealtime())
+                        return
+                    }
+                    if (state !is ConversationDictationState.Starting) {
                         return
                     }
                     unresolvedRecognitionFailure = null
@@ -2428,7 +2445,12 @@ internal class ConversationDictationController internal constructor(
                         state is ConversationDictationState.Starting ||
                             state is ConversationDictationState.Listening -> {
                             state = ConversationDictationState.Processing(sessionId, target)
-                            armGenerationTimeout(sessionId, generationId, PROCESSING_TIMEOUT_MILLIS, "processing") {
+                            armGenerationTimeout(
+                                sessionId,
+                                generationId,
+                                PROCESSING_TIMEOUT_MILLIS,
+                                ConversationDictationRecognitionDeadlines.GenerationPhase.Processing,
+                            ) {
                                 failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
                             }
                         }
@@ -2729,9 +2751,8 @@ internal class ConversationDictationController internal constructor(
             "event=session_failed failure=${failure.name} retained_audio=true " +
                 "retained_transcript=${accumulatedTranscript.isNotBlank()}",
         )
-        generation.cancelTimeout()
-        sessionTimeoutHandle?.cancel()
-        sessionTimeoutHandle = null
+        recognitionDeadlines.cancelGeneration()
+        recognitionDeadlines.clearSession()
         cancelPendingRestart()
         clearRecognitionGeneration(cancel = false)
         val drainAlreadyExpired = finishRequested && failure == ConversationDictationFailure.TimedOut
@@ -3195,7 +3216,10 @@ internal class ConversationDictationController internal constructor(
                 failOrRetainTranscript(sessionId, target, requireNotNull(unresolvedRecognitionFailure))
             transcript.isBlank() ->
                 fail(sessionId, target, unresolvedRecognitionFailure ?: ConversationDictationFailure.NoSpeech)
-            else -> validateAndDeliverTranscript(sessionId, target, transcript)
+            else -> {
+                recognitionDeadlines.finishCallerAudioDrain(sessionId)
+                validateAndDeliverTranscript(sessionId, target, transcript)
+            }
         }
     }
 
@@ -3406,8 +3430,7 @@ internal class ConversationDictationController internal constructor(
         pendingForegroundRecoverySessionId = null
         completion.dispatch.cancelBeforeTransport()
         completion.validation.reset()
-        sessionTimeoutHandle?.cancel()
-        sessionTimeoutHandle = null
+        recognitionDeadlines.clearSession()
         readinessHandle?.cancel()
         readinessHandle = null
         readinessStartedAtMillis = null
@@ -3987,18 +4010,18 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         generationId: Long,
         delayMillis: Long,
-        phase: String,
+        phase: ConversationDictationRecognitionDeadlines.GenerationPhase,
         callback: () -> Unit,
     ) {
-        generation.armTimeout(
+        recognitionDeadlines.armGeneration(sessionId, phase) {
             diagnosticTimeout(
                 sessionId,
                 delayMillis,
-                phase,
+                phase.diagnosticName,
                 isCurrent = { state.sessionId == sessionId && generation.activeId == generationId },
                 callback = callback,
-            ),
-        )
+            )
+        }
     }
 
     /** Arms the logical-session safety bound independently of provider generation churn. */
@@ -4008,8 +4031,7 @@ internal class ConversationDictationController internal constructor(
         phase: String,
         callback: () -> Unit,
     ) {
-        sessionTimeoutHandle?.cancel()
-        sessionTimeoutHandle =
+        recognitionDeadlines.armSession {
             diagnosticTimeout(
                 sessionId,
                 delayMillis,
@@ -4017,6 +4039,7 @@ internal class ConversationDictationController internal constructor(
                 isCurrent = { state.sessionId == sessionId },
                 callback = callback,
             )
+        }
     }
 
     private fun diagnosticTimeout(
