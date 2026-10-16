@@ -87,12 +87,14 @@ class ProfileAddToGroupsFlowTest {
     @Test
     fun profileWithoutSharedGroupsKeepsAddEntryReachable() {
         renderProfile()
-        composeRule.onNodeWithText(app.getString(R.string.person_groups_in_common))
+        composeRule
+            .onNodeWithText(app.getString(R.string.person_groups_in_common))
             .performScrollTo()
             .performClick()
         finishContentTransition()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_empty_shared_groups.png")
-        composeRule.onNodeWithText(app.getString(R.string.person_add_to_group))
+        composeRule
+            .onNodeWithText(app.getString(R.string.person_add_to_group))
             .assertIsDisplayed()
             .performClick()
         finishContentTransition()

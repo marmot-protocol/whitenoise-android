@@ -146,13 +146,12 @@ class GroupMembersReviewScreenshotTest {
         fun member(
             hex: String,
             name: String,
-        ) =
-            RecipientSearch.Candidate(
-                hex.repeat(64),
-                name,
-                "npub1$name",
-                searchProfile = UserProfileMetadataFfi(name, null, null, null, null, null, null),
-            )
+        ) = RecipientSearch.Candidate(
+            hex.repeat(64),
+            name,
+            "npub1$name",
+            searchProfile = UserProfileMetadataFfi(name, null, null, null, null, null, null),
+        )
         val selected = mutableStateListOf(member("b", "Alice"), member("c", "Bob"))
         rule.setContent {
             WhiteNoiseTheme {
@@ -220,7 +219,8 @@ class GroupMembersReviewScreenshotTest {
         rule.onNodeWithText("Garden club").assertIsDisplayed()
         rule.onNodeWithText("alice").assertIsDisplayed()
         rule.onNodeWithText(npub).assertIsDisplayed()
-        rule.onNode(hasText("Private Alice") and hasAnyAncestor(hasTestTag("group.members.review.member")))
+        rule
+            .onNode(hasText("Private Alice") and hasAnyAncestor(hasTestTag("group.members.review.member")))
             .assertDoesNotExist()
         val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
         val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
