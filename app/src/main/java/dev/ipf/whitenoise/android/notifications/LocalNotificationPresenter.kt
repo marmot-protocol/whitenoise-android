@@ -184,6 +184,7 @@ class LocalNotificationPresenter(
     fun hideConversationShortcutsFromDirectShare() {
         hideConversationShortcutsFromDirectShare(context)
         shortcutSnapshots.clear()
+        InFlightConversationShortcuts.forgetAllPublished()
         shortcutLastUsed.clear()
     }
 
@@ -198,7 +199,7 @@ class LocalNotificationPresenter(
             .filterValues { it.accountScope == accountScope }
             .keys
             .forEach { shortcutId ->
-                shortcutSnapshots.remove(shortcutId)
+                forgetShortcutSnapshot(shortcutId)
                 shortcutLastUsed.remove(shortcutId)
             }
     }
@@ -215,7 +216,7 @@ class LocalNotificationPresenter(
     ) {
         val shortcutId = conversationShortcutId(accountRef, groupIdHex) ?: return
         synchronized(UserEventNotificationGroup.mutationLock) {
-            shortcutSnapshots.remove(shortcutId)
+            forgetShortcutSnapshot(shortcutId)
             shortcutLastUsed.remove(shortcutId)
         }
     }
@@ -2067,7 +2068,7 @@ class LocalNotificationPresenter(
             notification
         } else {
             // A hidden card leaves its conversation shortcut generic, so the next rich post must publish it again.
-            notification.shortcutId?.let(shortcutSnapshots::remove)
+            notification.shortcutId?.let(::forgetShortcutSnapshot)
             notificationWithoutPreview(context, notification, shortcut = hiddenShortcut?.invoke())
         }
     }
@@ -2658,7 +2659,8 @@ class LocalNotificationPresenter(
                     shortcutSnapshots[shortcutId] = snapshot
                     InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
                     ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
-                    if (holdForPost) InFlightConversationShortcuts.hold(shortcutId, currentShortcut)
+                    InFlightConversationShortcuts.rememberPublished(shortcutId, currentShortcut)
+                    if (holdForPost) InFlightConversationShortcuts.hold(shortcutId)
                     holdForPost
                 } else {
                     false
@@ -2686,7 +2688,9 @@ class LocalNotificationPresenter(
                     shortcutId in dynamicShortcutIds() &&
                     !InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
             if (!published) {
-                shortcutSnapshots.remove(shortcutId, snapshot)
+                if (shortcutSnapshots.remove(shortcutId, snapshot)) {
+                    InFlightConversationShortcuts.forgetPublished(shortcutId)
+                }
                 null
             } else if (isPublishAllowed()) {
                 ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
@@ -2696,6 +2700,12 @@ class LocalNotificationPresenter(
                 false
             }
         }
+
+    /** Forgets one shortcut's publication snapshot together with the rich copy kept for holds of it. */
+    private fun forgetShortcutSnapshot(shortcutId: String) {
+        shortcutSnapshots.remove(shortcutId)
+        InFlightConversationShortcuts.forgetPublished(shortcutId)
+    }
 
     private fun conversationShortcutOpenIntent(
         update: NotificationUpdateFfi,
@@ -2765,7 +2775,7 @@ class LocalNotificationPresenter(
         if (!idsToRemove.isNullOrEmpty()) {
             ShortcutManagerCompat.removeDynamicShortcuts(context, idsToRemove)
             idsToRemove.forEach {
-                shortcutSnapshots.remove(it)
+                forgetShortcutSnapshot(it)
                 shortcutLastUsed.remove(it)
             }
         }

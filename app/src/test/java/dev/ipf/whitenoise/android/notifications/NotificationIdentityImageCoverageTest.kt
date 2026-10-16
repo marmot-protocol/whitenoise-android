@@ -52,7 +52,7 @@ class NotificationIdentityImageCoverageTest {
         assertFalse("never a second card write", "postNotificationSafely" in before || "notificationPoster" in before)
         assertFalse("no network wait on the posting path", "avatarBitmapResolver" in before)
         val payload = presenter.functionBody("previewPayload")
-        assertTrue("a hidden card makes the next rich post publish again", "shortcutSnapshots::remove" in payload)
+        assertTrue("a hidden card makes the next rich post publish again", "::forgetShortcutSnapshot" in payload)
         assertTrue("the shortcut is held for the coming write", "holdForPost = true" in before)
         assertTrue("and released once that write ends", "InFlightConversationShortcuts::release" in show)
         val release = show.indexOf("InFlightConversationShortcuts::release")
@@ -136,7 +136,7 @@ class NotificationIdentityImageCoverageTest {
             assertTrue("$name forgets inside the removal's lock", section.indexOf(removal) in 0 until forget)
         }
         val forget = source("LocalNotificationPresenter.kt").functionBody("forgetConversationShortcut")
-        assertTrue("the snapshot goes", "shortcutSnapshots.remove(" in forget)
+        assertTrue("the snapshot goes", "forgetShortcutSnapshot(" in forget)
         assertTrue("and so does its recency", "shortcutLastUsed.remove(" in forget)
     }
 

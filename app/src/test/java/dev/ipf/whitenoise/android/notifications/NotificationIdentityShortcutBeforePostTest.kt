@@ -188,6 +188,41 @@ class NotificationIdentityShortcutBeforePostTest {
         assertEquals(Color.BLUE, iconPixel(recorder.shortcuts.last()))
     }
 
+    /** A post that reuses an unchanged publication holds its rich copy, so a refresh during its write keeps it. */
+    @Test
+    fun shareRefreshDuringACachedPostKeepsTheShortcutPicture() {
+        val recorder = Recorder()
+        var refreshed = emptyList<ShortcutInfoCompat>()
+        val share =
+            dev.ipf.whitenoise.android.share.ShareShortcutPublisher(
+                context = context,
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = { shortcuts ->
+                    refreshed = shortcuts
+                    ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
+                },
+                existingShortcuts = { emptyList() },
+                dynamicShortcuts = { ShortcutManagerCompat.getDynamicShortcuts(context) },
+                cardShortcutIds = { emptySet() },
+            )
+        val presenter = presenter(recorder)
+        val picture = solid(Color.BLUE)
+        post(presenter, update(isDm = false), picture = picture)
+        val publishedPersons = personsOf(recorder.shortcuts.single())
+        manager.cancelAll()
+
+        recorder.beforePost = { share.publish(ACCOUNT, emptyList()) { it.group.name } }
+        post(presenter, update(isDm = false, messageIdHex = "second"), picture = picture)
+
+        val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        assertEquals("the second post reused the publication", listOf("shortcut", "post", "post"), recorder.events)
+        assertEquals("the refresh kept the in-flight shortcut", listOf(shortcutId), refreshed.map { it.id })
+        assertEquals("with the published picture", Color.BLUE, iconPixel(refreshed.single()))
+        assertTrue("the presenter published a Person", publishedPersons.isNotEmpty())
+        assertEquals("and the refresh kept it", publishedPersons, personsOf(refreshed.single()))
+        assertFalse("nothing was rebuilt bare", InFlightConversationShortcuts.consumeIdentityLost(shortcutId))
+    }
+
     /** A card write cancelled after the shortcut was published still releases that shortcut's hold. */
     @Test
     fun cancelledCardWriteReleasesItsHeldShortcut() {

@@ -11,8 +11,10 @@ import androidx.core.content.pm.ShortcutInfoCompat
  * overlap under one shortcut id, so holds are counted and the id stays held until the last one is released. A hold that
  * is never released lapses [HOLD_LIFETIME_MS] after the latest hold.
  *
- * The platform's shortcut readback carries no icon, so a refresh cannot rebuild a held shortcut's picture from it. A
- * hold therefore keeps the shortcut the presenter published, which the refresh retains as published. A refresh that had
+ * The platform's shortcut readback carries no icon, so a refresh cannot rebuild a held shortcut's picture from it. The
+ * registry therefore keeps the last shortcut the presenter published for each id, past the release of its hold, so a
+ * later post that reuses an unchanged publication holds the same rich copy, which the refresh retains as published.
+ * The presenter forgets it with [forgetPublished] wherever it forgets its own publication snapshot. A refresh that had
  * to rebuild a card's shortcut without its picture marks it [markIdentityLost], so the presenter publishes it again.
  */
 internal object InFlightConversationShortcuts {
@@ -28,7 +30,7 @@ internal object InFlightConversationShortcuts {
 
     /**
      * Adds one hold on [shortcutId] for a pending post, keeping [publishedShortcut] when the presenter has just
-     * published it. The caller already holds the shared publication lock.
+     * published it, or else the copy kept from its last publication. The caller already holds the publication lock.
      */
     fun hold(
         shortcutId: String,
@@ -47,7 +49,6 @@ internal object InFlightConversationShortcuts {
             val held = holds[shortcutId] ?: return
             if (held.count <= 1) {
                 holds.remove(shortcutId)
-                published.remove(shortcutId)
             } else {
                 holds[shortcutId] = held.copy(count = held.count - 1)
             }
@@ -57,6 +58,24 @@ internal object InFlightConversationShortcuts {
     /** The shortcut the presenter published for a held [shortcutId], picture included, or null. */
     fun publishedShortcut(shortcutId: String): ShortcutInfoCompat? =
         synchronized(UserEventNotificationGroup.mutationLock) { published[shortcutId]?.takeIf { shortcutId in holds } }
+
+    /** Keeps [shortcut] as the presenter's latest publication of [shortcutId], for holds that reuse it unchanged. */
+    fun rememberPublished(
+        shortcutId: String,
+        shortcut: ShortcutInfoCompat,
+    ) {
+        synchronized(UserEventNotificationGroup.mutationLock) { published[shortcutId] = shortcut }
+    }
+
+    /** Forgets the kept publication of [shortcutId], when the presenter forgets or replaces its snapshot. */
+    fun forgetPublished(shortcutId: String) {
+        synchronized(UserEventNotificationGroup.mutationLock) { published.remove(shortcutId) }
+    }
+
+    /** Forgets every kept publication, when the presenter forgets all of its snapshots. */
+    fun forgetAllPublished() {
+        synchronized(UserEventNotificationGroup.mutationLock) { published.clear() }
+    }
 
     /** Records that a refresh rebuilt [shortcutId] without the picture the presenter published. */
     fun markIdentityLost(shortcutId: String) {
@@ -74,7 +93,6 @@ internal object InFlightConversationShortcuts {
     fun ids(nowMs: Long = SystemClock.elapsedRealtime()): Set<String> =
         synchronized(UserEventNotificationGroup.mutationLock) {
             holds.entries.removeAll { nowMs - it.value.latestMs > HOLD_LIFETIME_MS }
-            published.keys.retainAll(holds.keys)
             holds.keys.toSet()
         }
 
