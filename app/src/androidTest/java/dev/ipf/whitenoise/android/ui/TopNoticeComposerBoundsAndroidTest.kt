@@ -126,7 +126,11 @@ class TopNoticeComposerBoundsAndroidTest {
         val header = composeRule.onNodeWithTag(HEADER_TAG).fetchSemanticsNode().boundsInRoot
         assertTrue("the banner overlaps the header", banner.top >= header.bottom - TOLERANCE_PX)
         assertTrue("the banner overlaps the playback strip", banner.top >= playback.bottom - TOLERANCE_PX)
-        assertTrue("the keyboard closed, so the composer was never at risk", keyboardInsetPx() >= MINIMUM_KEYBOARD_PX)
+        val keyboard = keyboardInsetPx()
+        assertTrue(
+            "the keyboard was not up ($keyboard px), so the composer bounds were never under test",
+            keyboard >= MINIMUM_KEYBOARD_PX,
+        )
         assertEquals(composerBefore, composerBounds())
         composeRule.onNodeWithTag(FIELD_TAG).assertIsFocused()
     }

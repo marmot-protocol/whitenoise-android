@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.ui.TransientNoticeTimeoutEffect
 import dev.ipf.whitenoise.android.ui.common.CONVERSATION_TRANSIENT_NOTICE_TAG
 import dev.ipf.whitenoise.android.ui.common.GLOBAL_TRANSIENT_NOTICE_TAG
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
 import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -231,8 +232,9 @@ class ConversationTransientNoticeTest {
 
     /**
      * A modal over the conversation, such as a profile or a full-screen viewer, takes the banners while it is open
-     * and hands them back when it closes. A notice scoped to the conversation never renders in the modal, so
-     * nothing it says is shown behind or over a surface it does not belong to.
+     * and hands them back when it closes. Production modals compose inside the routed conversation's scope, so a
+     * notice scoped to this conversation shows in the modal's own slot too, while one scoped to another chat never
+     * renders anywhere over this conversation.
      */
     @Test
     fun aModalTakesTheBannersAndHandsThemBack() {
@@ -247,15 +249,26 @@ class ConversationTransientNoticeTest {
         val inModal = composeRule.onAllNodesWithTag(GLOBAL_TRANSIENT_NOTICE_TAG).fetchSemanticsNodes()
         assertEquals(1, inModal.size)
         val modal = composeRule.onNodeWithTag(MODAL_TAG).fetchSemanticsNode().boundsInRoot
-        assertTrue("the modal slot presents it", inModal.single().boundsInRoot.top >= modal.top)
+        assertEquals("the modal slot presents it", modal.top, inModal.single().boundsInRoot.top, POSITION_TOLERANCE)
 
         composeRule.runOnUiThread { fixture.notice.value = scopedNotice(GROUP_A) }
         composeRule.waitForIdle()
+        val scopedInModal = composeRule.onAllNodesWithTag(CONVERSATION_TRANSIENT_NOTICE_TAG).fetchSemanticsNodes()
+        assertEquals("the modal shows this conversation's notice once", 1, scopedInModal.size)
+        assertEquals("in its own slot", modal.top, scopedInModal.single().boundsInRoot.top, POSITION_TOLERANCE)
+
+        composeRule.runOnUiThread { fixture.notice.value = scopedNotice(GROUP_B) }
+        composeRule.waitForIdle()
         composeRule.onNodeWithText(NOTICE_TEXT).assertDoesNotExist()
 
-        composeRule.runOnUiThread { fixture.modalOpen.value = false }
+        composeRule.runOnUiThread {
+            fixture.notice.value = scopedNotice(GROUP_A)
+            fixture.modalOpen.value = false
+        }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText(NOTICE_TEXT).assertIsDisplayed()
+        val handedBack = composeRule.onNodeWithTag(CONVERSATION_TRANSIENT_NOTICE_TAG).assertIsDisplayed()
+        val strip = composeRule.onNodeWithTag(PLAYBACK_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(strip.bottom, handedBack.fetchSemanticsNode().boundsInRoot.top, POSITION_TOLERANCE)
     }
 
     /** Under app lock no slot presents anything, so a locked screen exposes no stale banner text or action. */
@@ -320,7 +333,12 @@ class ConversationTransientNoticeTest {
                             Box(Modifier.fillMaxWidth().height(72.dp).testTag(COMPOSER_TAG))
                         }
                         if (modalOpen.value) {
-                            Column(Modifier.fillMaxSize().testTag(MODAL_TAG)) { TopNoticeSlot() }
+                            // Production modals compose inside MainShell's scope for the routed conversation.
+                            CompositionLocalProvider(
+                                LocalTopNoticeScope provides ConversationNoticeDestination(ACCOUNT, GROUP_A),
+                            ) {
+                                Column(Modifier.fillMaxSize().testTag(MODAL_TAG)) { TopNoticeSlot() }
+                            }
                         }
                     }
                 }
