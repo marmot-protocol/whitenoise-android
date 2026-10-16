@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.diagnostics
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.BuildConfig
@@ -50,7 +51,9 @@ internal fun dmCreationFailure(error: Throwable): DmCreationFailure =
     }
 
 /** Closed Android-visible operation boundaries; native subphase distinctions remain unavailable. */
-internal enum class DmCreationPhase { PREWARM, EXISTING_LOOKUP, CREATE, PROJECTION, FIRST_FRAME, OWNER }
+internal enum class DmCreationPhase { PREWARM, EXISTING_LOOKUP, CREATE, PROJECTION, FIRST_FRAME, OWNER, RECIPIENTS, ROSTER, RECONCILIATION }
+
+internal enum class CreationOperation { DM_CREATE_OPEN, GROUP_CREATE, GROUP_INVITE }
 
 internal enum class DmCreationOutcome { START, SUCCESS, FAILURE, CANCELLED, REPLACED }
 
@@ -58,6 +61,7 @@ internal enum class DmCreationOutcome { START, SUCCESS, FAILURE, CANCELLED, REPL
 internal class DmCreationInteraction(
     private val emit: (Map<String, Any>) -> Unit = DmCreationDiagnostics::record,
     private val nowNanos: () -> Long = System::nanoTime,
+    private val operation: CreationOperation = CreationOperation.DM_CREATE_OPEN,
 ) {
     private val token = UUID.randomUUID().toString()
     private val start = nowNanos()
@@ -78,7 +82,7 @@ internal class DmCreationInteraction(
             val duration = starts[phase]?.let { ((now - it) / NANOS_PER_MS).coerceIn(0, MAX_ELAPSED_MS) } ?: -1L
             emit(
                 mapOf(
-                    "operation" to "dm_create_open",
+                    "operation" to operation.name.lowercase(java.util.Locale.ROOT),
                     "interaction" to token,
                     "attempt" to ordinal,
                     "phase" to phase.name.lowercase(java.util.Locale.ROOT),
@@ -179,8 +183,11 @@ internal object DmCreationDiagnostics {
 
     /** Adds only compile-time/public platform context; unsupported revision fields say unknown. */
     fun record(fields: Map<String, Any>) {
-        if (!enabled) return
-        recorder?.recordFields(fields.filterKeys { it in TRACE_FIELDS } + buildContext)
+        val safe = creationDiagnosticFields(fields) ?: return
+        val context = safe + buildContext
+        // Logging never throws into an invitation, and never carries raw exceptions or identities.
+        runCatching { Log.i("GroupCreation", context.entries.joinToString(" ") { "${it.key}=${it.value}" }) }
+        if (enabled) runCatching { recorder?.recordFields(context) }
     }
 
     private val buildContext by lazy {
@@ -278,18 +285,23 @@ internal object DmCreationDiagnostics {
     )
 
     private val BUILD_TOKEN = Regex("[A-Za-z0-9._-]{1,80}")
-    private val TRACE_FIELDS =
-        setOf(
-            "operation",
-            "interaction",
-            "attempt",
-            "phase",
-            "outcome",
-            "failure",
-            "elapsed_ms",
-            "phase_duration_ms",
-            "native_phase_detail",
-        )
     private const val MAX_PENDING_FRAMES = 8
     private const val FRAME_TTL_MS = 30_000L
+}
+
+/** Validate values as well as names before either diagnostic sink sees a record. */
+internal fun creationDiagnosticFields(fields: Map<String, Any>): Map<String, Any>? {
+    fun code(key: String, choices: Set<String>): String? = (fields[key] as? String)?.takeIf { it in choices }
+    fun number(key: String): Long? = (fields[key] as? Number)?.toLong()?.takeIf { it in -1L..86_400_000L }
+    val operation = code("operation", CreationOperation.entries.map { it.name.lowercase(java.util.Locale.ROOT) }.toSet()) ?: return null
+    val phase = code("phase", DmCreationPhase.entries.map { it.name.lowercase(java.util.Locale.ROOT) }.toSet()) ?: return null
+    val outcome = code("outcome", DmCreationOutcome.entries.map { it.name.lowercase(java.util.Locale.ROOT) }.toSet()) ?: return null
+    val failure = code("failure", DmCreationFailure.entries.map { it.name.lowercase(java.util.Locale.ROOT) }.toSet()) ?: return null
+    val token = (fields["interaction"] as? String)?.takeIf { it.matches(Regex("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}")) } ?: return null
+    return linkedMapOf(
+        "operation" to operation, "interaction" to token, "attempt" to (number("attempt") ?: return null),
+        "phase" to phase, "outcome" to outcome, "failure" to failure,
+        "elapsed_ms" to (number("elapsed_ms") ?: return null),
+        "phase_duration_ms" to (number("phase_duration_ms") ?: return null), "native_phase_detail" to "unavailable",
+    )
 }

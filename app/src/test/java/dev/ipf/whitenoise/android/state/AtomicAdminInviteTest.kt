@@ -21,6 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -36,6 +37,7 @@ class AtomicAdminInviteTest {
                 assertTrue(PEER in fixture.controller.group.admins)
                 assertFalse(OTHER in fixture.controller.group.admins)
                 assertEquals(3, fixture.controller.members.size)
+                assertDiagnosticTerminal("success")
             } finally {
                 fixture.controller.onCleared()
             }
@@ -95,6 +97,7 @@ class AtomicAdminInviteTest {
                 assertEquals(1, fixture.invocations.size)
                 assertEquals(listOf(SELF), fixture.controller.members.map { it.memberIdHex })
                 assertTrue(fixture.controller.lastMutationError != null)
+                assertDiagnosticTerminal("failure")
             } finally {
                 fixture.controller.onCleared()
             }
@@ -115,10 +118,21 @@ class AtomicAdminInviteTest {
             }
         }
 
+    private fun assertDiagnosticTerminal(outcome: String) {
+        val terminal = ShadowLog.getLogsForTag("GroupCreation").filter {
+            it.msg.contains("operation=group_invite") && it.msg.contains("phase=owner") && !it.msg.contains("outcome=start")
+        }
+        assertEquals(1, terminal.size)
+        assertTrue(terminal.single().msg.contains("outcome=$outcome"))
+        assertFalse(terminal.single().msg.contains(PEER))
+    }
+
     private class Fixture(
         private val loseReply: Boolean = false,
         private val failBeforeCommit: Boolean = false,
     ) {
+        init { ShadowLog.clear() }
+
         val invocations = mutableListOf<Pair<List<String>, List<String>>>()
         var snapshotReads = 0
         var revokeOnRecipientResolution = false

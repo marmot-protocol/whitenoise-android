@@ -47,6 +47,33 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ChatListReconnectIntegrationTest {
+    @Test
+    fun accountTeardownAndCancelledBindCloseGroupSubscriptionExactlyOnce() {
+        val diagnostics = testRecoveryDiagnostics()
+        val subscription = ScriptedChatListSubscription(notificationChatListRow())
+        val groups = ScriptedChatsSubscription()
+        val appState = chatListTestAppState(diagnostics, subscription, groups)
+        val controller = ChatsController(
+            appState = appState,
+            initialAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+            memberSnapshotRetryDelay = { Long.MAX_VALUE },
+            memberSnapshotLoader = { _, _ -> conversationTimelineMemberSnapshot().members },
+        )
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val binding = scope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscription.nextUpdateStarted.isCompleted }
+            val teardown = scope.launch {
+                controller.closeLiveSubscriptionsForAccountTeardown(ConversationTimelineTestIds.ACCOUNT_REF)
+            }
+            awaitChatListCondition { teardown.isCompleted && binding.isCompleted }
+            assertEquals(1, groups.closeCalls)
+        } finally {
+            controller.onCleared()
+            scope.cancel()
+        }
+    }
+
     /** A recovered subscription row reaches the authoritative list under one generation. */
     @Test
     fun recoveryGenerationReachesTheAuthoritativeChatListRow() {
@@ -930,6 +957,8 @@ private class DroppedChatSubscriptions(
 /** Stable companion group subscription that lives until the controller closes it. */
 private class ScriptedChatsSubscription : ChatsSubscriptionHandle {
     private val closed = CompletableDeferred<Unit>()
+    var closeCalls = 0
+        private set
     var wasClosed = false
         private set
 
@@ -953,6 +982,7 @@ private class ScriptedChatsSubscription : ChatsSubscriptionHandle {
 
     /** Releases the paired stream. */
     override fun close() {
+        closeCalls += 1
         wasClosed = true
         closed.complete(Unit)
     }

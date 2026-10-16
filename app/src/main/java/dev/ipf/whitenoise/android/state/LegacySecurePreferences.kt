@@ -36,6 +36,12 @@ internal object LegacySecurePreferences {
         return prefs.all.mapNotNull { (key, value) -> stringOf(value)?.let { key to it } }.toMap()
     }
 
+    /** Opens an existing typed compatibility source without creating an empty encrypted store. */
+    internal fun openForImport(
+        context: Context,
+        fileName: String,
+    ): android.content.SharedPreferences? = if (exists(context, fileName)) openLegacyEncryptedPreferences(context, fileName) else null
+
     private fun openLegacyEncryptedPreferences(
         context: Context,
         fileName: String,

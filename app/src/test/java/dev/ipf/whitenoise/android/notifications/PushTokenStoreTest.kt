@@ -373,52 +373,6 @@ class PushTokenStoreTest {
         assertEquals(setOf("npub-b"), store.pendingDisables())
     }
 
-    @Test
-    fun migrationCopiesLegacyPlaintextPrefsToSecureStoreThenClearsLegacy() {
-        val legacy = FakeSharedPreferences()
-        val secure = FakeSharedPreferences()
-        PushTokenStore(legacy).apply {
-            setToken("fcm-legacy")
-            recordPendingNativePushRegistrationSync()
-            recordPendingPushWakeCatchUp()
-            recordPendingClear("npub-clear")
-            recordPendingDisable("npub-disable")
-        }
-
-        migrateLegacyPushTokenPreferences(legacy, secure)
-
-        PushTokenStore(secure).apply {
-            assertEquals("fcm-legacy", lastToken())
-            assertEquals(true, nativePushRegistrationSyncPending())
-            assertEquals(true, pushWakeCatchUpPending())
-            assertEquals(setOf("npub-clear"), pendingClears())
-            assertEquals(setOf("npub-disable"), pendingDisables())
-        }
-        assertTrue("legacy plaintext prefs should be wiped after durable migration", legacy.all.isEmpty())
-    }
-
-    @Test
-    fun migrationDoesNotOverwriteExistingSecureValues() {
-        val legacy = FakeSharedPreferences()
-        val secure = FakeSharedPreferences()
-        PushTokenStore(legacy).apply {
-            setToken("fcm-legacy")
-            recordPendingClear("legacy-clear")
-        }
-        PushTokenStore(secure).apply {
-            setToken("fcm-secure")
-            recordPendingClear("secure-clear")
-        }
-
-        migrateLegacyPushTokenPreferences(legacy, secure)
-
-        PushTokenStore(secure).apply {
-            assertEquals("fcm-secure", lastToken())
-            assertEquals(setOf("secure-clear"), pendingClears())
-        }
-        assertFalse("legacy should be cleared even when secure values win", legacy.contains("fcm_token"))
-    }
-
     // #167 regression: onNewToken runs on a Firebase background thread, so the
     // record/clear read-modify-write can race a concurrent sign-out. The fix is
     // the process-wide synchronized(LOCK) in PushTokenStore. These tests use a

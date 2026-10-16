@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
@@ -146,6 +147,7 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
+import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.PushWakeAdmission
 import dev.ipf.whitenoise.android.notifications.PushWakeAttemptBudget
@@ -157,6 +159,7 @@ import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
 import dev.ipf.whitenoise.android.notifications.normalizeNotificationReaction
 import dev.ipf.whitenoise.android.notifications.notificationReactionOutcome
+import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
@@ -233,8 +236,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
-import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
-import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
@@ -6584,6 +6585,11 @@ class WhiteNoiseAppState private constructor(
         deleteKeyPackages: Boolean,
         draftsSaved: Boolean,
     ): SignOutCompletion {
+        // Persist cleanup intent before native work; unavailable storage cannot lose a failed disable.
+        val disableRecorded =
+            withContext(Dispatchers.IO) {
+                runCatching { pushTokenStore.recordPendingDisable(signedOutRef) }.getOrDefault(false)
+            }
         // Credential persistence failures never enter the native-error fail-open path.
         val engineResult = runCatchingCancellable { marmotIo { signOut(signedOutRef, deleteKeyPackages) } }
         val engineOutcome = engineResult.getOrNull()
@@ -6604,12 +6610,13 @@ class WhiteNoiseAppState private constructor(
                 accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
             }
             // MDK deactivated push; discard stale retries and registration cache.
-            pushTokenStore.clearPendingDisable(signedOutRef)
+            runCatching { pushTokenStore.clearPendingDisable(signedOutRef) }
             nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
-        } else {
-            // Queue push disable while preserving the local fail-open contract.
-            pushTokenStore.recordPendingDisable(signedOutRef)
-        }
+        } else if (!disableRecorded) {
+            withContext(Dispatchers.IO) {
+                runCatching { pushTokenStore.suppressRegistrationUntilReconciled(signedOutRef) }
+            }
+        } // A failed native reply retains the durable or explicitly fenced disable intent.
 
         // Preserve per-account durable state for later account switching, but
         // synchronously drop plaintext memory and await the decrypted-disk wipe.
@@ -6644,10 +6651,10 @@ class WhiteNoiseAppState private constructor(
         wipeDecryptedMediaFromDisk()
         // Drop the cached FCM token only when no accounts remain on the
         // device — other identities still need it on multi-account switch.
-        if (next == null) pushTokenStore.clear()
+        if (next == null) runCatching { pushTokenStore.clear() }
         refreshLocalNotificationSettings()
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
-        return signOutCompletion(engineOutcome)
+        return if (disableRecorded) signOutCompletion(engineOutcome) else SignOutCompletion.AccountCleanupIncomplete
     }
 
     suspend fun exportActiveAccountNsec(): String? {
@@ -6699,11 +6706,11 @@ class WhiteNoiseAppState private constructor(
                             if (outcome.localCleanup.completed) {
                                 // Publish native removal before encrypted push cleanup can throw.
                                 accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
-                                pushTokenStore.clearPendingDisable(wipedRef)
+                                runCatching { pushTokenStore.clearPendingDisable(wipedRef) }
                                 // The wipe invalidates server-side registration state for this account.
                                 // withSerializedNativePushWipe already holds nativePushSyncMutex here.
                                 perAccountSyncedFingerprints.remove(wipedRef)
-                                pushTokenStore.clear()
+                                runCatching { pushTokenStore.clear() }
                             }
                         }
                 }
@@ -9202,7 +9209,8 @@ class WhiteNoiseAppState private constructor(
         val previous = Collections.synchronizedMap(linkedMapOf<String, NotificationSettingsFfi>())
         val persistentStopAttempted = AtomicBoolean(false)
         return try {
-            val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
+            if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
+            val token = fetchFcmTokenOrNull() ?: return false
             val registered = enableNativeDeliveryForAccounts(owner, config, token, previous)
             if (!registered) {
                 rollbackNativePushMode(owner, previous)
@@ -9516,7 +9524,7 @@ class WhiteNoiseAppState private constructor(
             if (!notificationDeliveryModeIntent.isCurrent(epoch)) return@withContext
             notificationDeliveryModeMutex.withLock {
                 val latest = notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
-                if (latest && pushTokenStore.nativePushRegistrationSyncPending()) syncNativePushRegistrationIfEnabled()
+                if (latest && runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)) syncNativePushRegistrationIfEnabled()
             }
         }
 
@@ -9569,6 +9577,7 @@ class WhiteNoiseAppState private constructor(
         if (perAccountSyncedFingerprints[account] == fingerprint) return ownsNotificationDeliveryMode(owner)
         val outcome =
             withContext(Dispatchers.IO) {
+                if (!pushTokenStore.registrationAllowed()) throw PushTokenStorageException()
                 owner.runtime.marmot.upsertPushRegistration(
                     accountRef = account,
                     platform = PushPlatformFfi.FCM,
@@ -9769,7 +9778,12 @@ class WhiteNoiseAppState private constructor(
      * lifecycle.
      */
     fun onPushTokenRotated(token: String) {
-        pushTokenStore.setToken(token)
+        try {
+            pushTokenStore.setToken(token)
+        } catch (_: PushTokenStorageException) {
+            android.util.Log.w("PushTokenStorage", "token_rotation_deferred")
+            return
+        }
         notificationScope.launch {
             withContext(pushWakeStorageDispatcher) {
                 pushTokenStore.recordPendingNativePushRegistrationSync()
@@ -9789,7 +9803,13 @@ class WhiteNoiseAppState private constructor(
      * something changes. Returns true only when every account that currently
      * requires native push is registered (or does not require registration).
      */
-    suspend fun syncNativePushRegistrationIfEnabled(): Boolean = nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
+    suspend fun syncNativePushRegistrationIfEnabled(): Boolean =
+        try {
+            nativePushSyncMutex.withLock { syncNativePushRegistrationIfEnabledLocked() }
+        } catch (_: PushTokenStorageException) {
+            android.util.Log.w("PushTokenStorage", "registration_deferred")
+            false
+        }
 
     /** Retains required sign-out cleanup while permission loss pauses registration and fallback mutation. */
     private suspend fun pauseNotificationDeliveryReconciliation(): Boolean {
@@ -9843,7 +9863,8 @@ class WhiteNoiseAppState private constructor(
         val capability = nativePushCapability(config)
         if (!capability.isAvailable) return reconcileUnavailableNativePushFallback(capability, accountRefs)
         config ?: return false
-        val token = pushTokenStore.lastToken() ?: fetchFcmTokenOrNull() ?: return false
+        if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.registrationAllowed() }) return false
+        val token = fetchFcmTokenOrNull() ?: return false
         for (account in accountRefs) {
             val synced = syncPushForAccount(account, config, token)
             if (!synced) return false
@@ -9990,6 +10011,7 @@ class WhiteNoiseAppState private constructor(
         return runCatching {
             val syncResult =
                 marmotIo {
+                    if (!pushTokenStore.registrationAllowed()) throw PushTokenStorageException()
                     upsertPushRegistration(
                         accountRef = account,
                         platform = PushPlatformFfi.FCM,
