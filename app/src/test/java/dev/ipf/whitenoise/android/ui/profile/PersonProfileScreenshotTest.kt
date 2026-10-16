@@ -89,7 +89,11 @@ class PersonProfileScreenshotTest {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
                     PersonProfileContent(
                         startingAs =
-                            StartingAccount("a".repeat(64), "Carol", null, "npub1carol"),
+                            if (self) {
+                                null
+                            } else {
+                                StartingAccount("a".repeat(64), "Carol", null, "npub1carol")
+                            },
                         person =
                             PersonProfilePresentation(
                                 "Alice",
