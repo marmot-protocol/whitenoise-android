@@ -127,12 +127,13 @@ internal fun groupAbandonmentBatchLabel(dmFlags: Collection<Boolean>): Int =
 @Composable
 internal fun GroupDetailsResetControl(
     isDm: Boolean,
-    readOnlyInvite: Boolean,
+    offered: Boolean,
     enabled: Boolean,
     inProgress: Boolean,
     onRequest: () -> Unit,
 ) {
-    if (readOnlyInvite) return
+    // [offered] is the shared group rule, so Details hides it exactly where the chat list does.
+    if (!offered) return
     DangerActionRow(
         icon = if (isDm) ImageVector.vectorResource(R.drawable.ic_person_remove) else Icons.Outlined.RestartAlt,
         title = stringResource(groupAbandonmentActionLabel(isDm)),

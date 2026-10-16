@@ -1561,7 +1561,7 @@ internal fun ChatsScreen(
                                 ChatAbandonMenuAction(item.isDm()) {
                                     pendingAbandonment =
                                         PendingChatAbandonment.capture(item, controller, appState, groupTitleCopy)
-                                }.takeIf { item.offersLocalAbandonment(appState.activeAccount?.accountIdHex) },
+                                }.takeIf { item.offersLocalAbandonment() },
                             onDismiss = {
                                 if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
                                     actionSheetChatId = null
@@ -1659,10 +1659,9 @@ internal fun ChatsScreen(
                 val selectionAccount = appState.activeAccountRef
                 val selectionRuntime = appState.runtimeGeneration
                 val selectionIds = selectedChatIds.toSet()
-                val activeAccountIdHex = appState.activeAccount?.accountIdHex
                 val abandonableSelection =
                     selectedVisibleItems
-                        .takeIf { it.offerLocalAbandonment(activeAccountIdHex) }
+                        .takeIf { it.offerLocalAbandonment() }
                         ?.map { it.isDm() }
                 dev.ipf.whitenoise.android.ui.common.AdaptiveContent(
                     Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
@@ -1721,7 +1720,7 @@ internal fun ChatsScreen(
                                 return@ChatListSelectionControls
                             }
                             val selected = selectedVisibleItems
-                            if (selected.offerLocalAbandonment(activeAccountIdHex)) {
+                            if (selected.offerLocalAbandonment()) {
                                 pendingLeaveAndDelete =
                                     PendingChatDeparture(selected, controller, appState, groupTitleCopy, abandon = true)
                             }

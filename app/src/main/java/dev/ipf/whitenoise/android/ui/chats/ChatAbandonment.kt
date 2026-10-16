@@ -1,27 +1,34 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.runtime.Composable
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.abandonChatFromList
+import dev.ipf.whitenoise.android.state.isNonMember
+import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentDialog
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentStatus
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
 
 /**
- * Whether the chat list offers MDK's forget for this row (#3310). A read-only invite declines instead, and a chat
- * this account already left or no longer holds (left, removed, disbanding or with a queued leave) has nothing to
- * abandon, so neither gets the action. The native row policy must also allow a local removal at all.
+ * Whether the chat list offers MDK's forget for this row (#3310), by the same rule as Group Details: not for a
+ * read-only invite, and not once MDK confirms the account left, was removed or the group is disbanded, read from the
+ * group or its row. A queued leave or a converging disband still offers it, since either can stay unfinished. The
+ * native row policy must also allow a local removal at all.
  */
-internal fun ChatListItem.offersLocalAbandonment(activeAccountIdHex: String?): Boolean =
-    !group.pendingConfirmation && actions?.canDeleteLocal != false && !removedFromGroup(activeAccountIdHex)
+internal fun ChatListItem.offersLocalAbandonment(): Boolean {
+    val row = projection
+    val rowConfirmsNonMember =
+        row?.selfMembership?.isNonMember() == true || row?.lifecycleState == GroupLifecycleStateFfi.DISBANDED
+    return group.offersLocalAbandonment() && !rowConfirmsNonMember && actions?.canDeleteLocal != false
+}
 
 /** A selection offers bulk abandonment only when it is not empty and every selected chat offers it. */
-internal fun List<ChatListItem>.offerLocalAbandonment(activeAccountIdHex: String?): Boolean =
-    isNotEmpty() && all { it.offersLocalAbandonment(activeAccountIdHex) }
+internal fun List<ChatListItem>.offerLocalAbandonment(): Boolean = isNotEmpty() && all { it.offersLocalAbandonment() }
 
 /** The row menu's abandonment entry, where [isDm] picks the direct-chat or group wording of the same forget. */
 internal class ChatAbandonMenuAction(

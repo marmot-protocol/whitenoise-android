@@ -98,6 +98,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
@@ -1163,7 +1164,7 @@ internal fun GroupDetailsScreen(
         }
         // #3310: the escape path after a Leave that did not finish, under the error banner wherever it shows.
         val leaveBlockedNotice: @Composable (Modifier) -> Unit = { modifier ->
-            if (abandonment.leaveBlocked && !readOnlyInvite) {
+            if (abandonment.leaveBlocked && controller.group.offersLocalAbandonment()) {
                 Box(modifier) {
                     GroupLeaveBlockedNotice(isDm = isDm, enabled = !mutationsBlocked, onAbandon = ::requestAbandonment)
                 }
@@ -2143,8 +2144,8 @@ internal fun GroupDetailsScreen(
                     GroupDetailsResetControl(
                         identity = ownIdentity,
                         isDm = isDm,
-                        readOnlyInvite = readOnlyInvite,
-                        enabled = !mutationsBlocked && (isDm || actingMemberHex != null),
+                        offered = controller.group.offersLocalAbandonment(),
+                        enabled = !mutationsBlocked,
                         inProgress = activeMutation?.action == GroupMutationAction.Reset,
                         onRequest = ::requestAbandonment,
                     )

@@ -14,16 +14,51 @@ import java.io.File
  * local delete or a second native call site.
  */
 class GroupAbandonmentCoverageTest {
-    /** Group Details hides the control only for a read-only invite, so a member DM always has its escape path. */
+    /**
+     * Group Details hides the control only by the shared rule, so a member DM always has its escape path and Details
+     * hides it exactly where the chat list does.
+     */
     @Test
     fun detailsControlStaysReachableForDirectChats() {
         val body = source("ui/group/GroupDetailsResetControl.kt").functionBody("GroupDetailsResetControl")
-        assertTrue("the control may hide only for read-only invites", "if (readOnlyInvite) return" in body)
+        assertTrue("the control may hide only by the shared rule", "if (!offered) return" in body)
         assertFalse("a direct chat must not hide the abandonment control", "isDm ||" in body || "|| isDm" in body)
         val screen = source("ui/group/GroupDetailsScreen.kt")
         val call = screen.substringAfter("GroupDetailsResetControl(").substringBefore(")\n")
         assertTrue("Group Details must pass the DM flag instead of gating the call", "isDm = isDm" in call)
+        assertTrue("Details uses the shared rule", "offered = controller.group.offersLocalAbandonment()" in call)
         assertTrue("the row opens the reviewed confirmation", "onRequest = ::requestAbandonment" in call)
+    }
+
+    /**
+     * One rule decides where abandonment is offered on both surfaces: a read-only invite declines instead, and only
+     * MDK's confirmed non-membership withdraws it. A queued leave or a converging disband must keep the escape path.
+     */
+    @Test
+    fun bothSurfacesShareTheConfirmedNonMembershipRule() {
+        val rule =
+            source("state/ConversationMembershipState.kt")
+                .substringAfter("fun AppGroupRecordFfi.offersLocalAbandonment()")
+                .substringBefore("\n}\n")
+        listOf("pendingConfirmation", "selfMembership.isNonMember()", "disbanded").forEach {
+            assertTrue("the rule reads $it", it in rule)
+        }
+        val row =
+            source("ui/chats/ChatAbandonment.kt")
+                .substringAfter("fun ChatListItem.offersLocalAbandonment()")
+                .substringBefore("\n}\n")
+        assertTrue("the chat list applies the same group rule", "group.offersLocalAbandonment()" in row)
+        assertTrue("the row's own confirmation counts too", "selfMembership?.isNonMember()" in row)
+        for ((name, body) in listOf("rule" to rule, "chat list" to row)) {
+            listOf("leaveRequestPending", "disbanding", "removedFromGroup").forEach {
+                assertFalse("the $name must not withdraw abandonment on $it", it in body)
+            }
+        }
+        val screen = source("ui/group/GroupDetailsScreen.kt")
+        assertTrue(
+            "the leave-blocked notice follows the same rule",
+            "abandonment.leaveBlocked && controller.group.offersLocalAbandonment()" in screen,
+        )
     }
 
     /** The confirmation fixes the acting account and the exact conversation before anything is submitted. */
@@ -132,13 +167,7 @@ class GroupAbandonmentCoverageTest {
         val screen = source("ui/chats/ChatsScreen.kt")
         val menu = screen.substringAfter("onAbandon =").substringBefore("onDismiss =")
         assertTrue("the menu captures its row and owner", "PendingChatAbandonment.capture(item" in menu)
-        assertTrue("the menu offers the action only where it applies", "item.offersLocalAbandonment(" in menu)
-        val eligibility =
-            source("ui/chats/ChatAbandonment.kt")
-                .substringAfter("fun ChatListItem.offersLocalAbandonment")
-                .substringBefore("\n\n")
-        assertTrue("read-only invites decline instead", "!group.pendingConfirmation" in eligibility)
-        assertTrue("a left or inactive chat has nothing to abandon", "!removedFromGroup(" in eligibility)
+        assertTrue("the menu offers the action only where it applies", "item.offersLocalAbandonment()" in menu)
         assertTrue("the host shares the departure busy set", "busyChats = leavingAndDeleting" in screen)
     }
 
