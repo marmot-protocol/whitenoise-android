@@ -23,7 +23,7 @@ def api(path, binary=False):
 
 
 def baseline(source, artifact_name):
-    """Use only a successful master push at the exact requested base commit."""
+    """Use the newest retained artifact from a successful master push at the tested base."""
     require(re.fullmatch(r'[a-f0-9]{40}', source or ''), 'Invalid baseline source')
     runs = api('actions/workflows/android-ci.yml/runs?event=push&status=success&head_sha=' + source + '&per_page=20')
     for run in runs['workflow_runs']:
@@ -34,10 +34,10 @@ def baseline(source, artifact_name):
                 run['head_repository']['full_name'] == REPOSITORY, 'Wrong-source baseline run')
         artifacts = api(f"actions/runs/{run['id']}/artifacts?per_page=100")['artifacts']
         matches = [a for a in artifacts if a['name'] == artifact_name and not a['expired']]
-        require(len(matches) <= 1, 'Ambiguous baseline artifact')
         if not matches:
             continue
-        artifact = matches[0]
+        # A rerun retains previous attempts under the same artifact name.
+        artifact = max(matches, key=lambda a: (a['created_at'], a['id']))
         require(0 < artifact['size_in_bytes'] <= 64 * 1024 * 1024, 'Oversized baseline artifact')
         with zipfile.ZipFile(io.BytesIO(api(f"actions/artifacts/{artifact['id']}/zip", binary=True))) as archive:
             entries = [info for info in archive.infolist() if info.filename == 'inventory/selected.json']
@@ -64,7 +64,12 @@ def main():
     after = read_json(args.after)
     require(after.get('source_sha') == args.after_source, 'Stale candidate inventory source')
     observations(after)
-    before, evidence = baseline(args.base_source, args.artifact_name)
+    try:
+        before, evidence = baseline(args.base_source, args.artifact_name)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        before = None
+        evidence = {'reason': 'GitHub baseline retrieval unavailable: ' + type(error).__name__}
+        print('::warning::' + evidence['reason'])
     result = {'status': 'unavailable', **evidence, 'before_source': args.base_source,
               'after_source': args.after_source}
     if before is not None:

@@ -81,12 +81,17 @@ remains comparable. Native/packaging layers absent from either input are explici
 coverage gaps, never empty deltas.
 
 The existing tooling lane runs this comparison against the same lane's retained
-successful `master` push at the exact PR base, using its existing artifact. No
-extra Gradle resolution, build, job or matrix is added. The retained
-`inventory/base-delta.json` binds both source SHAs and the baseline run/artifact.
-Missing or expired baseline evidence yields an `unavailable` receipt; malformed
-or wrong-source evidence fails. The first adoption has no historical inventory
-and therefore cannot claim a successful comparison.
+successful `master` push at the tested merge commit's first parent (`HEAD^1`),
+not the potentially stale PR event base. It uses the newest unexpired matching
+artifact by creation time, with artifact ID breaking ties, so reruns can retain
+earlier attempts. No extra Gradle resolution, build, job or matrix is added.
+The retained `inventory/base-delta.json` binds both source SHAs and the baseline
+run/artifact.
+Missing or expired baseline evidence and GitHub API failures yield an `unavailable`
+receipt; API failures also warn. Malformed or wrong-source evidence is rejected.
+The comparison step is informational and continues on error without weakening
+the preceding blocking dependency-security checks. The first adoption has no
+historical inventory and therefore cannot claim a successful comparison.
 
 ## Reviewed floors
 

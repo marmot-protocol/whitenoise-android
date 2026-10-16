@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 import textwrap
 import unittest
 
@@ -101,6 +102,45 @@ class AndroidCiGateTest(unittest.TestCase):
                       "&& ' (draft fast lane)' || '' }}\n", self.gate)
         self.assertIn('JOB_RESULTS: ${{ toJSON(needs) }}', self.gate)
         self.assertNotIn('continue-on-error:', self.gate)
+
+    def test_inventory_reporting_cannot_weaken_or_fail_security_enforcement(self):
+        """Comparison availability is optional while dependency-security verification still blocks."""
+        comparison = self.named_step(self.build_contracts, 'Compare already-observed dependencies with exact PR base')
+        verification = self.named_step(self.build_contracts, 'Verify selected dependency security floors')
+        self.assertIn('\n        continue-on-error: true\n', comparison)
+        self.assertNotIn('continue-on-error:', verification)
+        self.assertIn('scripts/verify_dependency_security.py', verification)
+
+    def test_inventory_comparison_uses_tested_merge_parent_despite_stale_event_base(self):
+        """Execute the production step against a merge whose master parent advanced after the event."""
+        comparison = self.named_step(self.build_contracts, 'Compare already-observed dependencies with exact PR base')
+        script = textwrap.dedent(comparison.split('        run: |\n', 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            def git(*arguments):
+                """Keep the synthetic merge graph entirely within this disposable fixture."""
+                return subprocess.check_output(['git', '-C', directory, *arguments], text=True).strip()
+            git('init', '-q')
+            git('config', 'user.name', 'Fixture')
+            git('config', 'user.email', 'fixture@example.invalid')
+            git('config', 'commit.gpgsign', 'false')
+            git('commit', '--allow-empty', '-qm', 'event base')
+            stale = git('rev-parse', 'HEAD')
+            git('commit', '--allow-empty', '-qm', 'newer master')
+            parent = git('rev-parse', 'HEAD')
+            merge = git('commit-tree', 'HEAD^{tree}', '-p', parent, '-p', stale, '-m', 'tested merge')
+            git('update-ref', 'HEAD', merge)
+            capture = Path(directory) / 'arguments.txt'
+            result = subprocess.run(
+                ['bash', '-eo', 'pipefail', '-c',
+                 'python3() { printf "%s\\n" "$@" > "$COMPARISON_ARGUMENTS"; }\n' + script],
+                cwd=directory, env={**os.environ, 'BASE_SHA': stale, 'BASE_ARTIFACT': 'fixture',
+                                    'COMPARISON_ARGUMENTS': str(capture)}, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            arguments = capture.read_text().splitlines()
+            self.assertEqual(arguments[arguments.index('--base-source') + 1], parent)
+            self.assertEqual(arguments[arguments.index('--after-source') + 1], merge)
+            self.assertNotEqual(parent, stale)
 
     def test_fuzz_trigger_policy_runs_outside_filtered_fuzz_workflow(self):
         """A missing parser path cannot skip the policy check itself."""

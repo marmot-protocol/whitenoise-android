@@ -1,7 +1,9 @@
 """Exact-source CI baseline retrieval without resolution or compilation."""
+from contextlib import redirect_stdout
 import io
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -25,7 +27,8 @@ class CiInventoryComparisonTest(unittest.TestCase):
                'path': '.github/workflows/android-ci.yml', 'repository': {'full_name': ci.REPOSITORY},
                'head_repository': {'full_name': ci.REPOSITORY}}
         responses = [{'workflow_runs': [run]}, {'artifacts': [
-            {'id': 2, 'name': 'fixture', 'expired': False, 'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
+            {'id': 2, 'name': 'fixture', 'expired': False, 'created_at': '2026-10-15T10:00:00Z',
+             'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); after = root / 'after.json'; output = root / 'delta.json'
             after.write_text(json.dumps(inventory))
@@ -37,6 +40,48 @@ class CiInventoryComparisonTest(unittest.TestCase):
             self.assertEqual(delta['status'], 'compared')
             self.assertEqual(delta['baseline'], {'run_id': 1, 'artifact_id': 2})
             self.assertEqual(delta['added'], [])
+
+    def test_rerun_uses_newest_unexpired_matching_artifact(self):
+        """Retained older attempts and timestamp ties cannot make a successful rerun ambiguous."""
+        inventory = selected_inventory([report()], SOURCE)
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, 'w') as archive:
+            archive.writestr('inventory/selected.json', json.dumps(inventory))
+        run = {'id': 1, 'head_sha': SOURCE, 'head_branch': 'master', 'event': 'push', 'conclusion': 'success',
+               'path': '.github/workflows/android-ci.yml', 'repository': {'full_name': ci.REPOSITORY},
+               'head_repository': {'full_name': ci.REPOSITORY}}
+        artifact = {'name': 'fixture', 'expired': False, 'size_in_bytes': len(stream.getvalue())}
+        artifacts = [{**artifact, 'id': 3, 'created_at': '2026-10-15T11:00:00Z'},
+                     {**artifact, 'id': 2, 'created_at': '2026-10-15T10:00:00Z'},
+                     {**artifact, 'id': 5, 'created_at': '2026-10-15T12:00:00Z', 'expired': True},
+                     {**artifact, 'id': 4, 'created_at': '2026-10-15T11:00:00Z'},
+                     {**artifact, 'id': 6, 'created_at': '2026-10-15T13:00:00Z', 'name': 'other'}]
+        responses = [{'workflow_runs': [run]}, {'artifacts': artifacts}, stream.getvalue()]
+        with mock.patch.object(ci, 'api', side_effect=responses) as api:
+            value, evidence = ci.baseline(SOURCE, 'fixture')
+        self.assertEqual(value, inventory)
+        self.assertEqual(evidence, {'run_id': 1, 'artifact_id': 4})
+        self.assertEqual(api.call_args, mock.call('actions/artifacts/4/zip', binary=True))
+
+    def test_api_failure_retains_unavailable_receipt_without_traceback(self):
+        """Transport, rate-limit and timeout failures warn without claiming an empty delta."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); after = root / 'after.json'; output = root / 'delta.json'
+            after.write_text(json.dumps(selected_inventory([report()], SOURCE)))
+            errors = [subprocess.CalledProcessError(1, ['gh', 'api']),
+                      subprocess.TimeoutExpired(['gh', 'api'], 60), OSError('gh unavailable')]
+            for error in errors:
+                with self.subTest(error=type(error).__name__), mock.patch.object(ci, 'api', side_effect=error), \
+                        mock.patch('sys.argv', ['compare', '--base-source', SOURCE, '--artifact-name', 'fixture',
+                                   '--after', str(after), '--after-source', SOURCE, '--output', str(output)]), \
+                        redirect_stdout(io.StringIO()) as stdout:
+                    ci.main()
+                delta = json.loads(output.read_text())
+                self.assertEqual(delta['status'], 'unavailable')
+                self.assertEqual((delta['before_source'], delta['after_source']), (SOURCE, SOURCE))
+                self.assertIn(type(error).__name__, delta['reason'])
+                self.assertIn('::warning::', stdout.getvalue())
+                self.assertNotIn('added', delta)
 
     def test_missing_baseline_is_unavailable_and_wrong_source_is_rejected(self):
         """An expired/missing baseline is not an empty comparison or a selection removal."""
@@ -54,7 +99,8 @@ class CiInventoryComparisonTest(unittest.TestCase):
                'path': '.github/workflows/android-ci.yml', 'repository': {'full_name': ci.REPOSITORY},
                'head_repository': {'full_name': ci.REPOSITORY}}
         responses = [{'workflow_runs': [run]}, {'artifacts': [
-            {'id': 2, 'name': 'fixture', 'expired': False, 'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
+            {'id': 2, 'name': 'fixture', 'expired': False, 'created_at': '2026-10-15T10:00:00Z',
+             'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
         with mock.patch.object(ci, 'api', side_effect=responses):
             self.assertIsNone(ci.baseline(SOURCE, 'fixture')[0])
 
@@ -70,7 +116,8 @@ class CiInventoryComparisonTest(unittest.TestCase):
             with zipfile.ZipFile(stream, 'w') as archive:
                 archive.writestr('inventory/selected.json', raw)
             responses = [{'workflow_runs': [run]}, {'artifacts': [
-                {'id': 2, 'name': 'fixture', 'expired': False, 'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
+                {'id': 2, 'name': 'fixture', 'expired': False, 'created_at': '2026-10-15T10:00:00Z',
+                 'size_in_bytes': len(stream.getvalue())}]}, stream.getvalue()]
             with self.subTest(raw=raw[:80]), mock.patch.object(ci, 'api', side_effect=responses):
                 with self.assertRaisesRegex(ValueError, 'Duplicate inventory/evidence key'):
                     ci.baseline(SOURCE, 'fixture')

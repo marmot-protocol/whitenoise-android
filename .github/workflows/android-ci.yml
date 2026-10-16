@@ -385,12 +385,13 @@ jobs:
 
       - name: Compare already-observed dependencies with exact PR base
         if: success() && github.event_name == 'pull_request' && matrix.phase == 'tooling'
+        # Observational reporting must not turn an otherwise valid build red.
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           BASE_ARTIFACT: dependency-security-build-contracts-0
         run: |
-          python3 scripts/compare_ci_dependency_inventory.py --base-source "$BASE_SHA" \
+          python3 scripts/compare_ci_dependency_inventory.py --base-source "$(git rev-parse HEAD^1)" \
             --artifact-name "$BASE_ARTIFACT" \
             --after build/reports/dependency-security/inventory/selected.json --after-source "$(git rev-parse HEAD)" \
             --output build/reports/dependency-security/inventory/base-delta.json
