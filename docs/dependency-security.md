@@ -193,6 +193,10 @@ merge. This adds a required maintainer review step to Gradle updates.
    `--refresh-dependencies --write-locks --write-verification-metadata sha256`,
    including optional preview-debug variants. It runs even after an earlier normal
    build fails against stale inputs, and never turns that failure into a pass.
+   After the candidates are retained, the job restores the committed locks and
+   verification metadata and deletes newly created lockfiles. The later strict
+   dependency-submission qualification therefore reads the committed trust root,
+   never the captured downloads. Every tooling run checks this before qualifying.
    Download its `dependency-inputs-bootstrap` artifact into `<capture>`.
 2. Cross-check the captured runtime evidence and checksum candidates:
 

@@ -409,6 +409,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # A capture rewrites locks and verification metadata in this checkout. Restore the
+      # committed trust root after one, and always prove qualification reads committed bytes.
+      - name: Require the committed dependency trust root for qualification
+        if: matrix.phase == 'tooling'
+        env:
+          RESTORE_CAPTURE: ${{ github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs }}
+        run: ./scripts/require-committed-dependency-trust-root.sh
+
       # Exercise the same init-script plugin under strict verification before master
       # publication. Generate/upload only: PR jobs never receive contents:write.
       - name: Qualify dependency submission graph generation
