@@ -104,7 +104,10 @@ class IncomingAttachmentSchedulingCoverageTest {
             "admission must use the live per-type policy",
             "automaticAttachmentPolicy(accountRef)" in admission,
         )
-        assertTrue("admission must wait for the native approval", "awaitApplied(accountRef)" in admission)
+        assertTrue(
+            "admission must wait for a native approval that allows this type",
+            "awaitApplied(accountRef) { it.allows(type) }" in admission,
+        )
         assertTrue(
             "durable observation must bound a pause",
             "NATIVE_AUTOMATIC_PAUSE_GRACE_MILLIS.takeIf" in source("state/NativeAttachmentTransfers.kt"),

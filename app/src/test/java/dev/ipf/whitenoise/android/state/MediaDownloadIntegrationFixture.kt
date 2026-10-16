@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AttachmentAutomaticPermissionFfi
 import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
@@ -64,6 +65,11 @@ internal class MediaDownloadIntegrationFixture(
 
     /** Runs as each policy-blocked refusal is returned, so a test can move the host's approval meanwhile. */
     @Volatile var onAutomaticPolicyBlock: () -> Unit = {}
+
+    /** When set, automatic requests are refused unless the last applied approval allows images, as in MDK. */
+    @Volatile var enforceNativePermission = false
+
+    @Volatile private var nativeImagesAllowed = false
     val permissionApplications = AtomicInteger()
     val active = AtomicInteger()
     val peak = AtomicInteger()
@@ -189,7 +195,8 @@ internal class MediaDownloadIntegrationFixture(
                     val retry = method.name.substringBefore('-') == "downloadAttachmentAgain"
                     if (automatic) {
                         automaticDemands.incrementAndGet()
-                        if (automaticPolicyBlocks.getAndUpdate { maxOf(0, it - 1) } > 0) {
+                        val denied = enforceNativePermission && !nativeImagesAllowed
+                        if (denied || automaticPolicyBlocks.getAndUpdate { maxOf(0, it - 1) } > 0) {
                             onAutomaticPolicyBlock()
                             val blocked = AttachmentTransferStateFfi.POLICY_BLOCKED
                             return@newProxyInstance AutomaticAttachmentRequestFfi(
@@ -215,9 +222,14 @@ internal class MediaDownloadIntegrationFixture(
                     cancellationObserved.complete(Unit)
                     true
                 }
-                "beginAttachmentPermissionUpdate" -> "fixture-generation"
+                "beginAttachmentPermissionUpdate" -> {
+                    // Beginning an update revokes the current approval, as MDK does.
+                    nativeImagesAllowed = false
+                    "fixture-generation"
+                }
                 "setAttachmentAutomaticPermission" -> {
                     permissionApplications.incrementAndGet()
+                    nativeImagesAllowed = (args!![2] as AttachmentAutomaticPermissionFfi).images
                     true
                 }
                 "downloadMedia" -> error("Legacy network fallback is forbidden")

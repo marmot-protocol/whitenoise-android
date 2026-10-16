@@ -4898,9 +4898,9 @@ class WhiteNoiseAppState private constructor(
      * Runs automatic [download] once the live policy allows [type] and the native runtime holds that approval. A
      * network change revokes approval before re-evaluating it, and a request that lands in that window is
      * refused without recording demand, so a refusal is asked again once the host's approval has moved on. A
-     * refusal under an unchanged approval is MDK's own final answer, such as a size cap, and ends the work. A
-     * transfer MDK keeps paused, usually because its type was turned off mid-download, is re-admitted the same
-     * way after it frees its download slot.
+     * refusal under an unchanged approval that allows the type is MDK's own final answer, such as a size cap,
+     * and ends the work. A transfer MDK keeps paused, usually because its type was turned off mid-download, is
+     * re-admitted the same way after it frees its download slot.
      */
     private suspend fun downloadAutomaticAttachment(
         accountRef: String,
@@ -4923,9 +4923,10 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Holds automatic work to the live policy for [type], then waits for the native runtime to apply it, and
-     * returns the approval's host revision. An approval that never lands asks for a fresh one before the work
-     * retries.
+     * Holds automatic work to the live policy for [type], then waits until the native runtime holds an approval
+     * that allows [type], and returns that approval's host revision. Live inputs can change before their refresh
+     * runs, so an approval that was merely applied could still be the previous network's denial. An approval
+     * that never lands asks for a fresh one before the work retries.
      */
     private suspend fun awaitAutomaticAttachmentAdmission(
         accountRef: String,
@@ -4933,9 +4934,11 @@ class WhiteNoiseAppState private constructor(
     ): Long {
         val policy = automaticAttachmentPolicy(accountRef)
         val hold = if (type == null) AutomaticAttachmentHold.Disabled else policy.hold(type)
-        if (hold != null) throw AttachmentAutomaticPolicyDeferredException(type, hold)
+        if (hold != null || type == null) {
+            throw AttachmentAutomaticPolicyDeferredException(type, hold ?: AutomaticAttachmentHold.Disabled)
+        }
         return withTimeoutOrNull(NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS) {
-            nativeAttachmentPermissions.awaitApplied(accountRef)
+            nativeAttachmentPermissions.awaitApplied(accountRef) { it.allows(type) }
         } ?: run {
             refreshNativeAttachmentPermissions()
             throw AttachmentPermissionPendingException()

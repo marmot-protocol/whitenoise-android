@@ -17,12 +17,12 @@ internal class NativeAttachmentPermissions {
     private val revision = AtomicLong()
     private val runtimeOwner = AtomicReference<Any?>()
     private val updates = Mutex()
-    private val applied = MutableStateFlow(AppliedPermissions(revision = 0L, accounts = emptySet()))
+    private val applied = MutableStateFlow(AppliedPermissions(revision = 0L, accounts = emptyMap()))
 
-    /** Accounts whose permission the native runtime holds for one host revision. */
+    /** The permission the native runtime holds for each account under one host revision. */
     private data class AppliedPermissions(
         val revision: Long,
-        val accounts: Set<String>,
+        val accounts: Map<String, AttachmentAutomaticPermissionFfi>,
     )
 
     /**
@@ -32,17 +32,21 @@ internal class NativeAttachmentPermissions {
     fun invalidate(owner: Any?): Long {
         runtimeOwner.set(owner)
         val next = revision.incrementAndGet()
-        applied.update { current -> if (next > current.revision) AppliedPermissions(next, emptySet()) else current }
+        applied.update { current -> if (next > current.revision) AppliedPermissions(next, emptyMap()) else current }
         return next
     }
 
     /**
-     * Suspends until the native runtime holds [account]'s permission for the latest host revision. A worker
-     * that starts in a fresh process, or just after a network change revoked the old approval, would
-     * otherwise ask before the approval exists and be refused as policy-blocked. Returns the revision whose
-     * approval was applied.
+     * Suspends until the native runtime holds a permission for [account], under the latest host revision, that
+     * [allows] accepts, and returns that revision. A worker that starts in a fresh process, or just after a
+     * network change revoked the old approval, would otherwise ask before the approval exists and be refused as
+     * policy-blocked. Host inputs can also change before their refresh runs, leaving the previous revision's
+     * denial applied, so automatic work waits for an approval that allows its own type.
      */
-    suspend fun awaitApplied(account: String): Long = applied.first { account in it.accounts }.revision
+    suspend fun awaitApplied(
+        account: String,
+        allows: (AttachmentAutomaticPermissionFfi) -> Boolean = { true },
+    ): Long = applied.first { it.accounts[account]?.let(allows) == true }.revision
 
     /** The host revision whose approval the native runtime holds for [account] now, or null while none is applied. */
     fun appliedRevision(account: String): Long? = applied.value.takeIf { account in it.accounts }?.revision
@@ -77,7 +81,7 @@ internal class NativeAttachmentPermissions {
                     val permission = evaluate(account)
                     if (isCurrent(expectedRevision, expectedOwner)) {
                         if (engine.setAttachmentAutomaticPermission(account, generation, permission)) {
-                            markApplied(expectedRevision, account)
+                            markApplied(expectedRevision, account, permission)
                         } else {
                             failed += account
                         }
@@ -93,16 +97,30 @@ internal class NativeAttachmentPermissions {
             failed
         }
 
-    /** Records [account] as applied only while [appliedRevision] is still the latest host revision. */
+    /** Records [account]'s applied [permission] only while [appliedRevision] is still the latest host revision. */
     private fun markApplied(
         appliedRevision: Long,
         account: String,
+        permission: AttachmentAutomaticPermissionFfi,
     ) {
         applied.update { current ->
-            if (current.revision == appliedRevision) current.copy(accounts = current.accounts + account) else current
+            if (current.revision == appliedRevision) {
+                current.copy(accounts = current.accounts + (account to permission))
+            } else {
+                current
+            }
         }
     }
 }
+
+/** Whether this applied permission lets MDK fetch [type] automatically. */
+internal fun AttachmentAutomaticPermissionFfi.allows(type: MediaAutoDownloadType): Boolean =
+    when (type) {
+        MediaAutoDownloadType.Image -> images
+        MediaAutoDownloadType.Video -> videos
+        MediaAutoDownloadType.Audio -> audio
+        MediaAutoDownloadType.Document -> files
+    }
 
 /** Denies unvalidated connections and user-paused accounts before applying the restrictive network matrix. */
 internal fun MediaAutoDownloadMatrix.nativePermission(
