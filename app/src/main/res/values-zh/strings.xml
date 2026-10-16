@@ -162,6 +162,8 @@
     <string name="toast_couldnt_abandon_chat">无法放弃对话，请重试。</string>
     <string name="leave_blocked_abandon_hint_dm">退出未完成。你可以改为在此设备上放弃此对话，不会向对方发送任何内容。</string>
     <string name="leave_blocked_abandon_hint_group">退出未完成。你可以改为在此设备上重置此群组，不会向群组发送任何内容。</string>
+    <string name="sole_admin_abandon_hint_dm">如果没有人能成为管理员，可以在此设备上放弃此对话来解决，不会向对方发送任何内容。</string>
+    <string name="sole_admin_abandon_hint_group">如果没有人能成为管理员，可以在此设备上重置此群组来解决，不会向群组发送任何内容。</string>
     <string name="key_package_relay_history">中继历史</string>
     <string name="key_package_current">当前</string>
     <string name="key_package_superseded">已替换</string>

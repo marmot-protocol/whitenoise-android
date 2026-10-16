@@ -1098,29 +1098,17 @@ internal fun GroupDetailsScreen(
                     )
                 // #1131: with no eligible successor, keep the sole admin in the group.
                 is DetailsConfirm.LeaveSoleAdmin ->
-                    // Fallback for the (unexpected) no-transfer-candidate case — still
-                    // an informational gate. The normal sole-admin Leave now routes to
-                    // LeaveSoleAdminTransfer or the picker in leave mode (#1131).
-                    AlertDialog(
-                        onDismissRequest = { pendingConfirm = null },
-                        title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
-                        text = {
-                            EmojiLabel(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName))
+                    // Fallback for the (unexpected) no-transfer-candidate case. The normal sole-admin Leave
+                    // routes to LeaveSoleAdminTransfer or the picker in leave mode (#1131). With no eligible
+                    // successor, local abandonment is the way out of this gate (#3310).
+                    GroupSoleAdminLeaveDialog(
+                        groupName = confirm.groupName,
+                        isDm = isDm,
+                        onAbandon = {
+                            pendingConfirm = null
+                            requestAbandonment()
                         },
-                        confirmButton = {
-                            TextButton(onClick = { pendingConfirm = null }) {
-                                Text(stringResource(R.string.cancel))
-                            }
-                        },
-                        // #3310: with no eligible successor, local abandonment is the escape path from this gate.
-                        dismissButton = {
-                            TextButton(
-                                onClick = {
-                                    pendingConfirm = null
-                                    requestAbandonment()
-                                },
-                            ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
-                        },
+                        onDismiss = { pendingConfirm = null },
                     )
                 is DetailsConfirm.LeaveSoleAdminTransfer ->
                     GroupDetailsConfirmation(

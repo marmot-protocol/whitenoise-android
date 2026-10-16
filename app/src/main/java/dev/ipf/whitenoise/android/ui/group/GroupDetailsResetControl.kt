@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -262,3 +263,47 @@ internal fun GroupLeaveBlockedNotice(
     }
 }
 
+/**
+ * The You're the only admin gate when no member can receive admin, the fallback of the transfer-then-leave route.
+ * Cancel only dismisses, and the error-coloured action opens the reviewed abandonment, which the body names as the
+ * way out on this device (#3310).
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun GroupSoleAdminLeaveDialog(
+    groupName: String,
+    isDm: Boolean,
+    onAbandon: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("chat_info.sole_admin_leave"),
+        title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
+        text = {
+            Column(
+                Modifier.fadingVerticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                EmojiLabel(stringResource(R.string.confirm_leave_sole_admin_message, groupName))
+                Text(
+                    stringResource(
+                        if (isDm) R.string.sole_admin_abandon_hint_dm else R.string.sole_admin_abandon_hint_group,
+                    ),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onAbandon,
+                modifier = Modifier.testTag("chat_info.sole_admin_leave.abandon"),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("chat_info.sole_admin_leave.cancel")) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}

@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -62,6 +63,40 @@ class GroupAbandonmentDialogScreenshotTest {
             .captureRoboImage("src/test/snapshots/group_abandon_leave_blocked_light.png")
     }
 
+    /** The sole-admin gate for a direct chat: Cancel and an error-coloured Abandon chat on this device. */
+    @Test
+    fun soleAdminDmLight() = captureSoleAdmin("dm_light", isDm = true)
+
+    /** The sole-admin gate for a group at 200% text in RTL in the dark theme. */
+    @Test
+    fun soleAdminGroupLargeRtl() = captureSoleAdmin("group_large_rtl", isDm = false, dark = true, large = true)
+
+    /** In the sole-admin gate Cancel only dismisses, and only the destructive action opens the abandonment. */
+    @Test
+    fun soleAdminCancelDismissesAndAbandonOpensTheReview() {
+        var abandons = 0
+        var dismissals = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                GroupSoleAdminLeaveDialog(
+                    groupName = "Alice",
+                    isDm = true,
+                    onAbandon = { abandons++ },
+                    onDismiss = { dismissals++ },
+                )
+            }
+        }
+        composeRule.onNodeWithText(app.getString(R.string.sole_admin_abandon_hint_dm)).assertIsDisplayed()
+        composeRule.onNodeWithTag("chat_info.sole_admin_leave.cancel").performClick()
+        assertEquals(0, abandons)
+        assertEquals(1, dismissals)
+        composeRule
+            .onNodeWithTag("chat_info.sole_admin_leave.abandon")
+            .assertTextEquals(app.getString(R.string.chat_abandon_action))
+            .performClick()
+        assertEquals(1, abandons)
+    }
+
     /** The dialog names the action, the exact conversation and the acting account, and Cancel submits nothing. */
     @Test
     fun reviewNamesTheTargetAndCancelSubmitsNothing() {
@@ -93,6 +128,27 @@ class GroupAbandonmentDialogScreenshotTest {
         composeRule.onNodeWithTag("group.abandon.error").assertIsDisplayed()
         composeRule.onNodeWithTag("group.abandon.confirm").assertIsEnabled().performClick()
         assertEquals(1, confirms)
+    }
+
+    /** Composes the sole-admin gate under the requested appearance and records its window. */
+    private fun captureSoleAdmin(
+        name: String,
+        isDm: Boolean,
+        dark: Boolean = false,
+        large: Boolean = false,
+    ) {
+        val groupName = if (isDm) "Alice" else "Hiking club"
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (large) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = if (large) 2f else 1f) {
+                    GroupSoleAdminLeaveDialog(groupName, isDm, onAbandon = {}, onDismiss = {})
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_abandon_sole_admin_$name.png")
     }
 
     /** Composes the dialog under the requested appearance and records its window. */
