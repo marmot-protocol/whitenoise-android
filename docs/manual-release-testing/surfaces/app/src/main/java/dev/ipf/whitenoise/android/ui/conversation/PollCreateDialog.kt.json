@@ -238,6 +238,14 @@
         "test_ids": [
           "MSG-021"
         ]
+      },
+      {
+        "surface": "PollCreateForm content-fit audit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "fun PollCreateForm(",
+        "test_ids": [
+          "PRO-004"
+        ]
       }
     ],
     "source_coverage": [

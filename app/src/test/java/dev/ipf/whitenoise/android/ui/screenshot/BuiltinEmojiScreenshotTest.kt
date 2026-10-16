@@ -90,7 +90,7 @@ class BuiltinEmojiScreenshotTest {
     private fun capture(mode: Variant) {
         val dark = mode == Variant.Dark
         val rtl = mode == Variant.LargeRtl
-        val repeatedEmoji = MarkdownInlineFfi.Text(":marmot::wn: :marmot::marmot: :wn::wn:")
+        val repeatedEmoji = MarkdownInlineFfi.Text("🦫 :marmot: 😀 :wn: :marmot::marmot: :wn::wn:")
         val malformedFence = "```\n``` trailing text\n:marmot: :wn:\n```\n:wn:"
         val document =
             MarkdownDocumentFfi(

@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -22,6 +23,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +45,56 @@ class ContactPrivateDetailsViewportScreenshotTest {
     @Test fun keyboardViewportAmoled() = capture("amoled", dark = true, amoled = true)
 
     @Test fun keyboardViewportLargeRtl() = capture("large_rtl", scale = 2f, rtl = true)
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h1000dp-mdpi")
+    fun fullPictureEditorUsesSpareHeight() = captureFull("light")
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h1000dp-mdpi")
+    fun fullPictureEditorDark() = captureFull("dark", dark = true)
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h1000dp-mdpi")
+    fun fullPictureEditorAmoled() = captureFull("amoled", dark = true, amoled = true)
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h1000dp-mdpi")
+    fun fullPictureEditorLargeRtl() = captureFull("large_rtl", rtl = true)
+
+    private fun captureFull(
+        name: String,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
+                    ContactPrivateDetailsDialog(
+                        profileName = "Alice",
+                        initialNickname = "A private nickname",
+                        initialNotes = "Private notes",
+                        onDismiss = {},
+                        onSave = { _, _ -> },
+                        securePolicy = SecureFlagPolicy.SecureOff,
+                        pictureState = ContactPictureEditorState(),
+                    )
+                }
+            }
+        }
+        if (!rtl) {
+            composeRule.onNodeWithTag("person_profile.nickname").assertIsDisplayed()
+            composeRule.onNodeWithTag("person_profile.notes").assertIsDisplayed()
+        }
+        composeRule.onNodeWithTag("person_profile.private_save").assertIsDisplayed()
+        val form = composeRule.onNodeWithTag("private_details.form").fetchSemanticsNode()
+        assertTrue(form.boundsInRoot.height > 360f)
+        if (!rtl) assertEquals(0f, form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue(), 0f)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/private_contact_full_height_$name.png")
+    }
 
     private fun capture(
         name: String,

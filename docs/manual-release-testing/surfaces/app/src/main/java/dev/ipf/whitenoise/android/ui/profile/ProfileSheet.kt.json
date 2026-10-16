@@ -147,6 +147,22 @@
         "test_ids": [
           "ACC-007"
         ]
+      },
+      {
+        "surface": "ProfileAddToGroupsContent UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileAddToGroupsContent(",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileAddToGroupsScreen(",
+        "test_ids": [
+          "ACC-002"
+        ]
       }
     ],
     "settings_controls": [
@@ -402,6 +418,14 @@
         "anchor": "rememberProfileAccountWideGroups(",
         "test_ids": [
           "ACC-021"
+        ]
+      },
+      {
+        "surface": "Recipient-scoped add-to-groups state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex)",
+        "test_ids": [
+          "ACC-002"
         ]
       }
     ]

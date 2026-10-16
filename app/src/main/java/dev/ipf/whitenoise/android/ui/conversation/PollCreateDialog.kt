@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -170,7 +169,7 @@ internal fun PollCreateForm(
     onDeadlineChange: (PollDeadlineSelection) -> Unit,
 ) {
     Column(
-        Modifier.heightIn(max = 400.dp).fadingVerticalScroll(rememberScrollState()),
+        Modifier.testTag("poll.create.form").fadingVerticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ProseTextField(

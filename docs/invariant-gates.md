@@ -1,7 +1,7 @@
 # Invariant gates
 
 An invariant gate is a test that enforces a behavioral rule across every call
-site that could break it, rather than one reported symptom. Most gates are
+site that could break it. Most gates are
 source-inspecting `*CoverageTest.kt` classes built on
 [`SourceBlockTestHelpers.kt`](../app/src/test/java/dev/ipf/whitenoise/android/SourceBlockTestHelpers.kt).
 This page is the checked-in registry: it names the invariant each gate owns and
@@ -120,6 +120,7 @@ table sorted by gate name.
 | [`ChatsScreenScrollControlAccessibilityCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreenScrollControlAccessibilityCoverageTest.kt) | The scroll-to-top control is exposed to accessibility services as a button. | `ui/chats/ChatsScreen.kt` |
 | [`ChatsScreenSelectionActionsCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreenSelectionActionsCoverageTest.kt) | Selection and long-press actions share one mutation path for read, mute, pin, order and folder changes. | `ui/chats/ChatsScreen.kt` selection actions |
 | [`ComposeHotPathCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/ComposeHotPathCoverageTest.kt) | Expensive composer, emoji, chat-list and TTS work stays remembered, off the main thread or outside screen composition. | Compose hot paths in the composer, chat list and conversation screen |
+| [`ContactPrivateDetailsViewportScreenshotTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/profile/ContactPrivateDetailsViewportScreenshotTest.kt) | Finite private-details content uses available safe height before scrolling; compact and IME-constrained forms keep Save and Cancel reachable. | `ContactPrivateDetailsFrame` viewport and action measurement |
 | [`ConversationAnchoringSourceCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/state/ConversationAnchoringSourceCoverageTest.kt) | Conversation anchoring state follows the current controller, and the read anchor follows the unobstructed viewport. | `ui/conversation/ConversationScreen.kt` anchoring holders |
 | [`ConversationDictationPlaybackHandoffSourceCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/state/ConversationDictationPlaybackHandoffSourceCoverageTest.kt) | Dictation capture pauses and resumes playback through paired callbacks, and resume requires the same paused clip and interruption token. | `state/ConversationDictationPlaybackHandoff.kt` and `audio/VoicePlaybackController.kt` |
 | [`ConversationMentionPickerStateCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationMentionPickerStateCoverageTest.kt) | Mention candidates use cached contact display names for both labels and filtering. | `ui/conversation/composer/ConversationMentionPickerState.kt` |
@@ -150,6 +151,7 @@ table sorted by gate name.
 | [`ProfileSheetContactEditorCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheetContactEditorCoverageTest.kt) | The contact private-details row prefers the nickname, then the notes label, then the add prompt. | `profileSheetContactPrivateDetailsRowValue` |
 | [`ScrollEdgeFadeCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFadeCoverageTest.kt) | Every app-owned scroll viewport, including aliased and qualified calls, uses its reviewed edge-fade policy from the inventory. | `scripts/check_scroll_edge_fades.py` and `docs/scroll-edge-fade-surfaces.json` |
 | [`StalenessGuardCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/state/StalenessGuardCoverageTest.kt) | Every suspend-then-publish path is guarded by the shared latest-wins primitive or carries a reasoned exemption. | Shared latest-wins staleness guard |
+| [`StartingAccountIndicatorScreenshotTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/account/StartingAccountIndicatorScreenshotTest.kt) | A creation identity cue names its captured account and rejects a different active account, runtime or sign-out state. | `startingAccount` and `StartingAccountIndicator` |
 | [`StartupUnreadHydrationCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/state/StartupUnreadHydrationCoverageTest.kt) | Startup publishes ready at the local activation boundary and defers unread hydration until after the first local frame. | `state/AppState.kt` bootstrap |
 | [`TtsAutoReadWiringCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadWiringCoverageTest.kt) | Automatic speech requires an owned session and a revealed transcript on every open, live and resume lane. | `ui/conversation/ConversationTtsEffects.kt` |
 | [`TtsQuickTransportWiringCoverageTest`](../app/src/test/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsQuickTransportWiringCoverageTest.kt) | The read-aloud gesture is attached to every message row and claimed before reply swipe and long press. | `ui/conversation/messages/MessageBubble.kt` gesture wiring |

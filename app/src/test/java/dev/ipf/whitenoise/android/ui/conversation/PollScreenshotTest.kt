@@ -7,10 +7,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -21,6 +23,8 @@ import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -134,7 +138,34 @@ class PollScreenshotTest {
                 }
             }
         }
+        val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
+        assertTrue(form.boundsInRoot.height > 400f)
+        assertEquals(0f, form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue(), 0f)
         composeRule.onNodeWithTag("poll-create-form").captureRoboImage("src/test/snapshots/poll_create_form_light.png")
+    }
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h1000dp-mdpi")
+    fun tallCreateDialogUsesAvailableHeight() {
+        composeRule.setContent {
+            WhiteNoiseTheme { PollCreateDialog({}, { _, _, _, _, _ -> }) }
+        }
+        val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
+        assertTrue(form.boundsInRoot.height > 400f)
+        assertEquals(0f, form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue(), 0f)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/poll_create_dialog_tall_light.png")
+    }
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h320dp-mdpi")
+    fun compactCreateDialogScrollsWithVisibleActions() {
+        composeRule.setContent {
+            WhiteNoiseTheme { PollCreateDialog({}, { _, _, _, _, _ -> }) }
+        }
+        val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
+        assertTrue(form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue() > 0f)
+        composeRule.onNodeWithText("Cancel").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/poll_create_dialog_compact_light.png")
     }
 
     /** A rejected duplicate option shows the reason without hiding the form controls. */

@@ -26,7 +26,8 @@
     "conversation/messages": "Focused message/forward picker/progress/details/history/kept-message cards, expanded/collapsed and selection/read-aloud states; menus and keyboard.",
     "conversation/nostr": "Loaded/error and long Nostr event detail content, expandable blocks and links.",
     "conversation/reactions": "Reaction configuration/participant lists, chosen emoji, loading/empty and own-reaction actions.",
-    "TtsSentenceAccessibility.kt": "Read-aloud sentence chooser, active sentence and overflowing labels."
+    "TtsSentenceAccessibility.kt": "Read-aloud sentence chooser, active sentence and overflowing labels.",
+    "conversation/ConversationTopBar.kt": "Timer explanation popup, compact windows and large text overflow."
   },
   "exclusions": [
     {
@@ -361,6 +362,21 @@
       "family": "conversation/ConversationScreen.kt",
       "policy": "measured_reverse_composer",
       "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/ConversationTopBar.kt",
+      "policy": "ordinary",
+      "test_ids": [
+        "CON-001",
         "SCR-001",
         "SCR-002",
         "SCR-003",
@@ -732,7 +748,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
       "calls": {
-        "whiteNoiseVerticalScroll": 2
+        "whiteNoiseVerticalScroll": 1
       },
       "family": "group",
       "policy": "ordinary",
@@ -1017,7 +1033,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
       "calls": {
-        "fadingVerticalScroll": 2,
+        "fadingVerticalScroll": 1,
         "WhiteNoiseLazyColumn": 2
       },
       "family": "profile",
@@ -1026,7 +1042,8 @@
         "SCR-001",
         "SCR-002",
         "SCR-003",
-        "SCR-004"
+        "SCR-004",
+        "ACC-002"
       ]
     },
     {
@@ -1627,6 +1644,20 @@
         "fadingVerticalScroll": 1
       },
       "family": "share",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "chats/newchat",
       "policy": "ordinary",
       "test_ids": [
         "SCR-001",

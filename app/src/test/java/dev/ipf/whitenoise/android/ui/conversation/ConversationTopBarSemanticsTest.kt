@@ -1,11 +1,15 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -18,7 +22,12 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -37,6 +46,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -99,6 +109,60 @@ class ConversationTopBarSemanticsTest {
             .captureRoboImage("src/test/snapshots/conversation_header_compact_timer_light.png")
     }
 
+    @Test
+    fun automaticTimerExplanationFitsWindow() {
+        val state = appState()
+        val controller = ConversationController(state, group().copy(disappearingMessageSecs = 60uL))
+        render(state, controller)
+        val tooltip = composeRule.onNodeWithTag("conversation.timer.tooltip")
+        // The first-time LaunchedEffect opens the production tooltip; use screen coordinates across popup roots.
+        val node = tooltip.fetchSemanticsNode()
+        val position = node.positionOnScreen
+        assertTrue(position.x >= 0f && position.y >= 0f)
+        assertTrue(position.x + node.size.width <= 360f && position.y + node.size.height <= 780f)
+        tooltip.captureRoboImage("src/test/snapshots/conversation_timer_tooltip_light.png")
+    }
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h120dp-mdpi")
+    fun oversizedTimerExplanationScrollsToItsEnd() {
+        val state = appState()
+        val controller = ConversationController(state, group().copy(disappearingMessageSecs = 60uL))
+        render(state, controller, compactHeight = true, fontScale = 2f)
+        val tooltip = composeRule.onNodeWithTag("conversation.timer.tooltip")
+        val node = tooltip.fetchSemanticsNode()
+        assertTrue(node.positionOnScreen.y >= 0f)
+        assertTrue(node.positionOnScreen.y + node.size.height <= 120f)
+        val text = composeRule.onNodeWithTag("conversation.timer.tooltip.text", useUnmergedTree = true)
+        val scroll = text.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        assertTrue("The oversized explanation must be scrollable", scroll.maxValue() > 0f)
+        text.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 10000f) }
+        composeRule.waitForIdle()
+        assertEquals(scroll.maxValue(), scroll.value(), 1f)
+        composeRule
+            .onNodeWithText(context.getString(dev.ipf.whitenoise.android.R.string.disappearing_tooltip_text))
+            .assertExists()
+        tooltip.captureRoboImage("src/test/snapshots/conversation_timer_tooltip_compact_large_end.png")
+    }
+
+    @Test
+    @OptIn(ExperimentalMaterial3Api::class)
+    fun timerPositionerClampsEdgeAnchors() {
+        lateinit var provider: PopupPositionProvider
+        composeRule.setContent {
+            provider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above)
+        }
+        composeRule.runOnIdle {
+            for (direction in listOf(LayoutDirection.Ltr, LayoutDirection.Rtl)) {
+                for (anchor in listOf(IntRect(92, 20, 180, 48), IntRect(0, 740, 60, 770), IntRect(330, 20, 360, 48))) {
+                    val position = provider.calculatePosition(anchor, IntSize(360, 780), direction, IntSize(320, 120))
+                    assertTrue(position.x >= 0 && position.x + 320 <= 360)
+                    assertTrue(position.y >= 0 && position.y + 120 <= 780)
+                }
+            }
+        }
+    }
+
     /** MDK's prepared title replaces the app's own projection once the window installs its first sidecar. */
     @Test
     fun preparedWindowTitleReplacesFallback() {
@@ -136,10 +200,11 @@ class ConversationTopBarSemanticsTest {
         compactHeight: Boolean = false,
         frozen: State<Boolean> = mutableStateOf(false),
         onOpenDetails: () -> Unit = {},
+        fontScale: Float = 1f,
     ) {
         val searchFocusRequester = FocusRequester()
         composeRule.setContent {
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(fontScale = fontScale) {
                 Surface {
                     ConversationTopBar(
                         selectionMode = false,

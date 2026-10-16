@@ -47,6 +47,8 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
+import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -181,10 +183,12 @@ internal fun SelectedMembersReviewScreen(
     confirmLabel: String,
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
+    startingAs: StartingAccount? = null,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
+                actions = { StartingAccountIndicator(startingAs) },
                 title = {
                     Column {
                         Text(stringResource(R.string.review_selection))
@@ -279,7 +283,7 @@ internal fun SelectedMembersReviewScreen(
 /** Keeps the privilege choice beside the full identity without consuming the name column. */
 @Composable
 @Suppress("FunctionNaming")
-private fun SelectedMemberRoleMenu(
+internal fun SelectedMemberRoleMenu(
     name: String,
     identifier: String,
     admin: Boolean,

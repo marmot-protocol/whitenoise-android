@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+  "legacy_sha256": "451f44c59830094d5b35589e6ae88b704974c550d768441f6911a82e2f941b54",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "fun content(",
+        "test_ids": [
+          "MSG-022",
+          "MSG-023",
+          "MSG-024"
+        ]
+      },
+      {
+        "surface": "EmojiArtImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "fun EmojiArtImage(",
+        "test_ids": [
+          "MSG-023",
+          "MSG-024",
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "EmojiArtImage UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "fun EmojiArtImage(",
+        "test_ids": [
+          "MSG-022"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

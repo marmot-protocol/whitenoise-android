@@ -3,14 +3,21 @@ package dev.ipf.whitenoise.android.ui.profile
 import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -21,6 +28,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -77,13 +85,28 @@ class ProfileAddToGroupsFlowTest {
     }
 
     @Test
+    fun profileWithoutSharedGroupsKeepsAddEntryReachable() {
+        renderProfile()
+        composeRule.onNodeWithText(app.getString(R.string.person_groups_in_common))
+            .performScrollTo()
+            .performClick()
+        finishContentTransition()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_empty_shared_groups.png")
+        composeRule.onNodeWithText(app.getString(R.string.person_add_to_group))
+            .assertIsDisplayed()
+            .performClick()
+        finishContentTransition()
+        composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
+    }
+
+    @Test
     fun unresolvedGroupsShowLoadingInsteadOfTerminalEmptyCopy() {
         val appState = testAppState()
         composeRule.setContent {
             WhiteNoiseTheme {
                 ProfileAddToGroupsContent(
                     appState = appState,
-                    targetName = "Alice",
+                    target = RecipientSearch.Candidate(TARGET_HEX, "Alice", TARGET_NPROFILE),
                     state =
                         ProfileGroupPickerState(
                             groups = emptyList(),
@@ -110,7 +133,7 @@ class ProfileAddToGroupsFlowTest {
             WhiteNoiseTheme {
                 ProfileAddToGroupsContent(
                     appState = appState,
-                    targetName = "Alice",
+                    target = RecipientSearch.Candidate(TARGET_HEX, "Alice", TARGET_NPROFILE),
                     state =
                         ProfileGroupPickerState(
                             groups = emptyList(),
@@ -138,7 +161,7 @@ class ProfileAddToGroupsFlowTest {
                 Surface {
                     ProfileAddToGroupsContent(
                         appState = appState,
-                        targetName = "Alice",
+                        target = RecipientSearch.Candidate(TARGET_HEX, "Alice", TARGET_NPROFILE),
                         state =
                             ProfileGroupPickerState(
                                 groups = listOf(groupItem("friends", "Friends"), groupItem("work", "Work")),
@@ -192,6 +215,126 @@ class ProfileAddToGroupsFlowTest {
             .captureRoboImage("src/test/snapshots/profile_make_admin_ready_dark.png")
         composeRule.onNodeWithText(app.getString(R.string.make_admin)).performClick()
         composeRule.runOnIdle { assertEquals("friends", promotedGroupId) }
+    }
+
+    @Test
+    fun overflowingListKeepsActionAtBottomAndLastGroupReachable() {
+        val state = testAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileAddToGroupsScreen(
+                    appState = state,
+                    target = RecipientSearch.Candidate(TARGET_HEX, "Alice", TARGET_NPROFILE),
+                    state =
+                        ProfileGroupPickerState(
+                            groups = (1..30).map { groupItem("group-$it", "Group $it") },
+                            pendingGroupIds = emptySet(),
+                            loadState = ProfileGroupPickerLoadState.READY,
+                        ),
+                    busy = false,
+                    onClose = {},
+                    onRetry = {},
+                    onAdd = {},
+                )
+            }
+        }
+        val action = composeRule.onNodeWithTag("profile.add_groups.action")
+        val initial = action.fetchSemanticsNode().boundsInRoot
+        assertTrue(initial.top > 600f)
+        composeRule.onNodeWithTag("profile.add_groups.list").performScrollToNode(hasText("Group 30"))
+        composeRule.onNodeWithText("Group 30").assertIsDisplayed().performClick()
+        action.assertIsDisplayed()
+        assertEquals(initial, action.fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test
+    fun fullRouteConsumesKeyboardSpaceOnce() {
+        val state = testAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileAddToGroupsScreen(
+                    appState = state,
+                    target = RecipientSearch.Candidate(TARGET_HEX, "Alice", TARGET_NPROFILE),
+                    state =
+                        ProfileGroupPickerState(
+                            groups = (1..30).map { groupItem("group-$it", "Group $it") },
+                            pendingGroupIds = emptySet(),
+                            loadState = ProfileGroupPickerLoadState.READY,
+                        ),
+                    busy = false,
+                    onClose = {},
+                    onRetry = {},
+                    onAdd = {},
+                    keyboardInsets = WindowInsets(bottom = 210.dp),
+                )
+            }
+        }
+        val action = composeRule.onNodeWithTag("profile.add_groups.action")
+        action.assertIsDisplayed()
+        val bottom = action.fetchSemanticsNode().boundsInRoot.bottom
+        // 780dp window - 210dp keyboard - 12dp footer margin; a second inset creates a 210dp gap.
+        assertTrue("Action bottom $bottom should sit above the keyboard", bottom in 550f..558f)
+        composeRule.onNodeWithTag("profile.add_groups.list").performScrollToNode(hasText("Group 30"))
+        composeRule.onNodeWithText("Group 30").assertIsDisplayed()
+    }
+
+    @Test
+    fun changingRecipientClearsSelectionAndOpenReview() {
+        val state = testAppState()
+        val recipient = mutableStateOf(RecipientSearch.Candidate(TARGET_HEX, "Alice", TARGET_NPROFILE))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileAddToGroupsScreen(
+                    appState = state,
+                    target = recipient.value,
+                    state =
+                        ProfileGroupPickerState(
+                            listOf(groupItem("garden", "Garden club")),
+                            emptySet(),
+                            ProfileGroupPickerLoadState.READY,
+                        ),
+                    busy = false,
+                    onClose = {},
+                    onRetry = {},
+                    onAdd = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Garden club").performClick()
+        composeRule.onNodeWithTag("profile.add_groups.action").performClick()
+        composeRule.onNodeWithTag("group.members.review.dialog").assertExists()
+        composeRule.runOnIdle {
+            recipient.value = RecipientSearch.Candidate("c".repeat(64), "Bob", "npub1bob")
+        }
+        composeRule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
+        composeRule.onNodeWithTag("profile.add_groups.action").assertIsNotEnabled()
+    }
+
+    @Test
+    fun sheetCallerRetainsBoundedListAndReachableAction() {
+        val state = testAppState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ProfileAddToGroupsSheet(
+                    appState = state,
+                    target = RecipientSearch.Candidate(TARGET_HEX, "Alice", TARGET_NPROFILE),
+                    state =
+                        ProfileGroupPickerState(
+                            groups = (1..30).map { groupItem("group-$it", "Group $it") },
+                            pendingGroupIds = emptySet(),
+                            loadState = ProfileGroupPickerLoadState.READY,
+                        ),
+                    busy = false,
+                    onDismiss = {},
+                    onRetry = {},
+                    onAdd = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("profile.add_groups.action").assertIsDisplayed()
+        composeRule.onNodeWithTag("profile.add_groups.list").performScrollToNode(hasText("Group 30"))
+        composeRule.onNodeWithText("Group 30").assertIsDisplayed()
+        composeRule.onNodeWithTag("profile.add_groups.action").assertIsDisplayed()
     }
 
     private fun renderProfile() {

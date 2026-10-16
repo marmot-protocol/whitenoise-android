@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -15,6 +16,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
@@ -28,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -54,6 +57,7 @@ import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -328,9 +332,33 @@ internal fun ConversationTopBar(
                                                 timerTooltipState.show()
                                             }
                                         }
+                                        val tooltipWindowHeight =
+                                            LocalWindowInfo.current.containerSize.height
+                                        val tooltipMaxHeight =
+                                            with(LocalDensity.current) {
+                                                tooltipWindowHeight.toDp()
+                                            }
                                         TooltipBox(
-                                            positionProvider = TooltipDefaults.rememberRichTooltipPositionProvider(),
-                                            tooltip = { RichTooltip { Text(timerTooltipText) } },
+                                            positionProvider =
+                                                TooltipDefaults.rememberTooltipPositionProvider(
+                                                    TooltipAnchorPosition.Above,
+                                                ),
+                                            tooltip = {
+                                                RichTooltip(
+                                                    modifier =
+                                                        Modifier
+                                                            .testTag("conversation.timer.tooltip")
+                                                            .heightIn(max = tooltipMaxHeight),
+                                                ) {
+                                                    Text(
+                                                        timerTooltipText,
+                                                        modifier =
+                                                            Modifier
+                                                                .testTag("conversation.timer.tooltip.text")
+                                                                .fadingVerticalScroll(rememberScrollState()),
+                                                    )
+                                                }
+                                            },
                                             state = timerTooltipState,
                                             content = subtitleRow,
                                         )
