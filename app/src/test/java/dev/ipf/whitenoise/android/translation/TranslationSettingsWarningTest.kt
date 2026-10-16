@@ -63,6 +63,23 @@ class TranslationSettingsWarningTest {
         preferences.close()
     }
 
+    /** A chat target saved elsewhere while the dialog is open replaces the shown target, and clearing it inherits. */
+    @Test
+    fun openChatDialogFollowsTargetChangesSavedElsewhere() {
+        val preferences = TranslationPreferences(context)
+        preferences.setGlobal(false, "en")
+        preferences.setTargetOverride("account", "group", "fr")
+        composeRule.setContent {
+            WhiteNoiseTheme { TranslationChatSettingsDialog("account", "group", {}) }
+        }
+        composeRule.onNodeWithText("Target language: French").assertIsDisplayed()
+        preferences.setTargetOverride("account", "group", "sk")
+        composeRule.onNodeWithText("Target language: Slovak").assertIsDisplayed()
+        preferences.setTargetOverride("account", "group", null)
+        composeRule.onNodeWithText("Target language: Slovak").assertDoesNotExist()
+        preferences.close()
+    }
+
     /** At double font size the engine route and automatic switch remain reachable by scrolling. */
     @Test
     fun largeTextSettingsCanScrollToTheEngineAndAutomaticControls() {

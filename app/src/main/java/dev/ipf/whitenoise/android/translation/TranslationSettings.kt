@@ -165,7 +165,8 @@ private fun TranslationOverrideOptions(
 
 /**
  * The chat target: inherited, a catalog override, or a saved code that needs a new choice. Leaving inherit
- * starts from a usable global target, and otherwise saves nothing until a language is chosen.
+ * starts from a usable global target, and otherwise saves nothing until a language is chosen. Every saved
+ * change, from this dialog or elsewhere, reloads the target so the checkbox and picker match storage.
  */
 @Composable
 private fun TranslationChatTargetControls(
@@ -173,7 +174,10 @@ private fun TranslationChatTargetControls(
     account: String,
     group: String,
 ) {
-    var targetOverride by remember { mutableStateOf(preferences.targetOverride(account, group)) }
+    val revision by preferences.changes.collectAsState()
+    var targetOverride by remember(revision, account, group) {
+        mutableStateOf(preferences.targetOverride(account, group))
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(targetOverride == null, onCheckedChange = { inherit ->
             val start = if (inherit) null else preferences.global().target
