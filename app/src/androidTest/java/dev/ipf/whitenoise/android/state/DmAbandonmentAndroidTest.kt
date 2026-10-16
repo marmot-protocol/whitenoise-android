@@ -25,7 +25,7 @@ import java.util.UUID
 
 /**
  * #3310 production flow against the real generated MarmotKit runtime: a newly started DM whose peer has not
- * accepted, an admin handover attempt whose outcome must not matter, the confirmed abandonment through Android's
+ * accepted, an admin handover that MDK refuses, the confirmed abandonment through Android's
  * journaled forget boundary, delivery of old-group events from the peer, and a process restart.
  *
  * A list-row disappearance alone is not the assertion. The test reads the native row and messages for the old
@@ -39,7 +39,7 @@ import java.util.UUID
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class DmAbandonmentAndroidTest {
-    /** Abandonment succeeds after the handover attempt and keeps the old DM forgotten through delivery and restart. */
+    /** Abandonment succeeds after a refused handover and keeps the old DM forgotten through delivery and restart. */
     @Test
     @Suppress("LongMethod") // One auditable sequence: start the DM, abandon it, deliver, restart, dispose.
     fun newlyStartedDm_abandonedAfterHandoverAttempt_staysForgottenThroughDeliveryAndRestart() =
@@ -56,9 +56,11 @@ class DmAbandonmentAndroidTest {
                 val peer = native.createIdentity(relays, relays)
                 val groupIdHex = withTimeout(ESTABLISH_TIMEOUT_MS) { startDirectChat(native, owner, peer) }
 
-                // The peer has not accepted yet — whether MDK refuses the handover must not affect abandonment.
-                val handover = runCatching { native.promoteAdminDetailed(owner.label, groupIdHex, peer.accountIdHex) }
-                Log.i(TAG, "handover before acceptance succeeded=${handover.isSuccess}")
+                // The reported dead end: an admin handover MDK refuses. Granting admin to an account outside the
+                // chat must fail, which forces the refusal however MDK treats the unaccepted peer.
+                val handover = runCatching { native.promoteAdminDetailed(owner.label, groupIdHex, NON_MEMBER_ID) }
+                assertTrue("the handover is refused before abandonment", handover.isFailure)
+                Log.i(TAG, "handover refused type=${handover.exceptionOrNull()?.javaClass?.simpleName}")
 
                 val app = appState(context, root, native, owner, peer)
                 val publishedBefore = relay.publicationAttempts(MLS_GROUP_EVENT_KIND).size
@@ -149,8 +151,10 @@ class DmAbandonmentAndroidTest {
 
     /** Keeps the fixture's draft cleanup in memory instead of the installed app's draft store. */
     private object NoDrafts : DraftPersistence {
+        /** Starts every fixture app state with no drafts. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Discards draft writes, so cleanup never reaches the installed app's drafts. */
         override fun write(
             key: String,
             value: String?,
@@ -167,5 +171,8 @@ class DmAbandonmentAndroidTest {
         const val POLL_MS = 100L
         const val MLS_GROUP_EVENT_KIND = 445
         const val HISTORY_LIMIT = 50u
+
+        /** A well-formed account id that is not in the chat, so granting it admin must be refused. */
+        val NON_MEMBER_ID = "0f".repeat(32)
     }
 }
