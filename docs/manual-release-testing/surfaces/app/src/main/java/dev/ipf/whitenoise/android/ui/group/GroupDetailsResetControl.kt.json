@@ -195,6 +195,78 @@
         "test_ids": [
           "GRP-031"
         ]
+      },
+      {
+        "surface": "GroupAbandonmentReviewDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "fun GroupAbandonmentReviewDialog(",
+        "test_ids": [
+          "GRP-031",
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "GroupSoleAdminLeaveDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "fun GroupSoleAdminLeaveDialog(",
+        "test_ids": [
+          "GRP-010",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "chats abandon dialog title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.chats_abandon_dialog_title",
+        "test_ids": [
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "chats abandon mixed action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.chats_abandon_mixed_action",
+        "test_ids": [
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "confirm leave sole admin title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.confirm_leave_sole_admin_title",
+        "test_ids": [
+          "GRP-010",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "confirm leave sole admin message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.confirm_leave_sole_admin_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-009",
+          "GRP-010",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "sole admin abandon hint dm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.sole_admin_abandon_hint_dm",
+        "test_ids": [
+          "GRP-010",
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "sole admin abandon hint group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.sole_admin_abandon_hint_group",
+        "test_ids": [
+          "GRP-010",
+          "GRP-031"
+        ]
       }
     ]
   },

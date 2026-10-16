@@ -279,6 +279,14 @@
         "test_ids": [
           "GRP-031"
         ]
+      },
+      {
+        "surface": "toast chat already abandoned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_chat_already_abandoned",
+        "test_ids": [
+          "GRP-031"
+        ]
       }
     ],
     "settings_controls": [
