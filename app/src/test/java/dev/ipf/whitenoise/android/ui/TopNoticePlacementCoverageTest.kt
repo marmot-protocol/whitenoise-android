@@ -108,6 +108,7 @@ class TopNoticePlacementCoverageTest {
         val frame = chats.functionBody("ChatListBodyFrame")
         val playback = frame.indexOf("ttsTransport()")
         assertTrue("the list slot follows its playback strip", frame.indexOf("TopNoticeSlot()") > playback)
+        assertTrue("the padded chat-list column must not pad for side insets twice", sideInsets in chats)
 
         val startup = mainSource("ui/common/StartupScreens.kt")
         assertTrue("a bar-less startup surface relies on the root slot", "topNoticeSlot = false" in startup)
