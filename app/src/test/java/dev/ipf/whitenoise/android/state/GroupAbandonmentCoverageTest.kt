@@ -106,7 +106,13 @@ class GroupAbandonmentCoverageTest {
         val screen = source("ui/chats/ChatsScreen.kt")
         val menu = screen.substringAfter("onAbandon =").substringBefore("onDismiss =")
         assertTrue("the menu captures its row and owner", "PendingChatAbandonment.capture(item" in menu)
-        assertTrue("read-only invites decline instead", "item.group.pendingConfirmation" in menu)
+        assertTrue("the menu offers the action only where it applies", "item.offersLocalAbandonment(" in menu)
+        val eligibility =
+            source("ui/chats/ChatAbandonment.kt")
+                .substringAfter("fun ChatListItem.offersLocalAbandonment")
+                .substringBefore("\n\n")
+        assertTrue("read-only invites decline instead", "!group.pendingConfirmation" in eligibility)
+        assertTrue("a left or inactive chat has nothing to abandon", "!removedFromGroup(" in eligibility)
         assertTrue("the host shares the departure busy set", "busyChats = leavingAndDeleting" in screen)
     }
 

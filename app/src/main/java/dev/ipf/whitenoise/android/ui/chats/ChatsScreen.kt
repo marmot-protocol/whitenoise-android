@@ -1560,7 +1560,7 @@ internal fun ChatsScreen(
                                 ChatAbandonMenuAction(item.isDm()) {
                                     pendingAbandonment =
                                         PendingChatAbandonment.capture(item, controller, appState, groupTitleCopy)
-                                }.takeUnless { item.group.pendingConfirmation },
+                                }.takeIf { item.offersLocalAbandonment(appState.activeAccount?.accountIdHex) },
                             onDismiss = {
                                 if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
                                     actionSheetChatId = null

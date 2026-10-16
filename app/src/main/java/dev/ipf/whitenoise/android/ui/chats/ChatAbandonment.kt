@@ -11,6 +11,14 @@ import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentDialog
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentStatus
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
 
+/**
+ * Whether the chat list offers MDK's forget for this row (#3310). A read-only invite declines instead, and a chat
+ * this account already left or no longer holds (left, removed, disbanding or with a queued leave) has nothing to
+ * abandon, so neither gets the action. The native row policy must also allow a local removal at all.
+ */
+internal fun ChatListItem.offersLocalAbandonment(activeAccountIdHex: String?): Boolean =
+    !group.pendingConfirmation && actions?.canDeleteLocal != false && !removedFromGroup(activeAccountIdHex)
+
 /** The row menu's abandonment entry, where [isDm] picks the direct-chat or group wording of the same forget. */
 internal class ChatAbandonMenuAction(
     val isDm: Boolean,
