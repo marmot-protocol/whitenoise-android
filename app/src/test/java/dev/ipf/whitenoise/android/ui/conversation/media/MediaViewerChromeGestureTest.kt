@@ -1,7 +1,14 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.click
@@ -50,6 +57,40 @@ class MediaViewerChromeGestureTest {
 
         assertEquals(0, singleTaps)
         assertEquals(1, doubleTaps)
+    }
+
+    /** The photo tap keeps toggling while hidden chrome hands its space to the page and visible chrome reclaims it. */
+    @Test
+    fun singleTapKeepsTogglingWhileThePageResizes() {
+        var chromeVisible by mutableStateOf(true)
+        composeRule.setContent {
+            MediaViewerFrame(
+                senderLabel = "Alex",
+                recordedAtLabel = "Oct 15, 2026, 9:41 AM",
+                onDismiss = {},
+                onSave = {},
+                onShare = {},
+                snackbarHostState = remember { SnackbarHostState() },
+                contentWindowInsets = WindowInsets(top = 24.dp, bottom = 48.dp),
+                chromeVisible = chromeVisible,
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .viewerTapGestureModifier(Unit, { chromeVisible = !chromeVisible }, {})
+                        .testTag(GESTURE_TAG),
+                )
+            }
+        }
+
+        listOf(false, true, false).forEach { expected ->
+            composeRule.onNodeWithTag(GESTURE_TAG).performTouchInput { click() }
+            composeRule.mainClock.advanceTimeBy(500L)
+            composeRule.waitForIdle()
+            composeRule.runOnIdle { assertEquals(expected, chromeVisible) }
+            val chrome = composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG)
+            if (expected) chrome.assertExists() else chrome.assertDoesNotExist()
+        }
     }
 
     /** Renders the production tap arbiter on a deterministic image-sized surface. */

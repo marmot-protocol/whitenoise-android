@@ -1,13 +1,17 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -19,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
@@ -217,6 +222,53 @@ class MediaViewerPagerRecompositionTest {
         visible = mediaViewerChromeVisibilityAfterPageChange(currentlyVisible = visible, pageIsVideo = true)
         assertTrue(visible)
         assertTrue(mediaViewerChromeVisibilityAfterPageChange(currentlyVisible = true, pageIsVideo = false))
+    }
+
+    /** Hiding and restoring chrome resizes the mounted page in place, never recreating it or changing pages. */
+    @Test
+    fun chromeToggleResizesTheMountedPageWithoutRecreatingIt() {
+        val pages = listOf(page("image"), page("clip", mediaType = "video/mp4"), page("later"))
+        var chromeVisible by mutableStateOf(true)
+        val mountedStates = mutableListOf<Any>()
+        val pageHeights = mutableListOf<Int>()
+        composeRule.setContent {
+            MediaViewerFrame(
+                senderLabel = "Alex",
+                recordedAtLabel = "Oct 15, 2026, 9:41 AM",
+                onDismiss = {},
+                onSave = {},
+                onShare = {},
+                snackbarHostState = remember { SnackbarHostState() },
+                contentWindowInsets = WindowInsets(top = 24.dp, bottom = 48.dp),
+                chromeVisible = chromeVisible,
+            ) {
+                StableMediaViewerPager(
+                    pages = pages,
+                    selection = rememberMediaViewerPagerSelection(pages, startIndex = 1),
+                    modifier = Modifier.fillMaxSize(),
+                    pagePositionDescription = null,
+                    userScrollEnabled = true,
+                ) { page, isCurrent ->
+                    if (isCurrent) {
+                        val pageState = remember { Any() }
+                        SideEffect { if (mountedStates.lastOrNull() !== pageState) mountedStates += pageState }
+                        Text(
+                            page.messageIdHex,
+                            Modifier.fillMaxSize().onSizeChanged { pageHeights += it.height }.testTag(CURRENT_PAGE_TAG),
+                        )
+                    }
+                }
+            }
+        }
+
+        repeat(2) {
+            composeRule.runOnIdle { chromeVisible = !chromeVisible }
+            composeRule.onNodeWithTag(CURRENT_PAGE_TAG).assertTextEquals("clip")
+        }
+        composeRule.runOnIdle {
+            assertEquals("the current page must stay mounted across chrome changes", 1, mountedStates.size)
+            assertEquals("hiding chrome must hand its height to the page", 2, pageHeights.distinct().size)
+        }
     }
 
     /** Scrolls the currently recreated pager and waits for its settled logical selection. */
