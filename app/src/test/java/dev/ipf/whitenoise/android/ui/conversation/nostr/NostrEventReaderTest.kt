@@ -76,8 +76,20 @@ class NostrEventReaderTest {
             ApplicationProvider
                 .getApplicationContext<Context>()
                 .getSystemService(ClipboardManager::class.java)
-        composeRule.runOnIdle { assertEquals(destination, clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
-        assertEquals(0, org.robolectric.shadows.ShadowToast.shownToastCount())
+        composeRule.runOnIdle {
+            assertEquals(
+                destination,
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    .toString(),
+            )
+        }
+        assertEquals(
+            0,
+            org.robolectric.shadows.ShadowToast
+                .shownToastCount(),
+        )
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
         composeRule.onNodeWithText(label).performClick()
         composeRule.onNodeWithText(destination).assertIsDisplayed()
@@ -112,20 +124,40 @@ class NostrEventReaderTest {
             ApplicationProvider
                 .getApplicationContext<Context>()
                 .getSystemService(ClipboardManager::class.java)
-        composeRule.runOnIdle { assertEquals("https://$typed", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
-        assertEquals(string(R.string.copied), org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+        composeRule.runOnIdle {
+            assertEquals(
+                "https://$typed",
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    .toString(),
+            )
+        }
+        assertEquals(
+            string(R.string.copied),
+            org.robolectric.shadows.ShadowToast
+                .getTextOfLatestToast(),
+        )
     }
 
     @Test
     fun clipboardFailureGivesFeedbackRatherThanEscapingTheReader() {
         triggerReaderCopyFailure(IllegalStateException("clipboard unavailable"))
-        assertEquals(string(R.string.not_copied), org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+        assertEquals(
+            string(R.string.not_copied),
+            org.robolectric.shadows.ShadowToast
+                .getTextOfLatestToast(),
+        )
     }
 
     @Test
     fun clipboardCancellationDoesNotShowFailureFeedback() {
         triggerReaderCopyFailure(kotlinx.coroutines.CancellationException("reader left"))
-        assertEquals(0, org.robolectric.shadows.ShadowToast.shownToastCount())
+        assertEquals(
+            0,
+            org.robolectric.shadows.ShadowToast
+                .shownToastCount(),
+        )
     }
 
     private fun triggerReaderCopyFailure(failure: Exception) {
@@ -133,9 +165,7 @@ class NostrEventReaderTest {
             object : Clipboard {
                 override suspend fun getClipEntry(): ClipEntry? = null
 
-                override suspend fun setClipEntry(clipEntry: ClipEntry?) {
-                    throw failure
-                }
+                override suspend fun setClipEntry(clipEntry: ClipEntry?): Unit = throw failure
             }
         val url = "https://example.com/clipboard"
         composeRule.setContent {
