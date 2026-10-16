@@ -32,6 +32,5 @@ class ExplicitInteractionCoverageTest {
         assertTrue("onWebLinkActivated = onWebLinkActivated" in reader)
     }
 
-    private fun source(relative: String): String =
-        File("src/main/java/dev/ipf/whitenoise/android/$relative").readText()
+    private fun source(relative: String) = File("src/main/java/dev/ipf/whitenoise/android/$relative").readText()
 }

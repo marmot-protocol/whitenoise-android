@@ -73,7 +73,8 @@ class NostrEventReaderTest {
         }
         composeRule.waitForIdle()
         val clipboard =
-            ApplicationProvider.getApplicationContext<Context>()
+            ApplicationProvider
+                .getApplicationContext<Context>()
                 .getSystemService(ClipboardManager::class.java)
         composeRule.runOnIdle { assertEquals(destination, clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
         assertEquals(0, org.robolectric.shadows.ShadowToast.shownToastCount())
@@ -108,7 +109,8 @@ class NostrEventReaderTest {
         composeRule.runOnIdle { assertTrue(actions.single().action()) }
         composeRule.waitForIdle()
         val clipboard =
-            ApplicationProvider.getApplicationContext<Context>()
+            ApplicationProvider
+                .getApplicationContext<Context>()
                 .getSystemService(ClipboardManager::class.java)
         composeRule.runOnIdle { assertEquals("https://$typed", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
         assertEquals(string(R.string.copied), org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
