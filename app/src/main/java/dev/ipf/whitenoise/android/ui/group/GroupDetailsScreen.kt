@@ -105,6 +105,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -134,7 +135,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
-import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsContent
+import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsScreen
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileAccountWideGroups
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileGroupPickerState
@@ -148,7 +149,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
-import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -412,7 +412,6 @@ internal fun GroupDetailsScreen(
                 null
             }
         val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
-        val dmAddToGroupsScroll = rememberScrollState()
         // Chats beyond the retained chat-list window, read only while the picker is open (#2983).
         val dmAccountWideGroups =
             rememberProfileAccountWideGroups(appState, enabled = showDmAddToGroups && dmPeerAccountIdHex != null)
@@ -430,40 +429,34 @@ internal fun GroupDetailsScreen(
             }
         }
         if (showDmAddToGroups && dmPeerAccountIdHex != null) {
-            SettingsScaffold(
-                title = stringResource(R.string.person_add_to_group),
-                onBack = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
-            ) {
-                Box(Modifier.fillMaxSize().whiteNoiseVerticalScroll(dmAddToGroupsScroll)) {
-                    ProfileAddToGroupsContent(
-                        appState = appState,
-                        targetName = conversationTitle,
-                        state = dmAddableGroupsState,
-                        busy = addingDmPeerToGroups,
-                        onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
-                        onRetry = {
-                            dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds, retry = true)
-                        },
-                        onAdd = { groups ->
-                            if (!addingDmPeerToGroups) {
-                                addingDmPeerToGroups = true
-                                appState.launchMutation {
-                                    try {
-                                        val added =
-                                            appState.inviteProfileToGroups(
-                                                targetRef = dmPeerAccountIdHex,
-                                                targetGroupIds = groups.map { it.group.groupIdHex },
-                                            )
-                                        if (added) showDmAddToGroups = false
-                                    } finally {
-                                        addingDmPeerToGroups = false
-                                    }
-                                }
+            ProfileAddToGroupsScreen(
+                appState = appState,
+                target =
+                    RecipientSearch.Candidate(dmPeerAccountIdHex, conversationTitle, dmPeerNpub.orEmpty()),
+                state = dmAddableGroupsState,
+                busy = addingDmPeerToGroups,
+                onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
+                onRetry = {
+                    dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds, retry = true)
+                },
+                onAdd = { groups ->
+                    if (!addingDmPeerToGroups) {
+                        addingDmPeerToGroups = true
+                        appState.launchMutation {
+                            try {
+                                val added =
+                                    appState.inviteProfileToGroups(
+                                        targetRef = dmPeerAccountIdHex,
+                                        targetGroupIds = groups.map { it.group.groupIdHex },
+                                    )
+                                if (added) showDmAddToGroups = false
+                            } finally {
+                                addingDmPeerToGroups = false
                             }
-                        },
-                    )
-                }
-            }
+                        }
+                    }
+                },
+            )
             return@PreparedGroupAvatarContent
         }
         val canShowEditAction = !isDm && canEdit
@@ -827,7 +820,15 @@ internal fun GroupDetailsScreen(
                     showLargeGroupInviteConfirmation = false
                 }
             }
+            val reviewAvatar = rememberConversationGroupAvatar(appState, controller)
             ContactPickerScreen(
+                reviewGroup =
+                    MemberReviewGroup(
+                        controller.group.groupIdHex,
+                        conversationTitle,
+                        reviewAvatar.pictureUrl,
+                        reviewAvatar.image,
+                    ),
                 appState = appState,
                 title = stringResource(R.string.add_member),
                 selected = addSelection,

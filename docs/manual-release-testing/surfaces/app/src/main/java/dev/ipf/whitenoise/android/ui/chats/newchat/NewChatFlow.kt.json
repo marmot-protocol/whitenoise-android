@@ -70,6 +70,14 @@
           "ACC-003",
           "ACC-017"
         ]
+      },
+      {
+        "surface": "NewMessageAccountScreen UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "fun NewMessageAccountScreen(",
+        "test_ids": [
+          "NCH-001"
+        ]
       }
     ],
     "settings_controls": [

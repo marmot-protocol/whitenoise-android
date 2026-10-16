@@ -10,6 +10,14 @@
         "test_ids": [
           "PRO-009"
         ]
+      },
+      {
+        "surface": "ContactPrivateDetailsFrame UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPrivateDetailsFrame.kt",
+        "anchor": "fun ContactPrivateDetailsFrame(",
+        "test_ids": [
+          "PRO-004"
+        ]
       }
     ],
     "settings_controls": [

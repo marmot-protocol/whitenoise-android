@@ -1,9 +1,13 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -44,9 +48,11 @@ import java.util.concurrent.CopyOnWriteArrayList
 class GroupInviteRetrySelectionTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Retains the selected recipient and admin role through a pending invitation failure. */
     @Test
     fun pendingThenFailedInvitationKeepsTheRecipientAndAdminRoleForRetry() {
         val fixture = Fixture()
+        val peerName = fixture.state.npubForDisplay(PEER)
         val controller = fixture.controller
         val reply = fixture.reply
         val calls = fixture.calls
@@ -56,16 +62,16 @@ class GroupInviteRetrySelectionTest {
                     GroupDetailsScreen(fixture.state, controller, onBack = {}, onLeft = {}, autoOpenAddMember = true)
                 }
             }
-            selectAdmin()
+            selectAdmin(peerName)
             val adminLabel = context.getString(R.string.admin)
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
             composeRule.waitUntil { calls.size == 1 }
-            composeRule.onNodeWithContentDescription("Retry peer, $adminLabel").assertIsNotEnabled()
+            composeRule.onNodeWithContentDescription("$peerName, $adminLabel").assertIsNotEnabled()
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsNotEnabled()
 
             composeRule.runOnIdle { reply.complete(Unit) }
             composeRule.waitUntil { !controller.mutationInFlight }
-            composeRule.onNodeWithContentDescription("Retry peer, $adminLabel").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("$peerName, $adminLabel").assertIsDisplayed()
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
             composeRule.waitUntil { calls.size == 2 && !controller.mutationInFlight }
             assertEquals(List(2) { listOf(PEER) to listOf(PEER) }, calls)
@@ -75,9 +81,11 @@ class GroupInviteRetrySelectionTest {
         }
     }
 
+    /** Closes a restored picker after its pending native invitation succeeds. */
     @Test
     fun restoredPickerClosesAfterThePendingNativeInvitationSucceeds() {
         val fixture = Fixture(succeed = true)
+        val peerName = fixture.state.npubForDisplay(PEER)
         val restoration = StateRestorationTester(composeRule)
         try {
             restoration.setContent {
@@ -86,7 +94,7 @@ class GroupInviteRetrySelectionTest {
                 }
             }
             composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().performClick()
-            selectAdmin()
+            selectAdmin(peerName)
             composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
             composeRule.waitUntil { fixture.calls.size == 1 }
             restoration.emulateSavedInstanceStateRestore()
@@ -106,11 +114,16 @@ class GroupInviteRetrySelectionTest {
         }
     }
 
-    private fun selectAdmin() {
+    /** Selects the named candidate and marks the retained invitation role as admin. */
+    private fun selectAdmin(publicPeerName: String) {
         composeRule.onNode(hasSetTextAction()).performTextInput(PEER)
         composeRule.onNodeWithContentDescription(context.getString(R.string.review_selected_members)).performClick()
+        composeRule.onNodeWithTag("group.members.review.dialog").assertExists()
+        composeRule
+            .onAllNodes(hasText("Retry peer") and hasAnyAncestor(hasTestTag("group.members.review.dialog")))
+            .assertCountEquals(0)
         val memberLabel = context.getString(R.string.member)
-        composeRule.onNodeWithContentDescription("Retry peer, $memberLabel").performClick()
+        composeRule.onNodeWithContentDescription("$publicPeerName, $memberLabel").performClick()
         composeRule.onNodeWithText(context.getString(R.string.admin)).performClick()
     }
 

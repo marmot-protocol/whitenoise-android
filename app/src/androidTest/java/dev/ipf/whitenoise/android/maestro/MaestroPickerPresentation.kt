@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectedMembersReviewScreen
 import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingDropdownMenu
@@ -87,6 +88,7 @@ private fun AnimatedAvatarPresentation(fixture: MaestroPresentationFixture) {
     }
 }
 
+/** Mounts the production contact picker with controlled destinations for dialog assertions. */
 @Composable
 @Suppress("FunctionNaming")
 private fun ContactPresentation(
@@ -109,6 +111,12 @@ private fun ContactPresentation(
             fixture.finish("contacts-confirmed")
         },
         confirmLabel = "Fixture next",
+        reviewGroup =
+            if (fixture.scenario == "surface-contact-group-selected") {
+                MemberReviewGroup("fixture-review-destination", "Fixture destination")
+            } else {
+                null
+            },
     )
 }
 

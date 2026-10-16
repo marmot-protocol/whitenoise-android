@@ -1,0 +1,62 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupMembersReviewDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "fun GroupMembersReviewDialog(",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "surface": "GroupMemberReviewPair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "fun GroupMemberReviewPair(",
+        "test_ids": [
+          "GRP-030"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Review invitation identities and controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "R.string.review_selection",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "surface": "Invitation review scroll boundaries",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "surface": "R.string.remove_member_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "R.string.remove_member_named",
+        "test_ids": [
+          "GRP-030"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

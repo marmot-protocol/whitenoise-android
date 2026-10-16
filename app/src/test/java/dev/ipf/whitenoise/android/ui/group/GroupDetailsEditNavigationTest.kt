@@ -293,6 +293,8 @@ class GroupDetailsEditNavigationTest {
         assertEquals("member-b", startedPeerId)
         composeRule.onNodeWithTag("chat_info.add_to_group").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG).assertExists()
+        composeRule.onNodeWithTag("profile.add_groups.list").assertHeightIsAtLeast(400.dp)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dm_add_groups_route_light.png")
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("chat_info.shared_media").assertExists()
         val sectionTops =

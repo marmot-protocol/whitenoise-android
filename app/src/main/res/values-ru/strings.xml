@@ -2391,4 +2391,6 @@
     <string name="media_reply_draft_conflict">Ваш черновик изменился. Сохраните этот ответ и повторите попытку или отмените ответ перед отправкой.</string>
     <string name="photo_editor_budget_exceeded">Для этой обрезки требуется больше данных изображения или памяти, чем можно безопасно обработать. Выберите более широкую область обрезки или более низкое качество. Предыдущее вложение останется без изменений.</string>
     <string name="share_connect_save_to_gallery">Сохранить в галерею</string>
+    <string name="starting_as">Начать от имени</string>
+    <string name="starting_as_account">Начать от имени %1$s</string>
 </resources>

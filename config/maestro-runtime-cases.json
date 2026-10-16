@@ -3746,6 +3746,28 @@
     "presentation-modal-widget-save":{"suite":"modals","manual_ids":["SET-035"],"assertions":"Production widget configuration chooses account B and verifies exact all-account/unread flags and permanently false message previews; no launcher/native widget query proof.","postcondition":"presentation-checked","presentation":"modal-widget-save","presentation_actions":["save-verified"],"layer":"production-presentation-ui"},
     "presentation-modal-widget-options":{"suite":"modals","manual_ids":["SET-035"],"assertions":"Production widget configuration chooses account B and verifies exact all-account/unread flags and permanently false message previews; no launcher/native widget query proof.","postcondition":"presentation-checked","presentation":"modal-widget-options","presentation_actions":["save-verified"],"layer":"production-presentation-ui"},
     "presentation-modal-widget-cancel":{"suite":"modals","manual_ids":["SET-035"],"assertions":"Production widget configuration toolbar/system cancellation; no saved choice or launcher mutation.","postcondition":"presentation-checked","presentation":"modal-widget-cancel","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
-    "presentation-modal-widget-removed":{"suite":"modals","manual_ids":["SET-035"],"assertions":"Observation of production configuration after controlled removal of selected account. Stale account cannot enable Save; input injection is not production action proof.","postcondition":"presentation-observed","presentation":"modal-widget-removed","presentation_actions":[],"layer":"production-presentation-ui"}
+    "presentation-modal-widget-removed":{"suite":"modals","manual_ids":["SET-035"],"assertions":"Observation of production configuration after controlled removal of selected account. Stale account cannot enable Save; input injection is not production action proof.","postcondition":"presentation-observed","presentation":"modal-widget-removed","presentation_actions":[],"layer":"production-presentation-ui"},
+    "creation-starting-account-disclosure": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-001"
+      ],
+      "assertions": "The starting-account menu opens on New Message, displays Maestro Alice, dismisses with Back, and returns through the recipient screen to the chat list. No account switching is claimed.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
+    "presentation-surface-contact-group-selected": {
+      "suite": "presentation",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "The production contact picker opens the destination/member review dialog. It displays the generated native peer identity and controlled destination, retains selection through Cancel and Back, and dispatches the exact bounded confirmation callback. No membership or relay mutation is claimed.",
+      "postcondition": "presentation-checked",
+      "presentation": "surface-contact-group-selected",
+      "presentation_actions": [
+        "contacts-confirmed"
+      ],
+      "layer": "production-presentation-ui"
+    }
   }
 }

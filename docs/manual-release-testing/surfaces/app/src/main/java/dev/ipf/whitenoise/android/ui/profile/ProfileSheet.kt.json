@@ -60,14 +60,6 @@
         ]
       },
       {
-        "surface": "ProfileAddToGroupsSheet",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "fun ProfileAddToGroupsSheet(",
-        "test_ids": [
-          "ACC-008"
-        ]
-      },
-      {
         "surface": "ProfileBannerImage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "fun ProfileBannerImage(",
@@ -146,6 +138,23 @@
         "anchor": "testTag(\"person_profile.notes\")",
         "test_ids": [
           "ACC-007"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsContent UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileAddToGroupsContent(",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileAddToGroupsScreen(",
+        "test_ids": [
+          "ACC-002",
+          "ACC-008"
         ]
       }
     ],
@@ -402,6 +411,14 @@
         "anchor": "rememberProfileAccountWideGroups(",
         "test_ids": [
           "ACC-021"
+        ]
+      },
+      {
+        "surface": "Recipient-scoped add-to-groups state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex)",
+        "test_ids": [
+          "ACC-002"
         ]
       }
     ]
