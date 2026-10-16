@@ -2652,8 +2652,9 @@ class LocalNotificationPresenter(
                         }
                     shortcutPublisher(currentShortcut)
                     shortcutSnapshots[shortcutId] = snapshot
+                    InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
                     ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
-                    if (holdForPost) InFlightConversationShortcuts.hold(shortcutId)
+                    if (holdForPost) InFlightConversationShortcuts.hold(shortcutId, currentShortcut)
                     holdForPost
                 } else {
                     false
@@ -2675,7 +2676,11 @@ class LocalNotificationPresenter(
         holdForPost: Boolean,
     ): Boolean? =
         synchronized(UserEventNotificationGroup.mutationLock) {
-            val published = shortcutSnapshots[shortcutId] == snapshot && shortcutId in dynamicShortcutIds()
+            // A Direct Share refresh that rebuilt the shortcut without its picture leaves the snapshot stale too.
+            val published =
+                shortcutSnapshots[shortcutId] == snapshot &&
+                    shortcutId in dynamicShortcutIds() &&
+                    !InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
             if (!published) {
                 shortcutSnapshots.remove(shortcutId, snapshot)
                 null

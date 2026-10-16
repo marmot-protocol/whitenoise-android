@@ -147,6 +147,47 @@ class NotificationIdentityShortcutBeforePostTest {
         assertTrue(InFlightConversationShortcuts.ids().isEmpty())
     }
 
+    /**
+     * A Direct Share refresh between the pre-post publication and the card write keeps the shortcut's picture, and a
+     * later refresh that has to rebuild the live card's shortcut without it makes the next post publish it again.
+     */
+    @Test
+    fun shareRefreshBeforeTheCardWriteKeepsTheShortcutPicture() {
+        val recorder = Recorder()
+        var refreshed = emptyList<ShortcutInfoCompat>()
+        val share =
+            dev.ipf.whitenoise.android.share.ShareShortcutPublisher(
+                context = context,
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = { shortcuts ->
+                    refreshed = shortcuts
+                    ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
+                },
+                existingShortcuts = { emptyList() },
+                dynamicShortcuts = { ShortcutManagerCompat.getDynamicShortcuts(context) },
+                cardShortcutIds = { emptySet() },
+            )
+        recorder.beforePost = { share.publish(ACCOUNT, emptyList()) { it.group.name } }
+        val presenter = presenter(recorder)
+        val picture = solid(Color.BLUE)
+        post(presenter, update(isDm = false), picture = picture)
+
+        val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        assertEquals("the refresh kept the in-flight shortcut", listOf(shortcutId), refreshed.map { it.id })
+        assertEquals("with the published picture", Color.BLUE, iconPixel(refreshed.single()))
+        val publishedPersons = personsOf(recorder.shortcuts.single())
+        assertTrue("the presenter published a Person", publishedPersons.isNotEmpty())
+        assertEquals("and the refresh kept it", publishedPersons, personsOf(refreshed.single()))
+
+        InFlightConversationShortcuts.markIdentityLost(shortcutId)
+        recorder.beforePost = {}
+        manager.cancelAll()
+        post(presenter, update(isDm = false, messageIdHex = "after-rebuild"), picture = picture)
+
+        assertEquals(listOf("shortcut", "post", "shortcut", "post"), recorder.events)
+        assertEquals(Color.BLUE, iconPixel(recorder.shortcuts.last()))
+    }
+
     /** A card write cancelled after the shortcut was published still releases that shortcut's hold. */
     @Test
     fun cancelledCardWriteReleasesItsHeldShortcut() {
@@ -274,6 +315,9 @@ class NotificationIdentityShortcutBeforePostTest {
         val shortcuts = mutableListOf<ShortcutInfoCompat>()
         val posts = mutableListOf<Notification>()
         val heldAtPost = mutableListOf<Set<String>>()
+
+        /** Runs inside the card write, before the platform post, as a concurrent refresh would. */
+        var beforePost: () -> Unit = {}
     }
 
     /** A presenter whose shortcut and card writes go to [recorder] and then to the platform. */
@@ -294,6 +338,7 @@ class NotificationIdentityShortcutBeforePostTest {
                 recorder.events += "post"
                 recorder.posts += notification
                 recorder.heldAtPost += InFlightConversationShortcuts.ids()
+                recorder.beforePost()
                 if (recorder.cancelPost) throw kotlinx.coroutines.CancellationException("post cancelled")
                 notificationManager.notify(tag, id, notification)
             },
@@ -348,6 +393,13 @@ class NotificationIdentityShortcutBeforePostTest {
     private fun iconPixel(shortcut: ShortcutInfoCompat): Int {
         val drawable = checkNotNull(shortcut.icon?.loadDrawable(context)) { "the shortcut has no icon" }
         return drawable.toBitmap().getPixel(0, 0)
+    }
+
+    /** The Person entries a shortcut carries, read from its compat model. */
+    private fun personsOf(shortcut: ShortcutInfoCompat): List<androidx.core.app.Person> {
+        val field = ShortcutInfoCompat::class.java.getDeclaredField("mPersons").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        return (field.get(shortcut) as Array<androidx.core.app.Person>?).orEmpty().toList()
     }
 
     /** The top-left pixel of a card's identity picture. */
