@@ -101,6 +101,7 @@ def generate(catalog_path, selected, output, baseline_path=None, icons_path=None
         raise ValueError('Empty selected runtime artifacts')
     identifiers = set()
     observed = set()
+    unreviewed = []
     for item in selected:
         key = artifact_key(item)
         expected = artifacts.get(key)
@@ -108,8 +109,14 @@ def generate(catalog_path, selected, output, baseline_path=None, icons_path=None
             raise ValueError('Duplicate selected runtime artifact: ' + str(key))
         observed.add(key)
         if expected is None or expected['sha256'] != item['sha256']:
-            raise ValueError('Unreviewed runtime artifact: ' + str(key))
+            # Report every gap at once so one dependency bump needs one catalogue review.
+            change = 'new artifact' if expected is None else 'changed bytes, reviewed ' + expected['sha256']
+            unreviewed.append(f"{key[0]} {key[1]} sha256={item['sha256']} ({change})")
+            continue
         identifiers.update(expected['notice_ids'])
+    if unreviewed:
+        raise ValueError('Unreviewed runtime artifacts; update config/licenses/catalog.json as described in '
+                         'docs/dependency-reduction/README.md:\n  ' + '\n  '.join(sorted(unreviewed)))
     entries = sorted({notices[i] for i in identifiers}, key=lambda entry: (entry[0].encode('utf-8'), entry[1]))
     content = bytearray()
     metadata = []

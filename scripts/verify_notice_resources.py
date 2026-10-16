@@ -14,16 +14,9 @@ else:
     from retain_dependency_evidence import validate_retained
 
 
-def require_baseline(metadata, texts, icons, baseline):
-    """Keep every original notice identity and the exact local copyright attribution."""
-    expected = json.loads(baseline.read_text(encoding='utf-8'))
-    if (type(expected.get('schema')) is not int or expected['schema'] != 1 or
-            not re.fullmatch(r'[a-f0-9]{40}', expected.get('source_sha', '')) or
-            not isinstance(expected.get('required_notices'), list) or not expected['required_notices']):
-        raise ValueError('missing source-bound notice baseline')
-    if 'retained' in expected:
-        validate_retained(baseline.resolve().parents[2], expected['retained'], expected['source_sha'])
-    actual = set()
+def notice_rows(metadata, texts):
+    """Decode the reader's offset:length index into (name, text SHA-256) rows."""
+    rows = []
     for line in metadata.decode('utf-8').splitlines():
         if not line.strip():
             continue
@@ -34,9 +27,31 @@ def require_baseline(metadata, texts, icons, baseline):
         text = texts[offset:offset + length]
         if not text.decode('utf-8').strip():
             raise ValueError('packaged notice text is empty')
-        actual.add((name, hashlib.sha256(text).hexdigest()))
-    required = {(item['name'], item['text_sha256']) for item in expected['required_notices']}
-    missing = required - actual
+        rows.append((name, hashlib.sha256(text).hexdigest()))
+    return rows
+
+
+def require_baseline(metadata, texts, icons, baseline):
+    """Keep every original notice identity and the exact local copyright attribution."""
+    expected = json.loads(baseline.read_text(encoding='utf-8'))
+    if (type(expected.get('schema')) is not int or expected['schema'] != 1 or
+            not re.fullmatch(r'[a-f0-9]{40}', expected.get('source_sha', '')) or
+            not isinstance(expected.get('required_notices'), list) or not expected['required_notices'] or
+            not isinstance(expected.get('retained'), dict) or not isinstance(expected.get('resources'), dict)):
+        raise ValueError('missing source-bound notice baseline')
+    # The baseline must equal the retained original plugin output, not merely its own pin.
+    root = baseline.resolve().parents[2]
+    receipt = validate_retained(root, expected['retained'], expected['source_sha'])
+    original = {}
+    for key, name in [('metadata_sha256', 'third_party_license_metadata'), ('text_sha256', 'third_party_licenses')]:
+        paths = [path for path in receipt['files'] if path.endswith('/' + name)]
+        if len(paths) != 1 or receipt['files'][paths[0]] != expected['resources'].get(key):
+            raise ValueError('retained original notice resources do not match the baseline')
+        original[name] = (root / paths[0]).read_bytes()
+    required = sorted((item['name'], item['text_sha256']) for item in expected['required_notices'])
+    if sorted(notice_rows(original['third_party_license_metadata'], original['third_party_licenses'])) != required:
+        raise ValueError('notice baseline differs from the retained original plugin output')
+    missing = set(required) - set(notice_rows(metadata, texts))
     if missing:
         raise ValueError('original notices were lost or changed: ' + ', '.join(sorted(name for name, _ in missing)))
     if hashlib.sha256(icons).hexdigest() != expected.get('material_icons_sha256'):

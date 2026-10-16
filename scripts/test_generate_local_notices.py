@@ -2,11 +2,13 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 import copy
 
 from scripts import generate_local_notices as notices
+from scripts import test_verify_notice_resources as fixtures
 
 
 class LocalNoticesTest(unittest.TestCase):
@@ -43,8 +45,8 @@ class LocalNoticesTest(unittest.TestCase):
                          'material_icons_sha256': hashlib.sha256(icons.read_bytes()).hexdigest(),
                          'required_notices': [{'name': n['name'], 'text_sha256': n['sha256']}
                                               for n in self.catalog['notices']]}
-        baseline = self.root / 'baseline.json'
-        baseline.write_text(json.dumps(self.baseline))
+        original = ''.join(f"0:{len(self.text)} {n['name']}\n" for n in self.catalog['notices']).encode('utf-8')
+        baseline = fixtures.write_retained_baseline(self.root.parents[1], self.baseline, original, self.text + b'\n')
         self.catalog['baseline'] = {'source_sha': 'c' * 40,
                                     'sha256': hashlib.sha256(baseline.read_bytes()).hexdigest()}
 
@@ -83,6 +85,18 @@ class LocalNoticesTest(unittest.TestCase):
             with self.subTest(item=item), self.assertRaisesRegex(ValueError, 'Unreviewed runtime artifact'):
                 notices.generate(self.path, [item], self.root / 'output')
         self.assertFalse((self.root / 'output').exists())
+
+    def test_every_unreviewed_artifact_is_reported_with_its_observed_digest(self):
+        """One failure names each new or changed artifact and the bytes a reviewer must check."""
+        self.write_catalog()
+        changed = dict(self.selected[0], sha256='d' * 64)
+        unknown = dict(self.selected[1], coordinate='example:new:1.0')
+        with self.assertRaises(ValueError) as raised:
+            notices.generate(self.path, [changed, unknown], self.root / 'output')
+        message = str(raised.exception)
+        self.assertIn('example:one:1.0 one-1.0.jar sha256=' + 'd' * 64 + ' (changed bytes, reviewed ' + 'a' * 64 + ')',
+                      message)
+        self.assertIn('example:new:1.0 two-1.0.aar sha256=' + 'b' * 64 + ' (new artifact)', message)
 
     def test_missing_or_truncated_text_fails(self):
         """A catalogue entry cannot mask incomplete or missing checked-in attribution."""
@@ -182,6 +196,26 @@ class LocalNoticesTest(unittest.TestCase):
             notices.generate(changed_path, changed['artifacts'], self.root / 'changed-output',
                              root / 'config/licenses/baseline.json',
                              root / 'app/src/main/res/raw/material_icons_notice.txt')
+
+    def test_committed_baseline_cannot_drop_a_notice_with_its_pin(self):
+        """Removing Firebase from the real baseline and re-pinning it still fails generation."""
+        root = Path(__file__).resolve().parents[1]
+        repository = self.root.parents[1] / 'committed'
+        licenses = repository / 'config/licenses'
+        shutil.copytree(root / 'config/licenses', licenses)
+        icons = repository / 'app/src/main/res/raw/material_icons_notice.txt'
+        icons.parent.mkdir(parents=True)
+        icons.write_bytes((root / 'app/src/main/res/raw/material_icons_notice.txt').read_bytes())
+        baseline_path = licenses / 'baseline.json'
+        baseline = json.loads(baseline_path.read_text())
+        baseline['required_notices'] = [n for n in baseline['required_notices'] if n['name'] != 'Firebase']
+        baseline_path.write_text(json.dumps(baseline))
+        catalog_path = licenses / 'catalog.json'
+        catalog = json.loads(catalog_path.read_text())
+        catalog['baseline']['sha256'] = hashlib.sha256(baseline_path.read_bytes()).hexdigest()
+        catalog_path.write_text(json.dumps(catalog))
+        with self.assertRaisesRegex(ValueError, 'differs from the retained original'):
+            notices.generate(catalog_path, catalog['artifacts'], self.root / 'committed-output')
 
 
 if __name__ == '__main__':

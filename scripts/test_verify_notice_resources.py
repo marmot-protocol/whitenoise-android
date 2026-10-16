@@ -7,7 +7,26 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from scripts.verify_notice_resources import packaged_notices, require_baseline
+from scripts.verify_notice_resources import notice_rows, packaged_notices, require_baseline
+
+
+def write_retained_baseline(repository, baseline, metadata, texts):
+    """Retain original notice bytes under a receipt and bind the baseline to them."""
+    evidence = repository / 'config/licenses/evidence'
+    evidence.mkdir(parents=True, exist_ok=True)
+    files = {}
+    for name, data in [('third_party_license_metadata', metadata), ('third_party_licenses', texts)]:
+        (evidence / name).write_bytes(data)
+        files['config/licenses/evidence/' + name] = hashlib.sha256(data).hexdigest()
+    receipt = evidence / 'capture.json'
+    receipt.write_text(json.dumps({'schema': 1, 'source_sha': baseline['source_sha'], 'files': files}))
+    baseline['retained'] = {'path': 'config/licenses/evidence/capture.json',
+                            'sha256': hashlib.sha256(receipt.read_bytes()).hexdigest()}
+    baseline['resources'] = {'metadata_sha256': files['config/licenses/evidence/third_party_license_metadata'],
+                             'text_sha256': files['config/licenses/evidence/third_party_licenses']}
+    path = repository / 'config/licenses/baseline.json'
+    path.write_text(json.dumps(baseline))
+    return path
 
 
 class PackagedNoticeTest(unittest.TestCase):
@@ -21,12 +40,12 @@ class PackagedNoticeTest(unittest.TestCase):
         self.text = b'Copyright owner\n'
         self.metadata = f'0:{len(self.text)} Library\n'.encode()
         self.icons = b'Copyright icon owners\nApache 2.0\n'
-        self.baseline = self.root / 'baseline.json'
-        self.baseline.write_text(json.dumps({
+        self.expected = {
             'schema': 1, 'source_sha': 'a' * 40,
             'material_icons_sha256': hashlib.sha256(self.icons).hexdigest(),
             'required_notices': [{'name': 'Library', 'text_sha256': hashlib.sha256(self.text).hexdigest()}],
-        }))
+        }
+        self.baseline = write_retained_baseline(self.root, self.expected, self.metadata, self.text)
         self.dump = '''resource 0x7f010001 raw/third_party_license_metadata
   () (file) res/a
 resource 0x7f010002 raw/third_party_licenses
@@ -57,6 +76,33 @@ resource 0x7f010003 raw/material_icons_notice
             require_baseline(self.metadata, self.text[:-1], self.icons, self.baseline)
         with self.assertRaises(UnicodeDecodeError):
             require_baseline(b'0:1 Library\n', b'\xff', self.icons, self.baseline)
+
+    def test_baseline_must_equal_the_retained_original_output(self):
+        """Editing the baseline together with its own pin cannot drop an original notice."""
+        cases = [
+            ({key: value for key, value in self.expected.items() if key != 'retained'}, 'missing source-bound'),
+            (dict(self.expected, required_notices=[{'name': 'Other', 'text_sha256': 'b' * 64}]),
+             'differs from the retained original'),
+            (dict(self.expected, resources={'metadata_sha256': 'c' * 64,
+                                            'text_sha256': self.expected['resources']['text_sha256']}),
+             'do not match the baseline'),
+        ]
+        for baseline, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                self.baseline.write_text(json.dumps(baseline))
+                require_baseline(self.metadata, self.text, self.icons, self.baseline)
+
+    def test_rehashed_original_evidence_cannot_drop_a_notice(self):
+        """Rewriting the retained index and re-pinning its receipt still fails the baseline rows."""
+        other = f'0:{len(self.text)} Other library\n'.encode()
+        baseline = write_retained_baseline(self.root, dict(self.expected), other, self.text)
+        with self.assertRaisesRegex(ValueError, 'differs from the retained original'):
+            require_baseline(self.metadata, self.text, self.icons, baseline)
+
+    def test_notice_rows_keep_duplicate_index_entries(self):
+        """Repeated original rows stay visible so the baseline row count is exact."""
+        metadata = self.metadata + self.metadata
+        self.assertEqual(2, len(notice_rows(metadata, self.text)))
 
     def test_missing_resource_reference_fails(self):
         """A removed stable raw-resource ID fails before an installation is attempted."""

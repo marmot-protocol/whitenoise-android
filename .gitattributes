@@ -16,3 +16,5 @@ config/licenses/evidence/** -text -whitespace
 gradle/dependency-evidence/** -text -whitespace
 config/licenses/baseline.json text eol=lf
 config/licenses/catalog.json text eol=lf
+# The local icon attribution is hashed by every notice generation.
+app/src/main/res/raw/material_icons_notice.txt -text

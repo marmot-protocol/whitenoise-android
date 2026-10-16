@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
+    """Fail when icon geometry, imports or the local icon attribution drift from review."""
     provenance = json.loads((ROOT / 'docs/dependency-reduction/material-icons-provenance.json').read_text())
     folder = ROOT / 'app/src/main/generated/material-icons'
     actual = {str(path.relative_to(folder)): hashlib.sha256(path.read_bytes()).hexdigest()

@@ -33,6 +33,7 @@ on:
       - 'scripts/verify-release-runtime.sh'
       - 'scripts/verify_notice_resources.py'
       - 'scripts/generate_local_notices.py'
+      - 'scripts/retain_dependency_evidence.py'
       - 'config/licenses/**'
       - 'scripts/stabilize-android17-emulator.sh'
       - 'scripts/android17-adb-wrapper.sh'

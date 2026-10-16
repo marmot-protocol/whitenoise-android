@@ -18,7 +18,8 @@ scanner owners and lifecycle code remain checked.
 ML Kit and Google's runtime licence activities are removed. ZXing already
 encoded QR data and now decodes bounded CameraX luminance crops. The local build-time notice generator consumes exact runtime artifact fingerprints
 and reviewed attribution in `config/licenses/`. It preserves the original 197
-production notice name/text pairs and the separate local Material icon notice.
+production notice rows (196 distinct name/text pairs) and the separate local
+Material icon notice.
 The baseline and catalogue pin their source revision and original capture.
 The original index/text and build inputs are retained in `config/licenses/evidence/`
 so attribution remains auditable after hosted artifact expiry. Every variant
@@ -46,6 +47,14 @@ catalogue update; do not reuse an old dependency's notice merely because its nam
 matches. Record supplier/POM/embedded-notice provenance, pin the text digest and
 preserve every baseline attribution. An intentional baseline change requires an
 explicit attribution review rather than regenerating the baseline from a candidate.
+
+A failed generation lists every unreviewed artifact with its observed SHA-256 and
+whether it is new or changed. For each one, add or update the exact
+`artifacts[]` entry in `catalog.json` (`coordinate`, file `name`, `sha256` and
+the `notice_ids` it ships). A new licence text goes in `texts/<sha256>.txt` with
+a `notices[]` entry (`id`, `name`, `text`, `sha256`, `source`). The baseline must
+equal the retained original plugin output in `config/licenses/evidence/`, so a
+catalogue edit cannot drop an original notice.
 
 `verify_notice_resources.py` follows the optimized APK's resource table to the
 actual ZIP entries, validates every UTF-8 range, checks the baseline's full notice
