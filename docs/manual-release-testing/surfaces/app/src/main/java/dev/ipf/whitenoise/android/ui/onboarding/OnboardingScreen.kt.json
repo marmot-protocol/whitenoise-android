@@ -10,6 +10,14 @@
         "test_ids": [
           "ONB-001"
         ]
+      },
+      {
+        "surface": "Explicit setup app-default availability",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingScreen.kt",
+        "anchor": "hasActiveNetwork: () -> Boolean = appState::hasActiveNetwork",
+        "test_ids": [
+          "ONB-003"
+        ]
       }
     ],
     "settings_controls": [

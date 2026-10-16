@@ -78,7 +78,8 @@ class NostrEventReaderTest {
     }
 
     @Test
-    fun readerAccessibilityCopiesWwwDestination() {
+    @Config(sdk = [30])
+    fun readerAccessibilityCopiesWwwDestinationWithFeedbackOnOlderAndroid() {
         val typed = "www.example.com/path?q=value#section"
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -105,6 +106,7 @@ class NostrEventReaderTest {
             ApplicationProvider.getApplicationContext<Context>()
                 .getSystemService(ClipboardManager::class.java)
         composeRule.runOnIdle { assertEquals("https://$typed", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
+        assertEquals(string(R.string.copied), org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
     }
 
     @Test

@@ -12,6 +12,14 @@
           "RDR-002",
           "RDR-003"
         ]
+      },
+      {
+        "surface": "Article reader accessible link copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventReaderEmoji.kt",
+        "anchor": "onCopyLink = copyLink",
+        "test_ids": [
+          "RDR-002"
+        ]
       }
     ]
   },
