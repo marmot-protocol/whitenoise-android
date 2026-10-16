@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.graphics.Bitmap
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.notifications.LocalNotificationContent
 import dev.ipf.whitenoise.android.notifications.NotificationIdentityPictureSources
 
 /** Avatar warmup metadata or exact ready-local bitmaps retained across first publication and correction. */
@@ -31,6 +32,15 @@ internal fun PreWarmedNotificationAvatars.lateIdentitySources(
         senderBitmap = senderAvatarBitmap,
         senderUrl = warmed.senderAvatarUrl,
     )
+
+/**
+ * #3311: a late picture refresh prepared inside the enrichment permit, from the content the card shows and where its
+ * missing pictures may still come from, and run after the permit is released.
+ */
+internal data class LateNotificationIdentity(
+    val content: LocalNotificationContent,
+    val sources: NotificationIdentityPictureSources,
+)
 
 /** Snapshots only decoded cache hits; no URL reaches a presenter that could start enrichment. */
 internal fun readyNotificationAvatarSnapshot(

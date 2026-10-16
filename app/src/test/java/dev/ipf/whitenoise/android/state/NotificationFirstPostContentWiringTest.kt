@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -46,8 +47,9 @@ class NotificationFirstPostContentWiringTest {
     }
 
     /**
-     * Requires content correction to consume the shared permit before avatar work, and the avatar prewarm to run
-     * before the single late-picture refresh it feeds (#3311).
+     * Requires content correction to consume the shared permit before avatar work, the avatar prewarm to run inside
+     * that permit after any correction, and the late-picture refresh it feeds to run only after the permit is
+     * released, under the late-correction fences (#3311).
      */
     @Test
     fun lateContentCorrectionRunsBeforeAvatarWorkAndKeepsOneWrite() {
@@ -60,17 +62,22 @@ class NotificationFirstPostContentWiringTest {
             source
                 .substringAfter("private suspend fun enrichResolvedNotificationUpdate")
                 .substringBefore("private suspend fun postNotificationContentCorrection")
-        val contentCorrection = source.functionBody("postNotificationContentCorrection")
+        val contentCorrection =
+            source
+                .substringAfter("private suspend fun postNotificationContentCorrection")
+                .substringBefore("/**")
         val firstResolve =
             enrichment.indexOf("notificationContentResolution.firstPost.resolve(update, localOnly = false)")
-        val avatarPreWarm = contentCorrection.indexOf("refreshLateNotificationIdentity(")
-        val pictureRefresh = source.functionBody("refreshLateNotificationIdentity")
 
         assertTrue("late text must resolve before routing correction work", firstResolve >= 0)
         assertTrue(
             "a changed-content correction must post before prewarming future avatars",
-            contentCorrection.indexOf("postNotificationLateCorrection(update, firstPost, content)") in
-                0 until avatarPreWarm,
+            routing.indexOf("postNotificationContentCorrection(update, firstPost, content)") in
+                0 until routing.indexOf("prepareLateNotificationIdentity("),
+        )
+        assertTrue(
+            "the correction writes its text through the one late-correction owner",
+            "postNotificationLateCorrection(update, firstPost, content)" in contentCorrection,
         )
         assertTrue(
             "the correction plan must choose content over an avatar rewrite",
@@ -86,14 +93,22 @@ class NotificationFirstPostContentWiringTest {
         )
         assertTrue(
             "avatar lookup must remain behind the content-routing decision",
-            "refreshLateNotificationIdentity(" in routing,
+            "notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)" in
+                source.functionBody("prepareLateNotificationIdentity"),
         )
-        val preWarm = pictureRefresh.indexOf("notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)")
+        val pictureRefresh = source.functionBody("refreshLateNotificationIdentity")
         assertTrue(
-            "the prewarm runs before the late-picture refresh it feeds, under the late-correction fences",
-            preWarm >= 0 &&
-                preWarm < pictureRefresh.indexOf("refreshLateIdentityImage(") &&
-                "isNotificationEnrichmentAllowed(update, firstPost)" in pictureRefresh,
+            "the late-picture refresh keeps the late-correction fences",
+            "isNotificationEnrichmentAllowed(update, firstPost)" in pictureRefresh &&
+                "refreshLateIdentityImage(" in pictureRefresh,
+        )
+        val schedule = source.functionBody("scheduleNotificationEnrichment")
+        val permitStart = schedule.indexOf("notificationEnrichmentGate.withPermit")
+        val permit = schedule.kotlinBlockFrom(permitStart, "enrichment permit", searchForOpening = true)
+        assertTrue(
+            "the late-picture refresh runs after the enrichment permit is released",
+            "refreshLateNotificationIdentity(" !in permit &&
+                schedule.indexOf("refreshLateNotificationIdentity(") > permitStart + permit.length,
         )
     }
 

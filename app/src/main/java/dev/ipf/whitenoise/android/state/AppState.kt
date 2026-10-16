@@ -11421,10 +11421,13 @@ class WhiteNoiseAppState private constructor(
      * its conversation or sender picture then gets at most one silent picture
      * rewrite once the avatar prewarm has made that picture available (#3311),
      * and a card that already showed its pictures is never repainted for imagery.
+     * The prewarm runs here, and [deferPicture] receives the picture refresh it
+     * enables, which the caller runs after releasing the enrichment permit.
      */
     private suspend fun enrichPostedNotificationUpdate(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
+        deferPicture: (LateNotificationIdentity) -> Unit,
     ): NotificationLateCorrectionOutcome =
         if (!isNotificationEnrichmentAllowed(update, firstPost)) {
             NotificationLateCorrectionOutcome.Stale
@@ -11439,7 +11442,7 @@ class WhiteNoiseAppState private constructor(
             when {
                 content == null -> NotificationLateCorrectionOutcome.Failed
                 !isNotificationEnrichmentAllowed(update, firstPost) -> NotificationLateCorrectionOutcome.Stale
-                else -> enrichResolvedNotificationUpdate(update, firstPost, content)
+                else -> enrichResolvedNotificationUpdate(update, firstPost, content, deferPicture)
             }
         }
 
@@ -11448,6 +11451,7 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: NotificationFirstPostContent,
+        deferPicture: (LateNotificationIdentity) -> Unit,
     ): NotificationLateCorrectionOutcome {
         val resolvedPresentation =
             notificationContentPresentation(
@@ -11456,58 +11460,72 @@ class WhiteNoiseAppState private constructor(
                 content = content,
                 shortNpub = ::shortNpub,
             )
-        return if (
-            notificationLateCorrectionPlan(
-                firstPresentation = firstPost.presentation,
-                resolvedPresentation = resolvedPresentation,
-            ) == NotificationLateCorrectionPlan.Content
-        ) {
-            postNotificationContentCorrection(update, firstPost, content, resolvedPresentation.content)
-        } else {
-            refreshLateNotificationIdentity(update, firstPost, resolvedPresentation.content)
-            NotificationLateCorrectionOutcome.Unchanged
+        val outcome =
+            if (
+                notificationLateCorrectionPlan(
+                    firstPresentation = firstPost.presentation,
+                    resolvedPresentation = resolvedPresentation,
+                ) == NotificationLateCorrectionPlan.Content
+            ) {
+                postNotificationContentCorrection(update, firstPost, content)
+            } else {
+                NotificationLateCorrectionOutcome.Unchanged
+            }
+        // Prime imagery only after any text correction is visible. A fallback
+        // receives at most one text replacement for this message, and a stale
+        // correction primes nothing.
+        if (outcome != NotificationLateCorrectionOutcome.Stale) {
+            prepareLateNotificationIdentity(update, firstPost, resolvedPresentation.content)?.let(deferPicture)
         }
+        return outcome
     }
 
-    /** Posts corrected text, then primes imagery and gives the corrected card a picture it was drawn without. */
+    /** Posts corrected text as this message's one silent late text write. */
     private suspend fun postNotificationContentCorrection(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: NotificationFirstPostContent,
-        correctedContent: LocalNotificationContent?,
-    ): NotificationLateCorrectionOutcome {
-        val posted = postNotificationLateCorrection(update, firstPost, content)
-        return if (posted) {
-            // Prime imagery only after the text correction is visible. A
-            // fallback receives at most one text replacement for this message.
-            refreshLateNotificationIdentity(update, firstPost, correctedContent)
+    ): NotificationLateCorrectionOutcome =
+        if (postNotificationLateCorrection(update, firstPost, content)) {
             NotificationLateCorrectionOutcome.ContentPosted
         } else {
             NotificationLateCorrectionOutcome.Stale
         }
+
+    /**
+     * #3311: runs the post-write avatar prewarm and returns the late picture
+     * refresh it enables for a card first drawn without its conversation or
+     * sender picture, or null when no picture can still arrive. [content] is
+     * what the card shows.
+     */
+    private suspend fun prepareLateNotificationIdentity(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        content: LocalNotificationContent?,
+    ): LateNotificationIdentity? {
+        val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+        val sources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        return if (content != null && sources.hasMissingPicture) LateNotificationIdentity(content, sources) else null
     }
 
     /**
-     * #3311: runs the post-write avatar prewarm, then gives a card first drawn
-     * without its conversation or sender picture the picture that has since
-     * become available, as one silent rewrite of the same live card under
-     * every fence a late correction obeys. [content] is what the card shows.
-     * App lock, a switched account, a newer epoch, or a dismissed, read or
-     * replaced card stop it here or at the write, and the presenter leaves
-     * redacted and hidden-preview cards alone.
+     * #3311: gives the card the picture that has since become available, as
+     * one silent rewrite of the same live card under every fence a late
+     * correction obeys. It runs after the enrichment permit is released, since
+     * it may wait for a download. App lock, a switched account, a newer epoch,
+     * or a dismissed, read or replaced card stop it here or at the write, and
+     * the presenter leaves redacted and hidden-preview cards alone.
      */
     private suspend fun refreshLateNotificationIdentity(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
-        content: LocalNotificationContent?,
+        late: LateNotificationIdentity,
     ) {
-        val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
-        val sources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
-        if (content == null || !sources.hasMissingPicture || !isNotificationEnrichmentAllowed(update, firstPost)) return
+        if (!isNotificationEnrichmentAllowed(update, firstPost)) return
         localNotificationPresenter.refreshLateIdentityImage(
             update = update,
-            content = content,
-            pictures = sources,
+            content = late.content,
+            pictures = late.sources,
             directShareEligible = update.accountRef == activeAccountRef,
             isRefreshCurrent = { isNotificationEnrichmentAllowed(update, firstPost) },
         )
@@ -11636,6 +11654,7 @@ class WhiteNoiseAppState private constructor(
         receivedAtElapsedMs: Long,
     ) {
         notificationScope.launch(notificationDispatcher) {
+            var latePicture: LateNotificationIdentity? = null
             notificationEnrichmentGate.withPermit {
                 if (
                     !isNotificationEnrichmentAllowed(
@@ -11647,13 +11666,16 @@ class WhiteNoiseAppState private constructor(
                 ) {
                     return@withPermit
                 }
-                val outcome = enrichPostedNotificationUpdate(update, firstPost)
+                val outcome = enrichPostedNotificationUpdate(update, firstPost) { latePicture = it }
                 appStateDebug {
                     "notification timing stage=late-correction " +
                         "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} " +
                         "outcome=${outcome.timingValue}"
                 }
             }
+            // A late picture may wait for its download, so it runs outside the
+            // permit and never delays other messages' text corrections.
+            latePicture?.let { refreshLateNotificationIdentity(update, firstPost, it) }
         }
     }
 
