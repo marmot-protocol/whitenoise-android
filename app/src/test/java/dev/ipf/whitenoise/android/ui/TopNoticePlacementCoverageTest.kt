@@ -129,17 +129,22 @@ class TopNoticePlacementCoverageTest {
             }
         assertTrue("the gate must see the plain scaffolds it protects", sites.size >= MIN_PLAIN_SCAFFOLD_TOP_BARS)
         sites.forEach { (path, call) ->
-            val topBar = call.indexOf("topBar =")
-            val slotted =
-                call.indexOf("TopNoticeSlot(", topBar) > topBar ||
-                    call.indexOf("ScaffoldTopBarWithNoticeSlot(", topBar) > topBar
+            // The slot counts only inside the bar lambda itself, not in the content or a bottom bar.
+            val topBar = topBarLambda(call)
+            val slotted = "TopNoticeSlot(" in topBar || "ScaffoldTopBarWithNoticeSlot(" in topBar
             val optedOut = PLAIN_SCAFFOLD_OPT_OUT.containsMatchIn(call)
             assertTrue(
-                "$path: a plain Scaffold with a top bar needs TopNoticeSlot() under it, or an opt-out comment " +
-                    "of the form '// top-notice-slot opt-out: <reason>' inside the call",
+                "$path: a plain Scaffold with a top bar needs TopNoticeSlot() inside its topBar lambda, or an " +
+                    "opt-out comment of the form '// top-notice-slot opt-out: <reason>' inside the call",
                 slotted || optedOut,
             )
         }
+    }
+
+    /** The balanced body of one scaffold call's `topBar = { ... }` argument. */
+    private fun topBarLambda(call: String): String {
+        val open = call.indexOf('{', call.indexOf("topBar ="))
+        return call.kotlinBlockFrom(openDelimiter = open, description = "topBar lambda")
     }
 
     /** A modal claims the banners below its playback strip, so nothing is rendered behind it in the window below. */
