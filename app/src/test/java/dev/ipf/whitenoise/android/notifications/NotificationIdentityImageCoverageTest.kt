@@ -10,7 +10,8 @@ import java.io.File
 /**
  * Invariant gate for #3311: every rich message card, in the conversation template and the long-message text block,
  * carries one shared conversation identity snapshot through first post, enrichment, private contact pictures and
- * every rewrite of a live card, while redacted and hidden-preview cards stay generic.
+ * every rewrite of a live card. Its identity shortcut is published before the single first post, so even a
+ * brand-new conversation's first card is a conversation, while redacted and hidden-preview cards stay generic.
  */
 class NotificationIdentityImageCoverageTest {
     /** The presenter sets the picture only through the shared snapshot, and never on a redacted card. */
@@ -30,6 +31,28 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("the shortcut monogram seed keeps card and shortcut alike", "seed = messagingShortcutId" in guarded)
         val image = source("NotificationIdentityImage.kt").extensionBody("identityImage")
         assertTrue("a group never borrows a member's face", "senderAvatar.takeIf { directChat }" in image)
+    }
+
+    /**
+     * Android draws the conversation layout and its picture only when the shortcut exists at post time, so the
+     * identity shortcut is published before the one first post, on the preview-allowed rich path only, through the
+     * existing shortcut owner and with no second card write or network wait.
+     */
+    @Test
+    fun identityShortcutIsPublishedBeforeTheFirstPost() {
+        val presenter = source("LocalNotificationPresenter.kt")
+        val show = presenter.functionBody("show")
+        val publish = show.indexOf("publishShortcutBeforePost(")
+        assertTrue("the first post publishes its identity shortcut", publish >= 0)
+        assertTrue("before the pacer slot and the write", publish < show.indexOf("postPacer.awaitSlot()"))
+        val guard = show.substring(show.lastIndexOf("messagingPost?.takeIf", publish), publish)
+        assertTrue("only on the preview-allowed rich path", "!redactContent && previewToken.allowed" in guard)
+        val before = presenter.functionBody("publishShortcutBeforePost")
+        assertTrue("through the existing shortcut owner", "publishConversationShortcut(" in before)
+        assertFalse("never a second card write", "postNotificationSafely" in before || "notificationPoster" in before)
+        assertFalse("no network wait on the posting path", "avatarBitmapResolver" in before)
+        val payload = presenter.functionBody("previewPayload")
+        assertTrue("a hidden card makes the next rich post publish again", "shortcutSnapshots::remove" in payload)
     }
 
     /** Late pictures rewrite both card templates with the same snapshot instead of only the conversation style. */

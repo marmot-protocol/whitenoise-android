@@ -881,8 +881,7 @@ class LocalNotificationPresenter(
                                 )
                             // #3311: every rich card carries its conversation identity picture in the first
                             // payload, for a direct chat as well as a group, and the long-message text block keeps
-                            // it. Shortcut publication stays off the initial-post path and is never the only route
-                            // to the picture. Redacted cards get none.
+                            // it, so the picture never depends on the shortcut alone. Redacted cards get none.
                             if (!redactContent) {
                                 builder.setConversationIdentityImage(
                                     notificationContent.identityImage(
@@ -955,6 +954,14 @@ class LocalNotificationPresenter(
                                     putString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID, style.groupIdHex)
                                 },
                             )
+                        }
+                    }
+                    // #3311: Android classifies a card as a conversation only when its shortcut already exists, so the
+                    // identity shortcut is published from the pictures already in hand, with no network wait, before
+                    // the one first post. Redacted and hidden-preview posts keep only the generic shortcut.
+                    messagingPost?.takeIf { !redactContent && previewToken.allowed }?.let { messaging ->
+                        publishShortcutBeforePost(update, notificationContent, messaging, directShareEligible) {
+                            profileAllowsPost() && showGenerationAllowsPost()
                         }
                     }
 
@@ -1304,6 +1311,37 @@ class LocalNotificationPresenter(
             if (!written) heldAlert?.release()
         }
         return written
+    }
+
+    /**
+     * Publishes the conversation's identity shortcut before the first post (#3311), so even a brand-new
+     * conversation's first card gets Android's conversation layout and picture without a second write. It reuses the
+     * resolved pictures or the monogram and never waits on the network. An unchanged snapshot costs nothing, and a
+     * failed publication is contained so the card still posts through the existing fallback.
+     */
+    private suspend fun publishShortcutBeforePost(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        messaging: MessagingPostContext,
+        directShareEligible: Boolean,
+        isPublishAllowed: () -> Boolean,
+    ) {
+        val shortcutId = messaging.shortcutId ?: return
+        withContext(Dispatchers.Default) {
+            publishConversationShortcut(
+                update = update,
+                content = content,
+                shortcutId = shortcutId,
+                locusId = LocusIdCompat(shortcutId),
+                conversationAvatarUrl = messaging.conversationAvatarUrl,
+                conversationAvatarBitmap = messaging.conversationAvatarBitmap,
+                senderAvatarUrl = messaging.senderAvatarUrl,
+                senderAvatarBitmap = messaging.senderAvatarBitmap,
+                sender = messaging.sender,
+                directShareEligible = directShareEligible,
+                isPublishAllowed = isPublishAllowed,
+            )
+        }
     }
 
     private suspend fun dispatchMessagingEnrichment(
@@ -1788,6 +1826,7 @@ class LocalNotificationPresenter(
         return sameGeneration && NotificationPreviewPreferences.canExpose(context, latest, latest)
     }
 
+    /** What Android receives: the rich card when its preview may be shown, otherwise the generic hidden card. */
     private fun previewPayload(
         notification: Notification,
         tag: String,
@@ -1801,6 +1840,8 @@ class LocalNotificationPresenter(
         return if (NotificationPreviewPreferences.canExpose(context, notification, current)) {
             notification
         } else {
+            // A hidden card leaves its conversation shortcut generic, so the next rich post must publish it again.
+            notification.shortcutId?.let(shortcutSnapshots::remove)
             notificationWithoutPreview(context, notification, shortcut = hiddenShortcut?.invoke())
         }
     }

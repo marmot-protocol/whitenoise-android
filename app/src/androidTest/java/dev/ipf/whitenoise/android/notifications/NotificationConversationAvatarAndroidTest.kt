@@ -78,32 +78,46 @@ class NotificationConversationAvatarAndroidTest {
         ShortcutManagerCompat.removeDynamicShortcuts(context, ids.toList())
     }
 
-    /** The direct chat's circle shows the peer, the group's shows the group, and the long card keeps its picture. */
+    /**
+     * Brand-new conversations: the very first card of a direct chat shows the peer in its circle and a group's shows
+     * the group, in the heads-up, collapsed and expanded states, and a long first message keeps its picture.
+     */
     @Test
-    fun collapsedExpandedAndHeadsUpCardsDrawTheConversationIdentity() {
+    fun brandNewConversationsFirstCardsDrawTheConversationIdentity() {
         val presenter = LocalNotificationPresenter(context).also { it.ensureChannels() }
-        // A first message publishes each conversation shortcut, so the second is a classified conversation.
+        // Each fixture conversation is new, so these are the first cards they ever post, one write each.
         post(presenter, DM_GROUP, isDm = true, picture = solid(Color.RED), sender = solid(Color.RED), body = "first")
+        val headsUp = capture("first_card_heads_up")
         post(presenter, GROUP, isDm = false, picture = solid(Color.BLUE), sender = solid(Color.GREEN), body = "first")
-        post(presenter, DM_GROUP, isDm = true, picture = solid(Color.RED), sender = solid(Color.RED), body = "second")
-        val headsUp = capture("heads_up")
-        post(presenter, GROUP, isDm = false, picture = solid(Color.BLUE), sender = solid(Color.GREEN), body = "second")
         post(presenter, LONG_GROUP, isDm = true, picture = solid(Color.MAGENTA), sender = null, body = LONG_BODY)
 
         device.openNotification()
         device.wait(Until.hasObject(By.text(DM_NAME)), WAIT_MS)
-        val collapsed = capture("collapsed")
-        assertColor("direct-chat circle", Color.RED, colorOf(collapsed, DM_NAME, "conversation_icon"))
-        assertColor("group circle", Color.BLUE, colorOf(collapsed, GROUP_NAME, "conversation_icon"))
-        assertColor("long-message picture", Color.MAGENTA, colorOf(collapsed, LONG_NAME, "right_icon"))
-        colorOf(headsUp, DM_NAME, "conversation_icon")?.let { assertColor("heads-up circle", Color.RED, it) }
+        val collapsed = capture("first_card_collapsed")
+        assertColor("first direct-chat circle", Color.RED, colorOf(collapsed, DM_NAME, "conversation_icon"))
+        assertColor("first group circle", Color.BLUE, colorOf(collapsed, GROUP_NAME, "conversation_icon"))
+        assertColor("first long-message picture", Color.MAGENTA, colorOf(collapsed, LONG_NAME, "right_icon"))
+        colorOf(headsUp, DM_NAME, "conversation_icon")?.let { assertColor("first heads-up circle", Color.RED, it) }
 
         device.findObject(By.text(DM_NAME))?.swipe(Direction.DOWN, EXPAND_SWIPE)
         device.waitForIdle()
-        val expanded = capture("expanded")
-        assertColor("expanded direct-chat circle", Color.RED, colorOf(expanded, DM_NAME, "conversation_icon"))
+        val expanded = capture("first_card_expanded")
+        assertColor("expanded first direct-chat circle", Color.RED, colorOf(expanded, DM_NAME, "conversation_icon"))
         val appIcon = colorOf(expanded, LONG_NAME, "icon")
         if (appIcon != null) assertFalse("the small app icon is not the identity", close(Color.MAGENTA, appIcon))
+    }
+
+    /** A second message in the same conversation keeps the same picture in its circle. */
+    @Test
+    fun laterMessagesKeepTheConversationIdentity() {
+        val presenter = LocalNotificationPresenter(context).also { it.ensureChannels() }
+        post(presenter, DM_GROUP, isDm = true, picture = solid(Color.RED), sender = solid(Color.RED), body = "first")
+        post(presenter, DM_GROUP, isDm = true, picture = solid(Color.RED), sender = solid(Color.RED), body = "second")
+
+        device.openNotification()
+        device.wait(Until.hasObject(By.text(DM_NAME)), WAIT_MS)
+        val shade = capture("second_card_collapsed")
+        assertColor("second direct-chat circle", Color.RED, colorOf(shade, DM_NAME, "conversation_icon"))
     }
 
     /** Posts one message through the production presenter with ready pictures, as the first post supplies them. */

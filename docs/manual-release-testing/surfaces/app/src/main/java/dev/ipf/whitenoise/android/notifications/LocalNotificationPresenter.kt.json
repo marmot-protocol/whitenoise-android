@@ -108,6 +108,15 @@
           "NTF-042",
           "NTF-025"
         ]
+      },
+      {
+        "surface": "identity shortcut published before the first post",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private suspend fun publishShortcutBeforePost(",
+        "test_ids": [
+          "NTF-042",
+          "NTF-006"
+        ]
       }
     ],
     "source_coverage": [
