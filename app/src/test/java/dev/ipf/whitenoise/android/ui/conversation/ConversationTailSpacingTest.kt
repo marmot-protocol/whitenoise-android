@@ -190,14 +190,11 @@ class ConversationTailSpacingTest {
 
     /** Ignores bottom-geometry changes when there is no real message row to anchor. */
     @Test
-    fun emptyTimelineIgnoresImeAndSnackbarInsetTransitions() {
+    fun emptyTimelineIgnoresKeyboardTransitions() {
         val fixture = TailSpacingFixture(timelineSize = 0)
         showFixture(fixture)
 
-        composeRule.runOnUiThread {
-            fixture.bottomChromeHeight.value = 180.dp
-            fixture.snackbarContentInset.value = 56.dp
-        }
+        composeRule.runOnUiThread { fixture.bottomChromeHeight.value = 180.dp }
         composeRule.waitForIdle()
 
         assertEquals(0, fixture.writer.snapCount)
@@ -234,24 +231,6 @@ class ConversationTailSpacingTest {
         assertEquals(0, fixture.writer.snapCount)
     }
 
-    /** Applies temporary snackbar clearance and restores the one-gap resting state. */
-    @Test
-    fun snackbarInsetTemporarilyClearsTheTailThenRestoresTheSingleGap() {
-        val fixture = TailSpacingFixture(timelineSize = 24)
-        showFixture(fixture)
-        scrollToTail(fixture)
-
-        composeRule.runOnUiThread { fixture.snackbarContentInset.value = 64.dp }
-        composeRule.waitForIdle()
-        assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP + 64.dp)
-
-        composeRule.runOnUiThread { fixture.snackbarContentInset.value = 0.dp }
-        composeRule.waitForIdle()
-        assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP)
-        assertFalse(fixture.listState.canScrollBackward)
-        assertEquals(0, fixture.writer.snapCount)
-    }
-
     /** Keeps a history reader's exact row and offset across an inset change, with no write. */
     @Test
     fun insetTransitionDoesNotMoveAHistoryReader() {
@@ -270,23 +249,20 @@ class ConversationTailSpacingTest {
         assertEquals("a reader owes no compensating write", writesBefore, fixture.writer.snapCount)
     }
 
-    /** Keeps a tail follower pinned across a coordinated keyboard and snackbar change, with no write. */
+    /** Keeps a tail follower pinned across a keyboard change that lands after a scroll, with no further write. */
     @Test
-    fun coordinatedInsetChangeKeepsTheTailPinnedWithoutAWrite() {
+    fun keyboardChangeAfterAScrollKeepsTheTailPinnedWithoutAWrite() {
         val fixture = TailSpacingFixture(timelineSize = 24)
         showFixture(fixture)
         scrollToTail(fixture)
         val writesBefore = fixture.writer.snapCount
 
-        composeRule.runOnUiThread {
-            fixture.bottomChromeHeight.value = 180.dp
-            fixture.snackbarContentInset.value = 64.dp
-        }
+        composeRule.runOnUiThread { fixture.bottomChromeHeight.value = 180.dp }
         composeRule.waitForIdle()
 
-        // Bottom-anchored layout absorbs both insets, so the resting interval
+        // Bottom-anchored layout absorbs the keyboard, so the resting interval
         // below the newest row is unchanged and no scroll was issued.
-        assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP + 64.dp)
+        assertTailGap(CONVERSATION_TIMELINE_TAIL_GAP)
         assertFalse(fixture.listState.canScrollBackward)
         assertEquals("a pinned tail owes no compensating write", writesBefore, fixture.writer.snapCount)
     }
@@ -342,8 +318,7 @@ class ConversationTailSpacingTest {
                         modifier = Modifier.fillMaxSize().testTag(TRANSCRIPT_TAG),
                         reverseLayout = true,
                         verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-                        contentPadding =
-                            conversationTimelineContentPadding(fixture.snackbarContentInset.value),
+                        contentPadding = conversationTimelineContentPadding(0.dp),
                     ) {
                         tailSpacingItems(fixture.timelineSize)
                     }
@@ -426,7 +401,6 @@ class ConversationTailSpacingTest {
         val writer = CountingLazyListScrollWriter(listState)
         val coordinator = ConversationScrollCoordinator(writer = writer, initialMode = initialMode)
         val bottomChromeHeight: MutableState<Dp> = mutableStateOf(60.dp)
-        val snackbarContentInset: MutableState<Dp> = mutableStateOf(0.dp)
         val foregroundRestoreInProgress: MutableState<Boolean> = mutableStateOf(false)
         val routePresentationFrozen: MutableState<Boolean> = mutableStateOf(false)
         lateinit var coroutineScope: CoroutineScope

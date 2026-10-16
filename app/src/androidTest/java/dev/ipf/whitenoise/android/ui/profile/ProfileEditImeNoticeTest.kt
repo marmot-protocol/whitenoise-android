@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.common.GLOBAL_TRANSIENT_NOTICE_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -38,10 +39,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The app-global confirmation races a keyboard the destination still owns, and the platform decides
- * how tall that keyboard is and when it arrives. A Robolectric test can dispatch an inset that says
- * 300 px; only a device can say what the real keyboard does, so this case runs the real editor with
- * the real platform IME open over a real focused field.
+ * The app-global confirmation lands in the shell's top region while the destination still owns a
+ * keyboard, and the platform decides how tall that keyboard is and when it arrives (#3312). A
+ * Robolectric test can dispatch an inset that says 300 px; only a device can say what the real
+ * keyboard does, so this case runs the real editor with the real platform IME open over a real
+ * focused field, and requires the banner to sit directly under the status bar, whole and well clear
+ * of that keyboard, while the field keeps its focus.
  *
  * Two seams are faked, both outside the behaviour under test. Publication itself goes through
  * MarmotKit and the network, which no instrumented harness here can stand up, so the editor's
@@ -73,15 +76,16 @@ class ProfileEditImeNoticeTest {
 
     /**
      * A profile save confirmation that lands while the name field still owns the platform keyboard
-     * shows its whole title and relay-count detail above that keyboard, and the field keeps focus.
+     * shows its whole title and relay-count detail at the top, under the status bar, and the field
+     * keeps focus.
      */
     @Test
-    fun profileSaveConfirmationClearsTheLiveKeyboard() {
+    fun profileSaveConfirmationSitsAtTheTopOverTheLiveKeyboard() {
         showProfileEditor { publishedProfileConfirmation() }
         editTheNameWithTheKeyboardOpen()
 
         composeRule.runOnUiThread { publishedProfileConfirmation() }
-        assertTheConfirmationClearsTheLiveKeyboard()
+        assertTheConfirmationSitsAtTheTopOverTheLiveKeyboard()
 
         composeRule.onNodeWithText(context.getString(R.string.toast_profile_published)).assertIsDisplayed()
         composeRule
@@ -114,12 +118,12 @@ class ProfileEditImeNoticeTest {
      * through the very call the relay publisher makes on success.
      */
     @Test
-    fun relayAddConfirmationClearsTheLiveKeyboardFromTheSameHost() {
+    fun relayAddConfirmationSitsAtTheTopFromTheSameHost() {
         showProfileEditor { true }
         editTheNameWithTheKeyboardOpen()
 
         composeRule.runOnUiThread { appState.presentTransient(R.string.toast_relay_list_updated) }
-        assertTheConfirmationClearsTheLiveKeyboard()
+        assertTheConfirmationSitsAtTheTopOverTheLiveKeyboard()
 
         composeRule.onNodeWithText(context.getString(R.string.toast_relay_list_updated)).assertIsDisplayed()
         composeRule.onNodeWithTag(NAME_FIELD_TAG).assertIsFocused()
@@ -145,18 +149,21 @@ class ProfileEditImeNoticeTest {
     /**
      * Samples the live keyboard and the confirmation together, and requires the keyboard to still be
      * covering a real share of the screen: a keyboard on its way out makes the comparison weaker,
-     * not stronger, so a test that accepted one would prove nothing.
+     * not stronger, so a test that accepted one would prove nothing. The banner must be the first
+     * thing under the status bar, in the shell's top region, and must end in the top half of the
+     * window the keyboard leaves visible, so a banner that drifted toward the keyboard would fail.
      */
-    private fun assertTheConfirmationClearsTheLiveKeyboard() {
+    private fun assertTheConfirmationSitsAtTheTopOverTheLiveKeyboard() {
         val deadline = SystemClock.uptimeMillis() + SAMPLE_WINDOW_MILLIS
         var samples = 0
         do {
             val keyboard = keyboardInsetPx()
             assertTrue(
-                "the keyboard was not up, so the confirmation was never covered",
+                "the keyboard was not up ($keyboard px), so the banner was never competing with it",
                 keyboard >= MINIMUM_REAL_KEYBOARD_PX,
             )
             val notice = composeRule.onNodeWithTag(GLOBAL_TRANSIENT_NOTICE_TAG).fetchSemanticsNode().boundsInRoot
+            val statusBar = statusBarInsetPx()
             val windowHeight =
                 composeRule
                     .onRoot()
@@ -164,9 +171,15 @@ class ProfileEditImeNoticeTest {
                     .size
                     .height
             val available = windowHeight - keyboard
+            assertEquals(
+                "the confirmation must sit directly under the status bar",
+                statusBar.toFloat(),
+                notice.top,
+                TOLERANCE_PX,
+            )
             assertTrue(
-                "the confirmation ran into the keyboard: bottom ${notice.bottom} past $available",
-                notice.bottom <= available + TOLERANCE_PX,
+                "the confirmation left the top region: bottom ${notice.bottom} past half of $available",
+                notice.bottom <= available / 2f,
             )
             samples += 1
         } while (SystemClock.uptimeMillis() < deadline)
@@ -182,6 +195,12 @@ class ProfileEditImeNoticeTest {
             } else {
                 insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
             }
+        }
+
+    /** How far the status bar reaches into the window, in pixels. */
+    private fun statusBarInsetPx(): Int =
+        composeRule.runOnUiThread {
+            ViewCompat.getRootWindowInsets(view)?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0
         }
 
     /** Renders the real editor inside the real shell host, with only publication faked. */
