@@ -76,7 +76,7 @@ jobs:
           ref: ${{ github.sha }}
 
       - name: Test selected dependency evidence validator
-        run: python3 -m unittest scripts/test_verify_dependency_security.py
+        run: python3 -m unittest scripts/test_verify_dependency_security.py scripts/test_dependency_inventory.py scripts/test_compare_ci_dependency_inventory.py
 
       - name: Test manual release guide and viewport coverage validators
         run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py scripts/test_check_scroll_edge_fades.py scripts/test_check_viewport_restoration_coverage.py scripts/test_paging_trace_report.py
@@ -221,6 +221,9 @@ jobs:
           retention-days: 14
 
   build-contracts:
+    permissions:
+      contents: read
+      actions: read
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
     name: Build contracts (${{ matrix.phase }})
@@ -279,7 +282,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: marmotkit-api-signature
-          path: app/build/reports/marmotkit/marmotkit-api-signature.txt
+          path: app/build/reports/marmotkit/
           if-no-files-found: error
           retention-days: 14
 
@@ -380,6 +383,24 @@ jobs:
         if: success()
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
 
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
+
+      - name: Compare already-observed dependencies with exact PR base
+        if: success() && github.event_name == 'pull_request' && matrix.phase == 'tooling'
+        # Observational reporting must not turn an otherwise valid build red.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_ARTIFACT: dependency-security-build-contracts-0
+        run: |
+          python3 scripts/compare_ci_dependency_inventory.py --base-source "$(git rev-parse HEAD^1)" \
+            --artifact-name "$BASE_ARTIFACT" \
+            --after build/reports/dependency-security/inventory/selected.json --after-source "$(git rev-parse HEAD)" \
+            --output build/reports/dependency-security/inventory/base-delta.json
+
       - name: Retain selected dependency security evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -471,6 +492,11 @@ jobs:
         if: success()
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
 
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
+
       - name: Retain selected dependency security evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -560,6 +586,11 @@ jobs:
       - name: Verify selected dependency security floors
         if: success()
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
 
       - name: Retain selected dependency security evidence
         if: always()
@@ -732,6 +763,11 @@ jobs:
         if: success()
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
 
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
+
       - name: Retain selected dependency security evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -829,6 +865,11 @@ jobs:
       - name: Verify selected dependency security floors
         if: success()
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
 
       - name: Retain selected dependency security evidence
         if: always()
