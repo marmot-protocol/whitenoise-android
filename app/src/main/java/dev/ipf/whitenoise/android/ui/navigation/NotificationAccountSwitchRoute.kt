@@ -28,7 +28,8 @@ internal fun notificationSwitchFailureClosesConversation(
  * The routing pass is keyed on the active account, so an inline suspend switch would cancel itself the
  * moment the ref flips. This work therefore outlives the pass that started it, and every write it makes
  * afterwards is fenced: by the request and live runtime through [NotificationOpenCurrency], by the pin
- * authority recheck, and by releasing only the first-frame gate it began itself.
+ * authority recheck, by releasing only the first-frame gate it began itself, and by standing down once a
+ * same-request successor holds the window.
  */
 internal class NotificationAccountSwitchRoute(
     private val owners: NotificationOpenOwners,
@@ -138,11 +139,15 @@ internal class NotificationAccountSwitchRoute(
         }
     }
 
-    /** Fails a pin that lost authority, or a switch that never landed, but only while this request owns it. */
+    /**
+     * Fails a pin that lost authority, or a switch that never landed, but only while this request owns it and no
+     * successor for the same request has taken over its window.
+     */
     private fun reconcileAfterActivation() {
-        val offered = currency.offers(requestId, target, routeRuntimeGeneration)
+        val superseded = supersededBySameRequest()
+        val offered = !superseded && currency.offers(requestId, target, routeRuntimeGeneration)
         if (offered && completion.rejectUnavailablePin(attempt, releaseGate = ::releaseOwnedGate)) return
-        if (!switchStillCurrent() || appState.activeAccountRef == accountRef) return
+        if (superseded || !switchStillCurrent() || appState.activeAccountRef == accountRef) return
         val earlyOpened = runtimeSlots.earlyOpenRequestId == requestId
         val stillInsideEarlyOpen = owners.shell.selectedOpenContext.notificationRouteTraceRequestId == requestId
         preloadSlot.preload = null
@@ -174,5 +179,19 @@ internal class NotificationAccountSwitchRoute(
     /** Ends only the first-frame window this route began, never a newer route's. */
     private fun releaseOwnedGate() {
         ownedGate?.let(owners.firstFrame::releaseOwned)
+    }
+
+    /**
+     * True once a successor route for this same request began its own first-frame window. A shell that remounts
+     * after App Lock or Activity recreation re-runs the request with fresh slots while this switch is still in
+     * flight, and request identity cannot tell the two routes apart. The successor's begin released this route's
+     * gate while leaving a window held, a shape none of this route's own release paths produce, and from then on
+     * the successor owns the fallback and the acknowledgement. A newer request's begin looks the same, and that
+     * route was already retired by its request id. A route without a window keeps its request fence alone.
+     */
+    private fun supersededBySameRequest(): Boolean {
+        val owned = ownedGate ?: return false
+        val held = owners.firstFrame.gate
+        return owned.isReleased && held != null && held !== owned
     }
 }

@@ -354,6 +354,15 @@ class NotificationConversationOpenCoverageTest {
         val failure = switch.between("private fun reconcileAfterActivation()", "private fun releaseStuckPreload")
         assertTrue("a switch that never landed releases its own gate", "releaseOwnedGate()" in failure)
         assertFalse("a switch that never landed never names a request id", "release(requestId)" in failure)
+        val superseded = failure.indexOf("val superseded = supersededBySameRequest()")
+        assertTrue(
+            "a same-request successor's held window retires the failure path before any write",
+            superseded in 0 until failure.indexOf("rejectUnavailablePin("),
+        )
+        assertTrue(
+            "the successor is recognised by gate identity, never by request id",
+            "owned.isReleased && held != null && held !== owned" in switch,
+        )
     }
 
     /** Every process-scoped completion asks the live request and runtime fence before it writes shell state. */
@@ -367,7 +376,10 @@ class NotificationConversationOpenCoverageTest {
             "a lost pin is failed only while the request is still offered",
             "if (offered && completion.rejectUnavailablePin(" in switch,
         )
-        assertTrue("a never-landed switch fails only while still current", "if (!switchStillCurrent() ||" in switch)
+        assertTrue(
+            "a never-landed switch fails only while still current and not superseded",
+            "if (superseded || !switchStillCurrent() ||" in switch,
+        )
         val retry = readsSource().replace(Regex("\\s+"), " ")
         val retryFence = "if (currency.offers(requestId, attempt.target, retryRuntimeGeneration))"
         assertTrue("the exact retry publishes only for the offered request", retryFence in retry)

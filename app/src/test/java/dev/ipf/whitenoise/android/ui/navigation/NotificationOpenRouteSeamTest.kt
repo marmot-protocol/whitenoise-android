@@ -21,8 +21,10 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -160,6 +162,44 @@ class NotificationOpenRouteSeamTest {
         assertNull(firstFrame.gate)
     }
 
+    /**
+     * App Lock: the lock unmounts the shell while the switch is in flight, freezing the readers its route captured,
+     * and the unlocked shell re-runs the same request with fresh slots, so a successor switch for the same request
+     * id begins its own window. The retired switch then fails. Request identity cannot tell the two apart, so only
+     * the successor's held window retires it: it must not fall back, consume the still-offered target the successor
+     * owns, or end the successor's window, and the successor must still reach the conversation.
+     */
+    @Test
+    fun aRetiredSwitchFailingAfterAnAppLockRemountLeavesTheSuccessorRouteIntact() {
+        gate.releasePreload.countDown()
+        val retired = routerWithFrozenReaders()
+        runBlocking { retired.route(target, requestId) }
+        val retiredGate = requireNotNull(firstFrame.gate)
+        awaitHeldActivationRead(0)
+        lockAndUnlock()
+        runBlocking { router.route(target, requestId) }
+        val successorGate = requireNotNull(firstFrame.gate)
+        assertNotSame(retiredGate, successorGate)
+        assertTrue(retiredGate.isReleased)
+        awaitHeldActivationRead(1)
+        awaitCondition("the successor preload never published") {
+            state.preloadSlot.preload?.state is NotificationMessagePreloadState.Ready
+        }
+
+        releaseRetiredActivationAndAssertUnchanged(fails = true)
+
+        assertSame(successorGate, firstFrame.gate)
+        assertFalse(successorGate.isReleased)
+        assertEquals(NotificationOpenRequest(target, requestId), request.value)
+        activationHold.read(1).release.countDown()
+        awaitCondition("the successor never activated its account") {
+            appState.activeAccountRef == NotificationRouteHarness.TARGET_ACCOUNT
+        }
+        runBlocking { router.route(target, requestId) }
+        val open = "open:${target.groupIdHex}"
+        assertEquals(listOf("arm", "close", "arm", "close", open, "handled:$requestId"), shell.calls.toList())
+    }
+
     /** Runs one routing pass for the inactive-account tap and waits until its exact preload is held. */
     private fun startRetiredSwitch() {
         runBlocking { router.route(target, requestId) }
@@ -244,6 +284,21 @@ class NotificationOpenRouteSeamTest {
             preloadSlot = NotificationPreloadSlot(notificationMessagePreloadKey(target, requestId)),
             currency = NotificationOpenCurrency(request, composedRuntime) { appState.runtimeGeneration },
         )
+
+    /**
+     * A router whose request and runtime readers stop at their current values, as the rememberUpdatedState
+     * readers of a shell that left composition do, over the same app state, priority owner and retained shell.
+     */
+    private fun routerWithFrozenReaders(): NotificationOpenRouter {
+        val frozen = routeState(mutableStateOf(request.value), mutableIntStateOf(appState.runtimeGeneration))
+        return NotificationOpenRouter(appState, router.chats, firstFrame, frozen, shell)
+    }
+
+    /** Shows the App Lock and dismisses it again, which unmounts and remounts the shell around a held switch. */
+    private fun lockAndUnlock() {
+        setAppStateField("setAppLockScreenVisible", Boolean::class.javaPrimitiveType!!, true)
+        setAppStateField("setAppLockScreenVisible", Boolean::class.javaPrimitiveType!!, false)
+    }
 
     /** Replaces the runtime generation, both live and as the composition last saw it. */
     private fun replaceRuntime() {

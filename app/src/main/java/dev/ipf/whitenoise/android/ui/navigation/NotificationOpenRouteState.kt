@@ -58,7 +58,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
  * - Account identity: activation runs only while the request still owns its switch, and an
  *   early-opened conversation is pinned to its target account.
  * - First-frame priority: a scoped release names its request id, and a process-scoped switch
- *   route releases only the gate object it began, so a retired route never ends a newer one.
+ *   route releases only the gate object it began, so a retired route never ends a newer one. A
+ *   switch whose gate a same-request successor released while a window stays held stands down
+ *   entirely: a shell remounted after App Lock or Activity recreation re-runs the request with
+ *   fresh slots, and request identity cannot tell the two routes apart.
  * - Card dismissal, reply-draft staging and the pinned-shortcut authority recheck stay inside the
  *   commit, around its only suspension.
  */
