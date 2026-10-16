@@ -101,6 +101,10 @@ internal fun boundedNotificationMessageText(text: CharSequence): String {
  * still on the card keeps the conversation template, which is the only standard template that holds each
  * message separately. A long newest message behind carried history therefore shows as many lines as the platform
  * gives that template, and the history stays intact. A redacted card never qualifies, since it carries no text.
+ *
+ * Android never classifies the text block as a conversation, so it trades the conversation circle for the full
+ * long body (#1901): its identity picture (#3311) shows as the right-hand thumbnail and the left circle shows the
+ * app icon. The next message returns the card to the conversation template and the picture to its circle.
  */
 internal fun shouldUseExpandedSingleMessageStyle(
     body: CharSequence,

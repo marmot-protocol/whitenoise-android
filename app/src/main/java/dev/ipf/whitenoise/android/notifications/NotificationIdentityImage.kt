@@ -72,7 +72,11 @@ internal fun Notification.recordedIdentityInputs(): Pair<String, String>? =
         inputs.getString(IDENTITY_TITLE).orEmpty() to inputs.getString(IDENTITY_SEED).orEmpty()
     }
 
-/** Puts [image] in the card's primary picture slot and records what a final-write refresh needs to redraw it. */
+/**
+ * Puts [image] in the card's primary picture slot and records what a final-write refresh needs to redraw it. The
+ * conversation template draws it in the conversation circle, and the long-message text block, which Android never
+ * classifies as a conversation, draws it as the right-hand thumbnail.
+ */
 internal fun NotificationCompat.Builder.setConversationIdentityImage(image: NotificationIdentityImage) =
     setLargeIcon(image.bitmap).addExtras(Bundle().apply { putBundle(EXTRA_IDENTITY_IMAGE, image.refreshInputs()) })
 

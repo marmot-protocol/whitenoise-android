@@ -898,7 +898,8 @@ class LocalNotificationPresenter(
                                 )
                             // #3311: every rich card carries its conversation identity picture in the first
                             // payload, for a direct chat as well as a group, and the long-message text block keeps
-                            // it, so the picture never depends on the shortcut alone. Redacted cards get none.
+                            // it as its right-hand thumbnail, so the picture never depends on the shortcut alone.
+                            // Redacted cards get none.
                             if (!redactContent) {
                                 builder.setConversationIdentityImage(
                                     notificationContent.identityImage(
@@ -1041,6 +1042,11 @@ class LocalNotificationPresenter(
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                                     // Hidden previews rewrite the card as a generic conversation, and only the
                                     // conversation template keeps Android's conversation classification.
+                                    // A long first message keeps the expandable text block so its whole body stays
+                                    // readable (#1901). Android never classifies that template as a conversation, so
+                                    // its identity picture (#3311) shows as the right-hand thumbnail while the left
+                                    // circle shows the app icon. The next message turns the card back into the
+                                    // conversation template, and the picture returns to the conversation circle.
                                     if (
                                         shouldUseExpandedSingleMessageStyle(
                                             body = notificationContent.body,
