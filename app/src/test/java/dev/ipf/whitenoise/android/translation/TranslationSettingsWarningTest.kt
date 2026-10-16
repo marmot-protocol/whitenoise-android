@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -77,6 +78,29 @@ class TranslationSettingsWarningTest {
         composeRule.onNodeWithText("Target language: Slovak").assertIsDisplayed()
         preferences.setTargetOverride("account", "group", null)
         composeRule.onNodeWithText("Target language: Slovak").assertDoesNotExist()
+        preferences.close()
+    }
+
+    /** With an unsupported global target, a chat's pending target choice survives a mode change until chosen. */
+    @Test
+    fun pendingChatTargetSurvivesAModeChangeUntilALanguageIsChosen() {
+        context
+            .getSharedPreferences("translation_choices", 0)
+            .edit()
+            .putString("target", "xx")
+            .commit()
+        val preferences = TranslationPreferences(context)
+        composeRule.setContent {
+            WhiteNoiseTheme { TranslationChatSettingsDialog("account", "group", {}) }
+        }
+        composeRule.onNode(isToggleable()).assertIsOn().performClick()
+        composeRule.onNodeWithText("Target language: Choose a language").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.translation_on)).performClick()
+        assertEquals(TranslationOverride.ON, preferences.override("account", "group"))
+        composeRule.onNodeWithText("Target language: Choose a language").performClick()
+        composeRule.onNodeWithText("Slovak").performScrollTo().performClick()
+        composeRule.onNodeWithText("Target language: Slovak").assertIsDisplayed()
+        assertEquals("sk", preferences.targetOverride("account", "group"))
         preferences.close()
     }
 
