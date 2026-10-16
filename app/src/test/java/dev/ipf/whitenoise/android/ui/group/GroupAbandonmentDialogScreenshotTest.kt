@@ -54,14 +54,15 @@ class GroupAbandonmentDialogScreenshotTest {
 
     /** The leave-blocked escape path offered after a Leave that did not finish. */
     @Test
-    fun leaveBlockedNoticeLight() {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) { GroupLeaveBlockedNotice(isDm = true, enabled = true, onAbandon = {}) }
-        }
-        composeRule
-            .onNodeWithTag("chat_info.leave_blocked")
-            .captureRoboImage("src/test/snapshots/group_abandon_leave_blocked_light.png")
-    }
+    fun leaveBlockedNoticeLight() = captureLeaveBlocked("light", isDm = true)
+
+    /** The group's leave-blocked reset notice in the dark theme. */
+    @Test
+    fun leaveBlockedNoticeDark() = captureLeaveBlocked("group_dark", isDm = false, dark = true)
+
+    /** The direct chat's leave-blocked notice at 200% text in RTL keeps its hint and action readable. */
+    @Test
+    fun leaveBlockedNoticeLargeRtl() = captureLeaveBlocked("large_rtl", isDm = true, scale = 2f, rtl = true)
 
     /** The sole-admin gate for a direct chat: Cancel and an error-coloured Abandon chat on this device. */
     @Test
@@ -128,6 +129,28 @@ class GroupAbandonmentDialogScreenshotTest {
         composeRule.onNodeWithTag("group.abandon.error").assertIsDisplayed()
         composeRule.onNodeWithTag("group.abandon.confirm").assertIsEnabled().performClick()
         assertEquals(1, confirms)
+    }
+
+    /** Composes the leave-blocked notice under the requested appearance and records it. */
+    private fun captureLeaveBlocked(
+        name: String,
+        isDm: Boolean,
+        dark: Boolean = false,
+        scale: Float = 1f,
+        rtl: Boolean = false,
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = scale) {
+                    GroupLeaveBlockedNotice(isDm = isDm, enabled = true, onAbandon = {})
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag("chat_info.leave_blocked")
+            .captureRoboImage("src/test/snapshots/group_abandon_leave_blocked_$name.png")
     }
 
     /** Composes the sole-admin gate under the requested appearance and records its window. */
