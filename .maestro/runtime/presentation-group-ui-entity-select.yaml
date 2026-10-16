@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-entity-select
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture entities
+- assertVisible:
+    text: Fixture member
+- tapOn: Fixture member
+- assertVisible:
+    id: presentation.complete

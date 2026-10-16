@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionBootReceiver
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
@@ -46,6 +47,9 @@ class MaestroFixtureApplication : WhiteNoiseApplication() {
                 ComponentName(this, BackgroundConnectionBootReceiver::class.java),
             ) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
         ) { "Production boot receiver must be disabled for the isolated native fixture" }
+        // The production decoder facade needs its real permissionless IPC transport.
+        // Keep production scheduling omitted; missing codec installation only showed filename fallbacks.
+        IsolatedMediaDecoder.install(this)
         DictationDiagnostics.attach(this)
         PerformanceDiagnostics.bind(this)
         VoicePlaybackController.attach(this)

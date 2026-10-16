@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-startup-diagnostics-terminal
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: startup-failure
+- assertVisible: Disposable startup failure
+- assertVisible: '^Includes startup stages, timings and build information[.] No messages or account details[.]$'
+- assertVisible:
+    id: startup-copy-report
+    enabled: true
+- assertNotVisible:
+    id: startup-retry
+- assertNotVisible:
+    id: presentation.complete
+- assertVisible:
+    id: startup-share-diagnostics
+    enabled: true
+- tapOn:
+    id: startup-share-diagnostics
+- assertVisible:
+    id: presentation.complete

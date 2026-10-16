@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-details-removemember
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Remove member\?
+- assertVisible:
+    text: Fixture successor will lose access to this chat\. They will not be notified\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Remove member\?
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Remove member\?
+- back
+- assertNotVisible:
+    text: Remove member\?
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Remove member\?
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

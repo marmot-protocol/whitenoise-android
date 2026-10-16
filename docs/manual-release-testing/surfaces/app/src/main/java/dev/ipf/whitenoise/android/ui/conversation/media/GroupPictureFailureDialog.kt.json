@@ -1,0 +1,83 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupPictureFailureDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "fun GroupPictureFailureDialog(",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "R.string.toast_couldnt_update_group",
+        "test_ids": [
+          "MED-015"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-003"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GroupPictureFailureDialog.kt",
+        "anchor": "R.string.toast_couldnt_update_group",
+        "test_ids": [
+          "GRP-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

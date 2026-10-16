@@ -1,0 +1,29 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: navigation-kept-clear
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible:
+    text: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- longPressOn:
+    text: Generated fixture message
+- assertVisible:
+    text: Keep on screen
+- tapOn: Keep on screen
+- assertVisible:
+    id: kept-message.card
+- assertVisible:
+    id: kept-message.text
+- tapOn:
+    id: kept-message.menu
+- assertVisible:
+    text: Go to Message
+- assertVisible:
+    text: Remove this message
+- assertVisible:
+    text: Clear all kept messages
+- tapOn: Clear all kept messages
+- assertNotVisible:
+    id: kept-message.card
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

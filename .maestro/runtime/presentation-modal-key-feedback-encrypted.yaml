@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-key-feedback-encrypted
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Couldn't create encrypted backup
+- tapOn:
+    text: OK
+- assertNotVisible:
+    text: Couldn't create encrypted backup
+- tapOn:
+    text: Reopen key feedback
+- assertVisible:
+    text: Couldn't create encrypted backup
+- back
+- assertNotVisible:
+    text: Couldn't create encrypted backup
+- tapOn:
+    text: Finish key feedback check
+- assertVisible:
+    id: presentation.complete

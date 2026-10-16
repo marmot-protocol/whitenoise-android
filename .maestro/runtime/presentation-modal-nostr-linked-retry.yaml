@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-nostr-linked-retry
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Couldn’t load this image\. Try again\.
+- assertVisible: Retry
+- tapOn: Retry
+- assertVisible: Image
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

@@ -126,6 +126,14 @@
         "test_ids": [
           "GRP-028"
         ]
+      },
+      {
+        "surface": "Stable native-popup render target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "stableRenderTarget = true",
+        "test_ids": [
+          "SCR-001"
+        ]
       }
     ]
   },

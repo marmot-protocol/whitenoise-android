@@ -1,0 +1,39 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-local-delete-readonly
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture local deletion needs attention
+- tapOn:
+    text: Details
+- assertVisible:
+    id: local-delete-details
+- assertVisible:
+    text: Fixture local deletion diagnostic report
+- tapOn:
+    text: Dismiss
+- assertNotVisible:
+    id: local-delete-details
+- tapOn:
+    text: Details
+- assertVisible:
+    id: local-delete-details
+- back
+- assertNotVisible:
+    id: local-delete-details
+- tapOn:
+    text: Details
+- assertVisible:
+    id: local-delete-details
+- assertNotVisible:
+    text: Copy
+- tapOn:
+    text: Dismiss
+- assertNotVisible:
+    id: local-delete-details
+- tapOn:
+    text: Dismiss
+    childOf:
+      id: modal.delete-snackbar
+- assertVisible:
+    id: presentation.complete

@@ -121,22 +121,6 @@
         ]
       },
       {
-        "surface": "R.string.cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
-        "surface": "R.string.error_try_again",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.error_try_again",
-        "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
         "surface": "R.string.group_photo_error",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "R.string.group_photo_error",
@@ -161,19 +145,11 @@
         ]
       },
       {
-        "surface": "R.string.retry",
+        "surface": "Shared modal presentation: GroupPictureFailureDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.retry",
+        "anchor": "GroupPictureFailureDialog(",
         "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
-        "surface": "R.string.toast_couldnt_update_group",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.toast_couldnt_update_group",
-        "test_ids": [
-          "GRP-003"
+          "MED-015"
         ]
       },
       {

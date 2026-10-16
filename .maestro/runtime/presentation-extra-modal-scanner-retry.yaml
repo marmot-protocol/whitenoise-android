@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-scanner-retry
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Camera is unavailable.
+- assertVisible:
+    text: Fixture camera binding failure
+- tapOn: Retry
+- assertVisible:
+    id: presentation.complete

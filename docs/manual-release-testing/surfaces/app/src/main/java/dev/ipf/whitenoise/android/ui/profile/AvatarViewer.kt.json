@@ -63,6 +63,15 @@
     ],
     "source_coverage": [
       {
+        "surface": "Avatar viewer window exports animation selectors in test builds",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": ".exposePerformanceTestTags()",
+        "test_ids": [
+          "PRO-001",
+          "PRO-006"
+        ]
+      },
+      {
         "surface": "Scroll boundaries: AvatarViewer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
         "anchor": ".scrollEdgeFade(",
@@ -71,6 +80,16 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Stable native-popup render target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "stableRenderTarget = true",
+        "test_ids": [
+          "SCR-001"
         ]
       }
     ]

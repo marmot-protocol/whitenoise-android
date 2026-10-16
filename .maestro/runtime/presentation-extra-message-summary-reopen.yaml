@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-message-summary-reopen
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Delete for me
+- back
+- assertVisible: Fixture summary menu
+- tapOn: Fixture summary menu
+- assertVisible: Delete for me
+- tapOn: Delete for me
+- assertVisible:
+    id: presentation.complete

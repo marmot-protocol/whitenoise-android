@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-startup-destination-loading
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: full-screen-loading
+- assertVisible: Waiting for disposable fixture

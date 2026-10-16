@@ -1,0 +1,41 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-scan-public
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    id: onboarding.sign_in.scan
+- assertVisible:
+    text: Fixture scanner session
+- tapOn:
+    text: Deliver decoded result
+- assertVisible:
+    id: onboarding.sign_in.scan_error
+- assertVisible:
+    text: That's a public key\. Enter your secret key \(nsec\) to sign in\.
+- tapOn:
+    text: OK
+- assertNotVisible:
+    id: onboarding.sign_in.scan_error
+- tapOn:
+    id: onboarding.sign_in.scan
+- assertVisible:
+    text: Fixture scanner session
+- tapOn:
+    text: Deliver previous scanner result
+- assertVisible:
+    text: Fixture scanner session
+- assertNotVisible:
+    id: onboarding.sign_in.scan_error
+- tapOn:
+    text: Deliver decoded result
+- assertVisible:
+    id: onboarding.sign_in.scan_error
+- assertVisible:
+    text: That's a public key\. Enter your secret key \(nsec\) to sign in\.
+- back
+- assertNotVisible:
+    id: onboarding.sign_in.scan_error
+- tapOn:
+    text: Finish scanner check
+- assertVisible:
+    id: presentation.complete

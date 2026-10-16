@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-details-leavesolemember
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Leave Fixture confirmation group\?
+- assertVisible:
+    text: You're the only member\. Leaving deletes this group entirely\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Leave Fixture confirmation group\?
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Leave Fixture confirmation group\?
+- back
+- assertNotVisible:
+    text: Leave Fixture confirmation group\?
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Leave Fixture confirmation group\?
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

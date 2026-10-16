@@ -384,7 +384,7 @@ private fun SettingsGroupScope.relayPublicationAction(
 /** One relay: its host, address and the lists it serves, with Use-for switches and Remove relay. */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
-private fun RelayDetailsScreen(
+internal fun RelayDetailsScreen(
     relay: AccountRelay,
     lists: AccountRelayListsFfi?,
     busy: Boolean,

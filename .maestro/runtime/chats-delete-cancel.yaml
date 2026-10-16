@@ -8,6 +8,8 @@ name: chats-delete-cancel
 - assertVisible: "Pin"
 - tapOn: "Delete from this device"
 - assertVisible: "Delete from this device"
+- assertVisible:
+    id: "confirmation.confirm"
 - tapOn: "Cancel"
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"

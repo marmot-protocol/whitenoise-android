@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
 internal data class TtsSentenceChoice(
     val revision: String,
@@ -49,7 +50,7 @@ internal fun ttsSentenceAccessibilityActions(
     val chooseLabel = stringResource(R.string.tts_choose_sentence)
     if (choosing && choices.isNotEmpty()) {
         AlertDialog(
-            modifier = Modifier.testTag("tts_sentence_chooser"),
+            modifier = Modifier.testTag("tts_sentence_chooser").exposePerformanceTestTags(),
             onDismissRequest = { choosing = false },
             title = { Text(chooseLabel) },
             text = {
