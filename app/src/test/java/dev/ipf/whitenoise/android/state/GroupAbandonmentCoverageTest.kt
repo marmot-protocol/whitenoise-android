@@ -124,6 +124,7 @@ class GroupAbandonmentCoverageTest {
                 .substringAfter("fun abandonmentDepartureCallbacks(")
                 .substringBefore("\n\n")
         assertTrue("each step uses the row action's forget", "abandonChatFromList(" in steps)
+        assertTrue("the batch alone reports each chat and owns its Retry", "reportedByBatch = true" in steps)
         DEPARTURES.forEach { assertFalse("bulk abandonment must not call $it", it in steps) }
         assertFalse("bulk abandonment must not delete locally", "deleteGroupLocalFromChatList" in steps)
     }

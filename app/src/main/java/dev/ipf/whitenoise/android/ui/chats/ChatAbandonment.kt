@@ -73,8 +73,8 @@ internal fun abandonmentAccountName(
 
 /**
  * The chat-list bulk abandonment's batch steps (#3310). There is no handover to prepare or choose, and each reviewed
- * chat goes through the same journaled forget as the row action, in abandonment wording, without a per-chat success
- * notice: the batch dialog reports the outcome, and a failure keeps its own notice and retry.
+ * chat goes through the same journaled forget as the row action, in abandonment wording. The batch dialog reports
+ * every outcome and owns the one Retry for unfinished chats, so no step posts its own success or failure notice.
  */
 internal fun abandonmentDepartureCallbacks(
     controller: ChatsController,
@@ -83,7 +83,7 @@ internal fun abandonmentDepartureCallbacks(
     ChatDepartureCallbacks(
         prepare = { emptyList() },
         choose = { _, _ -> null },
-        remove = { target, _ -> controller.abandonChatFromList(target.groupId, target.isDm, notify = false) },
+        remove = { target, _ -> controller.abandonChatFromList(target.groupId, target.isDm, reportedByBatch = true) },
         onProgress = onProgress,
     )
 

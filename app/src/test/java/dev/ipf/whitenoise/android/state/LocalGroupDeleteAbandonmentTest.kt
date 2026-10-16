@@ -166,16 +166,21 @@ class LocalGroupDeleteAbandonmentTest {
             assertEquals("the batch dialog reports the outcome", null, fixture.state.transientNotice)
         }
 
-    /** A failed bulk step reports unfinished for the batch's retry and keeps the reset wording in its notice. */
+    /**
+     * A failed bulk step reports unfinished to the batch, which shows the reset wording and owns the one Retry, so the
+     * step posts no notice of its own whose Retry would bypass the batch's busy set. The row is restored.
+     */
     @Test
-    fun failedBulkAbandonmentStepStaysUnfinishedInResetWording() =
+    fun failedBulkAbandonmentStepLeavesReportingToTheBatch() =
         runTest {
             val fixture = fixture("forgetGroupLocal")
             val steps = abandonmentDepartureCallbacks(fixture.controller)
             assertFalse(steps.remove(ChatDepartureTarget(GROUP, "Hiking club", isDm = false), null))
+            flushLocalDeleteChatRows()
             assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
-            assertEquals(AppText.Resource(R.string.toast_couldnt_reset_group), fixture.state.toast?.title)
-            assertEquals(AppText.Resource(R.string.local_reset_retry_detail), fixture.state.toast?.detail)
+            assertTrue("the failed chat is restored", fixture.controller.items.any { it.id == GROUP })
+            assertEquals("the batch dialog is the only failure report", null, fixture.state.toast)
+            assertEquals(null, fixture.state.transientNotice)
         }
 
     /** A failed media listing never blocks abandonment: the forget runs once and only media keys are skipped. */

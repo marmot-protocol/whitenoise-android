@@ -5,9 +5,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatDepartureStage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -32,6 +35,25 @@ class ChatDepartureStatusScreenshotTest {
 
     @Test fun largeRtlPartialFailure() = capture("large_rtl", scale = 2f, rtl = true)
 
+    /** #3310: an abandonment batch reports each unfinished chat in abandonment wording, never as a departure. */
+    @Test
+    fun abandonmentBatchReportsUnfinishedChatsInAbandonmentWording() {
+        val app = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val targets =
+            listOf(
+                ChatDepartureTarget("dm", "Alice", isDm = true),
+                ChatDepartureTarget("group", "Hiking club", isDm = false),
+            )
+        val result =
+            ChatDepartureBatchResult(mapOf("dm" to ChatDepartureOutcome.FAILED, "group" to ChatDepartureOutcome.FAILED))
+        composeRule.setContent {
+            WhiteNoiseTheme { ChatDepartureResultContent(result, targets, emptyMap(), abandon = true) }
+        }
+        composeRule.onNodeWithText("Alice: ${app.getString(R.string.toast_couldnt_abandon_chat)}").assertExists()
+        composeRule.onNodeWithText("Hiking club: ${app.getString(R.string.toast_couldnt_reset_group)}").assertExists()
+    }
+
+    /** Renders the partial-failure result in the requested appearance and records its baseline. */
     private fun capture(
         name: String,
         dark: Boolean = false,

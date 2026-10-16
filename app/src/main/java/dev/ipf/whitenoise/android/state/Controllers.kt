@@ -4989,7 +4989,7 @@ class ChatsController private constructor(
                     }
                 }
                 if (failure is CancellationException) throw failure
-                if (isCurrent()) {
+                if (isCurrent() && observer.presentsFailure) {
                     // The retry keeps this removal's wording, so a retried abandonment never reads as a delete.
                     appState.presentLocalDeleteFailure(
                         wording.failureTitle,
@@ -5004,8 +5004,8 @@ class ChatsController private constructor(
                                 )
                             },
                     )
-                    observer.onFailure(failure)
                 }
+                if (isCurrent()) observer.onFailure(failure)
                 false
             } else if (isCurrent()) {
                 val success = wording.success.takeIf { notify }

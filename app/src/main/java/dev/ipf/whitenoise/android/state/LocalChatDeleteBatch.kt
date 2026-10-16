@@ -2,12 +2,17 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.R
 
-/** Shared confirmation lifetime; outcomes distinguish failed deletion from deferred client cleanup. */
+/**
+ * Shared confirmation lifetime; outcomes distinguish failed deletion from deferred client cleanup. A caller that
+ * reports failures itself, such as the bulk abandonment's batch dialog, clears [presentsFailure] so a failed chat has
+ * one report and one Retry, not a second notice whose Retry would bypass the batch's busy set.
+ */
 internal class LocalChatDeleteObserver(
     val onFailure: (Throwable) -> Unit = {},
     val onCleanupDeferred: () -> Unit = {},
     val readinessBudget: LocalGroupDeleteReadinessBudget = LocalGroupDeleteReadinessBudget(),
     val onNativeCommitted: () -> Unit = {},
+    val presentsFailure: Boolean = true,
 )
 
 internal data class LocalChatDeleteBatchResult(
