@@ -1,9 +1,16 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -11,9 +18,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * #3310: one rule decides where abandonment is offered. Only MDK's confirmation that the account left, was removed
- * or the group is disbanded withdraws it, so a leave that stays queued or a disband that never converges keeps the
- * escape path on the row menu, the bulk bar and Group Details alike.
+ * #3310: one rule decides where abandonment is offered, and the review names the account captured with it. Only
+ * MDK's confirmation that the account left, was removed or the group is disbanded withdraws it, so a leave that stays
+ * queued or a disband that never converges keeps the escape path on the row menu, the bulk bar and Group Details.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -52,6 +59,29 @@ class ChatAbandonmentEligibilityTest {
         }
         assertFalse("Details reads the same group rule", confirmed.first().group.offersLocalAbandonment())
         assertFalse("disbanded groups too", leftScopeRow("gone").group.copy(disbanded = true).offersLocalAbandonment())
+    }
+
+    /** The review names the captured account, not whichever account is active when it renders. */
+    @Test
+    fun reviewNamesTheCapturedAccountRatherThanTheActiveOne() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val accounts =
+            listOf(
+                AccountSummaryFfi("active-ref", "a".repeat(64), true, false, false, true),
+                AccountSummaryFfi("captured-ref", "c".repeat(64), true, false, false, true),
+            )
+        val app =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = DraftStore.forContext(context),
+                accountIdHexResolver = { null },
+                accounts = accounts,
+                activeAccountRef = "active-ref",
+            )
+        val captured = abandonmentAccountName(app, "captured-ref")
+        assertEquals(app.accountDisplayNameCached("c".repeat(64)), captured)
+        assertNotEquals(app.accountDisplayNameCached("a".repeat(64)), captured)
+        assertEquals("an unknown reference names itself", "gone-ref", abandonmentAccountName(app, "gone-ref"))
     }
 
     /** A read-only invite declines instead, on both surfaces, and an empty selection offers nothing. */

@@ -117,8 +117,10 @@ class GroupAbandonmentCoverageTest {
         assertTrue("the busy set fences duplicate taps", "leavingAndDeleting" in selection)
         assertTrue("the captured request owns the batch", "PendingChatDeparture(" in selection)
         assertTrue("the batch abandons", "abandon = true" in selection)
+        assertTrue("no review without an acting account", "controller.accountRef != null" in selection)
         val dialog = source("ui/chats/ChatDepartureBatchDialog.kt")
         assertTrue("the batch uses the abandonment steps", "abandonmentDepartureCallbacks(controller" in dialog)
+        assertTrue("an identity-less review closes instead", "abandonmentTargets.isEmpty()" in dialog)
         val steps =
             source("ui/chats/ChatAbandonment.kt")
                 .substringAfter("fun abandonmentDepartureCallbacks(")

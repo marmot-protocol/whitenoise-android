@@ -65,11 +65,17 @@ internal class PendingChatAbandonment private constructor(
     }
 }
 
-/** The acting account a confirmation names: its cached display name, else the account reference itself. */
+/**
+ * The acting account a confirmation names, resolved from the captured [account] reference rather than whichever
+ * account is active now: its cached display name, else the reference itself.
+ */
 internal fun abandonmentAccountName(
     appState: WhiteNoiseAppState,
     account: String,
-): String = appState.activeAccount?.accountIdHex?.let(appState::accountDisplayNameCached) ?: account
+): String {
+    val accountIdHex = appState.accounts.firstOrNull { it.label == account }?.accountIdHex
+    return accountIdHex?.let(appState::accountDisplayNameCached) ?: account
+}
 
 /**
  * The chat-list bulk abandonment's batch steps (#3310). There is no handover to prepare or choose, and each reviewed

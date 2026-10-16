@@ -1659,9 +1659,10 @@ internal fun ChatsScreen(
                 val selectionAccount = appState.activeAccountRef
                 val selectionRuntime = appState.runtimeGeneration
                 val selectionIds = selectedChatIds.toSet()
+                // The review names the acting account, so a selection with no bound account offers nothing.
                 val abandonableSelection =
                     selectedVisibleItems
-                        .takeIf { it.offerLocalAbandonment() }
+                        .takeIf { controller.accountRef != null && it.offerLocalAbandonment() }
                         ?.map { it.isDm() }
                 dev.ipf.whitenoise.android.ui.common.AdaptiveContent(
                     Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
@@ -1720,7 +1721,7 @@ internal fun ChatsScreen(
                                 return@ChatListSelectionControls
                             }
                             val selected = selectedVisibleItems
-                            if (selected.offerLocalAbandonment()) {
+                            if (controller.accountRef != null && selected.offerLocalAbandonment()) {
                                 pendingLeaveAndDelete =
                                     PendingChatDeparture(selected, controller, appState, groupTitleCopy, abandon = true)
                             }

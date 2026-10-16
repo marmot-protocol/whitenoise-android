@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -168,7 +169,8 @@ private fun PendingChatDeparture.actionLabel(): Int =
 
 /**
  * The confirmation before anything is submitted. An abandonment uses the shared review that names every chat and the
- * acting account (#3282), and a departure keeps its handover-aware confirmation.
+ * acting account (#3282), and closes instead when it was captured without an account, and a departure keeps its
+ * handover-aware confirmation.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -179,7 +181,12 @@ private fun ChatDepartureReview(
     onDismiss: () -> Unit,
 ) {
     if (request.abandon) {
-        GroupAbandonmentDialog(targets = request.abandonmentTargets, onConfirm = onConfirm, onDismiss = onDismiss)
+        // Never review an abandonment without its acting account and chats, captured with the request.
+        if (request.abandonmentTargets.isEmpty()) {
+            LaunchedEffect(request) { onDismiss() }
+        } else {
+            GroupAbandonmentDialog(targets = request.abandonmentTargets, onConfirm = onConfirm, onDismiss = onDismiss)
+        }
     } else {
         ConfirmDialog(
             title = actionLabel,
