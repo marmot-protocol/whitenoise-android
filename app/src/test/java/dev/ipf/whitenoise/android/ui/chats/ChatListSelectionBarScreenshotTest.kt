@@ -108,6 +108,17 @@ class ChatListSelectionBarScreenshotTest {
             abandonLabel = R.string.chats_abandon_action,
         )
 
+    /** The several-chat abandonment on AMOLED keeps its destructive container distinct from the black surface. */
+    @Test
+    fun abandonAmoled() =
+        capture(
+            "selection_actions_abandon_amoled",
+            dark = true,
+            amoled = true,
+            departureLabel = R.string.leave_and_delete,
+            abandonLabel = R.string.chats_abandon_action,
+        )
+
     /** Several direct chats' abandonment at 200% text in RTL keeps both destructive actions reachable. */
     @Test
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
