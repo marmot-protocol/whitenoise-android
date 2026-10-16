@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
@@ -22,6 +22,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.Layout
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /** The pinned top-bar scroll behaviour a [WhiteNoiseScaffold] shares with its [WhiteNoiseTopBar]. */
@@ -55,10 +56,11 @@ fun WhiteNoiseScaffold(
         Scaffold(
             modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
-                Column {
-                    topBar()
-                    if (topNoticeSlot) TopNoticeSlot()
-                }
+                ScaffoldTopBarWithNoticeSlot(
+                    contentWindowInsets = contentWindowInsets,
+                    topNoticeSlot = topNoticeSlot,
+                    topBar = topBar,
+                )
             },
             bottomBar = bottomBar,
             floatingActionButton = floatingActionButton,
@@ -68,6 +70,39 @@ fun WhiteNoiseScaffold(
             contentWindowInsets = contentWindowInsets,
             content = content,
         )
+    }
+}
+
+/**
+ * A scaffold's top-bar slot that hosts the screen's temporary-banner slot directly below [topBar] (#3312).
+ *
+ * A material scaffold hands its content the top window inset only when the top-bar slot measures to nothing, and
+ * this slot always measures, so a screen with no top bar would otherwise lose its status-bar and cutout padding.
+ * When [topBar] composes nothing, this layout pads [contentWindowInsets]' top itself, above the banner slot, so
+ * the content keeps the inset a plain scaffold would give it and a banner still lands below the status bar. A bar
+ * that is present owns that inset, as every app bar does, and nothing is added. Screens that use a plain material
+ * scaffold with a bar that is sometimes absent can place this in their own top-bar slot.
+ */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+fun ScaffoldTopBarWithNoticeSlot(
+    contentWindowInsets: WindowInsets,
+    topNoticeSlot: Boolean = true,
+    topBar: @Composable () -> Unit,
+) {
+    Layout(
+        content = {
+            Box { topBar() }
+            Box { if (topNoticeSlot) TopNoticeSlot() }
+        },
+    ) { measurables, constraints ->
+        val bar = measurables[0].measure(constraints)
+        val slot = measurables[1].measure(constraints)
+        val inset = if (bar.height == 0) contentWindowInsets.getTop(this) else 0
+        layout(maxOf(bar.width, slot.width), inset + bar.height + slot.height) {
+            bar.placeRelative(0, inset)
+            slot.placeRelative(0, inset + bar.height)
+        }
     }
 }
 

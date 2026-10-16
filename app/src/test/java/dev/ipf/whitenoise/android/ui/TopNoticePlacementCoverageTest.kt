@@ -70,9 +70,14 @@ class TopNoticePlacementCoverageTest {
     /** Scaffold slots sit directly below the top bar, and every opt-out names the slot that replaces it. */
     @Test
     fun everyScaffoldOptOutHasItsOwnSlot() {
-        val scaffold = mainSource("ui/common/WhiteNoiseScaffold.kt").functionBody("WhiteNoiseScaffold")
-        val topBar = scaffold.indexOf("topBar()")
-        assertTrue("the slot follows the bar", scaffold.indexOf("TopNoticeSlot()") > topBar && topBar >= 0)
+        val scaffoldSource = mainSource("ui/common/WhiteNoiseScaffold.kt")
+        val scaffold = scaffoldSource.functionBody("WhiteNoiseScaffold")
+        assertTrue("the scaffold's bar slot hosts the banner slot", "ScaffoldTopBarWithNoticeSlot(" in scaffold)
+        val barSlot = scaffoldSource.functionBody("ScaffoldTopBarWithNoticeSlot")
+        val topBar = barSlot.indexOf("topBar()")
+        assertTrue("the slot follows the bar", barSlot.indexOf("TopNoticeSlot()") > topBar && topBar >= 0)
+        val insetGuard = "if (bar.height == 0) contentWindowInsets.getTop(this) else 0"
+        assertTrue("a bar-less scaffold must keep its top inset under the slot", insetGuard in barSlot)
 
         val conversation = mainSource("ui/conversation/ConversationScreen.kt")
         assertTrue("topNoticeSlot = false" in conversation)
