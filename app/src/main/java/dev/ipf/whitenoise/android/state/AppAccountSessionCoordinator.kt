@@ -32,7 +32,6 @@ internal data class PreparedAccountSessionActivation(
 /** Android/native adapters; ordering, cancellation and late-result admission belong to the coordinator. */
 internal interface AppAccountSessionActivation {
     val activeAccount: String?
-    val currentRuntimeGeneration: Int
 
     /** Restores sign-in and prepares local data without publishing a different active account. */
     suspend fun prepare(
@@ -71,7 +70,7 @@ internal interface AppAccountSessionActivation {
     fun isInForeground(): Boolean
 }
 
-/** Captured before suspension so recomposition cannot replace the controller handles being drained. */
+/** Captures controller handles before their suspending drain so recomposition cannot replace them. */
 internal data class AccountSessionTeardown(
     val restartNotifications: Boolean,
     val invalidateActiveSession: () -> Unit,
@@ -183,7 +182,7 @@ internal class AppAccountSessionCoordinator(
         switching: Boolean,
     ) {
         val isCurrent = {
-            activation.currentRuntimeGeneration == runtimeGeneration &&
+            activation.canPublish(request.label, runtimeGeneration) &&
                 activation.activeAccount == request.label && handoff.isCurrent(generation)
         }
         if (!isCurrent()) return
@@ -199,7 +198,9 @@ internal class AppAccountSessionCoordinator(
     }
 
     /** Fences the runtime, drains captured controllers, then joins the existing listener owner. */
-    suspend fun prepareForAccountTeardown(capture: () -> AccountSessionTeardown): Boolean {
+    suspend fun prepareForAccountTeardown(capture: suspend () -> AccountSessionTeardown): Boolean {
+        // Invalidate suspended selections before setup cancellation can suspend inside capture.
+        handoff.beginRequest()
         val teardown = capture()
         teardown.invalidateActiveSession()
         teardown.closeControllers()

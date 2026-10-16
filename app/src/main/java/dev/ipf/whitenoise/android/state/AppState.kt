@@ -3394,10 +3394,10 @@ class WhiteNoiseAppState private constructor(
     /** Fences runtime recovery and drains account subscriptions before the destructive engine wipe. */
     private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean =
         accountSession.prepareForAccountTeardown {
-            // Invalidate recovery before the first suspension; retain the exact old controller handles.
-            accountSetup.close()
+            // Fence recovery before setup cancellation suspends; capture controller handles before their drain.
             notificationRuntimeRecovery.advance()
             networkNotificationRecoverySuppressed = true
+            accountSetup.close()
             val restartNotifications =
                 backgroundConnectionEnabled ||
                     notificationJob.isActive() ||
@@ -6125,7 +6125,6 @@ class WhiteNoiseAppState private constructor(
     /** Adapts existing MDK reads and Android publication without owning another account lifetime. */
     private inner class AccountSessionActivation : AppAccountSessionActivation {
         override val activeAccount: String? get() = activeAccountRef
-        override val currentRuntimeGeneration: Int get() = runtimeGeneration
 
         /** Restores native sign-in and reads the selected policy's local projection before publication. */
         override suspend fun prepare(
@@ -6149,7 +6148,8 @@ class WhiteNoiseAppState private constructor(
         }
 
         /** Retains the native deletion/sign-out admission check in the facade's current account snapshot. */
-        override fun canPublish(label: String, runtime: Int): Boolean = canPublishAccountActivation(label, runtime)
+        override fun canPublish(label: String, runtime: Int): Boolean =
+            !networkNotificationRecoverySuppressed && canPublishAccountActivation(label, runtime)
 
         /** Hides platform share targets before publishing a different active account. */
         override suspend fun hidePreviousAccountShortcuts() = hideConversationShortcutsFromDirectShare()
@@ -8860,9 +8860,12 @@ class WhiteNoiseAppState private constructor(
 
     fun launchVerifiedAppSelfUpdate(context: Context = appContext): Boolean = appSelfUpdateFlow.launchInstall(context) { appSelfUpdateState = it }
 
+    /** Publishes native settings only for the same account selection and runtime that requested them. */
     suspend fun refreshLocalNotificationSettings() {
         val account = activeAccountRef
-        localNotificationSettings =
+        val activationGeneration = accountSwitchHandoff.capture()
+        val requestRuntimeGeneration = runtimeGeneration
+        val settings =
             if (account == null) {
                 null
             } else {
@@ -8870,6 +8873,12 @@ class WhiteNoiseAppState private constructor(
                     marmotIo { notificationSettings(account) }
                 }.getOrNull()
             }
+        if (
+            activeAccountRef == account && runtimeGeneration == requestRuntimeGeneration &&
+            accountSwitchHandoff.isCurrent(activationGeneration)
+        ) {
+            localNotificationSettings = settings
+        }
     }
 
     internal suspend fun sendNotificationReply(

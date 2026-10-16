@@ -143,6 +143,24 @@ class AppAccountSessionCoordinatorTest {
             assertFalse(host.events.any { it.startsWith("delivery:") })
         }
 
+    /** Revoked account admission stops deferred service work even before the visible label changes. */
+    @Test
+    fun revokedAccountCannotStartPostFrameRefreshes() =
+        runTest {
+            val host = Activation()
+            val owner = coordinator(backgroundScope, host)
+            val frame = CompletableDeferred<Unit>()
+            val activation =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("next"), awaitPostActivationWork = { frame.await() })
+                }
+            host.publicationAllowed = false
+            frame.complete(Unit)
+            assertNotNull(activation.await())
+            assertFalse(host.events.contains("privacy"))
+            assertFalse(host.events.any { it.startsWith("delivery:") })
+        }
+
     /** A newer same-label request must fence the earlier request's delayed post-frame work. */
     @Test
     fun sameAccountReactivationFencesOlderFrameCompletion() =
@@ -203,12 +221,20 @@ class AppAccountSessionCoordinatorTest {
     fun teardownFencesBeforeSuspensionAndWaitsForControllersBeforeListenerOwner() =
         runTest {
             val events = mutableListOf<String>()
+            val setupRelease = CompletableDeferred<Unit>()
             val controllerRelease = CompletableDeferred<Unit>()
-            val owner = coordinator(backgroundScope, Activation(), events)
+            val oldReadRelease = CompletableDeferred<Unit>()
+            val host = Activation().apply { beforePrepare = { oldReadRelease.await() } }
+            val owner = coordinator(backgroundScope, host, events)
+            val oldActivation =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("old-selection"))
+                }
             val teardown =
                 async(UnconfinedTestDispatcher(testScheduler)) {
                     owner.prepareForAccountTeardown {
                         events += "capture"
+                        setupRelease.await()
                         AccountSessionTeardown(
                             restartNotifications = true,
                             invalidateActiveSession = { events += "invalidate" },
@@ -219,6 +245,12 @@ class AppAccountSessionCoordinatorTest {
                         )
                     }
                 }
+            assertEquals(listOf("capture"), events)
+            oldReadRelease.complete(Unit)
+            assertNull(oldActivation.await())
+            assertEquals("original", host.activeAccount)
+            assertFalse(teardown.isCompleted)
+            setupRelease.complete(Unit)
             assertEquals(listOf("capture", "invalidate", "controllers"), events)
             assertFalse(teardown.isCompleted)
             controllerRelease.complete(Unit)
@@ -350,9 +382,10 @@ class AppAccountSessionCoordinatorTest {
     /** Records adapter effects while production code owns ordering and lifetime admission. */
     private class Activation : AppAccountSessionActivation {
         override var activeAccount: String? = "original"
-        override var currentRuntimeGeneration = 1
+        var currentRuntimeGeneration = 1
         val events = mutableListOf<String>()
         var foreground = true
+        var publicationAllowed = true
         var beforePrepare: suspend (String) -> Unit = {}
         var beforeHide: suspend () -> Unit = {}
         var beforePrivacy: suspend () -> Unit = {}
@@ -370,7 +403,8 @@ class AppAccountSessionCoordinatorTest {
         }
 
         /** Models the existing native/runtime admission result. */
-        override fun canPublish(label: String, runtime: Int): Boolean = runtime == currentRuntimeGeneration
+        override fun canPublish(label: String, runtime: Int): Boolean =
+            publicationAllowed && runtime == currentRuntimeGeneration
 
         /** Exposes the last suspending platform step before publication. */
         override suspend fun hidePreviousAccountShortcuts() {
