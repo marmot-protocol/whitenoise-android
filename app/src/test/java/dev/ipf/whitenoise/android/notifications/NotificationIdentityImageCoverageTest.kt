@@ -140,6 +140,28 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("and so does its recency", "shortcutLastUsed.remove(" in forget)
     }
 
+    /**
+     * A group's Marmot encrypted picture has no URL, so the late refresh loads it through the group avatar's own MDK
+     * download and decoded cache, only for a group, never while the app lock shows, and within the same time bound
+     * as a URL picture.
+     */
+    @Test
+    fun lateGroupIdentityLoadsTheEncryptedGroupPicture() {
+        val appState = File(notificationsRoot().parentFile, "state/AppState.kt").readText()
+        val prepare = appState.functionBody("prepareLateNotificationIdentity")
+        assertTrue("only a group card asks for the loader", "!update.isDm" in prepare)
+        assertTrue("the late sources carry it", "conversationLoader = encryptedGroupIdentityLoader(update)" in prepare)
+        val loader = appState.functionBody("encryptedGroupIdentityLoader")
+        assertTrue("through the group avatar cache", "GroupAvatarImageLoader" in loader)
+        assertTrue("and MDK's encrypted download", "downloadGroupBlossomImage(" in loader)
+        assertTrue("nothing decrypts behind the lock", loader.split("appLockScreenVisible").size - 1 >= 2)
+        val presenter = source("LocalNotificationPresenter.kt")
+        val start = presenter.indexOf("private suspend fun resolveAvatars(")
+        val resolve = presenter.substring(start, presenter.indexOf("\n\n", start))
+        assertTrue("the presenter falls back to the loader", "conversationLoader" in resolve)
+        assertTrue("within the URL picture's bound", "AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS" in resolve)
+    }
+
     /** An unchanged snapshot is re-read under the publication lock before only reporting use of the shortcut. */
     @Test
     fun unchangedSnapshotIsReReadUnderTheLockBeforeOnlyReportingUse() {

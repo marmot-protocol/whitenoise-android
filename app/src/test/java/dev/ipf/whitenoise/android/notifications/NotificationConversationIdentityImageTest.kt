@@ -224,6 +224,51 @@ class NotificationConversationIdentityImageTest {
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
+    /**
+     * A group whose picture is a Marmot encrypted image has no URL, so its card is first drawn with the lettered circle
+     * and the conversation loader supplies the picture as one silent rewrite of the same card.
+     */
+    @Test
+    fun lateIdentityRefreshGivesAGroupItsEncryptedPictureFromTheLoader() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts)
+            show(presenter, group())
+            val before = posts.size
+            val sources =
+                NotificationIdentityPictureSources(null, null, null, null, conversationLoader = { solid(Color.GREEN) })
+
+            assertTrue(sources.hasMissingPicture)
+            assertTrue(refreshLateIdentity(presenter, group(), sources))
+
+            assertEquals(before + 1, posts.size)
+            val card = liveCard()
+            assertEquals(Color.GREEN, identityPixel(card))
+            assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        }
+
+    /** A redacted group card never asks the loader for its encrypted picture, and nothing is written. */
+    @Test
+    fun lateIdentityRefreshNeverLoadsAGroupPictureForARedactedCard() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts)
+            presenter.show(group(), redactContent = true, shortNpub = { "npub1test" })
+            val sources =
+                NotificationIdentityPictureSources(
+                    null,
+                    null,
+                    null,
+                    null,
+                    conversationLoader = { error("a redacted card never loads a group picture") },
+                )
+
+            assertFalse(refreshLateIdentity(presenter, group(), sources))
+
+            assertEquals(1, posts.size)
+            assertNull(liveCard().getLargeIcon())
+        }
+
     /** A redacted card is never given a late picture, and nothing is written. */
     @Test
     fun lateIdentityRefreshLeavesARedactedCardAlone() =

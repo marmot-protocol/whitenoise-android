@@ -11504,8 +11504,35 @@ class WhiteNoiseAppState private constructor(
         content: LocalNotificationContent?,
     ): LateNotificationIdentity? {
         val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
-        val sources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        val urlSources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        val sources =
+            if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
+                urlSources.copy(conversationLoader = encryptedGroupIdentityLoader(update))
+            } else {
+                urlSources
+            }
         return if (content != null && sources.hasMissingPicture) LateNotificationIdentity(content, sources) else null
+    }
+
+    /**
+     * #3311: loads a group's Marmot encrypted picture, which has no URL, through the same MDK download and decoded
+     * cache the group avatar uses on screen, or null when the group record carries no such picture. Nothing is
+     * decrypted while the app lock shows, and a picture that finishes after the lock appears is dropped.
+     */
+    private suspend fun encryptedGroupIdentityLoader(update: NotificationUpdateFfi): (suspend () -> Bitmap?)? {
+        val group =
+            runCatching { marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group }.getOrNull()
+        val key = group?.let { encryptedGroupAvatarCacheKey(update.accountRef, it) } ?: return null
+        return {
+            if (appLockScreenVisible) {
+                null
+            } else {
+                GroupAvatarImageLoader
+                    .load(key) { marmotIo { downloadGroupBlossomImage(update.accountRef, group.groupIdHex) } }
+                    ?.asAndroidBitmap()
+                    ?.takeUnless { appLockScreenVisible }
+            }
+        }
     }
 
     /**

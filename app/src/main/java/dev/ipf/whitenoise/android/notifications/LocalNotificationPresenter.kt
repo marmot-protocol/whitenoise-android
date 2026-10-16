@@ -1499,12 +1499,22 @@ class LocalNotificationPresenter(
             ),
         )
 
-    /** Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it. */
+    /**
+     * Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it. A
+     * conversation picture with no URL, such as a group's encrypted image, comes from the sources' loader within the
+     * same bound as a URL picture.
+     */
     private suspend fun resolveAvatars(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?> =
         withContext(Dispatchers.Default) {
             coroutineScope {
                 val conversationAvatar =
-                    async { sources.conversationBitmap ?: avatarBitmapResolver(sources.conversationUrl) }
+                    async {
+                        sources.conversationBitmap
+                            ?: avatarBitmapResolver(sources.conversationUrl)
+                            ?: sources.conversationLoader?.let { load ->
+                                withTimeoutOrNull(AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS) { load() }
+                            }
+                    }
                 val senderAvatar = async { sources.senderBitmap ?: avatarBitmapResolver(sources.senderUrl) }
                 conversationAvatar.await() to senderAvatar.await()
             }
@@ -1621,7 +1631,8 @@ class LocalNotificationPresenter(
      * picture on the same path, which reports its use once more, since the snapshot changed. The one-report rule
      * holds for a message whose pictures are unchanged. Dismissed, read, replaced, redacted and hidden-preview
      * cards are left alone, and [isRefreshCurrent] carries the caller's account, lock and post fences up to the
-     * platform write. Returns whether the card was rewritten.
+     * platform write. No picture is fetched or decrypted unless the card still qualifies. Returns whether the card
+     * was rewritten.
      */
     internal suspend fun refreshLateIdentityImage(
         update: NotificationUpdateFfi,
@@ -1631,10 +1642,10 @@ class LocalNotificationPresenter(
         isRefreshCurrent: () -> Boolean,
     ): Boolean =
         withContext(Dispatchers.Default) {
-            val arrived =
-                arrivedPictures(pictures)?.takeIf {
-                    isRefreshCurrent() && refreshableIdentityCard(update, content) != null
-                }
+            // Nothing is fetched or decrypted for a card that can no longer take it, and the card is checked again
+            // once the pictures arrive, since it may have been dismissed, read or replaced meanwhile.
+            val refreshable = { isRefreshCurrent() && refreshableIdentityCard(update, content) != null }
+            val arrived = if (refreshable()) arrivedPictures(pictures)?.takeIf { refreshable() } else null
             if (arrived == null) {
                 false
             } else {

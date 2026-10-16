@@ -49,17 +49,20 @@ internal fun LocalNotificationContent.identityImage(
 /**
  * Where a card's two picture slots may still come from after its first post (#3311): the bitmap the first post drew,
  * authoritative when present, and the URL a missing one may resolve from. A present bitmap's URL is never fetched.
+ * [conversationLoader] supplies a group picture that has no URL, such as a Marmot encrypted group image, and is
+ * consulted only when neither the bitmap nor the URL gives one.
  */
 internal data class NotificationIdentityPictureSources(
     val conversationBitmap: Bitmap?,
     val conversationUrl: String?,
     val senderBitmap: Bitmap?,
     val senderUrl: String?,
+    val conversationLoader: (suspend () -> Bitmap?)? = null,
 ) {
-    /** True when the card was drawn without a picture that a URL may still supply. */
+    /** True when the card was drawn without a picture that a URL or the conversation loader may still supply. */
     val hasMissingPicture: Boolean
         get() =
-            (conversationBitmap == null && !conversationUrl.isNullOrBlank()) ||
+            (conversationBitmap == null && (!conversationUrl.isNullOrBlank() || conversationLoader != null)) ||
                 (senderBitmap == null && !senderUrl.isNullOrBlank())
 }
 
