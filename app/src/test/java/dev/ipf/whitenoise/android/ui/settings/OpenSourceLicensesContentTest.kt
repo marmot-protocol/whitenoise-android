@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -26,6 +28,33 @@ import org.robolectric.annotation.Config
 class OpenSourceLicensesContentTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** Notices sit under their first letter, and a lowercase name joins its capital's section. */
+    @Test
+    fun listGroupsNoticesUnderLetterHeadings() {
+        val notices =
+            listOf(
+                OpenSourceNotice("activity", "Activity", "Apache"),
+                OpenSourceNotice("errorprone", "error-prone annotations", "Apache"),
+                OpenSourceNotice("error", "Error Prone", "Apache"),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                OpenSourceLicensesContent(Result.success(notices), null, {}, {})
+            }
+        }
+        composeRule.onNodeWithText("A").assertIsDisplayed()
+        composeRule.onAllNodesWithText("E").assertCountEquals(1)
+        composeRule.onNodeWithText("error-prone annotations").assertIsDisplayed()
+    }
+
+    /** A section is the uppercase first letter, or "#" for a digit, symbol or empty name. */
+    @Test
+    fun sectionLetterIsUppercaseOrHash() {
+        assertEquals("E", noticeSection("error-prone annotations"))
+        assertEquals("#", noticeSection("2D library"))
+        assertEquals("#", noticeSection(""))
+    }
 
     /** Selecting a row forwards the full notice identity to the screen state. */
     @Test

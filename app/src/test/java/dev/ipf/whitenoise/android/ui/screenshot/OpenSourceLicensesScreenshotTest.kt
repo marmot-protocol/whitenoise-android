@@ -39,9 +39,17 @@ class OpenSourceLicensesScreenshotTest {
     @Test
     fun listDark() = capture("list_dark", dark = true)
 
+    /** Keep the touching AMOLED row seams and section headers distinct. */
+    @Test
+    fun listAmoled() = capture("list_amoled", dark = true, amoled = true)
+
+    /** Keep section headers and wrapped rows readable with large RTL text. */
+    @Test
+    fun listLargeRtl() = capture("list_large_rtl", dark = false, largeRtl = true)
+
     /** Preserve the full-text reader on the AMOLED surface. */
     @Test
-    fun selectedAmoled() = capture("text_amoled", dark = true, selected = true)
+    fun selectedAmoled() = capture("text_amoled", dark = true, amoled = true, selected = true)
 
     /** Keep retry legible with large RTL text. */
     @Test
@@ -51,6 +59,7 @@ class OpenSourceLicensesScreenshotTest {
     private fun capture(
         suffix: String,
         dark: Boolean,
+        amoled: Boolean = false,
         selected: Boolean = false,
         failed: Boolean = false,
         largeRtl: Boolean = false,
@@ -61,11 +70,21 @@ class OpenSourceLicensesScreenshotTest {
                 "Example library",
                 "Copyright Example\n\nFull licence notice text.",
             )
+        val apache = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+        val notices =
+            listOf(
+                OpenSourceNotice("activity", "Activity", apache),
+                OpenSourceNotice("arch", "Android Arch-Common", apache),
+                OpenSourceNotice("camera", "Camera Core", apache),
+                OpenSourceNotice("errorprone", "error-prone annotations", apache),
+                notice,
+                OpenSourceNotice("flatbuffers", "FlatBuffers", apache),
+            )
         val result: Result<List<OpenSourceNotice>> =
             if (failed) {
                 Result.failure(IllegalArgumentException())
             } else {
-                Result.success(listOf(notice))
+                Result.success(notices)
             }
         composeRule.setContent {
             val density = LocalDensity.current
@@ -74,7 +93,7 @@ class OpenSourceLicensesScreenshotTest {
                 LocalDensity provides Density(density.density, if (largeRtl) 2f else 1f),
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = selected) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
                     SettingsScaffold(title = title, onBack = {}) {
                         OpenSourceLicensesContent(result, if (selected) notice else null, {}, {})
                     }

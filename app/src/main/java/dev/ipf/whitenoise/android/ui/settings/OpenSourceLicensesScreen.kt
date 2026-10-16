@@ -1,12 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
@@ -18,17 +15,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -55,6 +51,7 @@ internal fun OpenSourceLicensesScreen(onBack: () -> Unit) {
     }
 }
 
+/** Shows loading, a retryable failure, the selected notice's selectable text or the sectioned list. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun OpenSourceLicensesContent(
@@ -83,19 +80,33 @@ internal fun OpenSourceLicensesContent(
                             .testTag("licenses.text"),
                 )
             }
-        else ->
-            WhiteNoiseLazyColumn(modifier = Modifier.fillMaxSize().testTag("licenses.list")) {
-                items(notices.getOrThrow(), key = OpenSourceNotice::id) { notice ->
-                    Text(
-                        text = notice.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable(role = Role.Button) { onSelect(notice) }
-                                .padding(24.dp),
-                    )
-                }
-            }
+        else -> OpenSourceLicensesList(notices.getOrThrow(), onSelect)
     }
 }
+
+/** Alphabetical Settings sections; each section is one segmented group of navigation rows. */
+@Suppress("FunctionNaming")
+@Composable
+private fun OpenSourceLicensesList(
+    notices: List<OpenSourceNotice>,
+    onSelect: (OpenSourceNotice) -> Unit,
+) {
+    val sections = remember(notices) { notices.groupBy { noticeSection(it.name) } }
+    SettingsList(modifier = Modifier.testTag("licenses.list")) {
+        sections.forEach { (section, entries) ->
+            item(key = "section:$section") { SettingsSection(section) }
+            item(key = "group:$section") {
+                SettingsGroup {
+                    entries.forEach { notice ->
+                        row(notice.id) { context ->
+                            SettingsLink(context, title = notice.name, onClick = { onSelect(notice) })
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The uppercase first letter of a notice name, or "#" when it starts with a digit or symbol. */
+internal fun noticeSection(name: String): String = name.firstOrNull()?.takeIf(Char::isLetter)?.uppercase() ?: "#"
