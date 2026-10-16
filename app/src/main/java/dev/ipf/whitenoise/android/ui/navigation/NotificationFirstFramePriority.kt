@@ -58,6 +58,12 @@ internal class NotificationFirstFramePriority(
     val heldRequestId: Long?
         get() = gate?.requestId
 
+    /**
+     * The live gate while it belongs to [requestId], or null. Work that may outlive its pass captures this as it
+     * starts and later releases it with [releaseOwned], so it never ends a successor that reuses the request id.
+     */
+    fun gateFor(requestId: Long): NotificationRouteFirstFrameGate? = gate?.takeIf { it.requestId == requestId }
+
     /** Holds [gate] for the current runtime, releasing any predecessor that a newer request replaced. */
     fun begin(gate: NotificationRouteFirstFrameGate) {
         val previous = held

@@ -59,7 +59,8 @@ internal class NotificationExactOpenReads(
      * The inactive-account read may fail while account activation is still taking ownership of the native
      * runtime. Retry the exact group once now that the target account is active, keeping the stable routing
      * surface up. If this retry also fails, the broad list remains the authoritative fallback without
-     * flashing it first.
+     * flashing it first. The retry runs in the process scope and can outlive a remounted shell that re-runs
+     * the same request, so it releases only the first-frame gate it captured as it started.
      */
     private fun retryAfterActivation(attempt: NotificationOpenAttempt) {
         val requestId = attempt.requestId
@@ -68,6 +69,7 @@ internal class NotificationExactOpenReads(
         val retryKey = requireNotNull(preloadSlot.key)
         val retryRuntimeGeneration = appState.runtimeGeneration
         val currency = state.currency
+        val retryGate = owners.firstFrame.gateFor(requestId)
         // Account activation can publish an empty broad list while this exact retry
         // is suspended. Keep that absence non-authoritative until the retry itself
         // returns. Run it in the process mutation scope because publishing Loading
@@ -83,7 +85,7 @@ internal class NotificationExactOpenReads(
                     NotificationMessageDirectLoadOutcome.AwaitChatList -> {
                         preloadSlot.preload =
                             NotificationMessagePreload(retryKey, NotificationMessagePreloadState.Failed)
-                        owners.firstFrame.release(requestId)
+                        retryGate?.let(owners.firstFrame::releaseOwned)
                     }
                 }
             }

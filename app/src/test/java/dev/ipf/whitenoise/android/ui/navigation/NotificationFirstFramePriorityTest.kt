@@ -110,6 +110,26 @@ class NotificationFirstFramePriorityTest {
         assertSame(successor, priority.gate)
     }
 
+    /**
+     * Work that captured its request's gate as it started, like the post-activation retry, ends only that gate: a
+     * successor that a remounted shell began under the same request id keeps its window (#3309).
+     */
+    @Test
+    fun aCapturedGateReleasedAfterARemountKeepsTheSuccessorWithTheSameRequestId() {
+        val retired = NotificationRouteFirstFrameGate(requestId = 7L, accountRef = "account-b")
+        priority.begin(retired)
+        val captured = priority.gateFor(7L)
+        assertSame(retired, captured)
+        assertNull("another request captures nothing", priority.gateFor(8L))
+        val successor = NotificationRouteFirstFrameGate(requestId = 7L, accountRef = "account-b")
+        priority.begin(successor)
+
+        captured?.let(priority::releaseOwned)
+
+        assertFalse("the remounted shell's window survives the old retry", successor.isReleased)
+        assertSame(successor, priority.gate)
+    }
+
     /** After a runtime replacement, the old runtime's held callback cannot end the new runtime's window. */
     @Test
     fun anOwnedReleaseAfterARuntimeReplacementLeavesTheNewRuntimesGate() {

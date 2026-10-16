@@ -322,8 +322,14 @@ class NotificationConversationOpenCoverageTest {
 
         val retry = readsSource().between("private fun retryAfterActivation(", "private suspend fun readTarget")
         val retryFallback = retry.substringAfter("NotificationMessageDirectLoadOutcome.AwaitChatList -> {")
-        val retryRelease = "owners.firstFrame.release(requestId)"
+        val retryRelease = "retryGate?.let(owners.firstFrame::releaseOwned)"
         assertTrue("a failed active retry must release deferred work", retryRelease in retryFallback)
+        assertTrue(
+            "the retry captures its own gate before it suspends, so it never releases a successor's",
+            retry.indexOf("val retryGate = owners.firstFrame.gateFor(requestId)") in
+                0 until retry.indexOf("launchMutation"),
+        )
+        assertFalse("the retry must not release by request id", "owners.firstFrame.release(requestId)" in retry)
 
         val load = readsSource().between("suspend fun loadMessage(", "private fun retryAfterActivation")
         val directFallback = load.substringAfter("null ->")
