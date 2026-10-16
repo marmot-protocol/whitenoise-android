@@ -27,7 +27,9 @@ import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -51,6 +53,52 @@ internal class AccountRouteOrderGate(
     val projectionReadCount = AtomicInteger()
     val rosterReadCount = AtomicInteger()
     val draftReadCount = AtomicInteger()
+}
+
+/**
+ * Holds every activation of one account at its first engine read, the onboarding recovery check that
+ * setActiveAccount makes before it publishes anything, so a test can order shell events against a switch
+ * that is still in flight. Each read is released on its own, and a read released as failing routes the
+ * account to pending setup, which is how a switch that never lands looks to the route.
+ */
+internal class AccountActivationHold {
+    private val arrivals = AtomicInteger()
+    private val reads = ConcurrentHashMap<Int, HeldRead>()
+
+    @Volatile
+    private var open = false
+
+    /** The [index]-th activation read, created on first use so a test can wait for it before it arrives. */
+    fun read(index: Int): HeldRead = reads.getOrPut(index) { HeldRead() }
+
+    /** Blocks the arriving read until its release and reports whether it must fail. Runs on the engine thread. */
+    fun awaitRelease(): Boolean {
+        val read = read(arrivals.getAndIncrement())
+        read.started.countDown()
+        if (!open) {
+            check(read.release.await(NotificationRouteHarness.ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                "activation hold timed out"
+            }
+        }
+        read.passed.countDown()
+        return read.fails
+    }
+
+    /** Frees every held read and lets later ones straight through, so no activation outlives its test. */
+    fun releaseAll() {
+        open = true
+        reads.values.forEach { it.release.countDown() }
+    }
+
+    /** One held activation read: when it arrived, when the test let it go, and whether it then failed. */
+    class HeldRead {
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val passed = CountDownLatch(1)
+
+        @Volatile
+        var fails = false
+    }
 }
 
 /** In-memory drafts, because no draft persistence participates in notification routing. */
@@ -155,6 +203,31 @@ internal object NotificationRouteHarness {
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
                 else -> error("Unexpected Marmot call: ${method.name}")
+            }
+        } as MarmotInterface
+
+    /**
+     * Wraps [delegate] so [accountRef]'s activation stops at [hold] before the engine answers the recovery
+     * check that setActiveAccount makes first, and fails that check when the test releases the read as
+     * failing. Every other call passes straight through to [delegate], with its own exceptions intact.
+     */
+    fun holdingActivation(
+        delegate: MarmotInterface,
+        hold: AccountActivationHold,
+        accountRef: String = TARGET_ACCOUNT,
+    ): MarmotInterface =
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { _, method, arguments ->
+            val heldRead =
+                method.name.substringBefore('-') == "onboardingRecoveryRequired" &&
+                    arguments?.firstOrNull() == accountRef
+            if (heldRead && hold.awaitRelease()) error("onboarding recovery state unavailable")
+            try {
+                method.invoke(delegate, *(arguments ?: emptyArray()))
+            } catch (failure: InvocationTargetException) {
+                throw failure.targetException
             }
         } as MarmotInterface
 
