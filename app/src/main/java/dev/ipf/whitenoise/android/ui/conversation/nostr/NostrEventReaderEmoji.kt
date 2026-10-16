@@ -5,12 +5,15 @@ import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
@@ -35,11 +38,12 @@ internal fun NostrEventReaderBlock(
     val layouts = remember(block) { MarkdownLinkLayoutRegistry() }
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
+    val copyLabel by rememberUpdatedState(stringResource(R.string.copy))
     val scope = rememberCoroutineScope()
     val copyLink: (String) -> Unit = { destination ->
         scope.launch {
             runCatchingCancellable {
-                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(context.getString(R.string.copy), destination)))
+                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(copyLabel, destination)))
             }.onSuccess {
                 // Android 13+ already confirms clipboard writes; older supported versions need feedback.
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {

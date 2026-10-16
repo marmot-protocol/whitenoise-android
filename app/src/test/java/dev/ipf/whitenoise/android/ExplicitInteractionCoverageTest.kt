@@ -17,9 +17,8 @@ class ExplicitInteractionCoverageTest {
         assertTrue("if (!hasActiveNetwork())" in signup)
         assertFalse("hasValidatedInternet" in onboarding)
         assertFalse("hasValidatedInternet" in signup)
-        assertTrue(
-            "hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet()" in source("state/AppState.kt"),
-        )
+        val state = source("state/AppState.kt")
+        assertTrue("hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet()" in state)
     }
 
     @Test
