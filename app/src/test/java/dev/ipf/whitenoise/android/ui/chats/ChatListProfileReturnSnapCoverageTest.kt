@@ -200,6 +200,7 @@ class ChatListProfileReturnSnapCoverageTest {
         )
     }
 
+    /** The published return head lives only in the shell's single return state machine, not a separate nullable. */
     @Test
     fun returnHeadPublishWiringUsesSingleStateMachine() {
         val mainShell = mainShellSource().readText()

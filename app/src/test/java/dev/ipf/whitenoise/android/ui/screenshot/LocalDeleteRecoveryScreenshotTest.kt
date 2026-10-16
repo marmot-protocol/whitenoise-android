@@ -70,6 +70,7 @@ class LocalDeleteRecoveryScreenshotTest {
     @Test
     fun stoppedLargeRtl() = capture(Notice.Stopped, "stopped_large_rtl", largeRtl = true)
 
+    /** Renders [notice] in the requested theme, direction and detail state and records its baseline. */
     private fun capture(
         notice: Notice,
         suffix: String,

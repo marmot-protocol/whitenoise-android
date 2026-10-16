@@ -48,6 +48,7 @@ class GroupSvgFailureNoticeScreenshotTest {
     @Test
     fun largeRtl() = capture("large_rtl", dark = true, largeRtl = true)
 
+    /** Renders the rejected-SVG notice in the requested theme and direction and records its baseline. */
     private fun capture(
         suffix: String,
         dark: Boolean,

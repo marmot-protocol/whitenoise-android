@@ -191,7 +191,6 @@ internal fun ShellTransientNoticeLayout(
 }
 
 /** Owns top-level privacy gates and records the first app-rendered useful surface. */
-
 @Composable
 @Suppress(
     "CyclomaticComplexMethod",
