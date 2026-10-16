@@ -5451,9 +5451,10 @@ class WhiteNoiseAppState private constructor(
     private suspend fun activateImportedIdentity(summary: AccountSummaryFfi) {
         marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
         refreshAccounts()
-        if (setActiveAccount(summary.label)) {
+        val receipt = activateAccountSession(AccountSessionActivationRequest(summary.label))
+        if (receipt != null) {
             accountSession.finishImportedIdentity(
-                label = summary.label,
+                receipt = receipt,
                 refreshSettings = ::refreshLocalNotificationSettings,
                 publishReady = {
                     phase = AppPhase.Ready
@@ -5528,13 +5529,7 @@ class WhiteNoiseAppState private constructor(
                     amberSigner.buildSigner(pubkeyHex),
                 )
             }
-            marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
-            refreshAccounts()
-            setActiveAccount(summary.label)
-            refreshLocalNotificationSettings()
-            phase = AppPhase.Ready
-            presentTransient(R.string.toast_identity_imported)
-            warmProfile(summary.accountIdHex)
+            activateImportedIdentity(summary)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             if (error is MarmotKitException.ExternalSignerRejected) {
@@ -6079,8 +6074,7 @@ class WhiteNoiseAppState private constructor(
         return required
     }
 
-    /** Delegates account-session ordering while retaining host telemetry and the pending-setup route. */
-    @Suppress("ThrowsCount") // Preserve the separate timeout, cancellation and failure telemetry outcomes.
+    /** Keeps the screen-facing Boolean contract while the session owner retains a precise activation receipt. */
     suspend fun setActiveAccount(
         label: String,
         deferUnreadRefresh: Boolean = false,
@@ -6088,20 +6082,32 @@ class WhiteNoiseAppState private constructor(
         preloadPolicy: AccountSwitchPreloadPolicy = AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
-    ): Boolean {
-        if (routePendingAccountSetup(label)) return false
+    ): Boolean =
+        activateAccountSession(
+            AccountSessionActivationRequest(label, deferUnreadRefresh, shouldActivate, preloadPolicy),
+            awaitPostActivationWork,
+            onActivated,
+        ) != null
+
+    /** Retains host telemetry and pending setup routing without recapturing the accepted activation's lifetime. */
+    @Suppress("ThrowsCount") // Preserve the separate timeout, cancellation and failure telemetry outcomes.
+    private suspend fun activateAccountSession(
+        request: AccountSessionActivationRequest,
+        awaitPostActivationWork: suspend () -> Unit = {},
+        onActivated: () -> Unit = {},
+    ): AccountSessionActivationReceipt? {
+        if (routePendingAccountSetup(request.label)) return null
         val accountSwitchAttempt =
-            if (label != activeAccountRef) beginHostPerformance(HostPerformanceOperationFfi.ACCOUNT_SWITCH) else null
+            if (request.label != activeAccountRef) {
+                beginHostPerformance(HostPerformanceOperationFfi.ACCOUNT_SWITCH)
+            } else {
+                null
+            }
         var accountSwitchOutcome = HostPerformanceOutcomeFfi.UNAVAILABLE
         try {
-            val activated =
-                accountSession.activate(
-                    AccountSessionActivationRequest(label, deferUnreadRefresh, shouldActivate, preloadPolicy),
-                    awaitPostActivationWork = awaitPostActivationWork,
-                    onActivated = onActivated,
-                )
-            if (activated) accountSwitchOutcome = HostPerformanceOutcomeFfi.SUCCESS
-            return activated
+            val receipt = accountSession.activate(request, awaitPostActivationWork, onActivated)
+            if (receipt != null) accountSwitchOutcome = HostPerformanceOutcomeFfi.SUCCESS
+            return receipt
         } catch (timeout: TimeoutCancellationException) {
             accountSwitchOutcome = HostPerformanceOutcomeFfi.TIMEOUT
             throw timeout
@@ -6179,8 +6185,9 @@ class WhiteNoiseAppState private constructor(
         override suspend fun refreshNotificationSettings() = refreshLocalNotificationSettings()
 
         /** Preserves foreground/startup delivery admission and background-account mode reconciliation. */
-        override suspend fun reconcileNotificationDelivery(includeBackgroundAccountModes: Boolean) =
+        override suspend fun reconcileNotificationDelivery(includeBackgroundAccountModes: Boolean) {
             reconcileNotificationDeliveryModeAfterActivation(includeBackgroundAccountModes)
+        }
 
         /** Reads foreground state at delivery admission rather than capturing it before the frame wait. */
         override fun isInForeground(): Boolean = appInForeground

@@ -8,6 +8,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,6 +83,26 @@ class AccountActivationRuntimeFenceTest {
                 assertEquals(baseline, notificationReads.get())
             } finally {
                 release.countDown()
+                fixture.close()
+            }
+        }
+
+    /** Cold initialization followed by warm resume retains the same process session and passive receiver. */
+    @Test
+    fun warmBootstrapReusesRuntimeAndReceiver() =
+        runBlocking {
+            val fixture = fixture(AtomicInteger())
+            try {
+                fixture.bootstrap()
+                val session = fixture.appState.accountSession
+                val subscriptions = fixture.subscriptionCalls.get()
+                fixture.bootstrap()
+                assertSame(session, fixture.appState.accountSession)
+                assertEquals(1, fixture.runtimeStartCalls.get())
+                assertEquals(subscriptions, fixture.subscriptionCalls.get())
+                assertEquals("self", fixture.appState.activeAccountRef)
+                assertEquals(AppPhase.Ready, fixture.appState.phase)
+            } finally {
                 fixture.close()
             }
         }

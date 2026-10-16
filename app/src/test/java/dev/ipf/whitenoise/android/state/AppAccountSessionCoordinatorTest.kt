@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,11 +38,17 @@ class AppAccountSessionCoordinatorTest {
             assertEquals(listOf("prepare:next", "hide", "publish:next", "ready"), host.events)
             assertEquals("next", host.activeAccount)
             frame.complete(Unit)
-            assertTrue(activation.await())
+            assertNotNull(activation.await())
             assertEquals(
                 listOf(
-                    "prepare:next", "hide", "publish:next", "ready",
-                    "profile:next", "privacy", "notifications", "delivery:true",
+                    "prepare:next",
+                    "hide",
+                    "publish:next",
+                    "ready",
+                    "profile:next",
+                    "privacy",
+                    "notifications",
+                    "delivery:true",
                 ),
                 host.events,
             )
@@ -59,9 +66,9 @@ class AppAccountSessionCoordinatorTest {
                 async(UnconfinedTestDispatcher(testScheduler)) {
                     owner.activate(AccountSessionActivationRequest("old-request"))
                 }
-            assertTrue(owner.activate(AccountSessionActivationRequest("new-request")))
+            assertNotNull(owner.activate(AccountSessionActivationRequest("new-request")))
             release.complete(Unit)
-            assertFalse(old.await())
+            assertNull(old.await())
             assertEquals("new-request", host.activeAccount)
             assertEquals(listOf("publish:new-request"), host.events.filter { it.startsWith("publish:") })
         }
@@ -79,9 +86,9 @@ class AppAccountSessionCoordinatorTest {
                 async(UnconfinedTestDispatcher(testScheduler)) {
                     owner.activate(AccountSessionActivationRequest("old-request"))
                 }
-            assertTrue(owner.activate(AccountSessionActivationRequest("new-request")))
+            assertNotNull(owner.activate(AccountSessionActivationRequest("new-request")))
             release.complete(Unit)
-            assertFalse(old.await())
+            assertNull(old.await())
             assertEquals("new-request", host.activeAccount)
             assertEquals(1, host.events.count { it.startsWith("publish:") })
         }
@@ -100,7 +107,7 @@ class AppAccountSessionCoordinatorTest {
             assertNotNull(owner.handoff.captureForAccount("original"))
             assertFalse(host.events.any { it.startsWith("publish:") })
             host.beforePrepare = {}
-            assertTrue(owner.activate(AccountSessionActivationRequest("next")))
+            assertNotNull(owner.activate(AccountSessionActivationRequest("next")))
         }
 
     /** Cancellation after local-ready keeps accepted state, releases intent and cannot start deferred services. */
@@ -118,7 +125,7 @@ class AppAccountSessionCoordinatorTest {
             assertEquals("next", host.activeAccount)
             assertNotNull(owner.handoff.captureForAccount("original"))
             assertFalse(host.events.contains("privacy"))
-            assertTrue(owner.activate(AccountSessionActivationRequest("next")))
+            assertNotNull(owner.activate(AccountSessionActivationRequest("next")))
             assertTrue(host.events.contains("delivery:false"))
         }
 
@@ -128,7 +135,7 @@ class AppAccountSessionCoordinatorTest {
         runTest {
             val host = Activation()
             host.beforePrivacy = { host.currentRuntimeGeneration++ }
-            assertTrue(coordinator(backgroundScope, host).activate(AccountSessionActivationRequest("next")))
+            assertNotNull(coordinator(backgroundScope, host).activate(AccountSessionActivationRequest("next")))
             assertTrue(host.events.contains("privacy"))
             assertFalse(host.events.contains("notifications"))
             assertFalse(host.events.any { it.startsWith("delivery:") })
@@ -145,10 +152,10 @@ class AppAccountSessionCoordinatorTest {
                 async(UnconfinedTestDispatcher(testScheduler)) {
                     owner.activate(AccountSessionActivationRequest("next"), awaitPostActivationWork = { frame.await() })
                 }
-            assertTrue(owner.activate(AccountSessionActivationRequest("next")))
+            assertNotNull(owner.activate(AccountSessionActivationRequest("next")))
             val refreshes = host.events.count { it == "privacy" }
             frame.complete(Unit)
-            assertTrue(old.await())
+            assertNotNull(old.await())
             assertEquals(refreshes, host.events.count { it == "privacy" })
         }
 
@@ -161,10 +168,10 @@ class AppAccountSessionCoordinatorTest {
             val request =
                 AccountSessionActivationRequest("next", preloadPolicy = AccountSwitchPreloadPolicy.STARTUP_RESTORATION)
             host.foreground = false
-            assertTrue(owner.activate(request))
+            assertNotNull(owner.activate(request))
             assertTrue(host.events.contains("notifications"))
             assertFalse(host.events.any { it.startsWith("delivery:") })
-            assertTrue(owner.activate(request, awaitPostActivationWork = { host.foreground = true }))
+            assertNotNull(owner.activate(request, awaitPostActivationWork = { host.foreground = true }))
             assertTrue(host.events.contains("delivery:false"))
         }
 
@@ -234,7 +241,7 @@ class AppAccountSessionCoordinatorTest {
                 }
             owner.publishCreatedIdentity("created") { host.activeAccount = "created" }
             release.complete(Unit)
-            assertFalse(selection.await())
+            assertNull(selection.await())
             assertEquals("created", host.activeAccount)
             assertFalse(host.events.any { it.startsWith("publish:") })
         }
@@ -245,11 +252,11 @@ class AppAccountSessionCoordinatorTest {
         runTest {
             val host = Activation()
             val owner = coordinator(backgroundScope, host)
-            assertTrue(owner.activate(AccountSessionActivationRequest("imported")))
+            val receipt = checkNotNull(owner.activate(AccountSessionActivationRequest("imported")))
             var ready = false
             var warmed = false
             owner.finishImportedIdentity(
-                label = "imported",
+                receipt = receipt,
                 refreshSettings = { owner.activate(AccountSessionActivationRequest("other")) },
                 publishReady = { ready = true },
                 warmProfile = { warmed = true },
@@ -257,6 +264,39 @@ class AppAccountSessionCoordinatorTest {
             assertEquals("other", host.activeAccount)
             assertFalse(ready)
             assertFalse(warmed)
+        }
+
+    /** Completion of an earlier A activation cannot acquire the receipt of a later A-B-A selection. */
+    @Test
+    fun importedIdentityRetainsOriginalReceiptAcrossABA() =
+        runTest {
+            val host = Activation()
+            val owner = coordinator(backgroundScope, host)
+            val receipt = checkNotNull(owner.activate(AccountSessionActivationRequest("imported")))
+            assertNotNull(owner.activate(AccountSessionActivationRequest("other")))
+            assertNotNull(owner.activate(AccountSessionActivationRequest("imported")))
+            owner.finishImportedIdentity(
+                receipt,
+                refreshSettings = { error("old import cannot refresh a newer selection") },
+                publishReady = { error("old import cannot publish Ready") },
+                warmProfile = { error("old import cannot warm a newer selection") },
+            )
+        }
+
+    /** A replacement runtime with the same account label cannot adopt an old import's completion. */
+    @Test
+    fun importedIdentityRetainsOriginalRuntimeReceipt() =
+        runTest {
+            val host = Activation()
+            val owner = coordinator(backgroundScope, host)
+            val receipt = checkNotNull(owner.activate(AccountSessionActivationRequest("imported")))
+            host.currentRuntimeGeneration++
+            owner.finishImportedIdentity(
+                receipt,
+                refreshSettings = { error("old import cannot refresh a replacement runtime") },
+                publishReady = { error("old import cannot publish into a replacement runtime") },
+                warmProfile = { error("old import cannot warm a replacement runtime") },
+            )
         }
 
     /** Uses deterministic state dispatch and the real teardown owner rather than a fake lifetime manager. */

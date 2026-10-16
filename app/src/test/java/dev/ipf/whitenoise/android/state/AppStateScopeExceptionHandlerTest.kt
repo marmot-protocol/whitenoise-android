@@ -34,6 +34,7 @@ class AppStateScopeExceptionHandlerTest {
             scope.cancel()
         }
     }
+
     /** A failed process-owned bootstrap can be observed and retried without cancelling sibling mutations. */
     @Test
     fun bootstrapFailureAllowsRetryOnTheSupervisedMutationScope() =
@@ -53,5 +54,4 @@ class AppStateScopeExceptionHandlerTest {
                 scope.cancel()
             }
         }
-
 }

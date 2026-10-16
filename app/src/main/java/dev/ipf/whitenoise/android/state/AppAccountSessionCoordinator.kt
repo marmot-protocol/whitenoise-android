@@ -15,6 +15,13 @@ internal data class AccountSessionActivationRequest(
     val preloadPolicy: AccountSwitchPreloadPolicy = AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
 )
 
+/** Receipt of the exact selection that reached local-ready, retained across any later enrichment waits. */
+internal data class AccountSessionActivationReceipt(
+    val label: String,
+    val generation: Long,
+    val runtimeGeneration: Int,
+)
+
 /** Short-lived authoritative projection prepared for the existing one-shot handoff, never a second store. */
 internal data class PreparedAccountSessionActivation(
     val runtimeGeneration: Int,
@@ -110,32 +117,31 @@ internal class AppAccountSessionCoordinator(
 
     /** Imported-account UI completion must still belong to the activation after its extra settings read. */
     suspend fun finishImportedIdentity(
-        label: String,
+        receipt: AccountSessionActivationReceipt,
         refreshSettings: suspend () -> Unit,
         publishReady: () -> Unit,
         warmProfile: suspend () -> Unit,
-    ) = withContext(stateDispatcher) {
-        val generation = handoff.captureForAccount(label) ?: return@withContext
-        val runtime = activation.currentRuntimeGeneration
-        val isCurrent = {
-            handoff.isCurrent(generation) && activation.activeAccount == label &&
-                activation.currentRuntimeGeneration == runtime
-        }
-        if (isCurrent()) {
-            refreshSettings()
+    ) =
+        withContext(stateDispatcher) {
+            val isCurrent = {
+                handoff.isCurrent(receipt.generation) && activation.activeAccount == receipt.label &&
+                    activation.canPublish(receipt.label, receipt.runtimeGeneration)
+            }
             if (isCurrent()) {
-                publishReady()
-                warmProfile()
+                refreshSettings()
+                if (isCurrent()) {
+                    publishReady()
+                    warmProfile()
+                }
             }
         }
-    }
 
     /** Publishes a latest-wins selection, then admits every deferred refresh against the same runtime. */
     suspend fun activate(
         request: AccountSessionActivationRequest,
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
-    ): Boolean =
+    ): AccountSessionActivationReceipt? =
         withContext(stateDispatcher) {
             val generation = handoff.beginRequest(request.label)
             try {
@@ -152,21 +158,21 @@ internal class AppAccountSessionCoordinator(
         generation: Long,
         awaitPostActivationWork: suspend () -> Unit,
         onActivated: () -> Unit,
-    ): Boolean {
+    ): AccountSessionActivationReceipt? {
         val switching = request.label != activation.activeAccount
-        val prepared = activation.prepare(request, generation, switching) ?: return false
+        val prepared = activation.prepare(request, generation, switching) ?: return null
         val allowed = {
             request.shouldActivate() && handoff.isCurrent(generation) &&
                 activation.canPublish(request.label, prepared.runtimeGeneration)
         }
-        if (!allowed()) return false
+        if (!allowed()) return null
         if (switching) activation.hidePreviousAccountShortcuts()
-        if (!allowed()) return false
+        if (!allowed()) return null
         activation.publish(request.label, generation, switching, prepared)
         onActivated()
         awaitPostActivationWork()
         refreshActivatedAccount(request, generation, prepared.runtimeGeneration, switching)
-        return true
+        return AccountSessionActivationReceipt(request.label, generation, prepared.runtimeGeneration)
     }
 
     /** Each suspension can replace the account/runtime, so later effects must revalidate ownership. */
