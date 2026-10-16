@@ -80,6 +80,7 @@ class ErrorRecoveryBannerScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/$fileName")
     }
 
+    /** Captures a conversation-scoped confirmation over a header and the newest message, in one theme. */
     private fun captureConversationConfirmation(
         fileName: String,
         dark: Boolean,

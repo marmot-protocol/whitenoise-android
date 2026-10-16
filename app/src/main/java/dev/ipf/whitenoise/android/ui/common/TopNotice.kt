@@ -218,8 +218,9 @@ private fun topNoticeMaxHeight(): Dp {
  * Times the queued snackbar out independently of which slot is composed. The material host only counts down
  * while it is composed, so a short confirmation queued under app lock, or while a modal takes the banners over,
  * would otherwise show for its whole duration again once a slot picked it up. Run at the app root, this clock
- * starts when the snackbar is queued and runs on through lock, slot changes and modals, so a confirmation is
- * timed out once, and an indefinite error still stays until it is dismissed (#3312).
+ * starts when a snackbar reaches the head of the queue, as the material host's does, and runs on through lock,
+ * slot changes and modals, so a confirmation is timed out once, and an indefinite error still stays until it is
+ * dismissed (#3312).
  */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.

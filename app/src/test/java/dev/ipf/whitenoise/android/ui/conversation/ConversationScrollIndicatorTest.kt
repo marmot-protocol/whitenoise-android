@@ -140,6 +140,7 @@ class ConversationScrollIndicatorTest {
         assertNull(readerScrollPosition(-1, 100, 100))
     }
 
+    /** Mounts a reversed transcript of rows with the given heights, with an optional bottom-edge failure row. */
     private fun render(
         heights: List<Int>,
         bottomError: Boolean = false,

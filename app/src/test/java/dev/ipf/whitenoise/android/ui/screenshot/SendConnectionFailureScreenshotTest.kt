@@ -84,6 +84,7 @@ class SendConnectionFailureScreenshotTest {
         }
     }
 
+    /** A transcript stand-in of the given height with the send-failure confirmation over its top edge. */
     @Composable
     private fun FailureConversation(height: Dp) {
         Surface(modifier = Modifier.fillMaxWidth().testTag(TAG)) {

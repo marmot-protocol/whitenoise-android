@@ -175,6 +175,7 @@ class ConversationScrollIndicatorScreenshotTest {
         }
     }
 
+    /** The reversed fixture transcript under the viewport, padded for the measured bottom chrome. */
     @Composable
     private fun FixtureTimeline(
         viewport: ConversationTimelineViewport,
