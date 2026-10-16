@@ -159,7 +159,7 @@ class NotificationIdentityImageCoverageTest {
         val start = presenter.indexOf("private suspend fun resolveAvatars(")
         val resolve = presenter.substring(start, presenter.indexOf("\n\n", start))
         assertTrue("the presenter falls back to the loader", "conversationLoader" in resolve)
-        assertTrue("within the URL picture's bound", "AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS" in resolve)
+        assertTrue("within its own late-refresh bound", "GROUP_IDENTITY_LOAD_TIMEOUT_MS" in resolve)
     }
 
     /** An unchanged snapshot is re-read under the publication lock before only reporting use of the shortcut. */

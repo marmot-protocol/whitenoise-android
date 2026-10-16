@@ -1501,8 +1501,9 @@ class LocalNotificationPresenter(
 
     /**
      * Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it. A
-     * conversation picture with no URL, such as a group's encrypted image, comes from the sources' loader within the
-     * same bound as a URL picture.
+     * conversation picture with no URL, such as a group's encrypted image, comes from the sources' loader. That loader
+     * downloads and decrypts through MDK and runs only in the late refresh, after the enrichment permit is released,
+     * so it gets a longer bound than a URL picture and a slow network or busy device still gets the picture.
      */
     private suspend fun resolveAvatars(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?> =
         withContext(Dispatchers.Default) {
@@ -1512,7 +1513,7 @@ class LocalNotificationPresenter(
                         sources.conversationBitmap
                             ?: avatarBitmapResolver(sources.conversationUrl)
                             ?: sources.conversationLoader?.let { load ->
-                                withTimeoutOrNull(AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS) { load() }
+                                withTimeoutOrNull(GROUP_IDENTITY_LOAD_TIMEOUT_MS) { load() }
                             }
                     }
                 val senderAvatar = async { sources.senderBitmap ?: avatarBitmapResolver(sources.senderUrl) }
@@ -2991,6 +2992,9 @@ internal fun notificationSenderPerson(
 
 private const val NOTIFICATION_MONOGRAM_SIZE_PX = 128
 private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
+
+/** Bound for a group's encrypted picture in the late refresh; it delays no other card, only this silent rewrite. */
+private const val GROUP_IDENTITY_LOAD_TIMEOUT_MS = 15_000L
 internal const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
 
 private val notificationEnrichmentScope =

@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -247,6 +248,33 @@ class NotificationConversationIdentityImageTest {
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
+    /**
+     * A group picture whose encrypted download outlasts a URL picture's 2.5 s bound, as on a slow network or a busy
+     * device, still reaches the card, because the late refresh gives the loader its own longer bound.
+     */
+    @Test
+    fun lateIdentityRefreshWaitsPastTheUrlBoundForASlowGroupPicture() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts)
+            show(presenter, group())
+            val sources =
+                NotificationIdentityPictureSources(
+                    null,
+                    null,
+                    null,
+                    null,
+                    conversationLoader = {
+                        delay(SLOW_GROUP_PICTURE_MS)
+                        solid(Color.BLUE)
+                    },
+                )
+
+            assertTrue(refreshLateIdentity(presenter, group(), sources))
+
+            assertEquals(Color.BLUE, identityPixel(liveCard()))
+        }
+
     /** A redacted group card never asks the loader for its encrypted picture, and nothing is written. */
     @Test
     fun lateIdentityRefreshNeverLoadsAGroupPictureForARedactedCard() =
@@ -481,3 +509,6 @@ class NotificationConversationIdentityImageTest {
         const val PICTURE_URL = "https://example.com/alice.png"
     }
 }
+
+/** Longer than a URL picture's 2.5 s bound and well inside the group picture's own. */
+private const val SLOW_GROUP_PICTURE_MS = 3_000L
