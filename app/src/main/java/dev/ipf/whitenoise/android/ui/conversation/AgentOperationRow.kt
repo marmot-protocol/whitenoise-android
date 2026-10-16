@@ -130,7 +130,7 @@ internal fun AgentOperationTimelineRow(
 }
 
 @Composable
-private fun AgentOperationDeleteDialog(
+internal fun AgentOperationDeleteDialog(
     record: AppMessageRecordFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,

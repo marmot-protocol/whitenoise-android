@@ -1,0 +1,56 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- scrollUntilVisible:
+    element:
+      text: 'Color #B91C1C'
+      childOf:
+        id: bubble_colors.mine.picker
+    direction: DOWN
+- assertVisible:
+    text: 'Color #B91C1C'
+    childOf:
+      id: bubble_colors.mine.picker
+- tapOn:
+    text: 'Color #B91C1C'
+    childOf:
+      id: bubble_colors.mine.picker
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#B91C1C$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#B91C1C$
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#B91C1C$
+- scrollUntilVisible:
+    element:
+      text: 'Color #15803D'
+      childOf:
+        id: bubble_colors.other.picker
+    direction: DOWN
+- assertVisible:
+    text: 'Color #15803D'
+    childOf:
+      id: bubble_colors.other.picker
+- tapOn:
+    text: 'Color #15803D'
+    childOf:
+      id: bubble_colors.other.picker
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#15803D$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#15803D$
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#15803D$

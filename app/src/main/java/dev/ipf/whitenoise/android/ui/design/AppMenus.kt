@@ -96,7 +96,7 @@ internal fun KeyboardPreservingDropdownMenu(
         scrollState = menuScrollState,
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = (modifier).scrollEdgeFade(menuScrollState),
+        modifier = (modifier).scrollEdgeFade(menuScrollState, stableRenderTarget = true),
         offset = offset,
         shape = shape,
         border = amoledSurfaceBorderStroke(),

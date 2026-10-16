@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Appearance
+    direction: DOWN
+- tapOn: Appearance
+- tapOn: Light
+- scrollUntilVisible:
+    element:
+      text: Action color
+    direction: DOWN
+- tapOn: Action color
+- assertVisible:
+    id: action_color.controls
+- scrollUntilVisible:
+    element:
+      id: color.hex
+    direction: DOWN
+- assertVisible:
+    id: color.hex

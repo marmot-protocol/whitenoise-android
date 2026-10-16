@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-description-reveal-discard
+---
+- runFlow: ../fixtures/new-folder-editor.yaml
+- runFlow: ../fixtures/reveal-folder-description.yaml
+- tapOn:
+    id: folder.description
+- inputText: Maestro draft note
+- hideKeyboard
+- assertVisible:
+    id: folder.save
+    enabled: false
+- back
+- assertVisible: Discard changes[?]
+- tapOn: Discard Changes
+- assertVisible:
+    id: chat-folders-content

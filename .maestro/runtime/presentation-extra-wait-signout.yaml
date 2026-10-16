@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-wait-signout
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: settings.sign_out_progress
+- back
+- assertVisible:
+    id: settings.sign_out_progress

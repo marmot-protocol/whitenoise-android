@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-nostr-video-retry
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Couldn’t play this video\.
+- tapOn: Retry
+- assertVisible: Couldn’t play this video\.
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

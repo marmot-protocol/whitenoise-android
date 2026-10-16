@@ -1,0 +1,81 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-bubble-colors-reset
+---
+- runFlow: ../fixtures/open-bubble-colors.yaml
+- runFlow: ../fixtures/draft-bubble-color-pair.yaml
+- assertVisible:
+    id: bubble_colors.save
+    enabled: true
+- tapOn:
+    id: bubble_colors.save
+- runFlow: ../fixtures/reopen-bubble-colors.yaml
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#B91C1C$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#B91C1C$
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#B91C1C$
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#15803D$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#15803D$
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#15803D$
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- tapOn:
+    id: bubble_colors.menu
+- assertVisible: Reset to default
+- tapOn: Reset to default
+- assertVisible:
+    id: bubble_colors.save
+    enabled: true
+- tapOn:
+    id: bubble_colors.save
+- runFlow: ../fixtures/reopen-bubble-colors.yaml
+- scrollUntilVisible:
+    element:
+      id: color.hex
+      text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+    text: ^#E5E5E5$
+- assertVisible:
+    id: bubble_colors.mine.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- scrollUntilVisible:
+    element:
+      id: bubble_colors.other.picker
+      containsDescendants:
+      - id: color.hex
+        text: ^#E5E5E5$
+    direction: DOWN
+- assertVisible:
+    id: bubble_colors.other.picker
+    containsDescendants:
+    - id: color.hex
+      text: ^#E5E5E5$
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false
+- back
+- assertVisible:
+    id: appearance.theme.group

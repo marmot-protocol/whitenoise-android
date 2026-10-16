@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-microphone-settings
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Microphone access is off
+- tapOn: Open Settings
+- assertVisible:
+    id: presentation.complete

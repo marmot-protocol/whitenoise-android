@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-modal-share-partial
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Some files could not be imported
+- assertVisible:
+    text: Cancel and share again.*
+- tapOn: Share to
+- assertVisible:
+    id: presentation.complete

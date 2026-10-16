@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-agent-delete-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Delete message\?
+- assertVisible:
+    text: Delete for me
+- assertVisible:
+    text: Delete for everyone
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

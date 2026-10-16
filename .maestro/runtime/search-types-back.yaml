@@ -9,6 +9,8 @@ name: search-types-back
     id: "chat-list-search-filters-action"
 - tapOn: "Chat type"
 - assertVisible: "Chat type"
+- assertVisible:
+    id: "chat-list-search-filter-dialog"
 - assertVisible: "Direct chats"
 - assertVisible: "Groups"
 - back

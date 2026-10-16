@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Edit
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -362,6 +363,7 @@ internal fun AvatarViewerFrame(
         modifier =
             modifier
                 .fillMaxSize()
+                .exposePerformanceTestTags()
                 .background(Color.Black)
                 .pointerInput(scale, dismissThresholdPx) {
                     if (scale <= VIEWER_MIN_SCALE) {
@@ -420,7 +422,7 @@ internal fun AvatarViewerFrame(
                 val menuScrollState = rememberScrollState()
                 DropdownMenu(
                     scrollState = menuScrollState,
-                    modifier = Modifier.scrollEdgeFade(menuScrollState),
+                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
                 ) {

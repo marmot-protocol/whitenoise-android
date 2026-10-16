@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-profile-qr-copy
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Maestro Alice
+- assertVisible:
+    text: npub.*
+- tapOn: npub.*
+- assertVisible:
+    text: Copied
+- back
+- assertVisible:
+    id: presentation.complete

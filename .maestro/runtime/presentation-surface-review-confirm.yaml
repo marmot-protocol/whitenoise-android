@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-review-confirm
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Review selection
+- assertVisible:
+    text: Maestro Bob
+- assertVisible:
+    text: Fixture confirm
+- assertVisible:
+    text: "Maestro Bob, Member"
+- assertNotVisible:
+    text: Admin
+- tapOn: "Maestro Bob, Member"
+- assertVisible:
+    text: Admin
+- tapOn: Admin
+- assertVisible:
+    text: "Maestro Bob, Admin"
+- tapOn: Fixture confirm
+- assertVisible:
+    id: presentation.complete

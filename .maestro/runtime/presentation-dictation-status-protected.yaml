@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-status-protected
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: dictation-recovery-status
+- assertVisible:
+    text: Speech\ service\ couldn’t\ connect
+- assertNotVisible:
+    id: dictation-recovery-panel
+- assertNotVisible:
+    id: dictation-partial-send-dialog
+- assertNotVisible:
+    id: dictation-discard-confirmation

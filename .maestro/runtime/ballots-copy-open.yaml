@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: ballots-copy-open
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Maestro fixture poll"
+- longPressOn:
+    text: "Maestro fixture poll"
+- assertVisible: "Copy"
+- tapOn: "Copy"
+- assertNotVisible: "Copy"
+- assertVisible: "Maestro fixture poll"

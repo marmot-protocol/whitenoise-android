@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-details-stepdownsoleadmin
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Transfer admin first
+- assertVisible:
+    text: You're the only admin\. Transfer admin to leave or step down\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Transfer admin first
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Transfer admin first
+- back
+- assertNotVisible:
+    text: Transfer admin first
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Transfer admin first
+- tapOn:
+    id: group.details.confirm
+- assertVisible:
+    id: presentation.complete

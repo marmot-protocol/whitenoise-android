@@ -29,7 +29,12 @@ internal suspend fun captureMaestroEditorBaselines(
         } else {
             emptyMap()
         }
-    val folders = if (postcondition.startsWith("smart-rule-")) captureMaestroFolderRules(state) else null
+    val folders =
+        if (postcondition.startsWith("smart-rule-") || postcondition.startsWith("folder-details-")) {
+            captureMaestroFolderRules(state)
+        } else {
+            null
+        }
     val relays =
         if (postcondition == "relay-lists-unchanged") {
             val relayOwner = withContext(Dispatchers.Main.immediate) { checkNotNull(state.activeAccountRef) }

@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-share-qr-url
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    text: Share
+- assertVisible:
+    text: Share profile URL
+- assertVisible:
+    text: Share profile card
+- back
+- assertNotVisible:
+    text: Share profile URL
+- tapOn:
+    text: Share
+- assertVisible:
+    text: Share profile URL
+- tapOn:
+    text: Share profile URL
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-licenses-failure-retry
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Open source licenses
+- assertVisible:
+    id: licenses.failed
+- assertVisible: Couldn’t open licenses
+- assertVisible: Retry
+- assertNotVisible:
+    id: licenses.list
+- tapOn: Retry
+- assertVisible:
+    id: licenses.list
+- assertNotVisible:
+    id: licenses.failed
+- tapOn: Maestro local notice
+- assertVisible:
+    id: licenses.text
+    text: Complete local notice text
+- back
+- assertVisible:
+    id: licenses.list
+- assertNotVisible:
+    id: licenses.text
+- back
+- assertVisible:
+    id: presentation.complete

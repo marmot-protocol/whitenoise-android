@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +32,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -352,6 +350,7 @@ internal fun ConversationMediaViewer(
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
+    imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
 ) {
     val messagePages =
         remember(messageIdHex, attachments, mine, sender, recordedAt) {
@@ -387,6 +386,7 @@ internal fun ConversationMediaViewer(
         videoFileResolver = videoFileResolver,
         onGoToMessage = onGoToMessage,
         forwardActions = forwardActions,
+        imageBytes = imageBytes,
     )
 }
 
@@ -408,6 +408,7 @@ internal fun FullScreenMediaViewer(
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
+    imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
 ) {
     if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -761,6 +762,7 @@ internal fun FullScreenMediaViewer(
                         mine = pageDescriptor.mine,
                         isCurrent = isCurrent,
                         onChromeToggle = { if (isCurrent) chromeVisible = !chromeVisible },
+                        imageBytes = imageBytes?.let { loader -> { loader(pageDescriptor) } },
                     )
                 }
             }
@@ -789,25 +791,12 @@ internal fun FullScreenMediaViewer(
         )
     }
     if (pictureSession.failedDraft != null && pictureSession.isCurrent() && !pictureSession.busy) {
-        AlertDialog(
-            onDismissRequest = {
+        GroupPictureFailureDialog(
+            onRetry = { scope.launch { pictureSession.retry(::commitPicture) } },
+            onDismiss = {
                 pictureSession.cancel()
                 pictureFailures.clear()
                 pictureNotice = null
-            },
-            title = { Text(stringResource(R.string.toast_couldnt_update_group)) },
-            text = { Text(stringResource(R.string.error_try_again)) },
-            confirmButton = {
-                TextButton(onClick = { scope.launch { pictureSession.retry(::commitPicture) } }) {
-                    Text(stringResource(R.string.retry))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    pictureSession.cancel()
-                    pictureFailures.clear()
-                    pictureNotice = null
-                }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -1043,6 +1032,7 @@ internal fun ViewerPage(
     mine: Boolean,
     isCurrent: Boolean,
     onChromeToggle: () -> Unit,
+    imageBytes: (suspend () -> ByteArray)? = null,
 ) {
     // `pointerInput(pageKey)` only restarts when the key changes — its
     // coroutine outlives any single gesture. Function parameters
@@ -1057,6 +1047,7 @@ internal fun ViewerPage(
     val latestOnScaleChange by rememberUpdatedState(onScaleChange)
     val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
     val latestOnChromeToggle by rememberUpdatedState(onChromeToggle)
+    val latestImageBytes by rememberUpdatedState(imageBytes)
     // `sourceEpoch` is folded into the page key so a viewer that failed
     // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
     // and retries when the real reference arrives.
@@ -1106,7 +1097,9 @@ internal fun ViewerPage(
         viewerFailed = false
         viewerTooLarge = false
         try {
-            val data = attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
+            val data =
+                latestImageBytes?.invoke()
+                    ?: attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,

@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-successor-empty
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Transfer administration
+- assertVisible:
+    id: sole-admin-delete-picker-empty
+- back
+- assertVisible:
+    id: presentation.complete
