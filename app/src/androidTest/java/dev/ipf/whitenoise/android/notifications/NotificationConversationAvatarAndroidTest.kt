@@ -88,6 +88,9 @@ class NotificationConversationAvatarAndroidTest {
         // Each fixture conversation is new, so these are the first cards they ever post, one write each.
         post(presenter, DM_GROUP, isDm = true, picture = solid(Color.RED), sender = solid(Color.RED), body = "first")
         val headsUp = capture("first_card_heads_up")
+        // Sample the banner now, while the live hierarchy still describes it: once other cards post or the shade
+        // opens, the same view ids resolve to other bounds and would sample the wrong part of this screenshot.
+        val headsUpCircle = colorOf(headsUp, DM_NAME, "conversation_icon")
         post(presenter, GROUP, isDm = false, picture = solid(Color.BLUE), sender = solid(Color.GREEN), body = "first")
         post(presenter, LONG_GROUP, isDm = true, picture = solid(Color.MAGENTA), sender = null, body = LONG_BODY)
 
@@ -97,7 +100,7 @@ class NotificationConversationAvatarAndroidTest {
         assertColor("first direct-chat circle", Color.RED, colorOf(collapsed, DM_NAME, "conversation_icon"))
         assertColor("first group circle", Color.BLUE, colorOf(collapsed, GROUP_NAME, "conversation_icon"))
         assertColor("first long-message picture", Color.MAGENTA, colorOf(collapsed, LONG_NAME, "right_icon"))
-        colorOf(headsUp, DM_NAME, "conversation_icon")?.let { assertColor("first heads-up circle", Color.RED, it) }
+        headsUpCircle?.let { assertColor("first heads-up circle", Color.RED, it) }
 
         device.findObject(By.text(DM_NAME))?.swipe(Direction.DOWN, EXPAND_SWIPE)
         device.waitForIdle()
