@@ -61,7 +61,21 @@ internal data class LocalGroupRemovalRequest(
     val groupIdHex: String,
     val forgetProtocol: Boolean,
     val onForgetResult: (Boolean) -> Unit = {},
-)
+) {
+    /**
+     * A forget, like the reset it replaced, proceeds without media keys when its media listing fails, so a listing
+     * never blocks the escape path (#3310). A local delete has no fallback and keeps its strict preflight.
+     */
+    fun mediaPreflightFallback(): ((Throwable) -> PendingLocalGroupDeleteCleanup)? =
+        if (forgetProtocol) {
+            { failure ->
+                appStateDebug(failure) { "local forget media listing failed, continuing without media keys" }
+                PendingLocalGroupDeleteCleanup(account, groupIdHex, emptyList(), emptySet())
+            }
+        } else {
+            null
+        }
+}
 
 /**
  * Preserve client data until native commit, then retry trailing Android cleanup without another mutation.
@@ -104,6 +118,7 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
                             }
                         }
                     },
+                    preflightFallback = request.mediaPreflightFallback(),
                 ),
             )
         onNativeCommitted()
