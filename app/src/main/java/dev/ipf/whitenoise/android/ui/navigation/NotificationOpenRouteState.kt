@@ -37,6 +37,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
  *   the Activity's pending target and request id, the process-owned selection, open context and
  *   first-frame priority in MainShellProcessState, the saved section state in
  *   MainShellStateHolder, and any work already launched into the app's process scope.
+ * - The other shell owners the port writes keep their own lifetimes: shellNavState and
+ *   settingsHomeViewport are rememberSaveable in MainShell, so they survive Activity recreation
+ *   through the saved instance state but are dropped on shell unmount, and chatListReturnHeadSnap
+ *   is a plain remember, dropped on both.
  *
  * What is cancelled:
  * - The keyed routing effect is cancelled on every key change and on unmount. That cancels a
