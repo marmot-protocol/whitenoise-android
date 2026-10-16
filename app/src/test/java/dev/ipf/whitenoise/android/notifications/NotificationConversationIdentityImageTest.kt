@@ -275,6 +275,28 @@ class NotificationConversationIdentityImageTest {
             assertEquals(Color.BLUE, identityPixel(liveCard()))
         }
 
+    /** A group picture loader that fails yields no group picture, but the sender picture that arrived still lands. */
+    @Test
+    fun lateIdentityRefreshKeepsTheSenderPictureWhenTheGroupLoaderFails() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            show(presenter, group())
+            val before = posts.size
+            val sources =
+                NotificationIdentityPictureSources(
+                    null,
+                    null,
+                    null,
+                    PICTURE_URL,
+                    conversationLoader = { error("the group picture download failed") },
+                )
+
+            assertTrue(refreshLateIdentity(presenter, group(), sources))
+
+            assertEquals("the sender picture is still written once", before + 1, posts.size)
+        }
+
     /** A redacted group card never asks the loader for its encrypted picture, and nothing is written. */
     @Test
     fun lateIdentityRefreshNeverLoadsAGroupPictureForARedactedCard() =

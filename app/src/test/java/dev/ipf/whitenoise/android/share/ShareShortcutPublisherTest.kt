@@ -8,6 +8,7 @@ import androidx.core.app.Person
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -20,6 +21,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -375,18 +377,30 @@ class ShareShortcutPublisherTest {
     @Test
     fun publish_retainsAShortcutHeldForACardAboutToBePosted() {
         val held = cardShortcut("acct", "invite-group", "Invite")
-        val rich =
+        val base =
             checkNotNull(
                 buildShareShortcut(
                     RuntimeEnvironment.getApplication(),
-                    ShareShortcutTarget(
-                        "acct",
-                        "invite-group",
-                        "Invite",
-                        avatarBitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888),
-                    ),
+                    ShareShortcutTarget("acct", "invite-group", "Invite"),
                 ),
             )
+        // The presenter publishes a real picture and Person, which the icon-less platform readback cannot rebuild.
+        val rich =
+            ShortcutInfoCompat
+                .Builder(base)
+                .setIcon(IconCompat.createWithBitmap(Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)))
+                .setPerson(
+                    Person
+                        .Builder()
+                        .setName("Invite sender")
+                        .setKey("invite-sender")
+                        .build(),
+                ).build()
+        // The presenter stamps the current preview policy into the shortcut it publishes and holds.
+        val preview = NotificationPreviewPreferences.capture(RuntimeEnvironment.getApplication())
+        rich.extras?.let { stampShortcutPreview(preview, it) }
+        assertEquals("the held shortcut carries a picture", IconCompat.TYPE_BITMAP, rich.icon?.type)
+        assertEquals("the held shortcut carries its Person", listOf("Invite sender"), personsOf(rich).map { it.name })
         var published = emptyList<ShortcutInfoCompat>()
         val publisher =
             ShareShortcutPublisher(
@@ -404,7 +418,7 @@ class ShareShortcutPublisherTest {
         assertEquals(listOf(conversationShortcutId("acct", "g1"), held.id), published.map { it.id })
         val retained = published.single { it.id == held.id }
         assertSame("the published picture is kept", rich.icon, retained.icon)
-        assertEquals("the published Person is kept", personsOf(rich), personsOf(retained))
+        assertEquals("the published Person is kept", listOf("Invite sender"), personsOf(retained).map { it.name })
         assertFalse(
             "a held shortcut keeps its picture, so nothing needs publishing again",
             InFlightConversationShortcuts.consumeIdentityLost(held.id),

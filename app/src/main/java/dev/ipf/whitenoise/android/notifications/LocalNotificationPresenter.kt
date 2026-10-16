@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.dismissalTime
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -1503,7 +1504,8 @@ class LocalNotificationPresenter(
      * Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it. A
      * conversation picture with no URL, such as a group's encrypted image, comes from the sources' loader. That loader
      * downloads and decrypts through MDK and runs only in the late refresh, after the enrichment permit is released,
-     * so it gets a longer bound than a URL picture and a slow network or busy device still gets the picture.
+     * so it gets a longer bound than a URL picture and a slow network or busy device still gets the picture. A loader
+     * that fails yields no group picture without cancelling the sender slot.
      */
     private suspend fun resolveAvatars(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?> =
         withContext(Dispatchers.Default) {
@@ -1513,7 +1515,9 @@ class LocalNotificationPresenter(
                         sources.conversationBitmap
                             ?: avatarBitmapResolver(sources.conversationUrl)
                             ?: sources.conversationLoader?.let { load ->
-                                withTimeoutOrNull(GROUP_IDENTITY_LOAD_TIMEOUT_MS) { load() }
+                                withTimeoutOrNull(GROUP_IDENTITY_LOAD_TIMEOUT_MS) {
+                                    runCatchingCancellable { load() }.getOrNull()
+                                }
                             }
                     }
                 val senderAvatar = async { sources.senderBitmap ?: avatarBitmapResolver(sources.senderUrl) }
