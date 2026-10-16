@@ -99,6 +99,27 @@ class ChatListSelectionBarScreenshotTest {
             departureLabel = R.string.leave_and_delete,
         )
 
+    /** #3310: a mixed selection offers its separate abandonment beside Leave and delete, in the light theme. */
+    @Test
+    fun abandonMixedLight() =
+        capture(
+            "selection_actions_abandon_light",
+            departureLabel = R.string.leave_and_delete,
+            abandonLabel = R.string.chats_abandon_mixed_action,
+        )
+
+    /** The direct-chat abandonment at 200% text in RTL keeps both destructive actions reachable. */
+    @Test
+    @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
+    fun abandonDirectLargeRtl() =
+        capture(
+            "selection_actions_abandon_large_rtl",
+            rtl = true,
+            large = true,
+            departureLabel = R.string.delete_from_device,
+            abandonLabel = R.string.chat_abandon_action,
+        )
+
     /** Captures the actual controls with deterministic eligibility and no account content. */
     @Suppress("LongParameterList")
     private fun capture(
@@ -109,6 +130,7 @@ class ChatListSelectionBarScreenshotTest {
         rtl: Boolean = false,
         large: Boolean = false,
         departureLabel: Int? = null,
+        abandonLabel: Int? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (large) 2f else 1f) {
@@ -140,6 +162,7 @@ class ChatListSelectionBarScreenshotTest {
                             onMovePinned = {},
                             onSelectAll = {},
                             onDeselectAll = {},
+                            abandonLabel = abandonLabel?.let { stringResource(it) },
                         )
                     }
                 }
@@ -149,6 +172,7 @@ class ChatListSelectionBarScreenshotTest {
         val selectAllLabel = context.getString(R.string.chat_list_select_all)
         composeRule.onNodeWithText(selectAllLabel, useUnmergedTree = true).assertIsDisplayed()
         departureLabel?.let { composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed() }
+        abandonLabel?.let { composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed() }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 }

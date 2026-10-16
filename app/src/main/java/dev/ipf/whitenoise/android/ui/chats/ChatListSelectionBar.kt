@@ -56,7 +56,10 @@ internal fun ChatListSelectionBar(onClose: () -> Unit) {
     )
 }
 
-/** Direct bulk controls retain native eligibility and reject callbacks from a replaced selection. */
+/**
+ * Direct bulk controls retain native eligibility and reject callbacks from a replaced selection. A non-null
+ * [abandonLabel] adds the separate destructive abandonment (#3310), kept apart from Leave and local delete.
+ */
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 internal fun ChatListSelectionControls(
@@ -84,6 +87,8 @@ internal fun ChatListSelectionControls(
     onDeselectAll: () -> Unit,
     isCurrent: () -> Boolean = { true },
     deleteLabel: String = stringResource(R.string.delete),
+    abandonLabel: String? = null,
+    onAbandon: () -> Unit = {},
 ) {
     var active by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { active = false } }
@@ -212,6 +217,15 @@ internal fun ChatListSelectionControls(
             destructive = true,
             onClick = { perform(onDelete) },
         )
+        abandonLabel?.let { label ->
+            DirectSelectionAction(
+                label = label,
+                icon = R.drawable.ic_person_remove,
+                enabled = actionsEnabled,
+                destructive = true,
+                onClick = { perform(onAbandon) },
+            )
+        }
     }
 }
 

@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.chats.ChatDepartureTarget
+import dev.ipf.whitenoise.android.ui.chats.abandonmentDepartureCallbacks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -144,6 +146,36 @@ class LocalGroupDeleteAbandonmentTest {
             } finally {
                 Dispatchers.resetMain()
             }
+        }
+
+    /**
+     * The chat-list bulk action's step abandons a reviewed chat through the same forget, with no handover to prepare
+     * and no departure. The batch dialog reports the outcome, so the step posts no per-chat success notice.
+     */
+    @Test
+    fun bulkAbandonmentStepForgetsTheReviewedChatWithoutAnyDeparture() =
+        runTest {
+            val fixture = fixture()
+            val steps = abandonmentDepartureCallbacks(fixture.controller)
+            assertTrue("no handover is prepared", steps.prepare(GROUP).isEmpty())
+            assertTrue(steps.remove(ChatDepartureTarget(GROUP, "Alice", isDm = true), null))
+            flushLocalDeleteChatRows()
+            assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
+            assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
+            assertTrue(fixture.controller.items.none { it.id == GROUP })
+            assertEquals("the batch dialog reports the outcome", null, fixture.state.transientNotice)
+        }
+
+    /** A failed bulk step reports unfinished for the batch's retry and keeps the reset wording in its notice. */
+    @Test
+    fun failedBulkAbandonmentStepStaysUnfinishedInResetWording() =
+        runTest {
+            val fixture = fixture("forgetGroupLocal")
+            val steps = abandonmentDepartureCallbacks(fixture.controller)
+            assertFalse(steps.remove(ChatDepartureTarget(GROUP, "Hiking club", isDm = false), null))
+            assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
+            assertEquals(AppText.Resource(R.string.toast_couldnt_reset_group), fixture.state.toast?.title)
+            assertEquals(AppText.Resource(R.string.local_reset_retry_detail), fixture.state.toast?.detail)
         }
 
     /** A failed media listing never blocks abandonment: the forget runs once and only media keys are skipped. */

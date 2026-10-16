@@ -161,6 +161,8 @@
     <string name="abandon_identity_chat">Conversation : %1$s</string>
     <string name="abandon_identity_group">Groupe : %1$s</string>
     <string name="abandon_identity_account">Votre compte : %1$s</string>
+    <string name="chats_abandon_mixed_action">Abandonner les conversations sur cet appareil</string>
+    <string name="chats_abandon_dialog_title">Abandonner les conversations sélectionnées sur cet appareil ?</string>
     <string name="toast_chat_abandoned">Conversation abandonnée sur cet appareil.</string>
     <string name="toast_chat_already_abandoned">Cette conversation est déjà abandonnée sur cet appareil.</string>
     <string name="toast_couldnt_abandon_chat">Impossible d’abandonner la conversation. Réessayez.</string>

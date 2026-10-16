@@ -19,6 +19,10 @@ import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
 internal fun ChatListItem.offersLocalAbandonment(activeAccountIdHex: String?): Boolean =
     !group.pendingConfirmation && actions?.canDeleteLocal != false && !removedFromGroup(activeAccountIdHex)
 
+/** A selection offers bulk abandonment only when it is not empty and every selected chat offers it. */
+internal fun List<ChatListItem>.offerLocalAbandonment(activeAccountIdHex: String?): Boolean =
+    isNotEmpty() && all { it.offersLocalAbandonment(activeAccountIdHex) }
+
 /** The row menu's abandonment entry, where [isDm] picks the direct-chat or group wording of the same forget. */
 internal class ChatAbandonMenuAction(
     val isDm: Boolean,
@@ -39,13 +43,12 @@ internal class PendingChatAbandonment private constructor(
             titleCopy: GroupTitleCopy,
         ): PendingChatAbandonment? {
             val account = controller.accountRef ?: return null
-            val accountName = appState.activeAccount?.accountIdHex?.let(appState::accountDisplayNameCached) ?: account
             return PendingChatAbandonment(
                 owner = PendingLocalChatDelete.capture(listOf(item), controller, appState),
                 target =
                     GroupAbandonmentTarget(
                         accountRef = account,
-                        accountName = accountName,
+                        accountName = abandonmentAccountName(appState, account),
                         groupIdHex = item.group.groupIdHex,
                         conversationTitle = chatListItemDisplayTitle(item, appState, titleCopy),
                         isDm = item.isDm(),
@@ -54,6 +57,28 @@ internal class PendingChatAbandonment private constructor(
         }
     }
 }
+
+/** The acting account a confirmation names: its cached display name, else the account reference itself. */
+internal fun abandonmentAccountName(
+    appState: WhiteNoiseAppState,
+    account: String,
+): String = appState.activeAccount?.accountIdHex?.let(appState::accountDisplayNameCached) ?: account
+
+/**
+ * The chat-list bulk abandonment's batch steps (#3310). There is no handover to prepare or choose, and each reviewed
+ * chat goes through the same journaled forget as the row action, in abandonment wording, without a per-chat success
+ * notice: the batch dialog reports the outcome, and a failure keeps its own notice and retry.
+ */
+internal fun abandonmentDepartureCallbacks(
+    controller: ChatsController,
+    onProgress: (String, Int, Int) -> Unit = { _, _, _ -> },
+): ChatDepartureCallbacks =
+    ChatDepartureCallbacks(
+        prepare = { emptyList() },
+        choose = { _, _ -> null },
+        remove = { target, _ -> controller.abandonChatFromList(target.groupId, target.isDm, notify = false) },
+        onProgress = onProgress,
+    )
 
 /**
  * Chat-list host for the shared abandonment confirmation. Confirm closes the dialog before the journaled forget

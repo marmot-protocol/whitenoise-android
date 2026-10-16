@@ -37,7 +37,7 @@ class GroupAbandonmentCoverageTest {
         assertTrue("the dialog names the conversation", "target.conversationTitle" in dialog)
         assertTrue("confirm is disabled while the forget runs", "enabled = !running" in dialog)
         val chatHost = source("ui/chats/ChatAbandonment.kt")
-        assertEquals("both surfaces share one confirmation", 2, sharedDialogUses())
+        assertEquals("every surface shares one confirmation", 3, sharedDialogUses())
         assertTrue(
             "chat-list confirm closes before submitting and fences its captured owner",
             chatHost.indexOf("onDismiss()") < chatHost.indexOf("request.owner.isCurrent(appState, controller)"),
@@ -65,6 +65,32 @@ class GroupAbandonmentCoverageTest {
             DEPARTURES.forEach { assertFalse("$name abandonment must not call $it", it in body) }
             assertFalse("$name abandonment must not use the receiving local delete", "deleteGroupLocal(" in body)
         }
+    }
+
+    /**
+     * The chat-list bulk action reaches the same journaled forget as the row action: it opens only for a selection
+     * that offers abandonment, through the captured departure request and its busy set, reviews every chat in the
+     * shared confirmation, and each step calls abandonChatFromList, never a departure or a receiving delete.
+     */
+    @Test
+    fun bulkAbandonmentUsesTheSharedForgetBoundary() {
+        val selection =
+            source("ui/chats/ChatsScreen.kt")
+                .substringAfter("abandonLabel =")
+                .substringBefore("onAddToFolder =")
+        assertTrue("only a selection that offers it", "offerLocalAbandonment(" in selection)
+        assertTrue("the busy set fences duplicate taps", "leavingAndDeleting" in selection)
+        assertTrue("the captured request owns the batch", "PendingChatDeparture(" in selection)
+        assertTrue("the batch abandons", "abandon = true" in selection)
+        val dialog = source("ui/chats/ChatDepartureBatchDialog.kt")
+        assertTrue("the batch uses the abandonment steps", "abandonmentDepartureCallbacks(controller" in dialog)
+        val steps =
+            source("ui/chats/ChatAbandonment.kt")
+                .substringAfter("fun abandonmentDepartureCallbacks(")
+                .substringBefore("\n\n")
+        assertTrue("each step uses the row action's forget", "abandonChatFromList(" in steps)
+        DEPARTURES.forEach { assertFalse("bulk abandonment must not call $it", it in steps) }
+        assertFalse("bulk abandonment must not delete locally", "deleteGroupLocalFromChatList" in steps)
     }
 
     /**
@@ -137,7 +163,11 @@ class GroupAbandonmentCoverageTest {
 
     /** How many entry-point sources compose the one shared confirmation. */
     private fun sharedDialogUses(): Int =
-        listOf("ui/group/GroupDetailsScreen.kt", "ui/chats/ChatAbandonment.kt").count {
+        listOf(
+            "ui/group/GroupDetailsScreen.kt",
+            "ui/chats/ChatAbandonment.kt",
+            "ui/chats/ChatDepartureBatchDialog.kt",
+        ).count {
             "GroupAbandonmentDialog(" in source(it)
         }
 

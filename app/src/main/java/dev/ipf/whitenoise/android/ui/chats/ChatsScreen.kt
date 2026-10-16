@@ -118,6 +118,7 @@ import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
+import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
@@ -1658,6 +1659,11 @@ internal fun ChatsScreen(
                 val selectionAccount = appState.activeAccountRef
                 val selectionRuntime = appState.runtimeGeneration
                 val selectionIds = selectedChatIds.toSet()
+                val activeAccountIdHex = appState.activeAccount?.accountIdHex
+                val abandonableSelection =
+                    selectedVisibleItems
+                        .takeIf { it.offerLocalAbandonment(activeAccountIdHex) }
+                        ?.map { it.isDm() }
                 dev.ipf.whitenoise.android.ui.common.AdaptiveContent(
                     Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 ) {
@@ -1706,6 +1712,19 @@ internal fun ChatsScreen(
                                 selectedVisibleItems
                                     .takeIf { it.isNotEmpty() }
                                     ?.let { PendingChatDeparture(it, controller, appState, groupTitleCopy) }
+                        },
+                        // #3310: bulk abandonment, only when every selected chat offers it, through the same
+                        // captured owner, busy set and batch dialog as Leave and delete.
+                        abandonLabel = abandonableSelection?.let { stringResource(groupAbandonmentBatchLabel(it)) },
+                        onAbandon = {
+                            if (selectedVisibleItems.any { it.group.groupIdHex in leavingAndDeleting }) {
+                                return@ChatListSelectionControls
+                            }
+                            val selected = selectedVisibleItems
+                            if (selected.offerLocalAbandonment(activeAccountIdHex)) {
+                                pendingLeaveAndDelete =
+                                    PendingChatDeparture(selected, controller, appState, groupTitleCopy, abandon = true)
+                            }
                         },
                         onAddToFolder = {
                             openFolderPicker(selectedVisibleItems)

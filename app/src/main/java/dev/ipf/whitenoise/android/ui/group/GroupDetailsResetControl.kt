@@ -107,6 +107,18 @@ internal fun groupAbandonmentActionLabel(isDm: Boolean): Int =
     }
 
 /**
+ * The bulk label for the same forget: the single-chat wording when every selected chat is a direct chat or every one
+ * is a group, and the mixed wording otherwise. [dmFlags] holds each selected chat's direct-chat flag.
+ */
+@StringRes
+internal fun groupAbandonmentBatchLabel(dmFlags: Collection<Boolean>): Int =
+    when {
+        dmFlags.all { it } -> R.string.chat_abandon_action
+        dmFlags.none { it } -> R.string.group_reset_action
+        else -> R.string.chats_abandon_mixed_action
+    }
+
+/**
  * Group Details entry for MDK 0.10.0's local forget (#3310): a direct chat is abandoned on this device and a group
  * is reset to wait for a Welcome created after the reset. It is deliberately separate from leaving, which tells the
  * other members, and from the ordinary local delete, which keeps receiving. Opening it only asks for confirmation.
@@ -143,21 +155,50 @@ internal fun GroupAbandonmentDialog(
     status: GroupAbandonmentStatus,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+) = GroupAbandonmentReviewDialog(listOf(target), status, onConfirm, onDismiss)
+
+/**
+ * The same confirmation for the chat list's bulk action: every reviewed chat of the one acting account, captured
+ * when the action was chosen, with the consequences of each kind of chat among them. The batch dialog that follows
+ * owns the progress and any per-chat failure.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun GroupAbandonmentDialog(
+    targets: List<GroupAbandonmentTarget>,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) = GroupAbandonmentReviewDialog(targets, GroupAbandonmentStatus.Review, onConfirm, onDismiss)
+
+/** The review for one or several chats; a single chat keeps its own title and confirm wording. */
+@Suppress("FunctionNaming")
+@Composable
+private fun GroupAbandonmentReviewDialog(
+    targets: List<GroupAbandonmentTarget>,
+    status: GroupAbandonmentStatus,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val running = status == GroupAbandonmentStatus.Running
     val failed = status == GroupAbandonmentStatus.Failed
-    val titleRes = if (target.isDm) R.string.chat_abandon_dialog_title else R.string.group_reset_dialog_title
+    val anyDm = targets.any { it.isDm }
+    val titleRes =
+        when {
+            targets.size > 1 -> R.string.chats_abandon_dialog_title
+            anyDm -> R.string.chat_abandon_dialog_title
+            else -> R.string.group_reset_dialog_title
+        }
     val confirmLabel =
         when {
             failed -> R.string.retry
-            target.isDm -> R.string.chat_abandon_confirm
+            anyDm -> R.string.chat_abandon_confirm
             else -> R.string.group_reset_confirm
         }
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("group.abandon.dialog"),
         title = { Text(stringResource(titleRes)) },
-        text = { GroupAbandonmentBody(target, failed) },
+        text = { GroupAbandonmentBody(targets, failed) },
         icon = if (running) ({ CircularProgressIndicator() }) else null,
         confirmButton = {
             TextButton(
@@ -175,36 +216,31 @@ internal fun GroupAbandonmentDialog(
     )
 }
 
-/** Identity first, then consequences, then any failure, scrolling as one block at large text sizes. */
+/** Identities first, then the consequences for each kind of chat, then any failure, scrolling as one block. */
 @Suppress("FunctionNaming")
 @Composable
 private fun GroupAbandonmentBody(
-    target: GroupAbandonmentTarget,
+    targets: List<GroupAbandonmentTarget>,
     failed: Boolean,
 ) {
+    val style = MaterialTheme.typography.bodyMedium
+    val color = MaterialTheme.colorScheme.onSurface
     Column(
         Modifier.fadingVerticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.testTag("group.abandon.identity"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                stringResource(
-                    if (target.isDm) R.string.abandon_identity_chat else R.string.abandon_identity_group,
-                    target.conversationTitle,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                stringResource(R.string.abandon_identity_account, target.accountName),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            targets.forEach { target ->
+                val identity = if (target.isDm) R.string.abandon_identity_chat else R.string.abandon_identity_group
+                Text(stringResource(identity, target.conversationTitle), style = style, color = color)
+            }
+            targets.firstOrNull()?.let { first ->
+                Text(stringResource(R.string.abandon_identity_account, first.accountName), style = style, color = color)
+            }
         }
-        val consequences =
-            if (target.isDm) R.string.chat_abandon_dialog_message else R.string.group_reset_dialog_message
-        Text(stringResource(consequences))
-        if (failed) GroupAbandonmentFailure(target.isDm)
+        if (targets.any { it.isDm }) Text(stringResource(R.string.chat_abandon_dialog_message))
+        if (targets.any { !it.isDm }) Text(stringResource(R.string.group_reset_dialog_message))
+        if (failed) GroupAbandonmentFailure(targets.all { it.isDm })
     }
 }
 

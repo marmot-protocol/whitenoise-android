@@ -157,6 +157,8 @@
     <string name="abandon_identity_chat">對話：%1$s</string>
     <string name="abandon_identity_group">群組：%1$s</string>
     <string name="abandon_identity_account">你的帳號：%1$s</string>
+    <string name="chats_abandon_mixed_action">在此裝置上放棄所選對話</string>
+    <string name="chats_abandon_dialog_title">要在此裝置上放棄所選對話嗎？</string>
     <string name="toast_chat_abandoned">已在此裝置上放棄對話。</string>
     <string name="toast_chat_already_abandoned">此對話已在此裝置上放棄。</string>
     <string name="toast_couldnt_abandon_chat">無法放棄對話，請再試一次。</string>

@@ -98,6 +98,33 @@ class GroupAbandonmentDialogScreenshotTest {
         assertEquals(1, abandons)
     }
 
+    /** The chat list's bulk review names every selected chat and the account, with both kinds' consequences. */
+    @Test
+    fun bulkMixedReviewLight() = captureBulk("light")
+
+    /** The bulk review at 200% text in RTL in the dark theme keeps every chat, consequence and button reachable. */
+    @Test
+    fun bulkMixedReviewLargeRtl() = captureBulk("large_rtl", dark = true, large = true)
+
+    /** The bulk review lists each chat with its own kind and confirms once for all of them. */
+    @Test
+    fun bulkReviewNamesEveryChatAndConfirmsOnce() {
+        var confirms = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                GroupAbandonmentDialog(listOf(DM, GROUP), onConfirm = { confirms++ }, onDismiss = {})
+            }
+        }
+        composeRule.onNodeWithText(app.getString(R.string.chats_abandon_dialog_title)).assertIsDisplayed()
+        listOf(
+            app.getString(R.string.abandon_identity_chat, DM.conversationTitle),
+            app.getString(R.string.abandon_identity_group, GROUP.conversationTitle),
+            app.getString(R.string.abandon_identity_account, DM.accountName),
+        ).forEach { composeRule.onNodeWithText(it).assertExists() }
+        composeRule.onNodeWithTag("group.abandon.confirm").performClick()
+        assertEquals(1, confirms)
+    }
+
     /** The dialog names the action, the exact conversation and the acting account, and Cancel submits nothing. */
     @Test
     fun reviewNamesTheTargetAndCancelSubmitsNothing() {
@@ -151,6 +178,25 @@ class GroupAbandonmentDialogScreenshotTest {
         composeRule
             .onNodeWithTag("chat_info.leave_blocked")
             .captureRoboImage("src/test/snapshots/group_abandon_leave_blocked_$name.png")
+    }
+
+    /** Composes the bulk review of a direct chat and a group and records its window. */
+    private fun captureBulk(
+        name: String,
+        dark: Boolean = false,
+        large: Boolean = false,
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (large) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = if (large) 2f else 1f) {
+                    GroupAbandonmentDialog(listOf(DM, GROUP), onConfirm = {}, onDismiss = {})
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_abandon_bulk_mixed_$name.png")
     }
 
     /** Composes the sole-admin gate under the requested appearance and records its window. */
