@@ -1504,7 +1504,9 @@ class LocalNotificationPresenter(
         senderAvatarBitmap: Bitmap?,
         enrichedSender: Person,
     ) {
-        // The enriched rewrite is a second platform write for the same card; it takes a slot like the first.
+        // The enriched rewrite is a second platform write for the same card, so it takes a slot like the first,
+        // but only while the card still shows this message. The lock section below checks it again.
+        if (!isLiveCardForMessage(content, update)) return
         postPacer.awaitSlot()
         ConversationCardPostSynchronizer.withLock(
             content.notificationTag,
@@ -1553,6 +1555,17 @@ class LocalNotificationPresenter(
         }
     }
 
+    /** Whether this message's card is still on the platform, the cheap check before spending a pacer slot. */
+    private fun isLiveCardForMessage(
+        content: LocalNotificationContent,
+        update: NotificationUpdateFfi,
+    ): Boolean {
+        val active = activeConversationCard(content.notificationTag, content.notificationId)
+        val expectedMessageId = update.messageIdHex?.takeIf(String::isNotBlank)
+        val sameMessage = expectedMessageId == null || conversationCardMessageIdHex(active) == expectedMessageId
+        return active != null && sameMessage
+    }
+
     /** Writes the late sender and identity picture to the still-live card, keeping its dismissal ownership. */
     private fun postEnrichedAvatarCard(
         content: LocalNotificationContent,
@@ -1599,11 +1612,15 @@ class LocalNotificationPresenter(
         isRefreshCurrent: () -> Boolean,
     ): Boolean =
         withContext(Dispatchers.Default) {
-            val arrived = arrivedPictures(pictures)?.takeIf { isRefreshCurrent() }
+            val arrived =
+                arrivedPictures(pictures)?.takeIf {
+                    isRefreshCurrent() && refreshableIdentityCard(update, content) != null
+                }
             if (arrived == null) {
                 false
             } else {
-                // A late picture is another platform write for the same card, so it takes a slot like the first.
+                // A late picture is another platform write for the same card, so it takes a slot like the first,
+                // but only once the card still qualifies. The lock section below checks it again.
                 postPacer.awaitSlot()
                 ConversationCardPostSynchronizer.withLock(
                     content.notificationTag,

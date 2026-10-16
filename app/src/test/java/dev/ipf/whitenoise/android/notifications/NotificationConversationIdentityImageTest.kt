@@ -24,6 +24,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * #3311: the bitmap each rich message card carries in its primary identity slot, across the conversation template,
@@ -266,6 +267,38 @@ class NotificationConversationIdentityImageTest {
             assertEquals(1, posts.size)
         }
 
+    /** A late picture for a card that is gone by the time it arrives takes no pacer slot. */
+    @Test
+    fun lateIdentityRefreshForAGoneCardTakesNoPacerSlot() =
+        runBlocking {
+            val slots = AtomicInteger()
+            val presenter = presenter(resolver = ::latePicture, pacer = countingPacer(slots))
+            show(presenter, dm())
+            val afterPost = slots.get()
+            manager.cancelAll()
+
+            assertFalse(refreshLateIdentity(presenter, dm()))
+
+            assertEquals(afterPost, slots.get())
+        }
+
+    /** A picture that resolves after its card left the platform takes no pacer slot on the enrichment path either. */
+    @Test
+    fun enrichmentForAGoneCardTakesNoPacerSlot() {
+        val slots = AtomicInteger()
+        var enrichment: (suspend () -> Unit)? = null
+        val presenter =
+            presenter(resolver = ::latePicture, launcher = { enrichment = it }, pacer = countingPacer(slots))
+        show(presenter, dm(), senderUrl = PICTURE_URL)
+        val afterPost = slots.get()
+        manager.cancelAll()
+
+        runBlocking { checkNotNull(enrichment).invoke() }
+
+        assertEquals(afterPost, slots.get())
+        assertTrue(manager.activeNotifications.isEmpty())
+    }
+
     /** Runs the late-picture refresh for [update] as AppState does, with every caller fence open. */
     private suspend fun refreshLateIdentity(
         presenter: LocalNotificationPresenter,
@@ -295,6 +328,7 @@ class NotificationConversationIdentityImageTest {
         resolver: suspend (String?) -> Bitmap? = { null },
         launcher: (suspend () -> Unit) -> Unit = { error("ready pictures must not launch enrichment") },
         contactAvatar: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
+        pacer: NotificationPostPacer = NotificationPostPacer(),
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context = context,
@@ -308,7 +342,17 @@ class NotificationConversationIdentityImageTest {
             avatarBitmapResolver = resolver,
             enrichmentLauncher = launcher,
             contactAvatarOverride = contactAvatar,
+            postPacer = pacer,
         ).also { it.ensureChannels() }
+
+    /** A pacer that counts the write slots taken, one clock read per slot. */
+    private fun countingPacer(slots: AtomicInteger) =
+        NotificationPostPacer(
+            nowMillis = {
+                slots.incrementAndGet()
+                0L
+            },
+        )
 
     /** Posts one message with the given ready pictures, cold picture URL and body. */
     @Suppress("LongParameterList") // Mirrors the presenter's optional picture inputs by name.
