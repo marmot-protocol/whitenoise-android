@@ -1,9 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
@@ -15,7 +18,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -25,7 +27,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -51,7 +56,7 @@ internal fun OpenSourceLicensesScreen(onBack: () -> Unit) {
     }
 }
 
-/** Shows loading, a retryable failure, the selected notice's selectable text or the sectioned list. */
+/** Shows loading, a retryable failure, the selected notice's selectable text or the notice list. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun OpenSourceLicensesContent(
@@ -84,29 +89,25 @@ internal fun OpenSourceLicensesContent(
     }
 }
 
-/** Alphabetical Settings sections; each section is one segmented group of navigation rows. */
+/** One continuous Settings-style group of navigation rows, composed lazily for the full notice set. */
 @Suppress("FunctionNaming")
 @Composable
 private fun OpenSourceLicensesList(
     notices: List<OpenSourceNotice>,
     onSelect: (OpenSourceNotice) -> Unit,
 ) {
-    val sections = remember(notices) { notices.groupBy { noticeSection(it.name) } }
-    SettingsList(modifier = Modifier.testTag("licenses.list")) {
-        sections.forEach { (section, entries) ->
-            item(key = "section:$section") { SettingsSection(section) }
-            item(key = "group:$section") {
-                SettingsGroup {
-                    entries.forEach { notice ->
-                        row(notice.id) { context ->
-                            SettingsLink(context, title = notice.name, onClick = { onSelect(notice) })
-                        }
-                    }
-                }
-            }
+    WhiteNoiseLazyColumn(
+        modifier = Modifier.fillMaxSize().testTag("licenses.list"),
+        contentPadding = PaddingValues(top = WhiteNoiseSpacing.Related, bottom = WhiteNoiseSpacing.Section),
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseListItemDefaults.segmentedGap),
+    ) {
+        itemsIndexed(notices, key = { _, notice -> notice.id }) { index, notice ->
+            SettingsLink(
+                settingsRowContext(index, notices.size),
+                title = notice.name,
+                onClick = { onSelect(notice) },
+                modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+            )
         }
     }
 }
-
-/** The uppercase first letter of a notice name, or "#" when it starts with a digit or symbol. */
-internal fun noticeSection(name: String): String = name.firstOrNull()?.takeIf(Char::isLetter)?.uppercase() ?: "#"

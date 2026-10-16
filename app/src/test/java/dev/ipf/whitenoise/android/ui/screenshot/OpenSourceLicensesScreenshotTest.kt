@@ -51,6 +51,10 @@ class OpenSourceLicensesScreenshotTest {
     @Test
     fun selectedAmoled() = capture("text_amoled", dark = true, amoled = true, selected = true)
 
+    /** Keep the selected notice's full text readable with large RTL text. */
+    @Test
+    fun selectedLargeRtl() = capture("text_large_rtl", dark = false, selected = true, largeRtl = true)
+
     /** Keep retry legible with large RTL text. */
     @Test
     fun failureLargeRtl() = capture("failure_large_rtl", dark = true, failed = true, largeRtl = true)

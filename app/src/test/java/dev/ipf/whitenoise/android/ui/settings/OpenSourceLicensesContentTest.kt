@@ -29,31 +29,22 @@ class OpenSourceLicensesContentTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** Notices sit under their first letter, and a lowercase name joins its capital's section. */
+    /** Every notice is one row of a single list, without letter headings. */
     @Test
-    fun listGroupsNoticesUnderLetterHeadings() {
+    fun listShowsEveryNoticeWithoutHeadings() {
         val notices =
             listOf(
                 OpenSourceNotice("activity", "Activity", "Apache"),
                 OpenSourceNotice("errorprone", "error-prone annotations", "Apache"),
-                OpenSourceNotice("error", "Error Prone", "Apache"),
             )
         composeRule.setContent {
             WhiteNoiseTheme {
                 OpenSourceLicensesContent(Result.success(notices), null, {}, {})
             }
         }
-        composeRule.onNodeWithText("A").assertIsDisplayed()
-        composeRule.onAllNodesWithText("E").assertCountEquals(1)
+        composeRule.onNodeWithText("Activity").assertIsDisplayed()
         composeRule.onNodeWithText("error-prone annotations").assertIsDisplayed()
-    }
-
-    /** A section is the uppercase first letter, or "#" for a digit, symbol or empty name. */
-    @Test
-    fun sectionLetterIsUppercaseOrHash() {
-        assertEquals("E", noticeSection("error-prone annotations"))
-        assertEquals("#", noticeSection("2D library"))
-        assertEquals("#", noticeSection(""))
+        composeRule.onAllNodesWithText("A").assertCountEquals(0)
     }
 
     /** Selecting a row forwards the full notice identity to the screen state. */
