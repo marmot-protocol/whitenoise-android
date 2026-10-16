@@ -67,6 +67,15 @@ class GroupAbandonmentCoverageTest {
         val request = source("ui/group/GroupDetailsScreen.kt").functionBody("requestAbandonment")
         listOf("accountRef = account", "accountName =", "groupIdHex = controller.group.groupIdHex", "isDm = isDm")
             .forEach { assertTrue("Group Details review must capture $it", it in request) }
+        val screen = source("ui/group/GroupDetailsScreen.kt")
+        assertTrue(
+            "the review opens only for the conversation's own account while it is active",
+            "abandonmentAccount(controller.boundAccountRef, appState.activeAccountRef) ?: return" in request,
+        )
+        assertTrue(
+            "the confirm re-checks the conversation's account against the active one",
+            "abandonment.targets(actingAccount, controller.group.groupIdHex)" in screen,
+        )
         val dialog = source("ui/group/GroupDetailsResetControl.kt")
         assertTrue("the dialog names the acting account", "R.string.abandon_identity_account" in dialog)
         assertTrue("the dialog names the conversation", "target.conversationTitle" in dialog)

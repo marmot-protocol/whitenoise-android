@@ -26,7 +26,9 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -80,6 +82,32 @@ class GroupDetailsAbandonmentTest {
         review.recordMutation(leave = true, succeeded = false)
         review.recordMutation(leave = true, succeeded = true)
         assertFalse(review.leaveBlocked)
+    }
+
+    /**
+     * During a notification early open the conversation's account differs from the active one, so no review can
+     * open or confirm until they match, and a review opened for one account never confirms for another.
+     */
+    @Test
+    fun abandonmentActsOnlyForTheConversationAccountWhileItIsActive() {
+        assertNull("early open: no acting account yet", abandonmentAccount("notified", "active"))
+        assertNull("no conversation account", abandonmentAccount(null, "active"))
+        assertEquals("matching accounts act for that account", "same", abandonmentAccount("same", "same"))
+        val review = GroupAbandonmentReview()
+        review.open(
+            GroupAbandonmentTarget(
+                accountRef = "same",
+                accountName = "Same",
+                groupIdHex = "ab",
+                conversationTitle = "Chat",
+                isDm = true,
+            ),
+        )
+        assertTrue(review.targets(abandonmentAccount("same", "same"), "AB"))
+        assertFalse(
+            "the confirm is refused once the conversation and active accounts diverge",
+            review.targets(abandonmentAccount("same", "other"), "ab"),
+        )
     }
 
     /**

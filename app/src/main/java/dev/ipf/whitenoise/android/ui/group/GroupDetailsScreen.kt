@@ -610,9 +610,12 @@ internal fun GroupDetailsScreen(
             }
         }
 
-        /** Opens the abandonment review for this exact conversation under the current account (#3310, #3282). */
+        /**
+         * Opens the abandonment review for this exact conversation under the current account (#3310, #3282), and
+         * only once the conversation's account is the active one, so the review names the account that will forget.
+         */
         fun requestAbandonment() {
-            val account = appState.activeAccountRef ?: return
+            val account = abandonmentAccount(controller.boundAccountRef, appState.activeAccountRef) ?: return
             abandonment.open(
                 GroupAbandonmentTarget(
                     accountRef = account,
@@ -1145,7 +1148,8 @@ internal fun GroupDetailsScreen(
                         else -> GroupAbandonmentStatus.Review
                     },
                 onConfirm = {
-                    if (!abandonment.targets(appState.activeAccountRef, controller.group.groupIdHex)) {
+                    val actingAccount = abandonmentAccount(controller.boundAccountRef, appState.activeAccountRef)
+                    if (!abandonment.targets(actingAccount, controller.group.groupIdHex)) {
                         abandonment.dismiss()
                     } else if (activeMutation == null && !controller.mutationInFlight) {
                         abandonment.attempted = true

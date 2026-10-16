@@ -98,6 +98,16 @@ internal class GroupAbandonmentReview {
     }
 }
 
+/**
+ * The account a Details abandonment may review and confirm for: the conversation's own account, and only while it is
+ * also the active one. During a notification-routed early open the two differ, and the review would otherwise name the
+ * active account while the forget runs for the conversation's account.
+ */
+internal fun abandonmentAccount(
+    conversationAccount: String?,
+    activeAccount: String?,
+): String? = conversationAccount?.takeIf { it == activeAccount }
+
 /** The one label for MDK's local forget: abandoning a direct chat, or resetting a group to await a new invite. */
 @StringRes
 internal fun groupAbandonmentActionLabel(isDm: Boolean): Int =
