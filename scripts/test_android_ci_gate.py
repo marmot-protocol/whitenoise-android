@@ -104,12 +104,22 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn('continue-on-error:', self.gate)
 
     def test_inventory_reporting_cannot_weaken_or_fail_security_enforcement(self):
-        """Comparison availability is optional while dependency-security verification still blocks."""
+        """Exports and comparisons cannot fail a lane or weaken its preceding floor gate."""
         comparison = self.named_step(self.build_contracts, 'Compare already-observed dependencies with exact PR base')
-        verification = self.named_step(self.build_contracts, 'Verify selected dependency security floors')
         self.assertIn('\n        continue-on-error: true\n', comparison)
-        self.assertNotIn('continue-on-error:', verification)
-        self.assertIn('scripts/verify_dependency_security.py', verification)
+        submission = (WORKFLOW.parent / 'dependency-submission.yml').read_text()
+        jobs = [self.build_contracts, self.compose_compiler, self.static_analysis,
+                self.tests_job, self.secondary, submission]
+        for job in jobs:
+            verification = self.named_step(job, 'Verify selected dependency security floors')
+            export = self.named_step(job, 'Export observed dependency inventory')
+            self.assertNotIn('continue-on-error:', verification)
+            self.assertNotIn('--inventory', verification)
+            self.assertIn('scripts/verify_dependency_security.py', verification)
+            self.assertIn('\n        continue-on-error: true\n', export)
+            self.assertIn('\n        if: success()\n', export)
+            self.assertIn('--inventory', export)
+            self.assertLess(job.index(verification), job.index(export))
 
     def test_inventory_comparison_uses_tested_merge_parent_despite_stale_event_base(self):
         """Execute the production step against a merge whose master parent advanced after the event."""

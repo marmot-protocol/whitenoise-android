@@ -19,7 +19,12 @@ REPOSITORY = 'marmot-protocol/whitenoise-android'
 def api(path, binary=False):
     """Read bounded GitHub metadata or a size-checked artifact with the job token."""
     value = subprocess.check_output(['gh', 'api', f'repos/{REPOSITORY}/{path}'], timeout=60)
-    return value if binary else json.loads(value)
+    if binary:
+        return value
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise OSError('GitHub API response is not JSON') from error
 
 
 def baseline(source, artifact_name):

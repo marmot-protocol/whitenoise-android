@@ -71,6 +71,7 @@ class SelectedSecurityEvidenceTest(unittest.TestCase):
 
     def test_inventory_cli_success_retains_verified_plugin_selection(self):
         """Exercise CI's successful export seam after selected-version validation."""
+        self.report["artifact_coverage"] = "resolved_configuration"
         self.report["artifacts"] = [{"coordinate": "org.freemarker:freemarker:2.3.35", "name": "freemarker.jar",
                                      "sha256": "b" * 64, "bytes": 12}]
         with tempfile.TemporaryDirectory() as temporary:
@@ -85,6 +86,28 @@ class SelectedSecurityEvidenceTest(unittest.TestCase):
             selected = json.loads(output.read_text())
             self.assertEqual(selected["source_sha"], "a" * 40)
             self.assertEqual(selected["tooling_test"][0]["components"][0]["coordinate"], "org.freemarker:freemarker:2.3.35")
+
+    def test_inventory_only_errors_do_not_fail_floor_only_cli(self):
+        """Malformed optional observations fail export independently of security-floor enforcement."""
+        self.report.update(artifacts=[], artifact_coverage='resolved_configuration')
+        for mutate in [lambda r: r['components'][0].update(licenses='invalid'),
+                       lambda r: r['artifacts'].append({'coordinate': 'unknown:module:1'}),
+                       lambda r: r.update(artifact_coverage='partial')]:
+            candidate = copy.deepcopy(self.report)
+            mutate(candidate)
+            with self.subTest(candidate=candidate), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary); reports = root / 'reports'; reports.mkdir()
+                (reports / 'selected.json').write_text(json.dumps(candidate))
+                policy = root / 'policy.json'
+                policy.write_text(json.dumps({'schema': 1, 'minimum_versions': self.policy}))
+                output = reports / 'inventory' / 'selected.json'
+                argv = ['verify', str(reports), '--policy', str(policy)]
+                with mock.patch.object(validator.subprocess, 'check_output', return_value='a' * 40):
+                    with mock.patch('sys.argv', argv):
+                        self.assertEqual(validator.main(), 0)
+                    with mock.patch('sys.argv', [*argv, '--inventory', str(output)]):
+                        self.assertEqual(validator.main(), 1)
+                self.assertFalse(output.exists())
 
     def test_does_not_treat_fixed_prerelease_as_stable_fix(self):
         self.assertTrue(below("2.3.35-rc1", "2.3.35"))

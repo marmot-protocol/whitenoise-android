@@ -21,7 +21,7 @@ def report(configuration="productionPlayReleaseRuntimeClasspath", scope="project
                 {"group": "example", "name": "library", "version": "1", "reasons": ["requested"]}],
             "artifacts": [{"coordinate": "example:library:1", "name": "library-1.jar",
                            "sha256": "b" * 64, "bytes": 12}],
-            "violations": [], "unresolved": []}
+            "artifact_coverage": "resolved_configuration", "violations": [], "unresolved": []}
 
 
 class DependencyInventoryTest(unittest.TestCase):
@@ -53,7 +53,7 @@ class DependencyInventoryTest(unittest.TestCase):
         """Transformed directories cannot abort observations or pretend to be hashed archives."""
         candidate = report()
         candidate['artifacts'] = []
-        candidate['artifact_coverage'] = 'partial_non_regular_artifacts'
+        candidate['artifact_coverage'] = 'partial'
         opaque = {'coordinate': 'example:library:1', 'name': 'classes', 'kind': 'directory',
                   'reason': 'Transformed directory is not a regular archive'}
         candidate['unfingerprinted_artifacts'] = [opaque]
@@ -69,6 +69,37 @@ class DependencyInventoryTest(unittest.TestCase):
             mutate(changed)
             with self.assertRaises(ValueError):
                 inventory.selected_inventory([changed], SOURCE)
+
+    def test_resolution_failures_keep_graphs_without_claiming_complete_artifact_deltas(self):
+        """Missing JARs retain selected coordinates while their byte comparison is unavailable."""
+        candidate = report()
+        candidate.update(artifacts=[], artifact_coverage='partial', unfingerprinted_artifacts=[
+            {'kind': 'resolution_failure', 'reason': 'Artifact resolution unavailable'}])
+        selected = inventory.selected_inventory([candidate], SOURCE)
+        delta = inventory.compare(selected, inventory.selected_inventory([report()], SOURCE), SOURCE, SOURCE)
+        self.assertEqual(delta['added'], [])
+        self.assertEqual(delta['removed'], [])
+        self.assertEqual(delta['changed_artifacts'], [])
+        self.assertEqual(len(delta['artifact_comparison_unavailable']), 1)
+        for mutate in [lambda r: r.update(artifact_coverage='resolved_configuration'),
+                       lambda r: r['unfingerprinted_artifacts'][0].update(coordinate='invented:module:1'),
+                       lambda r: r['unfingerprinted_artifacts'][0].update(bytes=0)]:
+            changed = copy.deepcopy(candidate)
+            mutate(changed)
+            with self.assertRaises(ValueError):
+                inventory.selected_inventory([changed], SOURCE)
+
+    def test_missing_coverage_and_usage_metadata_are_not_legacy_defaults(self):
+        """The first inventory schema requires explicit coverage and observed usage fields."""
+        candidate = report()
+        candidate.pop('artifact_coverage')
+        with self.assertRaises(ValueError):
+            inventory.selected_inventory([candidate], SOURCE)
+        for key in ('selection_reasons', 'requested_by'):
+            selected = inventory.selected_inventory([report()], SOURCE)
+            selected['release_runtime']['play']['components'][0].pop(key)
+            with self.assertRaises((KeyError, ValueError)):
+                inventory.observations(selected)
 
     def test_rejects_conflicting_observations_for_same_configuration(self):
         """Changed selection cannot be hidden by last-file-wins merging."""

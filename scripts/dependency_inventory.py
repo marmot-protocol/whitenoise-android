@@ -116,19 +116,22 @@ def selected_inventory(reports, source):
         entry = {"project": key[0], "scope": key[1], "configuration": key[2],
                  "components": sorted(components, key=lambda x: x["coordinate"]),
                  "artifacts": sorted(artifacts, key=lambda x: (x["coordinate"], x["name"])),
-                 "artifact_coverage": report.get("artifact_coverage", "observed"),
+                 "artifact_coverage": report.get("artifact_coverage"),
                  "edges": edges}
+        require(entry["artifact_coverage"] in {"resolved_configuration", "partial"},
+                "Missing or unsupported artifact coverage; enable dependencySecurity.inventory")
         unfingerprinted = report.get("unfingerprinted_artifacts", [])
         require(isinstance(unfingerprinted, list) and all(isinstance(item, dict) and
-                item.get("coordinate") in coordinates and isinstance(item.get("name"), str) and item["name"] and
-                item.get("kind") in {"directory", "non_regular"} and isinstance(item.get("reason"), str) and
+                ((item.get("kind") == "resolution_failure" and "coordinate" not in item and "name" not in item) or
+                 (item.get("kind") in {"directory", "non_regular", "read_failure"} and
+                  item.get("coordinate") in coordinates and isinstance(item.get("name"), str) and item["name"])) and
+                isinstance(item.get("reason"), str) and
                 item["reason"] and "sha256" not in item and "bytes" not in item for item in unfingerprinted),
                 "Malformed unfingerprinted artifact evidence")
-        require(bool(unfingerprinted) == (entry["artifact_coverage"] == "partial_non_regular_artifacts"),
+        require(bool(unfingerprinted) == (entry["artifact_coverage"] == "partial"),
                 "Partial artifact coverage requires explicit unfingerprinted evidence")
         if unfingerprinted:
-            entry["unfingerprinted_artifacts"] = sorted(unfingerprinted,
-                                                        key=lambda x: (x["coordinate"], x["name"], x["kind"]))
+            entry["unfingerprinted_artifacts"] = sorted(unfingerprinted, key=lambda x: json.dumps(x, sort_keys=True))
         if distribution:
             result[layer][distribution] = entry
         else:
@@ -140,20 +143,13 @@ def observations(inventory):
     """Index selections by configuration, preventing cross-scope delta comparisons."""
     require(inventory.get("schema") == 1, "Unsupported inventory schema")
     entries = list(inventory["release_runtime"].values()) + inventory["tooling_test"] + inventory["other_configurations"]
-    # Schema 1 captures made before usage enrichment had no reasons/requesters.
-    entries = [{**entry, "components": [{**component,
-        "selection_reasons": component.get("selection_reasons", []),
-        "requested_by": component.get("requested_by", sorted(
-            [edge for edge in entry["edges"] if edge["to"] == component["coordinate"]],
-            key=lambda edge: json.dumps(edge, sort_keys=True)))} for component in entry["components"]]}
-        for entry in entries]
     reports = []
     for entry in entries:
         components = []
         for component in entry["components"]:
             parts = component["coordinate"].split(":")
             require(len(parts) == 3 and all(parts), "Malformed inventory coordinate")
-            components.append(dict(zip(("group", "name", "version"), parts)) | {"licenses": component["licenses"], "reasons": component.get("selection_reasons", [])})
+            components.append(dict(zip(("group", "name", "version"), parts)) | {"licenses": component["licenses"], "reasons": component["selection_reasons"]})
         reports.append({**entry, "schema": 1, "source_sha": inventory["source_sha"],
                         "components": components, "violations": [], "unresolved": []})
     validated = selected_inventory(reports, inventory["source_sha"])

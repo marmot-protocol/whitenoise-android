@@ -2,6 +2,7 @@
 """Graph-only Gradle hook fixture: local Maven modules, no downloads or compilation."""
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -40,6 +41,8 @@ def main():
             module(repository, 'wire-runtime', version, group='com.squareup.wire')
         module(repository, 'legacy', '1.0')
         module(repository, 'directory', '1.0', group='example')
+        module(repository, 'metadata-only', '1.0', group='example')
+        (repository / 'example/metadata-only/1.0/metadata-only-1.0.jar').unlink()
         legacy_pom = repository / 'org/freemarker/legacy/1.0/legacy-1.0.pom'
         legacy_pom.write_text('<!DOCTYPE project [<!ELEMENT project ANY>]>' + legacy_pom.read_text())
         (repository / 'com/squareup/wire/wire-runtime/maven-metadata.xml').write_text(
@@ -130,7 +133,7 @@ repositories {
     }
 }
 configurations {
-    belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom
+    belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom; graphOnly
     directoryArtifact {
         attributes.attribute(Attribute.of('artifactType', String), 'fixture-directory')
     }
@@ -145,6 +148,7 @@ dependencies {
         to.attribute(Attribute.of('artifactType', String), 'fixture-directory')
     }
     directoryArtifact 'example:directory:1.0'
+    graphOnly 'example:metadata-only:1.0'
     belowFloor 'org.freemarker:freemarker:2.3.32'
     newer 'org.freemarker:freemarker:2.3.36'
     dynamic 'org.freemarker:freemarker:2.+'
@@ -154,6 +158,19 @@ dependencies {
     wireDynamic 'com.squareup.wire:wire-runtime:7.0.0-alpha04+'
     legacyPom 'org.freemarker:legacy:1.0'
     projectVariants project(':producer')
+}
+tasks.register('verifyGraphOnlyFixture') {
+    doLast {
+        // A resolvable POM with no JAR must remain usable for graph-only consumers.
+        def graph = configurations.graphOnly.incoming.resolutionResult
+        assert graph.allComponents.find { it.id.displayName == 'example:metadata-only:1.0' } != null
+        assert graph.allDependencies.every {
+            !(it instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult)
+        }
+        assert configurations.belowFloor.incoming.resolutionResult.allComponents.find {
+            it.id.displayName == 'org.freemarker:freemarker:2.3.35'
+        } != null
+    }
 }
 tasks.register('verifySecurityFixture') {
     doLast {
@@ -215,9 +232,22 @@ tasks.register('verifySecurityFixture') {
     }
 }
 ''')
-        completed = subprocess.run([str(args.gradle.resolve()), '--project-dir', str(project),
-                                    '--offline', '--no-configuration-cache', '--console=plain',
-                                    'verifySecurityFixture'], cwd=ROOT, timeout=120)
+        command = [str(args.gradle.resolve()), '--project-dir', str(project),
+                   '--offline', '--no-configuration-cache', '--console=plain']
+        local_environment = {key: value for key, value in os.environ.items() if key != 'CI'}
+        completed = subprocess.run([*command, 'verifyGraphOnlyFixture'], cwd=ROOT,
+                                   env=local_environment, timeout=120)
+        if completed.returncode:
+            raise SystemExit(completed.returncode)
+        report_dir = project / 'build/reports/dependency-security'
+        local_reports = [json.loads(path.read_text()) for path in report_dir.glob('*.json')]
+        assert local_reports
+        assert all(r['artifact_coverage'] == 'not_requested' and r['artifacts'] == [] and
+                   all(c['licenses'] == [] for c in r['components']) for r in local_reports)
+        shutil.rmtree(report_dir)
+        completed = subprocess.run([*command, '-PdependencySecurity.inventory=true',
+                                    'verifyGraphOnlyFixture', 'verifySecurityFixture'],
+                                   cwd=ROOT, env=local_environment, timeout=120)
         if completed.returncode:
             raise SystemExit(completed.returncode)
         reports = [json.loads(path.read_text()) for path in (project / 'build/reports/dependency-security').glob('*.json')]
@@ -235,9 +265,14 @@ tasks.register('verifySecurityFixture') {
         assert legacy_report['components'][0]['licenses'] == []
         directory_report = next(r for r in reports if r['configuration'] == 'directoryArtifact')
         assert directory_report['artifacts'] == []
-        assert directory_report['artifact_coverage'] == 'partial_non_regular_artifacts'
+        assert directory_report['artifact_coverage'] == 'partial'
         assert directory_report['unfingerprinted_artifacts'][0]['coordinate'] == 'example:directory:1.0'
         assert directory_report['unfingerprinted_artifacts'][0]['kind'] == 'directory'
+        graph_only_report = next(r for r in reports if r['configuration'] == 'graphOnly')
+        assert graph_only_report['unresolved'] == []
+        assert graph_only_report['artifacts'] == []
+        assert graph_only_report['artifact_coverage'] == 'partial'
+        assert graph_only_report['unfingerprinted_artifacts'][0]['kind'] == 'resolution_failure'
         project_report = next(r for r in reports if r['configuration'] == 'projectVariants')
         assert project_report['artifact_coverage'] == 'resolved_configuration'
         assert [a['coordinate'] for a in project_report['artifacts']] == ['org.freemarker:freemarker:2.3.35']
@@ -245,7 +280,8 @@ tasks.register('verifySecurityFixture') {
         assert expected_project_edge in project_report['edges'], project_report['edges']
         print('Gradle fixture PASS: raised exact request, retained newer/dynamic selection, '
               'rejected affected-only range and unsafe Wire alpha/suffixes, plugin/project reports, '
-              'external artifacts isolated from ambiguous project variants')
+              'external artifacts isolated from ambiguous project variants, local inventory disabled, '
+              'opt-in graph-only missing JAR recorded as partial coverage')
 
 
 if __name__ == '__main__':

@@ -381,6 +381,11 @@ jobs:
       # Read existing resolutions only; retain proof without a second build.
       - name: Verify selected dependency security floors
         if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
 
       - name: Compare already-observed dependencies with exact PR base
@@ -485,6 +490,11 @@ jobs:
       # Read existing resolutions only; retain proof without a second build.
       - name: Verify selected dependency security floors
         if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
 
       - name: Retain selected dependency security evidence
@@ -575,6 +585,11 @@ jobs:
       # Read existing resolutions only; retain proof without a second build.
       - name: Verify selected dependency security floors
         if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
 
       - name: Retain selected dependency security evidence
@@ -746,6 +761,11 @@ jobs:
       # Read existing resolutions only; retain proof without a second build.
       - name: Verify selected dependency security floors
         if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
 
       - name: Retain selected dependency security evidence
@@ -844,6 +864,11 @@ jobs:
       # Read existing resolutions only; retain proof without a second build.
       - name: Verify selected dependency security floors
         if: success()
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
+
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
 
       - name: Retain selected dependency security evidence

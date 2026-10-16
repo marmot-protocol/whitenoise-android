@@ -12,6 +12,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 class DependencyInventoryFiles {
     /** Hash artifact bytes without loading complete archives into the Gradle heap. */
     private final Map<String, String> hashes = [:]
+    private final Map<String, List> licenseDeclarations = [:]
 
     /** Reuse immutable cache bytes within this settings/build instance only. */
     synchronized String sha256(File file) {
@@ -28,8 +29,10 @@ class DependencyInventoryFiles {
         return value
     }
 
-    /** Inspect adjacent cached POMs without fetching metadata or resolving another graph. */
-    List licenses(File artifact, String module, String version) {
+    /** Memoize adjacent cached POM licences per coordinate without fetching metadata. */
+    synchronized List licenses(File artifact, String group, String module, String version) {
+        def coordinate = "${group}:${module}:${version}".toString()
+        if (licenseDeclarations.containsKey(coordinate)) return licenseDeclarations[coordinate]
         def parents = [artifact.parentFile]
         def siblings = artifact.parentFile.parentFile?.listFiles()
         parents.addAll((siblings ?: []).findAll { it.isDirectory() })
@@ -37,15 +40,15 @@ class DependencyInventoryFiles {
         parents.unique().each { parent ->
             def pom = new File(parent, "${module}-${version}.pom")
             if (pom.isFile() && pom.length() <= 256 * 1024) {
-                def factory = DocumentBuilderFactory.newInstance()
-                factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-                factory.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true)
-                factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, '')
-                factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, '')
                 def document
                 try {
+                    def factory = DocumentBuilderFactory.newInstance()
+                    factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+                    factory.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true)
+                    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, '')
+                    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, '')
                     document = factory.newDocumentBuilder().parse(pom)
-                } catch (org.xml.sax.SAXException | IOException ignored) {
+                } catch (org.xml.sax.SAXException | IOException | javax.xml.parsers.ParserConfigurationException ignored) {
                     // Optional cached licence metadata never weakens or blocks dependency selection.
                     return
                 }
@@ -59,7 +62,9 @@ class DependencyInventoryFiles {
                 }
             }
         }
-        return declarations.unique().sort { a, b -> "${a.name}:${a.url}:${a.pom_sha256}" <=> "${b.name}:${b.url}:${b.pom_sha256}" }
+        def result = declarations.unique().sort { a, b -> "${a.name}:${a.url}:${a.pom_sha256}" <=> "${b.name}:${b.url}:${b.pom_sha256}" }
+        licenseDeclarations[coordinate] = result
+        return result
     }
 }
 
@@ -119,7 +124,10 @@ try {
     // ZIP/source archives and machines without git retain the floor policy.
 }
 
-def inventoryFiles = new DependencyInventoryFiles()
+// GitHub opts in through CI=true; developers can explicitly enable or disable collection.
+def inventoryRequested = providers.gradleProperty('dependencySecurity.inventory')
+    .orElse(providers.environmentVariable('CI')).getOrElse('false').equalsIgnoreCase('true')
+def inventoryFiles = inventoryRequested ? new DependencyInventoryFiles() : null
 
 gradle.beforeProject { project ->
     def install = { configuration, scope ->
@@ -153,10 +161,18 @@ gradle.beforeProject { project ->
                 .findAll { it instanceof UnresolvedDependencyResult }
                 .collect { it.requested.displayName }.sort()
             def unfingerprinted = []
-            def artifacts = unresolved.isEmpty() ? configuration.incoming.artifactView {
+            def artifacts = []
+            if (inventoryRequested && unresolved.isEmpty()) {
+                def view = configuration.incoming.artifactView {
+                    lenient = true
                     componentFilter { it instanceof ModuleComponentIdentifier }
-                }.artifacts.artifacts
-                .collect { artifact ->
+                }.artifacts
+                view.failures.each { failure ->
+                    // Gradle does not expose a reliable component identity for every failure.
+                    unfingerprinted.add([kind: 'resolution_failure',
+                        reason: "Artifact resolution unavailable (${failure.class.simpleName})".toString()])
+                }
+                artifacts = view.artifacts.collect { artifact ->
                     def id = artifact.id.componentIdentifier
                     if (!artifact.file.isFile()) {
                         unfingerprinted.add([
@@ -165,12 +181,19 @@ gradle.beforeProject { project ->
                             reason: 'Transformed/non-regular artifact has no regular-file fingerprint'])
                         return null
                     }
-                    [coordinate: "${id.group}:${id.module}:${id.version}".toString(),
-                     name: artifact.file.name, sha256: inventoryFiles.sha256(artifact.file),
-                     bytes: artifact.file.length(),
-                     licenses: inventoryFiles.licenses(artifact.file, id.module, id.version)]
-                }.findAll { it != null }.sort { a, b -> "${a.coordinate}:${a.name}" <=> "${b.coordinate}:${b.name}" } : []
-            unfingerprinted.sort { a, b -> "${a.coordinate}:${a.name}:${a.kind}" <=> "${b.coordinate}:${b.name}:${b.kind}" }
+                    try {
+                        return [coordinate: "${id.group}:${id.module}:${id.version}".toString(),
+                            name: artifact.file.name, sha256: inventoryFiles.sha256(artifact.file),
+                            bytes: artifact.file.length(),
+                            licenses: inventoryFiles.licenses(artifact.file, id.group, id.module, id.version)]
+                    } catch (IOException ignored) {
+                        unfingerprinted.add([coordinate: "${id.group}:${id.module}:${id.version}".toString(),
+                            name: artifact.file.name, kind: 'read_failure', reason: 'Artifact bytes unavailable'])
+                        return null
+                    }
+                }.findAll { it != null }.sort { a, b -> "${a.coordinate}:${a.name}" <=> "${b.coordinate}:${b.name}" }
+            }
+            unfingerprinted.sort { a, b -> JsonOutput.toJson(a) <=> JsonOutput.toJson(b) }
             def components = dependencies.resolutionResult.allComponents
                 .findAll { it.id instanceof ModuleComponentIdentifier }
                 .collect { component ->
@@ -197,8 +220,8 @@ gradle.beforeProject { project ->
                 [schema: 1, source_sha: sourceSha, project: project.path, scope: scope,
                  configuration: configuration.name, components: components,
                  artifacts: artifacts, unfingerprinted_artifacts: unfingerprinted,
-                 artifact_coverage: !unresolved.isEmpty() ? 'failed' :
-                     (unfingerprinted.isEmpty() ? 'resolved_configuration' : 'partial_non_regular_artifacts'),
+                 artifact_coverage: !inventoryRequested ? 'not_requested' : (!unresolved.isEmpty() ? 'failed' :
+                     (unfingerprinted.isEmpty() ? 'resolved_configuration' : 'partial')),
                  edges: edges, unresolved: unresolved, violations: violations])) + '\n'
             if (!violations.isEmpty()) {
                 throw new GradleException("Vulnerable dependency selected in ${project.path}:${configuration.name}")

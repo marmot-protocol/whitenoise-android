@@ -16,10 +16,21 @@ or the R8-retained APK. Native MarmotKit requires its own target/feature invento
 
 ## Distribution and native inventories
 
-The same hook fingerprints external module artifacts on each already-selected
-configuration, memoizing file hashes within the build, using a component-filtered [artifact view](https://docs.gradle.org/current/userguide/artifact_views.html).
+Inventory collection is enabled by `CI=true` on GitHub. Local builds keep the
+security-floor policy and graph reports without selecting or fingerprinting
+artifacts or inspecting POMs. Request local inventory observations explicitly with
+`-PdependencySecurity.inventory=true`; `false` overrides the CI default.
+When enabled, the hook fingerprints external module artifacts on each already-selected
+configuration, memoizing file hashes within the build and licence declarations per
+Maven coordinate, using a lenient, component-filtered [artifact view](https://docs.gradle.org/current/userguide/artifact_views.html).
 Project components remain in graph edges but are excluded before artifact
 selection, so AGP's task-specific project variants are not selected by this hook.
+Missing artifacts and variant-selection failures are recorded as configuration-level
+`resolution_failure` observations without inventing a component identity. Non-regular
+or unreadable files retain their known coordinate and name. These gaps produce
+`artifact_coverage: partial` and `unfingerprinted_artifacts`; graph-only consumers
+remain usable. Graph resolution failures and selected security-floor violations
+still fail verification.
 It adds no configurations or compilation tasks. Cached adjacent
 POMs supply declared licence names/URLs and their POM hashes when available.
 Only the POM's project-level licence declarations qualify. Unparseable cached
@@ -29,7 +40,8 @@ Missing declarations remain `not_observed`; a Maven namespace is a supplier hint
 not verified legal ownership. These records are observations, not dependency locks
 or a replacement for the existing licence/notices generator.
 
-After the existing security-floor validator succeeds, CI writes
+After the existing blocking security-floor validator succeeds, a separate
+`continue-on-error` step in every core lane and dependency submission writes
 `build/reports/dependency-security/inventory/selected.json`. The existing
 `dependency-security-*` artifacts retain it alongside the raw observations.
 Only `:app`'s `productionPlayReleaseRuntimeClasspath` and
@@ -39,6 +51,9 @@ including debug runtime and compile classpaths, stay in `other_configurations`.
 A job that never resolved a release runtime graph does not claim to have one.
 Reports from another source, failed resolution or conflicting selections for the
 same configuration are rejected before inventory output.
+Inventory-only validation failures warn through the failed observational step
+without failing the lane. Explicit artifact coverage and component usage fields
+are required by the first schema; no earlier inventory format is assumed.
 
 MarmotKit preparation stages `native-provenance.json` with the API signature.
 It binds the complete Android lock hash, upstream source/artifact/manifest hashes,
@@ -75,7 +90,7 @@ separately so an absent graph never becomes a dependency removal. Each component
 retains its configuration purpose, selection reasons and incoming edges/requested
 selectors as observed usage evidence, without inventing a semantic purpose or
 legal supplier. Graph-edge, artifact-byte, native-provenance and packaging changes
-are reported, including changes at the same coordinate. Non-regular artifacts
+are reported, including changes at the same coordinate. Unfingerprinted artifacts
 make only that configuration's artifact comparison unavailable; other evidence
 remains comparable. Native/packaging layers absent from either input are explicit
 coverage gaps, never empty deltas.
@@ -87,7 +102,8 @@ artifact by creation time, with artifact ID breaking ties, so reruns can retain
 earlier attempts. No extra Gradle resolution, build, job or matrix is added.
 The retained `inventory/base-delta.json` binds both source SHAs and the baseline
 run/artifact.
-Missing or expired baseline evidence and GitHub API failures yield an `unavailable`
+Missing or expired baseline evidence and GitHub API failures, including non-JSON
+metadata responses, yield an `unavailable`
 receipt; API failures also warn. Malformed or wrong-source evidence writes a
 `rejected` receipt with both source SHAs and the error type, warns and exits
 unsuccessfully; it never becomes a usable baseline or an empty delta.

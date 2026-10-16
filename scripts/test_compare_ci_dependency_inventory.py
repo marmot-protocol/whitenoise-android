@@ -91,12 +91,29 @@ class CiInventoryComparisonTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Wrong-source'):
                 ci.baseline(SOURCE, 'fixture')
 
+    def test_non_json_api_response_is_retrieval_unavailable(self):
+        """Error pages and truncated metadata are transport gaps, not invalid retained inventories."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); after = root / 'after.json'; output = root / 'delta.json'
+            after.write_text(json.dumps(selected_inventory([report()], SOURCE)))
+            for response in (b'<html>Bad Gateway</html>', b'{"workflow_runs":', b'\xff'):
+                with self.subTest(response=response), \
+                        mock.patch.object(ci.subprocess, 'check_output', return_value=response), \
+                        mock.patch('sys.argv', ['compare', '--base-source', SOURCE, '--artifact-name', 'fixture',
+                                   '--after', str(after), '--after-source', SOURCE, '--output', str(output)]):
+                    ci.main()
+                delta = json.loads(output.read_text())
+                self.assertEqual(delta['status'], 'unavailable')
+                self.assertIn('GitHub baseline retrieval unavailable', delta['reason'])
+                self.assertNotIn('added', delta)
+
     def test_rejected_baseline_retains_source_bound_receipt_and_failure_exit(self):
         """Invalid evidence remains rejected while its reason survives the informational step."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary); after = root / 'after.json'; output = root / 'delta.json'
             after.write_text(json.dumps(selected_inventory([report()], SOURCE)))
-            errors = [ValueError('wrong source or duplicate keys'), KeyError('missing API field'),
+            errors = [ValueError('wrong source or duplicate keys'), json.JSONDecodeError('truncated inventory', '{', 1),
+                      KeyError('missing API field'),
                       TypeError('malformed field'), AttributeError('non-object JSON'), zipfile.BadZipFile('bad ZIP')]
             for error in errors:
                 with self.subTest(error=type(error).__name__), mock.patch.object(ci, 'baseline', side_effect=error), \
