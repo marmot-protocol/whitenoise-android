@@ -220,6 +220,47 @@ class LocalNotificationPresenterDecisionTest {
         assertEquals("republishing an existing shortcut needs no room", 0, prune(dynamic, dynamic.first()))
     }
 
+    /** Pruning never removes a shortcut backing a live card or held for a pending write, and gives up without room. */
+    @Test
+    fun conversationShortcutPrunePlanSparesLiveAndHeldShortcuts() {
+        val ids = (1..14).map { "${CONVERSATION_SHORTCUT_PREFIX}$it" }.toSet()
+        val new = "${CONVERSATION_SHORTCUT_PREFIX}new"
+        val lastUsed = ids.withIndex().associate { (index, id) -> id to index.toLong() }
+        val plan = { protectedIds: Set<String> ->
+            conversationShortcutPrunePlan(ids, 1, 15, new, protectedIds, lastUsed)
+        }
+
+        assertEquals(listOf("${CONVERSATION_SHORTCUT_PREFIX}1"), plan(emptySet()))
+        assertEquals(
+            "the least recently used unprotected shortcut goes instead",
+            listOf("${CONVERSATION_SHORTCUT_PREFIX}2"),
+            plan(setOf("${CONVERSATION_SHORTCUT_PREFIX}1")),
+        )
+        assertEquals("protected shortcuts filling the cap skip the publication", null, plan(ids))
+        assertEquals(
+            "a cap with room needs no removal",
+            emptyList<String>(),
+            conversationShortcutPrunePlan(ids - ids.first(), 1, 15, new, ids, lastUsed),
+        )
+    }
+
+    /** Overlapping posts for one conversation each hold its shortcut, which stays held until the last releases. */
+    @Test
+    fun inFlightShortcutHoldsAreCountedPerPost() {
+        InFlightConversationShortcuts.clearForTests()
+        val id = "${CONVERSATION_SHORTCUT_PREFIX}shared"
+        InFlightConversationShortcuts.hold(id, nowMs = 0)
+        InFlightConversationShortcuts.hold(id, nowMs = 1)
+
+        InFlightConversationShortcuts.release(id)
+        assertEquals("the second post still holds it", setOf(id), InFlightConversationShortcuts.ids(nowMs = 2))
+        InFlightConversationShortcuts.release(id)
+        assertEquals(emptySet<String>(), InFlightConversationShortcuts.ids(nowMs = 3))
+
+        InFlightConversationShortcuts.hold(id, nowMs = 0)
+        assertEquals("an unreleased hold lapses", emptySet<String>(), InFlightConversationShortcuts.ids(nowMs = 60_001))
+    }
+
     @Test
     fun conversationShortcutRemovalOrderRemovesLeastRecentlyUsedFirst() {
         val existing =

@@ -55,6 +55,13 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("a hidden card makes the next rich post publish again", "shortcutSnapshots::remove" in payload)
         assertTrue("the shortcut is held for the coming write", "holdForPost = true" in before)
         assertTrue("and released once that write ends", "InFlightConversationShortcuts::release" in show)
+        val release = show.indexOf("InFlightConversationShortcuts::release")
+        assertTrue("even when it is cancelled or fails", show.lastIndexOf("} finally {", release) > publish)
+        val prune = presenter.functionBody("pruneConversationShortcutsBeforePublish")
+        assertTrue(
+            "pruning spares live and held shortcuts",
+            "liveCardShortcutIds() + InFlightConversationShortcuts.ids()" in prune,
+        )
         val reuse = presenter.functionBody("reuseCachedShortcut")
         assertTrue("a cached snapshot needs the live shortcut", "shortcutId in dynamicShortcutIds()" in reuse)
         val share = File(notificationsRoot().parentFile, "share/ShareShortcutPublisher.kt").readText()

@@ -147,6 +147,28 @@ class NotificationIdentityShortcutBeforePostTest {
         assertTrue(InFlightConversationShortcuts.ids().isEmpty())
     }
 
+    /** A card write cancelled after the shortcut was published still releases that shortcut's hold. */
+    @Test
+    fun cancelledCardWriteReleasesItsHeldShortcut() {
+        val recorder = Recorder(cancelPost = true)
+        val cancelled =
+            runCatching {
+                runBlocking {
+                    presenter(recorder).show(
+                        update(isDm = true),
+                        previewTextOverride = "hi",
+                        conversationAvatarBitmap = solid(Color.BLUE),
+                        senderAvatarBitmap = solid(Color.BLUE),
+                        shortNpub = { "npub" },
+                    )
+                }
+            }.exceptionOrNull()
+
+        assertTrue("the write was cancelled", cancelled is kotlinx.coroutines.CancellationException)
+        assertEquals(listOf(setOf(checkNotNull(conversationShortcutId(ACCOUNT, GROUP)))), recorder.heldAtPost)
+        assertTrue(InFlightConversationShortcuts.ids().isEmpty())
+    }
+
     /** Forgetting one conversation leaves another conversation's snapshot, so that one is not published again. */
     @Test
     fun forgettingOneConversationKeepsAnotherConversationsSnapshot() {
@@ -246,6 +268,7 @@ class NotificationIdentityShortcutBeforePostTest {
     /** Records publication and post order, and can fail the platform shortcut write. */
     private class Recorder(
         val failPublication: Boolean = false,
+        val cancelPost: Boolean = false,
     ) {
         val events = mutableListOf<String>()
         val shortcuts = mutableListOf<ShortcutInfoCompat>()
@@ -271,6 +294,7 @@ class NotificationIdentityShortcutBeforePostTest {
                 recorder.events += "post"
                 recorder.posts += notification
                 recorder.heldAtPost += InFlightConversationShortcuts.ids()
+                if (recorder.cancelPost) throw kotlinx.coroutines.CancellationException("post cancelled")
                 notificationManager.notify(tag, id, notification)
             },
             cachedAvatarBitmap = { null },
