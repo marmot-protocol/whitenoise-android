@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.notifications.NotificationMessagePreloadState
 import dev.ipf.whitenoise.android.notifications.NotificationRouteFirstFrameGate
+import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.notificationMessagePreloadKey
@@ -115,6 +116,50 @@ class NotificationOpenRouteSeamTest {
         assertNull(firstFrame.gate)
     }
 
+    /**
+     * Back: the route opened its conversation early and the reader backed out of it, which releases the window
+     * and finishes the trace, before the held switch reports that it never landed. The retired failure must not
+     * reopen the conversation, fall back over the chat list the reader is already on, or acknowledge the
+     * consumed tap as the Activity's current one.
+     */
+    @Test
+    fun aRetiredSwitchFailingAfterBackDoesNotReopenOrFallBack() {
+        openEarlyWhileActivationIsHeld()
+        shell.backOut()
+        firstFrame.release(requestId)
+        NotificationRouteTrace.finishRequest(requestId)
+
+        releaseRetiredActivationAndAssertUnchanged(fails = true)
+
+        assertNull(shell.selectedChatId)
+        assertEquals(listOf(requestId), shell.droppedAcknowledgements.toList())
+        assertNull(firstFrame.gate)
+    }
+
+    /**
+     * Account removal: the reader is still inside the early-opened conversation when its account leaves the
+     * account list, so the held activation can never publish it. Released afterwards, the retired switch may do
+     * only what a never-landed switch always did, leave that conversation for the chat list, and must not reopen
+     * it, acknowledge the consumed tap as a current one or touch a window it no longer holds.
+     */
+    @Test
+    fun aRetiredSwitchReleasedAfterItsAccountWasRemovedOnlyLeavesTheConversation() {
+        openEarlyWhileActivationIsHeld()
+        firstFrame.release(requestId)
+        removeAccount(NotificationRouteHarness.TARGET_ACCOUNT)
+        val before = shell.calls.toList()
+
+        activationHold.read(0).release.countDown()
+        awaitCondition("the retired switch never reported its failure") { shell.droppedAcknowledgements.isNotEmpty() }
+
+        assertEquals(before + "fallBack", shell.calls.toList())
+        assertNull(shell.selectedChatId)
+        assertEquals(listOf(requestId), shell.droppedAcknowledgements.toList())
+        assertEquals(NotificationOpenRequest(null, requestId), request.value)
+        assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertNull(firstFrame.gate)
+    }
+
     /** Runs one routing pass for the inactive-account tap and waits until its exact preload is held. */
     private fun startRetiredSwitch() {
         runBlocking { router.route(target, requestId) }
@@ -207,6 +252,11 @@ class NotificationOpenRouteSeamTest {
         composedRuntime.intValue = next
     }
 
+    /** Drops [accountRef] from the account list, as the engine's refreshed list after a wipe no longer carries it. */
+    private fun removeAccount(accountRef: String) {
+        setAppStateField("setAccounts", List::class.java, appState.accounts.filterNot { it.label == accountRef })
+    }
+
     /** Writes one of the app state's privately set properties through its setter, as a production owner would. */
     private fun setAppStateField(
         setter: String,
@@ -292,6 +342,9 @@ class NotificationOpenRouteSeamTest {
             selectedChatId = chatId
             selectedOpenContext = ConversationOpenContext()
         }
+
+        /** The reader backs out of the selected conversation to the chat list. */
+        fun backOut() = deselect()
 
         /** Clears the selection and its open-time state. */
         private fun deselect() {
