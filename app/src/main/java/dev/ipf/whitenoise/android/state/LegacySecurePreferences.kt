@@ -40,7 +40,8 @@ internal object LegacySecurePreferences {
     internal fun openForImport(
         context: Context,
         fileName: String,
-    ): android.content.SharedPreferences? = if (exists(context, fileName)) openLegacyEncryptedPreferences(context, fileName) else null
+    ): android.content.SharedPreferences? =
+        if (exists(context, fileName)) openLegacyEncryptedPreferences(context, fileName) else null
 
     private fun openLegacyEncryptedPreferences(
         context: Context,

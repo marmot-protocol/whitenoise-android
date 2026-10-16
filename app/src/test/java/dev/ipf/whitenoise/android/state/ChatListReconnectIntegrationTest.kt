@@ -47,33 +47,6 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ChatListReconnectIntegrationTest {
-    @Test
-    fun accountTeardownAndCancelledBindCloseGroupSubscriptionExactlyOnce() {
-        val diagnostics = testRecoveryDiagnostics()
-        val subscription = ScriptedChatListSubscription(notificationChatListRow())
-        val groups = ScriptedChatsSubscription()
-        val appState = chatListTestAppState(diagnostics, subscription, groups)
-        val controller = ChatsController(
-            appState = appState,
-            initialAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
-            memberSnapshotRetryDelay = { Long.MAX_VALUE },
-            memberSnapshotLoader = { _, _ -> conversationTimelineMemberSnapshot().members },
-        )
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        val binding = scope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
-        try {
-            awaitChatListCondition { subscription.nextUpdateStarted.isCompleted }
-            val teardown = scope.launch {
-                controller.closeLiveSubscriptionsForAccountTeardown(ConversationTimelineTestIds.ACCOUNT_REF)
-            }
-            awaitChatListCondition { teardown.isCompleted && binding.isCompleted }
-            assertEquals(1, groups.closeCalls)
-        } finally {
-            controller.onCleared()
-            scope.cancel()
-        }
-    }
-
     /** A recovered subscription row reaches the authoritative list under one generation. */
     @Test
     fun recoveryGenerationReachesTheAuthoritativeChatListRow() {
@@ -712,7 +685,7 @@ class ChatListReconnectIntegrationTest {
 }
 
 /** Advances Robolectric frames and coroutine delays while waiting for a chat-list projection. */
-private fun awaitChatListCondition(condition: () -> Boolean) {
+internal fun awaitChatListCondition(condition: () -> Boolean) {
     repeat(250) {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
         if (condition()) return
@@ -763,14 +736,14 @@ class SmartFolderWindowResetTest {
 }
 
 /** Builds a numeric-only diagnostics collector without enabling logcat output. */
-private fun testRecoveryDiagnostics(): NotificationNetworkRecoveryDiagnostics =
+internal fun testRecoveryDiagnostics(): NotificationNetworkRecoveryDiagnostics =
     NotificationNetworkRecoveryDiagnostics(
         traceFactory = { null },
         traceRecorder = { _, _, _, _, _, _, _ -> },
     )
 
 /** Builds an app state whose live chat-list sources are fully controlled by this test. */
-private fun chatListTestAppState(
+internal fun chatListTestAppState(
     diagnostics: NotificationNetworkRecoveryDiagnostics,
     chatList: ChatListWindowHandle,
     chats: ChatsSubscriptionHandle,
@@ -787,7 +760,7 @@ private fun chatListTestAppState(
     )
 
 /** Builds an app state with lifecycle-aware live sources and optional catch-up observation. */
-private fun chatListTestAppState(
+internal fun chatListTestAppState(
     diagnostics: NotificationNetworkRecoveryDiagnostics,
     liveSubscriptions: ChatListLiveSubscriptions,
     marmotAccessObserver: (() -> Unit)? = null,
@@ -823,7 +796,7 @@ private fun testChatsController(appState: WhiteNoiseAppState): ChatsController =
         memberSnapshotLoader = { _, _ -> emptyList() },
     )
 
-private class ScriptedChatListSubscription(
+internal class ScriptedChatListSubscription(
     private val initialRows: List<ChatListRowFfi>,
     private val view: ChatListViewFfi = ChatListViewFfi.CHATS,
 ) : ChatListWindowHandle {
@@ -955,7 +928,7 @@ private class DroppedChatSubscriptions(
 }
 
 /** Stable companion group subscription that lives until the controller closes it. */
-private class ScriptedChatsSubscription : ChatsSubscriptionHandle {
+internal class ScriptedChatsSubscription : ChatsSubscriptionHandle {
     private val closed = CompletableDeferred<Unit>()
     var closeCalls = 0
         private set

@@ -60,10 +60,14 @@ internal class PushTokenPreferences(
 
     override fun edit(): SharedPreferences.Editor = Editor()
 
-    override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) =
+    override fun registerOnSharedPreferenceChangeListener(
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) =
         error("Push state does not use preference listeners")
 
-    override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) =
+    override fun unregisterOnSharedPreferenceChangeListener(
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) =
         error("Push state does not use preference listeners")
 
     /** A durable target receipt makes an unreadable leftover source irrelevant. */
@@ -89,21 +93,43 @@ internal class PushTokenPreferences(
             val merged = current.toMutableMap()
             val existingWakeEpisode = WAKE_KEYS.any { it in current || it in touched }
             for ((key, value) in legacy.all) {
-                if (key !in PUSH_KEYS || value == null || (key in touched && key !in CLEANUP_KEYS)) continue
-                if (key in WAKE_KEYS && existingWakeEpisode) continue
-                if (key in CLEANUP_KEYS) {
-                    require(value is Set<*> && value.all { it is String })
-                    val prior = current[key]?.let(::decode) as? Set<*> ?: emptySet<String>()
-                    merged[key] = encode(prior + value)
-                } else if (key !in current) {
-                    require(validValue(key, value))
-                    merged[key] = encode(value)
+                if (canImport(key, value, touched, existingWakeEpisode)) {
+                    mergeLegacyValue(key, value, current, merged)
                 }
             }
             merged[IMPORTED] = JSONArray((imported + source).sorted()).toString()
             // Always re-commit, including after a previous failed commit changed preferences memory.
             check(store.replaceAllDurably(merged)) { "Push state import could not be persisted" }
             cleanupImportedSource(legacy)
+        }
+    }
+
+    private fun canImport(
+        key: String,
+        value: Any?,
+        touched: Set<String>,
+        existingWakeEpisode: Boolean,
+    ): Boolean {
+        val recognized = key in PUSH_KEYS && value != null
+        val superseded = key in touched && key !in CLEANUP_KEYS
+        val oldWakeEpisode = key in WAKE_KEYS && existingWakeEpisode
+        return recognized && !superseded && !oldWakeEpisode
+    }
+
+    private fun mergeLegacyValue(
+        key: String,
+        value: Any?,
+        current: Map<String, String>,
+        merged: MutableMap<String, String>,
+    ) {
+        requireNotNull(value)
+        if (key in CLEANUP_KEYS) {
+            require(value is Set<*> && value.all { it is String })
+            val prior = current[key]?.let(::decode) as? Set<*> ?: emptySet<String>()
+            merged[key] = encode(prior + value)
+        } else if (key !in current) {
+            require(validValue(key, value))
+            merged[key] = encode(value)
         }
     }
 
@@ -212,13 +238,19 @@ internal class PushTokenPreferences(
             )
 
         fun stringSet(value: String?): Set<String> =
-            value?.let { text -> JSONArray(text).let { array -> (0 until array.length()).map { array.getString(it) }.toSet() } }.orEmpty()
+            value?.let { text ->
+                val array = JSONArray(text)
+                (0 until array.length()).map { array.getString(it) }.toSet()
+            }.orEmpty()
 
         fun validValue(key: String, value: Any): Boolean = when (key) {
             KEY_FCM_TOKEN -> value is String
             KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, KEY_PENDING_PUSH_WAKE_CATCH_UP -> value is Boolean
             KEY_WAKE_ATTEMPTS -> value is Int
-            KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION, KEY_PUSH_WAKE_CATCH_UP_SEQUENCE, KEY_WAKE_RETRY_AT -> value is Long
+            KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION,
+            KEY_PUSH_WAKE_CATCH_UP_SEQUENCE,
+            KEY_WAKE_RETRY_AT,
+            -> value is Long
             else -> false
         }
 
@@ -232,7 +264,10 @@ internal class PushTokenPreferences(
                     is Set<*> -> "set"
                     else -> error("Unsupported push state type")
                 }
-            return JSONObject().put("type", type).put("value", if (value is Set<*>) JSONArray(value.sortedBy { it.toString() }) else value).toString()
+            return JSONObject()
+                .put("type", type)
+                .put("value", if (value is Set<*>) JSONArray(value.sortedBy { it.toString() }) else value)
+                .toString()
         }
 
         fun decode(value: String): Any {

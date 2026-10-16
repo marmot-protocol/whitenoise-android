@@ -9524,7 +9524,9 @@ class WhiteNoiseAppState private constructor(
             if (!notificationDeliveryModeIntent.isCurrent(epoch)) return@withContext
             notificationDeliveryModeMutex.withLock {
                 val latest = notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
-                if (latest && runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)) syncNativePushRegistrationIfEnabled()
+                val pending = latest &&
+                    runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
+                if (pending) syncNativePushRegistrationIfEnabled()
             }
         }
 

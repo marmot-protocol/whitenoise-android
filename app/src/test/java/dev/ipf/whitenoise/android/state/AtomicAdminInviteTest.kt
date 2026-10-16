@@ -120,7 +120,8 @@ class AtomicAdminInviteTest {
 
     private fun assertDiagnosticTerminal(outcome: String) {
         val terminal = ShadowLog.getLogsForTag("GroupCreation").filter {
-            it.msg.contains("operation=group_invite") && it.msg.contains("phase=owner") && !it.msg.contains("outcome=start")
+            it.msg.contains("operation=group_invite") &&
+                it.msg.contains("phase=owner") && !it.msg.contains("outcome=start")
         }
         assertEquals(1, terminal.size)
         assertTrue(terminal.single().msg.contains("outcome=$outcome"))

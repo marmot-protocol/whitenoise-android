@@ -217,12 +217,9 @@ class PushTokenStoreTest {
     @Test
     fun legacyPushWakeBooleanActsAsAnObservedGeneration() {
         val legacy = FakeSharedPreferences()
-        val secure = FakeSharedPreferences()
         legacy.edit().putBoolean("pending_push_wake_catch_up", true).commit()
 
-        migrateLegacyPushTokenPreferences(legacy, secure)
-
-        val store = PushTokenStore(secure)
+        val store = PushTokenStore(legacy)
         val legacyGeneration = store.pendingPushWakeCatchUpGeneration()
         assertTrue(legacyGeneration > 0L)
         store.recordPendingPushWakeCatchUp()

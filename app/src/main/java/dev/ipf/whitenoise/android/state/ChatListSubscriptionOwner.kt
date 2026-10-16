@@ -18,7 +18,10 @@ internal class ChatListSubscriptionOwner {
 
     /** Transfers cleanup authority without closing handles while the controller lock is held. */
     fun take(): Pair<Attempt?, Job?> = synchronized(lock) {
-        (active to bindJob).also { active = null; bindJob = null }
+        (active to bindJob).also {
+            active = null
+            bindJob = null
+        }
     }
 
     /** A captured attempt closes once even when teardown and bind-finally both retire it. */

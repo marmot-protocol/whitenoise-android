@@ -49,7 +49,10 @@ class ChatListSubscriptionOwnerTest {
         attempt.chats = object : ChatsSubscriptionHandle {
             override fun snapshot(): List<AppGroupRecordFfi> = emptyList()
             override suspend fun next(): AppGroupRecordFfi? = null
-            override fun close() { closes += 1; error("close failed") }
+            override fun close() {
+                closes += 1
+                error("close failed")
+            }
         }
         attempt.close()
         attempt.close()

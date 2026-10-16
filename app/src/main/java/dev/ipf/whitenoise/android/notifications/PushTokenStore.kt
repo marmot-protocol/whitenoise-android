@@ -459,10 +459,14 @@ class PushTokenStore(
                 // cleanup or unavailable Keystore fails closed instead of appearing empty.
                 PushTokenStore(
                     secure,
-                    registrationSuppressed = { safety.getBoolean("migration_unknown", true) || safety.getBoolean("cleanup_unknown", false) },
+                    registrationSuppressed = {
+                        safety.getBoolean("migration_unknown", true) || safety.getBoolean("cleanup_unknown", false)
+                    },
                     suppressRegistration = { check(safety.edit().putBoolean("cleanup_unknown", true).commit()) },
                     cleanupSuppressed = { safety.getBoolean("cleanup_unknown", false) },
-                    clearRegistrationSuppression = { check(safety.edit().putBoolean("cleanup_unknown", false).commit()) },
+                    clearRegistrationSuppression = {
+                        check(safety.edit().putBoolean("cleanup_unknown", false).commit())
+                    },
                 )
             }
 

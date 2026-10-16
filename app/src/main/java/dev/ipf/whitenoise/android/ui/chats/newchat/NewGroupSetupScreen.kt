@@ -21,9 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.diagnostics.CreationOperation
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
-import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
 import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
@@ -158,7 +156,7 @@ private suspend fun runNewGroupCreateMutation(
     onAuthoritativeReadFailed: (Throwable) -> Unit,
     owner: GroupCreationSession,
 ) {
-    val diagnostic = DmCreationInteraction(operation = CreationOperation.GROUP_CREATE).nextAttempt()
+    val diagnostic = owner.diagnostics.nextAttempt()
     try {
         runGroupCreationStages(
             owner = owner,

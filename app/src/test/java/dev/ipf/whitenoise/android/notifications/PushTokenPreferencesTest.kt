@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.state.KeystoreSecureStore
 import dev.ipf.whitenoise.android.state.SecureStoreKeyProvider
@@ -50,6 +52,7 @@ class PushTokenPreferencesTest {
         legacy.edit()
             .putString("fcm_token", "secret-token")
             .putBoolean("pending_native_push_registration_sync", true)
+            .putBoolean("pending_push_wake_catch_up", true)
             .putLong("pending_push_wake_catch_up_generation", 7L)
             .putLong("push_wake_catch_up_sequence", 7L)
             .putInt("push_wake_attempts", 2)
@@ -148,6 +151,67 @@ class PushTokenPreferencesTest {
         assertThrows(IllegalArgumentException::class.java) { adapter().importLegacy("bad", legacy) }
         assertFalse(adapter().hasImported("bad"))
         assertTrue(legacy.contains("push_wake_attempts"))
+    }
+
+    @Test
+    fun failedCommitWithUpdatedMemoryCannotRetireLegacySource() {
+        var failCommit = true
+        var successfulTargetCommits = 0
+        val failingContext = object : ContextWrapper(context) {
+            override fun getApplicationContext(): Context = this
+
+            override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
+                val preferences = super.getSharedPreferences(name, mode)
+                return object : SharedPreferences by preferences {
+                    override fun edit(): SharedPreferences.Editor {
+                        val editor = preferences.edit()
+                        return object : SharedPreferences.Editor by editor {
+                            override fun commit(): Boolean {
+                                if (failCommit) {
+                                    editor.apply() // Model SharedPreferences changing memory despite commit=false.
+                                    return false
+                                }
+                                return editor.commit().also { committed ->
+                                    if (committed) successfulTargetCommits += 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        val target = PushTokenPreferences(
+            KeystoreSecureStore(
+                failingContext,
+                "push-target",
+                object : SecureStoreKeyProvider {
+                    override fun secretKey(): SecretKey = key
+                },
+            ),
+            lock,
+        )
+        val legacy = context.getSharedPreferences("legacy-a", Context.MODE_PRIVATE)
+        legacy.edit().putString("fcm_token", "retained").commit()
+        assertThrows(IllegalStateException::class.java) { target.importLegacy("first", legacy) }
+        assertTrue(legacy.contains("fcm_token"))
+        failCommit = false
+        target.importLegacy("first", legacy)
+        assertTrue(successfulTargetCommits > 0)
+        assertFalse(legacy.contains("fcm_token"))
+        assertEquals("retained", PushTokenStore(adapter()).lastToken())
+    }
+
+    @Test
+    fun legacyBooleanOnlyWakeRetainsObservedGenerationAfterEncryptedImport() {
+        val legacy = context.getSharedPreferences("legacy-a", Context.MODE_PRIVATE)
+        legacy.edit().putBoolean("pending_push_wake_catch_up", true).commit()
+        adapter().importLegacy("first", legacy)
+        val store = PushTokenStore(adapter())
+        val observed = store.pendingPushWakeCatchUpGeneration()
+        assertTrue(observed > 0L)
+        assertTrue(store.recordPendingPushWakeCatchUp())
+        assertTrue(store.pendingPushWakeCatchUpGeneration() > observed)
+        assertFalse(store.clearPendingPushWakeCatchUp(observed))
     }
 
 }

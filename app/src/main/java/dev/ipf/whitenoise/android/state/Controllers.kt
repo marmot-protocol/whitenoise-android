@@ -100,6 +100,9 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceSendStage
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
+import dev.ipf.whitenoise.android.diagnostics.invitationFailed
+import dev.ipf.whitenoise.android.diagnostics.projectionFinished
+import dev.ipf.whitenoise.android.diagnostics.traceInvitation
 import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -6219,7 +6222,7 @@ class ConversationController(
         { account, groupId -> appState.marmotIo { groupConversationSnapshot(account, groupId) } },
     private val initialAdminInviteWriter:
         suspend (String, String, List<String>, List<String>) -> dev.ipf.marmotkit.GroupMutationResultFfi =
-        { account, groupId, members, admins ->
+            { account, groupId, members, admins ->
             appState.marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
                 inviteMembersDetailedWithInitialAdmins(account, groupId, members, admins)
             }
@@ -11836,9 +11839,8 @@ class ConversationController(
         initialAdminRefs: List<String> = if (addAsAdmin) memberRefs else emptyList(),
     ): Boolean {
         val diagnostic = DmCreationInteraction(operation = CreationOperation.GROUP_INVITE).nextAttempt()
-        diagnostic.record(DmCreationPhase.OWNER, DmCreationOutcome.START)
-        diagnostic.record(DmCreationPhase.ROSTER, DmCreationOutcome.START)
-        return try {
+        return diagnostic.traceInvitation {
+            diagnostic.record(DmCreationPhase.ROSTER, DmCreationOutcome.START)
             withMutationLockResult(false) {
                 lastMutationError = null
                 if (!canAdministerMembersFromAuthoritativeRoster()) {
@@ -11860,9 +11862,11 @@ class ConversationController(
                     var nativeAccepted = false
                     var canonicalAdmins = emptyList<String>()
                     val runtimeGeneration = appState.runtimeGeneration
-                    val absentBefore = refs.none { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
+                    val absentBefore =
+                        refs.none { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
                     try {
-                        val adminTargets = resolveCanonicalInviteRefs(initialAdminRefs, diagnostic) ?: return@track false
+                        val adminTargets =
+                            resolveCanonicalInviteRefs(initialAdminRefs, diagnostic) ?: return@track false
                         canonicalAdmins = adminTargets
                         check(adminTargets.all { admin -> refs.any { it.equals(admin, ignoreCase = true) } }) {
                             "Initial admin selection contains an unselected recipient"
@@ -11875,88 +11879,88 @@ class ConversationController(
                                 val authorityEpoch = groupAuthorityEpoch
                                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
                                 nativeInvoked = true
-                                val inviteResult = initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
+                                val inviteResult =
+                                    initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
                                 nativeAccepted = true
                                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                                 diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
-                                publishInitialAdminInviteResult(account, inviteResult, authorityEpoch, runtimeGeneration)
-                                if (appState.runtimeGeneration != runtimeGeneration || controllerCleared || isAccountTeardownRequested()) {
-                                    diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.REPLACED, DmCreationFailure.OWNER_REPLACED)
-                                } else {
-                                    diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS)
-                                }
+                                publishInitialAdminInviteResult(
+                                    account, inviteResult, authorityEpoch, runtimeGeneration,
+                                )
+                                diagnostic.projectionFinished(
+                                    appState.runtimeGeneration == runtimeGeneration &&
+                                        !controllerCleared && !isAccountTeardownRequested(),
+                                )
                                 optimisticGroupRosterMutation.settleMembershipActivity(activityId)
                                 GroupAdministrationCommitOutcome.COMMITTED
                             }
                         if (outcome == GroupAdministrationCommitOutcome.ROSTER_CHANGED) {
-                            diagnostic.record(DmCreationPhase.ROSTER, DmCreationOutcome.FAILURE, DmCreationFailure.UNKNOWN)
+                            diagnostic.record(
+                                DmCreationPhase.ROSTER,
+                                DmCreationOutcome.FAILURE,
+                                DmCreationFailure.UNKNOWN,
+                            )
                             presentRosterChanged(R.string.toast_couldnt_add_members)
                             return@track false
                         }
                         presentConversationTransient(R.string.toast_invite_sent)
                         true
                     } catch (throwable: Throwable) {
-                        diagnostic.failed(
-                            when {
-                                nativeAccepted -> DmCreationPhase.PROJECTION
-                                nativeInvoked -> DmCreationPhase.CREATE
-                                else -> DmCreationPhase.RECIPIENTS
-                            },
-                            throwable,
-                        )
+                        diagnostic.invitationFailed(throwable, nativeInvoked, nativeAccepted)
                         throwable.rethrowIfCancellation()
                         diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.START)
-                        if (reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore, nativeInvoked, throwable)) {
+                        val reconciled =
+                            reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore, nativeInvoked, throwable)
+                        if (reconciled) {
                             diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.SUCCESS)
                             presentConversationTransient(R.string.toast_invite_sent)
                             return@track true
                         }
-                        val rawMessage = throwable.message.orEmpty()
-                        if (isDuplicateSignatureKeyError(rawMessage)) {
-                            // MLS rejected the add commit because the proposed member
-                            // already holds a seat (or their signing key collides with
-                            // an existing member's). The UI pre-checks membership, but a
-                            // race or key collision can still land here — surface plain
-                            // language with the resolved name instead of the raw
-                            // CreateCommitError(ProposalValidationError(...)) enum (#899).
-                            val name = duplicateSignatureKeyDisplayName(refs, appState::displayName)
-                            val friendly = copy.couldntAddMemberDuplicate(name)
-                            recordMutationFailure(
-                                R.string.toast_couldnt_add_members,
-                                "GROUP_INVITE_DUPLICATE_MEMBER",
-                                throwable,
-                                AppText.Plain(friendly),
-                            )
-                            false
-                        } else {
-                            recordMutationFailure(
-                                R.string.toast_couldnt_add_members,
-                                "GROUP_INVITE_MEMBER",
-                                throwable,
-                                inviteFailureDetail(
-                                    throwable,
-                                    appState::displayName,
-                                    if (throwable is MarmotKitException.InvalidKeyPackageEvent) {
-                                        refs.singleOrNull()?.let(appState::displayName)
-                                    } else {
-                                        null
-                                    },
-                                ),
-                            )
-                            false
-                        }
+                        presentInviteFailure(throwable, refs)
                     }
                 }
-            }.also { accepted ->
-                diagnostic.record(
-                    DmCreationPhase.OWNER,
-                    if (accepted) DmCreationOutcome.SUCCESS else DmCreationOutcome.FAILURE,
-                    if (accepted) DmCreationFailure.NONE else DmCreationFailure.UNKNOWN,
-                )
             }
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            diagnostic.failed(DmCreationPhase.OWNER, cancelled)
-            throw cancelled
+        }
+    }
+
+    /** Keep error copy independent of native invitation and reconciliation ownership. */
+    private fun presentInviteFailure(
+        throwable: Throwable,
+        refs: List<String>,
+    ): Boolean {
+        val rawMessage = throwable.message.orEmpty()
+        return if (isDuplicateSignatureKeyError(rawMessage)) {
+            // MLS rejected the add commit because the proposed member
+            // already holds a seat (or their signing key collides with
+            // an existing member's). The UI pre-checks membership, but a
+            // race or key collision can still land here — surface plain
+            // language with the resolved name instead of the raw
+            // CreateCommitError(ProposalValidationError(...)) enum (#899).
+            val name = duplicateSignatureKeyDisplayName(refs, appState::displayName)
+            val friendly = copy.couldntAddMemberDuplicate(name)
+            recordMutationFailure(
+                R.string.toast_couldnt_add_members,
+                "GROUP_INVITE_DUPLICATE_MEMBER",
+                throwable,
+                AppText.Plain(friendly),
+            )
+            false
+        } else {
+            recordMutationFailure(
+                R.string.toast_couldnt_add_members,
+                "GROUP_INVITE_MEMBER",
+                throwable,
+                inviteFailureDetail(
+                    throwable,
+                    appState::displayName,
+                    if (throwable is MarmotKitException.InvalidKeyPackageEvent) {
+                        refs.singleOrNull()?.let(appState::displayName)
+                    } else {
+                        null
+                    },
+                ),
+            )
+            false
         }
     }
 
