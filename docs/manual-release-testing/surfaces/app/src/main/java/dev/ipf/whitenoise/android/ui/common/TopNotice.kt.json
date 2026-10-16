@@ -19,6 +19,14 @@
         "test_ids": [
           "CON-034"
         ]
+      },
+      {
+        "surface": "TopNoticeSnackbarTimeoutEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/TopNotice.kt",
+        "anchor": "fun TopNoticeSnackbarTimeoutEffect(",
+        "test_ids": [
+          "CON-034"
+        ]
       }
     ]
   },

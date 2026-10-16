@@ -49,6 +49,8 @@ class TopNoticePlacementCoverageTest {
         val lockGate = "presentationAllowed = { !appState.appLockScreenVisible }"
         assertTrue("app lock must hide every banner", lockGate in root)
         assertTrue("the host must be provided to the whole app", "LocalTopNoticeHost provides topNoticeHost" in root)
+        val timeout = "TopNoticeSnackbarTimeoutEffect(snackbarHostState)"
+        assertTrue("snackbars must time out at the root, not only while a slot shows them", timeout in root)
         val fallback = root.indexOf("TopNoticeSlot(Modifier.zIndex(1f)")
         val lockBranch = root.indexOf("if (appState.appLockScreenVisible) {", fallback)
         assertTrue("the root fallback must claim before any screen composes", fallback in 0 until lockBranch)

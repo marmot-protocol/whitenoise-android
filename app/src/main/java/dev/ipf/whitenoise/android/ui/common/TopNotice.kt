@@ -6,14 +6,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.AccessibilityManager
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -25,9 +30,14 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.isForConversation
+import kotlinx.coroutines.delay
 
 /** The region that holds the temporary banners of the slot that currently owns them. */
 internal const val TOP_NOTICE_REGION_TAG = "top-notice-region"
+
+/** The material snackbar durations, which the material host keeps private. */
+internal const val SNACKBAR_SHORT_MILLIS = 4_000L
+internal const val SNACKBAR_LONG_MILLIS = 10_000L
 
 /** An app-wide confirmation shown in the owning top region. */
 internal const val GLOBAL_TRANSIENT_NOTICE_TAG = "global-transient-notice"
@@ -194,4 +204,48 @@ private fun topNoticeMaxHeight(): Dp {
     val windowHeight = LocalConfiguration.current.screenHeightDp.dp
     val keyboard = with(density) { WindowInsets.ime.getBottom(this).toDp() }
     return ((windowHeight - keyboard) * TOP_NOTICE_MAX_HEIGHT_FRACTION).coerceAtLeast(TOP_NOTICE_MIN_MAX_HEIGHT)
+}
+
+/**
+ * Times the queued snackbar out independently of which slot is composed. The material host only counts down
+ * while it is composed, so a short confirmation queued under app lock, or while a modal takes the banners over,
+ * would otherwise show for its whole duration again once a slot picked it up. Run at the app root, this clock
+ * starts when the snackbar is queued and runs on through lock, slot changes and modals, so a confirmation is
+ * timed out once, and an indefinite error still stays until it is dismissed (#3312).
+ */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+internal fun TopNoticeSnackbarTimeoutEffect(hostState: SnackbarHostState) {
+    val current = hostState.currentSnackbarData
+    val accessibilityManager = LocalAccessibilityManager.current
+    LaunchedEffect(current) {
+        current ?: return@LaunchedEffect
+        val timeout = snackbarTimeoutMillis(current.visuals, accessibilityManager)
+        if (timeout == Long.MAX_VALUE) return@LaunchedEffect
+        delay(timeout)
+        current.dismiss()
+    }
+}
+
+/**
+ * How long a snackbar stays, as the material host decides it: the duration's fixed length, stretched to the
+ * accessibility manager's recommended timeout for text with icons and, when it has an action, controls. An
+ * indefinite snackbar never times out.
+ */
+internal fun snackbarTimeoutMillis(
+    visuals: SnackbarVisuals,
+    accessibilityManager: AccessibilityManager?,
+): Long {
+    val original =
+        when (visuals.duration) {
+            SnackbarDuration.Indefinite -> return Long.MAX_VALUE
+            SnackbarDuration.Long -> SNACKBAR_LONG_MILLIS
+            SnackbarDuration.Short -> SNACKBAR_SHORT_MILLIS
+        }
+    return accessibilityManager?.calculateRecommendedTimeoutMillis(
+        original,
+        containsIcons = true,
+        containsText = true,
+        containsControls = visuals.actionLabel != null,
+    ) ?: original
 }

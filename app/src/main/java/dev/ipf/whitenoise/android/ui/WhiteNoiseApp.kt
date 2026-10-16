@@ -71,6 +71,7 @@ import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.TopNoticeRegion
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSnackbarTimeoutEffect
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
@@ -433,6 +434,9 @@ internal fun WhiteNoiseApp(
         }
     }
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
+    // Snackbars time out here, at the root, so a slot that is hidden by app lock or replaced by a modal
+    // cannot pause the clock and show a confirmation for its full length a second time.
+    TopNoticeSnackbarTimeoutEffect(snackbarHostState)
     LaunchedEffect(inboundProfilePayload, appState.phase) {
         val payload = inboundProfilePayload ?: return@LaunchedEffect
         if (appState.phase == AppPhase.Ready && appState.presentProfilePayload(payload)) {
