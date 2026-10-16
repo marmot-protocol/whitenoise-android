@@ -63,7 +63,6 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
-import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
@@ -159,7 +158,6 @@ import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
 import dev.ipf.whitenoise.android.notifications.normalizeNotificationReaction
 import dev.ipf.whitenoise.android.notifications.notificationReactionOutcome
-import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
@@ -236,6 +234,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
+import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
+import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
@@ -1050,6 +1050,7 @@ class WhiteNoiseAppState private constructor(
     private val messageDraftRepositoryOverride: MessageDraftRepository?,
     private val nativePushFallbackPlatform: NativePushFallbackPlatform,
     private val pushServerConfigProvider: () -> PushServerConfig?,
+    private val fcmTokenReaderOverride: (suspend () -> String?)?,
     private val nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability,
     preferencesOverride: SharedPreferences?,
     pushTokenStoreOverride: PushTokenStore?,
@@ -1107,6 +1108,7 @@ class WhiteNoiseAppState private constructor(
             messageDraftRepositoryOverride = null,
             nativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
             pushServerConfigProvider = PushServerConfig::current,
+            fcmTokenReaderOverride = null,
             nativePushCapabilityResolver = { nativePushCapabilityForContext(context.applicationContext, it) },
             preferencesOverride = null,
             pushTokenStoreOverride = null,
@@ -1144,6 +1146,7 @@ class WhiteNoiseAppState private constructor(
         messageDraftRepository: MessageDraftRepository? = null,
         nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
         pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
+        fcmTokenReader: (suspend () -> String?)? = null,
         nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
             nativePushCapabilityForContext(context.applicationContext, it)
         },
@@ -1176,6 +1179,7 @@ class WhiteNoiseAppState private constructor(
         messageDraftRepositoryOverride = messageDraftRepository,
         nativePushFallbackPlatform = nativePushFallbackPlatform,
         pushServerConfigProvider = pushServerConfigProvider,
+        fcmTokenReaderOverride = fcmTokenReader,
         nativePushCapabilityResolver = nativePushCapabilityResolver,
         preferencesOverride = preferences,
         pushTokenStoreOverride = pushTokenStore,
@@ -9524,8 +9528,8 @@ class WhiteNoiseAppState private constructor(
             if (!notificationDeliveryModeIntent.isCurrent(epoch)) return@withContext
             notificationDeliveryModeMutex.withLock {
                 val latest = notificationDeliveryModeIntent.runIfCurrent(epoch) { notificationDeliveryModeBusy = false }
-                val pending = latest &&
-                    runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
+                val pending =
+                    latest && runCatching { pushTokenStore.nativePushRegistrationSyncPending() }.getOrDefault(false)
                 if (pending) syncNativePushRegistrationIfEnabled()
             }
         }
@@ -10148,31 +10152,35 @@ class WhiteNoiseAppState private constructor(
         if (!nativePushCapability().isAvailable) return null
         val token =
             runCatchingCancellable {
-                suspendCancellableCoroutine<String?> { continuation ->
-                    // The Firebase Task API has no cancel surface, so the
-                    // completion listener can fire after this coroutine is
-                    // cancelled. Guard the resume on isActive so a stale
-                    // callback doesn't try to push a value onto a closed
-                    // continuation; the task completes in the background and
-                    // its result is dropped. The outer runCatching is a
-                    // belt — `getInstance()` itself can throw
-                    // IllegalStateException if FirebaseApp isn't initialized,
-                    // and we'd rather drop the token fetch than crash.
-                    FirebaseMessaging
-                        .getInstance()
-                        .token
-                        .addOnCompleteListener { task ->
-                            if (continuation.isActive) {
-                                continuation.resume(if (task.isSuccessful) task.result else null)
-                            }
-                        }
-                }
+                val reader: suspend () -> String? = fcmTokenReaderOverride ?: ::readFcmTokenFromSdk
+                reader()
             }.onFailure {
                 appStateDebug { "FCM token fetch failed: ${it.readableMessage()}" }
             }.getOrNull()
         if (!token.isNullOrBlank()) pushTokenStore.setToken(token)
         return token?.takeIf { it.isNotBlank() }
     }
+
+    private suspend fun readFcmTokenFromSdk(): String? =
+        suspendCancellableCoroutine<String?> { continuation ->
+            // The Firebase Task API has no cancel surface, so the
+            // completion listener can fire after this coroutine is
+            // cancelled. Guard the resume on isActive so a stale
+            // callback doesn't try to push a value onto a closed
+            // continuation; the task completes in the background and
+            // its result is dropped. The outer runCatching is a
+            // belt — `getInstance()` itself can throw
+            // IllegalStateException if FirebaseApp isn't initialized,
+            // and we'd rather drop the token fetch than crash.
+            FirebaseMessaging
+                .getInstance()
+                .token
+                .addOnCompleteListener { task ->
+                    if (continuation.isActive) {
+                        continuation.resume(if (task.isSuccessful) task.result else null)
+                    }
+                }
+        }
 
     fun shouldRequestDefaultNotificationPermission(): Boolean =
         activeAccountRef != null &&

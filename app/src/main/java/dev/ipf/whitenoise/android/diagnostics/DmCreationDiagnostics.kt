@@ -326,8 +326,15 @@ internal fun creationDiagnosticFields(fields: Map<String, Any>): Map<String, Any
     safe["native_phase_detail"] = "unavailable"
     if (safe.size != CREATION_FIELD_COUNT) return null
     return listOf(
-        "operation", "interaction", "attempt", "phase", "outcome", "failure",
-        "elapsed_ms", "phase_duration_ms", "native_phase_detail",
+        "operation",
+        "interaction",
+        "attempt",
+        "phase",
+        "outcome",
+        "failure",
+        "elapsed_ms",
+        "phase_duration_ms",
+        "native_phase_detail",
     ).associateWithTo(linkedMapOf()) { safe.getValue(it) }
 }
 

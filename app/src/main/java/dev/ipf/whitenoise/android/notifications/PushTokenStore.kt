@@ -3,9 +3,11 @@ package dev.ipf.whitenoise.android.notifications
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.VisibleForTesting
 import dev.ipf.whitenoise.android.state.AndroidKeystoreSecretKeyProvider
 import dev.ipf.whitenoise.android.state.KeystoreSecureStore
 import dev.ipf.whitenoise.android.state.LegacySecurePreferences
+import dev.ipf.whitenoise.android.state.SecureStoreKeyProvider
 
 private const val PREFS_NAME = "whitenoise.push.tokens"
 private const val SECURE_PREFS_NAME = "whitenoise.push.tokens.secure"
@@ -57,24 +59,25 @@ class PushTokenStore(
     private val clearRegistrationSuppression: () -> Unit = {},
 ) {
     /** Unknown legacy cleanup or a failed durable disable holds every native registration path. */
-    internal fun registrationAllowed(): Boolean = runCatching {
-        synchronized(LOCK) {
-            preferences.all // Resolve lazy migration before inspecting its persisted fence.
-            if (deferredDisables.isNotEmpty()) {
-                val pending = pendingDisables() + deferredDisables
-                if (preferences.edit().putStringSet(KEY_PENDING_DISABLES, pending).commit()) {
-                    if (ownsCleanupFence) {
-                        clearRegistrationSuppression()
-                        ownsCleanupFence = false
+    internal fun registrationAllowed(): Boolean =
+        runCatching {
+            synchronized(LOCK) {
+                preferences.all // Resolve lazy migration before inspecting its persisted fence.
+                if (deferredDisables.isNotEmpty()) {
+                    val pending = pendingDisables() + deferredDisables
+                    if (preferences.edit().putStringSet(KEY_PENDING_DISABLES, pending).commit()) {
+                        if (ownsCleanupFence) {
+                            clearRegistrationSuppression()
+                            ownsCleanupFence = false
+                        }
+                        deferredDisables.clear()
                     }
-                    deferredDisables.clear()
+                }
+                (!registrationSuppressed()).also { allowed ->
+                    if (!allowed) android.util.Log.w("PushTokenStorage", "registration_held_unknown_cleanup")
                 }
             }
-            (!registrationSuppressed()).also { allowed ->
-                if (!allowed) android.util.Log.w("PushTokenStorage", "registration_held_unknown_cleanup")
-            }
-        }
-    }.getOrDefault(false)
+        }.getOrDefault(false)
 
     /** Keep failed native cleanup retryable without making unreadable account data plaintext. */
     internal fun suppressRegistrationUntilReconciled(account: String) {
@@ -408,6 +411,18 @@ class PushTokenStore(
         private val LOCK = Any()
         private val deferredDisables = mutableSetOf<String>()
         private var ownsCleanupFence = false
+        private const val KEYSTORE_ALIAS = "whitenoise.push.tokens.keystore.key"
+        private var keyProvider: SecureStoreKeyProvider = AndroidKeystoreSecretKeyProvider(KEYSTORE_ALIAS)
+
+        /** JVM fixtures supply an AES key; null restores the production Keystore boundary. */
+        @VisibleForTesting
+        internal fun installKeyProvider(provider: SecureStoreKeyProvider?) {
+            synchronized(LOCK) {
+                keyProvider = provider ?: AndroidKeystoreSecretKeyProvider(KEYSTORE_ALIAS)
+                deferredDisables.clear()
+                ownsCleanupFence = false
+            }
+        }
 
         /** Constructs lazily so a locked Keystore cannot crash AppState initialization. */
         @Suppress("LongMethod") // One serialized import and registration-safety boundary for three legacy sources.
@@ -423,29 +438,30 @@ class PushTokenStore(
                         KeystoreSecureStore(
                             appContext,
                             "whitenoise.push.tokens.keystore",
-                            AndroidKeystoreSecretKeyProvider("whitenoise.push.tokens.keystore.key"),
+                            keyProvider,
                         ),
                         LOCK,
                         prepare = {
                             if (!initialized && android.os.SystemClock.elapsedRealtime() >= nextImportAttemptMs) {
                                 var unknown = false
                                 for (source in listOf(SECURE_PREFS_NAME, FALLBACK_PREFS_NAME, PREFS_NAME)) {
-                                    val imported = runCatching {
-                                        val receipt = secure.hasImported(source)
-                                        val sourceStore = {
-                                            if (source == SECURE_PREFS_NAME) {
-                                                LegacySecurePreferences.openForImport(appContext, source)
-                                            } else {
-                                                appContext.getSharedPreferences(source, Context.MODE_PRIVATE)
+                                    val imported =
+                                        runCatching {
+                                            val receipt = secure.hasImported(source)
+                                            val sourceStore = {
+                                                if (source == SECURE_PREFS_NAME) {
+                                                    LegacySecurePreferences.openForImport(appContext, source)
+                                                } else {
+                                                    appContext.getSharedPreferences(source, Context.MODE_PRIVATE)
+                                                }
                                             }
-                                        }
-                                        if (receipt) {
-                                            // A failed source cleanup cannot invalidate a durable target receipt.
-                                            runCatching { sourceStore()?.let(secure::cleanupImportedSource) }
-                                        } else {
-                                            sourceStore()?.let { secure.importLegacy(source, it) }
-                                        }
-                                    }.isSuccess
+                                            if (receipt) {
+                                                // A failed source cleanup cannot invalidate a durable target receipt.
+                                                runCatching { sourceStore()?.let(secure::cleanupImportedSource) }
+                                            } else {
+                                                sourceStore()?.let { secure.importLegacy(source, it) }
+                                            }
+                                        }.isSuccess
                                     unknown = unknown || !imported
                                 }
                                 check(safety.edit().putBoolean("migration_unknown", unknown).commit())
@@ -469,6 +485,5 @@ class PushTokenStore(
                     },
                 )
             }
-
     }
 }

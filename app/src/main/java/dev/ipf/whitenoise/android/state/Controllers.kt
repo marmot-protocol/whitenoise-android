@@ -6222,7 +6222,7 @@ class ConversationController(
         { account, groupId -> appState.marmotIo { groupConversationSnapshot(account, groupId) } },
     private val initialAdminInviteWriter:
         suspend (String, String, List<String>, List<String>) -> dev.ipf.marmotkit.GroupMutationResultFfi =
-            { account, groupId, members, admins ->
+        { account, groupId, members, admins ->
             appState.marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
                 inviteMembersDetailedWithInitialAdmins(account, groupId, members, admins)
             }
@@ -11850,10 +11850,11 @@ class ConversationController(
                 diagnostic.record(DmCreationPhase.ROSTER, DmCreationOutcome.SUCCESS)
                 val account = conversationAccountRef ?: return@withMutationLockResult false
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.START)
-                val refs = resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: run {
-                    diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.FAILURE, DmCreationFailure.UNKNOWN)
-                    return@withMutationLockResult false
-                }
+                val refs =
+                    resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: run {
+                        diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.FAILURE, DmCreationFailure.UNKNOWN)
+                        return@withMutationLockResult false
+                    }
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
                 if (refs.isEmpty()) return@withMutationLockResult false
                 optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
@@ -11885,11 +11886,15 @@ class ConversationController(
                                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                                 diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
                                 publishInitialAdminInviteResult(
-                                    account, inviteResult, authorityEpoch, runtimeGeneration,
+                                    account,
+                                    inviteResult,
+                                    authorityEpoch,
+                                    runtimeGeneration,
                                 )
                                 diagnostic.projectionFinished(
                                     appState.runtimeGeneration == runtimeGeneration &&
-                                        !controllerCleared && !isAccountTeardownRequested(),
+                                        !controllerCleared &&
+                                        !isAccountTeardownRequested(),
                                 )
                                 optimisticGroupRosterMutation.settleMembershipActivity(activityId)
                                 GroupAdministrationCommitOutcome.COMMITTED

@@ -16,15 +16,17 @@ internal class PushTokenPreferences(
     private val lock: Any,
     private val prepare: () -> Unit = {},
 ) : SharedPreferences {
-    override fun getAll(): Map<String, Any> = read {
-        prepare()
-        values().mapValues { decode(it.value) }
-    }
+    override fun getAll(): Map<String, Any> =
+        read {
+            prepare()
+            values().mapValues { decode(it.value) }
+        }
 
-    override fun contains(key: String): Boolean = read {
-        prepare()
-        values().containsKey(key)
-    }
+    override fun contains(key: String): Boolean =
+        read {
+            prepare()
+            values().containsKey(key)
+        }
 
     override fun getString(
         key: String,
@@ -55,26 +57,24 @@ internal class PushTokenPreferences(
     override fun getStringSet(
         key: String,
         defValues: MutableSet<String>?,
-    ): MutableSet<String>? =
-        (getAll()[key] as? Set<String>)?.toMutableSet() ?: defValues?.toMutableSet()
+    ): MutableSet<String>? = (getAll()[key] as? Set<String>)?.toMutableSet() ?: defValues?.toMutableSet()
 
     override fun edit(): SharedPreferences.Editor = Editor()
 
     override fun registerOnSharedPreferenceChangeListener(
         listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) =
-        error("Push state does not use preference listeners")
+    ) = error("Push state does not use preference listeners")
 
     override fun unregisterOnSharedPreferenceChangeListener(
         listener: SharedPreferences.OnSharedPreferenceChangeListener,
-    ) =
-        error("Push state does not use preference listeners")
+    ) = error("Push state does not use preference listeners")
 
     /** A durable target receipt makes an unreadable leftover source irrelevant. */
-    fun hasImported(source: String): Boolean = synchronized(lock) {
-        val current = store.readAll()
-        source in stringSet(current[IMPORTED]) && store.replaceAllDurably(current)
-    }
+    fun hasImported(source: String): Boolean =
+        synchronized(lock) {
+            val current = store.readAll()
+            source in stringSet(current[IMPORTED]) && store.replaceAllDurably(current)
+        }
 
     /** A source is retired only after values and its import receipt are committed together. */
     fun importLegacy(
@@ -183,8 +183,7 @@ internal class PushTokenPreferences(
         override fun putStringSet(
             key: String,
             values: MutableSet<String>?,
-        ): SharedPreferences.Editor =
-            apply { updates[key] = values?.toSet()?.let(::encode) }
+        ): SharedPreferences.Editor = apply { updates[key] = values?.toSet()?.let(::encode) }
 
         override fun remove(key: String): SharedPreferences.Editor = apply { updates[key] = null }
 
@@ -230,29 +229,38 @@ internal class PushTokenPreferences(
         val PUSH_KEYS =
             setOf(
                 KEY_FCM_TOKEN,
-                KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, KEY_PENDING_PUSH_WAKE_CATCH_UP,
+                KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC,
+                KEY_PENDING_PUSH_WAKE_CATCH_UP,
                 KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION,
-                KEY_PUSH_WAKE_CATCH_UP_SEQUENCE, KEY_WAKE_ATTEMPTS,
+                KEY_PUSH_WAKE_CATCH_UP_SEQUENCE,
+                KEY_WAKE_ATTEMPTS,
                 KEY_WAKE_RETRY_AT,
-                KEY_PENDING_CLEARS, KEY_PENDING_DISABLES,
+                KEY_PENDING_CLEARS,
+                KEY_PENDING_DISABLES,
             )
 
         fun stringSet(value: String?): Set<String> =
-            value?.let { text ->
-                val array = JSONArray(text)
-                (0 until array.length()).map { array.getString(it) }.toSet()
-            }.orEmpty()
+            value
+                ?.let { text ->
+                    val array = JSONArray(text)
+                    (0 until array.length()).map { array.getString(it) }.toSet()
+                }
+                .orEmpty()
 
-        fun validValue(key: String, value: Any): Boolean = when (key) {
-            KEY_FCM_TOKEN -> value is String
-            KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, KEY_PENDING_PUSH_WAKE_CATCH_UP -> value is Boolean
-            KEY_WAKE_ATTEMPTS -> value is Int
-            KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION,
-            KEY_PUSH_WAKE_CATCH_UP_SEQUENCE,
-            KEY_WAKE_RETRY_AT,
-            -> value is Long
-            else -> false
-        }
+        fun validValue(
+            key: String,
+            value: Any,
+        ): Boolean =
+            when (key) {
+                KEY_FCM_TOKEN -> value is String
+                KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, KEY_PENDING_PUSH_WAKE_CATCH_UP -> value is Boolean
+                KEY_WAKE_ATTEMPTS -> value is Int
+                KEY_PENDING_PUSH_WAKE_CATCH_UP_GENERATION,
+                KEY_PUSH_WAKE_CATCH_UP_SEQUENCE,
+                KEY_WAKE_RETRY_AT,
+                -> value is Long
+                else -> false
+            }
 
         fun encode(value: Any): String {
             val type =

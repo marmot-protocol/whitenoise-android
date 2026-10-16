@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.app.Application
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
@@ -15,6 +16,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import java.security.GeneralSecurityException
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -157,6 +159,7 @@ class PushTokenPreferencesTest {
     fun failedCommitWithUpdatedMemoryCannotRetireLegacySource() {
         var failCommit = true
         var successfulTargetCommits = 0
+        var failedTargetCommits = 0
         val failingContext = object : ContextWrapper(context) {
             override fun getApplicationContext(): Context = this
 
@@ -166,8 +169,12 @@ class PushTokenPreferencesTest {
                     override fun edit(): SharedPreferences.Editor {
                         val editor = preferences.edit()
                         return object : SharedPreferences.Editor by editor {
+                            override fun putString(key: String, value: String?): SharedPreferences.Editor =
+                                apply { editor.putString(key, value) }
+
                             override fun commit(): Boolean {
                                 if (failCommit) {
+                                    failedTargetCommits += 1
                                     editor.apply() // Model SharedPreferences changing memory despite commit=false.
                                     return false
                                 }
@@ -194,11 +201,27 @@ class PushTokenPreferencesTest {
         legacy.edit().putString("fcm_token", "retained").commit()
         assertThrows(IllegalStateException::class.java) { target.importLegacy("first", legacy) }
         assertTrue(legacy.contains("fcm_token"))
+        assertEquals(1, failedTargetCommits)
         failCommit = false
         target.importLegacy("first", legacy)
         assertTrue(successfulTargetCommits > 0)
         assertFalse(legacy.contains("fcm_token"))
         assertEquals("retained", PushTokenStore(adapter()).lastToken())
+    }
+
+    @Test
+    fun unavailableKeystoreDefersServiceSyncWithoutThrowing() {
+        PushTokenStore.installKeyProvider(
+            object : SecureStoreKeyProvider {
+                override fun secretKey(): SecretKey = throw GeneralSecurityException("unavailable")
+            },
+        )
+        try {
+            assertFalse(NotificationStreamForegroundService.syncNativePushRegistration(context))
+            assertNull(shadowOf(context as Application).nextStartedService)
+        } finally {
+            PushTokenStore.installKeyProvider(null)
+        }
     }
 
     @Test

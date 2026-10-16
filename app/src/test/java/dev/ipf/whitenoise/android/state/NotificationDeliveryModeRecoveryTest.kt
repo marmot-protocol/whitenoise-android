@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.notifications.BackgroundConnectionPreferences
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
+import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -22,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -38,6 +40,9 @@ import java.util.concurrent.atomic.AtomicInteger
 @Config(sdk = [36])
 @Suppress("LargeClass") // One fixture-backed suite covers the complete two-transport settlement state machine.
 class NotificationDeliveryModeRecoveryTest {
+    @get:Rule
+    val pushTokenKey = PushTokenKeyRule()
+
     private val context: Context
         get() = RuntimeEnvironment.getApplication().applicationContext
 
@@ -1102,12 +1107,14 @@ class NotificationDeliveryModeRecoveryTest {
                         check(releasePersist.await(10, TimeUnit.SECONDS))
                     },
                 )
+            var sdkToken = "old-token"
             val fixture =
                 fixture(
                     platform = platform,
                     nativeEnabled = true,
                     accounts = listOf(account(ACCOUNT_A), account(ACCOUNT_B)),
                     fcmAvailable = true,
+                    fcmTokenReader = { sdkToken },
                 )
             val store = PushTokenStore.create(context)
             try {
@@ -1124,6 +1131,7 @@ class NotificationDeliveryModeRecoveryTest {
                 val local = async { fixture.appState.setNotificationDeliveryMode(NotificationDeliveryMode.Local) }
                 withTimeout(2_000L) { while (persistStarted.count > 0L) yield() }
                 fixture.runWithMainLooperPumping {
+                    sdkToken = "rotated-token"
                     fixture.appState.onPushTokenRotated("rotated-token")
                     withTimeout(2_000L) { while (!store.nativePushRegistrationSyncPending()) yield() }
                 }
@@ -1288,6 +1296,7 @@ class NotificationDeliveryModeRecoveryTest {
         accounts: List<AccountSummaryFfi> = listOf(account(ACCOUNT_A)),
         onUpsert: (String) -> Unit = {},
         fcmAvailable: Boolean = false,
+        fcmTokenReader: suspend () -> String? = { "test-token" },
         onSetNative: ((String, Boolean) -> NotificationSettingsFfi)? = null,
         onClear: ((String) -> PushRegistrationShareOutcomeFfi)? = null,
         onNotificationSettings: ((String) -> NotificationSettingsFfi)? = null,
@@ -1301,6 +1310,7 @@ class NotificationDeliveryModeRecoveryTest {
         onClearPushRegistration = onClear,
         onNotificationSettings = onNotificationSettings,
         pushServerConfigProvider = { CONFIG },
+        fcmTokenReader = fcmTokenReader,
         nativePushCapabilityResolver = {
             if (fcmAvailable) NativePushCapability.Available else NativePushCapability.MissingPushServerConfiguration
         },
