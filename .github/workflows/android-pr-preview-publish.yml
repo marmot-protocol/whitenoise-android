@@ -114,6 +114,7 @@ jobs:
           .github/scripts/test-pr-preview-validation.sh
           .github/scripts/test-publish-pr-apk-to-github-release.sh
           node --test .github/scripts/update-pr-preview-links.test.js
+          python3 .github/scripts/test-publish-pr-apk-to-blossom.py
 
       - name: Download candidates from completed run
         env:
@@ -255,6 +256,29 @@ jobs:
             printf '%s_url=%s\n' "$channel" "$url" >> "$GITHUB_OUTPUT"
           done
 
+      - name: Install pinned Blossom client
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --max-time 120 \
+            https://github.com/fiatjaf/nak/releases/download/v0.21.2/nak-v0.21.2-linux-amd64 \
+            -o "$RUNNER_TEMP/nak"
+          printf '%s  %s\n' 0acd56fea6ab1b9a0a68c8615670c6f8eff9e8878922442e387b94ee15266bb8 "$RUNNER_TEMP/nak" | sha256sum --check
+          chmod 700 "$RUNNER_TEMP/nak"
+          printf '%s\n' "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Publish stable preview to Blossom
+        id: blossom
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOSTR_SECRET_KEY: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find signed/stable -type f -name '*.apk' -print -quit)
+          url=$(APK_PATH="$apk" python3 .github/scripts/publish-pr-apk-to-blossom.py)
+          printf 'stable_url=%s\n' "$url" >> "$GITHUB_OUTPUT"
+
       # A push can land while validation/signing/upload runs. Do not let a
       # superseded run overwrite the description with stale APK links.
       - name: Recheck PR head before description update
@@ -276,7 +300,7 @@ jobs:
         env:
           PR_NUMBER: ${{ env.PR_NUMBER }}
           HEAD_SHA: ${{ env.HEAD_SHA }}
-          STABLE_URL: ${{ steps.publish.outputs.stable_url }}
+          STABLE_URL: ${{ steps.blossom.outputs.stable_url }}
           ISOLATED_URL: ${{ steps.publish.outputs.isolated_url }}
         with:
           script: |

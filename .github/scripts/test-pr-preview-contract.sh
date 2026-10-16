@@ -83,7 +83,10 @@ grep -Fq 'contents: write' "$workflow"
 grep -Fq 'GH_TOKEN: ${{ github.token }}' "$workflow"
 grep -Fq 'PREVIEW_CHANNEL="$channel"' "$workflow"
 grep -Fq '.github/scripts/publish-pr-apk-to-github-release.sh' "$workflow"
-reject 'BLOSSOM_UPLOAD_NSEC' "$workflow"
+# Only the trusted, validated publisher may see the existing upload identity.
+reject 'BLOSSOM_UPLOAD_NSEC' "$build"
+grep -Fq 'NOSTR_SECRET_KEY: ${{ secrets.BLOSSOM_UPLOAD_NSEC }}' "$workflow"
+grep -Fq 'STABLE_URL: ${{ steps.blossom.outputs.stable_url }}' "$workflow"
 # Both the pre-checkout prepare job and the post-checkout publish job must bind
 # artifact downloads explicitly to this repository. Without --repo, gh fails
 # before checkout with "not a git repository" and no preview links are posted.

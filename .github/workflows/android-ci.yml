@@ -153,7 +153,9 @@ jobs:
           bash .github/scripts/test-pr-preview-validation.sh
 
       - name: Test PR preview publisher
-        run: bash .github/scripts/test-publish-pr-apk-to-github-release.sh
+        run: |
+          bash .github/scripts/test-publish-pr-apk-to-github-release.sh
+          python3 .github/scripts/test-publish-pr-apk-to-blossom.py
 
       - name: Test release and staging transport tooling
         run: |
