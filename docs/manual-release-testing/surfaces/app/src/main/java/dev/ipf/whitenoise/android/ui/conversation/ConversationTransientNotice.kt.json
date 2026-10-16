@@ -4,15 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "ConversationTransientNotice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTransientNotice.kt",
-        "anchor": "fun ConversationTransientNotice(",
-        "test_ids": [
-          "CON-006",
-          "CON-015"
-        ]
-      },
-      {
         "surface": "ConversationTransientNoticeLayout",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTransientNotice.kt",
         "anchor": "fun ConversationTransientNoticeLayout(",

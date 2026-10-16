@@ -168,7 +168,7 @@ class ConversationScrollIndicatorTest {
                         state = state,
                         reverseLayout = true,
                         verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-                        contentPadding = conversationTimelineContentPadding(0.dp, 0.dp),
+                        contentPadding = conversationTimelineContentPadding(),
                         modifier =
                             Modifier
                                 .fillMaxWidth()

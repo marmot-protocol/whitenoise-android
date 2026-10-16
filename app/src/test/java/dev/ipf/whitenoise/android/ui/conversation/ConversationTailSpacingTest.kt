@@ -142,7 +142,7 @@ class ConversationTailSpacingTest {
             modifier = Modifier.size(width = 320.dp, height = 100.dp),
             reverseLayout = true,
             verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-            contentPadding = conversationTimelineContentPadding(0.dp),
+            contentPadding = conversationTimelineContentPadding(),
         ) {
             // Reversed emission: the newest row is laid out against the composer.
             item(key = "tail") { Spacer(Modifier.fillMaxWidth().height(400.dp)) }
@@ -318,7 +318,7 @@ class ConversationTailSpacingTest {
                         modifier = Modifier.fillMaxSize().testTag(TRANSCRIPT_TAG),
                         reverseLayout = true,
                         verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-                        contentPadding = conversationTimelineContentPadding(0.dp),
+                        contentPadding = conversationTimelineContentPadding(),
                     ) {
                         tailSpacingItems(fixture.timelineSize)
                     }

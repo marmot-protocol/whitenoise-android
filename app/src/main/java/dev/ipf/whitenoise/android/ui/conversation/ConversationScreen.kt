@@ -4164,7 +4164,7 @@ internal fun ConversationScreen(
                 recentEmojis = recentEmojiRecentsOwner.recents,
                 onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
                 onTimelineComposerMeasured = timelineViewport::onComposerMeasured,
-                onBottomChromeMeasured = { heightPx, _ ->
+                onBottomChromeMeasured = { heightPx ->
                     timelineViewport.onBottomChromeMeasured(heightPx)
                     bottomChromeHeightObserver.onMeasured(heightPx)
                     if (measuredBottomChromeHeightPx != heightPx) {
@@ -4362,7 +4362,7 @@ internal fun ConversationScreen(
                                 // row as the stable tail anchor.
                                 contentPadding =
                                     remember(overlayPadding) {
-                                        conversationTimelineContentPadding(0.dp, overlayPadding)
+                                        conversationTimelineContentPadding(overlayPadding)
                                     },
                             ) {
                                 // The list is reversed, so the first item emitted

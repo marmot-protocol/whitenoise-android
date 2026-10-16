@@ -112,6 +112,7 @@ class ConversationTransientNoticeTest {
         assertEquals(initialOffset, timelineState.firstVisibleItemScrollOffset)
     }
 
+    /** The conversation's row shows a delivered scoped notice and clears it when its timeout retires it. */
     @Test
     fun deliveredNoticeClearsAfterTransientWindow() {
         composeRule.mainClock.autoAdvance = false
@@ -121,13 +122,11 @@ class ConversationTransientNoticeTest {
                 if (notice.value === delivered) notice.value = null
             }
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxSize()) {
-                    ConversationTransientNotice(
-                        notice = notice.value,
-                        accountRef = ACCOUNT,
-                        groupIdHex = GROUP_A,
-                    )
-                }
+                ConversationTransientNoticeLayout(
+                    notice = notice.value,
+                    accountRef = ACCOUNT,
+                    groupIdHex = GROUP_A,
+                ) {}
             }
         }
         composeRule.onNodeWithText(NOTICE_TEXT).assertIsDisplayed()

@@ -7,31 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.TransientNotice
-import dev.ipf.whitenoise.android.state.isForConversation
-import dev.ipf.whitenoise.android.ui.common.CONVERSATION_TRANSIENT_NOTICE_TAG
-import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
 import dev.ipf.whitenoise.android.ui.common.TopNoticeRegion
 import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
-
-/** Renders [notice] only when it belongs to this account and conversation. */
-@Composable
-@Suppress("FunctionNaming")
-internal fun ConversationTransientNotice(
-    notice: TransientNotice?,
-    accountRef: String?,
-    groupIdHex: String,
-    modifier: Modifier = Modifier,
-) {
-    notice?.takeIf { accountRef != null && it.isForConversation(accountRef, groupIdHex) }?.let {
-        InlineConfirmationNotice(
-            notice = it,
-            modifier = modifier.testTag(CONVERSATION_TRANSIENT_NOTICE_TAG),
-        )
-    }
-}
 
 /**
  * The conversation's temporary-banner slot: its own row below the stable app bar and playback strip. Keeping it out

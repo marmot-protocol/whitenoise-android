@@ -26,7 +26,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.TransientNotice
-import dev.ipf.whitenoise.android.ui.conversation.ConversationTransientNotice
+import dev.ipf.whitenoise.android.ui.common.CONVERSATION_TRANSIENT_NOTICE_TAG
+import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -98,16 +99,14 @@ class SendConnectionFailureScreenshotTest {
                     modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                ConversationTransientNotice(
+                InlineConfirmationNotice(
                     notice =
                         TransientNotice(
                             id = 1L,
                             title = AppText.Resource(R.string.toast_send_connection_failed),
                             conversation = ConversationNoticeDestination("account-a", "group-a"),
                         ),
-                    accountRef = "account-a",
-                    groupIdHex = "group-a",
-                    modifier = Modifier.align(Alignment.TopCenter),
+                    modifier = Modifier.align(Alignment.TopCenter).testTag(CONVERSATION_TRANSIENT_NOTICE_TAG),
                 )
             }
         }

@@ -33,7 +33,15 @@ class TopNoticePlacementCoverageTest {
     /** Bottom-specific banner compensation is gone and cannot return under another call site. */
     @Test
     fun noBottomBannerCompensationRemains() {
-        val retired = listOf("LocalSnackbarBottomInset", "LocalSnackbarContentInset", "reserveSnackbarSpace")
+        val retired =
+            listOf(
+                "LocalSnackbarBottomInset",
+                "LocalSnackbarContentInset",
+                "reserveSnackbarSpace",
+                "snackbarContentInset",
+                // The standalone scoped composable is gone, the conversation row is the only scoped presenter.
+                "ConversationTransientNotice(",
+            )
         mainSources().forEach { (path, source) ->
             retired.forEach { name -> assertFalse("$path still uses $name", name in source) }
         }
