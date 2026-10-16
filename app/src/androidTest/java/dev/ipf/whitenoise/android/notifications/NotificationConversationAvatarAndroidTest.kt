@@ -37,7 +37,8 @@ import kotlin.math.abs
  * card's picture and the small app icon, and saves shade screenshots for before/after review.
  *
  * Opt in with `-e allowShadeProbe true` on an emulator or a disposable, unlocked device with its screen on. It posts
- * synthetic cards for a fixture account only and removes just those cards and their shortcuts afterwards.
+ * synthetic cards for a fixture account only and removes just those cards, their shortcuts and their conversation
+ * channels afterwards.
  */
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
@@ -62,20 +63,26 @@ class NotificationConversationAvatarAndroidTest {
         device.pressHome()
     }
 
-    /** Leaves no synthetic card, fixture shortcut or open shade behind, and touches nothing else. */
+    /** Leaves no synthetic card, fixture shortcut, fixture channel or open shade behind, and touches nothing else. */
     @After
     fun cleanUp() {
         removeFixtureCards()
         device.pressHome()
     }
 
-    /** Cancels only this fixture's cards and removes only its own conversation shortcuts. */
+    /**
+     * Cancels only this fixture's cards, removes only its own conversation shortcuts, and deletes the per-conversation
+     * channels posting created for them ("Ruby Identity", "Blue Identity Group" and "Magenta Identity").
+     */
     private fun removeFixtureCards() {
         val ids = names.keys.mapNotNull { conversationShortcutId(NotificationFixtureDefaults.ACCOUNT_REF, it) }.toSet()
         manager.activeNotifications
             .filter { it.notification.shortcutId in ids }
             .forEach { manager.cancel(it.tag, it.id) }
         ShortcutManagerCompat.removeDynamicShortcuts(context, ids.toList())
+        manager.notificationChannels
+            .filter { it.conversationId in ids }
+            .forEach { manager.deleteNotificationChannel(it.id) }
     }
 
     /**
