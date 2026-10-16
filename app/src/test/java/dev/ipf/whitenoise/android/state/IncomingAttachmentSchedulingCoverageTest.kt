@@ -32,13 +32,17 @@ class IncomingAttachmentSchedulingCoverageTest {
         }
         assertTrue(
             "receipt scheduling must use the receiving account's live per-type policy",
-            "automaticAttachmentTypesAllowed(update.accountRef)" in body,
+            "automaticAttachmentPolicy(update.accountRef)" in body,
         )
         assertTrue(
             "receipt scheduling must read only the received message's slots",
-            "receivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex)" in body,
+            "receivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex" in body,
         )
         assertTrue("receipt scheduling must queue durable work", "enqueueAttachmentDownload(" in body)
+        assertTrue(
+            "queued work must wait for a network its type's policy could allow",
+            "networkType = policy.networkType(it.type)" in body,
+        )
         assertFalse("receipt scheduling must not scan the whole group's media", "listMedia(" in body)
         assertFalse(
             "the planner must classify by MDK's category, not re-derive and drop types by MIME",
@@ -74,7 +78,10 @@ class IncomingAttachmentSchedulingCoverageTest {
         )
     }
 
-    /** Durable automatic work re-checks the live policy and waits for the native approval before asking MDK. */
+    /**
+     * Durable automatic work re-checks the live policy and waits for the native approval before asking MDK, and
+     * a lasting pause frees its download slot and goes back through admission.
+     */
     @Test
     fun durableAutomaticWorkRechecksLivePolicy() {
         val source = appState()
@@ -83,16 +90,25 @@ class IncomingAttachmentSchedulingCoverageTest {
             "durable automatic work must go through admission",
             "downloadAutomaticAttachment(" in source.functionBody("downloadAttachmentForDurableWork"),
         )
+        val attempts = source.functionBody("downloadAutomaticAttachment")
         assertTrue(
             "every automatic attempt must be admitted against the live policy",
-            "awaitAutomaticAttachmentAdmission(" in source.functionBody("downloadAutomaticAttachment"),
+            "awaitAutomaticAttachmentAdmission(" in attempts,
+        )
+        assertTrue(
+            "a lasting pause must end in re-admission, not hold a download slot",
+            "NativeAttachmentPausedException" in attempts,
         )
         val admission = source.functionBody("awaitAutomaticAttachmentAdmission")
         assertTrue(
             "admission must use the live per-type policy",
-            "automaticAttachmentTypesAllowed(accountRef)" in admission,
+            "automaticAttachmentPolicy(accountRef)" in admission,
         )
         assertTrue("admission must wait for the native approval", "awaitApplied(accountRef)" in admission)
+        assertTrue(
+            "durable observation must bound a pause",
+            "NATIVE_AUTOMATIC_PAUSE_GRACE_MILLIS.takeIf" in source("state/NativeAttachmentTransfers.kt"),
+        )
     }
 
     /** Reads AppState from either the module or the repository working directory. */

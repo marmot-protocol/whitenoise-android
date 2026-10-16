@@ -163,6 +163,8 @@ internal class NotificationBootstrapTestFixture(
     private val messageRecords: List<AppMessageRecordFfi> = emptyList(),
     // Newest-first attachment history the receipt scheduler pages through (#3308).
     private val attachmentHistory: List<AttachmentEntryFfi> = emptyList(),
+    // Continuation reads answered as RestartRequired first, as when history changes under the cursor.
+    attachmentHistoryRestarts: Int = 0,
     private val profileImageDownload: ((url: String, maxBytes: ULong) -> ByteArray)? = null,
     notificationFirstPostTimingObserver: ((NotificationFirstPostTimingEvent) -> Unit)? = null,
     notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -222,6 +224,7 @@ internal class NotificationBootstrapTestFixture(
     val notificationMessageHistoryCalls = AtomicInteger(0)
     val notificationGroupDetailsCalls = AtomicInteger(0)
     val attachmentHistoryPageCalls = AtomicInteger(0)
+    private val attachmentHistoryRestartsLeft = AtomicInteger(attachmentHistoryRestarts)
     val listMediaCalls = AtomicInteger(0)
 
     @Volatile
@@ -466,14 +469,19 @@ internal class NotificationBootstrapTestFixture(
                     val start = (arguments[3] as? FixtureHistoryCursor)?.offset ?: 0
                     val end = minOf(attachmentHistory.size, start + limit)
                     val more = end < attachmentHistory.size
-                    AttachmentPageReadFfi.Page(
-                        AttachmentPageFfi(
-                            entries = attachmentHistory.subList(start, end),
-                            version = allocateWithoutConstructor(FixtureHistoryVersion::class.java),
-                            nextCursor = if (more) historyCursor(end) else null,
-                            hasMore = more,
-                        ),
-                    )
+                    val restart = start > 0 && attachmentHistoryRestartsLeft.getAndUpdate { maxOf(0, it - 1) } > 0
+                    if (restart) {
+                        AttachmentPageReadFfi.RestartRequired
+                    } else {
+                        AttachmentPageReadFfi.Page(
+                            AttachmentPageFfi(
+                                entries = attachmentHistory.subList(start, end),
+                                version = allocateWithoutConstructor(FixtureHistoryVersion::class.java),
+                                nextCursor = if (more) historyCursor(end) else null,
+                                hasMore = more,
+                            ),
+                        )
+                    }
                 }
                 "listMedia" -> {
                     listMediaCalls.incrementAndGet()

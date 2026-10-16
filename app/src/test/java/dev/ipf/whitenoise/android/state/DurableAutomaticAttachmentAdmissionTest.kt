@@ -3,8 +3,10 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.ACCOUNT
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.qualifiedRequest
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -56,21 +58,60 @@ class DurableAutomaticAttachmentAdmissionTest {
     @Test
     fun automaticWorkIsDeferredWhenTheLivePolicyNoLongerAllowsItsType() =
         runTest(dispatcher) {
-            persistMatrix(MediaAutoDownloadMatrix(emptySet()))
+            persistMatrix(VIDEO_ON_WIFI)
             setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
 
-            expectDeferred(MediaAutoDownloadType.Image)
+            expectDeferred(MediaAutoDownloadType.Image, AutomaticAttachmentHold.Disabled)
             assertEquals(0, fixture.automaticDemands.get())
         }
 
-    /** A connection without validated internet is the same conservative "not now" as the native permission. */
+    /** A policy that enables nothing anywhere is decided before the attachment is even looked up. */
     @Test
-    fun automaticWorkIsDeferredWithoutValidatedInternet() =
+    fun policyThatEnablesNothingDefersBeforeTheLookup() =
+        runTest(dispatcher) {
+            persistMatrix(MediaAutoDownloadMatrix(emptySet()))
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+
+            expectDeferred(type = null, hold = AutomaticAttachmentHold.Disabled)
+            assertEquals(0, fixture.automaticDemands.get())
+        }
+
+    /** A paused backlog or an account no longer on the device holds every type back. */
+    @Test
+    fun pausedBacklogAndRemovedAccountDeferEveryType() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            expectDeferred(type = null, hold = AutomaticAttachmentHold.UnknownAccount, account = "removed-account")
+
+            intents().pauseAutomatic(ACCOUNT)
+            expectDeferred(type = null, hold = AutomaticAttachmentHold.Paused)
+            assertEquals(0, fixture.automaticDemands.get())
+        }
+
+    /** A connection without validated internet holds the type for the network only, so the work waits for one. */
+    @Test
+    fun automaticWorkWaitsForTheNetworkWithoutValidatedInternet() =
         runTest(dispatcher) {
             setNetwork(setOf(MediaAutoDownloadNetwork.WiFi), validated = false)
 
-            expectDeferred(MediaAutoDownloadType.Image)
+            expectDeferred(MediaAutoDownloadType.Image, AutomaticAttachmentHold.Network)
             assertEquals(0, fixture.automaticDemands.get())
+        }
+
+    /** Work a bubble already made local finishes without consulting the policy or MDK's demand. */
+    @Test
+    fun locallyAvailableWorkFinishesWithoutAdmission() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            fixture.state.refreshNativeAttachmentPermissions()
+            advanceUntilIdle()
+            val first = async { durable(AttachmentDownloadPriority.Automatic) }
+            fixture.entered.receive().succeed(PAYLOAD)
+            assertTrue(first.await())
+
+            persistMatrix(MediaAutoDownloadMatrix(emptySet()))
+            assertTrue(durable(AttachmentDownloadPriority.Automatic))
+            assertEquals(1, fixture.automaticDemands.get())
         }
 
     /** Allowed work waits for the native approval instead of asking while MDK still denies it. */
@@ -91,25 +132,28 @@ class DurableAutomaticAttachmentAdmissionTest {
             assertEquals(1, fixture.permissionApplications.get())
         }
 
-    /** A refusal from a revocation window is asked again under the fresh approval, not turned into a failure. */
+    /** A refusal from a revocation window is asked again once the host's approval has moved on. */
     @Test
-    fun policyBlockedRequestIsAskedAgainUnderTheFreshApproval() =
+    fun policyBlockedRequestIsAskedAgainOnceTheApprovalMovesOn() =
         runTest(dispatcher) {
             setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
             fixture.state.refreshNativeAttachmentPermissions()
             advanceUntilIdle()
             fixture.automaticPolicyBlocks.set(1)
+            // The network changes while the request is in flight: approval is revoked and re-applied.
+            fixture.onAutomaticPolicyBlock = { fixture.state.refreshNativeAttachmentPermissions() }
 
             val download = async { durable(AttachmentDownloadPriority.Automatic) }
             fixture.entered.receive().succeed(PAYLOAD)
 
             assertTrue(download.await())
             assertEquals(2, fixture.automaticDemands.get())
+            assertEquals(2, fixture.permissionApplications.get())
         }
 
-    /** A second refusal is a transient "permission pending" failure that the worker retries after backoff. */
+    /** A refusal under an unchanged approval is MDK's own answer, such as a size cap, and is not asked again. */
     @Test
-    fun repeatedPolicyBlockIsReportedAsPendingPermission() =
+    fun policyBlockUnderAnUnchangedApprovalIsFinal() =
         runTest(dispatcher) {
             setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
             fixture.state.refreshNativeAttachmentPermissions()
@@ -118,12 +162,16 @@ class DurableAutomaticAttachmentAdmissionTest {
 
             val failure = runCatching { durable(AttachmentDownloadPriority.Automatic) }.exceptionOrNull()
 
-            assertTrue("$failure", failure is AttachmentPermissionPendingException)
-            assertTrue(isTransientAttachmentDownloadFailure(checkNotNull(failure)))
-            assertEquals(2, fixture.automaticDemands.get())
+            assertTrue("$failure", failure is NativeAttachmentTerminalException)
+            assertEquals(
+                AttachmentTransferStateFfi.POLICY_BLOCKED,
+                (failure as NativeAttachmentTerminalException).state,
+            )
+            assertFalse(isTransientAttachmentDownloadFailure(failure))
+            assertEquals(1, fixture.automaticDemands.get())
         }
 
-    /** An approval that never lands bounds the wait and reports a retryable failure. */
+    /** An approval that never lands bounds the wait, asks for a fresh approval, and reports a retryable failure. */
     @Test
     fun approvalThatNeverLandsEndsTheWaitAsPendingPermission() =
         runTest(dispatcher) {
@@ -134,6 +182,73 @@ class DurableAutomaticAttachmentAdmissionTest {
 
             assertTrue("${download.await()}", download.await() is AttachmentPermissionPendingException)
             assertEquals(0, fixture.automaticDemands.get())
+            assertEquals(1, fixture.permissionApplications.get())
+        }
+
+    /**
+     * A transfer MDK paused because its type was turned off mid-download frees its download slot, and the
+     * work then finishes as deferred instead of holding the slot until the platform stops it.
+     */
+    @Test
+    fun transferPausedAfterItsTypeWasTurnedOffFreesItsSlot() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            fixture.state.refreshNativeAttachmentPermissions()
+            advanceUntilIdle()
+            val download = async { runCatching { durable(AttachmentDownloadPriority.Automatic) }.exceptionOrNull() }
+            val call = fixture.entered.receive()
+
+            persistMatrix(VIDEO_ON_WIFI)
+            call.pause()
+            val failure = download.await()
+
+            assertTrue("$failure", failure is AttachmentAutomaticPolicyDeferredException)
+            assertEquals(AutomaticAttachmentHold.Disabled, (failure as AttachmentAutomaticPolicyDeferredException).hold)
+            assertFalse(fixture.state.hasActiveAttachmentAcquisition(qualifiedRequest(0).cacheKey()))
+            assertEquals(1, fixture.automaticDemands.get())
+        }
+
+    /** A pause that outlasts the grace while the type is still allowed is asked once more, then retried later. */
+    @Test
+    fun lastingPauseWhileStillAllowedBecomesPendingPermission() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            fixture.state.refreshNativeAttachmentPermissions()
+            advanceUntilIdle()
+            val download = async { runCatching { durable(AttachmentDownloadPriority.Automatic) }.exceptionOrNull() }
+            fixture.entered.receive().pause()
+
+            val failure = download.await()
+
+            assertTrue("$failure", failure is AttachmentPermissionPendingException)
+            assertEquals(2, fixture.automaticDemands.get())
+            assertFalse(fixture.state.hasActiveAttachmentAcquisition(qualifiedRequest(0).cacheKey()))
+        }
+
+    /** A bubble shown while durable work is fetching joins that work instead of starting a second transfer. */
+    @Test
+    fun bubbleJoinsInFlightDurableWork() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            fixture.state.refreshNativeAttachmentPermissions()
+            advanceUntilIdle()
+            val download = async { durable(AttachmentDownloadPriority.Automatic) }
+            val call = fixture.entered.receive()
+            val bubble =
+                async {
+                    fixture.state
+                        .downloadAttachmentPlaintextSource(
+                            request = qualifiedRequest(0),
+                            reference = reference(0),
+                            priority = AttachmentDownloadPriority.Automatic,
+                        ).use { }
+                }
+            call.succeed(PAYLOAD)
+
+            assertTrue(download.await())
+            bubble.await()
+            assertEquals(1, fixture.calls.size)
+            assertEquals(1, fixture.automaticDemands.get())
         }
 
     /** The user's explicit download is not held to the automatic policy or its approval. */
@@ -150,8 +265,11 @@ class DurableAutomaticAttachmentAdmissionTest {
         }
 
     /** Runs the production durable entry point for the fixture's first canonical image slot. */
-    private suspend fun durable(priority: AttachmentDownloadPriority): Boolean {
-        val request = qualifiedRequest(0)
+    private suspend fun durable(
+        priority: AttachmentDownloadPriority,
+        account: String = ACCOUNT,
+    ): Boolean {
+        val request = qualifiedRequest(0).copy(accountRef = account)
         return fixture.state.downloadAttachmentForDurableWork(request, priority)
     }
 
@@ -162,13 +280,25 @@ class DurableAutomaticAttachmentAdmissionTest {
             .apply { isAccessible = true }
             .get(fixture.state) as NativeAttachmentPermissions
 
-    /** Asserts the durable entry point defers [type] without demanding anything. */
-    private suspend fun expectDeferred(type: MediaAutoDownloadType) {
+    /** The fixture state's durable intent store, which records a stopped backlog. */
+    private fun intents(): AttachmentDownloadIntentStore =
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("attachmentDownloadIntents")
+            .apply { isAccessible = true }
+            .get(fixture.state) as AttachmentDownloadIntentStore
+
+    /** Asserts the durable entry point defers [type] for [hold] without demanding anything. */
+    private suspend fun expectDeferred(
+        type: MediaAutoDownloadType?,
+        hold: AutomaticAttachmentHold,
+        account: String = ACCOUNT,
+    ) {
         try {
-            durable(AttachmentDownloadPriority.Automatic)
+            durable(AttachmentDownloadPriority.Automatic, account)
             fail("automatic work ran against the live policy")
         } catch (deferred: AttachmentAutomaticPolicyDeferredException) {
             assertEquals(type, deferred.type)
+            assertEquals(hold, deferred.hold)
             assertFalse(isTransientAttachmentDownloadFailure(deferred))
         }
     }
@@ -226,5 +356,11 @@ class DurableAutomaticAttachmentAdmissionTest {
     private companion object {
         const val ACCOUNT_ID = "synthetic-account-id"
         val PAYLOAD = ByteArray(64) { it.toByte() }
+        val VIDEO_ON_WIFI =
+            MediaAutoDownloadMatrix(emptySet()).withToggle(
+                MediaAutoDownloadType.Video,
+                MediaAutoDownloadNetwork.WiFi,
+                on = true,
+            )
     }
 }

@@ -65,10 +65,14 @@ class NativeAttachmentPermissionsTest {
             assertFalse("a refused grant released the wait", waiting.isCompleted)
 
             grant = true
-            owner.update(owner.invalidate(engine), engine, engine, listOf("a")) { allow }
-            waiting.await()
+            val granted = owner.invalidate(engine)
+            owner.update(granted, engine, engine, listOf("a")) { allow }
+            assertEquals(granted, waiting.await())
+            assertEquals(granted, owner.appliedRevision("a"))
+            assertEquals(null, owner.appliedRevision("b"))
 
             owner.invalidate(engine)
+            assertEquals("a revoked approval still reported as applied", null, owner.appliedRevision("a"))
             val reopened = async(start = CoroutineStart.UNDISPATCHED) { owner.awaitApplied("a") }
             assertFalse("a newer host revision kept the old approval", reopened.isCompleted)
             reopened.cancel()

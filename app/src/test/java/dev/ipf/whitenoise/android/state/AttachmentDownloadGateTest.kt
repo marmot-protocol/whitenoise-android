@@ -226,7 +226,9 @@ class AttachmentDownloadGateTest {
     @Test
     fun pendingPermissionIsTransientButPolicyDeferralIsNot() {
         assertTrue(isTransientAttachmentDownloadFailure(AttachmentPermissionPendingException()))
-        val deferred = AttachmentAutomaticPolicyDeferredException(MediaAutoDownloadType.Video)
-        assertFalse(isTransientAttachmentDownloadFailure(deferred))
+        AutomaticAttachmentHold.entries.forEach { hold ->
+            val deferred = AttachmentAutomaticPolicyDeferredException(MediaAutoDownloadType.Video, hold)
+            assertFalse(isTransientAttachmentDownloadFailure(deferred))
+        }
     }
 }

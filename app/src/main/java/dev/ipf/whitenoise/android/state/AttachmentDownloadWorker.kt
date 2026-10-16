@@ -201,11 +201,13 @@ internal fun attachmentDownloadWorkState(
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 
 /**
- * Automatic work whose type the live policy no longer allows when it runs, after a network or settings change
- * since it was queued. It finishes without a fetch; the attachment's bubble still offers it on demand.
+ * Automatic work the live policy does not allow when it runs, for the [hold] reason, after a network or settings
+ * change since it was queued. No fetch starts. A [AutomaticAttachmentHold.Network] hold waits for a network the
+ * policy allows; any other finishes, and the attachment's bubble still offers it on demand.
  */
 internal class AttachmentAutomaticPolicyDeferredException(
     val type: MediaAutoDownloadType?,
+    val hold: AutomaticAttachmentHold,
 ) : IllegalStateException("automatic attachment policy does not allow this download now")
 
 /** The native runtime does not hold the live automatic approval yet, so the work retries after its backoff. */
@@ -218,10 +220,10 @@ internal typealias PerformDurableAttachmentDownload = suspend (
 ) -> Boolean
 
 /**
- * Durable safety net for document downloads. Foreground UI callers still join
- * the same app-level in-flight Deferred for immediate response; this worker
- * makes the intent survive process death and verifies that the result reached
- * the encrypted disk cache before declaring success.
+ * Durable owner for received attachments of every type and for explicit downloads. Foreground UI callers still
+ * join the same app-level in-flight Deferred for immediate response; this worker makes the intent survive process
+ * death, holds automatic work to the live policy when it runs, and verifies that the result is locally available
+ * before declaring success.
  */
 class AttachmentDownloadWorker : CoroutineWorker {
     private val performDownloadOverride: PerformDurableAttachmentDownload?
@@ -254,6 +256,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 priority == AttachmentDownloadPriority.Automatic &&
                 (intentStore.isAutomaticPaused(request.accountRef) || intentStore.isAutomaticSuppressed(request))
             ) {
+                val reason = if (intentStore.isAutomaticPaused(request.accountRef)) "paused" else "cancelled"
+                Log.i(TAG, "attachment_work_skipped reason=$reason")
                 intentStore.resetTransientRetry(request)
                 Result.success()
             } else {
@@ -334,10 +338,20 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 Result.success()
             }
         } catch (deferred: AttachmentAutomaticPolicyDeferredException) {
-            // Not a failure: the live policy holds this type back, and no network work was started.
-            Log.i(TAG, "attachment_work_policy_deferred type=${deferred.type?.preferenceKey ?: "unknown"}")
-            intentStore.resetTransientRetry(request)
-            Result.success()
+            // Not a failure: the live policy holds this type back, and no network work was started. A network
+            // hold waits for an allowed connection without spending the failure retry.
+            val retry = deferred.hold.waitsAfterRun(runAttemptCount)
+            Log.i(
+                TAG,
+                "attachment_work_policy_deferred type=${deferred.type?.preferenceKey ?: "unknown"} " +
+                    "reason=${deferred.hold.reason} retry=$retry",
+            )
+            if (retry) {
+                Result.retry()
+            } else {
+                intentStore.resetTransientRetry(request)
+                Result.success()
+            }
         } catch (cancel: CancellationException) {
             // A cancelled shared fetch does not mean WorkManager stopped this
             // worker. Finish that transfer so its foreground notification and
@@ -415,12 +429,14 @@ class AttachmentDownloadWorker : CoroutineWorker {
          * backoff for system interruptions: a job stopped by Android resumes after an exponential delay
          * from [BACKOFF_SECONDS], doubling per run up to WorkManager's five-hour
          * ceiling, instead of restarting at once. Explicit work does not opt in, so a stopped explicit
-         * download resumes immediately. [id] updates an existing spec in place.
+         * download resumes immediately. Automatic work runs only on [networkType], the narrowest network its
+         * policy could allow it on. [id] updates an existing spec in place.
          */
         internal fun buildRequest(
             request: AttachmentTransferRequest,
             priority: AttachmentDownloadPriority,
             id: UUID? = null,
+            networkType: NetworkType = NetworkType.CONNECTED,
         ): OneTimeWorkRequest {
             val ordinary = priority == AttachmentDownloadPriority.Automatic
             return OneTimeWorkRequestBuilder<AttachmentDownloadWorker>()
@@ -428,7 +444,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 .setConstraints(
                     Constraints
                         .Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .setRequiredNetworkType(if (ordinary) networkType else NetworkType.CONNECTED)
                         .setRequiresStorageNotLow(true)
                         .build(),
                 ).setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
@@ -481,14 +497,16 @@ class AttachmentDownloadWorker : CoroutineWorker {
 
         /**
          * Persists one transfer as unique WorkManager work. Automatic work coalesces onto any existing
-         * work and backs off after platform interruptions. An explicit request replaces waiting
-         * automatic work instead, and on Android 14 or later a visible one runs as a user-initiated job.
+         * work, waits for [networkType] and backs off after platform interruptions. An explicit request
+         * replaces waiting automatic work instead, and on Android 14 or later a visible one runs as a
+         * user-initiated job.
          */
         internal fun enqueue(
             context: Context,
             request: AttachmentTransferRequest,
             priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
             userVisible: Boolean = false,
+            networkType: NetworkType = NetworkType.CONNECTED,
         ) {
             val intentStore = attachmentIntentStore(context.applicationContext)
             if (
@@ -510,7 +528,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
                     return
                 }
             }
-            val work = buildRequest(request, priority)
+            val work = buildRequest(request, priority, networkType = networkType)
             if (priority == AttachmentDownloadPriority.Interactive) {
                 enqueueExplicit(context.applicationContext, request, work, intentStore)
             } else {

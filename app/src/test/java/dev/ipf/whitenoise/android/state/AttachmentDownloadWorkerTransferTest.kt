@@ -112,13 +112,33 @@ class AttachmentDownloadWorkerTransferTest {
     @Test
     fun automaticWorkDeferredByLivePolicyFinishesWithoutRetry() =
         runTest {
-            val download: PerformDurableAttachmentDownload = { _, _, _ ->
-                throw AttachmentAutomaticPolicyDeferredException(MediaAutoDownloadType.Video)
-            }
+            AutomaticAttachmentHold.entries.filter { it != AutomaticAttachmentHold.Network }.forEach { hold ->
+                val download: PerformDurableAttachmentDownload = { _, _, _ ->
+                    throw AttachmentAutomaticPolicyDeferredException(MediaAutoDownloadType.Video, hold)
+                }
 
-            assertEquals(Result.success(), worker(0, request, download).doWork())
+                assertEquals(hold.reason, Result.success(), worker(0, request, download).doWork())
+            }
             assertFalse(attachmentIntentStore(appContext).hasSpentTransientRetry(request))
             assertTrue(lines.isEmpty())
+        }
+
+    /** Work held only by the network waits for an allowed one without spending its failure retry, for bounded runs. */
+    @Test
+    fun networkHeldAutomaticWorkWaitsWithoutSpendingItsFailureRetry() =
+        runTest {
+            val download: PerformDurableAttachmentDownload = { _, _, _ ->
+                throw AttachmentAutomaticPolicyDeferredException(
+                    MediaAutoDownloadType.Video,
+                    AutomaticAttachmentHold.Network,
+                )
+            }
+
+            repeat(AUTOMATIC_NETWORK_DEFERRAL_RUNS) { run ->
+                assertEquals("run $run", Result.retry(), worker(run, request, download).doWork())
+            }
+            assertFalse(attachmentIntentStore(appContext).hasSpentTransientRetry(request))
+            assertEquals(Result.success(), worker(AUTOMATIC_NETWORK_DEFERRAL_RUNS, request, download).doWork())
         }
 
     /** An approval the runtime had not applied yet earns the one follow-up run, then fails (#3308). */

@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -32,6 +34,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 /**
  * Receipt-side scheduling for every attachment type (#3308): an incoming message queues durable automatic
@@ -144,30 +147,33 @@ class IncomingAttachmentAutoDownloadTest {
             }
         }
 
-    /** A type disabled for the live network, or turned off between receipts, queues nothing for that type. */
+    /**
+     * A type no network enables queues nothing, a type the live network refuses still queues and waits for a
+     * network it is allowed on, and a settings change applies to the next receipt.
+     */
     @Test
-    fun disabledTypesAndBlockedNetworksAreNotQueued() =
+    fun disabledTypesAreNotQueuedAndRefusedOnesWaitForTheirNetwork() =
         runBlocking {
             persistMatrix(ACCOUNT_A, MediaAutoDownloadMatrix.DEFAULT)
             val fixture = fixture(history = mixedHistory() + mixedHistory(message = SECOND_MESSAGE))
             try {
                 fixture.bootstrap()
-                // Defaults on mobile data: images and audio only.
-                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.Mobile))
+                // The defaults allow nothing on metered mobile data, and enable documents on no network at all.
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.Mobile, MediaAutoDownloadNetwork.Metered))
                 fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
-                assertEquals(1, queued(request(IMAGE_INDEX)))
-                assertEquals(1, queued(request(AUDIO_INDEX)))
-                assertEquals(0, queued(request(VIDEO_INDEX)))
+                val waiting = listOf(IMAGE_INDEX, VIDEO_INDEX, AUDIO_INDEX).map { request(it) }
+                waiting.forEach {
+                    assertEquals(1, queued(it))
+                    assertEquals(NetworkType.UNMETERED, constraints(it).requiredNetworkType)
+                }
                 assertEquals(0, queued(request(FILE_INDEX)))
 
-                // Turning images off is applied to the next receipt.
+                // Turning images off everywhere is applied to the next receipt.
                 persistMatrix(
                     ACCOUNT_A,
-                    MediaAutoDownloadMatrix.DEFAULT.withToggle(
-                        MediaAutoDownloadType.Image,
-                        MediaAutoDownloadNetwork.Mobile,
-                        on = false,
-                    ),
+                    MediaAutoDownloadMatrix.DEFAULT
+                        .withToggle(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.WiFi, on = false)
+                        .withToggle(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Mobile, on = false),
                 )
                 val next = fixture.update.copy(notificationKey = "second", messageIdHex = SECOND_MESSAGE)
                 fixture.appState.scheduleIncomingAttachmentDownloadsForTest(next)
@@ -178,18 +184,53 @@ class IncomingAttachmentAutoDownloadTest {
             }
         }
 
-    /** A stopped backlog, a signed-out account, or no validated network queue nothing and read no history. */
+    /** Each slot's work runs only on the narrowest network its type's policy allows, and never on low storage. */
     @Test
-    fun stoppedBacklogSignedOutAccountAndUnvalidatedNetworkQueueNothing() =
+    fun queuedWorkWaitsForTheNarrowestNetworkItsPolicyAllows() =
+        runBlocking {
+            val matrix =
+                MediaAutoDownloadMatrix(
+                    setOf(
+                        MediaAutoDownloadType.Image to MediaAutoDownloadNetwork.WiFi,
+                        MediaAutoDownloadType.Image to MediaAutoDownloadNetwork.Mobile,
+                        MediaAutoDownloadType.Image to MediaAutoDownloadNetwork.Metered,
+                        MediaAutoDownloadType.Video to MediaAutoDownloadNetwork.WiFi,
+                        MediaAutoDownloadType.Document to MediaAutoDownloadNetwork.WiFi,
+                    ) + MediaAutoDownloadNetwork.entries.map { MediaAutoDownloadType.Audio to it },
+                )
+            persistMatrix(ACCOUNT_A, matrix)
+            val fixture = fixture(history = mixedHistory())
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                val expected =
+                    mapOf(
+                        IMAGE_INDEX to NetworkType.NOT_ROAMING,
+                        VIDEO_INDEX to NetworkType.UNMETERED,
+                        AUDIO_INDEX to NetworkType.CONNECTED,
+                        FILE_INDEX to NetworkType.UNMETERED,
+                    )
+                expected.forEach { (index, network) ->
+                    val constraints = constraints(request(index))
+                    assertEquals("slot $index", network, constraints.requiredNetworkType)
+                    assertTrue("slot $index", constraints.requiresStorageNotLow())
+                }
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A stopped backlog or a signed-out account queues nothing and reads no history. */
+    @Test
+    fun stoppedBacklogAndSignedOutAccountQueueNothing() =
         runBlocking {
             persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
             persistMatrix(ACCOUNT_B, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
             val fixture = fixture(history = mixedHistory(), signedOutB = true)
             try {
                 fixture.bootstrap()
-                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi), validated = false)
-                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
-
                 setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
                 fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update.forAccount(ACCOUNT_B))
 
@@ -201,6 +242,137 @@ class IncomingAttachmentAutoDownloadTest {
                     assertEquals(0, queued(request(it.index, account = ACCOUNT_B)))
                 }
                 assertEquals(0, fixture.attachmentHistoryPageCalls.get())
+                val skipped = receiptLogs().filter { "attachment_receipt_skipped" in it }
+                assertEquals(
+                    listOf("reason=signed_out", "reason=paused"),
+                    skipped.map { it.substringAfter("attachment_receipt_skipped ") },
+                )
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A connection without validated internet still queues the message's media, to run once one validates. */
+    @Test
+    fun unvalidatedNetworkQueuesWorkThatWaits() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = mixedHistory())
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi), validated = false)
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                targetSlots().forEach { assertEquals(1, queued(request(it.index))) }
+                assertTrue(receiptLogs().any { "queued=4 waiting=4 held=0" in it })
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A receipt that arrives before the account list loads queues every slot, and the worker decides later. */
+    @Test
+    fun unknownReceivingAccountQueuesEverySlotForTheWorker() =
+        runBlocking {
+            val fixture = fixture(history = mixedHistory())
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update.forAccount(ACCOUNT_C))
+
+                targetSlots().forEach {
+                    val request = request(it.index, account = ACCOUNT_C)
+                    assertEquals(1, queued(request))
+                    assertEquals(NetworkType.CONNECTED, constraints(request).requiredNetworkType)
+                }
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A slot the reader cancelled is not queued again when the same message is received again. */
+    @Test
+    fun cancelledAttachmentIsNotQueuedAgain() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = mixedHistory())
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                intents(fixture.appState).suppressAutomatic(request(IMAGE_INDEX))
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                assertEquals(0, queued(request(IMAGE_INDEX)))
+                listOf(VIDEO_INDEX, AUDIO_INDEX, FILE_INDEX).forEach { assertEquals(1, queued(request(it))) }
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A text message in a group whose attachments were all received long before costs one page read. */
+    @Test
+    fun textReceiptReadsOnePage() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val older =
+                (0 until RECEIPT_ATTACHMENT_PAGE_LIMIT.toInt() * 2).map { index ->
+                    entry("%064x".format(index + 1_000), 0, AttachmentCategoryFfi.IMAGE)
+                }
+            val fixture = fixture(history = older)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                val text = fixture.update.copy(messageIdHex = TEXT_MESSAGE, timestampMs = DAY_LATER_MILLIS)
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(text)
+
+                assertEquals(1, fixture.attachmentHistoryPageCalls.get())
+                assertTrue("a text receipt logged scheduling", receiptLogs().isEmpty())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A history change under the cursor restarts the read from the newest page once, without losing the budget. */
+    @Test
+    fun historyChangeRestartsTheReadOnce() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val newer =
+                (0 until RECEIPT_ATTACHMENT_PAGE_LIMIT.toInt()).map { index ->
+                    entry("%064x".format(index + 1_000), 0, AttachmentCategoryFfi.IMAGE)
+                }
+            val fixture = fixture(history = newer + mixedHistory(), historyRestarts = 1)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                targetSlots().forEach { assertEquals(1, queued(request(it.index))) }
+                assertEquals(4, fixture.attachmentHistoryPageCalls.get())
+                assertTrue(receiptLogs().any { "pages=3 end=passed" in it })
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Receipt logs carry counts and types only, never the account, group or message they describe. */
+    @Test
+    fun receiptLogsCarryNoAttachmentIdentity() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = mixedHistory())
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                val logs = receiptLogs()
+                assertTrue(logs.toString(), logs.any { "attachment_receipt_scheduled queued=4 waiting=0 held=0" in it })
+                logs.forEach { line ->
+                    listOf(ACCOUNT_A, GROUP, MESSAGE, OTHER_MESSAGE).forEach { identity ->
+                        assertFalse("log line leaked an identity: $line", identity in line)
+                    }
+                }
             } finally {
                 fixture.close()
             }
@@ -255,9 +427,21 @@ class IncomingAttachmentAutoDownloadTest {
 
         assertEquals(targetSlots().map { request(it.index) }, planned.map { it.request })
         assertEquals(targetSlots().map { it.type }, planned.map { it.type })
-        assertTrue(mixedHistory().passedMessage(MESSAGE))
-        assertFalse(mixedHistory().take(targetSlots().size).passedMessage(MESSAGE))
-        assertFalse(mixedHistory().passedMessage(SECOND_MESSAGE))
+    }
+
+    /** The read stops after the message's run, at the next page when the run ends on a boundary, or on a stale page. */
+    @Test
+    fun pageEndStopsAfterTheRunOrOnAStalePage() {
+        val history = mixedHistory()
+        val run = history.take(targetSlots().size)
+        val older = history.drop(targetSlots().size)
+
+        assertEquals(true to ReceiptLookupEnd.Passed, history.receiptPageEnd(MESSAGE, false, 0L))
+        assertEquals(true to null, run.receiptPageEnd(MESSAGE, false, 0L))
+        assertEquals(true to ReceiptLookupEnd.Passed, older.receiptPageEnd(MESSAGE, true, 0L))
+        assertEquals(false to null, history.receiptPageEnd(SECOND_MESSAGE, false, 0L))
+        assertEquals(false to ReceiptLookupEnd.Stale, history.receiptPageEnd(SECOND_MESSAGE, false, 2L))
+        assertEquals("a seen run is never stale", true to null, run.receiptPageEnd(MESSAGE, false, 2L))
     }
 
     /** Builds the bootstrap fixture with two local accounts, either of which can be the receiver. */
@@ -265,6 +449,7 @@ class IncomingAttachmentAutoDownloadTest {
         history: List<AttachmentEntryFfi>,
         muted: Boolean = false,
         signedOutB: Boolean = false,
+        historyRestarts: Int = 0,
     ): NotificationBootstrapTestFixture {
         context.getSystemService(NotificationManager::class.java).cancelAll()
         return NotificationBootstrapTestFixture(
@@ -274,6 +459,7 @@ class IncomingAttachmentAutoDownloadTest {
             messageIdHex = MESSAGE,
             groupIdHex = GROUP,
             attachmentHistory = history,
+            attachmentHistoryRestarts = historyRestarts,
             onChatNotificationSettings = { accountRef, groupIdHex ->
                 ChatNotificationSettingsFfi(accountRef, accountRef, groupIdHex, muted, null, 0L)
             },
@@ -342,6 +528,22 @@ class IncomingAttachmentAutoDownloadTest {
         account: String = ACCOUNT_A,
         message: String = MESSAGE,
     ) = AttachmentTransferRequest(account, GROUP, message, index, message)
+
+    /** The constraints of the one live work spec queued for [request]. */
+    private fun constraints(request: AttachmentTransferRequest): Constraints {
+        val live = workInfos(request).single { !it.state.isFinished }
+        return live.constraints
+    }
+
+    /** Receipt scheduling's log lines, which must stay free of attachment identity. */
+    private fun receiptLogs(): List<String> = ShadowLog.getLogsForTag("DMAttachmentReceipt").map { it.msg }
+
+    /** The state's durable intent store, where a reader's cancel is recorded. */
+    private fun intents(state: WhiteNoiseAppState): AttachmentDownloadIntentStore =
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("attachmentDownloadIntents")
+            .apply { isAccessible = true }
+            .get(state) as AttachmentDownloadIntentStore
 
     /** Non-finished work queued for [request]'s unique identity. */
     private fun queued(request: AttachmentTransferRequest): Int = workInfos(request).count { !it.state.isFinished }
@@ -435,10 +637,17 @@ class IncomingAttachmentAutoDownloadTest {
     private companion object {
         const val ACCOUNT_A = "account-a"
         const val ACCOUNT_B = "account-b"
+
+        // A receiving account the device has not loaded yet, as on a cold start.
+        const val ACCOUNT_C = "account-c"
         val GROUP = "0a".repeat(16)
         val MESSAGE = "1b".repeat(32)
         val SECOND_MESSAGE = "3d".repeat(32)
         val OTHER_MESSAGE = "2c".repeat(32)
+        val TEXT_MESSAGE = "4e".repeat(32)
+
+        // A receipt a day after the history's slots were received, so every page of it is stale.
+        const val DAY_LATER_MILLIS = 86_400_000L
         const val IMAGE_INDEX = 0
         const val VIDEO_INDEX = 1
         const val AUDIO_INDEX = 2
