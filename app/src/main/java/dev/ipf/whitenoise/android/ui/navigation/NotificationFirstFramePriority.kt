@@ -18,18 +18,25 @@ import kotlinx.coroutines.delay
 internal const val NOTIFICATION_FIRST_FRAME_MAX_HOLD_MS = 6_000L
 
 /**
- * Process-owned first-frame priority for one notification-routed conversation (#586).
+ * Process-owned first-frame priority for one notification-routed conversation (#586), and the claim of
+ * the route that currently owns the pending notification request (#3309).
  *
  * The gate used to live in the shell's composition, so unmounting the shell released it and its
  * state vanished with it. Here it survives that unmount and ends only for a reason the route owns:
  * its first frame, a newer request, a failed or never-landing activation, Back, or the runtime
  * generation it was issued under going away. A release is idempotent and fenced by request, so a
  * stale request can never release its successor's gate.
+ *
+ * The route claim is what a process-scoped switch compares instead of the request reader its shell
+ * froze when it left composition. Arming a request and launching a switch each take a fresh claim,
+ * so a shell remounted after App Lock or Activity recreation, or a newer tap armed after the route's
+ * shell was disposed, retires the switch even where request identity alone could not.
  */
 internal class NotificationFirstFramePriority(
     private val runtimeGeneration: () -> Int,
 ) {
     private var held by mutableStateOf<HeldGate?>(null)
+    private var latestRouteClaim = 0L
 
     /**
      * The live gate, or null once it was released or its runtime generation is gone. A gate that
@@ -78,6 +85,17 @@ internal class NotificationFirstFramePriority(
         gate.release()
         if (held?.gate === gate) held = null
     }
+
+    /**
+     * Claims the pending request for the caller and retires every earlier claim. The routing pass claims as
+     * it arms a request, and each process-scoped switch claims again as it is created, so the claim changes
+     * whenever another route takes the request over, whether under a newer request id or, after a shell
+     * remount, under the same one. It is independent of the window: a route without a gate is covered too.
+     */
+    fun claimRoute(): Long = ++latestRouteClaim
+
+    /** True while [claim] is the latest route claim, so its holder still owns the pending request. */
+    fun routeClaimIsCurrent(claim: Long): Boolean = latestRouteClaim == claim
 
     /**
      * Whether a notification-owned retained conversation must keep the shell composed. It does while that

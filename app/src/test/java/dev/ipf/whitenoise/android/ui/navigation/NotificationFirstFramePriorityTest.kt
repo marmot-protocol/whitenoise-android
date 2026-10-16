@@ -155,6 +155,31 @@ class NotificationFirstFramePriorityTest {
         assertFalse(priority.ownsShell(route(appLockScreenVisible = true)))
     }
 
+    /** Each new claim retires every earlier one, whatever request id the routes behind them carried. */
+    @Test
+    fun aLaterRouteClaimRetiresTheEarlierOne() {
+        val retired = priority.claimRoute()
+        assertTrue(priority.routeClaimIsCurrent(retired))
+
+        val successor = priority.claimRoute()
+
+        assertFalse("the earlier route no longer owns the request", priority.routeClaimIsCurrent(retired))
+        assertTrue(priority.routeClaimIsCurrent(successor))
+    }
+
+    /** The claim is independent of the window, so a route with no gate, or one whose gate ended, is still fenced. */
+    @Test
+    fun theRouteClaimOutlivesTheWindow() {
+        val claim = priority.claimRoute()
+        val gate = NotificationRouteFirstFrameGate(requestId = 4L, accountRef = "account-b")
+
+        priority.begin(gate)
+        priority.release(requestId = 4L)
+
+        assertNull(priority.gate)
+        assertTrue("ending the window does not change who owns the request", priority.routeClaimIsCurrent(claim))
+    }
+
     /** A route snapshot with one deviation per case. */
     private fun route(
         conversationSelected: Boolean = true,

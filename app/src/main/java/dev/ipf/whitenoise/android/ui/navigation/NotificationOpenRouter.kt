@@ -106,13 +106,18 @@ internal class NotificationOpenRouter(
         }
     }
 
-    /** Arms a newly delivered request, then resolves it once accounts are known. */
+    /**
+     * Arms a newly delivered request, then resolves it once accounts are known. Arming takes the process-owned
+     * route claim, so a switch still running for a request this shell no longer carries, or that an earlier
+     * composition of this shell carried, stands down.
+     */
     private suspend fun routeArmed(attempt: NotificationOpenAttempt) {
         if (attempt.requestId != state.armedRequestId) {
             owners.firstFrame.release(state.armedRequestId)
             state.runtimeSlots.activeRetryRequestId = null
             shell.armRequest()
             state.armedRequestId = attempt.requestId
+            owners.firstFrame.claimRoute()
         }
         if (appState.accounts.isEmpty()) {
             awaitAccounts(attempt)

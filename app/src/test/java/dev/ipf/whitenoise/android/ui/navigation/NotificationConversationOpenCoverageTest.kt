@@ -354,15 +354,19 @@ class NotificationConversationOpenCoverageTest {
         val failure = switch.between("private fun reconcileAfterActivation()", "private fun releaseStuckPreload")
         assertTrue("a switch that never landed releases its own gate", "releaseOwnedGate()" in failure)
         assertFalse("a switch that never landed never names a request id", "release(requestId)" in failure)
-        val superseded = failure.indexOf("val superseded = supersededBySameRequest()")
+        val claimed = failure.indexOf("owners.firstFrame.routeClaimIsCurrent(claim)")
         assertTrue(
-            "a same-request successor's held window retires the failure path before any write",
-            superseded in 0 until failure.indexOf("rejectUnavailablePin("),
+            "the failure path asks the process-owned route claim before any write",
+            claimed in 0 until failure.indexOf("rejectUnavailablePin("),
         )
+        val current = switch.between("private fun switchStillCurrent()", "private suspend fun runSwitch")
         assertTrue(
-            "the successor is recognised by gate identity, never by request id",
-            "owned.isReleased && held != null && held !== owned" in switch,
+            "activation currency starts from the route claim, not the frozen request reader",
+            "owners.firstFrame.routeClaimIsCurrent(claim) &&" in current,
         )
+        assertTrue("every switch takes its own claim", "private val claim = owners.firstFrame.claimRoute()" in switch)
+        val armed = routerSource().between("private suspend fun routeArmed(", "private fun awaitAccounts")
+        assertTrue("arming a request claims it for the routing shell", "owners.firstFrame.claimRoute()" in armed)
     }
 
     /** Every process-scoped completion asks the live request and runtime fence before it writes shell state. */
@@ -376,10 +380,7 @@ class NotificationConversationOpenCoverageTest {
             "a lost pin is failed only while the request is still offered",
             "if (offered && completion.rejectUnavailablePin(" in switch,
         )
-        assertTrue(
-            "a never-landed switch fails only while still current and not superseded",
-            "if (superseded || !switchStillCurrent() ||" in switch,
-        )
+        assertTrue("a never-landed switch fails only while still current", "if (!switchStillCurrent() ||" in switch)
         val retry = readsSource().replace(Regex("\\s+"), " ")
         val retryFence = "if (currency.offers(requestId, attempt.target, retryRuntimeGeneration))"
         assertTrue("the exact retry publishes only for the offered request", retryFence in retry)
