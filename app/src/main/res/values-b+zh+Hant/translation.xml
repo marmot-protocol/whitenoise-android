@@ -20,4 +20,11 @@
     <string name="translation_off">關閉</string>
     <string name="translation_inherit_language">使用全域目標語言</string>
     <string name="translation_privacy_warning">Offline Translator 可能將訊息文字和譯文寫入 Android 系統記錄。White Noise 無法保證其他應用程式處理文字時的安全性。</string>
+    <string name="translation_choose_language">選擇語言</string>
+    <string name="translation_unsupported_target">已儲存的目標語言在 Offline Translator 中無法使用。請選擇其他語言。</string>
+    <string name="translation_engine_update_required">此語言需要較新版本的 Offline Translator。請更新翻譯引擎後重試。</string>
+    <string name="translation_install_zapstore">從 Zapstore 安裝</string>
+    <string name="translation_install_release">從 GitHub 安裝</string>
+    <string name="translation_install_release_reason">Zapstore 尚未提供 White Noise 可用的版本，因此將開啟發布者在 GitHub 上的 %1$s 版本。</string>
+    <string name="translation_install_open_failed">沒有應用程式能開啟 Offline Translator 或其下載頁面。請安裝網頁瀏覽器後重試。</string>
 </resources>

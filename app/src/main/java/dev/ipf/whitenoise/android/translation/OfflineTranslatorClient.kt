@@ -27,6 +27,7 @@ internal class OfflineTranslatorClient(
     override val identity = service.identity
     override val trust = TranslationTrust.LOCAL
 
+    /** Binds for this request only, submitting nothing the discovered release's own catalog cannot resolve. */
     override suspend fun translate(
         text: String,
         source: String,
@@ -63,6 +64,7 @@ internal class OfflineTranslatorClient(
                     }
                     translateOnBoundTranslator(
                         ITranslationService.Stub.asInterface(connected),
+                        service.engineVersion,
                         text,
                         source,
                         target,

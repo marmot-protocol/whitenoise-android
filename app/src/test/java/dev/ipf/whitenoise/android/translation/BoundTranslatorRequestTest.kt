@@ -85,6 +85,76 @@ class BoundTranslatorRequestTest {
             assertTrue(service.submissions.isEmpty())
         }
 
+    /** Slovak reaches Binder as the engine's own `en`/`sk` and `sk`/`en` pairs, and after detection. */
+    @Test
+    fun slovakPairsReachBinderUnchangedInBothDirections() =
+        runBlocking {
+            val service = readyTranslator("Ahoj svet")
+            for ((source, target) in listOf("en" to "sk", "sk" to "en", "" to "sk")) {
+                assertEquals("Ahoj svet", request(service, source = source, target = target))
+                assertEquals(listOf("Hello world", source, target), service.submissions.last())
+            }
+        }
+
+    /** `zh_hant` is an engine identifier, not a BCP 47 tag, and is submitted exactly as the catalog spells it. */
+    @Test
+    fun traditionalChineseEngineCodeReachesBinderUnchanged() =
+        runBlocking {
+            val service = readyTranslator("你好世界")
+            assertEquals("你好世界", request(service, source = "en", target = "zh_hant"))
+            assertEquals(listOf("Hello world", "en", "zh_hant"), service.submissions.last())
+            assertEquals("你好世界", request(service, source = "zh_hant", target = "nb"))
+            assertEquals(listOf("Hello world", "zh_hant", "nb"), service.submissions.last())
+            val probesAndMessages = service.submissions.size
+            for (displayTag in listOf("zh-Hant", "zh-TW", "sk-SK")) {
+                val failure = failureOf { request(service, target = displayTag) }
+                assertEquals(TranslationFailure.INVALID_REQUEST, failure)
+            }
+            assertEquals(probesAndMessages, service.submissions.size)
+        }
+
+    /** Georgian reaches only releases whose bundled catalog lists it, never the engine default on 0.8.3. */
+    @Test
+    fun georgianIsSubmittedOnlyToReleasesWhoseCatalogListsIt() =
+        runBlocking {
+            val older = readyTranslator("unexpected")
+            val failure = failureOf { request(older, source = "en", target = "ka", engineVersion = "0.8.3") }
+            assertEquals(TranslationFailure.ENGINE_UPDATE_REQUIRED, failure)
+            assertEquals(
+                TranslationFailure.ENGINE_UPDATE_REQUIRED,
+                failureOf { request(older, source = "ka", target = "en", engineVersion = "0.8.3") },
+            )
+            assertTrue(older.submissions.isEmpty())
+            for (version in listOf("0.8.4", "0.8.5")) {
+                val newer = readyTranslator("გამარჯობა")
+                assertEquals("გამარჯობა", request(newer, source = "en", target = "ka", engineVersion = version))
+                assertEquals(listOf("Hello world", "en", "ka"), newer.submissions.last())
+            }
+        }
+
+    /** Languages with only an into-English model can be sources, but never targets the engine cannot reach. */
+    @Test
+    fun sourceOnlyLanguagesCannotBecomeTargets() =
+        runBlocking {
+            val service = readyTranslator("Hello")
+            for (code in listOf("be", "mr", "nn", "ur")) {
+                assertEquals(TranslationFailure.INVALID_REQUEST, failureOf { request(service, target = code) })
+            }
+            assertTrue(service.submissions.isEmpty())
+            assertEquals("Hello", request(service, source = "be", target = "en"))
+            assertEquals(listOf("Hello world", "be", "en"), service.submissions.last())
+        }
+
+    /** A release outside the reviewed catalogs receives neither the probe nor the message. */
+    @Test
+    fun unreviewedEngineReleaseReceivesNoProbeOrMessage() =
+        runBlocking {
+            val service = readyTranslator("unexpected")
+            val failure = failureOf { request(service, engineVersion = "0.8.6") }
+            assertEquals(TranslationFailure.INCOMPATIBLE_ENGINE, failure)
+            assertTrue(service.submissions.isEmpty())
+        }
+
     @Test
     fun malformedProbeOrEngineErrorNeverReceivesMessage() =
         runBlocking {
@@ -179,14 +249,16 @@ class BoundTranslatorRequestTest {
             }
         }
 
+    /** Submits the fixed message through the production adapter as the given reviewed engine release. */
     private suspend fun request(
         service: ITranslationService,
         source: String = "en",
         target: String = "es",
+        engineVersion: String = "0.8.5",
         beforeSubmission: suspend () -> Unit = {},
         activeResult: (CompletableDeferred<String>) -> Unit = {},
     ): String =
-        translateOnBoundTranslator(service, "Hello world", source, target) {
+        translateOnBoundTranslator(service, engineVersion, "Hello world", source, target) {
             activeResult(it)
             beforeSubmission()
         }

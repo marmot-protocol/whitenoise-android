@@ -7,9 +7,13 @@ import kotlinx.coroutines.flow.asStateFlow
 
 internal enum class TranslationOverride { INHERIT, ON, OFF }
 
+/**
+ * [target] is a reviewed engine target, or null when the saved target is outside the catalog. A null target
+ * pauses automatic translation until the person chooses again, instead of substituting another language.
+ */
 internal data class TranslationChoice(
     val enabled: Boolean,
-    val target: String,
+    val target: String?,
 )
 
 /** Platform choices only: no source text, rendition, error, revision or request identity is persisted. */
@@ -48,12 +52,20 @@ internal class TranslationPreferences(
         preferences.unregisterOnSharedPreferenceChangeListener(listener)
     }
 
-    fun global(): TranslationChoice = TranslationChoice(boolean("global"), language("target") ?: "en")
+    /** The global choice: English until someone chooses, and null once a saved target leaves the catalog. */
+    fun global(): TranslationChoice {
+        val enabled = runCatching { preferences.getBoolean("global", false) }.getOrDefault(false)
+        return TranslationChoice(enabled, usableTarget(savedTarget("target"), DEFAULT_TARGET))
+    }
 
+    /**
+     * The chat's saved target exactly as stored, or null when the chat inherits the global target. The value
+     * can be outside the catalog, so the chat dialog can show it needs recovery rather than hiding it.
+     */
     fun targetOverride(
         account: String,
         group: String,
-    ): String? = language(key(account, group) + ":target")
+    ): String? = savedTarget(key(account, group) + ":target")
 
     fun override(
         account: String,
@@ -62,6 +74,10 @@ internal class TranslationPreferences(
         runCatching { TranslationOverride.valueOf(preferences.getString(key(account, group), null).orEmpty()) }
             .getOrDefault(TranslationOverride.INHERIT)
 
+    /**
+     * The choice automatic translation uses for one chat. A saved chat target outside the catalog yields a
+     * null target, never the global one, so an unusable override is not silently replaced.
+     */
     fun effective(
         account: String,
         group: String,
@@ -73,41 +89,47 @@ internal class TranslationPreferences(
                 TranslationOverride.ON -> true
                 TranslationOverride.OFF -> false
             }
-        return TranslationChoice(enabled, language(key(account, group) + ":target") ?: global.target)
+        return TranslationChoice(enabled, usableTarget(savedTarget(key(account, group) + ":target"), global.target))
     }
 
+    /** Saves the global switch, and [target] when given; null keeps the saved target, even one needing recovery. */
     fun setGlobal(
         enabled: Boolean,
-        target: String,
+        target: String?,
     ) {
-        require(translationLanguageValid(target))
-        preferences
-            .edit()
-            .putBoolean("global", enabled)
-            .putString("target", target)
-            .apply()
+        require(target == null || OfflineTranslatorLanguageCatalog.supportsTarget(target))
+        val edit = preferences.edit().putBoolean("global", enabled)
+        if (target != null) edit.putString("target", target)
+        edit.apply()
     }
 
+    /** Saves the chat's automatic mode without touching its target language. */
     fun setOverride(
         account: String,
         group: String,
         override: TranslationOverride,
-        target: String?,
     ) {
-        require(target == null || translationLanguageValid(target))
         val edit = preferences.edit()
         val key = key(account, group)
         if (override == TranslationOverride.INHERIT) edit.remove(key) else edit.putString(key, override.name)
-        if (target == null) edit.remove("$key:target") else edit.putString("$key:target", target)
         edit.apply()
     }
 
-    private fun boolean(key: String): Boolean = runCatching { preferences.getBoolean(key, false) }.getOrDefault(false)
+    /** Saves a reviewed target for one chat, or null to inherit the global target again. */
+    fun setTargetOverride(
+        account: String,
+        group: String,
+        target: String?,
+    ) {
+        require(target == null || OfflineTranslatorLanguageCatalog.supportsTarget(target))
+        val key = key(account, group) + ":target"
+        val edit = preferences.edit()
+        if (target == null) edit.remove(key) else edit.putString(key, target)
+        edit.apply()
+    }
 
-    private fun language(key: String): String? =
-        runCatching {
-            preferences.getString(key, null)?.takeIf(::translationLanguageValid)
-        }.getOrNull()
+    /** The raw saved code, `""` for a value of the wrong type, or null when nothing is saved. */
+    private fun savedTarget(key: String): String? = runCatching { preferences.getString(key, null) }.getOrElse { "" }
 
     private fun key(
         account: String,
@@ -120,5 +142,12 @@ internal class TranslationPreferences(
     private companion object {
         const val PRIVACY_NOTICE_VERSION = "privacy_notice_version"
         const val CURRENT_PRIVACY_NOTICE = 1
+        const val DEFAULT_TARGET = "en"
     }
 }
+
+/** An unsaved target inherits [fallback]; a saved one counts only while the catalog can still translate into it. */
+private fun usableTarget(
+    saved: String?,
+    fallback: String?,
+): String? = if (saved == null) fallback else saved.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)

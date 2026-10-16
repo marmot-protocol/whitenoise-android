@@ -12,11 +12,12 @@ import java.security.MessageDigest
 internal const val OFFLINE_TRANSLATOR_PACKAGE = "dev.davidv.translator"
 internal const val OFFLINE_TRANSLATOR_ACTION = "dev.davidv.translator.ITranslationService"
 internal const val OFFLINE_TRANSLATOR_SIGNER = "2b3806e745d809018a51be58d0635ffc74cc9733439407ab1ed0424a4db3e1fb"
-internal const val OFFLINE_TRANSLATOR_INSTALL = "https://f-droid.org/packages/dev.davidv.translator/"
 
+/** [engineVersion] is the reviewed release name that selects the bundled language catalog for requests. */
 internal data class VerifiedTranslationService(
     val component: ComponentName,
     val identity: TranslationEngineIdentity,
+    val engineVersion: String,
 )
 
 /** Never uses another package or trusts a self-declared local capability. */
@@ -38,6 +39,7 @@ internal fun discoverOfflineTranslator(context: Context): VerifiedTranslationSer
     return VerifiedTranslationService(
         ComponentName(service.packageName, service.name),
         TranslationEngineIdentity(OFFLINE_TRANSLATOR_PACKAGE, OFFLINE_TRANSLATOR_SIGNER, info.longVersionCode),
+        checkNotNull(info.versionName),
     )
 }
 
@@ -55,12 +57,13 @@ private fun installedTranslatorPackage(manager: PackageManager): PackageInfo =
         throw TranslationException(TranslationFailure.MISSING_ENGINE)
     }
 
+/** Only the pinned publisher signer and a release whose catalog and Binder contract were reviewed pass. */
 private fun validateTranslatorPackage(info: PackageInfo) {
     val signers = info.signingInfo?.apkContentsSigners.orEmpty()
     if (signers.size != 1 || certificateHash(signers.single().toByteArray()) != OFFLINE_TRANSLATOR_SIGNER) {
         throw TranslationException(TranslationFailure.UNVERIFIED_ENGINE)
     }
-    if (info.versionName !in setOf("0.8.3", "0.8.4", "0.8.5")) {
+    if (info.versionName !in OfflineTranslatorLanguageCatalog.engineVersions) {
         throw TranslationException(TranslationFailure.INCOMPATIBLE_ENGINE)
     }
 }

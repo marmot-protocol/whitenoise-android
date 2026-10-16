@@ -20,4 +20,11 @@
     <string name="translation_off">Off</string>
     <string name="translation_inherit_language">Use global target language</string>
     <string name="translation_privacy_warning">Offline Translator can write message text and translations to Android system logs. White Noise cannot guarantee the security of text handled by another app.</string>
+    <string name="translation_choose_language">Choose a language</string>
+    <string name="translation_unsupported_target">The saved target language is not available in Offline Translator. Choose another language.</string>
+    <string name="translation_engine_update_required">This language needs a newer Offline Translator. Update the engine, then retry.</string>
+    <string name="translation_install_zapstore">Install from Zapstore</string>
+    <string name="translation_install_release">Install from GitHub</string>
+    <string name="translation_install_release_reason">Zapstore does not offer a version White Noise can use yet, so this opens version %1$s from the publisher on GitHub.</string>
+    <string name="translation_install_open_failed">No app could open Offline Translator or its download page. Install a web browser, then retry.</string>
 </resources>

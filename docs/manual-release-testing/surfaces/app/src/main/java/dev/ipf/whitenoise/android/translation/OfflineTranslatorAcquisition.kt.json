@@ -1,0 +1,86 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "OfflineTranslatorEngineAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "internal fun OfflineTranslatorEngineAction(",
+        "test_ids": [
+          "SET-033",
+          "SET-037"
+        ]
+      },
+      {
+        "surface": "R.string.translation_open_engine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "R.string.translation_open_engine",
+        "test_ids": [
+          "SET-033",
+          "SET-037"
+        ]
+      },
+      {
+        "surface": "R.string.translation_install_zapstore",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "R.string.translation_install_zapstore",
+        "test_ids": [
+          "SET-037"
+        ]
+      },
+      {
+        "surface": "R.string.translation_install_release",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "R.string.translation_install_release",
+        "test_ids": [
+          "SET-037"
+        ]
+      },
+      {
+        "surface": "R.string.translation_install_release_reason",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "R.string.translation_install_release_reason",
+        "test_ids": [
+          "SET-037"
+        ]
+      },
+      {
+        "surface": "R.string.translation_install_open_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "R.string.translation_install_open_failed",
+        "test_ids": [
+          "SET-037"
+        ]
+      },
+      {
+        "surface": "Open installed translation engine without message text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "fun openOfflineTranslator(",
+        "test_ids": [
+          "SET-033",
+          "SET-037"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Zapstore preferred only for a reviewed compatible release",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "fun offlineTranslatorRoute(",
+        "test_ids": [
+          "SET-037"
+        ]
+      },
+      {
+        "surface": "Reviewed Zapstore release record",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/OfflineTranslatorAcquisition.kt",
+        "anchor": "val offlineTranslatorZapstoreRelease",
+        "test_ids": [
+          "SET-037"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
