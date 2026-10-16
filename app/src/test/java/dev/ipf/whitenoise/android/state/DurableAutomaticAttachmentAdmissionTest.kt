@@ -132,6 +132,35 @@ class DurableAutomaticAttachmentAdmissionTest {
             assertEquals(1, fixture.permissionApplications.get())
         }
 
+    /**
+     * Network inputs that change before their refresh runs leave the previous network's denial applied. The work
+     * waits for an approval that allows its type instead of asking MDK under that denial, so a refresh delayed
+     * past the wait ends the run as retryable, never as a final refusal, and the retry finishes the same work.
+     */
+    @Test
+    fun newlyAllowedNetworkWaitsForAnApprovalThatAllowsTheType() =
+        runTest(dispatcher) {
+            fixture.enforceNativePermission = true
+            setNetwork(setOf(MediaAutoDownloadNetwork.Mobile, MediaAutoDownloadNetwork.Metered))
+            fixture.state.refreshNativeAttachmentPermissions()
+            advanceUntilIdle()
+            // Wi-Fi is published, but the callback has not reached its permission refresh yet.
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            val first = async { runCatching { durable(AttachmentDownloadPriority.Automatic) }.exceptionOrNull() }
+            advanceTimeBy(NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS + 1)
+            advanceUntilIdle()
+
+            val failure = first.await()
+            assertTrue("$failure", failure is AttachmentPermissionPendingException)
+            assertEquals("work asked MDK under the previous network's denial", 0, fixture.automaticDemands.get())
+
+            advanceUntilIdle()
+            val retry = async { durable(AttachmentDownloadPriority.Automatic) }
+            fixture.entered.receive().succeed(PAYLOAD)
+            assertTrue(retry.await())
+            assertEquals(1, fixture.automaticDemands.get())
+        }
+
     /** A refusal from a revocation window is asked again once the host's approval has moved on. */
     @Test
     fun policyBlockedRequestIsAskedAgainOnceTheApprovalMovesOn() =

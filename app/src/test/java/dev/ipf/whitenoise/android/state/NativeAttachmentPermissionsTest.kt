@@ -78,6 +78,33 @@ class NativeAttachmentPermissionsTest {
             reopened.cancel()
         }
 
+    /** An applied denial for a type does not release a wait for that type; a later approval that allows it does. */
+    @Test
+    fun appliedDenialDoesNotReleaseAWaitForTheDeniedType() =
+        runTest {
+            val owner = NativeAttachmentPermissions()
+            val engine =
+                nativeBoundary { method, _ ->
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> "generation"
+                        "setAttachmentAutomaticPermission" -> true
+                        else -> error(method)
+                    }
+                }
+            val imagesOnly = AttachmentAutomaticPermissionFfi(true, false, false, false)
+            val denied = owner.invalidate(engine)
+            owner.update(denied, engine, engine, listOf("a")) { imagesOnly }
+            val video = async(start = CoroutineStart.UNDISPATCHED) { owner.awaitApplied("a") { it.videos } }
+            yield()
+            assertFalse("an approval denying video released a video wait", video.isCompleted)
+            assertEquals(denied, owner.awaitApplied("a") { it.allows(MediaAutoDownloadType.Image) })
+
+            val everything = AttachmentAutomaticPermissionFfi(true, true, true, true)
+            val granted = owner.invalidate(engine)
+            owner.update(granted, engine, engine, listOf("a")) { everything }
+            assertEquals(granted, video.await())
+        }
+
     /** A newer host event invalidates old evaluation without minting another native generation. */
     @Test
     fun staleEvaluationCannotRestorePermission() =
