@@ -80,6 +80,11 @@ class BlossomPublicationTests(unittest.TestCase):
             with patch.object(publisher.urllib.request, 'urlopen', return_value=response):
                 with self.assertRaises(RuntimeError): publisher.readback(self.url, self.digest, self.apk.stat().st_size)
 
+    def test_redirected_404_never_admits_upload(self):
+        error = urllib.error.HTTPError('https://other.invalid/missing', 404, '', {}, None)
+        with patch.object(publisher.urllib.request, 'urlopen', side_effect=error), patch.object(publisher, 'marker_exists', side_effect=AssertionError('upload admission')):
+            with self.assertRaises(urllib.error.HTTPError): publisher.publish(self.apk, 'o/r')
+
     def test_only_missing_blob_allows_publication(self):
         for code in (404, 403, 500):
             error = urllib.error.HTTPError(self.url, code, '', {}, None)

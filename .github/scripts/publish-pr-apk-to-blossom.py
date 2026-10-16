@@ -27,7 +27,7 @@ def readback(url, digest, size):
                     raise RuntimeError('Blossom readback exceeds APK size')
                 actual.update(chunk)
     except urllib.error.HTTPError as error:
-        if error.code == 404:
+        if error.code == 404 and error.geturl() == url:
             return False
         raise
     if total != size or actual.hexdigest() != digest:
