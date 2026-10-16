@@ -195,7 +195,8 @@ class NotificationIdentityShortcutBeforePostTest {
 
     /**
      * A message whose shortcut and picture are unchanged reports the shortcut used exactly once, from the pre-post
-     * publish, and the post-write enrichment adds no second report.
+     * publish, and the post-write enrichment adds no second report. A late picture is a changed snapshot, so its
+     * republish reports use once more, which this case does not cover.
      */
     @Test
     fun unchangedPictureReportsShortcutUseOncePerMessage() {

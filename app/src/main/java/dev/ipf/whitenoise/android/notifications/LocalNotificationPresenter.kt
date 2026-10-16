@@ -1434,7 +1434,8 @@ class LocalNotificationPresenter(
 
     /**
      * Rewrites the card and republishes its shortcut only when a picture resolved after the post. An unchanged
-     * picture leaves both alone, because the pre-post publish already published this shortcut and reported its use.
+     * picture leaves both alone, because the pre-post publish already published this shortcut and reported its use,
+     * so a message reports the shortcut used once. A changed picture republishes it and reports its use once more.
      */
     private suspend fun enrichMessagingNotification(
         update: NotificationUpdateFfi,
@@ -1600,9 +1601,10 @@ class LocalNotificationPresenter(
      * prewarm has run. Only a still-live, rich, preview-allowed card for this message, and the app's latest write
      * for its key, is rewritten, through the same enrichment rewrite a late picture uses, so the card keeps its key,
      * text, history, timestamp and actions and alerts only once. The conversation shortcut is republished with the
-     * picture on the same path. Dismissed, read, replaced, redacted and hidden-preview cards are left alone, and
-     * [isRefreshCurrent] carries the caller's account, lock and post fences up to the platform write. Returns
-     * whether the card was rewritten.
+     * picture on the same path, which reports its use once more, since the snapshot changed. The one-report rule
+     * holds for a message whose pictures are unchanged. Dismissed, read, replaced, redacted and hidden-preview
+     * cards are left alone, and [isRefreshCurrent] carries the caller's account, lock and post fences up to the
+     * platform write. Returns whether the card was rewritten.
      */
     internal suspend fun refreshLateIdentityImage(
         update: NotificationUpdateFfi,
@@ -2531,7 +2533,8 @@ class LocalNotificationPresenter(
 
     /**
      * Revalidates account-private icon overrides at the serialized shortcut write while retaining route and
-     * preview ownership.
+     * preview ownership. An unchanged snapshot only reports the shortcut used. A changed one, such as a picture
+     * that arrived after the post, is republished and reported used once more.
      */
     @Suppress("LongMethod") // One serialized platform write retains its alert, routing and privacy snapshot.
     private fun publishConversationShortcut(
