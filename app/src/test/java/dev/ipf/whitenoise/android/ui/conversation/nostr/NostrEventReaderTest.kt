@@ -2,6 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
@@ -72,6 +76,7 @@ class NostrEventReaderTest {
             ApplicationProvider.getApplicationContext<Context>()
                 .getSystemService(ClipboardManager::class.java)
         composeRule.runOnIdle { assertEquals(destination, clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
+        assertEquals(0, org.robolectric.shadows.ShadowToast.shownToastCount())
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
         composeRule.onNodeWithText(label).performClick()
         composeRule.onNodeWithText(destination).assertIsDisplayed()
@@ -107,6 +112,53 @@ class NostrEventReaderTest {
                 .getSystemService(ClipboardManager::class.java)
         composeRule.runOnIdle { assertEquals("https://$typed", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
         assertEquals(string(R.string.copied), org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun clipboardFailureGivesFeedbackRatherThanEscapingTheReader() {
+        triggerReaderCopyFailure(IllegalStateException("clipboard unavailable"))
+        assertEquals(string(R.string.not_copied), org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun clipboardCancellationDoesNotShowFailureFeedback() {
+        triggerReaderCopyFailure(kotlinx.coroutines.CancellationException("reader left"))
+        assertEquals(0, org.robolectric.shadows.ShadowToast.shownToastCount())
+    }
+
+    private fun triggerReaderCopyFailure(failure: Exception) {
+        val clipboard =
+            object : Clipboard {
+                override suspend fun getClipEntry(): ClipEntry? = null
+
+                override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+                    throw failure
+                }
+            }
+        val url = "https://example.com/clipboard"
+        composeRule.setContent {
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
+                WhiteNoiseTheme {
+                    NostrEventReaderBlock(
+                        block =
+                            MarkdownBlockFfi.Paragraph(
+                                listOf(
+                                    MarkdownInlineFfi.Autolink(
+                                        url,
+                                        dev.ipf.marmotkit.MarkdownAutolinkKindFfi.URI,
+                                        MarkdownLinkDestinationKindFfi.WEB,
+                                    ),
+                                ),
+                            ),
+                        mentionDisplayName = { null },
+                        onNostrProfileTap = {},
+                    )
+                }
+            }
+        }
+        val actions = composeRule.onNodeWithText(url).fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        composeRule.runOnIdle { assertTrue(actions.single().action()) }
+        composeRule.waitForIdle()
     }
 
     @Test
