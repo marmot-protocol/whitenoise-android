@@ -82,7 +82,7 @@ class KeptMessagesOverlayInsetTest {
         composeRule.waitForIdle()
     }
 
-    /** One kept message inside a transcript stand-in padded for the side insets and consuming them, as the conversation does. */
+    /** One kept message in a transcript stand-in that, like the conversation, pads for and consumes the side insets. */
     private fun render() {
         val controller = KeptMessagesController().apply { keep(KeptMessageKey(ACCOUNT, GROUP, MESSAGE_ID)) }
         composeRule.setContent {
@@ -95,7 +95,8 @@ class KeptMessagesOverlayInsetTest {
                         .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                         .testTag(TRANSCRIPT_TAG),
                 ) {
-                    val entries = rememberKeptMessageEntries(controller, ACCOUNT) { key -> timelineMessage(key.messageIdHex) }
+                    val entries =
+                        rememberKeptMessageEntries(controller, ACCOUNT) { key -> timelineMessage(key.messageIdHex) }
                     KeptMessagesOverlay(
                         state = KeptMessagesOverlayState(entries, controller, ACCOUNT),
                         composerHeight = 96.dp,
