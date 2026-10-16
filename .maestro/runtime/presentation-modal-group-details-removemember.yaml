@@ -5,7 +5,19 @@ name: presentation-modal-group-details-removemember
 - assertVisible:
     text: Remove member\?
 - assertVisible:
-    text: Fixture successor will lose access to this chat\. They will not be notified\.
+    text: Member\ will\ lose\ access\ to\ this\ chat\.\ They\ will\ not\ be\ notified\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Bob
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
 - tapOn:
     text: Cancel
 - assertNotVisible:

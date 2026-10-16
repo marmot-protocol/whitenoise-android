@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
@@ -58,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.profile.PROFILE_ADD_TO_GROUPS_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -559,6 +561,79 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertDoesNotExist()
     }
 
+    /** Picking a successor opens review; cancel does not enter the native mutation path. */
+    @Test
+    fun soleAdminLeaveReviewsChosenSuccessorBeforeMutation() {
+        val mutations = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val nativeCalls = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val promotionTargets = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val native =
+            java.lang.reflect.Proxy.newProxyInstance(
+                dev.ipf.marmotkit.MarmotInterface::class.java.classLoader,
+                arrayOf(dev.ipf.marmotkit.MarmotInterface::class.java),
+            ) { _, method, arguments ->
+                nativeCalls += method.name
+                when (method.name.substringBefore('-')) {
+                    "groupMembers" -> listOf(member(SELF_HEX, local = true), member("member-b"), member("member-c"))
+                    "npub" -> null
+                    "recordHostTiming" -> dev.ipf.marmotkit.ProductRecordResultFfi.IGNORED_DISABLED
+                    "promoteAdminDetailed", "selfDemoteAdminDetailed", "leaveGroup" -> {
+                        if (method.name.substringBefore('-') == "promoteAdminDetailed") promotionTargets += arguments?.get(2).toString()
+                        mutations += method.name.substringBefore('-')
+                        error("Native mutation deliberately rejected by the test fixture")
+                    }
+                    else -> error("Unexpected native call: ${method.name}")
+                }
+            } as dev.ipf.marmotkit.MarmotInterface
+        val testController =
+            controller(
+                group(),
+                verifiedRoster = true,
+                marmotRuntime =
+                    dev.ipf.whitenoise.android.state
+                        .AppMarmotRuntime("test", native),
+                memberNames =
+                    mapOf(
+                        "member-b" to "Bob",
+                        "member-c" to "Carol",
+                    ),
+            )
+        render(testController)
+        composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
+        val successor = testController.controller.transferAdminCandidates().first()
+        val successorName = testController.controller.memberDisplayName(successor)
+        composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
+        composeRule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
+        composeRule
+            .onNode(hasText(successorName) and hasAnyAncestor(hasTestTag("group.members.review.member")), useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule
+            .onNode(hasText(GROUP_NAME) and hasAnyAncestor(hasTestTag("group.members.review.destination")), useUnmergedTree = true)
+            .assertIsDisplayed()
+        assertEquals(emptyList<String>(), mutations)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_leave_successor_review.png")
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        composeRule.onNodeWithTag("confirmation.confirm").assertDoesNotExist()
+        assertEquals(emptyList<String>(), mutations)
+        composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
+        composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
+        composeRule.onNodeWithTag("confirmation.confirm").assertIsEnabled().performClick()
+        try {
+            composeRule.waitUntil(timeoutMillis = 5_000) { mutations.isNotEmpty() }
+        } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
+            throw AssertionError(
+                "Native calls: $nativeCalls; roster=${testController.controller.memberRosterState}; error=${testController.controller.lastMutationError}",
+                failure,
+            )
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertFalse(testController.controller.mutationInFlight) }
+        // The fixture rejects promotion: confirm reaches that boundary, but never
+        // demotes or leaves after rejection. Successful transfer/leave needs device evidence.
+        assertEquals(listOf("promoteAdminDetailed"), mutations)
+        assertEquals(listOf("member-b"), promotionTargets)
+    }
+
     private fun render(
         testController: TestController,
         onOpenSearch: (() -> Unit)? = null,
@@ -591,8 +666,10 @@ class GroupDetailsEditNavigationTest {
         extraMembers: Int = 0,
         verifiedRoster: Boolean = false,
         membersOverride: List<AppGroupMemberRecordFfi>? = null,
+        memberNames: Map<String, String> = emptyMap(),
+        marmotRuntime: dev.ipf.whitenoise.android.state.AppMarmotRuntime? = null,
     ): TestController {
-        val appState = testAppState()
+        val appState = testAppState(memberNames, marmotRuntime)
         val members =
             membersOverride
                 ?: (
@@ -618,7 +695,7 @@ class GroupDetailsEditNavigationTest {
                                     isAdmin = member.memberIdHex in group.admins,
                                     isSelf = member.memberIdHex == SELF_HEX,
                                     npub = "npub-${member.memberIdHex}",
-                                    displayName = null,
+                                    displayName = memberNames[member.memberIdHex],
                                 )
                             },
                         epoch = 1uL,
@@ -700,7 +777,10 @@ class GroupDetailsEditNavigationTest {
             local = local,
         )
 
-    private fun testAppState(): WhiteNoiseAppState =
+    private fun testAppState(
+        memberNames: Map<String, String> = emptyMap(),
+        marmotRuntime: dev.ipf.whitenoise.android.state.AppMarmotRuntime? = null,
+    ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore(InMemoryDraftPersistence()),
@@ -717,7 +797,8 @@ class GroupDetailsEditNavigationTest {
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
-            profileReader = { null },
+            initialMarmotRuntime = marmotRuntime,
+            profileReader = { hex -> memberNames[hex]?.let { dev.ipf.marmotkit.UserProfileMetadataFfi(it, null, null, null, null, null, null) } },
         )
 
     private data class TestController(

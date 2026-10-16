@@ -6,13 +6,17 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -146,9 +150,9 @@ class GroupMembersReviewScreenshotTest {
         assertEquals(0, submits)
     }
 
-    /** Retires a removed member's role menu instead of transferring it to another row. */
+    /** Changing one member's role never transfers that privilege to another person after removal. */
     @Test
-    fun removingMemberDoesNotMoveTheirOpenRoleMenuToAnotherPerson() {
+    fun removingMemberDoesNotMoveTheirAdminRoleToAnotherPerson() {
         val state = emptyAppState()
 
         /** Creates a stable public member identity for the role-menu ownership check. */
@@ -162,6 +166,7 @@ class GroupMembersReviewScreenshotTest {
             searchProfile = UserProfileMetadataFfi(name, null, null, null, null, null, null),
         )
         val selected = mutableStateListOf(member("b", "Alice"), member("c", "Bob"))
+        val admins = mutableStateListOf<String>()
         rule.setContent {
             WhiteNoiseTheme {
                 GroupMembersReviewDialog(
@@ -172,15 +177,129 @@ class GroupMembersReviewScreenshotTest {
                     onDismiss = {},
                     onConfirm = {},
                     confirmLabel = "Add members",
-                    onInitialAdminChange = { _, _ -> },
+                    initialAdminIds = admins.toSet(),
+                    onInitialAdminChange = { person, admin ->
+                        if (admin) admins.add(person.accountIdHex) else admins.remove(person.accountIdHex)
+                    },
                 )
             }
         }
-        rule.onNodeWithContentDescription("Alice, Member").performClick()
-        rule.onNodeWithText("Admin").assertExists()
+        rule.onNodeWithContentDescription("Admin, Alice").performClick()
+        rule.runOnIdle { assertEquals(listOf("b".repeat(64)), admins.toList()) }
         rule.runOnIdle { selected.removeAt(0) }
-        rule.onNodeWithText("Admin").assertDoesNotExist()
-        rule.onNodeWithContentDescription("Bob, Member").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Admin, Bob").assertIsOff()
+        rule.onNodeWithContentDescription("Admin, Bob").assertIsDisplayed()
+    }
+
+    /** Unrelated work can disable confirmation without trapping the user or showing false progress. */
+    @Test
+    fun unrelatedWorkStillAllowsCancellingRoleReview() {
+        var dismisses = 0
+        val state = emptyAppState()
+        rule.setContent {
+            WhiteNoiseTheme {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members =
+                        listOf(
+                            RecipientSearch.Candidate(
+                                "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+                                "",
+                                "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg",
+                            ),
+                        ),
+                    busy = true,
+                    dismissEnabled = true,
+                    showProgress = false,
+                    invitation = false,
+                    description = null,
+                    title = "Make admin",
+                    confirmLabel = "Make admin",
+                    onConfirm = {},
+                    onDismiss = { dismisses += 1 },
+                )
+            }
+        }
+        rule.onNode(hasTestTag(SELECTED_MEMBERS_CONFIRM_TAG) and hasText("Make admin")).assertIsNotEnabled()
+        rule.onNodeWithText("Cancel").performClick()
+        assertEquals(1, dismisses)
+    }
+
+    /** An unresolved public name shows exactly one shortened npub, with person before destination. */
+    @Test
+    fun unnamedMemberHasOneAbbreviatedIdentity() {
+        val state = emptyAppState()
+        val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
+        rule.setContent {
+            WhiteNoiseTheme {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club"), MemberReviewGroup("orchard", "Orchard club")),
+                    members = listOf(RecipientSearch.Candidate("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f", npub, npub)),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Add members",
+                    onRemove = {},
+                )
+            }
+        }
+        rule.onAllNodesWithText(npub).assertCountEquals(0)
+        val short =
+            dev.ipf.whitenoise.android.core.IdentityFormatter
+                .short(npub, prefix = 10, suffix = 8)
+        rule.onAllNodesWithText(short).assertCountEquals(1)
+        val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
+        val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
+        assertTrue(person.right <= group.left)
+        rule
+            .onNodeWithTag("group.members.review.dialog")
+            .captureRoboImage("src/test/snapshots/group_member_review_unnamed.png")
+    }
+
+    /** Separates each member's own role and remove controls at large font sizes. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h1280dp-mdpi")
+    fun multipleMembersLarge() = captureMultipleMembers(false)
+
+    /** Mirrors the paired identity columns without losing per-member control grouping. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1280dp-mdpi")
+    fun multipleMembersLargeRtl() = captureMultipleMembers(true)
+
+    private fun captureMultipleMembers(rtl: Boolean) {
+        val state = emptyAppState()
+        val members =
+            listOf("Alice", "Bob").mapIndexed { index, name ->
+                RecipientSearch.Candidate(
+                    (index + 1).toString(16).padStart(64, '0'),
+                    name,
+                    "npub1member$index",
+                    searchProfile = UserProfileMetadataFfi(name, null, null, null, null, null, null),
+                )
+            }
+        rule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                WhiteNoiseTheme(fontScale = 1.5f) {
+                    GroupMembersReviewDialog(
+                        appState = state,
+                        groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                        members = members,
+                        busy = false,
+                        onDismiss = {},
+                        onConfirm = {},
+                        confirmLabel = "Add members",
+                        onRemove = {},
+                        initialAdminIds = setOf(members.first().accountIdHex),
+                        onInitialAdminChange = { _, _ -> },
+                    )
+                }
+            }
+        }
+        rule.onNodeWithContentDescription("Admin, Alice").assertIsOn()
+        rule.onNodeWithContentDescription("Admin, Bob").performScrollTo().assertIsOff()
+        rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_member_review_multiple_${if (rtl) "rtl" else "ltr"}.png")
     }
 
     /** Renders the production member-review dialog in the requested visual variant. */
@@ -191,7 +310,7 @@ class GroupMembersReviewScreenshotTest {
         rtl: Boolean = false,
     ) {
         val state = emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
-        val id = "b".repeat(64)
+        val id = "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
         val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
         val pictureUrl = "https://example.com/alice-review.png"
         val memberImage = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888).apply { eraseColor(0xff008080.toInt()) }
@@ -206,6 +325,7 @@ class GroupMembersReviewScreenshotTest {
             )
         val selected = mutableStateListOf(member)
         var submits = 0
+        val admins = mutableStateListOf<String>()
         rule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
@@ -219,7 +339,10 @@ class GroupMembersReviewScreenshotTest {
                         onConfirm = { submits += 1 },
                         confirmLabel = "Add member",
                         reviewGroup = MemberReviewGroup("garden", "Garden club", image = groupImage.asImageBitmap()),
-                        onInitialAdminChange = { _, _ -> },
+                        initialAdminIds = admins.toSet(),
+                        onInitialAdminChange = { person, admin ->
+                            if (admin) admins.add(person.accountIdHex) else admins.remove(person.accountIdHex)
+                        },
                     )
                 }
             }
@@ -227,14 +350,19 @@ class GroupMembersReviewScreenshotTest {
         rule.onNodeWithContentDescription("Review selected members").performClick()
         rule.onNode(isDialog()).assertExists()
         rule.onNodeWithText("Garden club").assertIsDisplayed()
-        rule.onNodeWithText("alice").assertIsDisplayed()
-        rule.onNodeWithText(npub).assertIsDisplayed()
+        rule.onNodeWithText("alice").performScrollTo().assertIsDisplayed()
+        rule
+            .onNodeWithText(
+                dev.ipf.whitenoise.android.core.IdentityFormatter
+                    .short(npub, prefix = 10, suffix = 8),
+            ).performScrollTo()
+            .assertIsDisplayed()
         rule
             .onNode(hasText("Private Alice") and hasAnyAncestor(hasTestTag("group.members.review.member")))
             .assertDoesNotExist()
         val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
         val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
-        assertTrue(if (rtl) group.center.x > person.center.x else group.center.x < person.center.x)
+        assertTrue(if (rtl) person.center.x > group.center.x else person.center.x < group.center.x)
         rule
             .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_$name.png")

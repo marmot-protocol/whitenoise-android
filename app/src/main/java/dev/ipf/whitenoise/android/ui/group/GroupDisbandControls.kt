@@ -93,6 +93,8 @@ internal fun GroupDisbandStatus(
 internal fun GroupDisbandConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    identity: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     ConfirmDialog(
         title = stringResource(R.string.group_disband_dialog_title),
@@ -101,6 +103,8 @@ internal fun GroupDisbandConfirmDialog(
         onConfirm = onConfirm,
         onDismiss = onDismiss,
         destructive = true,
+        identity = identity,
+        confirmEnabled = enabled,
     )
 }
 

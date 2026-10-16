@@ -176,3 +176,5 @@
 # DM profile group picker retains a finite viewport.
 *.GroupDetailsEditNavigationTest.directMessageOverviewKeepsPeerGroupActionsTogether
 *.ProfileAddToGroupsFlowTest.profileWithoutSharedGroupsKeepsAddEntryReachable
+
+*.GroupDetailsEditNavigationTest.soleAdminLeaveReviewsChosenSuccessorBeforeMutation

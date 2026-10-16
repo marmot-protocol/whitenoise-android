@@ -24,7 +24,7 @@
       {
         "surface": "Review invitation identities and controls",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "anchor": "R.string.review_selection",
+        "anchor": "R.string.profile_add_to_groups_confirm_message",
         "test_ids": [
           "GRP-030"
         ]

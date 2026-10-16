@@ -5,8 +5,19 @@ name: presentation-modal-group-details-transferthenleave
 - assertVisible:
     text: You're the only admin
 - assertVisible:
-    text: You're the only admin\. Fixture successor becomes admin and you leave the
-      group\.
+    text: You're\ the\ only\ admin\.\ Member\ becomes\ admin\ and\ you\ leave\ the\ group\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Bob
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
 - tapOn:
     text: Cancel
 - assertNotVisible:

@@ -5,8 +5,19 @@ name: presentation-modal-group-details-blockedleave
 - assertVisible:
     text: You're the only admin
 - assertVisible:
-    text: Make another member an admin before leaving Fixture confirmation group,
-      so the group keeps an admin\.
+    text: Make another member an admin before leaving Fixture confirmation group, so the group keeps an admin\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Alice
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
 - assertNotVisible:
     text: Leave
 - tapOn:

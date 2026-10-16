@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -200,13 +202,10 @@ class SelectedMembersReviewScreenTest {
                 )
             }
         }
-        val memberLabel = context.getString(R.string.member)
         val adminLabel = context.getString(R.string.admin)
-        composeRule.onNodeWithContentDescription("${members.first().displayName}, $memberLabel").performClick()
-        composeRule.onNodeWithText(members.first().npub).assertIsDisplayed()
-        composeRule.onNodeWithText(adminLabel).performClick()
-        composeRule.onNodeWithContentDescription("${members.first().displayName}, $adminLabel").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("${members.last().displayName}, $memberLabel").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("$adminLabel, ${members.first().displayName}").performClick()
+        composeRule.onNodeWithContentDescription("$adminLabel, ${members.first().displayName}").assertIsDisplayed().assertIsOn()
+        composeRule.onNodeWithContentDescription("$adminLabel, ${members.last().displayName}").assertIsDisplayed().assertIsOff()
         assertEquals(0, removed)
         assertEquals(0, confirmed)
         composeRule.onNodeWithText(context.getString(R.string.add_member)).performClick()
@@ -217,7 +216,7 @@ class SelectedMembersReviewScreenTest {
     }
 
     @Test
-    fun busyRoleMenuCannotChangePrivileges() {
+    fun busyRoleSwitchCannotChangePrivileges() {
         var changes = 0
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -234,12 +233,12 @@ class SelectedMembersReviewScreenTest {
                 )
             }
         }
-        val memberLabel = context.getString(R.string.member)
+        val adminLabel = context.getString(R.string.admin)
         composeRule
-            .onNodeWithContentDescription("${members.first().displayName}, $memberLabel")
+            .onNodeWithContentDescription("$adminLabel, ${members.first().displayName}")
             .assertIsNotEnabled()
             .performClick()
-        composeRule.onNodeWithText(context.getString(R.string.admin)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("$adminLabel, ${members.last().displayName}").assertIsNotEnabled().assertIsOff()
         assertEquals(0, changes)
     }
 

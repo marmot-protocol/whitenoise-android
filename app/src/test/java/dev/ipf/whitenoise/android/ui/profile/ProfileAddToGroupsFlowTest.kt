@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -201,6 +202,7 @@ class ProfileAddToGroupsFlowTest {
                     ProfileMakeAdminContent(
                         appState = appState,
                         targetName = "Alice",
+                        target = RecipientSearch.Candidate("b".repeat(64), "Alice", "npub1alice"),
                         state =
                             ProfileGroupPickerState(
                                 groups = listOf(group),
@@ -220,7 +222,13 @@ class ProfileAddToGroupsFlowTest {
         composeRule
             .onRoot()
             .captureRoboImage("src/test/snapshots/profile_make_admin_ready_dark.png")
-        composeRule.onNodeWithText(app.getString(R.string.make_admin)).performClick()
+        composeRule.onNode(hasText(app.getString(R.string.make_admin)) and hasClickAction()).performClick()
+        composeRule.runOnIdle { assertEquals(null, promotedGroupId) }
+        composeRule.onNodeWithTag("group.members.review.destination").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("group.members.review.dialog")
+            .captureRoboImage("src/test/snapshots/profile_make_admin_review_dark.png")
+        composeRule.onNodeWithTag("selected_members_confirm").performClick()
         composeRule.runOnIdle { assertEquals("friends", promotedGroupId) }
     }
 

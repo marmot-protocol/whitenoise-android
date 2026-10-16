@@ -34,7 +34,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -119,10 +118,10 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.withDmCreationOwner
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
@@ -1053,6 +1052,7 @@ internal fun ProfileSheet(
                             ProfileMakeAdminContent(
                                 appState = appState,
                                 targetName = displayTitle,
+                                target = RecipientSearch.Candidate(hex.orEmpty(), displayTitle, npub),
                                 state = promotableGroupsState,
                                 busy = promotingAdmin,
                                 onClose = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
@@ -1524,6 +1524,7 @@ internal fun ProfileAddToGroupsContent(
 internal fun ProfileMakeAdminContent(
     appState: WhiteNoiseAppState,
     targetName: String,
+    target: RecipientSearch.Candidate,
     state: ProfileGroupPickerState,
     busy: Boolean,
     onClose: () -> Unit,
@@ -1533,6 +1534,9 @@ internal fun ProfileMakeAdminContent(
     val groups = state.groups
     val groupTitleCopy = rememberGroupTitleCopy()
     var selectedGroupId by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<String?>(null)
+    }
+    var confirmGroupId by remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex) {
         mutableStateOf<String?>(null)
     }
     var query by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
@@ -1551,6 +1555,7 @@ internal fun ProfileMakeAdminContent(
         }
     LaunchedEffect(groups) {
         if (groups.none { it.group.groupIdHex == selectedGroupId }) selectedGroupId = null
+        if (groups.none { it.group.groupIdHex == confirmGroupId }) confirmGroupId = null
     }
     val selectedGroup = groups.firstOrNull { it.group.groupIdHex == selectedGroupId }
     PreparedGroupAvatarContent(
@@ -1566,12 +1571,19 @@ internal fun ProfileMakeAdminContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             EmojiLabel(
-                stringResource(R.string.profile_make_admin_title, targetName),
+                stringResource(R.string.make_admin),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
             EmojiLabel(
-                stringResource(R.string.profile_make_admin_description, targetName),
+                stringResource(
+                    R.string.profile_make_admin_description,
+                    if (IdentityFormatter.isNostrIdentityFallback(targetName)) {
+                        IdentityFormatter.short(targetName, prefix = 10, suffix = 8)
+                    } else {
+                        targetName
+                    },
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
@@ -1631,8 +1643,8 @@ internal fun ProfileMakeAdminContent(
                     }
                 }
                 Button(
-                    onClick = { selectedGroup?.let(onPromote) },
-                    enabled = selectedGroup != null && !busy,
+                    onClick = { confirmGroupId = selectedGroup?.group?.groupIdHex },
+                    enabled = selectedGroup != null && target.accountIdHex.isNotBlank() && !busy,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
                 ) {
                     if (busy) {
@@ -1645,6 +1657,32 @@ internal fun ProfileMakeAdminContent(
                 }
             }
         }
+    }
+    groups.firstOrNull { it.group.groupIdHex == confirmGroupId }?.let { group ->
+        val avatar = rememberChatListGroupAvatar(appState, group)
+        GroupMembersReviewDialog(
+            appState = appState,
+            groups =
+                listOf(
+                    MemberReviewGroup(
+                        group.group.groupIdHex,
+                        chatListItemDisplayTitle(group, appState, groupTitleCopy),
+                        avatar.pictureUrl,
+                        avatar.image,
+                    ),
+                ),
+            members = listOf(target),
+            busy = busy,
+            title = stringResource(R.string.make_admin),
+            description = null,
+            invitation = false,
+            confirmLabel = stringResource(R.string.make_admin),
+            onConfirm = {
+                confirmGroupId = null
+                onPromote(group)
+            },
+            onDismiss = { confirmGroupId = null },
+        )
     }
 }
 
@@ -1708,9 +1746,9 @@ private fun ProfileSheetAdminActions(
 ) {
     // Keep the initiated action stable until its coroutine completes. Detailed
     // MDK state can land one frame before the local pending flag clears.
-    var pendingAction by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
-    var confirmRemove by remember(targetHex) { mutableStateOf(false) }
-    var confirmRoleChange by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
+    var pendingAction by remember(controller, targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
+    var confirmRemove by remember(controller, targetHex) { mutableStateOf(false) }
+    var confirmRoleChange by remember(controller, targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
     val targetMember =
         remember(controller.presentedMembers, targetHex) {
             controller.presentedMembers.firstOrNull { it.memberIdHex.equals(targetHex, ignoreCase = true) }
@@ -1769,14 +1807,28 @@ private fun ProfileSheetAdminActions(
         onRemoveMember = { if (isCurrent()) confirmRemove = true },
     )
 
+    val groupAvatar = rememberConversationGroupAvatar(appState, controller)
+    val reviewGroup =
+        MemberReviewGroup(
+            controller.group.groupIdHex,
+            controller.title(rememberGroupTitleCopy()),
+            groupAvatar.pictureUrl,
+            groupAvatar.image,
+        )
+    val reviewMember =
+        RecipientSearch.Candidate(
+            targetHex,
+            controller.memberDisplayName(targetMember),
+            appState.npubForDisplay(targetHex),
+        )
     confirmRoleChange?.let { roleChange ->
         val promoting = roleChange == GroupMemberMenuAction.GrantAdmin
         ProfileSheetModerationConfirmDialog(
-            title =
-                stringResource(
-                    if (promoting) R.string.make_admin_question else R.string.remove_admin_question,
-                    controller.memberDisplayName(targetMember),
-                ),
+            appState = appState,
+            group = reviewGroup,
+            member = reviewMember,
+            busy = busy,
+            title = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
             confirmLabel = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
             onConfirm = {
                 confirmRoleChange = null
@@ -1790,11 +1842,11 @@ private fun ProfileSheetAdminActions(
 
     if (confirmRemove) {
         ProfileSheetModerationConfirmDialog(
-            title =
-                stringResource(
-                    R.string.remove_member_question,
-                    controller.memberDisplayName(targetMember),
-                ),
+            appState = appState,
+            group = reviewGroup,
+            member = reviewMember,
+            busy = busy,
+            title = stringResource(R.string.remove_from_group),
             confirmLabel = stringResource(R.string.remove_from_group),
             onConfirm = {
                 confirmRemove = false
@@ -1808,34 +1860,34 @@ private fun ProfileSheetAdminActions(
     }
 }
 
-/**
- * Moderation confirmations carry the whole question in the title, as the prototype does, so no body
- * copy repeats it; a destructive confirm takes the error role and the dismiss is always Cancel.
- */
+/** Reviews the public member and destination before the existing scoped mutation runs. */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 private fun ProfileSheetModerationConfirmDialog(
+    appState: WhiteNoiseAppState,
+    group: MemberReviewGroup,
+    member: RecipientSearch.Candidate,
+    busy: Boolean,
     title: String,
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = false,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                colors =
-                    if (destructive) {
-                        ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    } else {
-                        ButtonDefaults.textButtonColors()
-                    },
-            ) { Text(confirmLabel) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-        title = { Text(title) },
+    GroupMembersReviewDialog(
+        appState = appState,
+        groups = listOf(group),
+        members = listOf(member),
+        busy = busy,
+        title = title,
+        description = null,
+        invitation = false,
+        dismissEnabled = true,
+        showProgress = false,
+        confirmLabel = confirmLabel,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = destructive,
     )
 }
 

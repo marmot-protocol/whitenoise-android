@@ -6,6 +6,18 @@ name: presentation-modal-group-details-stepdownsoleadmin
     text: Transfer admin first
 - assertVisible:
     text: You're the only admin\. Transfer admin to leave or step down\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Alice
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
 - tapOn:
     text: Cancel
 - assertNotVisible:
