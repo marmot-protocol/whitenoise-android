@@ -102,7 +102,8 @@ class GroupMembersReviewScreenshotTest {
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
         rule.onNodeWithText("Member 8").performScrollTo().assertIsDisplayed()
         rule.onNodeWithText("Cancel").assertIsDisplayed()
-        rule.onNodeWithTag("group.members.review.dialog")
+        rule
+            .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_overflow.png")
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
         assertEquals(1, submits)
@@ -141,7 +142,11 @@ class GroupMembersReviewScreenshotTest {
     @Test
     fun removingMemberDoesNotMoveTheirOpenRoleMenuToAnotherPerson() {
         val state = emptyAppState()
-        fun member(hex: String, name: String) =
+
+        fun member(
+            hex: String,
+            name: String,
+        ) =
             RecipientSearch.Candidate(
                 hex.repeat(64),
                 name,
@@ -220,7 +225,8 @@ class GroupMembersReviewScreenshotTest {
         val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
         val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
         assertTrue(if (rtl) group.center.x > person.center.x else group.center.x < person.center.x)
-        rule.onNodeWithTag("group.members.review.dialog")
+        rule
+            .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_$name.png")
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed().performClick()
         assertEquals(1, submits)
