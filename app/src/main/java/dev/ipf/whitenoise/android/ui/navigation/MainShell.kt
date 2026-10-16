@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
+import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
@@ -137,13 +138,14 @@ internal data class ConversationOpenContext(
     val pinnedAccountRef: String? = null,
 )
 
+/** A conversation open waiting for its prepared route, with the list head captured for the return snap. */
 internal data class PendingConversationOpen(
     val requestId: Long,
     val accountRef: String?,
     val item: ChatListItem,
     val focusMessageId: String?,
     val justCreated: Boolean,
-    val visibleActiveListHeadId: String?,
+    val visibleActiveListHead: ChatListReturnHead?,
 )
 
 internal fun pendingConversationOpenBelongsToAccount(
@@ -538,7 +540,7 @@ internal fun MainShell(
                     item = item,
                     focusMessageId = null,
                     justCreated = false,
-                    visibleActiveListHeadId = null,
+                    visibleActiveListHead = null,
                 )
         }
     }
@@ -2237,7 +2239,7 @@ internal fun MainShell(
         chatListReturnHeadSnap =
             openGroupFromChatList(
                 chatListReturnHeadSnap,
-                visibleActiveListHeadId = request.visibleActiveListHeadId,
+                visibleActiveListHead = request.visibleActiveListHead,
             )
         selectedChat = request.item
         pendingConversationOpen = null
@@ -2608,7 +2610,7 @@ internal fun MainShell(
                                     onGroupCreateSubmitted = onGroupCreateSubmitted,
                                     onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
                                     onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
-                                    conversationReturnHeadId = publishedConversationReturnHead(chatListReturnHeadSnap),
+                                    conversationReturnHead = publishedConversationReturnHead(chatListReturnHeadSnap),
                                     onConversationReturnHeadHandled = {
                                         chatListReturnHeadSnap = onConversationReturnHeadHandled(chatListReturnHeadSnap)
                                     },
@@ -2625,7 +2627,7 @@ internal fun MainShell(
                                                 SettingsHomeViewportEvent.OpenNewSettingsVisit,
                                             )
                                     },
-                                    onOpenGroup = { item, focusMessageId, justCreated, visibleHeadId ->
+                                    onOpenGroup = { item, focusMessageId, justCreated, visibleHead ->
                                         commitExplicitConversationOpen(item.group.groupIdHex)
                                         nextPendingConversationOpenRequestId += 1L
                                         pendingConversationOpen =
@@ -2635,13 +2637,13 @@ internal fun MainShell(
                                                 item = item,
                                                 focusMessageId = focusMessageId,
                                                 justCreated = justCreated,
-                                                visibleActiveListHeadId = visibleHeadId,
+                                                visibleActiveListHead = visibleHead,
                                             )
                                     },
-                                    onPresentProfile = { npub, visibleHeadId ->
+                                    onPresentProfile = { npub, visibleHead ->
                                         pendingConversationOpen = null
                                         chatListReturnHeadSnap =
-                                            presentProfileFromChatList(chatListReturnHeadSnap, visibleHeadId)
+                                            presentProfileFromChatList(chatListReturnHeadSnap, visibleHead)
                                         shellNavState =
                                             armShellProfileForeground(shellNavState, profileGroupForegroundState)
                                         previousPendingProfileNpub = npub

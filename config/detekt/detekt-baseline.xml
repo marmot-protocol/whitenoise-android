@@ -593,7 +593,6 @@
     <ID>MaxLineLength:BubbleColorPreferencesTest.kt:BubbleColorPreferencesTest$assertEquals(0xFFABCDEF, BubbleColorPreferences.readChatColor(preferences, "account-a", "group-a", BubbleSide.Mine))</ID>
     <ID>MaxLineLength:BubbleColorPreferencesTest.kt:BubbleColorPreferencesTest$chatOverrideArgb = BubbleColorPreferences.readChatColor(preferences, "account-a", "group-a", BubbleSide.Other)</ID>
     <ID>MaxLineLength:CancellationHandlingTest.kt:CancellationHandlingTest$assertFalse("forwardText must not use plain runCatching around sendText", Regex("""runCatching\s*\{[^}]*sendText""").containsMatchIn(forwardText))</ID>
-    <ID>MaxLineLength:ChatListReturnHeadSnapState.kt:internal fun publishedConversationReturnHead: String?</ID>
     <ID>MaxLineLength:ChatListSelectionBarTest.kt:ChatListSelectionBarTest$)</ID>
     <ID>MaxLineLength:ChatListSelectionBarTest.kt:ChatListSelectionBarTest$private fun string: String</ID>
     <ID>MaxLineLength:ChatListSortKeyTest.kt:ChatListSortKeyTest$defaultBlobEndpoints = listOf(AppBlobEndpointFfi(locatorKind = "blossom-v1", baseUrl = "https://blossom.primal.net"))</ID>

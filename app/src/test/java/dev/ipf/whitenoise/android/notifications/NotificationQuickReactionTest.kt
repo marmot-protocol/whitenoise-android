@@ -42,6 +42,19 @@ class NotificationQuickReactionTest {
         assertEquals(listOf("🥳", "🔥", "😂", "👍", "❤️", "👎"), notificationQuickReactionChoices(context))
     }
 
+    /** Eight configured quick reactions persist in order, while the notification keeps its six-choice bound (#3279). */
+    @Test
+    fun eightSavedQuickReactionsReloadInOrderAndNotificationsKeepSix() {
+        val eight = listOf("🥳", "🔥", "😂", "👍", "❤️", "👎", "🚀", "✅")
+
+        assertEquals(eight, RecentEmojiPreferences.saveQuickReactions(context, eight))
+        assertEquals(eight, RecentEmojiPreferences.loadQuickReactions(context))
+        assertEquals(eight.take(6), notificationQuickReactionChoices(context))
+
+        RecentEmojiPreferences.resetQuickReactions(context)
+        assertEquals(listOf("❤️", "👍", "👎", "😂", "😮", "😢"), RecentEmojiPreferences.loadQuickReactions(context))
+    }
+
     @Test
     fun quickReactionChoicesDropBlankOversizedAndDuplicateFavourites() {
         val stored = listOf("🥳", "   ", "😀".repeat(33), "🔥", "🥳")

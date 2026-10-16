@@ -365,6 +365,8 @@ internal fun MessageBubble(
     onDeclineInvite: () -> Unit,
     mentionCandidates: List<MentionComposer.Candidate>,
     mentionPickerEnabled: Boolean,
+    // The conversation's accepted-send reveal, run after a send from the Read more reader closes it (#3268).
+    onReaderSendAccepted: () -> Unit = {},
     showSenderName: Boolean = false,
     showSenderAvatar: Boolean = false,
     collapseLongMessages: Boolean = true,
@@ -2473,7 +2475,7 @@ internal fun MessageBubble(
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
-                                    onExpand = { if (!deleted) surfaces.expandedFullView = true },
+                                    onExpand = { if (!deleted) surfaces.openExpandedFullView() },
                                 )
                             }
                         } else {
@@ -2563,7 +2565,7 @@ internal fun MessageBubble(
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
-                                    onExpand = { if (!deleted) surfaces.expandedFullView = true },
+                                    onExpand = { if (!deleted) surfaces.openExpandedFullView() },
                                 )
                             }
                         }
@@ -2632,7 +2634,7 @@ internal fun MessageBubble(
                             footerOnPendingVisual = footerOnPendingVisual,
                             invalidationWarning = invalidationWarning,
                             mine = mine,
-                            onExpand = { if (!deleted) surfaces.expandedFullView = true },
+                            onExpand = { if (!deleted) surfaces.openExpandedFullView() },
                         )
                     }
                 }
@@ -2936,6 +2938,8 @@ internal fun MessageBubble(
                     },
                 )
                 if (surfaces.expandedFullView && !deleted) {
+                    val readerSession = surfaces.expandedFullViewSession
+                    ReaderSendDismissal(surfaces, onReaderSendAccepted)
                     val groupIdHex = controller.group.groupIdHex
                     val editingRecord =
                         controller.editingMessageId?.let { id ->
@@ -3074,6 +3078,7 @@ internal fun MessageBubble(
                                             enterKeyBehavior = appState.enterKeyBehavior,
                                             recentEmojis = recentEmojis,
                                             onEmojiUsed = onEmojiUsed,
+                                            onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) },
                                         )
                                     }
                             }
@@ -3100,10 +3105,7 @@ internal fun MessageBubble(
                             if (pickingSlot == null) {
                                 reactWithEmoji(emoji)
                             } else {
-                                surfaces.configureReactionsDraft =
-                                    surfaces.configureReactionsDraft.mapIndexed { index, current ->
-                                        if (index == pickingSlot) emoji else current
-                                    }
+                                surfaces.pickConfigureReaction(pickingSlot, emoji)
                                 surfaces.configureReactionSlot = null
                                 surfaces.customizeReactionsOpen = true
                             }

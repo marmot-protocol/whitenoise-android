@@ -489,6 +489,10 @@ class MessageActionMenuLayoutTest {
         assertTrue(bounds.height >= 48f)
     }
 
+    /**
+     * A sparse rail keeps its buttons compact: they grow to share the row (#3279) but never past twice their
+     * 48 dp height, and the pair stays centered instead of spreading to the rail's far edges.
+     */
     @Test
     fun quickReactionButtonsStayCompactWhenOnlyOneIsAvailable() {
         renderMenu(fontScale = 1f, canReact = true)
@@ -498,9 +502,11 @@ class MessageActionMenuLayoutTest {
                 .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍")
                 .fetchSemanticsNode()
                 .boundsInRoot
+        val picker = composeRule.onNodeWithContentDescription("Open emoji picker").fetchSemanticsNode().boundsInRoot
 
-        assertEquals(48f, bounds.width, 0.5f)
+        assertEquals(96f, bounds.width, 0.5f)
         assertEquals(48f, bounds.height, 0.5f)
+        assertEquals("the pair is a compact centered cluster", 4f, picker.left - bounds.right, 0.5f)
     }
 
     /** A full six-slot configuration keeps every reaction, and the full picker, inside the popup. */

@@ -81,6 +81,8 @@ internal fun TimelineRow(
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     onTtsSentenceSeek: (TtsState) -> Unit = {},
     onWave: (suspend (String, () -> Unit) -> Unit)? = null,
+    // Reveals a send accepted from a long message's Read more reader (#3268).
+    onReaderSendAccepted: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
     Column(modifier.fillMaxWidth()) {
@@ -264,6 +266,7 @@ internal fun TimelineRow(
                         onBack = onBack,
                         mentionCandidates = mentionCandidates,
                         mentionPickerEnabled = mentionPickerEnabled,
+                        onReaderSendAccepted = onReaderSendAccepted,
                         showSenderName = senderDecoration.showName,
                         showSenderAvatar = senderDecoration.showAvatar,
                         collapseLongMessages = collapseLongMessages,

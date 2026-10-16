@@ -396,6 +396,8 @@
     <string name="configure_reactions_guidance">Toca un emoji para reemplazarlo.</string>
     <string name="reset">Restablecer</string>
     <string name="reaction_slot_description">Reacción %1$d, %2$s. Toca dos veces para reemplazarla.</string>
+    <string name="configure_reactions_add">Añadir una reacción</string>
+    <string name="configure_reactions_remove">Quitar la reacción %1$d, %2$s</string>
     <string name="emoji_search_hint">Buscar emojis</string>
     <string name="emoji_search_clear">Borrar búsqueda de emojis</string>
     <string name="emoji_search_no_results">No se encontraron emojis</string>
