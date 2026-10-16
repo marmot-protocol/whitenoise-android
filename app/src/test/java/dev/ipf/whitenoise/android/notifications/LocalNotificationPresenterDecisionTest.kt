@@ -206,6 +206,20 @@ class LocalNotificationPresenterDecisionTest {
         assertTrue(expanded(bounded))
     }
 
+    /** The per-activity cap counts manifest and other dynamic shortcuts too, so a full set makes room first. */
+    @Test
+    fun conversationShortcutPruneCountCountsManifestAndOtherDynamicShortcutsAgainstTheCap() {
+        val conversations = (1..13).map { "${CONVERSATION_SHORTCUT_PREFIX}$it" }.toSet()
+        val dynamic = conversations + "${CONVERSATION_SHORTCUT_PREFIX}14"
+        val new = "${CONVERSATION_SHORTCUT_PREFIX}new"
+
+        val prune = { ids: Set<String>, id: String -> conversationShortcutPruneCount(ids, 1, 15, id) }
+        assertEquals("14 conversations and a manifest shortcut fill the cap", 1, prune(dynamic, new))
+        assertEquals(0, prune(conversations, new))
+        assertEquals("another dynamic shortcut counts too", 2, prune(dynamic + "other", new))
+        assertEquals("republishing an existing shortcut needs no room", 0, prune(dynamic, dynamic.first()))
+    }
+
     @Test
     fun conversationShortcutRemovalOrderRemovesLeastRecentlyUsedFirst() {
         val existing =

@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
+import dev.ipf.whitenoise.android.notifications.InFlightConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewToken
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
@@ -315,9 +316,12 @@ class ShareShortcutPublisher(
         }
     }
 
-    /** Dynamic conversation shortcuts that still back a live card, which replacing the dynamic set must not delete. */
+    /**
+     * Dynamic conversation shortcuts that still back a live card, or that the presenter published for a card it is
+     * about to post, which replacing the dynamic set must not delete. Both are read under the shared publication lock.
+     */
     private fun cardBackedShortcuts(): List<ShortcutInfoCompat> {
-        val cards = cardShortcutIds()
+        val cards = cardShortcutIds() + InFlightConversationShortcuts.ids()
         if (cards.isEmpty()) return emptyList()
         return dynamicShortcuts().filter { it.id in cards && isConversationShortcutId(it.id) }
     }

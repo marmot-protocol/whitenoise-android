@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA
+import dev.ipf.whitenoise.android.notifications.InFlightConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
@@ -44,6 +45,7 @@ class ShareShortcutPublisherTest {
     @After
     fun clearPlatformShortcuts() {
         ShortcutManagerCompat.removeAllDynamicShortcuts(RuntimeEnvironment.getApplication())
+        InFlightConversationShortcuts.clearForTests()
     }
 
     @Test
@@ -360,6 +362,34 @@ class ShareShortcutPublisherTest {
             kept.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
         )
         assertTrue(kept.categories.isNullOrEmpty())
+    }
+
+    /**
+     * A shortcut the presenter published for a card it has not posted yet, such as a pending invite's first message,
+     * survives a refresh that rebuilds the dynamic set, and is judged as an ordinary shortcut once released.
+     */
+    @Test
+    fun publish_retainsAShortcutHeldForACardAboutToBePosted() {
+        val held = cardShortcut("acct", "invite-group", "Invite")
+        var published = emptyList<ShortcutInfoCompat>()
+        val publisher =
+            ShareShortcutPublisher(
+                context = RuntimeEnvironment.getApplication(),
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = { published = it },
+                existingShortcuts = { emptyList() },
+                dynamicShortcuts = { listOf(held) },
+                cardShortcutIds = { emptySet() },
+            )
+        val chats = listOf(chat("g1", pending = false), chat("invite-group", pending = true))
+        InFlightConversationShortcuts.hold(held.id)
+
+        publisher.publish("acct", chats) { it.group.name }
+        assertEquals(listOf(conversationShortcutId("acct", "g1"), held.id), published.map { it.id })
+
+        InFlightConversationShortcuts.release(held.id)
+        publisher.publish("acct", chats) { it.group.name }
+        assertEquals(listOf(conversationShortcutId("acct", "g1")), published.map { it.id })
     }
 
     /** Card-backed shortcuts take their slots first, so the lowest-ranked recent chats give theirs up. */

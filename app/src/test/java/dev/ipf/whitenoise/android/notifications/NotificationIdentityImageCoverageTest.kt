@@ -53,6 +53,15 @@ class NotificationIdentityImageCoverageTest {
         assertFalse("no network wait on the posting path", "avatarBitmapResolver" in before)
         val payload = presenter.functionBody("previewPayload")
         assertTrue("a hidden card makes the next rich post publish again", "shortcutSnapshots::remove" in payload)
+        assertTrue("the shortcut is held for the coming write", "holdForPost = true" in before)
+        assertTrue("and released once that write ends", "InFlightConversationShortcuts::release" in show)
+        val reuse = presenter.functionBody("reuseCachedShortcut")
+        assertTrue("a cached snapshot needs the live shortcut", "shortcutId in dynamicShortcutIds()" in reuse)
+        val share = File(notificationsRoot().parentFile, "share/ShareShortcutPublisher.kt").readText()
+        assertTrue(
+            "a Direct Share refresh keeps a held shortcut",
+            "InFlightConversationShortcuts.ids()" in share.functionBody("cardBackedShortcuts"),
+        )
     }
 
     /** Late pictures rewrite both card templates with the same snapshot instead of only the conversation style. */
@@ -127,10 +136,16 @@ class NotificationIdentityImageCoverageTest {
     /** An unchanged snapshot is re-read under the publication lock before only reporting use of the shortcut. */
     @Test
     fun unchangedSnapshotIsReReadUnderTheLockBeforeOnlyReportingUse() {
-        val publish = source("LocalNotificationPresenter.kt").functionBody("publishConversationShortcut")
-        val report = publish.indexOf("reportShortcutUsed(")
-        val lock = publish.lastIndexOf("synchronized(UserEventNotificationGroup.mutationLock)", report)
-        val reRead = publish.lastIndexOf("shortcutSnapshots[shortcutId] == snapshot", report)
+        val presenter = source("LocalNotificationPresenter.kt")
+        val publish = presenter.functionBody("publishConversationShortcut")
+        assertTrue("an unchanged snapshot goes through the locked reuse", "reuseCachedShortcut(" in publish)
+        // The helper is expression-bodied, so read its whole declaration, lock call included.
+        val start = presenter.indexOf("private fun reuseCachedShortcut(")
+        val body = presenter.functionBody("reuseCachedShortcut")
+        val reuse = presenter.substring(start, presenter.indexOf(body, start) + body.length)
+        val report = reuse.indexOf("reportShortcutUsed(")
+        val lock = reuse.lastIndexOf("synchronized(UserEventNotificationGroup.mutationLock)", report)
+        val reRead = reuse.lastIndexOf("shortcutSnapshots[shortcutId] == snapshot", report)
         assertTrue("the use report re-reads the snapshot inside the lock", lock in 0 until reRead)
     }
 

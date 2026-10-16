@@ -46,6 +46,7 @@ class NotificationIdentityShortcutBeforePostTest {
     fun setUp() {
         manager.cancelAll()
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
+        InFlightConversationShortcuts.clearForTests()
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
 
@@ -113,6 +114,37 @@ class NotificationIdentityShortcutBeforePostTest {
 
         assertEquals(listOf("shortcut", "post", "shortcut", "post"), recorder.events)
         assertEquals(listOf(shortcutId), ShortcutManagerCompat.getDynamicShortcuts(context).map { it.id })
+    }
+
+    /**
+     * A shortcut another publisher removed while the presenter still caches its snapshot, as a Direct Share refresh
+     * can, is published again before the next card instead of that card naming a missing shortcut.
+     */
+    @Test
+    fun removedShortcutIsPublishedAgainDespiteACachedSnapshot() {
+        val recorder = Recorder()
+        val presenter = presenter(recorder)
+        val picture = solid(Color.BLUE)
+        post(presenter, update(isDm = true), picture = picture)
+        manager.cancelAll()
+        val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(shortcutId))
+
+        post(presenter, update(isDm = true, messageIdHex = "after-removal"), picture = picture)
+
+        assertEquals(listOf("shortcut", "post", "shortcut", "post"), recorder.events)
+        assertEquals(listOf(shortcutId), ShortcutManagerCompat.getDynamicShortcuts(context).map { it.id })
+    }
+
+    /** The shortcut published for a card is held while that card is written, and released once it is. */
+    @Test
+    fun publishedShortcutIsHeldUntilItsCardIsWritten() {
+        val recorder = Recorder()
+        post(presenter(recorder), update(isDm = true), picture = solid(Color.BLUE))
+
+        val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        assertEquals(listOf(setOf(shortcutId)), recorder.heldAtPost)
+        assertTrue(InFlightConversationShortcuts.ids().isEmpty())
     }
 
     /** Forgetting one conversation leaves another conversation's snapshot, so that one is not published again. */
@@ -218,6 +250,7 @@ class NotificationIdentityShortcutBeforePostTest {
         val events = mutableListOf<String>()
         val shortcuts = mutableListOf<ShortcutInfoCompat>()
         val posts = mutableListOf<Notification>()
+        val heldAtPost = mutableListOf<Set<String>>()
     }
 
     /** A presenter whose shortcut and card writes go to [recorder] and then to the platform. */
@@ -237,6 +270,7 @@ class NotificationIdentityShortcutBeforePostTest {
             notificationPoster = { notificationManager, tag, id, notification ->
                 recorder.events += "post"
                 recorder.posts += notification
+                recorder.heldAtPost += InFlightConversationShortcuts.ids()
                 notificationManager.notify(tag, id, notification)
             },
             cachedAvatarBitmap = { null },

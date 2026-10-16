@@ -146,6 +146,10 @@ class LocalNotificationPresenter(
     private val emojiArtworkTimeoutMs: Long = NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS,
     // First argument is opaque account scope, never the local account label stored in a system payload.
     private val contactAvatarOverride: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
+    // The platform's current dynamic shortcut ids, read before trusting a cached publication snapshot.
+    private val dynamicShortcutIds: () -> Set<String> = {
+        ShortcutManagerCompat.getDynamicShortcuts(context).mapTo(mutableSetOf()) { it.id }
+    },
     // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
@@ -977,11 +981,12 @@ class LocalNotificationPresenter(
                     // #3311: Android classifies a card as a conversation only when its shortcut already exists, so the
                     // identity shortcut is published from the pictures already in hand, with no network wait, before
                     // the one first post. Redacted and hidden-preview posts keep only the generic shortcut.
-                    messagingPost?.takeIf { !redactContent && previewToken.allowed }?.let { messaging ->
-                        publishShortcutBeforePost(update, notificationContent, messaging, directShareEligible) {
-                            profileAllowsPost() && showGenerationAllowsPost()
+                    val heldShortcutId =
+                        messagingPost?.takeIf { !redactContent && previewToken.allowed }?.let { messaging ->
+                            publishShortcutBeforePost(update, notificationContent, messaging, directShareEligible) {
+                                profileAllowsPost() && showGenerationAllowsPost()
+                            }
                         }
-                    }
 
                     // Builds under the card lock, so the quiet flags see the card the platform will update.
                     val buildSettled = { afterOwnCancel: Boolean ->
@@ -1306,6 +1311,8 @@ class LocalNotificationPresenter(
                                 }
                             }
                         }
+                    // The card is written or abandoned, so a Direct Share refresh may now judge it as a live card.
+                    heldShortcutId?.let(InFlightConversationShortcuts::release)
                     if (!posted) return@withRegisteredShow false
                     messagingPost?.takeUnless { redactContent }?.let { messaging ->
                         dispatchMessagingEnrichment(
@@ -1340,7 +1347,9 @@ class LocalNotificationPresenter(
      * Publishes the conversation's identity shortcut before the first post (#3311), so even a brand-new
      * conversation's first card gets Android's conversation layout and picture without a second write. It reuses the
      * resolved pictures or the monogram and never waits on the network. An unchanged snapshot costs nothing, and a
-     * failed publication is contained so the card still posts through the existing fallback.
+     * failed publication is contained so the card still posts through the existing fallback. The published shortcut
+     * is held in [InFlightConversationShortcuts] until the caller releases it after that write, so a Direct Share
+     * refresh in between cannot delete it. Returns the held shortcut id, or null when nothing was published or held.
      */
     private suspend fun publishShortcutBeforePost(
         update: NotificationUpdateFfi,
@@ -1348,9 +1357,9 @@ class LocalNotificationPresenter(
         messaging: MessagingPostContext,
         directShareEligible: Boolean,
         isPublishAllowed: () -> Boolean,
-    ) {
-        val shortcutId = messaging.shortcutId ?: return
-        withContext(Dispatchers.Default) {
+    ): String? {
+        val shortcutId = messaging.shortcutId ?: return null
+        return withContext(Dispatchers.Default) {
             publishConversationShortcut(
                 update = update,
                 content = content,
@@ -1363,8 +1372,9 @@ class LocalNotificationPresenter(
                 sender = messaging.sender,
                 directShareEligible = directShareEligible,
                 isPublishAllowed = isPublishAllowed,
+                holdForPost = true,
             )
-        }
+        }.takeIf { it }?.let { shortcutId }
     }
 
     private suspend fun dispatchMessagingEnrichment(
@@ -2534,7 +2544,11 @@ class LocalNotificationPresenter(
     /**
      * Revalidates account-private icon overrides at the serialized shortcut write while retaining route and
      * preview ownership. An unchanged snapshot only reports the shortcut used. A changed one, such as a picture
-     * that arrived after the post, is republished and reported used once more.
+     * that arrived after the post, is republished and reported used once more. A cached snapshot counts as published
+     * only while the platform still lists the shortcut, so a dropped push or a shortcut another publisher removed is
+     * published again instead of leaving every later card naming a missing shortcut. With [holdForPost] the
+     * published shortcut is held in [InFlightConversationShortcuts], under the same lock as the write, for the
+     * caller's coming card write. Returns whether it was held.
      */
     @Suppress("LongMethod") // One serialized platform write retains its alert, routing and privacy snapshot.
     private fun publishConversationShortcut(
@@ -2549,7 +2563,8 @@ class LocalNotificationPresenter(
         sender: Person,
         directShareEligible: Boolean,
         isPublishAllowed: () -> Boolean,
-    ) {
+        holdForPost: Boolean = false,
+    ): Boolean =
         runCatching {
             val (ownedConversationAvatar, ownedSenderAvatar, ownedSender) =
                 ownedShortcutAvatars(update, conversationAvatarBitmap, senderAvatarBitmap, sender)
@@ -2562,7 +2577,7 @@ class LocalNotificationPresenter(
                         ?.longLabel
                         ?.toString()
             val title = preferredConversationShortcutTitle(candidateTitle, existingTitle)
-            val accountScope = conversationShortcutAccountScope(update.accountRef) ?: return
+            val accountScope = conversationShortcutAccountScope(update.accountRef) ?: return false
             val snapshot =
                 ConversationShortcutSnapshot(
                     shortcutId = shortcutId,
@@ -2581,17 +2596,7 @@ class LocalNotificationPresenter(
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
             if (shortcutSnapshots[shortcutId] == snapshot) {
-                // Re-read under the lock: a local removal may have forgotten the snapshot after the check above,
-                // and then the shortcut must be published again rather than only reported as used.
-                val stillPublished =
-                    synchronized(UserEventNotificationGroup.mutationLock) {
-                        (shortcutSnapshots[shortcutId] == snapshot).also { published ->
-                            if (published && isPublishAllowed()) {
-                                ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
-                            }
-                        }
-                    }
-                if (stillPublished) return
+                reuseCachedShortcut(shortcutId, snapshot, isPublishAllowed, holdForPost)?.let { return it }
             }
             val intent = conversationShortcutOpenIntent(update, content)
             val shortcut =
@@ -2629,12 +2634,40 @@ class LocalNotificationPresenter(
                     shortcutPublisher(currentShortcut)
                     shortcutSnapshots[shortcutId] = snapshot
                     ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+                    if (holdForPost) InFlightConversationShortcuts.hold(shortcutId)
+                    holdForPost
+                } else {
+                    false
                 }
             }
         }.onFailure {
             notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
+        }.getOrDefault(false)
+
+    /**
+     * Reuses an unchanged cached publication. Re-read under the lock: a local removal may have forgotten the snapshot
+     * after the caller's check, or the platform may have lost the shortcut, and then it must be published again rather
+     * than only reported used. Returns whether the reused shortcut was held, or null when it must be republished.
+     */
+    private fun reuseCachedShortcut(
+        shortcutId: String,
+        snapshot: ConversationShortcutSnapshot,
+        isPublishAllowed: () -> Boolean,
+        holdForPost: Boolean,
+    ): Boolean? =
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            val published = shortcutSnapshots[shortcutId] == snapshot && shortcutId in dynamicShortcutIds()
+            if (!published) {
+                shortcutSnapshots.remove(shortcutId, snapshot)
+                null
+            } else if (isPublishAllowed()) {
+                ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+                if (holdForPost) InFlightConversationShortcuts.hold(shortcutId)
+                holdForPost
+            } else {
+                false
+            }
         }
-    }
 
     private fun conversationShortcutOpenIntent(
         update: NotificationUpdateFfi,
@@ -2678,17 +2711,22 @@ class LocalNotificationPresenter(
         return builder.build()
     }
 
+    /**
+     * Makes room for [shortcutId] under the platform's per-activity cap, which counts every dynamic shortcut and every
+     * manifest shortcut, by removing the least recently used app-owned conversation shortcuts.
+     */
     private fun pruneConversationShortcutsBeforePublish(shortcutId: String) {
         val maxShortcuts = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context)
         if (maxShortcuts <= 0) return
+        val dynamicIds = dynamicShortcutIds()
+        val manifestCount =
+            runCatching {
+                ShortcutManagerCompat.getShortcuts(context, ShortcutManagerCompat.FLAG_MATCH_MANIFEST).size
+            }.getOrDefault(0)
+        val removeCount = conversationShortcutPruneCount(dynamicIds, manifestCount, maxShortcuts, shortcutId)
+        if (removeCount <= 0) return
         val existingConversationShortcutIds =
-            ShortcutManagerCompat
-                .getDynamicShortcuts(context)
-                .map { it.id }
-                .filter { it.startsWith(CONVERSATION_SHORTCUT_PREFIX) }
-                .toSet()
-        if (shortcutId in existingConversationShortcutIds || existingConversationShortcutIds.size < maxShortcuts) return
-        val removeCount = existingConversationShortcutIds.size - maxShortcuts + 1
+            dynamicIds.filterTo(mutableSetOf()) { it.startsWith(CONVERSATION_SHORTCUT_PREFIX) }
         val idsToRemove =
             conversationShortcutRemovalOrder(existingConversationShortcutIds, shortcutLastUsed, shortcutId)
                 .take(removeCount)

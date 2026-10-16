@@ -121,6 +121,21 @@ private fun CharSequence.codePointCount(): Int {
     return value.codePointCount(0, value.length)
 }
 
+/**
+ * How many conversation shortcuts must go before [shortcutId] can be published, counting every dynamic shortcut in
+ * [dynamicShortcutIds] and the [manifestShortcutCount] manifest shortcuts against the per-activity [maxShortcuts] cap.
+ * Republishing an existing id needs no room.
+ */
+internal fun conversationShortcutPruneCount(
+    dynamicShortcutIds: Set<String>,
+    manifestShortcutCount: Int,
+    maxShortcuts: Int,
+    shortcutId: String,
+): Int {
+    if (shortcutId in dynamicShortcutIds) return 0
+    return (dynamicShortcutIds.size + manifestShortcutCount - maxShortcuts + 1).coerceAtLeast(0)
+}
+
 internal fun conversationShortcutRemovalOrder(
     existingShortcutIds: Set<String>,
     lastUsed: Map<String, Long>,
