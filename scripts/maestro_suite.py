@@ -3,6 +3,7 @@
 import argparse
 from collections import Counter
 import json
+import math
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
@@ -100,27 +101,45 @@ def report(destination, maestro_exit):
     """Missing, skipped, duplicated or unexpected cases cannot be reported as passing."""
     reports = Path(destination)
     expected = json.loads((reports / 'suite-manifest.json').read_text())
-    results = list(ET.parse(reports / 'junit.xml').getroot().iter('testcase'))
+    discovery_error = None
+    try:
+        results = list(ET.parse(reports / 'junit.xml').getroot().iter('testcase'))
+    except (OSError, ET.ParseError) as error:
+        results = []
+        discovery_error = type(error).__name__
     names = [case.get('name') for case in results]
-    if Counter(names) != Counter(case['name'] for case in expected['cases']):
-        raise ValueError('JUnit case discovery differs from the selected suite')
+    selected = Counter(case['name'] for case in expected['cases'])
+    observed = Counter(names)
+    discovery_matches = not discovery_error and observed == selected
     controls = {case['name'] for case in expected['cases'] if case['negative']}
     cases = []
     for case in results:
         problems = [item for item in case if item.tag in ('failure', 'error', 'skipped')]
         control = case.get('name') in controls
         deliberate = control and len(problems) == 1 and problems[0].tag == 'failure' and NEGATIVE_ASSERTION in ''.join(problems[0].itertext())
-        cases.append({'name': case.get('name'), 'seconds': float(case.get('time', '0')),
-                      'passed': not problems and case.get('status') == 'SUCCESS', 'deliberate_failure': deliberate})
+        try:
+            seconds = float(case.get('time', '0'))
+        except (TypeError, ValueError):
+            seconds = None
+        duration_valid = seconds is not None and math.isfinite(seconds) and seconds >= 0
+        cases.append({'name': case.get('name'), 'seconds': seconds if duration_valid else None,
+                      'passed': not problems and case.get('status') == 'SUCCESS' and duration_valid,
+                      'deliberate_failure': deliberate and duration_valid})
     positives_pass = all(case['passed'] for case in cases if case['name'] not in controls)
-    controls_match = all(case['deliberate_failure'] for case in cases if case['name'] in controls)
+    actual_controls = [case for case in cases if case['name'] in controls]
+    controls_match = len(actual_controls) == len(controls) and all(case['deliberate_failure'] for case in actual_controls)
     # GNU timeout uses 124/137; these must never certify the control.
     exit_matches = maestro_exit == 1 if controls else maestro_exit == 0
     summary = {'suite': expected['suite'], 'positive_count': expected['positive_count'],
-               'positive_passed': sum(case['passed'] for case in cases if case['name'] not in controls),
+               'positive_passed': sum(case['passed'] for case in cases
+                                      if case['name'] in selected and case['name'] not in controls
+                                      and observed[case['name']] == 1),
                'negative_control_verified': bool(controls) and controls_match,
-               'evidence_complete': positives_pass and controls_match and exit_matches,
-               'maestro_exit': maestro_exit, 'cases': cases}
+               'evidence_complete': bool(discovery_matches) and positives_pass and controls_match and exit_matches,
+               'maestro_exit': maestro_exit, 'cases': cases,
+               'missing_cases': list((selected - observed).elements()),
+               'unexpected_cases': list((observed - selected).elements()),
+               'discovery_error': discovery_error}
     (reports / 'suite-results.json').write_text(json.dumps(summary, indent=2) + '\n')
     if not summary['evidence_complete']:
         raise ValueError('Selected journeys or deliberate assertion proof failed; inspect JUnit/debug output')

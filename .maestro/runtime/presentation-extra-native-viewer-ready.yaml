@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-viewer-ready
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture viewer 0.png
+- back
+- assertVisible:
+    id: presentation.complete

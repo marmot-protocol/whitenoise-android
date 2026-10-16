@@ -30,7 +30,8 @@ import kotlin.math.roundToLong
  * MediaViewerFrame and VideoViewerPage's own ExoPlayer and PlayerView — plays deterministic edge-marked clips from
  * local assets. Every edge of the portrait, landscape and rotation-tagged frames must land inside the media body,
  * clear of the chrome, in portrait and landscape windows. Media3's time bar, times and play/pause must sit inside the
- * safe area and above Share/Forward. A real time-bar drag seeks without paging while a picture drag still pages, one
+ * safe area and above Share/Forward; short landscape windows keep Media3's compact time bar and play/pause.
+ * A real time-bar drag seeks without paging while a picture drag still pages, one
  * tap hides and restores the controls with the chrome, and simulated cutouts and an active shell transport never
  * cover the controls. Edge positions come from UiAutomation screenshots, since SurfaceView video is absent from
  * Compose captures, and touches go through the platform input pipeline.
@@ -72,7 +73,9 @@ class MediaViewerVideoControlsAndroidTest {
     @Test
     fun landscapeWindowShowsEveryEdgeOfEveryClip() {
         requestOrientation(landscape = true)
-        EdgeClip.entries.forEach { assertClipFitsWithChromeShownAndHidden(it, "landscape") }
+        EdgeClip.entries.forEach {
+            assertClipFitsWithChromeShownAndHidden(it, "landscape", allowCompactHeight = true)
+        }
     }
 
     /**
@@ -131,7 +134,11 @@ class MediaViewerVideoControlsAndroidTest {
                 navigationBars = Insets.of(0, 0, dp(LANDSCAPE_NAVIGATION_DP), dp(LANDSCAPE_GESTURE_DP)),
                 cutout = Insets.of(dp(LANDSCAPE_CUTOUT_DP), 0, 0, 0),
             )
-        assertClipFitsWithChromeShownAndHidden(EdgeClip.Landscape, "simulated landscape cutout")
+        assertClipFitsWithChromeShownAndHidden(
+            EdgeClip.Landscape,
+            "simulated landscape cutout",
+            allowCompactHeight = true,
+        )
     }
 
     /**
@@ -152,11 +159,12 @@ class MediaViewerVideoControlsAndroidTest {
     private fun assertClipFitsWithChromeShownAndHidden(
         clip: EdgeClip,
         window: String,
+        allowCompactHeight: Boolean = false,
     ) {
         val label = "$window ${clip.name}"
         val shown = fixture.open(EdgeClipScenario(listOf(clip)))
         shown.assertBodyInsideTheSafeSides("$label, chrome shown")
-        shown.assertControlsClear("$label, chrome shown")
+        shown.assertControlsClear("$label, chrome shown", shown.requiredControls(label, allowCompactHeight))
         assertFrameFits(clip, "$label, chrome shown")
 
         fixture.tapPicture(shown)
@@ -167,13 +175,13 @@ class MediaViewerVideoControlsAndroidTest {
 
         fixture.tapPicture(hidden)
         fixture.awaitControllerAndChrome(visible = true)
-        fixture.geometry().assertControlsClear("$label, chrome restored")
+        val restored = fixture.geometry()
+        restored.assertControlsClear("$label, chrome restored", restored.requiredControls(label, allowCompactHeight))
     }
 
     /**
-     * Compares the viewer with and without the shell transport and asserts the strip covers nothing. If the strip
-     * leaves the body too short for Media3's full layout, its minimal layout must still keep the time bar and
-     * play/pause.
+     * Compares the viewer with and without the shell transport and asserts the strip covers nothing. Media3 may drop
+     * its time row only when the strip shortened the body, and must keep the time bar and play/pause.
      */
     private fun assertTransportLeavesTheViewerClear(
         clip: EdgeClip,
@@ -193,7 +201,16 @@ class MediaViewerVideoControlsAndroidTest {
             actual = plainChrome.height() - sharedChrome.height(),
             tolerance = INSET_TOLERANCE_PX,
         )
-        shared.assertControlsClear(label)
+        // The strip shortens the media body. In a landscape phone window that leaves Media3 too little height for its
+        // time row, which it drops while keeping the time bar and play/pause, as on any short window.
+        if (!shared.hasTimeLabels) {
+            assertTrue(
+                "$label: Media3 dropped its time row although the transport left the body ${shared.body} as tall as " +
+                    "${plain.body}",
+                shared.body.height() < plain.body.height(),
+            )
+        }
+        shared.assertControlsClear(label, shared.requiredControls(label, allowCompactHeight = true))
         assertFrameFits(clip, label)
     }
 
@@ -249,15 +266,40 @@ class MediaViewerVideoControlsAndroidTest {
     private fun dp(value: Int): Int = (value * context.resources.displayMetrics.density).roundToInt()
 }
 
+private val ViewerGeometry.hasTimeLabels: Boolean
+    get() = ELAPSED_TIME in controls && TOTAL_TIME in controls
+
+/** Accepts missing time text only in Media3's observed minimal layout with a measured short controller. */
+private fun ViewerGeometry.requiredControls(
+    label: String,
+    allowCompactHeight: Boolean,
+): Collection<String> {
+    Log.i(
+        TAG,
+        "$label: minimalVisible=$minimalControlsVisible timeLabels=$hasTimeLabels " +
+            "controllerHeight=$controllerContentHeight fullHeight=$fullControllerHeight",
+    )
+    if (hasTimeLabels) return ALL_CONTROLS
+    assertTrue("$label: missing time labels require Media3's minimal controls", minimalControlsVisible)
+    assertTrue("$label: this case requires the full Media3 time row", allowCompactHeight)
+    assertTrue(
+        "$label: compact controls require a short controller: $controllerContentHeight <= $fullControllerHeight",
+        controllerContentHeight > 0 && fullControllerHeight > 0 && controllerContentHeight <= fullControllerHeight,
+    )
+    assertTrue(
+        "$label: minimal layout must hide both time labels",
+        ELAPSED_TIME !in controls && TOTAL_TIME !in controls,
+    )
+    return ESSENTIAL_CONTROLS
+}
+
 /**
  * Asserts the Media3 [required] controls are shown inside the media body and the safe area, below the top chrome or
- * shell transport and above Share/Forward. A body too small for Media3's full layout, such as a landscape phone
- * window or one shortened by the shell transport, gets Media3's minimal layout. That layout drops the time row by
- * design, so only the time bar and play/pause are then required, and only while Media3 itself reports it.
+ * shell transport and above Share/Forward.
  */
 private fun ViewerGeometry.assertControlsClear(
     label: String,
-    required: Collection<String> = if (minimalLayout) ESSENTIAL_CONTROLS else ALL_CONTROLS,
+    required: Collection<String> = ALL_CONTROLS,
 ) {
     assertTrue("$label: Media3 controls must be showing", controllerVisible)
     val ceiling = listOfNotNull(topChrome?.bottom, transport?.bottom, body.top).max()

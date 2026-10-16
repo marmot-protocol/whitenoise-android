@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-tts-trust-proceed
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: External text-to-speech engine
+- tapOn: Speak anyway
+- assertVisible:
+    id: presentation.complete

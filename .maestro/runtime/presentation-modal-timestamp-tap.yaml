@@ -1,0 +1,31 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-timestamp-tap
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    id: modal.timestamp.text
+- assertVisible:
+    id: timestamp.disclosure
+- assertVisible:
+    text: (?s).*2027.*<t:1800000000:F>.*
+- tapOn:
+    text: Dismiss
+- assertNotVisible:
+    id: timestamp.disclosure
+- tapOn:
+    id: modal.timestamp.text
+- assertVisible:
+    id: timestamp.disclosure
+- back
+- assertNotVisible:
+    id: timestamp.disclosure
+- tapOn:
+    id: modal.timestamp.text
+- assertVisible:
+    id: timestamp.disclosure
+- tapOn:
+    text: Dismiss
+- tapOn:
+    text: Finish disclosure check
+- assertVisible:
+    id: presentation.complete

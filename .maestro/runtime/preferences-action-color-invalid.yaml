@@ -1,0 +1,109 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-action-color-invalid
+---
+- runFlow: ../fixtures/open-action-color.yaml
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- assertVisible:
+    id: color.hex
+    text: ^#171717$
+- tapOn:
+    id: color.hex
+- eraseText: 100
+- assertNotVisible:
+    id: color.hex
+    text: '^\#171717$'
+- inputText: '12'
+- assertVisible:
+    id: color.hex
+    text: ^12$
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: 'Enter six hexadecimal digits, such as #1D4ED8.'
+    direction: DOWN
+- assertVisible: 'Enter six hexadecimal digits, such as #1D4ED8.'
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- tapOn:
+    id: color.hex
+- eraseText: 100
+- assertNotVisible:
+    id: color.hex
+    text: '^12$'
+- inputText: '1234567'
+- assertVisible:
+    id: color.hex
+    text: ^1234567$
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: 'Enter six hexadecimal digits, such as #1D4ED8.'
+    direction: DOWN
+- assertVisible: 'Enter six hexadecimal digits, such as #1D4ED8.'
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- tapOn:
+    id: color.hex
+- eraseText: 100
+- assertNotVisible:
+    id: color.hex
+    text: '^1234567$'
+- inputText: GGGGGG
+- assertVisible:
+    id: color.hex
+    text: ^GGGGGG$
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: 'Enter six hexadecimal digits, such as #1D4ED8.'
+    direction: DOWN
+- assertVisible: 'Enter six hexadecimal digits, such as #1D4ED8.'
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- tapOn:
+    id: action_color.save
+- assertVisible:
+    id: action_color.controls
+- tapOn:
+    id: color.hex
+- eraseText: 100
+- assertNotVisible:
+    id: color.hex
+    text: '^GGGGGG$'
+- inputText: '#12ab34'
+- assertVisible:
+    id: color.hex
+    text: ^#12ab34$
+- hideKeyboard
+- assertNotVisible: 'Enter six hexadecimal digits, such as #1D4ED8.'
+- assertVisible:
+    id: action_color.save
+    enabled: true
+- back
+- assertVisible:
+    id: appearance.theme.group
+- scrollUntilVisible:
+    element:
+      text: Action color
+    direction: DOWN
+- tapOn: Action color
+- scrollUntilVisible:
+    element:
+      id: color.hex
+    direction: DOWN
+- assertVisible:
+    id: color.hex
+- assertVisible:
+    id: color.hex
+    text: ^#171717$
+- assertVisible:
+    id: action_color.save
+    enabled: false
+- back
+- assertVisible:
+    id: appearance.theme.group

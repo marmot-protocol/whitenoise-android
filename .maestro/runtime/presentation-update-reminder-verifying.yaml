@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-update-reminder-verifying
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: appUpdate.dialog
+- assertNotVisible:
+    id: appUpdate.remindLater
+- tapOn:
+    id: appUpdate.cancel
+- assertVisible:
+    id: presentation.complete

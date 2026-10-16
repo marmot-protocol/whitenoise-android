@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-nostr-image
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn: View image
+- assertVisible: View image
+- tapOn: View image
+- assertVisible: Image
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

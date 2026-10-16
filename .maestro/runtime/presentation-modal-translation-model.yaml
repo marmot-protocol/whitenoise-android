@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-translation-model
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: translation.form
+- assertVisible:
+    id: translation.confirm
+- assertVisible: "Install the source language pack in the engine[.]"
+- assertVisible:
+    id: translation.engine
+- assertVisible: Install from GitHub
+- back
+- assertVisible:
+    id: presentation.complete

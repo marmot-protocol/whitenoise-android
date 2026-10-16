@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-update-confirm
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Download update?
+- assertVisible:
+    id: appUpdate.download
+    enabled: true
+- tapOn:
+    id: appUpdate.download
+- assertVisible:
+    id: presentation.complete

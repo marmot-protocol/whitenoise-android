@@ -353,7 +353,7 @@ class MaestroWorkflowTest(unittest.TestCase):
     def test_real_journey_and_negative_control_keep_assertions(self):
         """Check real UI assertions, offline installation and observable failure control."""
         flow = (ROOT / '.maestro/onboarding.yaml').read_text()
-        self.assertIn('clearState: true', flow)
+        self.assertIn('clearState: false', flow)
         self.assertIn('all: deny', flow)
         self.assertEqual(flow.count('- assertVisible: "Sign Up"'), 2)
         self.assertIn('- assertVisible: "Private key"', flow)
@@ -361,7 +361,9 @@ class MaestroWorkflowTest(unittest.TestCase):
         self.assertNotIn('inputText', flow)
         runner = (ROOT / 'scripts/run-maestro-pilot.sh').read_text()
         self.assertIn('MAESTRO_NEGATIVE_CONTROL_IMPOSSIBLE_3141', runner)
-        self.assertNotIn('|| true', runner.split('maestro --device', 1)[1])
+        entry = 'timeout --signal=TERM --kill-after=30s 10m python3 scripts/maestro_offline_batches.py'
+        self.assertIn(entry, runner)
+        self.assertNotIn('|| true', runner.split(entry, 1)[1])
         self.assertLess(runner.index('maestro_apk.py offline'), runner.index('install -r -t'))
 
     def test_pilot_retention_cannot_fail_required_baseline_verification(self):

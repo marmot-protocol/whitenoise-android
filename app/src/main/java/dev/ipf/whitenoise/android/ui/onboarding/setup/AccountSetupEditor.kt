@@ -90,7 +90,7 @@ internal fun SetupEditorContent(
                     ),
                 )
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("setup.editor.reads"),
         )
         if (editor.action == OnboardingActionFfi.EDIT_RELAYS && editor.step == OnboardingStepFfi.RELAYS) {
             WhiteNoiseTextField(
@@ -98,7 +98,7 @@ internal fun SetupEditorContent(
                 enabled = !busy && editor.canEditRelayDeclaration,
                 lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 1, maxHeightInLines = 6),
                 label = { Text(stringResource(R.string.setup_write_list)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("setup.editor.writes"),
             )
         }
     }

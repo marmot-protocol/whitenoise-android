@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-rejoin-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Review invitation from Fixture inviter · epoch 9
+- tapOn: Review invitation from Fixture inviter · epoch 9
+- assertVisible:
+    text: Rejoin group\?
+- assertVisible:
+    text: Only rejoin if you trust this invitation.*
+- back
+- assertVisible:
+    text: Review invitation from Fixture inviter · epoch 9
+- assertNotVisible:
+    text: Rejoin group\?
+- tapOn: Review invitation from Fixture inviter · epoch 9
+- assertVisible:
+    text: Rejoin group\?
+- back
+- assertVisible:
+    text: Review invitation from Fixture inviter · epoch 9
+- assertNotVisible:
+    text: Rejoin group\?
+- back

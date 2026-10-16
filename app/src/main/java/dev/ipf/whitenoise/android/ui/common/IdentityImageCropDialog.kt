@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.IdentityImageCrop
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlin.math.roundToInt
 
 /** Carries a crop through activity recreation, which otherwise resets the framing mid-choice. */
@@ -104,7 +105,8 @@ internal fun IdentityImageCropDialog(
                     Modifier
                         .fillMaxSize()
                         .windowInsetsPadding(WindowInsets.safeDrawing)
-                        .testTag("identity_crop.dialog"),
+                        .testTag("identity_crop.dialog")
+                        .exposePerformanceTestTags(),
             ) {
                 IdentityImageCropTopBar(onDismiss = onDismiss, onConfirm = { onConfirm(crop) })
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {

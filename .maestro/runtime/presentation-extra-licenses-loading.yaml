@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-licenses-loading
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Open source licenses
+- assertNotVisible:
+    id: licenses.list
+- assertNotVisible:
+    id: licenses.text
+- assertNotVisible: Retry
+- back
+- assertVisible:
+    id: presentation.complete

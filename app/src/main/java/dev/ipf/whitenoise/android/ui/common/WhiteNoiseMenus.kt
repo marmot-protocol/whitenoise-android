@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /**
@@ -33,7 +34,7 @@ fun WhiteNoiseDropdownMenu(
         scrollState = menuScrollState,
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+        modifier = modifier.exposePerformanceTestTags().scrollEdgeFade(menuScrollState, stableRenderTarget = true),
         shape = MaterialTheme.shapes.medium,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         border = amoledOutlineBorder(),

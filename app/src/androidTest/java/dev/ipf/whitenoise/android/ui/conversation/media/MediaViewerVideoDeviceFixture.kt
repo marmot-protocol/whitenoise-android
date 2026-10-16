@@ -5,6 +5,7 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
+import android.view.ViewGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -50,8 +51,7 @@ internal data class EdgeClipScenario(
 /**
  * Screen-space layout of the open viewer, measured from its real Compose nodes and Media3 views. [safe] is the
  * window less the insets the viewer window was given, [video] is Media3's aspect-fitted content frame and
- * [controls] holds only the Media3 controls currently shown. [minimalLayout] is true while Media3 has chosen its own
- * minimal layout for a body too small for the full one, which replaces the time row with its minimal controls.
+ * [controls] holds only the Media3 controls currently shown.
  */
 internal data class ViewerGeometry(
     val window: Rect,
@@ -62,8 +62,10 @@ internal data class ViewerGeometry(
     val transport: Rect?,
     val video: Rect,
     val controllerVisible: Boolean,
+    val minimalControlsVisible: Boolean,
+    val controllerContentHeight: Int,
+    val fullControllerHeight: Int,
     val controls: Map<String, Rect>,
-    val minimalLayout: Boolean,
 )
 
 /**
@@ -162,6 +164,9 @@ internal class EdgeClipViewerFixture(
         return onMain {
             val window = root.screenRect()
             val view = playerViewIn(root, body) ?: error("No PlayerView fills the media body $body")
+            val controller = requireNotNull(view.findViewById<View>(Media3R.id.exo_controller))
+            val center = requireNotNull(view.findViewById<View>(Media3R.id.exo_center_controls))
+            val bottom = requireNotNull(view.findViewById<View>(Media3R.id.exo_bottom_bar))
             ViewerGeometry(
                 window = window,
                 safe = simulatedInsets?.safeArea(window) ?: window.insetBy(realSafeInsets(root)),
@@ -171,8 +176,13 @@ internal class EdgeClipViewerFixture(
                 transport = transport,
                 video = view.findViewById<View>(Media3R.id.exo_content_frame).screenRect(),
                 controllerVisible = view.isControllerFullyVisible,
+                minimalControlsVisible =
+                    view.findViewById<View>(Media3R.id.exo_minimal_controls)?.visibility == View.VISIBLE,
+                controllerContentHeight = controller.height - controller.paddingTop - controller.paddingBottom,
+                fullControllerHeight =
+                    center.heightWithMargins() - center.paddingTop - center.paddingBottom +
+                        2 * bottom.heightWithMargins(),
                 controls = shownControls(view),
-                minimalLayout = view.findViewById<View>(Media3R.id.exo_minimal_controls)?.isShown == true,
             )
         }
     }
@@ -345,6 +355,12 @@ private fun playerViewIn(
         .descendantPlayerViews()
         .filter { it.isShown }
         .firstOrNull { view -> view.screenRect().let { body.contains(it.centerX(), it.centerY()) } }
+
+/** Measured control height including the layout margins Media3 uses for its compact-height decision. */
+private fun View.heightWithMargins(): Int {
+    val margins = layoutParams as? ViewGroup.MarginLayoutParams
+    return height + (margins?.topMargin ?: 0) + (margins?.bottomMargin ?: 0)
+}
 
 /** Screen bounds of each Media3 control [view] currently shows. */
 private fun shownControls(view: PlayerView): Map<String, Rect> =

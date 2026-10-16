@@ -224,7 +224,7 @@ private val EmojiCodeInput =
 /** Names a picked image; the prefill is its sanitized file name. */
 @Suppress("FunctionNaming")
 @Composable
-private fun CustomEmojiNameDialog(
+internal fun CustomEmojiNameDialog(
     preview: ImageBitmap,
     suggestedCode: String,
     existing: CustomEmojiSet,

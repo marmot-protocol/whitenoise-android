@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-binary
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Maestro complete filename.txt
+- assertVisible: This file doesn’t appear to contain safe text. Open it in another app.
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

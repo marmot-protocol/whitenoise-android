@@ -1,11 +1,11 @@
 appId: dev.ipf.whitenoise.android.dev
 name: signin-qr-denied
 ---
-# Stop the previous foreground process before Android clears its data.
+# The offline runner verifies a fresh data reset before starting this driver.
 - stopApp
 - setOrientation: PORTRAIT
 - launchApp:
-    clearState: true
+    clearState: false
     permissions:
       all: deny
 # Back closes this known optional sheet and records declined sharing choices.

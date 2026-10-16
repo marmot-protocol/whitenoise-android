@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-error
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Account setup
+- assertVisible: Resume checks
+- back
+- assertVisible:
+    id: presentation.complete

@@ -14,6 +14,8 @@ name: groups-notifications-back
     direction: DOWN
 - tapOn: "Sounds & notifications"
 - assertVisible: "Sounds & notifications"
+- assertVisible:
+    id: "conversation-mute-switch-row"
 - back
 - assertVisible:
     id: "chat_info.list"
