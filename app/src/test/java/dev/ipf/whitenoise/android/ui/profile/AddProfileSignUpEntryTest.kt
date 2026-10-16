@@ -21,7 +21,6 @@ import dev.ipf.marmotkit.RelayListFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
-import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshotHandoff
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -243,14 +242,15 @@ class AddProfileSignUpEntryTest {
 
     /** Uses the actual caller dialog and production root route, with a retained Chats handoff for Alice. */
     private fun show(app: WhiteNoiseAppState) {
-        listOf("bootstrapCompleted", "networkNotificationRecoverySuppressed").forEach { name ->
+        app.accountSession.bootstrapCompleted = true
+        listOf("networkNotificationRecoverySuppressed").forEach { name ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField(name)
                 .apply { isAccessible = true }
                 .setBoolean(app, true)
         }
         app.markDefaultNotificationsEnableAttempted()
-        val handoff = field(app, "accountSwitchHandoff") as AccountSwitchLocalSnapshotHandoff
+        val handoff = app.accountSession.handoff
         handoff.publish(
             handoff.beginRequest("alice"),
             AccountSwitchLocalSnapshot(
