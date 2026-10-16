@@ -897,8 +897,8 @@ class LocalNotificationPresenter(
                                         },
                                 )
                             // #3311: every rich card carries its conversation identity picture in the first
-                            // payload, for a direct chat as well as a group, and the long-message text block keeps
-                            // it as its right-hand thumbnail, so the picture never depends on the shortcut alone.
+                            // payload, for a direct chat as well as a group, and the long-message text block carries
+                            // it as its large right-hand picture, so the picture never depends on the shortcut alone.
                             // Redacted cards get none.
                             if (!redactContent) {
                                 builder.setConversationIdentityImage(
@@ -1042,11 +1042,11 @@ class LocalNotificationPresenter(
                                     stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
                                     // Hidden previews rewrite the card as a generic conversation, and only the
                                     // conversation template keeps Android's conversation classification.
-                                    // A long first message keeps the expandable text block so its whole body stays
-                                    // readable (#1901). Android never classifies that template as a conversation, so
-                                    // its identity picture (#3311) shows as the right-hand thumbnail while the left
-                                    // circle shows the app icon. The next message turns the card back into the
-                                    // conversation template, and the picture returns to the conversation circle.
+                                    // A long first message keeps the expandable text block by design, so its whole
+                                    // body stays readable (#1901), and that block carries the identity picture
+                                    // (#3311) as its explicit large picture on the right while app attribution keeps
+                                    // its small system-owned place. The next message turns the card back into the
+                                    // conversation template, which draws the picture in the conversation circle.
                                     if (
                                         shouldUseExpandedSingleMessageStyle(
                                             body = notificationContent.body,
