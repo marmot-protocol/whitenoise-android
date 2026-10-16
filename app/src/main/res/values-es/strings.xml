@@ -161,7 +161,7 @@
     <string name="abandon_identity_chat">Chat: %1$s</string>
     <string name="abandon_identity_group">Grupo: %1$s</string>
     <string name="abandon_identity_account">Tu cuenta: %1$s</string>
-    <string name="chats_abandon_mixed_action">Abandonar los chats en este dispositivo</string>
+    <string name="chats_abandon_action">Abandonar los chats en este dispositivo</string>
     <string name="chats_abandon_dialog_title">¿Abandonar los chats seleccionados en este dispositivo?</string>
     <string name="toast_chat_abandoned">Chat abandonado en este dispositivo.</string>
     <string name="toast_chat_already_abandoned">Este chat ya está abandonado en este dispositivo.</string>

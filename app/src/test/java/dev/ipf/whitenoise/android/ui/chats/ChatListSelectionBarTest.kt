@@ -100,7 +100,7 @@ class ChatListSelectionBarTest {
         var deletes = 0
         var abandons = 0
         var current = true
-        val offered = mutableStateOf<String?>(string(R.string.chats_abandon_mixed_action))
+        val offered = mutableStateOf<String?>(string(R.string.chats_abandon_action))
         composeRule.setContent {
             WhiteNoiseTheme {
                 ChatListSelectionControls(
@@ -133,7 +133,7 @@ class ChatListSelectionBarTest {
                 )
             }
         }
-        val abandon = string(R.string.chats_abandon_mixed_action)
+        val abandon = string(R.string.chats_abandon_action)
         composeRule.onNodeWithContentDescription(abandon).performClick()
         assertEquals(1, abandons)
         assertEquals("abandoning never leaves or deletes", 0, deletes)

@@ -105,10 +105,10 @@ class ChatListSelectionBarScreenshotTest {
         capture(
             "selection_actions_abandon_light",
             departureLabel = R.string.leave_and_delete,
-            abandonLabel = R.string.chats_abandon_mixed_action,
+            abandonLabel = R.string.chats_abandon_action,
         )
 
-    /** The direct-chat abandonment at 200% text in RTL keeps both destructive actions reachable. */
+    /** Several direct chats' abandonment at 200% text in RTL keeps both destructive actions reachable. */
     @Test
     @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
     fun abandonDirectLargeRtl() =
@@ -117,7 +117,7 @@ class ChatListSelectionBarScreenshotTest {
             rtl = true,
             large = true,
             departureLabel = R.string.delete_from_device,
-            abandonLabel = R.string.chat_abandon_action,
+            abandonLabel = R.string.chats_abandon_action,
         )
 
     /** Captures the actual controls with deterministic eligibility and no account content. */

@@ -125,6 +125,24 @@ class GroupAbandonmentDialogScreenshotTest {
         assertEquals(1, confirms)
     }
 
+    /** Several chats always read as abandoning chats, whatever their kinds, while one chat keeps its own wording. */
+    @Test
+    fun severalChatsUsePluralWordingAndOneKeepsItsOwn() {
+        assertEquals(R.string.chats_abandon_action, groupAbandonmentBatchLabel(listOf(false, false)))
+        assertEquals(R.string.chats_abandon_action, groupAbandonmentBatchLabel(listOf(true, true)))
+        assertEquals(R.string.chats_abandon_action, groupAbandonmentBatchLabel(listOf(true, false)))
+        assertEquals(R.string.group_reset_action, groupAbandonmentBatchLabel(listOf(false)))
+        assertEquals(R.string.chat_abandon_action, groupAbandonmentBatchLabel(listOf(true)))
+        val groups = listOf(GROUP, GROUP.copy(groupIdHex = "group-books", conversationTitle = "Book club"))
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) { GroupAbandonmentDialog(groups, onConfirm = {}, onDismiss = {}) }
+        }
+        composeRule.onNodeWithText(app.getString(R.string.chats_abandon_dialog_title)).assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("group.abandon.confirm")
+            .assertTextEquals(app.getString(R.string.chat_abandon_confirm))
+    }
+
     /** The dialog names the action, the exact conversation and the acting account, and Cancel submits nothing. */
     @Test
     fun reviewNamesTheTargetAndCancelSubmitsNothing() {

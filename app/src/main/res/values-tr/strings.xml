@@ -161,7 +161,7 @@
     <string name="abandon_identity_chat">Sohbet: %1$s</string>
     <string name="abandon_identity_group">Grup: %1$s</string>
     <string name="abandon_identity_account">Hesabınız: %1$s</string>
-    <string name="chats_abandon_mixed_action">Sohbetleri bu cihazda bırak</string>
+    <string name="chats_abandon_action">Sohbetleri bu cihazda bırak</string>
     <string name="chats_abandon_dialog_title">Seçili sohbetler bu cihazda bırakılsın mı?</string>
     <string name="toast_chat_abandoned">Sohbet bu cihazda bırakıldı.</string>
     <string name="toast_chat_already_abandoned">Bu sohbet bu cihazda zaten bırakıldı.</string>

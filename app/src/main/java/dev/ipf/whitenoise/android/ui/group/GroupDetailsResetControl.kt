@@ -107,15 +107,14 @@ internal fun groupAbandonmentActionLabel(isDm: Boolean): Int =
     }
 
 /**
- * The bulk label for the same forget: the single-chat wording when every selected chat is a direct chat or every one
- * is a group, and the mixed wording otherwise. [dmFlags] holds each selected chat's direct-chat flag.
+ * The bulk label for the same forget: one selected chat keeps its own direct-chat or group wording, and several chats
+ * always read as abandoning chats, whatever their kinds. [dmFlags] holds each selected chat's direct-chat flag.
  */
 @StringRes
 internal fun groupAbandonmentBatchLabel(dmFlags: Collection<Boolean>): Int =
-    when {
-        dmFlags.all { it } -> R.string.chat_abandon_action
-        dmFlags.none { it } -> R.string.group_reset_action
-        else -> R.string.chats_abandon_mixed_action
+    when (dmFlags.size) {
+        1 -> groupAbandonmentActionLabel(dmFlags.single())
+        else -> R.string.chats_abandon_action
     }
 
 /**
@@ -171,7 +170,7 @@ internal fun GroupAbandonmentDialog(
     onDismiss: () -> Unit,
 ) = GroupAbandonmentReviewDialog(targets, GroupAbandonmentStatus.Review, onConfirm, onDismiss)
 
-/** The review for one or several chats; a single chat keeps its own title and confirm wording. */
+/** The review for one or several chats, where a single chat keeps its own title and confirm wording. */
 @Suppress("FunctionNaming")
 @Composable
 private fun GroupAbandonmentReviewDialog(
@@ -189,10 +188,11 @@ private fun GroupAbandonmentReviewDialog(
             anyDm -> R.string.chat_abandon_dialog_title
             else -> R.string.group_reset_dialog_title
         }
+    // Several chats always confirm as one abandonment, and a single chat keeps its own wording.
     val confirmLabel =
         when {
             failed -> R.string.retry
-            anyDm -> R.string.chat_abandon_confirm
+            targets.size > 1 || anyDm -> R.string.chat_abandon_confirm
             else -> R.string.group_reset_confirm
         }
     WhiteNoiseAlertDialog(

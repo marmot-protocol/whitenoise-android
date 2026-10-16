@@ -223,9 +223,9 @@
         ]
       },
       {
-        "surface": "chats abandon mixed action",
+        "surface": "chats abandon action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.chats_abandon_mixed_action",
+        "anchor": "R.string.chats_abandon_action",
         "test_ids": [
           "CHL-026"
         ]
