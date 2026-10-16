@@ -67,9 +67,11 @@ def verify(report: dict, minimums: dict[str, str], expected_source: str | None =
 
 
 def main() -> int:
+    """Validate current-source security floors before optionally emitting an inventory."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
     parser.add_argument("--policy", type=Path, default=Path("gradle/dependency-security.json"))
+    parser.add_argument("--inventory", type=Path, help="Export separated observed graphs after floor verification")
     args = parser.parse_args()
     try:
         policy = json.loads(args.policy.read_text())
@@ -81,6 +83,12 @@ def main() -> int:
             raise InvalidEvidence("selected dependency evidence missing")
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, timeout=10).strip()
         checked = sum(verify(json.loads(path.read_text()), minimums, source, policy.get("fixed_prerelease_versions", {})) for path in paths)
+        if args.inventory:
+            if __package__:
+                from .dependency_inventory import export_selected
+            else:
+                from dependency_inventory import export_selected
+            export_selected(args.directory, source, args.inventory)
         print(f"Verified {len(paths)} resolved configurations; {checked} security-floor selections")
         return 0
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:

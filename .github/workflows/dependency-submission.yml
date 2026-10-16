@@ -41,6 +41,11 @@ jobs:
         if: success()
         run: python3 scripts/verify_dependency_security.py build/reports/dependency-security
 
+      - name: Export observed dependency inventory
+        if: success()
+        continue-on-error: true
+        run: python3 scripts/verify_dependency_security.py build/reports/dependency-security --inventory build/reports/dependency-security/inventory/selected.json
+
       - name: Retain selected dependency security evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

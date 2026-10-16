@@ -4568,6 +4568,10 @@ internal fun ConversationScreen(
                                             } else {
                                                 null
                                             },
+                                        onReaderSendAccepted = {
+                                            acceptedSendRevealedTranscript = true
+                                            revealSentMessage()
+                                        },
                                         onBack = exitConversation,
                                         mentionCandidates = mentionPicker.candidates,
                                         mentionPickerEnabled = mentionPicker.enabled,

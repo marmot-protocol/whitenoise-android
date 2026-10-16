@@ -385,6 +385,8 @@
     <string name="configure_reactions_guidance">點按表情符號即可替換。</string>
     <string name="reset">重設</string>
     <string name="reaction_slot_description">回應 %1$d，%2$s。點兩下即可替換。</string>
+    <string name="configure_reactions_add">新增回應</string>
+    <string name="configure_reactions_remove">移除回應 %1$d，%2$s</string>
     <string name="emoji_search_hint">搜尋表情符號</string>
     <string name="emoji_search_clear">清除表情符號搜尋</string>
     <string name="emoji_search_no_results">找不到表情符號</string>

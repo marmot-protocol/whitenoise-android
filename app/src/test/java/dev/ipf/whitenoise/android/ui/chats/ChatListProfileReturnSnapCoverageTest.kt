@@ -12,6 +12,7 @@ import java.io.File
  * visible filtered active-list head snapshot used by direct row opens.
  */
 class ChatListProfileReturnSnapCoverageTest {
+    /** Profile opens from the list capture the same filtered, pinned-aware head as direct row opens. */
     @Test
     fun chatListProfileOpenCapturesVisibleFilteredHeadForReturnSnap() {
         val chatsScreen = chatsScreenSource().readText()
@@ -20,7 +21,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val presentProfileBody = chatsScreen.kotlinFunctionBody("presentProfileFromVisibleList")
         assertTrue(
             "chat-list profile capture must use the filtered visible list head",
-            "visibleItems.firstOrNull()?.id" in presentProfileBody,
+            "chatListReturnHead(visibleItems)" in presentProfileBody,
         )
         assertFalse(
             "profile capture must not substitute the unfiltered controller head",
@@ -48,10 +49,49 @@ class ChatListProfileReturnSnapCoverageTest {
         )
         assertTrue(
             "visible filtered head must be forwarded into profile presentation",
-            "visibleHeadId" in onPresentProfileBlock,
+            "presentProfileFromChatList(chatListReturnHeadSnap, visibleHead)" in onPresentProfileBlock,
         )
     }
 
+    /**
+     * Every list-origin open captures the pinned head and the first unpinned row, and the return
+     * effect compares both, so a send promoting a chat beneath unchanged pins still snaps (#3280).
+     */
+    @Test
+    fun listOpensCaptureAndReturnComparesThePinnedAwareHead() {
+        val chatsScreen = chatsScreenSource().readText()
+
+        val directOpenBody = chatsScreen.kotlinFunctionBody("openGroupFromVisibleList")
+        assertTrue(
+            "direct list opens must capture the pinned head and first unpinned row together",
+            "chatListReturnHead(visibleItems)" in directOpenBody,
+        )
+        assertFalse(
+            "direct list opens must not fall back to the absolute first row alone",
+            "visibleItems.firstOrNull()?.id" in directOpenBody,
+        )
+
+        val returnEffect =
+            chatsScreen.requiredSection(
+                start = "LaunchedEffect(conversationReturnHead,",
+                end = "onConversationReturnHeadHandled()",
+            )
+        assertTrue(
+            "the return effect must compare the captured head with the current pinned-aware head",
+            "currentHead = activeReturnHead" in returnEffect &&
+                "headAtConversationOpen = headAtConversationOpen" in returnEffect,
+        )
+        assertTrue(
+            "the current head must be derived from the same filtered visible rows as the capture",
+            "val activeReturnHead = chatListReturnHead(visibleItems).takeIf { ordinaryActiveList }" in chatsScreen,
+        )
+        assertTrue(
+            "a snap must reach the absolute top above the pinned block",
+            "chatListState.scrollToItem(0)" in returnEffect,
+        )
+    }
+
+    /** Row avatar taps reach the profile through the head-capturing path. */
     @Test
     fun chatListRowAvatarUsesProfileCapturePath() {
         val chatsScreen = chatsScreenSource().readText()
@@ -71,6 +111,7 @@ class ChatListProfileReturnSnapCoverageTest {
         )
     }
 
+    /** Dismissal and unrelated navigation clear the captured profile head. */
     @Test
     fun profileSnapshotClearsOnDismissAndUnrelatedNavigation() {
         val mainShell = mainShellSource().readText()
@@ -109,7 +150,7 @@ class ChatListProfileReturnSnapCoverageTest {
         assertTrue(
             "direct list opens must carry visible-head provenance into the prepared-route request",
             "PendingConversationOpen(" in onOpenGroupBlock &&
-                "visibleActiveListHeadId = visibleHeadId" in onOpenGroupBlock,
+                "visibleActiveListHead = visibleHead" in onOpenGroupBlock,
         )
     }
 
