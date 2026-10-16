@@ -53,40 +53,23 @@ internal data class PushWakeAttemptClaim(
  */
 class PushTokenStore(
     private val preferences: SharedPreferences,
-    private val registrationSuppressed: () -> Boolean = { false },
-    private val suppressRegistration: () -> Unit = {},
-    private val cleanupSuppressed: () -> Boolean = { false },
-    private val clearRegistrationSuppression: () -> Unit = {},
+    private val recoveryStatus: () -> PushStorageRecovery = { PushStorageRecovery.Ready },
+    private val retryImport: () -> Unit = {},
 ) {
-    /** Unknown legacy cleanup or a failed durable disable holds every native registration path. */
-    internal fun registrationAllowed(): Boolean =
-        runCatching {
-            synchronized(LOCK) {
-                preferences.all // Resolve lazy migration before inspecting its persisted fence.
-                if (deferredDisables.isNotEmpty()) {
-                    val pending = pendingDisables() + deferredDisables
-                    if (preferences.edit().putStringSet(KEY_PENDING_DISABLES, pending).commit()) {
-                        if (ownsCleanupFence) {
-                            clearRegistrationSuppression()
-                            ownsCleanupFence = false
-                        }
-                        deferredDisables.clear()
-                    }
-                }
-                (!registrationSuppressed()).also { allowed ->
-                    if (!allowed) android.util.Log.w("PushTokenStorage", "registration_held_unknown_cleanup")
-                }
-            }
-        }.getOrDefault(false)
-
-    /** Keep failed native cleanup retryable without making unreadable account data plaintext. */
-    internal fun suppressRegistrationUntilReconciled(account: String) {
+    /** Observes retained storage without interpreting unavailable data as an empty cleanup queue. */
+    internal fun recoveryState(retry: Boolean = false): PushStorageRecovery =
         synchronized(LOCK) {
-            deferredDisables += account
-            ownsCleanupFence = ownsCleanupFence || !cleanupSuppressed()
-            suppressRegistration()
+            try {
+                if (retry) retryImport()
+                preferences.all // Resolve lazy migration before inspecting durable safety state.
+                recoveryStatus()
+            } catch (_: Exception) {
+                PushStorageRecovery.StorageUnavailable
+            }
         }
-    }
+
+    /** Unknown legacy cleanup or an orphaned historical fence holds every native registration path. */
+    internal fun registrationAllowed(): Boolean = recoveryState() == PushStorageRecovery.Ready
 
     /** Returns only a non-blank cached FCM token; absence requires fresh token acquisition. */
     fun lastToken(): String? = preferences.getString(KEY_FCM_TOKEN, null)?.takeIf { it.isNotBlank() }
@@ -382,7 +365,7 @@ class PushTokenStore(
     /** Returns account refs whose failed sign-out disable must be retried before registration is allowed. */
     fun pendingDisables(): Set<String> = preferences.getStringSet(KEY_PENDING_DISABLES, emptySet())?.toSet() ?: emptySet()
 
-    /** Idempotently queues an account's failed native-push disable for the next synchronization. */
+    /** Commits an account-specific disable obligation before sign-out admission, even after a failed prior commit. */
     @SuppressLint("ApplySharedPref")
     fun recordPendingDisable(account: String): Boolean {
         if (account.isBlank()) return false
@@ -409,8 +392,6 @@ class PushTokenStore(
         // Firebase background thread while sign-out uses another instance), so
         // an instance lock would serialize nothing across them. See #167.
         private val LOCK = Any()
-        private val deferredDisables = mutableSetOf<String>()
-        private var ownsCleanupFence = false
         private const val KEYSTORE_ALIAS = "whitenoise.push.tokens.keystore.key"
         private var keyProvider: SecureStoreKeyProvider = AndroidKeystoreSecretKeyProvider(KEYSTORE_ALIAS)
 
@@ -419,8 +400,6 @@ class PushTokenStore(
         internal fun installKeyProvider(provider: SecureStoreKeyProvider?) {
             synchronized(LOCK) {
                 keyProvider = provider ?: AndroidKeystoreSecretKeyProvider(KEYSTORE_ALIAS)
-                deferredDisables.clear()
-                ownsCleanupFence = false
             }
         }
 
@@ -475,13 +454,16 @@ class PushTokenStore(
                 // cleanup or unavailable Keystore fails closed instead of appearing empty.
                 PushTokenStore(
                     secure,
-                    registrationSuppressed = {
-                        safety.getBoolean("migration_unknown", true) || safety.getBoolean("cleanup_unknown", false)
+                    recoveryStatus = {
+                        when {
+                            safety.getBoolean("cleanup_unknown", false) -> PushStorageRecovery.CleanupReconciliationRequired
+                            safety.getBoolean("migration_unknown", true) -> PushStorageRecovery.LegacyImportPending
+                            else -> PushStorageRecovery.Ready
+                        }
                     },
-                    suppressRegistration = { check(safety.edit().putBoolean("cleanup_unknown", true).commit()) },
-                    cleanupSuppressed = { safety.getBoolean("cleanup_unknown", false) },
-                    clearRegistrationSuppression = {
-                        check(safety.edit().putBoolean("cleanup_unknown", false).commit())
+                    retryImport = {
+                        initialized = false
+                        nextImportAttemptMs = 0L
                     },
                 )
             }

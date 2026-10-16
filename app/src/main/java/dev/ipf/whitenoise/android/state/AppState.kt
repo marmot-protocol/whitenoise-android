@@ -146,6 +146,7 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
+import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.PushWakeAdmission
@@ -2113,6 +2114,14 @@ class WhiteNoiseAppState private constructor(
 
     // staleness-exempt: observable relationship version consumed as a Compose key.
     var relationshipRevision by mutableLongStateOf(0L)
+        private set
+
+    /** Presentation only: encrypted/native storage remains the authority for push cleanup admission. */
+    var pushStorageRecovery by mutableStateOf(PushStorageRecovery.Checking)
+        private set
+
+    /** Prevents concurrent user retries without clearing unresolved cleanup or import fences. */
+    var pushStorageRecoveryBusy by mutableStateOf(false)
         private set
 
     var localNotificationSettings by mutableStateOf<NotificationSettingsFfi?>(null)
@@ -4375,13 +4384,21 @@ class WhiteNoiseAppState private constructor(
         if (!isCatchUpKeyCurrent(key)) {
             false
         } else {
-            when (val admission = pushWakeAttemptBudget().reserve()) {
+            val admission =
+                observePushState { pushWakeAttemptBudget().reserve() }
+                    ?: if (trigger == PerformanceTrigger.PUSH_WAKE) {
+                        PushWakeAdmission.Rejected
+                    } else {
+                        // Ordinary foreground/connectivity work is independently bounded and cannot settle an unknown wake.
+                        PushWakeAdmission.Admitted(claim = null)
+                    }
+            when (admission) {
                 PushWakeAdmission.Rejected -> false
                 is PushWakeAdmission.Admitted -> {
                     if (isCatchUpKeyCurrent(key)) {
                         performAdmittedAccountCatchUp(key, trigger, admission.claim)
                     } else {
-                        admission.claim?.let { reserved -> pushWakeAttemptBudget().release(reserved) }
+                        admission.claim?.let { reserved -> observePushState { pushWakeAttemptBudget().release(reserved) } }
                         false
                     }
                 }
@@ -4397,7 +4414,8 @@ class WhiteNoiseAppState private constructor(
         val nativeSucceeded = instrumentedCatchUpAccounts(trigger)
         var settlementSucceeded = nativeSucceeded && isCatchUpKeyCurrent(key)
         if (claim != null) {
-            settlementSucceeded = pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) }
+            settlementSucceeded =
+                observePushState { pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) } } == true
         }
         val succeeded = settlementSucceeded && isCatchUpKeyCurrent(key)
         if (claim != null) {
@@ -4426,7 +4444,9 @@ class WhiteNoiseAppState private constructor(
                     )
                 },
                 onSucceeded = { result ->
-                    result.key?.let { key -> acknowledgePendingPushWakeCatchUp(pendingGeneration, key) } == true
+                    observePushState {
+                        result.key?.let { key -> acknowledgePendingPushWakeCatchUp(pendingGeneration, key) } == true
+                    } == true
                 },
             )
         if (result.succeeded) recordStartupRelayCatchUpReady()
@@ -4486,11 +4506,15 @@ class WhiteNoiseAppState private constructor(
             return
         }
         admitPushWakeEpisodeFromLifecycle()
+        val pendingGeneration =
+            withContext(pushWakeStorageDispatcher) {
+                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
+            }
         isForegroundCatchUpRunning = true
         try {
-            val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
             catchUpAfterObservedPushWake(
-                pendingGeneration = pendingGeneration,
+                // A missing observation runs ordinary catch-up without acknowledging unknown stored work.
+                pendingGeneration = pendingGeneration ?: 0L,
                 trigger = PerformanceTrigger.FOREGROUND,
             )
         } finally {
@@ -5082,10 +5106,23 @@ class WhiteNoiseAppState private constructor(
 
     /** Keeps storage failure in recovery bookkeeping from interrupting unlock or connectivity handling. */
     private suspend fun admitPushWakeEpisodeFromLifecycle() {
-        if (!withContext(pushWakeStorageDispatcher) { pushTokenStore.admitPushWakeEpisode(pushWakeNowMs()) }) {
+        val admitted =
+            withContext(pushWakeStorageDispatcher) {
+                observePushState { pushTokenStore.admitPushWakeEpisode(pushWakeNowMs()) }
+            }
+        if (admitted != true) {
             PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
         }
     }
+
+    /** Defers passive push work when encrypted state is unavailable without inventing an empty queue. */
+    private inline fun <T> observePushState(read: () -> T): T? =
+        try {
+            read()
+        } catch (_: PushTokenStorageException) {
+            android.util.Log.w("PushTokenStorage", "lifecycle_work_deferred")
+            null
+        }
 
     /** Acknowledges the concrete foreground-service instance that currently owns background runtime. */
     internal fun acknowledgePushWakeServiceOwner(owner: Any) {
@@ -5233,14 +5270,23 @@ class WhiteNoiseAppState private constructor(
 
     /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
     private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
-        if (pushTokenStore.nativePushRegistrationSyncPending()) {
+        val pending =
+            withContext(pushWakeStorageDispatcher) {
+                observePushState {
+                    pushTokenStore.nativePushRegistrationSyncPending() || pushTokenStore.lastToken() != null
+                }
+            } ?: return
+        if (pending) {
             syncNativePushRegistrationIfEnabled()
         }
     }
 
     /** Returns fetch success, acknowledging only the matching durable wake after fresh work. */
     private suspend fun drainPendingPushWakeCatchUpIfNeeded(): Boolean {
-        val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+        val pendingGeneration =
+            withContext(pushWakeStorageDispatcher) {
+                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
+            } ?: return false
         if (pendingGeneration == 0L) return true
         return catchUpAfterObservedPushWake(
             pendingGeneration = pendingGeneration,
@@ -6560,8 +6606,8 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
-     * the established local fail-open behavior; a structured unfinished-local
-     * outcome retains the active session. Credential revocation failure returns an incomplete result before
+     * local fallback behavior only after durable push cleanup admission; a structured unfinished-local
+     * outcome or unavailable cleanup authority retains the active session. Credential revocation failure returns an incomplete result before
      * native admission; errors after admission retain their established propagation.
      * Returns null when no account is active.
      */
@@ -6589,19 +6635,40 @@ class WhiteNoiseAppState private constructor(
         deleteKeyPackages: Boolean,
         draftsSaved: Boolean,
     ): SignOutCompletion {
-        // Persist cleanup intent before native work; unavailable storage cannot lose a failed disable.
-        val disableRecorded =
-            withContext(Dispatchers.IO) {
-                runCatching { pushTokenStore.recordPendingDisable(signedOutRef) }.getOrDefault(false)
-            }
-        // Credential persistence failures never enter the native-error fail-open path.
-        val engineResult = runCatchingCancellable { marmotIo { signOut(signedOutRef, deleteKeyPackages) } }
+        val signOutRuntime = marmotRuntime
+        // Serialize admission/native teardown with mode changes, then release before activating another account.
+        // Activation performs its own delivery reconciliation and cannot re-enter this non-reentrant mutex.
+        val engineResult =
+            notificationDeliveryModeMutex.withLock {
+                if (marmotRuntime !== signOutRuntime || !prepareSignOutPushCleanup(signedOutRef)) return@withLock null
+                if (marmotRuntime !== signOutRuntime || activeAccountRef != signedOutRef) return@withLock null
+                runCatchingCancellable {
+                    withContext(marmotIoDispatcher) { checkNotNull(signOutRuntime).marmot.signOut(signedOutRef, deleteKeyPackages) }
+                }
+            } ?: return SignOutCompletion.AccountCleanupIncomplete
         val engineOutcome = engineResult.getOrNull()
         if (engineOutcome?.localCleanup?.completed == false) {
             appStateDebug {
                 "signOut kept active account=${signedOutRef.take(8)} because engine cleanup did not complete"
             }
             return SignOutCompletion.AccountCleanupIncomplete
+        }
+        // A confirmed old-account result still retires its keyed data, but never tears down a replacement session.
+        if (marmotRuntime !== signOutRuntime || activeAccountRef != signedOutRef) {
+            if (engineOutcome == null) return SignOutCompletion.AccountCleanupIncomplete
+            // A replacement using the same ref may already own these keyed resources; never erase its session.
+            if (marmotRuntime !== signOutRuntime && activeAccountRef == signedOutRef) {
+                return SignOutCompletion.AccountCleanupIncomplete
+            }
+            accountListLifetime.advance {
+                accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
+            }
+            runCatching { pushTokenStore.clearPendingDisable(signedOutRef) }
+            nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
+            clearSignedOutAccountMemory(signedOutRef)
+            clearRevokedConversationShortcutsForAccount(signedOutRef, includeUnscopedLegacy = false)
+            clearContactPrivateDetailsForAccount(signedOutRef)
+            return signOutCompletion(engineOutcome)
         }
         engineResult.exceptionOrNull()?.let { failure ->
             appStateDebug(failure) {
@@ -6616,21 +6683,11 @@ class WhiteNoiseAppState private constructor(
             // MDK deactivated push; discard stale retries and registration cache.
             runCatching { pushTokenStore.clearPendingDisable(signedOutRef) }
             nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
-        } else if (!disableRecorded) {
-            withContext(Dispatchers.IO) {
-                runCatching { pushTokenStore.suppressRegistrationUntilReconciled(signedOutRef) }
-            }
-        } // A failed native reply retains the durable or explicitly fenced disable intent.
+        } // A failed native reply retains the encrypted obligation or native durable disable intent.
 
         // Preserve per-account durable state for later account switching, but
         // synchronously drop plaintext memory and await the decrypted-disk wipe.
-        composerExpansionStateRetention.removeAccount(signedOutRef)
-        composerDraftExpansionBridge.removeAccount(signedOutRef)
-        pendingMessageEditHandoff.removeAccount(signedOutRef)
-        notificationReplyDraftHandoff.removeAccount(signedOutRef)
-        draftWriter.removeAccount(signedOutRef)
-        conversationDictation.onAccountUnavailable(signedOutRef)
-        stopTtsForRemovedAccount(signedOutRef)
+        clearSignedOutAccountMemory(signedOutRef)
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
@@ -6658,8 +6715,44 @@ class WhiteNoiseAppState private constructor(
         if (next == null) runCatching { pushTokenStore.clear() }
         refreshLocalNotificationSettings()
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
-        return if (disableRecorded) signOutCompletion(engineOutcome) else SignOutCompletion.AccountCleanupIncomplete
+        return signOutCompletion(engineOutcome)
     }
+
+    /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
+    private fun clearSignedOutAccountMemory(account: String) {
+        composerExpansionStateRetention.removeAccount(account)
+        composerDraftExpansionBridge.removeAccount(account)
+        pendingMessageEditHandoff.removeAccount(account)
+        notificationReplyDraftHandoff.removeAccount(account)
+        draftWriter.removeAccount(account)
+        conversationDictation.onAccountUnavailable(account)
+        stopTtsForRemovedAccount(account)
+    }
+
+    /** Serializes durable disable admission with registration, using the captured native runtime on storage failure. */
+    private suspend fun prepareSignOutPushCleanup(account: String): Boolean =
+        nativePushSyncMutex.withLock {
+            val runtime = marmotRuntime
+            if (activeAccountRef != account) return@withLock false
+            val recorded =
+                withContext(pushWakeStorageDispatcher) {
+                    runCatching { pushTokenStore.recordPendingDisable(account) }.getOrDefault(false)
+                }
+            if (recorded) return@withLock marmotRuntime === runtime && activeAccountRef == account
+            if (runtime == null) return@withLock false
+            // An unknown/cancelled native reply invalidates the cache instead of displaying an enabled setting.
+            perAccountSyncedFingerprints.remove(account)
+            localNotificationSettings = null
+            val settings =
+                runCatchingCancellable {
+                    withContext(marmotIoDispatcher) { runtime.marmot.setNativePushEnabled(account, false) }
+                }.getOrNull() ?: return@withLock false
+            if (settings.nativePushEnabled) return@withLock false
+            perAccountSyncedFingerprints.remove(account)
+            if (marmotRuntime !== runtime || activeAccountRef != account) return@withLock false
+            localNotificationSettings = settings
+            true
+        }
 
     suspend fun exportActiveAccountNsec(): String? {
         val accountRef = activeAccountRef ?: return null
@@ -8050,9 +8143,13 @@ class WhiteNoiseAppState private constructor(
             },
             ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
             catchUpAccounts = {
-                val pendingGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+                val pendingGeneration =
+                    withContext(pushWakeStorageDispatcher) {
+                        observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
+                    }
+                // Unknown push storage cannot prevent ordinary relay catch-up or authorize marker acknowledgement.
                 catchUpAfterObservedPushWake(
-                    pendingGeneration = pendingGeneration,
+                    pendingGeneration = pendingGeneration ?: 0L,
                     trigger = PerformanceTrigger.NETWORK_RECONNECT,
                 )
             },
@@ -8065,10 +8162,12 @@ class WhiteNoiseAppState private constructor(
                 )
             },
             onRecoveryAttemptStarted = { networkGeneration ->
-                notificationPushWakeRecoveryCircuit.noteRecoveryAttempt(
-                    networkGeneration = networkGeneration,
-                    pushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration(),
-                )
+                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }?.let { generation ->
+                    notificationPushWakeRecoveryCircuit.noteRecoveryAttempt(
+                        networkGeneration = networkGeneration,
+                        pushWakeGeneration = generation,
+                    )
+                }
             },
             onRecoveryExhausted = { networkGeneration, _ ->
                 notificationPushWakeRecoveryCircuit.noteRecoveryExhausted(networkGeneration)
@@ -8299,10 +8398,11 @@ class WhiteNoiseAppState private constructor(
 
     /** Starts push-wake catch-up only when network recovery does not own the receiver. */
     private fun schedulePendingPushWakeCatchUpDrain() {
-        if (pushTokenStore.pushWakeCatchUpPending() && !networkNotificationRecoverySuppressed) {
+        val pendingPushWakeGeneration =
+            observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() } ?: return
+        if (pendingPushWakeGeneration != 0L && !networkNotificationRecoverySuppressed) {
             notificationScope.launch(pushWakeStorageDispatcher) { schedulePushWakeRecovery() }
         }
-        val pendingPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
         val networkGeneration = validatedConnectivityRecoveryGenerationMutable.value
         val runtimeUnavailable =
             networkNotificationRecoverySuppressed ||
@@ -8329,7 +8429,9 @@ class WhiteNoiseAppState private constructor(
                     }
                 }.also { drainJob ->
                     drainJob.invokeOnCompletion {
-                        val currentPushWakeGeneration = pushTokenStore.pendingPushWakeCatchUpGeneration()
+                        val currentPushWakeGeneration =
+                            observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
+                                ?: return@invokeOnCompletion
                         val currentNetworkGeneration = validatedConnectivityRecoveryGenerationMutable.value
                         if (
                             currentPushWakeGeneration != 0L &&
@@ -8865,7 +8967,28 @@ class WhiteNoiseAppState private constructor(
 
     fun launchVerifiedAppSelfUpdate(context: Context = appContext): Boolean = appSelfUpdateFlow.launchInstall(context) { appSelfUpdateState = it }
 
+    /** Reads retained push recovery state off Main, including before an active account exists. */
+    suspend fun refreshPushStorageRecovery() {
+        pushStorageRecovery = withContext(pushWakeStorageDispatcher) { pushTokenStore.recoveryState() }
+    }
+
+    /** Retries original sources and normal cleanup; unknown cleanup provenance remains explicitly held. */
+    suspend fun retryPushStorageRecovery() {
+        if (pushStorageRecoveryBusy) return
+        pushStorageRecoveryBusy = true
+        try {
+            withContext(pushWakeStorageDispatcher) { pushTokenStore.recoveryState(retry = true) }
+            notificationDeliveryModeMutex.withLock {
+                if (!notificationDeliveryModeBusy) syncNativePushRegistrationIfEnabled()
+            }
+            refreshPushStorageRecovery()
+        } finally {
+            pushStorageRecoveryBusy = false
+        }
+    }
+
     suspend fun refreshLocalNotificationSettings() {
+        refreshPushStorageRecovery()
         val account = activeAccountRef
         localNotificationSettings =
             if (account == null) {
@@ -9791,9 +9914,14 @@ class WhiteNoiseAppState private constructor(
             return
         }
         notificationScope.launch {
-            withContext(pushWakeStorageDispatcher) {
-                pushTokenStore.recordPendingNativePushRegistrationSync()
-            }
+            val recorded =
+                withContext(pushWakeStorageDispatcher) {
+                    observePushState {
+                        pushTokenStore.recordPendingNativePushRegistrationSync()
+                        true
+                    }
+                }
+            if (recorded != true) return@launch
             notificationDeliveryModeMutex.withLock {
                 if (!notificationDeliveryModeBusy) syncNativePushRegistrationIfEnabled()
             }
@@ -9984,12 +10112,14 @@ class WhiteNoiseAppState private constructor(
     // Retry sign-out push-disables that failed; on success the account leaves the pending set.
     private suspend fun drainPendingPushDisables() {
         for (account in pushTokenStore.pendingDisables()) {
-            val disabled =
+            val settings =
                 runCatchingCancellable { marmotIo { setNativePushEnabled(account, false) } }
                     .onFailure {
                         appStateDebug { "pending setNativePushEnabled(false) retry failed: ${it.readableMessage()}" }
-                    }.isSuccess
-            if (disabled) {
+                    }.getOrNull()
+            if (settings?.nativePushEnabled == false) {
+                perAccountSyncedFingerprints.remove(account)
+                if (account == activeAccountRef) localNotificationSettings = settings
                 pushTokenStore.clearPendingDisable(account)
                 appStateDebug { "pending native-push disable drained account=${account.take(8)}" }
             }

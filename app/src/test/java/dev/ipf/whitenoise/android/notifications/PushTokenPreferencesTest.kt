@@ -37,7 +37,8 @@ class PushTokenPreferencesTest {
     private fun adapter(unavailable: Boolean = false) =
         PushTokenPreferences(
             KeystoreSecureStore(
-                context, "push-target",
+                context,
+                "push-target",
                 object : SecureStoreKeyProvider {
                     override fun secretKey(): SecretKey {
                         if (unavailable) throw GeneralSecurityException("private key details")
@@ -51,7 +52,8 @@ class PushTokenPreferencesTest {
     @Test
     fun importsEveryTypeAndRetainsUnknownLegacyData() {
         val legacy = context.getSharedPreferences("legacy-a", Context.MODE_PRIVATE)
-        legacy.edit()
+        legacy
+            .edit()
             .putString("fcm_token", "secret-token")
             .putBoolean("pending_native_push_registration_sync", true)
             .putBoolean("pending_push_wake_catch_up", true)
@@ -119,6 +121,7 @@ class PushTokenPreferencesTest {
         assertThrows(PushTokenStorageException::class.java) { adapter(true).getAll() }
         assertEquals(setOf("account-a"), PushTokenStore(adapter()).pendingClears())
     }
+
     @Test
     fun lateReadableLegacyCleanupIsPreservedAfterNewCleanupWrites() {
         val store = PushTokenStore(adapter())
@@ -129,21 +132,34 @@ class PushTokenPreferencesTest {
         assertEquals(setOf("old-account", "new-account"), store.pendingDisables())
     }
 
+    /** An old account-free fence survives restart and cannot be discharged by unrelated successful cleanup. */
     @Test
-    fun processKnownCleanupFenceClearsOnlyAfterDurableRetry() {
-        var suppressed = false
-        val store = PushTokenStore(
-            adapter(),
-            registrationSuppressed = { suppressed },
-            suppressRegistration = { suppressed = true },
-            cleanupSuppressed = { suppressed },
-            clearRegistrationSuppression = { suppressed = false },
+    fun orphanedCleanupFenceSurvivesReconstructionAndExplicitRetry() {
+        PushTokenStore.installKeyProvider(
+            object : SecureStoreKeyProvider {
+                override fun secretKey(): SecretKey = key
+            },
         )
-        store.suppressRegistrationUntilReconciled("deferred-account")
-        assertTrue(suppressed)
-        assertTrue(store.registrationAllowed())
-        assertFalse(suppressed)
-        assertEquals(setOf("deferred-account"), store.pendingDisables())
+        val safety = context.getSharedPreferences("whitenoise.push.safety", Context.MODE_PRIVATE)
+        safety.edit().putBoolean("cleanup_unknown", true).commit()
+        try {
+            val store = PushTokenStore.create(context)
+            assertEquals(PushStorageRecovery.CleanupReconciliationRequired, store.recoveryState())
+            assertFalse(store.registrationAllowed())
+            store.setToken("fresh-token")
+            assertTrue(store.recordPendingDisable("unrelated-account"))
+            store.clearPendingDisable("unrelated-account")
+            val recreated = PushTokenStore.create(context)
+            assertTrue(recreated.pendingDisables().isEmpty())
+            repeat(2) {
+                assertEquals(PushStorageRecovery.CleanupReconciliationRequired, recreated.recoveryState(retry = true))
+                assertFalse(recreated.registrationAllowed())
+            }
+            assertTrue(safety.getBoolean("cleanup_unknown", false))
+        } finally {
+            safety.edit().remove("cleanup_unknown").commit()
+            PushTokenStore.installKeyProvider(null)
+        }
     }
 
     @Test
@@ -155,48 +171,109 @@ class PushTokenPreferencesTest {
         assertTrue(legacy.contains("push_wake_attempts"))
     }
 
+    /** Reconstructed adapters retain exact account obligations and never substitute an unavailable queue with empty. */
+    @Test
+    fun encryptedDisableQueueSurvivesReconstructionAndTemporaryKeyLoss() {
+        val store = PushTokenStore(adapter())
+        assertTrue(store.recordPendingDisable("account-a"))
+        assertTrue(store.recordPendingDisable("account-b"))
+        assertThrows(PushTokenStorageException::class.java) { PushTokenStore(adapter(true)).pendingDisables() }
+        assertEquals(setOf("account-a", "account-b"), PushTokenStore(adapter()).pendingDisables())
+        PushTokenStore(adapter()).clearPendingDisable("account-a")
+        assertEquals(setOf("account-b"), PushTokenStore(adapter()).pendingDisables())
+    }
+
+    /** Explicit retry bypasses only the import throttle, preserving and unioning a temporarily unreadable legacy source. */
+    @Test
+    fun retryImportsRetainedLegacyObligationsWithoutErasingNewWrites() {
+        PushTokenStore.installKeyProvider(
+            object : SecureStoreKeyProvider {
+                override fun secretKey(): SecretKey = key
+            },
+        )
+        val sourceName = "whitenoise.push.tokens.fallback"
+        val source = context.getSharedPreferences(sourceName, Context.MODE_PRIVATE)
+        source.edit().putStringSet("pending_native_push_disables", setOf("legacy-account")).commit()
+        var unavailable = true
+        val owner =
+            object : ContextWrapper(context) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getSharedPreferences(
+                    name: String,
+                    mode: Int,
+                ): SharedPreferences {
+                    if (name == sourceName && unavailable) throw GeneralSecurityException("scripted legacy unavailable")
+                    return super.getSharedPreferences(name, mode)
+                }
+            }
+        try {
+            val store = PushTokenStore.create(owner)
+            assertEquals(PushStorageRecovery.LegacyImportPending, store.recoveryState())
+            assertFalse(store.registrationAllowed())
+            assertTrue(source.contains("pending_native_push_disables"))
+            assertTrue(store.recordPendingDisable("new-account"))
+            val recreated = PushTokenStore.create(owner)
+            assertEquals(PushStorageRecovery.LegacyImportPending, recreated.recoveryState(retry = true))
+            assertTrue(source.contains("pending_native_push_disables"))
+            unavailable = false
+            assertEquals(PushStorageRecovery.Ready, recreated.recoveryState(retry = true))
+            assertEquals(setOf("legacy-account", "new-account"), recreated.pendingDisables())
+            assertFalse(source.contains("pending_native_push_disables"))
+        } finally {
+            PushTokenStore.installKeyProvider(null)
+        }
+    }
+
     @Test
     fun failedCommitWithUpdatedMemoryCannotRetireLegacySource() {
         var failCommit = true
         var successfulTargetCommits = 0
         var failedTargetCommits = 0
-        val failingContext = object : ContextWrapper(context) {
-            override fun getApplicationContext(): Context = this
+        val failingContext =
+            object : ContextWrapper(context) {
+                override fun getApplicationContext(): Context = this
 
-            override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
-                val preferences = super.getSharedPreferences(name, mode)
-                return object : SharedPreferences by preferences {
-                    override fun edit(): SharedPreferences.Editor {
-                        val editor = preferences.edit()
-                        return object : SharedPreferences.Editor by editor {
-                            override fun putString(key: String, value: String?): SharedPreferences.Editor =
-                                apply { editor.putString(key, value) }
+                override fun getSharedPreferences(
+                    name: String,
+                    mode: Int,
+                ): SharedPreferences {
+                    val preferences = super.getSharedPreferences(name, mode)
+                    return object : SharedPreferences by preferences {
+                        override fun edit(): SharedPreferences.Editor {
+                            val editor = preferences.edit()
+                            return object : SharedPreferences.Editor by editor {
+                                override fun putString(
+                                    key: String,
+                                    value: String?,
+                                ): SharedPreferences.Editor = apply { editor.putString(key, value) }
 
-                            override fun commit(): Boolean {
-                                if (failCommit) {
-                                    failedTargetCommits += 1
-                                    editor.apply() // Model SharedPreferences changing memory despite commit=false.
-                                    return false
-                                }
-                                return editor.commit().also { committed ->
-                                    if (committed) successfulTargetCommits += 1
+                                override fun commit(): Boolean {
+                                    if (failCommit) {
+                                        failedTargetCommits += 1
+                                        editor.apply() // Model SharedPreferences changing memory despite commit=false.
+                                        return false
+                                    }
+                                    return editor.commit().also { committed ->
+                                        if (committed) successfulTargetCommits += 1
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-        val target = PushTokenPreferences(
-            KeystoreSecureStore(
-                failingContext,
-                "push-target",
-                object : SecureStoreKeyProvider {
-                    override fun secretKey(): SecretKey = key
-                },
-            ),
-            lock,
-        )
+        val target =
+            PushTokenPreferences(
+                KeystoreSecureStore(
+                    failingContext,
+                    "push-target",
+                    object : SecureStoreKeyProvider {
+                        override fun secretKey(): SecretKey = key
+                    },
+                ),
+                lock,
+            )
         val legacy = context.getSharedPreferences("legacy-a", Context.MODE_PRIVATE)
         legacy.edit().putString("fcm_token", "retained").commit()
         assertThrows(IllegalStateException::class.java) { target.importLegacy("first", legacy) }
@@ -236,5 +313,4 @@ class PushTokenPreferencesTest {
         assertTrue(store.pendingPushWakeCatchUpGeneration() > observed)
         assertFalse(store.clearPendingPushWakeCatchUp(observed))
     }
-
 }

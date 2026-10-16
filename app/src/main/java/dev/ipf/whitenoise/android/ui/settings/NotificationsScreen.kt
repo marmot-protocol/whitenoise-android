@@ -74,6 +74,7 @@ internal fun NotificationsScreen(
                 if (event == Lifecycle.Event.ON_RESUME) {
                     appState.refreshLocalNotificationPermission()
                     appState.refreshNotificationBatteryPolicy()
+                    appState.launchMutation { appState.refreshPushStorageRecovery() }
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -103,6 +104,13 @@ internal fun NotificationsScreen(
                     capability = capability,
                     enabled = hasAccount && permissionGranted && !appState.notificationDeliveryModeBusy,
                     onSelect = { mode -> appState.launchMutation { appState.setNotificationDeliveryMode(mode) } },
+                )
+            }
+            item {
+                PushStorageRecoveryControl(
+                    state = appState.pushStorageRecovery,
+                    busy = appState.pushStorageRecoveryBusy,
+                    onRetry = { appState.launchMutation { appState.retryPushStorageRecovery() } },
                 )
             }
             if (!capability.isAvailable) {

@@ -11851,14 +11851,7 @@ class ConversationController(
                 val account = conversationAccountRef ?: return@withMutationLockResult false
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.START)
                 val refs =
-                    resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: run {
-                        diagnostic.record(
-                            DmCreationPhase.RECIPIENTS,
-                            DmCreationOutcome.FAILURE,
-                            DmCreationFailure.UNKNOWN,
-                        )
-                        return@withMutationLockResult false
-                    }
+                    resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: return@withMutationLockResult false
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
                 if (refs.isEmpty()) return@withMutationLockResult false
                 optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {

@@ -8,6 +8,7 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
@@ -60,6 +61,11 @@ class ExternalSignerSignOutLifecycleTest {
             localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
         )
     private var signOutFailure: Throwable? = null
+    private var nativeDisableFailure: Throwable? = null
+    private var nativePushEnabled = true
+    private var nativeDisableReturnsEnabled = false
+    private val nativeDisableCalls = AtomicInteger(0)
+    private val nativeCallOrder = mutableListOf<String>()
     private var listAccountsFailure: Throwable? = null
     private var engineSignedOut = false
     private var wipeOutcome =
@@ -72,6 +78,7 @@ class ExternalSignerSignOutLifecycleTest {
         )
     private var engineWiped = false
     private var beforeListAccounts: () -> Unit = {}
+    private var beforeSignOutReply: () -> Unit = {}
 
     /** Builds a signed-in external-signer identity without private key material for the real teardown path. */
     private fun externalSignerAccount(
@@ -99,8 +106,18 @@ class ExternalSignerSignOutLifecycleTest {
             }
 
             when (method.name) {
+                "setNativePushEnabled" -> {
+                    nativeDisableCalls.incrementAndGet()
+                    nativeCallOrder += "disable"
+                    nativeDisableFailure?.let(::suspendFailure) ?: run {
+                        nativePushEnabled = nativeDisableReturnsEnabled
+                        NotificationSettingsFfi(ACCOUNT_REF, ACCOUNT_HEX, true, nativePushEnabled)
+                    }
+                }
                 "signOut" -> {
                     signOutCalls.incrementAndGet()
+                    nativeCallOrder += "signOut"
+                    beforeSignOutReply()
                     signOutFailure?.let(::suspendFailure)
                         ?: signOutOutcome.also { engineSignedOut = it.localCleanup.completed }
                 }
@@ -407,6 +424,159 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
             assertEquals(1, signOutCalls.get())
             assertNull(state.activeAccountRef)
+        }
+
+    /** Models encrypted cleanup reads failing before and after native admission. */
+    private fun unavailablePushStore(): PushTokenStore {
+        val original = context.getSharedPreferences("sign-out-unavailable-push", Context.MODE_PRIVATE)
+        return PushTokenStore(
+            object : SharedPreferences by original {
+                override fun getStringSet(
+                    key: String?,
+                    defValues: MutableSet<String>?,
+                ): MutableSet<String>? =
+                    throw dev.ipf.whitenoise.android.notifications
+                        .PushTokenStorageException()
+            },
+        )
+    }
+
+    /** A durable native disable admits sign-out when the encrypted cleanup journal cannot be written. */
+    @Test
+    fun nativeDisableFallbackPreservesAuthoritativeSignOutCompletion() =
+        runBlocking {
+            val state = appState(pushTokenStore = unavailablePushStore())
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            assertEquals(1, nativeDisableCalls.get())
+            assertEquals(listOf("disable", "signOut"), nativeCallOrder)
+            assertFalse(nativePushEnabled)
+            assertEquals(1, signOutCalls.get())
+            assertTrue(state.accounts.single().signedOut)
+            assertNull(state.activeAccountRef)
+        }
+
+    /** The encrypted journal preserves the existing local fallback when no native runtime is available. */
+    @Test
+    fun committedJournalAllowsLocalFallbackWithoutNativeRuntime() =
+        runBlocking {
+            val state = appState()
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("marmotRuntime")
+                .apply { isAccessible = true }
+                .set(state, null)
+            assertEquals(SignOutCompletion.RelayCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(0, signOutCalls.get())
+            assertNull(state.activeAccountRef)
+            assertTrue(PushTokenStore.create(context).pendingDisables().contains(ACCOUNT_REF))
+        }
+
+    /** Total durable-storage failure retains the account, history owner, and native session. */
+    @Test
+    fun failedJournalAndNativeDisableDoNotAdmitSignOut() =
+        runBlocking {
+            nativeDisableFailure = java.io.IOException("scripted native failure")
+            val state = appState(pushTokenStore = unavailablePushStore())
+            retainComposerExpansion(state)
+            val phase = state.phase
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(0, signOutCalls.get())
+            assertEquals(1, nativeDisableCalls.get())
+            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+            assertFalse(state.accounts.single().signedOut)
+            assertEquals(phase, state.phase)
+            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    /** An enabled response is not durable native cleanup authority. */
+    @Test
+    fun enabledNativeResponseCannotAdmitSignOut() =
+        runBlocking {
+            nativeDisableReturnsEnabled = true
+            val state = appState(pushTokenStore = unavailablePushStore())
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(0, signOutCalls.get())
+            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+        }
+
+    /** Cancellation of an unknown native disable must not fall through into local teardown. */
+    @Test
+    fun cancelledNativeDisableRetainsSessionAndPropagatesCancellation() =
+        runBlocking {
+            nativeDisableFailure = kotlinx.coroutines.CancellationException("scripted cancellation")
+            val state = appState(pushTokenStore = unavailablePushStore())
+            var cancelled = false
+            try {
+                state.signOutActiveAccount()
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                cancelled = true
+            }
+            assertTrue(cancelled)
+            assertNull(state.localNotificationSettings)
+            assertEquals(0, signOutCalls.get())
+            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+            assertFalse(state.accounts.single().signedOut)
+        }
+
+    /** A late native success clears the old account's keyed state while preserving the replacement session. */
+    @Test
+    fun lateSignOutSuccessClearsOnlyTheCapturedAccount() =
+        runBlocking {
+            val state = appState()
+            retainComposerExpansion(state)
+            retainContactPictures(state)
+            val originalPhase = state.phase
+            beforeSignOutReply = {
+                WhiteNoiseAppState::class.java
+                    .getDeclaredField("marmotRuntime")
+                    .apply { isAccessible = true }
+                    .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
+                state.activeAccountRef = OTHER_ACCOUNT_REF
+            }
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            assertEquals(OTHER_ACCOUNT_REF, state.activeAccountRef)
+            assertEquals(originalPhase, state.phase)
+            assertTrue(state.accounts.single().signedOut)
+            assertNull(state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID))
+            assertContactPicturesRemovedOnlyForThisAccount(state)
+        }
+
+    /** A replacement runtime with the same ref owns its keyed state until it completes its own sign-out. */
+    @Test
+    fun lateSuccessCannotEraseReplacementUsingTheSameAccountRef() =
+        runBlocking {
+            val state = appState()
+            retainComposerExpansion(state)
+            beforeSignOutReply = {
+                WhiteNoiseAppState::class.java
+                    .getDeclaredField("marmotRuntime")
+                    .apply { isAccessible = true }
+                    .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
+            }
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertTrue(PushTokenStore.create(context).pendingDisables().contains(ACCOUNT_REF))
+        }
+
+    /** A replaced runtime's failed reply cannot report sign-out or tear down the still-active session. */
+    @Test
+    fun lateSignOutFailureKeepsAccountAndReportsIncompleteCleanup() =
+        runBlocking {
+            val state = appState()
+            retainComposerExpansion(state)
+            signOutFailure = java.io.IOException("scripted late failure")
+            beforeSignOutReply = {
+                WhiteNoiseAppState::class.java
+                    .getDeclaredField("marmotRuntime")
+                    .apply { isAccessible = true }
+                    .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
+            }
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+            assertFalse(state.accounts.single().signedOut)
+            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertTrue(PushTokenStore.create(context).pendingDisables().contains(ACCOUNT_REF))
         }
 
     /** Push bookkeeping failure preserves the completed native sign-out and local cleanup. */

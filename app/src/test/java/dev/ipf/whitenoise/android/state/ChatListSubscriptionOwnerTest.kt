@@ -13,11 +13,16 @@ class ChatListSubscriptionOwnerTest {
         val owner = ChatListSubscriptionOwner()
         var closes = 0
         val attempt = ChatListSubscriptionOwner.Attempt()
-        attempt.chats = object : ChatsSubscriptionHandle {
-            override fun snapshot(): List<AppGroupRecordFfi> = emptyList()
-            override suspend fun next(): AppGroupRecordFfi? = null
-            override fun close() { closes += 1 }
-        }
+        attempt.chats =
+            object : ChatsSubscriptionHandle {
+                override fun snapshot(): List<AppGroupRecordFfi> = emptyList()
+
+                override suspend fun next(): AppGroupRecordFfi? = null
+
+                override fun close() {
+                    closes += 1
+                }
+            }
         owner.install(attempt)
         val job = Job()
         owner.bindJob = job
@@ -46,14 +51,17 @@ class ChatListSubscriptionOwnerTest {
     fun aFailingCloseDoesNotRepeatOrMaskTheOtherHandleCleanup() {
         var closes = 0
         val attempt = ChatListSubscriptionOwner.Attempt()
-        attempt.chats = object : ChatsSubscriptionHandle {
-            override fun snapshot(): List<AppGroupRecordFfi> = emptyList()
-            override suspend fun next(): AppGroupRecordFfi? = null
-            override fun close() {
-                closes += 1
-                error("close failed")
+        attempt.chats =
+            object : ChatsSubscriptionHandle {
+                override fun snapshot(): List<AppGroupRecordFfi> = emptyList()
+
+                override suspend fun next(): AppGroupRecordFfi? = null
+
+                override fun close() {
+                    closes += 1
+                    error("close failed")
+                }
             }
-        }
         attempt.close()
         attempt.close()
         assertEquals(1, closes)
