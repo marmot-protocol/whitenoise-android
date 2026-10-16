@@ -42,7 +42,9 @@ text and local attribution before installation, without another build or matrix.
 
 
 The generator runs without network access and rejects unreviewed artifact bytes,
-missing attribution, changed/truncated text and invalid UTF-8. It emits the same
+missing attribution, changed/truncated text and invalid UTF-8. A runtime file that
+is neither a Maven module nor a project, such as a `files(...)` dependency, fails
+generation because it has no reviewed notice. It emits the same
 `third_party_license_metadata` / `third_party_licenses` raw resources with byte
 ranges consumed by the existing reader. New dependency bytes require a reviewed
 catalogue update; do not reuse an old dependency's notice merely because its name

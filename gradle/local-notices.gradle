@@ -1,5 +1,6 @@
 import groovy.json.JsonOutput
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
@@ -24,6 +25,10 @@ abstract class GenerateLocalLicenseResources extends DefaultTask {
     /** Include coordinate/name changes in cache identity even when archive bytes are identical. */
     @Input
     abstract ListProperty<String> getArtifactIdentities()
+
+    /** Runtime files that are neither Maven modules nor projects, such as files(...) dependencies. */
+    @Input
+    abstract ListProperty<String> getUnattributedArtifacts()
 
     /** Respect the same Python executable override and Windows convention as MarmotKit preparation. */
     @Input
@@ -72,6 +77,10 @@ abstract class GenerateLocalLicenseResources extends DefaultTask {
     /** Fingerprint actual selected bytes before invoking the deterministic, network-free generator. */
     @TaskAction
     void generateResources() {
+        if (!unattributedArtifacts.get().isEmpty()) {
+            // A local file has no reviewed coordinate or notice, so it must not ship unattributed.
+            throw new GradleException("Runtime files without reviewed attribution: ${unattributedArtifacts.get()}")
+        }
         def selected = artifactFilesByIdentity.get().collect { identity, files ->
             def separator = identity.lastIndexOf('/')
             def hashes = files.collect { file ->
@@ -106,6 +115,9 @@ components.onVariants(components.selector().all()) { variant ->
     def artifacts = variant.runtimeConfiguration.incoming.artifactView {
         componentFilter { it instanceof ModuleComponentIdentifier }
     }.artifacts.resolvedArtifacts
+    def unattributed = variant.runtimeConfiguration.incoming.artifactView {
+        componentFilter { !(it instanceof ModuleComponentIdentifier) && !(it instanceof ProjectComponentIdentifier) }
+    }.artifacts.resolvedArtifacts
     def byIdentity = artifacts.map { resolved ->
         def files = [:]
         resolved.each { artifact ->
@@ -124,6 +136,7 @@ components.onVariants(components.selector().all()) { variant ->
         runtimeArtifacts.from(artifacts.map { it.collect { artifact -> artifact.file } })
         artifactFilesByIdentity.set(byIdentity)
         artifactIdentities.set(byIdentity.map { it.keySet().toList().sort() })
+        unattributedArtifacts.set(unattributed.map { it.collect { artifact -> artifact.id.displayName }.sort() })
         catalog.set(new File(root, 'config/licenses/catalog.json'))
         baseline.set(new File(root, 'config/licenses/baseline.json'))
         iconNotice.set(new File(root, 'app/src/main/res/raw/material_icons_notice.txt'))
