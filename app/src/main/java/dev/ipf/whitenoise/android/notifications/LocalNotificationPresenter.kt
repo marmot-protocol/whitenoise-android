@@ -199,10 +199,10 @@ class LocalNotificationPresenter(
     }
 
     /**
-     * Forgets the published-shortcut snapshot of one locally removed conversation (abandon, reset or local delete),
-     * after its launcher cleanup removed the platform shortcut. A new conversation under the same group id then
-     * publishes its identity shortcut again before its first card, instead of only reporting use of a shortcut that
-     * no longer exists.
+     * Forgets the published-shortcut snapshot of one locally removed conversation (abandon, reset or local delete).
+     * A new conversation under the same group id then publishes its identity shortcut again before its first card,
+     * instead of only reporting use of a shortcut that no longer exists. It takes the shared publication lock, so the
+     * caller runs it off the main thread, inside the same lock section as the platform removal.
      */
     internal fun forgetConversationShortcut(
         accountRef: String,
@@ -2561,10 +2561,17 @@ class LocalNotificationPresenter(
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
             if (shortcutSnapshots[shortcutId] == snapshot) {
-                synchronized(UserEventNotificationGroup.mutationLock) {
-                    if (isPublishAllowed()) ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
-                }
-                return
+                // Re-read under the lock: a local removal may have forgotten the snapshot after the check above,
+                // and then the shortcut must be published again rather than only reported as used.
+                val stillPublished =
+                    synchronized(UserEventNotificationGroup.mutationLock) {
+                        (shortcutSnapshots[shortcutId] == snapshot).also { published ->
+                            if (published && isPublishAllowed()) {
+                                ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+                            }
+                        }
+                    }
+                if (stillPublished) return
             }
             val intent = conversationShortcutOpenIntent(update, content)
             val shortcut =

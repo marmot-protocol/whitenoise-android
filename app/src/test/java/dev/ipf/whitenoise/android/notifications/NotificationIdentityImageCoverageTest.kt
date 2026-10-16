@@ -100,19 +100,38 @@ class NotificationIdentityImageCoverageTest {
     }
 
     /**
-     * Local removal drops the presenter's snapshot of the removed conversation shortcut on both removal paths, so a
-     * conversation joined again under the same group id publishes its shortcut before its first card.
+     * Local removal drops the presenter's snapshot of the removed conversation shortcut on both removal paths, off
+     * the main thread and in the same publication-lock section as the platform removal, so no card publishes between
+     * the two and a conversation joined again under the same group id publishes its shortcut before its first card.
      */
     @Test
     fun localRemovalForgetsTheConversationShortcutSnapshot() {
         val lifecycle = File(notificationsRoot().parentFile, "state/PinnedShortcutLifecycle.kt").readText()
-        listOf("removePinnedConversationShortcuts", "removeRevokedPinnedConversationShortcuts").forEach { name ->
+        mapOf(
+            "removePinnedConversationShortcuts" to "removeGroup(",
+            "removeRevokedPinnedConversationShortcuts" to "removeRevokedGroup(",
+        ).forEach { (name, removal) ->
             val body = lifecycle.extensionBody(name)
-            assertTrue("$name forgets the snapshot", "forgetNotificationConversationShortcut(" in body)
+            val io = body.indexOf("withContext(Dispatchers.IO)")
+            val lock = body.indexOf("synchronized(UserEventNotificationGroup.mutationLock)")
+            assertTrue("$name holds the lock off the main thread", io in 0 until lock)
+            val section = body.substring(lock)
+            val forget = section.indexOf("forgetNotificationConversationShortcut(")
+            assertTrue("$name forgets inside the removal's lock", section.indexOf(removal) in 0 until forget)
         }
         val forget = source("LocalNotificationPresenter.kt").functionBody("forgetConversationShortcut")
         assertTrue("the snapshot goes", "shortcutSnapshots.remove(" in forget)
         assertTrue("and so does its recency", "shortcutLastUsed.remove(" in forget)
+    }
+
+    /** An unchanged snapshot is re-read under the publication lock before only reporting use of the shortcut. */
+    @Test
+    fun unchangedSnapshotIsReReadUnderTheLockBeforeOnlyReportingUse() {
+        val publish = source("LocalNotificationPresenter.kt").functionBody("publishConversationShortcut")
+        val report = publish.indexOf("reportShortcutUsed(")
+        val lock = publish.lastIndexOf("synchronized(UserEventNotificationGroup.mutationLock)", report)
+        val reRead = publish.lastIndexOf("shortcutSnapshots[shortcutId] == snapshot", report)
+        assertTrue("the use report re-reads the snapshot inside the lock", lock in 0 until reRead)
     }
 
     /** Body of an extension function such as `fun Receiver.name(...)`, which [functionBody] does not match. */
