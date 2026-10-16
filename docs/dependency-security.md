@@ -287,11 +287,16 @@ checksums were independently checked with the other test/tooling inputs. A bulk
 evidence during updates; never repair it with a global exclusion or unlocked
 classpath. Guava's two cross-version Android/JRE publications similarly retain
 explicit references to their authenticated Gradle module metadata rather than
-loosening supplier-path checks for unrelated artifacts. The two exact module JSON
-files are retained under `gradle/publication-metadata/`; normal offline validation
-checks their SHA-256 and rederives each selected artifact name, digest and unique
-resolved URL. Keeping a valid metadata anchor while changing the supplier URL
-therefore fails qualification.
+loosening supplier-path checks for unrelated artifacts. A supplier URL counts as
+direct evidence only when its path is exactly the registry root, the coordinate's
+group, module and version directories, and the recorded artifact name. Any other
+path, including an inserted directory or a different filename, needs the same
+authenticated mapping. That covers the Guava publications and the Gradle module
+metadata display names, such as `animation.aar`, published as
+`animation-android-1.13.0-beta01.aar`. The exact module JSON files are retained under
+`gradle/publication-metadata/`; normal offline validation checks their SHA-256 and
+rederives each selected artifact name, digest and unique resolved URL. Keeping a
+valid metadata anchor while changing the supplier URL therefore fails qualification.
 
 AGP creates `androidApis` lazily when resource tasks need local SDK jars. Its
 empty Maven lock state is committed for all three Android modules, and candidate

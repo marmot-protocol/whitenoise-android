@@ -1,0 +1,490 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "url": "../../datastore/1.1.7/datastore-1.1.7.module",
+    "group": "androidx.datastore",
+    "module": "datastore",
+    "version": "1.1.7",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.7-rc-1"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseApiElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.annotation",
+          "module": "annotation",
+          "version": {
+            "requires": "1.2.0"
+          }
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core",
+          "version": {
+            "requires": "1.1.7"
+          }
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core-okio",
+          "version": {
+            "requires": "1.1.7"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "1.8.22"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.7.3"
+          }
+        }
+      ],
+      "dependencyConstraints": [
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core-okio",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-core",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-external-protobuf",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-proto",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-rxjava2",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-rxjava3",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-rxjava2",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-rxjava3",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        }
+      ],
+      "files": [
+        {
+          "name": "datastore-release.aar",
+          "url": "datastore-android-1.1.7.aar",
+          "size": 26511,
+          "sha512": "6096c4aeadfd0faea0decb0096099fb6865d8f506e0789a24aaf01933dc0af0d3b3f82c19feab6805ddfcf4dbd5cd052c7e393251454b9ffbcbfac8ae00c99a5",
+          "sha256": "26c12c6417e7e4cfd36386aa8cc2b9839fe87a6792f820805827bde4d27f9e6e",
+          "sha1": "4c12c47f19bc951e572ddd78fd7917630bae27f9",
+          "md5": "e98dfe036793a986d990d48e1b70bcff"
+        }
+      ]
+    },
+    {
+      "name": "releaseRuntimeElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.annotation",
+          "module": "annotation",
+          "version": {
+            "requires": "1.2.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core-okio",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        },
+        {
+          "group": "com.squareup.okio",
+          "module": "okio",
+          "version": {
+            "requires": "3.4.0"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "1.8.22"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.7.3"
+          },
+          "excludes": [
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-stdlib-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-common"
+            },
+            {
+              "group": "org.jetbrains.kotlin",
+              "module": "kotlin-test-annotations-common"
+            }
+          ]
+        }
+      ],
+      "dependencyConstraints": [
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core-okio",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-core",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-external-protobuf",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-proto",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-rxjava2",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-rxjava3",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-rxjava2",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-rxjava3",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        }
+      ],
+      "files": [
+        {
+          "name": "datastore-release.aar",
+          "url": "datastore-android-1.1.7.aar",
+          "size": 26511,
+          "sha512": "6096c4aeadfd0faea0decb0096099fb6865d8f506e0789a24aaf01933dc0af0d3b3f82c19feab6805ddfcf4dbd5cd052c7e393251454b9ffbcbfac8ae00c99a5",
+          "sha256": "26c12c6417e7e4cfd36386aa8cc2b9839fe87a6792f820805827bde4d27f9e6e",
+          "sha1": "4c12c47f19bc951e572ddd78fd7917630bae27f9",
+          "md5": "e98dfe036793a986d990d48e1b70bcff"
+        }
+      ]
+    },
+    {
+      "name": "releaseSourcesElements-published",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "fake-sources",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencyConstraints": [
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-core-okio",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-core",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-external-protobuf",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-proto",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-rxjava2",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-preferences-rxjava3",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-rxjava2",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        },
+        {
+          "group": "androidx.datastore",
+          "module": "datastore-rxjava3",
+          "version": {
+            "requires": "1.1.7"
+          },
+          "reason": "datastore is in atomic group androidx.datastore"
+        }
+      ],
+      "files": [
+        {
+          "name": "datastore-android-1.1.7-sources.jar",
+          "url": "datastore-android-1.1.7-sources.jar",
+          "size": 8197,
+          "sha512": "2f2a46938f98aea7d162c69e6f3c005e2f6a5afa46e6e0c2d762d05d1cc228155dd4ec997a22855775fb2390b7235dc67ff12ecea83c0aa1488ef0402bee4bc9",
+          "sha256": "09186429ebf9da4236ff7a0b164fb117bae713cdc22f3b3cd79bc2deaf0cf6f2",
+          "sha1": "f373c2d607dac74728c3f15eb0fc9b70dae0964e",
+          "md5": "4eb0a0b5aea9432f6f8f429faa41f40b"
+        }
+      ]
+    }
+  ]
+}

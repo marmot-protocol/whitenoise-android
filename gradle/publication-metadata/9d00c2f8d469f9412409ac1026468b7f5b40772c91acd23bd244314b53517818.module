@@ -1,0 +1,199 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "url": "../../tracing/2.0.3/tracing-2.0.3.module",
+    "group": "androidx.tracing",
+    "module": "tracing",
+    "version": "2.0.3",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.6.0",
+      "buildId:": "16342595"
+    }
+  },
+  "variants": [
+    {
+      "name": "androidApiElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.annotation",
+          "module": "annotation",
+          "version": {
+            "requires": "1.7.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.20"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.9.0"
+          }
+        }
+      ],
+      "dependencyConstraints": [
+        {
+          "group": "androidx.tracing",
+          "module": "tracing-ktx",
+          "version": {
+            "requires": "2.0.3"
+          },
+          "reason": "tracing is in atomic group androidx.tracing"
+        },
+        {
+          "group": "androidx.tracing",
+          "module": "tracing-wire",
+          "version": {
+            "requires": "2.0.3"
+          },
+          "reason": "tracing is in atomic group androidx.tracing"
+        }
+      ],
+      "files": [
+        {
+          "name": "tracing.aar",
+          "url": "tracing-android-2.0.3.aar",
+          "size": 148160,
+          "sha512": "39342a556e458ada4acc32f1fc8bffbc66f74338a2285ddcc935a7e5fb9f87b08bb9b676bc9d8998d8d8229e403bfb4a04b9ba12438c5f1d753495487160e631",
+          "sha256": "8fffc4b79bf43dd72203e2b3619086eb2668f01d5d704080d3c7e99d19bf42a0",
+          "sha1": "ddef163da46c81c951e6d1b127713344a0201aab",
+          "md5": "4cbe051f57d942e68876dd23fc4d8d20"
+        }
+      ]
+    },
+    {
+      "name": "androidRuntimeElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.annotation",
+          "module": "annotation",
+          "version": {
+            "requires": "1.10.0"
+          }
+        },
+        {
+          "group": "androidx.annotation",
+          "module": "annotation",
+          "version": {
+            "requires": "1.7.0"
+          }
+        },
+        {
+          "group": "androidx.collection",
+          "module": "collection",
+          "version": {
+            "requires": "1.6.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.20"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.9.0"
+          }
+        }
+      ],
+      "dependencyConstraints": [
+        {
+          "group": "androidx.tracing",
+          "module": "tracing-ktx",
+          "version": {
+            "requires": "2.0.3"
+          },
+          "reason": "tracing is in atomic group androidx.tracing"
+        },
+        {
+          "group": "androidx.tracing",
+          "module": "tracing-wire",
+          "version": {
+            "requires": "2.0.3"
+          },
+          "reason": "tracing is in atomic group androidx.tracing"
+        }
+      ],
+      "files": [
+        {
+          "name": "tracing.aar",
+          "url": "tracing-android-2.0.3.aar",
+          "size": 148160,
+          "sha512": "39342a556e458ada4acc32f1fc8bffbc66f74338a2285ddcc935a7e5fb9f87b08bb9b676bc9d8998d8d8229e403bfb4a04b9ba12438c5f1d753495487160e631",
+          "sha256": "8fffc4b79bf43dd72203e2b3619086eb2668f01d5d704080d3c7e99d19bf42a0",
+          "sha1": "ddef163da46c81c951e6d1b127713344a0201aab",
+          "md5": "4cbe051f57d942e68876dd23fc4d8d20"
+        }
+      ]
+    },
+    {
+      "name": "androidSourcesElements-published",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencyConstraints": [
+        {
+          "group": "androidx.tracing",
+          "module": "tracing-ktx",
+          "version": {
+            "requires": "2.0.3"
+          },
+          "reason": "tracing is in atomic group androidx.tracing"
+        },
+        {
+          "group": "androidx.tracing",
+          "module": "tracing-wire",
+          "version": {
+            "requires": "2.0.3"
+          },
+          "reason": "tracing is in atomic group androidx.tracing"
+        }
+      ],
+      "files": [
+        {
+          "name": "tracing-android-2.0.3-sources.jar",
+          "url": "tracing-android-2.0.3-sources.jar",
+          "size": 73704,
+          "sha512": "af336beb608971aa7c0637c874848501ad58060241353369be57961014d587ce4c4aa00be275a177e2f17923b9d1af4ded30ca9fa1c5d068eddd235b43b03282",
+          "sha256": "920f999febcfaff50220a48721d9ae3bc807ad9b97512e54b6803ba211dc3b05",
+          "sha1": "de7a20c4174685b1457a4343afa6e8cc3c6f6afc",
+          "md5": "be6e9ea5d911dbe2dc39de2cbb3b4451"
+        }
+      ]
+    }
+  ]
+}

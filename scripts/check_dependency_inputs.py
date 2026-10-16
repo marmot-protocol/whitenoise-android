@@ -122,8 +122,11 @@ REPOSITORY = 'marmot-protocol/whitenoise-android'
 REQUIRED_LOCKS = {'buildscript-gradle.lockfile', 'settings-gradle.lockfile'} | {
     module + '/' + name for module in ['app', 'benchmark', 'cryptoBenchmark', 'fuzz']
     for name in ['gradle.lockfile', 'buildscript-gradle.lockfile']}
-SUPPLIER_HOSTS = {'dl.google.com', 'maven.google.com', 'repo.maven.apache.org', 'repo1.maven.org',
-                  'plugins.gradle.org', 'plugins-artifacts.gradle.org'}
+# Each supplier's Maven repository root. A host without a fixed root serves only URLs that authenticated
+# publication metadata names.
+SUPPLIER_ROOTS = {'dl.google.com': '/dl/android/maven2', 'maven.google.com': '', 'repo.maven.apache.org': '/maven2',
+                  'repo1.maven.org': '/maven2', 'plugins.gradle.org': '/m2', 'plugins-artifacts.gradle.org': None}
+SUPPLIER_HOSTS = set(SUPPLIER_ROOTS)
 
 
 def unique_object(pairs):
@@ -145,6 +148,15 @@ def payload_url(item):
             raise ValueError('Supplier checksum URL is malformed')
         return url[:-len('.sha256')]
     return url
+
+
+def is_standard_supplier_path(item):
+    """Whether the supplier URL is exactly the registry's coordinate path ending in the recorded artifact name."""
+    group, module, version = item['coordinate'].split(':')
+    url = urllib.parse.urlsplit(payload_url(item))
+    registry = SUPPLIER_ROOTS.get(url.hostname)
+    expected = '/'.join([registry or '', *group.split('.'), module, version, item['name']])
+    return registry is not None and urllib.parse.unquote(url.path) == expected
 
 
 def validate_publication_mapping(item, records, suppliers, root):
@@ -244,9 +256,9 @@ def validate_bundle(root):
                 url.port not in [None, 443] or url.query or url.fragment or
                 item.get('method') not in ['published-sha256', 'independent-payload-sha256']):
             raise ValueError('Unreviewed or ambiguous artifact supplier evidence')
-        group, module, version = item['coordinate'].split(':')
-        publication = '/' + '/'.join([*group.split('.'), module, version]) + '/'
-        if publication not in urllib.parse.unquote(url.path):
+        # Any other path, including another directory or a different filename, must be named by the
+        # coordinate's own authenticated publication metadata.
+        if not is_standard_supplier_path(item):
             validate_publication_mapping(item, records, manifest['suppliers'], root)
         suppliers[key] = item
     if set(suppliers) != set(records):

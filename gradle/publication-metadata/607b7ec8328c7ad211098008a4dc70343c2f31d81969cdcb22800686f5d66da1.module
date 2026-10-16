@@ -1,0 +1,140 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "url": "../../uiautomator-shell/2.4.0/uiautomator-shell-2.4.0.module",
+    "group": "androidx.test.uiautomator",
+    "module": "uiautomator-shell",
+    "version": "2.4.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.5.0",
+      "buildId:": "15669731"
+    }
+  },
+  "variants": [
+    {
+      "name": "androidApiElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.20"
+          }
+        }
+      ],
+      "dependencyConstraints": [
+        {
+          "group": "androidx.test.uiautomator",
+          "module": "uiautomator",
+          "version": {
+            "requires": "2.4.0"
+          },
+          "reason": "uiautomator-shell is in atomic group androidx.test.uiautomator"
+        }
+      ],
+      "files": [
+        {
+          "name": "uiautomator-shell.aar",
+          "url": "uiautomator-shell-android-2.4.0.aar",
+          "size": 74796,
+          "sha512": "c2488de3bb6130c96382d5677f5871697ce6a14c6e1470760bde0933058dc46b5205876b6c050430ace53727a6c1bcc4d2f6355b7594a53ea377b42b8cb0dcff",
+          "sha256": "aa97c53f034c7ffed41975b2c37b82b02b23b3cd28be61a1281edd29014bbcc4",
+          "sha1": "ceaf2f593ccd9c2477a4632862ba756ffc5f8fcc",
+          "md5": "18ccbb2be78c22c204d233cd7c76941f"
+        }
+      ]
+    },
+    {
+      "name": "androidRuntimeElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.test",
+          "module": "core",
+          "version": {
+            "requires": "1.7.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.1.20"
+          }
+        }
+      ],
+      "dependencyConstraints": [
+        {
+          "group": "androidx.test.uiautomator",
+          "module": "uiautomator",
+          "version": {
+            "requires": "2.4.0"
+          },
+          "reason": "uiautomator-shell is in atomic group androidx.test.uiautomator"
+        }
+      ],
+      "files": [
+        {
+          "name": "uiautomator-shell.aar",
+          "url": "uiautomator-shell-android-2.4.0.aar",
+          "size": 74796,
+          "sha512": "c2488de3bb6130c96382d5677f5871697ce6a14c6e1470760bde0933058dc46b5205876b6c050430ace53727a6c1bcc4d2f6355b7594a53ea377b42b8cb0dcff",
+          "sha256": "aa97c53f034c7ffed41975b2c37b82b02b23b3cd28be61a1281edd29014bbcc4",
+          "sha1": "ceaf2f593ccd9c2477a4632862ba756ffc5f8fcc",
+          "md5": "18ccbb2be78c22c204d233cd7c76941f"
+        }
+      ]
+    },
+    {
+      "name": "androidSourcesElements-published",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencyConstraints": [
+        {
+          "group": "androidx.test.uiautomator",
+          "module": "uiautomator",
+          "version": {
+            "requires": "2.4.0"
+          },
+          "reason": "uiautomator-shell is in atomic group androidx.test.uiautomator"
+        }
+      ],
+      "files": [
+        {
+          "name": "uiautomator-shell-android-2.4.0-sources.jar",
+          "url": "uiautomator-shell-android-2.4.0-sources.jar",
+          "size": 25290,
+          "sha512": "59621e6025cd923a151010468b478cc9c6f9216b6df43e23b2f54736463848bc3b4c6413a39e90f9eaa0668c375709415e4d4434eb1a03df5a7ca54f83800f8e",
+          "sha256": "26a124cb2fe0501f5a4a47f29a7ccdff25df9d10aeefb7c2f8a2193b1fe2e125",
+          "sha1": "7e32ae4bd1c5b0f1a23a430d22dc6f20e89e9470",
+          "md5": "295f04587308e104bdf8834575db8168"
+        }
+      ]
+    }
+  ]
+}

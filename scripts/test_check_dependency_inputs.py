@@ -230,6 +230,23 @@ class DependencyInputsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
             inputs.validate_bundle(self.root)
 
+    def test_supplier_url_with_an_inserted_path_segment_is_not_the_declared_coordinate(self):
+        """An extra directory before the coordinate path is another location, not evidence for this artifact."""
+        artifact = self.manifest['suppliers'][0]
+        artifact['source'] = ('https://repo.maven.apache.org/maven2/not-the-declared-coordinate/'
+                              'example/library/1.0/library-1.0.jar.sha256')
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
+            inputs.validate_bundle(self.root)
+
+    def test_supplier_url_filename_must_be_the_recorded_artifact_name(self):
+        """The coordinate directory alone is not enough when the final URL names a different file."""
+        artifact = self.manifest['suppliers'][0]
+        artifact['source'] = 'https://repo.maven.apache.org/maven2/example/library/1.0/library-1.0-sources.jar.sha256'
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
+            inputs.validate_bundle(self.root)
+
     def test_metadata_bypasses_and_malformed_records_fail(self):
         """Verification cannot be disabled, broadly trusted, entity-expanded or ambiguous."""
         for text in [XML.replace('true', 'false'),
