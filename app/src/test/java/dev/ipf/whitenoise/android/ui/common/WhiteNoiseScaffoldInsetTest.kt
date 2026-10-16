@@ -2,11 +2,13 @@ package dev.ipf.whitenoise.android.ui.common
 
 import android.view.View
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +67,15 @@ class WhiteNoiseScaffoldInsetTest {
         dispatchStatusBar()
 
         assertEquals(STATUS_PX.dp.value, contentBounds().top.value, TOLERANCE)
+    }
+
+    /** Under an ancestor that already consumed the status bar, as the shell or a modal strip does, no gap is added. */
+    @Test
+    fun aBarLessScaffoldUnderAConsumingAncestorAddsNoSecondInset() {
+        render(topBar = false, statusBarConsumedAbove = true)
+        dispatchStatusBar()
+
+        assertEquals(0f, contentBounds().top.value, TOLERANCE)
     }
 
     /** Without a top bar, a banner sits directly under the status bar and the content starts under the banner. */
@@ -133,27 +144,35 @@ class WhiteNoiseScaffoldInsetTest {
         composeRule.waitForIdle()
     }
 
-    /** Renders the scaffold under a host, with a plain fixed-height bar that pads for nothing itself. */
+    /**
+     * Renders the scaffold under a host, with a plain fixed-height bar that pads for nothing itself, optionally
+     * below an ancestor that has already consumed the status bar.
+     */
     private fun render(
         topBar: Boolean,
         slot: Boolean = true,
+        statusBarConsumedAbove: Boolean = false,
     ) {
         val host = TopNoticeHost(SnackbarHostState(), notice = { notice.value })
         composeRule.setContent {
             view = LocalView.current
             CompositionLocalProvider(LocalTopNoticeHost provides host) {
                 WhiteNoiseTheme {
-                    WhiteNoiseScaffold(
-                        topBar = { if (topBar) Box(Modifier.fillMaxWidth().height(BAR_HEIGHT).testTag(BAR_TAG)) },
-                        topNoticeSlot = slot,
-                    ) { padding ->
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .padding(padding)
-                                .consumeWindowInsets(padding)
-                                .testTag(CONTENT_TAG),
-                        )
+                    val ancestor =
+                        if (statusBarConsumedAbove) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier
+                    Box(ancestor) {
+                        WhiteNoiseScaffold(
+                            topBar = { if (topBar) Box(Modifier.fillMaxWidth().height(BAR_HEIGHT).testTag(BAR_TAG)) },
+                            topNoticeSlot = slot,
+                        ) { padding ->
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(padding)
+                                    .consumeWindowInsets(padding)
+                                    .testTag(CONTENT_TAG),
+                            )
+                        }
                     }
                 }
             }

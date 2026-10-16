@@ -86,8 +86,9 @@ class TopNoticePlacementCoverageTest {
         val barSlot = scaffoldSource.functionBody("ScaffoldTopBarWithNoticeSlot")
         val topBar = barSlot.indexOf("topBar()")
         assertTrue("the slot follows the bar", barSlot.indexOf("TopNoticeSlot()") > topBar && topBar >= 0)
-        val insetGuard = "if (bar.height == 0) contentWindowInsets.getTop(this) else 0"
-        assertTrue("a bar-less scaffold must keep its top inset under the slot", insetGuard in barSlot)
+        val insetGuard = "if (bar.height == 0) contentWindowInsets.exclude(consumed).getTop(this) else 0"
+        assertTrue("a bar-less scaffold keeps only the top inset no ancestor consumed under the slot", insetGuard in barSlot)
+        assertTrue("the slot must track what ancestors consumed", "onConsumedWindowInsetsChanged" in barSlot)
 
         val conversation = mainSource("ui/conversation/ConversationScreen.kt")
         assertTrue("topNoticeSlot = false" in conversation)
