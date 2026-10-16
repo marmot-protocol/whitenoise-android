@@ -67,17 +67,37 @@ class GroupAbandonmentCoverageTest {
         }
     }
 
-    /** The native forget has exactly one call site, so no surface can bypass the journal or its cleanup. */
+    /**
+     * The native forget has exactly one call site, so no surface can bypass the journal or its cleanup. Any call that
+     * passes an argument counts, whatever it is named, while declarations and the controller's argument-free
+     * `forgetGroupLocal()` do not.
+     */
     @Test
     fun nativeForgetHasOneJournaledCallSite() {
-        val nativeCall = Regex("""\bforgetGroupLocal\(\s*account\b""")
-        val callers =
+        val callSites =
             mainRoot()
                 .walkTopDown()
-                .filter { it.isFile && it.extension == "kt" && nativeCall.containsMatchIn(it.readText()) }
-                .map { it.name }
+                .filter { it.isFile && it.extension == "kt" }
+                .flatMap { file -> nativeForgetCalls(file.readText()).map { line -> "${file.name}:$line" } }
                 .toList()
-        assertEquals(listOf("GroupLocalRemoval.kt"), callers)
+        assertEquals("exactly one native forget call site, found $callSites", 1, callSites.size)
+        assertTrue("the call site is the journaled boundary", callSites.single().startsWith("GroupLocalRemoval.kt:"))
+    }
+
+    /** The detector matches calls with any argument, including a multi-line one, and skips declarations. */
+    @Test
+    fun nativeForgetDetectorMatchesAnyArgumentAndSkipsDeclarations() {
+        val source =
+            """
+            fun MarmotInterface.forgetGroupLocal(account: String, group: String) = Unit
+            suspend fun forgetGroupLocal(): Boolean = true
+            val a = forgetGroupLocal(accountRef, groupIdHex)
+            val b = marmot.forgetGroupLocal(
+                account = other,
+            )
+            val c = controller.forgetGroupLocal()
+            """.trimIndent()
+        assertEquals(listOf(3, 4), nativeForgetCalls(source))
     }
 
     /** The chat list offers the row action only through its captured, reviewed request. */
@@ -89,6 +109,16 @@ class GroupAbandonmentCoverageTest {
         assertTrue("read-only invites decline instead", "item.group.pendingConfirmation" in menu)
         assertTrue("the host shares the departure busy set", "busyChats = leavingAndDeleting" in screen)
     }
+
+    /** One-based lines of every `forgetGroupLocal` call that passes an argument, skipping `fun` declarations. */
+    private fun nativeForgetCalls(source: String): List<Int> =
+        NATIVE_FORGET_CALL
+            .findAll(source)
+            .filterNot { call ->
+                val lineStart = source.lastIndexOf('\n', call.range.first) + 1
+                FORGET_DECLARATION_PREFIX.containsMatchIn(source.substring(lineStart, call.range.first))
+            }.map { call -> source.substring(0, call.range.first).count { it == '\n' } + 1 }
+            .toList()
 
     /** Body of an extension function such as `fun Receiver.name(...)`, which [functionBody] does not match. */
     private fun String.extensionBody(name: String): String {
@@ -116,6 +146,8 @@ class GroupAbandonmentCoverageTest {
         ).firstOrNull { it.exists() } ?: error("Missing main source root")
 
     private companion object {
+        val NATIVE_FORGET_CALL = Regex("""\bforgetGroupLocal\(\s*[^)\s]""")
+        val FORGET_DECLARATION_PREFIX = Regex("""\bfun\s+(?:[\w.<>]+\.)?$""")
         val DEPARTURES =
             listOf("leaveGroup(", "transferAdmin", "promoteAdmin", "selfDemoteAdmin", "stepDownAsAdmin", "disbandGroup")
     }
