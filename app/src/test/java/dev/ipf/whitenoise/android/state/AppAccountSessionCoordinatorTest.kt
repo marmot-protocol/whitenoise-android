@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -16,6 +17,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.coroutines.ContinuationInterceptor
 
 /** Exercises the extracted production boundary with suspended platform/native adapters, without booting MDK. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -297,6 +299,30 @@ class AppAccountSessionCoordinatorTest {
                 publishReady = { error("old import cannot publish into a replacement runtime") },
                 warmProfile = { error("old import cannot warm a replacement runtime") },
             )
+        }
+
+    /** Extraction must preserve the caller's continuation dispatcher across platform/native suspensions. */
+    @Test
+    fun activationImportAndTeardownRetainCallerDispatcher() =
+        runTest {
+            val expected = currentCoroutineContext()[ContinuationInterceptor]
+            val host = Activation()
+            host.beforePrepare = { assertSame(expected, currentCoroutineContext()[ContinuationInterceptor]) }
+            val owner = coordinator(backgroundScope, host)
+            val receipt = checkNotNull(owner.activate(AccountSessionActivationRequest("imported")))
+            owner.finishImportedIdentity(
+                receipt,
+                refreshSettings = { assertSame(expected, currentCoroutineContext()[ContinuationInterceptor]) },
+                publishReady = {},
+                warmProfile = {},
+            )
+            owner.prepareForAccountTeardown {
+                AccountSessionTeardown(
+                    restartNotifications = false,
+                    invalidateActiveSession = {},
+                    closeControllers = { assertSame(expected, currentCoroutineContext()[ContinuationInterceptor]) },
+                )
+            }
         }
 
     /** Uses deterministic state dispatch and the real teardown owner rather than a fake lifetime manager. */

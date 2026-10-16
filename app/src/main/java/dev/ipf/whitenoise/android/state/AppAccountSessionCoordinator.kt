@@ -79,9 +79,10 @@ internal data class AccountSessionTeardown(
 )
 
 /**
- * Owns Android account-session ordering on [stateDispatcher]. Bootstrap and catch-up retain their existing
- * process scopes; activation stays caller-cancellable. Native startup, one-shot projection handoff and
- * listener cleanup reuse their shipped owners rather than acquiring competing runtime lifetimes.
+ * Owns Android account-session ordering. Bootstrap dispatches through [stateDispatcher]; catch-up retains
+ * its recovery scope. Activation, identity publication and teardown inherit the facade caller's state
+ * confinement and cancellation context, including its continuation dispatcher. Native startup, one-shot
+ * projection handoff and listener cleanup reuse their shipped owners without competing runtime lifetimes.
  */
 internal class AppAccountSessionCoordinator(
     private val mutationScope: CoroutineScope,
@@ -121,35 +122,33 @@ internal class AppAccountSessionCoordinator(
         refreshSettings: suspend () -> Unit,
         publishReady: () -> Unit,
         warmProfile: suspend () -> Unit,
-    ) =
-        withContext(stateDispatcher) {
-            val isCurrent = {
-                handoff.isCurrent(receipt.generation) && activation.activeAccount == receipt.label &&
-                    activation.canPublish(receipt.label, receipt.runtimeGeneration)
-            }
+    ) {
+        val isCurrent = {
+            handoff.isCurrent(receipt.generation) && activation.activeAccount == receipt.label &&
+                activation.canPublish(receipt.label, receipt.runtimeGeneration)
+        }
+        if (isCurrent()) {
+            refreshSettings()
             if (isCurrent()) {
-                refreshSettings()
-                if (isCurrent()) {
-                    publishReady()
-                    warmProfile()
-                }
+                publishReady()
+                warmProfile()
             }
         }
+    }
 
     /** Publishes a latest-wins selection, then admits every deferred refresh against the same runtime. */
     suspend fun activate(
         request: AccountSessionActivationRequest,
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
-    ): AccountSessionActivationReceipt? =
-        withContext(stateDispatcher) {
-            val generation = handoff.beginRequest(request.label)
-            try {
-                activateCurrentRequest(request, generation, awaitPostActivationWork, onActivated)
-            } finally {
-                handoff.finishRequest(generation)
-            }
+    ): AccountSessionActivationReceipt? {
+        val generation = handoff.beginRequest(request.label)
+        return try {
+            activateCurrentRequest(request, generation, awaitPostActivationWork, onActivated)
+        } finally {
+            handoff.finishRequest(generation)
         }
+    }
 
     /** Rechecks after shortcut I/O and keeps publication atomic before the caller's frame barrier. */
     @Suppress("ReturnCount") // Preparation failure and each post-suspension fence reject without publication.
@@ -200,14 +199,13 @@ internal class AppAccountSessionCoordinator(
     }
 
     /** Fences the runtime, drains captured controllers, then joins the existing listener owner. */
-    suspend fun prepareForAccountTeardown(capture: () -> AccountSessionTeardown): Boolean =
-        withContext(stateDispatcher) {
-            val teardown = capture()
-            teardown.invalidateActiveSession()
-            teardown.closeControllers()
-            stopListenersForAccountTeardown()
-            teardown.restartNotifications
-        }
+    suspend fun prepareForAccountTeardown(capture: () -> AccountSessionTeardown): Boolean {
+        val teardown = capture()
+        teardown.invalidateActiveSession()
+        teardown.closeControllers()
+        stopListenersForAccountTeardown()
+        return teardown.restartNotifications
+    }
 
     /** Delegates to the shipped owner, including native subscription close and recovery-job joins. */
     suspend fun stopListenersForAccountTeardown() = listenerTeardown().stopForAccountTeardown()
