@@ -16,7 +16,7 @@ else:
 
 
 def notice_rows(metadata, texts):
-    """Decode the reader's offset:length index into (name, text SHA-256) rows."""
+    """Decode the reader's offset:length index into (name, text bytes) rows."""
     rows = []
     for line in metadata.decode('utf-8').splitlines():
         if not line.strip():
@@ -28,7 +28,7 @@ def notice_rows(metadata, texts):
         text = texts[offset:offset + length]
         if not text.decode('utf-8').strip():
             raise ValueError('packaged notice text is empty')
-        rows.append((name, hashlib.sha256(text).hexdigest()))
+        rows.append((name, text))
     return rows
 
 
@@ -55,7 +55,12 @@ def require_baseline(metadata, texts, icons, baseline):
     required = set(notice_rows(original['third_party_license_metadata'], original['third_party_licenses']))
     if not required:
         raise ValueError('missing source-bound notice baseline')
-    missing = required - set(notice_rows(metadata, texts))
+    shipped = {}
+    for name, text in notice_rows(metadata, texts):
+        shipped.setdefault(name, []).append(text)
+    # An original text may gain a reviewed full licence after a blank line, but never lose or change a byte.
+    missing = {(name, text) for name, text in required
+               if not any(item == text or item.startswith(text + b'\n\n') for item in shipped.get(name, []))}
     if missing:
         raise ValueError('original notices were lost or changed: ' + ', '.join(sorted(name for name, _ in missing)))
     if hashlib.sha256(icons).hexdigest() != expected.get('material_icons_sha256'):

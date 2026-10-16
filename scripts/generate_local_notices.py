@@ -42,6 +42,30 @@ def artifact_key(item):
     return coordinate, name
 
 
+def read_text(catalog_path, item, name):
+    """Read one pinned, reviewed text under texts/, with its source recorded."""
+    relative = Path(item.get('text', ''))
+    if relative.is_absolute() or '..' in relative.parts or len(relative.parts) != 2 or relative.parts[0] != 'texts':
+        raise ValueError('Unsafe notice text path')
+    text_path = catalog_path.parent / relative
+    if text_path.is_symlink() or not text_path.is_file():
+        raise ValueError('Missing notice text: ' + name)
+    try:
+        text_path.resolve().relative_to(catalog_path.parent.resolve())
+    except ValueError as error:
+        raise ValueError('Notice text escapes reviewed directory') from error
+    if not 0 < text_path.stat().st_size <= 16 * 1024 * 1024:
+        raise ValueError('Invalid notice text size: ' + name)
+    data = text_path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != item.get('sha256'):
+        raise ValueError('Changed or truncated notice text: ' + name)
+    if not data.decode('utf-8', errors='strict').strip():
+        raise ValueError('Empty notice text: ' + name)
+    if not isinstance(item.get('source'), str) or not item['source'].strip():
+        raise ValueError('Missing notice source: ' + name)
+    return data
+
+
 def read_catalog(path):
     """Verify every pinned notice before selecting entries for a build variant."""
     catalog = read_json(path)
@@ -60,25 +84,12 @@ def read_catalog(path):
                 identifier in notices or not isinstance(name, str) or not name.strip() or
                 name != name.strip() or '\n' in name or '\r' in name):
             raise ValueError('Invalid or duplicate notice name/id')
-        relative = Path(item.get('text', ''))
-        if relative.is_absolute() or '..' in relative.parts or len(relative.parts) != 2 or relative.parts[0] != 'texts':
-            raise ValueError('Unsafe notice text path')
-        text_path = path.parent / relative
-        if text_path.is_symlink() or not text_path.is_file():
-            raise ValueError('Missing notice text: ' + name)
-        try:
-            text_path.resolve().relative_to(path.parent.resolve())
-        except ValueError as error:
-            raise ValueError('Notice text escapes reviewed directory') from error
-        if not 0 < text_path.stat().st_size <= 16 * 1024 * 1024:
-            raise ValueError('Invalid notice text size: ' + name)
-        data = text_path.read_bytes()
-        if hashlib.sha256(data).hexdigest() != item.get('sha256'):
-            raise ValueError('Changed or truncated notice text: ' + name)
-        if not data.decode('utf-8', errors='strict').strip():
-            raise ValueError('Empty notice text: ' + name)
-        if not isinstance(item.get('source'), str) or not item['source'].strip():
-            raise ValueError('Missing notice source: ' + name)
+        data = read_text(path, item, name)
+        if 'full_text' in item:
+            # A licence named only by URL keeps that original line and gains its reviewed full text.
+            if not isinstance(item['full_text'], dict):
+                raise ValueError('Malformed full licence text: ' + name)
+            data += b'\n\n' + read_text(path, item['full_text'], name)
         notices[identifier] = (name, data)
     if not notices or len(notices) > 4096:
         raise ValueError('Missing or oversized notice set')

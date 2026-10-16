@@ -112,6 +112,14 @@ resource 0x7f010003 raw/material_icons_notice
         with self.assertRaisesRegex(ValueError, 'lost or changed: Library'):
             require_baseline(b'0:5 Other library\n', b'Other', self.icons, baseline)
 
+    def test_original_text_may_gain_a_full_licence_but_not_change(self):
+        """An original URL-only notice is kept when full text follows it, never when its bytes change."""
+        expanded = self.text + b'\n\nFull licence text\n'
+        require_baseline(f'0:{len(expanded)} Library\n'.encode(), expanded, self.icons, self.baseline)
+        for text in [b'Changed owner\n\nFull licence text\n', self.text + b'Full licence text\n']:
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, 'lost or changed: Library'):
+                require_baseline(f'0:{len(text)} Library\n'.encode(), text, self.icons, self.baseline)
+
     def test_notice_rows_keep_duplicate_index_entries(self):
         """Repeated original rows stay visible so the baseline row count is exact."""
         metadata = self.metadata + self.metadata

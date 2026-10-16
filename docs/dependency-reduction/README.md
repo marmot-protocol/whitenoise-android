@@ -55,7 +55,15 @@ whether it is new or changed. For each one, add or update the exact
 `artifacts[]` entry in `catalog.json` (`coordinate`, file `name`, `sha256` and
 the `notice_ids` it ships). A new licence text goes in `texts/<sha256>.txt` with
 a `notices[]` entry (`id`, `name`, `text`, `sha256`, `source`). Keep one artifact
-or notice per line. The required notices come from the retained original plugin
+or notice per line.
+
+Where the original notice is only a licence URL, an optional `full_text`
+(`text`, `sha256`, `source`) appends the reviewed full licence after a blank line.
+The original line stays first, so the baseline still finds it unchanged. Apache 2.0
+uses the official text; Checker Qual's MIT text comes from its own jar; the BSD-3
+texts are libyuv's (bundled in Camera Core) and Protocol Buffers'; JNA's LGPL-2.1
+row uses the text from JNA's repository. The Google Play services and Firebase
+rows stay links to the Android SDK terms. The required notices come from the retained original plugin
 output in `config/licenses/evidence/`, so a catalogue edit cannot drop one.
 
 `verify_notice_resources.py` follows the optimized APK's resource table to the

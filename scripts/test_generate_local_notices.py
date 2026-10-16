@@ -96,6 +96,24 @@ class LocalNoticesTest(unittest.TestCase):
                       message)
         self.assertIn('example:new:1.0 two-1.0.aar sha256=' + 'b' * 64 + ' (new artifact)', message)
 
+    def test_full_licence_text_follows_the_original_line(self):
+        """A reviewed full text is appended after a blank line, and its bytes stay pinned."""
+        full = b'Full licence terms\n'
+        (self.root / 'texts/full.txt').write_bytes(full)
+        self.catalog['notices'][0]['full_text'] = {'text': 'texts/full.txt', 'sha256': hashlib.sha256(full).hexdigest(),
+                                                   'source': 'Synthetic full licence fixture'}
+        self.write_catalog()
+        notices.generate(self.path, self.selected, self.root / 'output')
+        data = (self.root / 'output/third_party_licenses').read_bytes()
+        self.assertIn(self.text + b'\n\n' + full, data)
+        for broken, message in [({'text': 'texts/full.txt', 'sha256': 'f' * 64, 'source': 'fixture'}, 'Changed or truncated'),
+                                ({'text': 'texts/full.txt', 'sha256': hashlib.sha256(full).hexdigest()}, 'Missing notice source'),
+                                ('texts/full.txt', 'Malformed full licence text')]:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                self.catalog['notices'][0]['full_text'] = broken
+                self.write_catalog()
+                notices.generate(self.path, self.selected, self.root / 'broken')
+
     def test_missing_or_truncated_text_fails(self):
         """A catalogue entry cannot mask incomplete or missing checked-in attribution."""
         self.write_catalog()
@@ -187,8 +205,9 @@ class LocalNoticesTest(unittest.TestCase):
         changed_path = self.root / 'changed-catalog.json'
         # Retain real reviewed text paths beside the edited catalogue, with pinned bytes.
         for notice in changed['notices']:
-            target = self.root / notice['text']
-            target.write_bytes((path.parent / notice['text']).read_bytes())
+            for text in [notice['text'], notice.get('full_text', {}).get('text')]:
+                if text:
+                    (self.root / text).write_bytes((path.parent / text).read_bytes())
         changed_path.write_text(json.dumps(changed))
         with self.assertRaisesRegex(ValueError, 'original notices were lost or changed'):
             notices.generate(changed_path, changed['artifacts'], self.root / 'changed-output',
