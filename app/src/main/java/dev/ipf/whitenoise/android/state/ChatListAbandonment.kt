@@ -1,28 +1,16 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.whitenoise.android.R
-
 /**
  * Chat-list local abandonment (#3310) of one reviewed row: MDK's forget through the same optimistic row removal,
- * durable cleanup journal, failure notice and scoped retry as Delete from this device. It never leaves, demotes or
- * transfers admin, so it completes whatever the peer's acceptance, eligibility or availability.
+ * durable cleanup journal, failure notice and scoped retry as Delete from this device, in abandonment wording. It
+ * never leaves, demotes or transfers admin, so it completes whatever the peer's acceptance, eligibility or
+ * availability. Deferred cleanup finishes quietly from the journal, and [notify] confirms a complete removal.
  */
 internal suspend fun ChatsController.abandonChatFromList(
     groupIdHex: String,
     isDm: Boolean,
+    notify: Boolean = true,
 ): Boolean {
-    var cleanupDeferred = false
-    val removed =
-        deleteGroupLocalFromChatList(
-            groupIdHex,
-            notify = false,
-            failureMessage = if (isDm) R.string.toast_couldnt_abandon_chat else R.string.toast_couldnt_reset_group,
-            observer = LocalChatDeleteObserver(onCleanupDeferred = { cleanupDeferred = true }),
-            forgetProtocol = true,
-        )
-    // Deferred cleanup finishes quietly from the journal, as it does for a local delete.
-    if (removed && !cleanupDeferred) {
-        appState.presentTransient(if (isDm) R.string.toast_chat_abandoned else R.string.toast_group_reset_done)
-    }
-    return removed
+    val wording = LocalRemovalWording.abandonment(isDm)
+    return deleteGroupLocalFromChatList(groupIdHex, notify = notify, wording = wording, forgetProtocol = true)
 }

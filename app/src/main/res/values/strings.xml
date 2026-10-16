@@ -2392,6 +2392,8 @@
     <string name="onboarding_details_collapsed">Collapsed</string>
     <!-- Keep first-strong isolation balanced so counts and punctuation stay readable in RTL layouts. -->
     <string name="local_delete_retry_detail">\u2068Deletion stopped. Try Delete from this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
+    <string name="local_abandon_retry_detail">\u2068Abandoning stopped. Try Abandon chat on this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
+    <string name="local_reset_retry_detail">\u2068Reset stopped. Try Reset and wait for a new invite again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
     <string name="chat_list_delete_stopped">Deletion stopped</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>

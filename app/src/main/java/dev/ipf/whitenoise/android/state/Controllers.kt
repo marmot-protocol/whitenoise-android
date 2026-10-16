@@ -4893,7 +4893,7 @@ class ChatsController private constructor(
         val deleted =
             deleteGroupLocalFromChatList(
                 groupIdHex,
-                failureMessage = R.string.toast_left_chat_delete_failed,
+                wording = LocalRemovalWording.Delete.copy(failureTitle = R.string.toast_left_chat_delete_failed),
                 observer = LocalChatDeleteObserver(onCleanupDeferred = { deferred = true }),
             )
         return (deleted && !deferred).also { if (it) onStage(ChatDepartureStage.COMPLETED) }
@@ -4952,7 +4952,7 @@ class ChatsController private constructor(
     internal suspend fun deleteGroupLocalFromChatList(
         groupIdHex: String,
         notify: Boolean = true,
-        failureMessage: Int = R.string.toast_couldnt_delete_chat,
+        wording: LocalRemovalWording = LocalRemovalWording.Delete,
         observer: LocalChatDeleteObserver = LocalChatDeleteObserver(),
         forgetProtocol: Boolean = false,
     ): Boolean =
@@ -4990,14 +4990,16 @@ class ChatsController private constructor(
                 }
                 if (failure is CancellationException) throw failure
                 if (isCurrent()) {
+                    // The retry keeps this removal's wording, so a retried abandonment never reads as a delete.
                     appState.presentLocalDeleteFailure(
-                        failureMessage,
+                        wording.failureTitle,
                         failure,
+                        detail = AppText.Resource(wording.failureDetail),
                         notice =
                             appState.localDeleteRetryNotice(account, groupIdHex, isCurrent) {
                                 deleteGroupLocalFromChatList(
                                     groupIdHex,
-                                    failureMessage = failureMessage,
+                                    wording = wording,
                                     forgetProtocol = forgetProtocol,
                                 )
                             },
@@ -5006,25 +5008,27 @@ class ChatsController private constructor(
                 }
                 false
             } else if (isCurrent()) {
-                completeChatLocalRemoval(account, groupIdHex, wipe.getOrDefault(false), notify, observer)
+                val success = wording.success.takeIf { notify }
+                completeChatLocalRemoval(account, groupIdHex, wipe.getOrDefault(false), success, observer)
                 true
             } else {
                 false
             }
         } ?: false
 
+    /** Settles a committed removal, confirming it with [success] only once its Android cleanup also finished. */
     private fun completeChatLocalRemoval(
         account: String,
         groupIdHex: String,
         cleanupComplete: Boolean,
-        notify: Boolean,
+        @StringRes success: Int?,
         observer: LocalChatDeleteObserver,
     ) {
         appState.dismissLocalDeleteFailure(account, groupIdHex)
         removeChatRow(groupIdHex)
         finishRemovedChatRowClientState(groupIdHex)
         if (!cleanupComplete) observer.onCleanupDeferred()
-        if (notify && cleanupComplete) appState.presentTransient(R.string.toast_chat_deleted_local)
+        if (success != null && cleanupComplete) appState.presentTransient(success)
     }
 
     private fun requireChatListDepartureCurrent(

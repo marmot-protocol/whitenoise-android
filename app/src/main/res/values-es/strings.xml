@@ -2226,6 +2226,8 @@
     <string name="onboarding_details_expanded">Expandido</string>
     <string name="onboarding_details_collapsed">Contraído</string>
     <string name="local_delete_retry_detail">\u2068El borrado se detuvo. Vuelve a elegir Eliminar de este dispositivo; primero se comprobará el resultado anterior. Si sigue fallando, reinicia la aplicación.\u2069</string>
+    <string name="local_abandon_retry_detail">\u2068El abandono se detuvo. Vuelve a elegir Abandonar el chat en este dispositivo; primero se comprobará el resultado anterior. Si sigue fallando, reinicia la aplicación.\u2069</string>
+    <string name="local_reset_retry_detail">\u2068El restablecimiento se detuvo. Vuelve a elegir Restablecer y esperar una nueva invitación; primero se comprobará el resultado anterior. Si sigue fallando, reinicia la aplicación.\u2069</string>
     <string name="chat_list_delete_stopped">Borrado detenido</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d de %2$d eliminaciones confirmadas. Reintenta Eliminar de este dispositivo para comprobar el resultado. Si sigue fallando, reinicia la aplicación.\u2069</string>
     <string name="group_svg_rejected_detail">No se pudo preparar este SVG. Elige un SVG sencillo, PNG o JPEG.</string>

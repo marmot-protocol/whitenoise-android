@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
@@ -11,7 +12,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,23 +85,55 @@ class LocalGroupDeleteAbandonmentTest {
             assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
         }
 
-    /** A failed forget restores the row with the abandonment wording, and a later confirm forgets exactly once. */
+    /**
+     * A failed forget restores the row with abandonment wording, and the notice's own Retry forgets exactly once
+     * and confirms the abandonment, never a local delete.
+     */
     @Test
-    fun chatListAbandonmentFailureRestoresTheRowAndARetryForgetsOnce() =
+    fun chatListAbandonmentFailureRestoresTheRowAndItsRetryForgetsOnceInAbandonmentWording() =
         runTest {
-            val fixture = fixture("forgetGroupLocal")
-            assertFalse(fixture.controller.abandonChatFromList(GROUP, isDm = true))
-            flushLocalDeleteChatRows()
-            assertTrue(fixture.controller.items.any { it.id == GROUP })
-            val failure = requireNotNull(fixture.state.toast)
-            assertEquals(AppText.Resource(R.string.toast_couldnt_abandon_chat), failure.title)
-            assertNotNull("the failure keeps a scoped retry", failure.localDeleteNotice?.retry)
-            fixture.failureMethod.set(null)
-            val forgetsBefore = fixture.calls.count { it == "forgetGroupLocal" }
-            assertTrue(fixture.controller.abandonChatFromList(GROUP, isDm = true))
-            assertEquals(forgetsBefore + 1, fixture.calls.count { it == "forgetGroupLocal" })
-            assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
-            assertEquals(null, fixture.state.toast)
+            // The notice's Retry launches on the app's mutation scope, which the test dispatcher then drives.
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture("forgetGroupLocal")
+                assertFalse(fixture.controller.abandonChatFromList(GROUP, isDm = true))
+                testScheduler.advanceTimeBy(ROW_PROJECTION_SETTLE_MS)
+                testScheduler.runCurrent()
+                flushLocalDeleteChatRows()
+                assertTrue("a failed forget restores the row", fixture.controller.items.any { it.id == GROUP })
+                val failure = requireNotNull(fixture.state.toast)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_abandon_chat), failure.title)
+                assertEquals(AppText.Resource(R.string.local_abandon_retry_detail), failure.detail)
+                fixture.failureMethod.set(null)
+                val forgetsBefore = fixture.calls.count { it == "forgetGroupLocal" }
+                retry(fixture, failure)
+                assertEquals(forgetsBefore + 1, fixture.calls.count { it == "forgetGroupLocal" })
+                assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
+                assertEquals(null, fixture.state.toast)
+                assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** A group's failed reset keeps the reset wording through its notice and its retry's confirmation. */
+    @Test
+    fun chatListGroupResetFailureAndRetryKeepTheResetWording() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture("forgetGroupLocal")
+                assertFalse(fixture.controller.abandonChatFromList(GROUP, isDm = false))
+                val failure = requireNotNull(fixture.state.toast)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_reset_group), failure.title)
+                assertEquals(AppText.Resource(R.string.local_reset_retry_detail), failure.detail)
+                fixture.failureMethod.set(null)
+                retry(fixture, failure)
+                assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
+                assertEquals(AppText.Resource(R.string.toast_group_reset_done), fixture.state.transientNotice?.title)
+            } finally {
+                Dispatchers.resetMain()
+            }
         }
 
     /** A failed media listing never blocks abandonment: the forget runs once and only media keys are skipped. */
@@ -120,6 +152,19 @@ class LocalGroupDeleteAbandonmentTest {
             assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
         }
 
+    /** Runs the failure notice's own Retry, as its action button does, and waits for the launched mutation. */
+    private suspend fun retry(
+        fixture: LocalGroupDeleteFixture,
+        failure: ToastMessage,
+    ) {
+        val notice = requireNotNull(failure.localDeleteNotice) { "the failure keeps a scoped retry" }
+        requireNotNull(notice.retry).invoke(notice.groupIds)
+        fixture.state.mutationsScope.coroutineContext[Job]
+            ?.children
+            ?.toList()
+            ?.forEach { it.join() }
+    }
+
     /** A Group Details controller for the fixture row presented as a freshly started direct chat. */
     private fun dmConversation(fixture: LocalGroupDeleteFixture): ConversationController =
         ConversationController(
@@ -135,6 +180,7 @@ class LocalGroupDeleteAbandonmentTest {
     ): LocalGroupDeleteFixture = localGroupDeleteFixture(controllers, failing, onRowRead)
 
     private companion object {
+        const val ROW_PROJECTION_SETTLE_MS = 100L
         val GROUP = LOCAL_DELETE_GROUP
         val DEPARTURE_MUTATIONS =
             setOf("leaveGroup", "selfDemoteAdmin", "selfDemoteAdminDetailed", "promoteAdmin", "promoteAdminDetailed")
