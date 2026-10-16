@@ -51,8 +51,7 @@ internal data class EdgeClipScenario(
 /**
  * Screen-space layout of the open viewer, measured from its real Compose nodes and Media3 views. [safe] is the
  * window less the insets the viewer window was given, [video] is Media3's aspect-fitted content frame and
- * [controls] holds only the Media3 controls currently shown. [minimalLayout] is true while Media3 has chosen its own
- * minimal layout for a body too small for the full one, which replaces the time row with its minimal controls.
+ * [controls] holds only the Media3 controls currently shown.
  */
 internal data class ViewerGeometry(
     val window: Rect,
@@ -67,7 +66,6 @@ internal data class ViewerGeometry(
     val controllerContentHeight: Int,
     val fullControllerHeight: Int,
     val controls: Map<String, Rect>,
-    val minimalLayout: Boolean,
 )
 
 /**
@@ -185,7 +183,6 @@ internal class EdgeClipViewerFixture(
                     center.heightWithMargins() - center.paddingTop - center.paddingBottom +
                         2 * bottom.heightWithMargins(),
                 controls = shownControls(view),
-                minimalLayout = view.findViewById<View>(Media3R.id.exo_minimal_controls)?.isShown == true,
             )
         }
     }

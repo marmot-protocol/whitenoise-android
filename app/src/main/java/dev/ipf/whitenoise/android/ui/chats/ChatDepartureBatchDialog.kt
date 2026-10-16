@@ -129,7 +129,13 @@ internal fun ChatDepartureBatchDialog(
         }
     }
     if (!ui.confirmed) {
-        ChatDepartureReview(request, actionLabel, onConfirm = { start(request.targets) }, onDismiss = actions.onDismiss)
+        ChatDepartureReview(
+            abandonmentTargets = request.abandonmentTargets.takeIf { request.abandon },
+            targetCount = request.targets.size,
+            actionLabel = actionLabel,
+            onConfirm = { start(request.targets) },
+            onDismiss = actions.onDismiss,
+        )
     } else if (ui.decision != null) {
         ChatDepartureSuccessor(ui, appState)
     } else {
@@ -168,29 +174,30 @@ private fun PendingChatDeparture.actionLabel(): Int =
     }
 
 /**
- * The confirmation before anything is submitted. An abandonment uses the shared review that names every chat and the
- * acting account (#3282), and closes instead when it was captured without an account, and a departure keeps its
- * handover-aware confirmation.
+ * The confirmation before anything is submitted. An abandonment, given its [abandonmentTargets], uses the shared review
+ * that names every chat and the acting account (#3282), and closes instead when it was captured without an account. A
+ * departure, with null targets, keeps its handover-aware confirmation for [targetCount] chats.
  */
 @Composable
 @Suppress("FunctionNaming")
-private fun ChatDepartureReview(
-    request: PendingChatDeparture,
+internal fun ChatDepartureReview(
+    abandonmentTargets: List<GroupAbandonmentTarget>?,
+    targetCount: Int,
     actionLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    if (request.abandon) {
+    if (abandonmentTargets != null) {
         // Never review an abandonment without its acting account and chats, captured with the request.
-        if (request.abandonmentTargets.isEmpty()) {
-            LaunchedEffect(request) { onDismiss() }
+        if (abandonmentTargets.isEmpty()) {
+            LaunchedEffect(abandonmentTargets) { onDismiss() }
         } else {
-            GroupAbandonmentDialog(targets = request.abandonmentTargets, onConfirm = onConfirm, onDismiss = onDismiss)
+            GroupAbandonmentDialog(targets = abandonmentTargets, onConfirm = onConfirm, onDismiss = onDismiss)
         }
     } else {
         ConfirmDialog(
             title = actionLabel,
-            message = stringResource(R.string.chat_departure_confirm, request.targets.size),
+            message = stringResource(R.string.chat_departure_confirm, targetCount),
             confirmLabel = actionLabel,
             destructive = true,
             onConfirm = onConfirm,
@@ -219,7 +226,7 @@ private fun departureCallbacks(
     )
 }
 
-private suspend fun chooseDepartureSuccessor(
+internal suspend fun chooseDepartureSuccessor(
     ui: ChatDepartureUi,
     target: ChatDepartureTarget,
     members: List<AppGroupMemberRecordFfi>,

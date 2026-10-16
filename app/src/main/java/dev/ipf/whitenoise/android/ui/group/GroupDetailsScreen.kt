@@ -1100,7 +1100,6 @@ internal fun GroupDetailsScreen(
                             ),
                         onDismiss = { pendingConfirm = null },
                     )
-                // #1131: with no eligible successor, keep the sole admin in the group.
                 is DetailsConfirm.LeaveSoleAdmin ->
                     // Fallback for the (unexpected) no-transfer-candidate case. The normal sole-admin Leave
                     // routes to LeaveSoleAdminTransfer or the picker in leave mode (#1131). With no eligible

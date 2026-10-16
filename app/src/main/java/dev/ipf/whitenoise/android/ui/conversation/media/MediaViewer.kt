@@ -789,19 +789,6 @@ internal fun FullScreenMediaViewer(
                 pictureSession.cancel()
                 pictureFailures.clear()
             },
-            title = { Text(stringResource(R.string.toast_couldnt_update_group)) },
-            text = { Text(stringResource(R.string.error_try_again)) },
-            confirmButton = {
-                TextButton(onClick = { scope.launch { pictureSession.retry(::commitPicture) } }) {
-                    Text(stringResource(R.string.retry))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    pictureSession.cancel()
-                    pictureFailures.clear()
-                }) { Text(stringResource(R.string.cancel)) }
-            },
         )
     }
 }
@@ -835,6 +822,8 @@ internal fun MediaViewerFrame(
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
     var topChromeHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
+    // An open overflow menu keeps its chrome until dismissed, even when a video's controls time out under it.
+    val chromeShown = chromeVisible || moreExpanded
     // The viewer's own snackbars sit below its top chrome, like every temporary banner (#3312).
     val snackbarInsetSides =
         if (chromeShown) {
@@ -848,7 +837,6 @@ internal fun MediaViewerFrame(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
                         .onSizeChanged { topChromeHeight = with(density) { it.height.toDp() } }
                         .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
                 color = MaterialTheme.colorScheme.background,
@@ -954,7 +942,6 @@ internal fun MediaViewerFrame(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
                         .testTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG),
                 color = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
@@ -1016,7 +1003,7 @@ internal fun MediaViewerFrame(
             modifier =
                 Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = if (chromeVisible) topChromeHeight else 0.dp)
+                    .padding(top = if (chromeShown) topChromeHeight else 0.dp)
                     .windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
