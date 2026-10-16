@@ -2,34 +2,41 @@ package dev.ipf.whitenoise.android.media
 
 import android.content.Context
 import android.os.Build
+import android.os.Process
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
-import androidx.test.runner.lifecycle.Stage
+import androidx.work.NetworkType
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.NotificationTrafficClassFfi
-import dev.ipf.marmotkit.NotificationTriggerFfi
-import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.ManualDeviceFixture
+import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.DiscardedDrafts
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.assertDurableOwners
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.awaitLedger
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.awaitValidatedInternet
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.nativeState
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.permissions
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.receipt
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.reportStall
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.requestFrom
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.requestJson
+import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.visibleActivities
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
+import dev.ipf.whitenoise.android.state.AttachmentDownloadWorker
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
-import dev.ipf.whitenoise.android.state.DraftPersistence
+import dev.ipf.whitenoise.android.state.AutomaticAttachmentHold
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
-import dev.ipf.whitenoise.android.state.NativeAttachmentPermissions
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentDownloadWorkName
@@ -46,10 +53,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -61,9 +70,22 @@ private const val IMAGE_SEED = 33L
 private const val AUDIO_BYTES = 300 * 1024
 private const val FILE_BYTES = 768 * 1024
 private const val HELD_FILE_BYTES = 4 * 1024 * 1024
+private const val NETWORK_VIDEO_BYTES = 1024 * 1024
 private const val READY_TIMEOUT_MILLIS = 90_000L
 private const val RESUME_TIMEOUT_MILLIS = 150_000L
+private const val NETWORK_READY_TIMEOUT_MILLIS = 240_000L
 private const val SETTLE_MILLIS = 5_000L
+private const val ACTIVITY_STOP_TIMEOUT_MILLIS = 15_000L
+private const val FLUSH_MILLIS = 500L
+private const val STAGE_MAIN = "main"
+private const val STAGE_RESUME = "resume"
+private const val MANIFEST = "background-receipt-recreate.json"
+
+// Ledger markers bound each case, so the host checker can tell its uploads and fetches apart.
+private const val DISABLED_START_MARKER = 10
+private const val DISABLED_END_MARKER = 11
+private const val NETWORK_START_MARKER = 20
+private const val NETWORK_RESTORED_MARKER = 21
 
 /**
  * Received media downloads in the background under its own type's policy (#3308). A generated sender in the same
@@ -71,6 +93,10 @@ private const val SETTLE_MILLIS = 5_000L
  * and the conversation never opened. Each case asserts native READY, exact bytes and the durable WorkManager owner
  * before anything returns to the foreground; every fact reported is closed (counts, booleans, times), never an
  * identity, name or byte.
+ *
+ * The runner launches the test twice on one preserved root. The `main` stage runs the connected, return,
+ * policy-disabled and network-held cases, then has Android stop a held download and ends its own process. The
+ * `resume` stage, in a new Android process, binds the same account and waits for the same WorkManager work to finish.
  */
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
@@ -82,10 +108,11 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
     private var marmot: Marmot? = null
     private var state: WhiteNoiseAppState? = null
     private var restoreApplication: (suspend () -> Unit)? = null
+    private var wifiDisabled = false
     private val accounts = mutableListOf<String>()
     private val requests = mutableListOf<AttachmentTransferRequest>()
 
-    /** Runs the connected, return, policy-disabled and stopped-then-recreated cases against one generated session. */
+    /** Runs the stage the runner selected against the session it preserved between the two processes. */
     @Test
     fun receivedMediaDownloadsInTheBackgroundUnderItsOwnPolicy() =
         runBlocking {
@@ -94,38 +121,59 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             assumeTrue(arguments.getString("allowControlledAttachmentProbe") == "true")
             check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
             check(PlatformBackgroundAttachmentProbe.shell("getprop ro.kernel.qemu").trim() == "1")
+            val stage = arguments.getString("fixtureBackgroundStage") ?: STAGE_MAIN
+            require(stage in setOf(STAGE_MAIN, STAGE_RESUME))
+            val session = requireNotNull(arguments.getString("fixtureRestartSession"))
             blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
             relays = listOf("ws://127.0.0.1:${requireNotNull(arguments.getString("fixtureRelayPort")).toInt()}")
             MarmotAndroid.initialize(context)
-            root = RestartAttachmentRetentionProbe.createRoot(context, null, null)
-            try {
-                val runtime = TileFixtureSupport.openRuntime(root, relays).also { marmot = it }
-                runtime.start()
-                val (sender, receiver, group) = createPeers(runtime)
-                bindReceiver(runtime, receiver)
-                setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
-                ActivityScenario.launch(ComponentActivity::class.java).use {
-                    stopActivities()
-                    val background = backgroundAlbum(sender, receiver, group)
-                    val returned = returnWithoutFetching(background)
-                    stopActivities()
-                    val disabled = disabledTypeIsNeverFetched(sender, receiver, group)
-                    val recreated = stoppedWorkResumesInARecreatedRuntime(sender, receiver, group)
-                    ControlledAttachmentProbe.report(
-                        JSONObject()
-                            .put("phase", "background-receipt")
-                            .put("success", true)
-                            .put("android_api", Build.VERSION.SDK_INT)
-                            .put("background", background.report)
-                            .put("returned", returned)
-                            .put("disabled_type", disabled)
-                            .put("stopped_recreated", recreated),
-                    )
-                }
-            } finally {
-                cleanUp()
-            }
+            if (stage == STAGE_MAIN) runMain(session) else runResume(session)
         }
+
+    /**
+     * Runs every in-process case, then hands the stopped download to the next process by ending this one with no
+     * cleanup at all, as the system does when it reclaims memory. Any failure before that cleans up normally.
+     */
+    private suspend fun runMain(session: String) {
+        root = RestartAttachmentRetentionProbe.createRoot(context, "prepare", session)
+        var handedOff = false
+        try {
+            val runtime = TileFixtureSupport.openRuntime(root, relays).also { marmot = it }
+            runtime.start()
+            val (sender, receiver, group) = createPeers(runtime)
+            bindReceiver(runtime, receiver)
+            awaitValidatedInternet(requireNotNull(state))
+            setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
+            ActivityScenario.launch(ComponentActivity::class.java).use {
+                stopActivities()
+                val background = backgroundAlbum(sender, receiver, group)
+                val returned = returnWithoutFetching(background)
+                stopActivities()
+                val disabled = disabledTypeIsNeverFetched(sender, receiver, group)
+                val network = networkHeldTypeWaitsForWifi(sender, receiver, group)
+                val stopped = stopHeldWorkForTheNextProcess(sender, receiver, group)
+                ControlledAttachmentProbe.report(
+                    JSONObject()
+                        .put("phase", "background-receipt")
+                        .put("success", true)
+                        .put("android_api", Build.VERSION.SDK_INT)
+                        .put("background", background.report)
+                        .put("returned", returned)
+                        .put("disabled_type", disabled)
+                        .put("network_held", network)
+                        .put("stopped", stopped),
+                )
+            }
+            ControlledAttachmentProbe.report(JSONObject().put("phase", "background-receipt-held"))
+            handedOff = true
+        } finally {
+            if (!handedOff) cleanUp()
+        }
+        // The status lines must reach the host before the process goes, then it ends with no cleanup at all.
+        delay(FLUSH_MILLIS)
+        Process.killProcess(Process.myPid())
+        delay(Long.MAX_VALUE)
+    }
 
     /** One generated album and what the background case observed about it. */
     private class Album(
@@ -158,9 +206,10 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         val album = project(receiver, group, sent)
         awaitReady(receiver, group, album)
         val readyMillis = (System.nanoTime() - started) / 1_000_000
-        assertEquals("an Activity returned to the foreground", 0, visibleActivities())
+        val visible = visibleActivities()
+        assertEquals("an Activity returned to the foreground", 0, visible)
         assertExactBytes(album, attachments.map { it.plaintextBytes })
-        assertDurableOwners(album)
+        assertDurableOwners(context, album.requests)
         HeldAttachmentCancellationProbe.control(blobPort, "/__background-end")
         val gets = HeldAttachmentCancellationProbe.ledger(blobPort).count { it.getString("kind") == "get" }
         return Album(
@@ -171,7 +220,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 .put("attachments", album.requests.size)
                 .put("types", "image,video,audio,file")
                 .put("activity_stopped", true)
-                .put("conversation_opened", false)
+                .put("visible_activities", visible)
                 .put("durable_work_succeeded", album.requests.size)
                 .put("interactive_intent", false)
                 .put("plaintext_exact", true)
@@ -212,6 +261,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         group: String,
     ): JSONObject {
         setPolicy(receiver, MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Video)
+        HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$DISABLED_START_MARKER")
         val before = HeldAttachmentCancellationProbe.ledger(blobPort).count { it.getString("kind") == "get" }
         val image = FixtureMediaAssets.jpeg(IMAGE_SEED + 1)
         val video = FixtureMediaAssets.paddedVideo(FixtureMediaAssets.video(), 2 * 1024 * 1024, 5L)
@@ -233,11 +283,12 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(videoRequest)).get().isEmpty(),
         )
         assertFalse("a disabled type became local", requireNotNull(state).hasNativeAttachment(videoRequest))
-        val videoState = nativeState(receiver, group, videoRequest)
+        val videoState = nativeState(requireNotNull(marmot), receiver, group, videoRequest)
         val undemanded = setOf(AttachmentTransferStateFfi.NOT_REQUESTED, AttachmentTransferStateFfi.POLICY_BLOCKED)
         assertTrue("a disabled type was demanded: $videoState", videoState in undemanded)
         val after = HeldAttachmentCancellationProbe.ledger(blobPort).count { it.getString("kind") == "get" }
         assertEquals("only the enabled image was fetched", 1, after - before)
+        HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$DISABLED_END_MARKER")
         requests += album.requests
         setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
         return JSONObject()
@@ -248,22 +299,74 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
     }
 
     /**
-     * Android stops the receipt-scheduled file's job mid-body; while WorkManager holds it in backoff the MarmotKit
-     * runtime and app state are rebuilt on the same root, so automatic permission starts denied again. The resumed
-     * job waits for the fresh approval and completes from the native checkpoint. The file arrives while files are off,
-     * so its body can be held before the receipt path schedules it again through the shipping update handler.
+     * With Wi-Fi off, a received video whose policy allows only Wi-Fi is queued but not fetched: its work waits for an
+     * unmetered network and the worker's live recheck holds it for the network. Once Wi-Fi returns, the same work
+     * downloads it. The host checker confirms from the ledger that nothing was fetched before Wi-Fi returned.
      */
-    @Suppress("LongMethod") // One lifetime owns the stopped job, the recreated runtime and their evidence.
-    private suspend fun stoppedWorkResumesInARecreatedRuntime(
+    private suspend fun networkHeldTypeWaitsForWifi(
+        sender: AccountSummaryFfi,
+        receiver: AccountSummaryFfi,
+        group: String,
+    ): JSONObject {
+        val receiverState = requireNotNull(state)
+        setPolicy(receiver, MediaAutoDownloadType.entries.toSet(), wifiOnly = setOf(MediaAutoDownloadType.Video))
+        setWifi(receiver, enabled = false)
+        val video = FixtureMediaAssets.paddedVideo(FixtureMediaAssets.video(), NETWORK_VIDEO_BYTES, 7L)
+        val attachment = FixtureMediaAssets.attachment(video, "video/mp4", "network.mp4", "320x240")
+        HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$NETWORK_START_MARKER")
+        val request = project(receiver, group, send(sender, group, listOf(attachment))).requests.single()
+        requests += request
+        val manager = WorkManager.getInstance(context)
+        val name = attachmentDownloadWorkName(request)
+        withTimeout(READY_TIMEOUT_MILLIS) {
+            while (manager.getWorkInfosForUniqueWork(name).get().none { !it.state.isFinished }) delay(50L)
+        }
+        delay(SETTLE_MILLIS)
+        val waiting = manager.getWorkInfosForUniqueWork(name).get().single { !it.state.isFinished }
+        assertEquals(NetworkType.UNMETERED, waiting.constraints.requiredNetworkType)
+        assertFalse("a network-held type became local", receiverState.hasNativeAttachment(request))
+        val hold = receiverState.automaticAttachmentPolicy(receiver.label).hold(MediaAutoDownloadType.Video)
+        assertEquals(AutomaticAttachmentHold.Network, hold)
+        HeldAttachmentCancellationProbe.control(blobPort, "/__marker/$NETWORK_RESTORED_MARKER")
+        setWifi(receiver, enabled = true)
+        withTimeout(NETWORK_READY_TIMEOUT_MILLIS) {
+            while (manager.getWorkInfosForUniqueWork(name).get().none { it.state == WorkInfo.State.SUCCEEDED }) {
+                delay(50L)
+            }
+        }
+        receiverState.openNativeAttachment(request).use { local ->
+            assertArrayEquals(attachment.plaintextBytes, requireNotNull(local).toByteArray())
+        }
+        val visible = visibleActivities()
+        assertEquals("an Activity returned to the foreground", 0, visible)
+        setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
+        return JSONObject()
+            .put("queued_without_wifi", true)
+            .put("constraint", "unmetered")
+            .put("hold_reason", AutomaticAttachmentHold.Network.reason)
+            .put("work_state_while_held", waiting.state.name.lowercase())
+            .put("same_work_succeeded", true)
+            .put("plaintext_exact", true)
+            .put("visible_activities", visible)
+    }
+
+    /**
+     * Android stops the receipt-scheduled file's job mid-body and WorkManager holds it in backoff. The identities the
+     * next process needs are written to the preserved root; the caller then ends this process. The file arrives while
+     * files are off, so its body can be held before the receipt path schedules it again through the shipping handler.
+     */
+    @Suppress("LongMethod") // One lifetime owns the stopped job and the evidence the next process reads.
+    private suspend fun stopHeldWorkForTheNextProcess(
         sender: AccountSummaryFfi,
         receiver: AccountSummaryFfi,
         group: String,
     ): JSONObject {
         setPolicy(receiver, MediaAutoDownloadType.entries.toSet() - MediaAutoDownloadType.Document)
-        val bytes = Random(4L).nextBytes(HELD_FILE_BYTES)
+        val bytes = heldFileBytes()
         val attachment = FixtureMediaAssets.attachment(bytes, "application/pdf", "held.pdf")
         val sent = send(sender, group, listOf(attachment))
         val request = project(receiver, group, sent).requests.single()
+        requests += request
         HeldAttachmentCancellationProbe.control(blobPort, "/__hold-resumable-acquisition")
         setPolicy(receiver, MediaAutoDownloadType.entries.toSet())
         requireNotNull(state).processNotificationUpdateForTest(receipt(receiver, group, request))
@@ -279,16 +382,9 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 }
                 info
             }
-        HeldAttachmentCancellationProbe.awaitLedger(blobPort) { events ->
-            events.any { it.getString("kind") == "held" }
-        }
+        awaitLedger(blobPort) { events -> events.any { it.getString("kind") == "held" } }
         val job = PlatformInterruptedAttachmentProbe.findScheduledWork(context, running.id.toString())
         HeldAttachmentCancellationProbe.control(blobPort, "/__platform-stop-marker")
-        val stopSeq =
-            HeldAttachmentCancellationProbe
-                .ledger(blobPort)
-                .last { it.getString("kind") == "platform_stop_marker" }
-                .getLong("seq")
         val namespace = if (job.first == null) "" else "-n ${job.first} "
         val command = "cmd jobscheduler timeout -u 0 ${namespace}${context.packageName} ${job.second}"
         val stopped = PlatformBackgroundAttachmentProbe.shell(command)
@@ -298,56 +394,84 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 delay(25L)
             }
         }
-        HeldAttachmentCancellationProbe.control(blobPort, "/__interrupt-acquisition-held-resume")
-        recreateRuntime(receiver)
-        HeldAttachmentCancellationProbe.awaitLedger(blobPort) { events ->
-            events.any { it.getString("kind") == "get" && it.getLong("seq") > stopSeq }
-        }
-        HeldAttachmentCancellationProbe.control(blobPort, "/__release-acquisition")
-        withTimeout(RESUME_TIMEOUT_MILLIS) {
-            while (manager.getWorkInfosForUniqueWork(name).get().none { it.state == WorkInfo.State.SUCCEEDED }) {
-                delay(50L)
-            }
-        }
-        assertEquals("an Activity returned to the foreground", 0, visibleActivities())
-        requireNotNull(state).openNativeAttachment(request).use { local ->
-            assertArrayEquals(bytes, requireNotNull(local).toByteArray())
-        }
-        assertFalse(attachmentIntentStore(context).isInteractive(request))
-        requests += request
+        val manifest =
+            JSONObject()
+                .put("schema", 1)
+                .put("hold_pid", Process.myPid())
+                .put("stopped_at_ms", System.currentTimeMillis())
+                .put("receiver", receiver.label)
+                .put("request", requestJson(request))
+                .put("accounts", JSONArray(accounts))
+                .put("requests", JSONArray(requests.map(::requestJson)))
+        File(root, MANIFEST).writeText(manifest.toString())
         return JSONObject()
             .put("actual_platform_stop", true)
-            .put("runtime_recreated", true)
-            .put("same_work_succeeded", true)
-            .put("plaintext_exact", true)
-            .put("android_process_restart_qualified", false)
+            .put("held_before_stop", true)
+            .put("work_enqueued_after_stop", true)
     }
 
-    /** The receiver's NEW_MESSAGE update for [request]'s message, as MarmotKit delivers it on receipt. */
-    private fun receipt(
-        receiver: AccountSummaryFfi,
-        group: String,
-        request: AttachmentTransferRequest,
-    ) = NotificationUpdateFfi(
-        notificationKey = "fixture:${request.messageIdHex}",
-        conversationKey = "fixture:$group",
-        trigger = NotificationTriggerFfi.NEW_MESSAGE,
-        trafficClass = NotificationTrafficClassFfi.STANDARD,
-        accountRef = receiver.label,
-        accountIdHex = receiver.accountIdHex,
-        groupIdHex = group,
-        groupName = null,
-        isDm = false,
-        isMention = false,
-        messageIdHex = request.messageIdHex,
-        sender = NotificationUserFfi(accountIdHex = "sender", displayName = null, pictureUrl = null),
-        receiver = NotificationUserFfi(accountIdHex = receiver.accountIdHex, displayName = null, pictureUrl = null),
-        previewText = null,
-        reactionEmoji = null,
-        reactedToPreview = null,
-        timestampMs = System.currentTimeMillis(),
-        isFromSelf = false,
-    )
+    /**
+     * In a new Android process, binds the preserved account before the stopped work's backoff ends and waits for that
+     * same WorkManager work to finish with exact bytes. The application's own state must not have started, and the
+     * work must still be waiting, or the work ran without the fixture's account and the run proves nothing.
+     */
+    private suspend fun runResume(session: String) {
+        root = RestartAttachmentRetentionProbe.createRoot(context, "read", session)
+        val manifest = JSONObject(File(root, MANIFEST).readText())
+        val accountList = manifest.getJSONArray("accounts")
+        accounts += List(accountList.length()) { accountList.getString(it) }
+        val requestList = manifest.getJSONArray("requests")
+        requests += List(requestList.length()) { requestFrom(requestList.getJSONObject(it)) }
+        try {
+            val holdPid = manifest.getInt("hold_pid")
+            assertNotEquals("stage did not cross an Android process boundary", holdPid, Process.myPid())
+            val application = context.applicationContext as WhiteNoiseApplication
+            val startedBeforeBind = application.initializedAppState() != null
+            check(!startedBeforeBind) { "the application's own state started before the fixture bound its account" }
+            val request = requestFrom(manifest.getJSONObject("request"))
+            val manager = WorkManager.getInstance(context)
+            val name = attachmentDownloadWorkName(request)
+            val beforeBind = manager.getWorkInfosForUniqueWork(name).get().map { it.state }
+            check(WorkInfo.State.ENQUEUED in beforeBind && beforeBind.none { it == WorkInfo.State.SUCCEEDED }) {
+                "the stopped work ran before the fixture bound its account: $beforeBind"
+            }
+            val runtime = TileFixtureSupport.openRuntime(root, relays).also { marmot = it }
+            runtime.start()
+            val receiver = runtime.listAccounts().single { it.label == manifest.getString("receiver") }
+            bindReceiver(runtime, receiver)
+            withContext(Dispatchers.Main.immediate) { requireNotNull(state).setAppInForeground(false) }
+            val backoffEnds = manifest.getLong("stopped_at_ms") + AttachmentDownloadWorker.BACKOFF_SECONDS * 1_000L
+            val marginMillis = backoffEnds - System.currentTimeMillis()
+            withTimeout(RESUME_TIMEOUT_MILLIS) {
+                while (manager.getWorkInfosForUniqueWork(name).get().none { it.state == WorkInfo.State.SUCCEEDED }) {
+                    delay(50L)
+                }
+            }
+            val visible = visibleActivities()
+            assertEquals("an Activity came to the foreground", 0, visible)
+            requireNotNull(state).openNativeAttachment(request).use { local ->
+                assertArrayEquals(heldFileBytes(), requireNotNull(local).toByteArray())
+            }
+            assertFalse(attachmentIntentStore(context).isInteractive(request))
+            ControlledAttachmentProbe.report(
+                JSONObject()
+                    .put("phase", "background-receipt-resumed")
+                    .put("process_restarted", true)
+                    .put("app_state_started_before_bind", false)
+                    .put("work_waiting_before_bind", true)
+                    .put("same_work_succeeded", true)
+                    .put("plaintext_exact", true)
+                    .put("interactive_intent", false)
+                    .put("visible_activities", visible)
+                    .put("backoff_margin_ms", marginMillis),
+            )
+        } finally {
+            cleanUp()
+        }
+    }
+
+    /** The held file's generated bytes, reproduced identically in both processes. */
+    private fun heldFileBytes(): ByteArray = Random(4L).nextBytes(HELD_FILE_BYTES)
 
     /** Creates the generated sender and receiver and waits for the receiver's genuine welcome. */
     private suspend fun createPeers(runtime: Marmot): Triple<AccountSummaryFfi, AccountSummaryFfi, String> {
@@ -392,39 +516,49 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         }
     }
 
-    /** Applies exactly [enabled] on every network and waits until receipt and native policy both reflect it. */
+    /**
+     * Applies exactly [enabled], on every network except Wi-Fi alone for [wifiOnly], and waits until receipt and
+     * native policy both reflect it on the current Wi-Fi connection.
+     */
     private suspend fun setPolicy(
         receiver: AccountSummaryFfi,
         enabled: Set<MediaAutoDownloadType>,
+        wifiOnly: Set<MediaAutoDownloadType> = emptySet(),
     ) {
         val receiverState = requireNotNull(state)
         withContext(Dispatchers.Main.immediate) {
             MediaAutoDownloadType.entries.forEach { type ->
                 MediaAutoDownloadNetwork.entries.forEach { network ->
-                    receiverState.setMediaAutoDownload(type, network, enabled = type in enabled)
+                    val on = type in enabled && (type !in wifiOnly || network == MediaAutoDownloadNetwork.WiFi)
+                    receiverState.setMediaAutoDownload(type, network, enabled = on)
                 }
             }
         }
         withTimeout(15_000L) {
-            while (receiverState.automaticAttachmentTypesAllowed(receiver.label) != enabled) delay(25L)
+            while (receiverState.automaticAttachmentPolicy(receiver.label).allowedNow() != enabled) delay(25L)
         }
         withContext(Dispatchers.Main.immediate) { receiverState.refreshNativeAttachmentPermissions() }
         withTimeout(15_000L) { permissions(receiverState).awaitApplied(receiver.label) }
     }
 
+    /** Turns the emulator's Wi-Fi on or off and waits until the receiver's network snapshot follows. */
+    private suspend fun setWifi(
+        receiver: AccountSummaryFfi,
+        enabled: Boolean,
+    ) {
+        BackgroundReceiptFixtureSupport.setWifiEnabled(enabled)
+        wifiDisabled = !enabled
+        val receiverState = requireNotNull(state)
+        BackgroundReceiptFixtureSupport.awaitWifiSnapshot(receiverState, receiver.label, enabled)
+        if (enabled) awaitValidatedInternet(receiverState)
+    }
+
     /** Leaves every generated Activity behind Home so the process runs with no visible UI. */
     private suspend fun stopActivities() {
         PlatformBackgroundAttachmentProbe.shell("input keyevent KEYCODE_HOME")
-        withTimeout(5_000L) { while (visibleActivities() > 0) delay(10L) }
+        withTimeout(ACTIVITY_STOP_TIMEOUT_MILLIS) { while (visibleActivities() > 0) delay(10L) }
         withContext(Dispatchers.Main.immediate) { requireNotNull(state).setAppInForeground(false) }
     }
-
-    /** Activities of this process that are on screen or still leaving it. */
-    private suspend fun visibleActivities(): Int =
-        withContext(Dispatchers.Main.immediate) {
-            val monitor = ActivityLifecycleMonitorRegistry.getInstance()
-            listOf(Stage.RESUMED, Stage.STARTED, Stage.PAUSED).sumOf { monitor.getActivitiesInStage(it).size }
-        }
 
     /** Sends [attachments] as one message through the shipping Android send path. */
     private suspend fun send(
@@ -472,44 +606,9 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 while (album.requests.any { !receiverState.hasNativeAttachment(it) }) delay(50L)
             }
         } catch (stalled: kotlinx.coroutines.TimeoutCancellationException) {
-            reportStall(receiver, group, album.requests)
+            reportStall(context, receiverState, requireNotNull(marmot), receiver, group, album.requests)
             throw stalled
         }
-    }
-
-    /** Records closed facts about a stalled album: native and WorkManager states, policy and approval only. */
-    private suspend fun reportStall(
-        receiver: AccountSummaryFfi,
-        group: String,
-        stalled: List<AttachmentTransferRequest>,
-    ) {
-        val receiverState = requireNotNull(state)
-        val manager = WorkManager.getInstance(context)
-        val applied =
-            runCatching {
-                val coordinator = permissions(receiverState)
-                val field = NativeAttachmentPermissions::class.java.getDeclaredField("applied")
-                field.isAccessible = true
-                (field.get(coordinator) as kotlinx.coroutines.flow.StateFlow<*>)
-                    .value
-                    .toString()
-                    .contains(receiver.label)
-            }.getOrNull()
-        val nativeStates = stalled.map { runCatching { nativeState(receiver, group, it).name }.getOrElse { "error" } }
-        val workStates =
-            stalled.map { request ->
-                val name = attachmentDownloadWorkName(request)
-                manager.getWorkInfosForUniqueWork(name).get().map { it.state.name }
-            }
-        ControlledAttachmentProbe.report(
-            JSONObject()
-                .put("phase", "background-receipt-stall")
-                .put("native_states", nativeStates.toString())
-                .put("work_states", workStates.toString())
-                .put("allowed_types", receiverState.automaticAttachmentTypesAllowed(receiver.label).toString())
-                .put("approval_applied", applied)
-                .put("validated_internet", receiverState.hasValidatedInternet()),
-        )
     }
 
     /** Every attachment's retained native bytes equal the sent plaintext. */
@@ -524,67 +623,10 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         }
     }
 
-    /**
-     * Each attachment was fetched by its own automatic WorkManager owner, never an interactive one. Native READY can
-     * land a moment before the owner records its result, so each owner is given time to finish.
-     */
-    private suspend fun assertDurableOwners(album: Projected) {
-        val manager = WorkManager.getInstance(context)
-        val intents = attachmentIntentStore(context)
-        album.requests.forEach { request ->
-            val name = attachmentDownloadWorkName(request)
-            withTimeout(30_000L) {
-                while (manager.getWorkInfosForUniqueWork(name).get().none { it.state == WorkInfo.State.SUCCEEDED }) {
-                    delay(50L)
-                }
-            }
-            assertFalse("automatic work became interactive", intents.isInteractive(request))
-        }
-    }
-
-    /** Reads MDK's authoritative transfer state for one slot without demanding it. */
-    private suspend fun nativeState(
-        receiver: AccountSummaryFfi,
-        group: String,
-        request: AttachmentTransferRequest,
-    ): AttachmentTransferStateFfi {
-        val target =
-            AttachmentLocalTargetFfi(
-                request.messageIdHex,
-                requireNotNull(request.sourceMessageIdHex),
-                request.attachmentIndex.toUInt(),
-            )
-        return requireNotNull(marmot)
-            .attachmentTransferSnapshot(receiver.label, group, listOf(target))
-            .items
-            .single()
-            .state
-    }
-
-    /** Rebuilds the MarmotKit runtime and the receiver's app state on the same root, as a fresh process would. */
-    private suspend fun recreateRuntime(receiver: AccountSummaryFfi) {
-        val oldState = requireNotNull(state)
-        restoreApplication?.invoke()
-        restoreApplication = null
-        oldState.stopNotificationListenerForAccountTeardown()
-        oldState.mutationsScope.cancel()
-        requireNotNull(marmot).shutdownAndClose()
-        val reopened = TileFixtureSupport.openRuntime(root, relays).also { marmot = it }
-        reopened.start()
-        bindReceiver(reopened, receiver)
-        withContext(Dispatchers.Main.immediate) { requireNotNull(state).setAppInForeground(false) }
-    }
-
-    /** The receiver state's permission coordinator, which owns the approval durable work waits for. */
-    private fun permissions(receiverState: WhiteNoiseAppState): NativeAttachmentPermissions =
-        WhiteNoiseAppState::class.java
-            .getDeclaredField("nativeAttachmentPermissions")
-            .apply { isAccessible = true }
-            .get(receiverState) as NativeAttachmentPermissions
-
-    /** Releases generated work, state, accounts and files on every path. */
+    /** Releases generated work, state, accounts and files, and turns Wi-Fi back on, on every path. */
     private suspend fun cleanUp() {
         withContext(NonCancellable) {
+            if (wifiDisabled) runCatching { BackgroundReceiptFixtureSupport.setWifiEnabled(true) }
             val manager = WorkManager.getInstance(context)
             requests.forEach { runCatching { manager.cancelUniqueWork(attachmentDownloadWorkName(it)).result.get() } }
             try {
@@ -593,7 +635,12 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             } finally {
                 restoreApplication?.invoke()
             }
-            val runtime = marmot ?: return@withContext
+            val runtime =
+                marmot ?: run {
+                    // A run that never opened its runtime still owns the preserved root and its local accounts.
+                    root.deleteRecursively()
+                    return@withContext
+                }
             val cleanup = accounts.map { runCatching { withTimeout(5_000L) { runtime.removeAccount(it) } } }
             try {
                 runtime.shutdownAndClose()
@@ -602,17 +649,5 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             }
             check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
         }
-    }
-
-    /** The generated session has no persisted user draft. */
-    private object DiscardedDrafts : DraftPersistence {
-        /** Never reads installed draft storage. */
-        override fun read(): Map<String, String> = emptyMap()
-
-        /** Discards only generated-fixture draft writes. */
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
     }
 }

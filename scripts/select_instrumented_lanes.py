@@ -34,6 +34,7 @@ FIXTURE_ONLY = (
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/FixtureSession.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MatrixAttachmentProbe.kt',
     'app/src/androidTest/java/dev/ipf/whitenoise/android/media/IncomingAttachmentBackgroundDownloadAndroidTest.kt',
+    'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptFixtureSupport.kt',
 )
 
 # Production and build inputs the fixture exercises alongside other device tests.
@@ -46,6 +47,10 @@ FIXTURE_SHARED = (
     'app/src/androidTest/AndroidManifest.xml',
     'app/src/main/marmotkit/**',
     'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/state/IncomingAttachmentScheduling.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/state/AutomaticAttachmentPolicy.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentPermissions.kt',
+    'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/state/MessageForwarding.kt',
     'app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt',

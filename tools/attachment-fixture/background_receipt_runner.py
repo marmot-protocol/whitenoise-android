@@ -1,4 +1,5 @@
-"""Run the background receipt fixture (#3308) on a disposable emulator; failed attempts stay in the report."""
+"""Run the background receipt fixture (#3308) on a disposable emulator in two Android processes; failed attempts
+stay in the report."""
 
 import argparse
 import json
@@ -6,7 +7,9 @@ from pathlib import Path
 import subprocess
 import threading
 import time
+import uuid
 
+from apk_recreation_runner import CRASH_MARKERS, release_held_body, result_lines
 from budget_checker import PROFILES
 from device_runner import APP, adb_command
 from fixture_relay import FixtureRelay
@@ -17,18 +20,45 @@ from background_receipt_checker import check_background_receipt
 TEST = ("dev.ipf.whitenoise.android.media.IncomingAttachmentBackgroundDownloadAndroidTest"
         "#receivedMediaDownloadsInTheBackgroundUnderItsOwnPolicy")
 INSTRUMENT_TIMEOUT_SECONDS = 900
+DISCONNECT_WAIT_SECONDS = 15
+STAGES = ("main", "resume")
 
 
-def instrument(adb, serial, ports):
-    """Run the one fixture process; its timeout covers three albums, a platform stop and its backed-off resume."""
+def instrument(adb, serial, ports, stage, session):
+    """Run one fixture process for [stage] on the preserved [session]; the main stage ends in a crash by design."""
+    if stage not in STAGES:
+        raise ValueError("unknown fixture stage")
     command = [
         adb, "-s", serial, "shell", "am", "instrument", "-w", "-r",
         "-e", "class", TEST, "-e", "allowControlledAttachmentProbe", "true",
         "-e", "fixtureBlobPort", str(ports[0]), "-e", "fixtureRelayPort", str(ports[1]),
+        "-e", "fixtureBackgroundStage", stage, "-e", "fixtureRestartSession", session,
         APP + ".test/androidx.test.runner.AndroidJUnitRunner",
     ]
-    return subprocess.run(command, check=True, capture_output=True, text=True,
+    return subprocess.run(command, check=False, capture_output=True, text=True,
                           timeout=INSTRUMENT_TIMEOUT_SECONDS).stdout
+
+
+def ended_abruptly(output):
+    """The main stage handed off a stopped download: no pass, a crash marker and the held row.
+
+    A crash with no held row is some other failure and must never be mistaken for the hand-off.
+    """
+    held = any(m.get("phase") == "background-receipt-held" for m in metrics_of(output))
+    return not passed(output) and held and any(marker in output for marker in CRASH_MARKERS)
+
+
+def await_held_disconnect(server, start, timeout=DISCONNECT_WAIT_SECONDS):
+    """Wait for the ended process's held request to end after the platform stop, so no two acquisitions overlap."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        events = server.ledger.snapshot()[start:]
+        stops = [e["seq"] for e in events if e["kind"] == "platform_stop_marker"]
+        ended = ("disconnect", "hold_timeout")
+        if stops and any(e["kind"] in ended and e["seq"] > stops[-1] for e in events):
+            return True
+        time.sleep(0.05)
+    return False
 
 
 def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
@@ -40,7 +70,8 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
     if f"package:{APP}" not in adb_command(adb, serial, "shell", "pm", "list", "packages", APP).splitlines():
         raise ValueError("install the isolated measurement APK in place before running")
     server, relay = FixtureServer(root), FixtureRelay()
-    report = {"schema": 1, "scope": "android-background-receipt-scheduling", "qualified": False, "metrics": []}
+    report = {"schema": 1, "scope": "android-background-receipt-scheduling", "qualified": False, "metrics": [],
+              "stages": []}
     start = len(server.ledger.snapshot())
     forwards, threads, started, failure = [], [], [], None
     try:
@@ -53,9 +84,21 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         for port in ports:
             adb_command(adb, serial, "reverse", "--no-rebind", f"tcp:{port}", f"tcp:{port}")
             forwards.append(port)
-        output_text = instrument(adb, serial, ports)
-        report["metrics"] = metrics_of(output_text)
-        report["instrumentation_passed"] = passed(output_text)
+        session = str(uuid.uuid4())
+        main_output = instrument(adb, serial, ports, "main", session)
+        report["metrics"] += metrics_of(main_output)
+        report["process_ended_abruptly"] = ended_abruptly(main_output)
+        report["stages"].append({"stage": "main", "passed": report["process_ended_abruptly"],
+                                 "instrumentation": result_lines(main_output)})
+        if report["process_ended_abruptly"]:
+            release_held_body(server)
+            report["interrupted_acquisition_ended"] = await_held_disconnect(server, start)
+            resume_output = instrument(adb, serial, ports, "resume", session)
+            report["metrics"] += metrics_of(resume_output)
+            report["stages"].append({"stage": "resume", "passed": passed(resume_output),
+                                     "instrumentation": result_lines(resume_output)})
+        report["instrumentation_passed"] = (len(report["stages"]) == 2 and all(s["passed"] for s in report["stages"])
+                                            and report.get("interrupted_acquisition_ended", False))
         report["environment"] = {
             "api": adb_command(adb, serial, "shell", "getprop", "ro.build.version.sdk").strip(),
             "abi": adb_command(adb, serial, "shell", "getprop", "ro.product.cpu.abi").strip(),
@@ -73,7 +116,7 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         report["receipt_check"] = check_background_receipt(report["metrics"], events)
         report["qualified"] = (report.get("instrumentation_passed", False) and report["receipt_check"]["passed"]
                                and report.get("environment") == PROFILES[budget_profile] and failure is None)
-        report["deferred"] = ["os-process-death", "physical-device", "doze", "representative-performance"]
+        report["deferred"] = ["system-initiated-recreation", "physical-device", "doze", "representative-performance"]
         report["reverse_cleanup_failed"] = False
         for port in forwards:
             try:

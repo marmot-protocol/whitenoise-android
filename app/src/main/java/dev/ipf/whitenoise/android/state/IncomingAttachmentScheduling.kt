@@ -62,43 +62,128 @@ internal fun incomingAttachments(
         }
     }
 
-/** Whether a newest-first page has moved past [messageIdHex]'s run of slots onto an older message. */
-internal fun List<AttachmentEntryFfi>.passedMessage(messageIdHex: String): Boolean {
+/**
+ * How far before a receipt a page's slots may have been received while the received message could still be
+ * further down. A page received entirely earlier than this ends the read, which keeps a text message's
+ * receipt to one page read in a group whose recent attachments are older.
+ */
+internal const val RECEIPT_RECENT_WINDOW_SECONDS = 30L * 60L
+
+/** Restarts allowed when history changes under the read's cursor, before the read gives up. */
+private const val RECEIPT_LOOKUP_RESTARTS = 1
+
+/** How one receipt's bounded history read ended, as a privacy-safe log key. */
+internal enum class ReceiptLookupEnd(
+    val key: String,
+) {
+    /** The received message's run of slots ended. */
+    Passed("passed"),
+
+    /** A page held nothing received recently, so the message carries no attachments that far down. */
+    Stale("stale"),
+
+    /** The group's attachment history ended. */
+    HistoryEnd("history_end"),
+
+    /** The page budget ran out first. */
+    Exhausted("exhausted"),
+
+    /** History kept changing under the cursor, or MDK refused the read. */
+    Unavailable("unavailable"),
+}
+
+/** One receipt's planned attachments, with how many pages the read took and why it stopped. */
+internal data class ReceiptAttachmentLookup(
+    val attachments: List<IncomingAttachment>,
+    val pages: Int,
+    val end: ReceiptLookupEnd,
+)
+
+/**
+ * Decides, for one newest-first page, whether the read can stop. [seenBefore] carries across pages that the
+ * message's run already started, so a run ending exactly on a page boundary still stops at the next page.
+ * Returns whether the message has been seen so far, and the reason to stop, or null to read on.
+ */
+internal fun List<AttachmentEntryFfi>.receiptPageEnd(
+    messageIdHex: String,
+    seenBefore: Boolean,
+    recentSinceSeconds: Long,
+): Pair<Boolean, ReceiptLookupEnd?> {
     val first = indexOfFirst { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
-    return first >= 0 && drop(first).any { !it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
+    val seen = seenBefore || first >= 0
+    val passed =
+        when {
+            first >= 0 -> drop(first).any { !it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
+            else -> seenBefore && isNotEmpty()
+        }
+    val stale = !seen && none { it.receivedAt.toLong() >= recentSinceSeconds }
+    val end =
+        when {
+            passed -> ReceiptLookupEnd.Passed
+            stale -> ReceiptLookupEnd.Stale
+            else -> null
+        }
+    return seen to end
 }
 
 /**
  * Finds a received message's attachments in MDK's authoritative attachment history, newest first, reading at
- * most [pageBudget] pages of [pageLimit] slots and stopping once the message's run of slots has ended. A
- * history change between pages ends the read with what was found; the bubbles still cover anything missed.
+ * most [pageBudget] pages of [pageLimit] slots. The read stops once the message's run of slots has ended, or
+ * on a page with nothing received within [RECEIPT_RECENT_WINDOW_SECONDS] of [receivedAtMillis]. A cursor made
+ * stale by a history change restarts the read from the newest page once, without spending the page budget,
+ * and the bubbles still cover anything missed.
  */
-@Suppress("ReturnCount") // Each page outcome ends the bounded read directly.
+@Suppress("ReturnCount", "CyclomaticComplexMethod") // Each page outcome ends the bounded read directly.
 internal suspend fun WhiteNoiseAppState.receivedMessageAttachments(
     accountRef: String,
     groupIdHex: String,
     messageIdHex: String,
+    receivedAtMillis: Long,
     pageLimit: UInt = RECEIPT_ATTACHMENT_PAGE_LIMIT,
     pageBudget: Int = RECEIPT_ATTACHMENT_PAGE_BUDGET,
-): List<IncomingAttachment> {
+): ReceiptAttachmentLookup {
+    val recentSince = receivedAtMillis / MILLIS_PER_SECOND - RECEIPT_RECENT_WINDOW_SECONDS
     val found = mutableListOf<IncomingAttachment>()
+    var seen = false
+    var pages = 0
+    var restarts = 0
     var cursor: AttachmentHistoryCursor? = null
+
+    fun lookup(end: ReceiptLookupEnd) = ReceiptAttachmentLookup(found.toList(), pages, end)
     try {
-        repeat(pageBudget) {
+        while (pages < pageBudget) {
+            // The cursor is consumed by this read, so the outer cleanup must never close it a second time.
             val previous = cursor
+            cursor = null
             val read =
                 try {
-                    marmotIo { attachmentHistoryPage(accountRef, groupIdHex, pageLimit, previous) }
+                    marmotIo(MarmotTraceSection.MEDIA_LIST) {
+                        attachmentHistoryPage(accountRef, groupIdHex, pageLimit, previous)
+                    }
                 } finally {
                     previous?.close()
                 }
-            cursor = null
-            val page = (read as? AttachmentPageReadFfi.Page)?.page ?: return found
+            val page =
+                when (read) {
+                    is AttachmentPageReadFfi.Page -> read.page.also { pages += 1 }
+                    AttachmentPageReadFfi.RestartRequired,
+                    AttachmentPageReadFfi.CursorMismatch,
+                    -> {
+                        if (restarts++ >= RECEIPT_LOOKUP_RESTARTS) return lookup(ReceiptLookupEnd.Unavailable)
+                        found.clear()
+                        seen = false
+                        continue
+                    }
+                    AttachmentPageReadFfi.InvalidLimit -> return lookup(ReceiptLookupEnd.Unavailable)
+                }
             val next = page.nextCursor
             var kept = false
             try {
                 found += incomingAttachments(accountRef, groupIdHex, messageIdHex, page.entries)
-                if (page.entries.passedMessage(messageIdHex) || !page.hasMore || next == null) return found
+                val (seenNow, end) = page.entries.receiptPageEnd(messageIdHex, seen, recentSince)
+                seen = seenNow
+                if (end != null) return lookup(end)
+                if (!page.hasMore || next == null) return lookup(ReceiptLookupEnd.HistoryEnd)
                 cursor = next
                 kept = true
             } finally {
@@ -109,5 +194,7 @@ internal suspend fun WhiteNoiseAppState.receivedMessageAttachments(
     } finally {
         cursor?.close()
     }
-    return found
+    return lookup(ReceiptLookupEnd.Exhausted)
 }
+
+private const val MILLIS_PER_SECOND = 1_000L

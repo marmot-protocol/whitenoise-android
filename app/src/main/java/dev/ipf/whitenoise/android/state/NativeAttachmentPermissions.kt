@@ -25,7 +25,10 @@ internal class NativeAttachmentPermissions {
         val accounts: Set<String>,
     )
 
-    /** Invalidates pending evaluations and binds the next revision to one runtime identity. */
+    /**
+     * Invalidates pending evaluations and binds the next revision to one runtime identity. No account counts as
+     * applied again until an update under the new revision applies it.
+     */
     fun invalidate(owner: Any?): Long {
         runtimeOwner.set(owner)
         val next = revision.incrementAndGet()
@@ -36,11 +39,13 @@ internal class NativeAttachmentPermissions {
     /**
      * Suspends until the native runtime holds [account]'s permission for the latest host revision. A worker
      * that starts in a fresh process, or just after a network change revoked the old approval, would
-     * otherwise ask before the approval exists and be refused as policy-blocked.
+     * otherwise ask before the approval exists and be refused as policy-blocked. Returns the revision whose
+     * approval was applied.
      */
-    suspend fun awaitApplied(account: String) {
-        applied.first { account in it.accounts }
-    }
+    suspend fun awaitApplied(account: String): Long = applied.first { account in it.accounts }.revision
+
+    /** The host revision whose approval the native runtime holds for [account] now, or null while none is applied. */
+    fun appliedRevision(account: String): Long? = applied.value.takeIf { account in it.accounts }?.revision
 
     /** How many callers are waiting in [awaitApplied], so a test can act exactly while work is held. */
     internal fun waitersForTest(): StateFlow<Int> = applied.subscriptionCount

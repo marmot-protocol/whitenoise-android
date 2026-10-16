@@ -32,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.RandomAccessFile
@@ -60,6 +61,9 @@ internal class MediaDownloadIntegrationFixture(
 
     /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
     val automaticPolicyBlocks = AtomicInteger()
+
+    /** Runs as each policy-blocked refusal is returned, so a test can move the host's approval meanwhile. */
+    @Volatile var onAutomaticPolicyBlock: () -> Unit = {}
     val permissionApplications = AtomicInteger()
     val active = AtomicInteger()
     val peak = AtomicInteger()
@@ -89,6 +93,15 @@ internal class MediaDownloadIntegrationFixture(
         @Volatile var bytes: ByteArray? = null
 
         @Volatile var failure: Throwable? = null
+
+        @Volatile var paused = false
+        internal val pausedSignal = CompletableDeferred<Unit>()
+
+        /** Holds the job paused, as MDK does when the host revokes its automatic permission mid-transfer. */
+        fun pause() {
+            paused = true
+            pausedSignal.complete(Unit)
+        }
 
         /** Completes one synthetic native operation successfully. */
         fun succeed(bytes: ByteArray) {
@@ -177,6 +190,7 @@ internal class MediaDownloadIntegrationFixture(
                     if (automatic) {
                         automaticDemands.incrementAndGet()
                         if (automaticPolicyBlocks.getAndUpdate { maxOf(0, it - 1) } > 0) {
+                            onAutomaticPolicyBlock()
                             val blocked = AttachmentTransferStateFfi.POLICY_BLOCKED
                             return@newProxyInstance AutomaticAttachmentRequestFfi(
                                 AttachmentTransferStatusFfi(null, blocked, 0u, 0u, null, null),
@@ -273,16 +287,21 @@ internal class MediaDownloadIntegrationFixture(
                 call.bytes != null -> AttachmentTransferStateFfi.READY
                 call.failure != null -> AttachmentTransferStateFfi.FAILED
                 call.result.isCancelled -> AttachmentTransferStateFfi.CANCELLED
+                call.paused -> AttachmentTransferStateFfi.PAUSED
                 else -> AttachmentTransferStateFfi.DOWNLOADING
             }
         return AttachmentTransferStatusFfi(if (call == null) null else key, state, 0u, 0u, null, null)
     }
 
-    /** Emits an initial snapshot; later observation awaits native work without owning or cancelling it. */
+    /**
+     * Emits an initial snapshot; later observation awaits native work without owning or cancelling it. A paused
+     * job is reported once per subscription, then the feed waits for the job to end.
+     */
     private fun subscription(key: String): AttachmentTransferSubscription {
         val initialSnapshot = AttachmentTransferSnapshotFfi(listOf(status(key)))
         return nativeStub(FixtureTransferFeed::class.java).also {
             var initial = true
+            var pauseDelivered = false
             it.nextSnapshot = {
                 if (initial) {
                     initial = false
@@ -290,7 +309,13 @@ internal class MediaDownloadIntegrationFixture(
                 } else {
                     val call = checkNotNull(jobs[key])
                     call.observed.complete(Unit)
-                    call.result.await()
+                    val deliverPause =
+                        !pauseDelivered &&
+                            select {
+                                call.result.onJoin { false }
+                                call.pausedSignal.onJoin { true }
+                            }
+                    if (deliverPause) pauseDelivered = true else call.result.await()
                     AttachmentTransferSnapshotFfi(listOf(status(key)))
                 }
             }
