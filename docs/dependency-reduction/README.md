@@ -17,9 +17,10 @@ scanner owners and lifecycle code remain checked.
 
 ML Kit and Google's runtime licence activities are removed. ZXing already
 encoded QR data and now decodes bounded CameraX luminance crops. The local build-time notice generator consumes exact runtime artifact fingerprints
-and reviewed attribution in `config/licenses/`. It preserves the original 197
-production notice rows (196 distinct name/text pairs) and the separate local
-Material icon notice.
+and reviewed attribution in `config/licenses/`. It preserves all 196 distinct
+name/text pairs from the original 197 production notice rows and the separate
+local Material icon notice. The extra original row repeated `0:46 Lifecycle
+ViewModel` exactly, and the reader already shows identical rows once.
 The baseline and catalogue pin their source revision and original capture.
 The original index, its gzip-compressed text and the build inputs are retained in
 `config/licenses/evidence/` so attribution remains auditable after hosted artifact

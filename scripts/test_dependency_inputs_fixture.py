@@ -24,6 +24,11 @@ class FixtureRepository(SimpleHTTPRequestHandler):
             del self.headers['If-Modified-Since']
         super().do_GET()
 
+    def send_header(self, keyword, value):
+        """Omit Last-Modified: a same-size rewrite within one second otherwise looks unchanged to Gradle."""
+        if keyword.lower() != 'last-modified':
+            super().send_header(keyword, value)
+
     def log_message(self, *arguments):
         """Keep expected repository misses out of the hosted test output."""
 
