@@ -14,10 +14,45 @@ else:
     from retain_dependency_evidence import retain_capture, sha256
 
 
+RETAINED_PREFIX = 'gradle/dependency-evidence/'
+
+
+def retained_copy(relative, source_root, output):
+    """Return the checked source and destination for one carried-forward retained file.
+
+    The path must be a plain relative path under the retained-evidence folder, with no traversal or symlinked
+    component, and both ends must resolve inside their roots. This runs before the candidate is created, so a
+    rejected entry never writes anywhere.
+    """
+    if (not isinstance(relative, str) or not relative.startswith(RETAINED_PREFIX) or '\\' in relative or
+            Path(relative).is_absolute() or any(part in ['', '.', '..'] for part in relative.split('/'))):
+        raise ValueError('Unsafe retained dependency exception path')
+    source = source_root / relative
+    for parent in [source, *source.parents]:
+        if parent == source_root:
+            break
+        if parent.is_symlink():
+            raise ValueError('Unsafe retained dependency exception path')
+    destination = output / relative
+    if (not source.is_file() or not source.resolve().is_relative_to((source_root / RETAINED_PREFIX).resolve()) or
+            not destination.resolve().is_relative_to((output / RETAINED_PREFIX).resolve())):
+        raise ValueError('Unsafe retained dependency exception path')
+    return source, destination
+
+
 def assemble(capture, review, output, evidence_url, supplements=(), inputs=None, carry_forward=None):
     """Stage files and provenance for review; never alter the current checkout or approve a supplier."""
     if output.exists():
         raise ValueError('Candidate output must not already exist')
+    reviewed = None
+    retained_copies = []
+    if carry_forward is not None:
+        # Every carried path is checked before any filesystem effect.
+        reviewed = json.loads(carry_forward.read_text(), object_pairs_hook=unique_object)
+        source_root = carry_forward.resolve().parents[1]
+        for item in reviewed.get('post_lock_selection', []):
+            if isinstance(item, dict) and 'retained' in item:
+                retained_copies.append(retained_copy(item['retained'].get('path'), source_root, output))
     inputs = inputs or capture / 'candidate-inputs'
     verification = inputs / 'gradle/verification-metadata.xml'
     original = validate_verification(verification)
@@ -90,17 +125,14 @@ def assemble(capture, review, output, evidence_url, supplements=(), inputs=None,
     manifest = {'schema': 1, 'reviewed_from': {'repository': 'marmot-protocol/whitenoise-android',
                 'source_sha': (capture / 'source.txt').read_text().strip(), 'evidence': evidence_url,
                 'retained': retained}, 'files': files, 'coverage': coverage, 'suppliers': suppliers}
-    if carry_forward is not None:
+    if reviewed is not None:
         # Reviewed exceptions outlive one capture; reviewers prune entries the new graph no longer needs.
-        reviewed = json.loads(carry_forward.read_text(), object_pairs_hook=unique_object)
         for key in ['post_lock_selection', 'supplemental_tools']:
             if key in reviewed:
                 manifest[key] = reviewed[key]
-        for item in manifest.get('post_lock_selection', []):
-            if 'retained' in item:
-                destination = output / item['retained']['path']
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(carry_forward.resolve().parents[1] / item['retained']['path'], destination)
+        for source, destination in retained_copies:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, destination)
     (output / 'gradle/dependency-inputs.json').write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n')
     validate_bundle(output)
     return manifest

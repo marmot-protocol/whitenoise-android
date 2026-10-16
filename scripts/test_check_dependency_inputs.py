@@ -110,7 +110,6 @@ class DependencyInputsTest(unittest.TestCase):
     def test_assembly_carries_reviewed_exceptions_and_their_retained_evidence(self):
         """A new capture keeps reviewed post-lock exceptions instead of silently dropping them."""
         from scripts.assemble_dependency_inputs import assemble
-        import shutil
         retained = self.root / 'gradle/dependency-evidence/post-lock-selection/report.json.gz'
         retained.parent.mkdir(parents=True)
         retained.write_bytes(b'retained report')
@@ -124,6 +123,17 @@ class DependencyInputsTest(unittest.TestCase):
         self.manifest['supplemental_tools'] = {'fixture': 'reviewed'}
         self.save()
         self.assertEqual((10, 1), inputs.validate_bundle(self.root))
+        capture, review = self.stage_capture()
+        destination = self.root / 'staged-candidate'
+        result = assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'],
+                          carry_forward=self.root / 'gradle/dependency-inputs.json')
+        self.assertEqual(self.manifest['post_lock_selection'], result['post_lock_selection'])
+        self.assertEqual({'fixture': 'reviewed'}, result['supplemental_tools'])
+        self.assertTrue((destination / retained.relative_to(self.root)).is_file())
+
+    def stage_capture(self):
+        """Build a capture and supplier review that assemble accepts for the fixture's committed inputs."""
+        import shutil
         capture = self.root / 'capture'; capture.mkdir()
         for relative in self.manifest['files']:
             destination = capture / 'candidate-inputs' / relative
@@ -135,12 +145,37 @@ class DependencyInputsTest(unittest.TestCase):
         (capture / 'resolution.json').write_text(json.dumps({'schema': 1, 'observations': self.manifest['coverage']}))
         review = self.root / 'review'; review.mkdir()
         (review / 'provenance.json').write_text(json.dumps(self.manifest['suppliers']))
-        destination = self.root / 'staged-candidate'
-        result = assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'],
-                          carry_forward=self.root / 'gradle/dependency-inputs.json')
-        self.assertEqual(self.manifest['post_lock_selection'], result['post_lock_selection'])
-        self.assertEqual({'fixture': 'reviewed'}, result['supplemental_tools'])
-        self.assertTrue((destination / retained.relative_to(self.root)).is_file())
+        return capture, review
+
+    def test_assembly_rejects_unsafe_retained_paths_before_writing_anything(self):
+        """Traversal, absolute, foreign-prefix and symlinked retained paths fail before any file is written.
+
+        The carried manifest and the candidate both live under the fixture root, so any escaping write would appear
+        in the snapshot of that root.
+        """
+        from scripts.assemble_dependency_inputs import assemble
+        capture, review = self.stage_capture()
+        outside = self.root / 'outside'
+        outside.mkdir()
+        (outside / 'secret.txt').write_text('outside')
+        linked = self.root / 'gradle/dependency-evidence/linked'
+        linked.symlink_to(outside, target_is_directory=True)
+        unsafe = ['../outside.txt', str(outside / 'secret.txt'), 'gradle/dependency-evidence/../../outside.txt',
+                  'gradle/elsewhere.txt', 'gradle/dependency-evidence/linked/secret.txt']
+        for path in unsafe:
+            with self.subTest(path=path):
+                self.manifest['post_lock_selection'] = [{
+                    'scope': 'plugin', 'reason': 'fixture', 'additional_coordinates': [], 'additional_metadata': [],
+                    'evidence': 'https://github.com/marmot-protocol/whitenoise-android/actions/runs/1/artifacts/2',
+                    'retained': {'path': path, 'sha256': 'a' * 64}}]
+                self.save()
+                before = sorted(p for p in self.root.rglob('*'))
+                destination = self.root / 'staged-candidate'
+                with self.assertRaisesRegex(ValueError, 'Unsafe retained'):
+                    assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'],
+                             carry_forward=self.root / 'gradle/dependency-inputs.json')
+                self.assertFalse(destination.exists())
+                self.assertEqual(before, sorted(p for p in self.root.rglob('*')))
 
     def test_exceptions_must_name_locked_coordinates_and_checked_metadata(self):
         """Free-text exceptions cannot claim selections or metadata the trust root lacks."""
