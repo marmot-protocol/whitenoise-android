@@ -20,4 +20,11 @@
     <string name="translation_off">Выключено</string>
     <string name="translation_inherit_language">Использовать общий язык перевода</string>
     <string name="translation_privacy_warning">Offline Translator может записывать сообщения и переводы в системные журналы Android. White Noise не может гарантировать безопасность текста, который обрабатывает другое приложение.</string>
+    <string name="translation_choose_language">Выберите язык</string>
+    <string name="translation_unsupported_target">Сохранённый язык перевода недоступен в Offline Translator. Выберите другой язык.</string>
+    <string name="translation_engine_update_required">Для этого языка нужна более новая версия Offline Translator. Обновите приложение и повторите попытку.</string>
+    <string name="translation_install_zapstore">Установить из Zapstore</string>
+    <string name="translation_install_release">Установить с GitHub</string>
+    <string name="translation_install_release_reason">В Zapstore пока нет версии, которую может использовать White Noise, поэтому откроется версия %1$s от автора на GitHub.</string>
+    <string name="translation_install_open_failed">Ни одно приложение не смогло открыть Offline Translator или страницу загрузки. Установите веб-браузер и повторите попытку.</string>
 </resources>

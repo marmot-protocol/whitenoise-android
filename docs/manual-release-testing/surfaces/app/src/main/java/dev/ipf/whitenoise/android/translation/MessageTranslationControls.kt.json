@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "fun MessageTranslationDialog(",
         "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-036"
         ]
       },
       {
@@ -88,15 +89,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "fun rememberMessageTranslationSource(",
         "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
-        "surface": "Open installed translation engine without message text",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "fun openOfflineTranslator(",
-        "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-036"
         ]
       },
       {
@@ -113,6 +107,23 @@
         "surface": "inactive translation contributes no width to message reaction alignment",
         "test_ids": [
           "SET-033"
+        ]
+      },
+      {
+        "surface": "R.string.translation_engine_update_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_engine_update_required",
+        "test_ids": [
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "R.string.translation_recovery_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_recovery_notice",
+        "test_ids": [
+          "SET-033",
+          "SET-036"
         ]
       }
     ]

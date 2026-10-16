@@ -12,6 +12,7 @@ internal enum class TranslationFailure {
     DETECTION,
     SOURCE_MODEL,
     ENGINE,
+    ENGINE_UPDATE_REQUIRED,
     INVALID_REQUEST,
     CONSENT_REQUIRED,
 }
@@ -37,8 +38,6 @@ internal interface TranslationEngine {
     ): String
 }
 
-internal fun translationLanguageValid(code: String): Boolean = code.matches(Regex("[a-z]{2,3}(-[A-Za-z]{2,8})?"))
-
 internal suspend fun translateWithPrivacyGate(
     engine: TranslationEngine,
     text: String,
@@ -55,14 +54,14 @@ internal suspend fun translateWithPrivacyGate(
     }
 }
 
+/** Bounded text and an engine-catalog pair are required, so no unreviewed language code reaches any provider. */
 private fun validateTranslationInput(
     text: String,
     source: String,
     target: String,
 ) {
     val validText = text.isNotBlank() && text.length <= MAX_TRANSLATION_TEXT
-    val validSource = source.isEmpty() || translationLanguageValid(source)
-    if (!validText || !validSource || !translationLanguageValid(target)) {
+    if (!validText || !OfflineTranslatorLanguageCatalog.supportsRequest(source, target)) {
         throw TranslationException(TranslationFailure.INVALID_REQUEST)
     }
 }

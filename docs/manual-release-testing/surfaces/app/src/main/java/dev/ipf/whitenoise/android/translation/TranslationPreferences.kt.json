@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationPreferences.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Unsupported saved target recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationPreferences.kt",
+        "anchor": "private fun usableTarget(",
+        "test_ids": [
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "Catalog-validated saved targets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationPreferences.kt",
+        "anchor": "fun setTargetOverride(",
+        "test_ids": [
+          "SET-033",
+          "SET-036"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

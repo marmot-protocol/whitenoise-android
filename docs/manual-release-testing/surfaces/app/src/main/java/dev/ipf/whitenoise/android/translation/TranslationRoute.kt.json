@@ -4,11 +4,12 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "R.string.translation_recovery_notice",
+        "surface": "conversation translation recovery notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationRoute.kt",
-        "anchor": "R.string.translation_recovery_notice",
+        "anchor": "recoveryNotice(session.failure)",
         "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-036"
         ]
       }
     ]
