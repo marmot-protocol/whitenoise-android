@@ -1409,6 +1409,10 @@ class LocalNotificationPresenter(
         }
     }
 
+    /**
+     * Rewrites the card and republishes its shortcut only when a picture resolved after the post. An unchanged
+     * picture leaves both alone, because the pre-post publish already published this shortcut and reported its use.
+     */
     private suspend fun enrichMessagingNotification(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
@@ -1419,7 +1423,11 @@ class LocalNotificationPresenter(
     ) {
         val (conversationAvatarBitmap, senderAvatarBitmap) =
             resolveMessagingAvatars(messaging)
-        if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) return
+        val avatarChanged =
+            conversationAvatarBitmap !== messaging.conversationAvatarBitmap ||
+                senderAvatarBitmap !== messaging.senderAvatarBitmap
+        val stillOwned = isPostStillAllowed() && ConversationCardPostSynchronizer.isShowCurrent(showToken)
+        if (!avatarChanged || !stillOwned) return
 
         val enrichedSender =
             notificationSenderPerson(
@@ -1456,7 +1464,7 @@ class LocalNotificationPresenter(
             }
         }
 
-    /** Rewrites one live card with resolved avatars while preserving dismissal ownership. */
+    /** Rewrites one live card with avatars that changed after its post, preserving dismissal ownership. */
     private suspend fun postEnrichedMessagingNotification(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
@@ -1505,10 +1513,6 @@ class LocalNotificationPresenter(
                     },
                 )
             }
-            val avatarChanged =
-                conversationAvatarBitmap !== messaging.conversationAvatarBitmap ||
-                    senderAvatarBitmap !== messaging.senderAvatarBitmap
-            if (!avatarChanged) return@withLock
             // The late picture replaces the identity image and the sender together, for either card template.
             val identity =
                 content.identityImage(

@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.ShortcutManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.Icon
@@ -142,15 +143,35 @@ class NotificationIdentityShortcutBeforePostTest {
         assertEquals(Color.RED, iconPixel(recorder.shortcuts.single()))
     }
 
-    /** A failed publication is contained and the card still posts exactly once with its picture. */
+    /**
+     * A failed publication is contained and the card still posts exactly once with its picture. An unchanged picture
+     * does not publish again after the post, so the next message's pre-post publish is the retry.
+     */
     @Test
     fun failedPublicationStillPostsOnce() {
         val recorder = Recorder(failPublication = true)
         post(presenter(recorder), update(isDm = true), picture = solid(Color.RED))
 
-        assertEquals(listOf("shortcut", "post"), recorder.events.take(2))
-        assertEquals("one post, with only the shortcut retried after it", 1, recorder.posts.size)
+        assertEquals(listOf("shortcut", "post"), recorder.events)
+        assertEquals(1, recorder.posts.size)
         assertNotNull(recorder.posts.single().getLargeIcon())
+    }
+
+    /**
+     * A message whose shortcut and picture are unchanged reports the shortcut used exactly once, from the pre-post
+     * publish, and the post-write enrichment adds no second report.
+     */
+    @Test
+    fun unchangedPictureReportsShortcutUseOncePerMessage() {
+        val presenter = presenter(Recorder())
+        val picture = solid(Color.BLUE)
+        post(presenter, update(isDm = false), picture = picture)
+        val reportedBefore = reportedShortcutUses().size
+
+        post(presenter, update(isDm = false, messageIdHex = "second"), picture = picture)
+
+        val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        assertEquals(listOf(shortcutId), reportedShortcutUses().drop(reportedBefore))
     }
 
     /** Records publication and post order, and can fail the platform shortcut write. */
@@ -205,6 +226,12 @@ class NotificationIdentityShortcutBeforePostTest {
                 )
             },
         )
+    }
+
+    /** Shortcut ids the platform was told were used, in order. */
+    private fun reportedShortcutUses(): List<String> {
+        val shortcuts = Shadows.shadowOf(context.getSystemService(ShortcutManager::class.java))
+        return shortcuts.reportedShortcutsUsed.toList()
     }
 
     /** Turns notification previews off the way the persisted setting does. */
