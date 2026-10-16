@@ -90,6 +90,28 @@ class CiInventoryComparisonTest(unittest.TestCase):
         with mock.patch.object(ci, 'api', return_value={'workflow_runs': [{'head_sha': 'b' * 40}]}):
             with self.assertRaisesRegex(ValueError, 'Wrong-source'):
                 ci.baseline(SOURCE, 'fixture')
+
+    def test_rejected_baseline_retains_source_bound_receipt_and_failure_exit(self):
+        """Invalid evidence remains rejected while its reason survives the informational step."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); after = root / 'after.json'; output = root / 'delta.json'
+            after.write_text(json.dumps(selected_inventory([report()], SOURCE)))
+            errors = [ValueError('wrong source or duplicate keys'), KeyError('missing API field'),
+                      TypeError('malformed field'), AttributeError('non-object JSON'), zipfile.BadZipFile('bad ZIP')]
+            for error in errors:
+                with self.subTest(error=type(error).__name__), mock.patch.object(ci, 'baseline', side_effect=error), \
+                        mock.patch('sys.argv', ['compare', '--base-source', SOURCE, '--artifact-name', 'fixture',
+                                   '--after', str(after), '--after-source', SOURCE, '--output', str(output)]), \
+                        redirect_stdout(io.StringIO()) as stdout, self.assertRaises(SystemExit) as failure:
+                    ci.main()
+                delta = json.loads(output.read_text())
+                self.assertEqual(failure.exception.code, 1)
+                self.assertEqual(delta['status'], 'rejected')
+                self.assertEqual(delta['error_type'], type(error).__name__)
+                self.assertEqual((delta['before_source'], delta['after_source']), (SOURCE, SOURCE))
+                self.assertIn('::warning::Baseline evidence rejected:', stdout.getvalue())
+                self.assertNotIn('added', delta)
+
     def test_legacy_raw_report_artifact_is_an_unavailable_baseline(self):
         """Pre-inventory CI artifacts retain their valid old contract without failing adoption."""
         stream = io.BytesIO()

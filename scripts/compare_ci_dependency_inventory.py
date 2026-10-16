@@ -70,6 +70,11 @@ def main():
         before = None
         evidence = {'reason': 'GitHub baseline retrieval unavailable: ' + type(error).__name__}
         print('::warning::' + evidence['reason'])
+    except (ValueError, KeyError, TypeError, AttributeError, zipfile.BadZipFile) as error:
+        before = None
+        evidence = {'status': 'rejected', 'reason': 'Baseline evidence failed validation',
+                    'error_type': type(error).__name__}
+        print('::warning::Baseline evidence rejected: ' + evidence['error_type'])
     result = {'status': 'unavailable', **evidence, 'before_source': args.base_source,
               'after_source': args.after_source}
     if before is not None:
@@ -77,6 +82,8 @@ def main():
                   **compare(before, after, args.base_source, args.after_source)}
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
     print('Dependency comparison: ' + result['status'])
+    if result['status'] == 'rejected':
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

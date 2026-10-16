@@ -88,7 +88,9 @@ earlier attempts. No extra Gradle resolution, build, job or matrix is added.
 The retained `inventory/base-delta.json` binds both source SHAs and the baseline
 run/artifact.
 Missing or expired baseline evidence and GitHub API failures yield an `unavailable`
-receipt; API failures also warn. Malformed or wrong-source evidence is rejected.
+receipt; API failures also warn. Malformed or wrong-source evidence writes a
+`rejected` receipt with both source SHAs and the error type, warns and exits
+unsuccessfully; it never becomes a usable baseline or an empty delta.
 The comparison step is informational and continues on error without weakening
 the preceding blocking dependency-security checks. The first adoption has no
 historical inventory and therefore cannot claim a successful comparison.
