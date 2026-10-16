@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -162,7 +161,7 @@ internal fun TopNoticeRegion(
         modifier
             .fillMaxWidth()
             .heightIn(max = topNoticeMaxHeight())
-            .verticalScroll(rememberScrollState())
+            .fadingVerticalScroll(rememberScrollState())
             .testTag(TOP_NOTICE_REGION_TAG),
     ) {
         shown?.let {
