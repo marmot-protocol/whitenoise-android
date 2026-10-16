@@ -23,6 +23,8 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.translation.OFFLINE_TRANSLATOR_PACKAGE
+import dev.ipf.whitenoise.android.translation.OfflineTranslatorRoute
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.json.JSONArray
 import org.json.JSONObject
@@ -45,6 +47,7 @@ internal class MaestroPresentationFixture(
         private set
     private var imageFile: File? = null
     private var clipboard: MaestroPresentationClipboard? = null
+    private var translationAcquisition: JSONObject? = null
     var nativeController: ConversationController? = null
         private set
     val imagePagesLoaded = mutableSetOf<Int>()
@@ -57,6 +60,19 @@ internal class MaestroPresentationFixture(
 
     fun record(action: String) {
         calls.add(action)
+    }
+
+    /** Retains observed native prerequisites after Maestro clears its device-log buffer. */
+    fun recordTranslationAcquisition(
+        enginePackageAbsent: Boolean,
+        acquisitionRoute: OfflineTranslatorRoute,
+    ) {
+        check(enginePackageAbsent && acquisitionRoute == OfflineTranslatorRoute.GITHUB_RELEASE)
+        translationAcquisition =
+            JSONObject()
+                .put("package", OFFLINE_TRANSLATOR_PACKAGE)
+                .put("enginePackageAbsent", enginePackageAbsent)
+                .put("acquisitionRoute", acquisitionRoute.name)
     }
 
     fun install(activity: MainActivity) {
@@ -163,6 +179,9 @@ internal class MaestroPresentationFixture(
             val expectedPages = if (scenario.endsWith("gallery")) setOf(0, 1) else setOf(0)
             check(imagePagesLoaded == expectedPages) { "Viewer did not request the selected image pages" }
         }
+        if (scenario in translationAcquisitionScenarios) {
+            check(translationAcquisition != null) { "Native translation acquisition prerequisites were not observed" }
+        }
         return JSONObject()
             .put("scenario", scenario)
             .put("callbacks", JSONArray(calls))
@@ -172,6 +191,7 @@ internal class MaestroPresentationFixture(
             .put("clipboardCleared", clipboard?.cleared == true)
             .put("imagePagesLoaded", JSONArray(imagePagesLoaded.sorted()))
             .put("nostrImageLoads", nostrImageLoads)
+            .put("translationAcquisition", translationAcquisition ?: JSONObject.NULL)
             .put("verified", true)
     }
 
@@ -186,3 +206,12 @@ internal class MaestroPresentationFixture(
         imageFile?.let { check(!it.exists() || it.delete()) { "Generated preview file cleanup failed" } }
     }
 }
+
+private val translationAcquisitionScenarios =
+    setOf(
+        "modal-translation-missing",
+        "modal-translation-unverified",
+        "modal-translation-detection",
+        "modal-translation-model",
+        "modal-translation-engine",
+    )
