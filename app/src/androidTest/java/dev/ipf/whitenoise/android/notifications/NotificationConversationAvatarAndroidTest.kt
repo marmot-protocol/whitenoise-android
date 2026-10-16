@@ -87,7 +87,8 @@ class NotificationConversationAvatarAndroidTest {
 
     /**
      * Brand-new conversations: the very first card of a direct chat shows the peer in its circle and a group's shows
-     * the group, in the heads-up, collapsed and expanded states, and a long first message keeps its picture.
+     * the group, in the heads-up, collapsed and expanded states, and a long first message keeps its picture. The
+     * heads-up circle must be found, so a banner that never appeared fails instead of being skipped.
      */
     @Test
     fun brandNewConversationsFirstCardsDrawTheConversationIdentity() {
@@ -107,7 +108,8 @@ class NotificationConversationAvatarAndroidTest {
         assertColor("first direct-chat circle", Color.RED, colorOf(collapsed, DM_NAME, "conversation_icon"))
         assertColor("first group circle", Color.BLUE, colorOf(collapsed, GROUP_NAME, "conversation_icon"))
         assertColor("first long-message picture", Color.MAGENTA, colorOf(collapsed, LONG_NAME, "right_icon"))
-        headsUpCircle?.let { assertColor("first heads-up circle", Color.RED, it) }
+        // assertColor fails when the circle was never resolved, so a missing heads-up cannot pass silently.
+        assertColor("first heads-up circle", Color.RED, headsUpCircle)
 
         device.findObject(By.text(DM_NAME))?.swipe(Direction.DOWN, EXPAND_SWIPE)
         device.waitForIdle()
