@@ -105,8 +105,22 @@ class GroupDetailsAbandonmentTest {
         composeRule.onNodeWithText(app.getString(title)).assertIsDisplayed()
     }
 
+    /** A disbanded group still listing this account withdraws Reset, so Details offers the local delete instead. */
+    @Test
+    fun disbandedGroupOffersLocalDeleteInsteadOfReset() {
+        render(isDm = false, disbanded = true)
+        composeRule
+            .onNodeWithText(app.getString(R.string.chat_row_action_delete_group))
+            .performScrollTo()
+            .assertIsDisplayed()
+        assertTrue(composeRule.onAllNodes(hasTestTag("chat_info.reset")).fetchSemanticsNodes().isEmpty())
+    }
+
     /** Composes the real details screen for a chat this account administers alongside one other member. */
-    private fun render(isDm: Boolean) {
+    private fun render(
+        isDm: Boolean,
+        disbanded: Boolean = false,
+    ) {
         val appState =
             WhiteNoiseAppState(
                 context = app,
@@ -119,7 +133,7 @@ class GroupDetailsAbandonmentTest {
         val controller =
             ConversationController(
                 appState = appState,
-                initialGroup = group(isDm),
+                initialGroup = group(isDm).copy(disbanded = disbanded),
                 initialMemberSnapshot = GroupMemberSnapshot(listOf(member(SELF_HEX, local = true), member(PEER_HEX))),
                 initialIsDm = isDm,
             )

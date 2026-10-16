@@ -2125,13 +2125,16 @@ internal fun GroupDetailsScreen(
                             onDismiss = { disbandConfirmOpen = false },
                         )
                     }
+                    // A disbanded group has ended even while its roster still lists this account, and the shared
+                    // abandonment rule withdraws Reset there, so local deletion is its way out of Details.
+                    val disbanded = controller.group.disbanded
                     GroupDetailsLocalDeleteControl(
                         identity = ownIdentity,
                         isDm = isDm,
                         readOnlyInvite = readOnlyInvite,
-                        isSelfMember = controller.isSelfMember,
-                        membersVerified = controller.membersVerified,
-                        enabled = !mutationsBlocked && (isDm || actingMemberHex != null),
+                        isSelfMember = controller.isSelfMember && !disbanded,
+                        membersVerified = controller.membersVerified || disbanded,
+                        enabled = !mutationsBlocked,
                         inProgress = activeMutation?.action == GroupMutationAction.Delete,
                         onDeleteConfirmed = {
                             runGroupMutation(

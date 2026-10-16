@@ -31,7 +31,7 @@ class ChatAbandonmentEligibilityTest {
         val queued = leftScopeRow("queued", leavePending = true)
         assertTrue("the row menu keeps the escape path", queued.offersLocalAbandonment())
         assertTrue("the bulk bar keeps it", listOf(queued, leftScopeRow("member")).offerLocalAbandonment())
-        assertTrue("Details keeps it", queued.group.offersLocalAbandonment())
+        assertTrue("Details keeps it", queued.group.copy(leaveRequestPending = true).offersLocalAbandonment())
     }
 
     /** A disband that has not converged is not confirmation either, so the action stays. */
@@ -41,6 +41,7 @@ class ChatAbandonmentEligibilityTest {
         val disbanding = member.copy(projection = member.projection?.copy(disbanding = true))
         assertTrue(disbanding.offersLocalAbandonment())
         assertTrue(listOf(disbanding).offerLocalAbandonment())
+        assertTrue("Details keeps it", disbanding.group.copy(disbanding = true).offersLocalAbandonment())
     }
 
     /** A confirmed left, removed or disbanded chat offers neither the row action nor the bulk action. */
