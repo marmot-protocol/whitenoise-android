@@ -570,7 +570,7 @@ internal fun GroupDetailsScreen(
             appState.launchMutation {
                 try {
                     val succeeded = mutation()
-                    if (action == GroupMutationAction.Leave) abandonment.leaveBlocked = !succeeded
+                    abandonment.recordMutation(leave = action == GroupMutationAction.Leave, succeeded = succeeded)
                     if (succeeded) onSuccess()
                 } finally {
                     // onSuccess() may have already dismissed this sheet; clearing
@@ -1173,17 +1173,21 @@ internal fun GroupDetailsScreen(
                 onDismiss = abandonment::dismiss,
             )
         }
+        // #3310: the escape path after a Leave that did not finish, under the error banner wherever it shows.
+        val leaveBlockedNotice: @Composable (Modifier) -> Unit = { modifier ->
+            if (abandonment.leaveBlocked && !readOnlyInvite) {
+                Box(modifier) {
+                    GroupLeaveBlockedNotice(isDm = isDm, enabled = !mutationsBlocked, onAbandon = ::requestAbandonment)
+                }
+            }
+        }
         val groupFeedback: @Composable () -> Unit = {
             controller.lastMutationError?.let { error ->
                 Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     GroupMutationErrorBanner(error = error, onDismiss = { controller.clearLastMutationError() })
                 }
             }
-            if (abandonment.leaveBlocked && !readOnlyInvite) {
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    GroupLeaveBlockedNotice(isDm = isDm, enabled = !mutationsBlocked, onAbandon = ::requestAbandonment)
-                }
-            }
+            leaveBlockedNotice(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
         val memberContent: @Composable () -> Unit = {
             if (!isDm) {
@@ -1622,6 +1626,7 @@ internal fun GroupDetailsScreen(
                         )
                     }
                 }
+                leaveBlockedNotice(Modifier.padding(horizontal = Dimens.spaceLg).padding(top = 8.dp))
 
                 memberContent()
 

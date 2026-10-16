@@ -62,6 +62,7 @@ internal class GroupAbandonmentReview {
         private set
     var attempted by mutableStateOf(false)
     var leaveBlocked by mutableStateOf(false)
+        private set
 
     /** Starts a fresh review, so an earlier failure never carries into a new confirmation. */
     fun open(next: GroupAbandonmentTarget) {
@@ -73,6 +74,17 @@ internal class GroupAbandonmentReview {
     fun dismiss() {
         target = null
         attempted = false
+    }
+
+    /**
+     * Records a finished group mutation: a Leave that did not finish offers the escape path, and any later success —
+     * a Leave, or a mutation such as an admin transfer that unblocks leaving — retires it so it never goes stale.
+     */
+    fun recordMutation(
+        leave: Boolean,
+        succeeded: Boolean,
+    ) {
+        if (leave || succeeded) leaveBlocked = leave && !succeeded
     }
 
     /** True only while the reviewed account and conversation are still the ones on screen. */
@@ -249,3 +261,4 @@ internal fun GroupLeaveBlockedNotice(
         }
     }
 }
+
