@@ -116,6 +116,15 @@
         "test_ids": [
           "SET-036"
         ]
+      },
+      {
+        "surface": "R.string.translation_recovery_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_recovery_notice",
+        "test_ids": [
+          "SET-033",
+          "SET-036"
+        ]
       }
     ]
   }

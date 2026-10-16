@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.translation
 
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -215,6 +216,18 @@ class MessageTranslationStateTest {
             assertEquals(0, requests)
             assertEquals(TranslationFailure.INVALID_REQUEST, session.failure)
         }
+
+    /** Only an engine too old for the language swaps the generic notice for the update instruction. */
+    @Test
+    fun recoveryNoticeNamesAnEngineUpdateOnlyWhenOneIsRequired() {
+        assertEquals(
+            R.string.translation_engine_update_required,
+            recoveryNotice(TranslationFailure.ENGINE_UPDATE_REQUIRED),
+        )
+        for (failure in TranslationFailure.entries - TranslationFailure.ENGINE_UPDATE_REQUIRED + null) {
+            assertEquals("$failure", R.string.translation_recovery_notice, recoveryNotice(failure))
+        }
+    }
 
     /** Builds a session over an engine whose every translation runs [translate]. */
     private fun session(

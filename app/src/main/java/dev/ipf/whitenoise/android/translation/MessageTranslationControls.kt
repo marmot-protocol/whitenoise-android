@@ -153,3 +153,13 @@ internal fun translationFailureResource(failure: TranslationFailure): Int {
         else -> R.string.translation_engine_failed
     }
 }
+
+/**
+ * The conversation notice after the sheet has closed. An engine too old for the chosen language needs an
+ * update, which retrying or opening the engine cannot fix, so it names that instead of the generic recovery.
+ */
+internal fun recoveryNotice(failure: TranslationFailure?): Int =
+    when (failure) {
+        TranslationFailure.ENGINE_UPDATE_REQUIRED -> R.string.translation_engine_update_required
+        else -> R.string.translation_recovery_notice
+    }
