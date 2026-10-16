@@ -166,20 +166,20 @@ internal fun ChatsScreen(
     // scrolls to that message on open. justCreated is true only when the chat
     // was just created by the New Chat / Create Group flow (issue #321), which
     // opens it with the composer focused + keyboard up.
-    onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHeadId: String?) -> Unit,
+    onOpenGroup: (ChatListItem, String?, Boolean, visibleActiveListHead: ChatListReturnHead?) -> Unit,
     // MainShell supplies the request-owned presentation handoff for the
     // home-screen quick toggle. Isolated screens keep the legacy direct path.
     onQuickSwitchAccount: ((String) -> Unit)? = null,
     onQuickSwitchToAccount: ((String) -> Unit)? = null,
-    // Head row id captured when the shell opened a conversation from this list.
+    // Head rows captured when the shell opened a conversation from this list.
     // Compared once on re-entry so a background reorder while away can snap to
-    // item 0 without yanking an active on-list reader (issue #1313).
-    conversationReturnHeadId: String? = null,
+    // item 0 without yanking an active on-list reader (issues #1313, #3280).
+    conversationReturnHead: ChatListReturnHead? = null,
     onConversationReturnHeadHandled: () -> Unit = {},
     // Chat-list profile opens must capture the same visible filtered head used
     // by direct conversation opens so profile-sheet Message/shared-group routes
     // can arm the return snap (#1313).
-    onPresentProfile: (npub: String, visibleActiveListHeadId: String?) -> Unit = { npub, _ ->
+    onPresentProfile: (npub: String, visibleActiveListHead: ChatListReturnHead?) -> Unit = { npub, _ ->
         appState.presentProfile(npub)
     },
     // Shell-owned global search state survives conversation navigation (#1941).
@@ -741,9 +741,9 @@ internal fun ChatsScreen(
         focusMessageId: String?,
         justCreated: Boolean,
     ) {
-        val visibleHeadId =
-            if (showArchived || advancedFolder) null else visibleItems.firstOrNull()?.id
-        onOpenGroup(item, focusMessageId, justCreated, visibleHeadId)
+        val visibleHead =
+            if (showArchived || advancedFolder) null else chatListReturnHead(visibleItems)
+        onOpenGroup(item, focusMessageId, justCreated, visibleHead)
     }
 
     /** Opens the chat a search result came from, focused on that result's message. */
@@ -763,9 +763,9 @@ internal fun ChatsScreen(
 
     /** Presents a profile from the visible list, remembering the list head for the return scroll. */
     fun presentProfileFromVisibleList(npub: String) {
-        val visibleHeadId =
-            if (showArchived || advancedFolder) null else visibleItems.firstOrNull()?.id
-        onPresentProfile(npub, visibleHeadId)
+        val visibleHead =
+            if (showArchived || advancedFolder) null else chatListReturnHead(visibleItems)
+        onPresentProfile(npub, visibleHead)
     }
     LaunchedEffect(visibleChatIds, selectionMode) {
         if (selectionMode) {
@@ -1116,20 +1116,21 @@ internal fun ChatsScreen(
     // Keyed on `showArchived` so the tracked head resets alongside
     // `chatListState` on a view swap.
     val activeHeadId = visibleItems.firstOrNull()?.id.takeIf { ordinaryActiveList }
-    LaunchedEffect(conversationReturnHeadId, activeHeadId, ordinaryActiveList) {
-        val headAtConversationOpen = conversationReturnHeadId ?: return@LaunchedEffect
+    val activeReturnHead = chatListReturnHead(visibleItems).takeIf { ordinaryActiveList }
+    LaunchedEffect(conversationReturnHead, activeReturnHead, ordinaryActiveList) {
+        val headAtConversationOpen = conversationReturnHead ?: return@LaunchedEffect
         snapshotFlow {
             canDecideConversationReturnHeadSnap(
-                headIdAtConversationOpen = headAtConversationOpen,
-                currentHeadId = activeHeadId,
+                headAtConversationOpen = headAtConversationOpen,
+                currentHead = activeReturnHead,
                 isScrollInProgress = chatListState.isScrollInProgress,
                 isActiveList = ordinaryActiveList,
             )
         }.first { it }
         if (
             shouldSnapChatListOnConversationReturn(
-                headIdAtConversationOpen = headAtConversationOpen,
-                currentHeadId = activeHeadId,
+                headAtConversationOpen = headAtConversationOpen,
+                currentHead = activeReturnHead,
                 isActiveList = ordinaryActiveList,
             )
         ) {

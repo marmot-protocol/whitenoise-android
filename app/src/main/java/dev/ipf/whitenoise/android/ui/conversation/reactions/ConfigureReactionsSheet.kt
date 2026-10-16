@@ -5,17 +5,18 @@ package dev.ipf.whitenoise.android.ui.conversation.reactions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -38,6 +40,9 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
+import dev.ipf.whitenoise.android.ui.icons.Icons
+import dev.ipf.whitenoise.android.ui.icons.filled.Add
+import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -45,11 +50,14 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 private val ConfigureReactionsMaximumWidth = 560.dp
 private val ReactionSlotSize = 56.dp
 private val ConfigureReactionsButtonHeight = 56.dp
+internal const val CONFIGURE_REACTIONS_ADD_SLOT_TAG = "configure-reactions-add-slot"
 
 /**
- * Quick-reaction configuration: the six slots as 56dp discs, Reset back to the defaults, Done to
- * apply. Tapping a slot hands the current draft to [onPickSlot] so the caller can open the emoji
- * sheet for that slot and return here with the replacement.
+ * Quick-reaction configuration: the six standard slots as 56dp discs, up to two optional slots that can
+ * also be removed, an add slot while fewer than eight are configured (#3279), Reset back to the six
+ * defaults, and Done to apply. The slots wrap rather than scroll, so every one stays visible at compact
+ * widths. Tapping a slot — or the add slot, as the next index — hands the current draft to [onPickSlot]
+ * so the caller can open the emoji sheet for that slot and return here with the choice.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,12 +85,25 @@ internal fun ConfigureReactionsSheet(
                     stringResource(R.string.configure_reactions_guidance),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                LazyRow(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
                 ) {
-                    itemsIndexed(draft, key = { index, _ -> index }) { index, emoji ->
-                        ReactionSlot(index = index, emoji = emoji, onClick = { onPickSlot(index, draft) })
+                    draft.forEachIndexed { index, emoji ->
+                        if (index < RecentEmojiList.QuickLimit) {
+                            ReactionSlot(index = index, emoji = emoji, onClick = { onPickSlot(index, draft) })
+                        } else {
+                            OptionalReactionSlot(
+                                index = index,
+                                emoji = emoji,
+                                onReplace = { onPickSlot(index, draft) },
+                                onRemove = { draft = RecentEmojiList.withoutQuickChoiceAt(draft, index) },
+                            )
+                        }
+                    }
+                    if (draft.size < RecentEmojiList.QuickMaximum) {
+                        AddReactionSlot(onClick = { onPickSlot(draft.size, draft) })
                     }
                 }
                 Row(
@@ -121,6 +142,45 @@ private fun ReactionSlot(
     ) {
         Box(contentAlignment = Alignment.Center) {
             EmojiGlyph(emoji)
+        }
+    }
+}
+
+/** An optional seventh or eighth slot: replaceable like the others, with its own remove button. */
+@Composable
+private fun OptionalReactionSlot(
+    index: Int,
+    emoji: String,
+    onReplace: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ReactionSlot(index = index, emoji = emoji, onClick = onReplace)
+        IconButton(onClick = onRemove) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = stringResource(R.string.configure_reactions_remove, index + 1, emoji),
+            )
+        }
+    }
+}
+
+/** Appends another optional slot, opening the emoji sheet for it. */
+@Composable
+private fun AddReactionSlot(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.size(ReactionSlotSize).testTag(CONFIGURE_REACTIONS_ADD_SLOT_TAG),
+        border = amoledOutlineBorder(),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                Icons.Default.Add,
+                contentDescription = stringResource(R.string.configure_reactions_add),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

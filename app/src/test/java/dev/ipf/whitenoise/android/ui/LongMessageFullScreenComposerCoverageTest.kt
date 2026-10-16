@@ -73,6 +73,55 @@ class LongMessageFullScreenComposerCoverageTest {
         )
     }
 
+    /**
+     * The reader's composer hands an accepted send back to the conversation: it closes only its own reader
+     * session, after the cleared composer reached the keyboard, and every row layer forwards the conversation's
+     * accepted-send reveal (#3268).
+     */
+    @Test
+    fun expandedReaderSendClosesItsSessionAndRevealsThroughTheConversation() {
+        val body = messageBubbleSource().readText().functionBody("MessageBubble")
+        val fullScreenCall =
+            body
+                .substringAfter("MessageFullScreenView(")
+                .substringBefore("if (surfaces.emojiPickerOpen")
+        assertTrue(
+            "the reader composer must mark its own session when a send is accepted",
+            "val readerSession = surfaces.expandedFullViewSession" in body &&
+                "onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) }" in fullScreenCall,
+        )
+        assertTrue(
+            "the reader must close through the deferred dismissal that reveals through the conversation",
+            "ReaderSendDismissal(surfaces, onReaderSendAccepted)" in body,
+        )
+        val state = messageBubbleSource().resolveSibling("MessageBubbleState.kt").readText()
+        val dismissal = state.substringAfter("internal fun ReaderSendDismissal(").substringBefore("\n}\n")
+        assertTrue(
+            "closing in the clearing frame lets the keyboard's composing word restore the sent text",
+            "withFrameNanos" in dismissal && "closeReaderAfterAcceptedSend(session)" in dismissal,
+        )
+        assertFalse(
+            "Read more must open a new reader session rather than flipping the flag directly",
+            "surfaces.expandedFullView = true" in body,
+        )
+
+        val timelineRow = conversationSource("TimelineRow.kt").readText()
+        val rowBubble = conversationSource("TimelineRowTtsHighlight.kt").readText()
+        assertTrue(
+            "TimelineRow and its bubble wrapper must forward the accepted-send reveal to MessageBubble",
+            "onReaderSendAccepted = onReaderSendAccepted" in timelineRow &&
+                "onReaderSendAccepted = onReaderSendAccepted" in rowBubble,
+        )
+
+        val screen = conversationSource("ConversationScreen.kt").readText()
+        val readerHandoff = screen.substringAfter("onReaderSendAccepted = {").substringBefore("},")
+        assertTrue(
+            "the conversation must reveal a reader send through the same path as its main composer",
+            "acceptedSendRevealedTranscript = true" in readerHandoff && "revealSentMessage()" in readerHandoff,
+        )
+    }
+
+    /** One composer gate and mention picker feed both the main composer and the reader. */
     @Test
     fun conversationPassesMainComposerGateAndMentionPickerToExpandedReader() {
         val screenBody = conversationSource("ConversationScreen.kt").readText()
