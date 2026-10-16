@@ -1,0 +1,52 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+  "legacy_sha256": "4fa85a1be3ba0fb18434288f4d319b0dc645eb960e88c36a36e587634a5f0d8e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ContactPickerScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "fun ContactPickerScreen(",
+        "test_ids": [
+          "NCH-003",
+          "NCH-001",
+          "GRP-005"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:user_search_address_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_address_result",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "NCH-001",
+          "NCH-003",
+          "GRP-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: ContactPickerScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

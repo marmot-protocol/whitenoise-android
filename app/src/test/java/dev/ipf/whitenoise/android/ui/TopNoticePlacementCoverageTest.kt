@@ -102,6 +102,31 @@ class TopNoticePlacementCoverageTest {
         assertEquals("a new opt-out needs a reviewed replacement slot", 3, optOuts)
     }
 
+    /**
+     * Every plain material scaffold with a top bar hosts the banner slot under that bar, so a banner never sits
+     * above the bar of a surface that bypasses WhiteNoiseScaffold, unless a reasoned opt-out says why it may.
+     */
+    @Test
+    fun everyPlainScaffoldTopBarHostsTheSlot() {
+        val sites =
+            mainSources().flatMap { (path, source) ->
+                plainScaffoldCalls(source).filter { "topBar =" in it }.map { path to it }
+            }
+        assertTrue("the gate must see the plain scaffolds it protects", sites.size >= MIN_PLAIN_SCAFFOLD_TOP_BARS)
+        sites.forEach { (path, call) ->
+            val topBar = call.indexOf("topBar =")
+            val slotted =
+                call.indexOf("TopNoticeSlot(", topBar) > topBar ||
+                    call.indexOf("ScaffoldTopBarWithNoticeSlot(", topBar) > topBar
+            val optedOut = PLAIN_SCAFFOLD_OPT_OUT.containsMatchIn(call)
+            assertTrue(
+                "$path: a plain Scaffold with a top bar needs TopNoticeSlot() under it, or an opt-out comment " +
+                    "of the form '// top-notice-slot opt-out: <reason>' inside the call",
+                slotted || optedOut,
+            )
+        }
+    }
+
     /** A modal claims the banners below its playback strip, so nothing is rendered behind it in the window below. */
     @Test
     fun modalsClaimTheBannersBelowTheirPlaybackStrip() {
@@ -135,6 +160,21 @@ class TopNoticePlacementCoverageTest {
         assertTrue("presentationAllowed() && claims.lastOrNull() === claim" in owns)
     }
 
+    /** Material `Scaffold(` calls in one source, as their balanced argument lists, skipping the app's own scaffold. */
+    private fun plainScaffoldCalls(source: String): List<String> {
+        if (SCAFFOLD_ALIAS in source) return emptyList()
+        return Regex("""(?<![A-Za-z])Scaffold\(""")
+            .findAll(source)
+            .map { match ->
+                source.kotlinBlockFrom(
+                    openDelimiter = match.range.last,
+                    description = "scaffold call",
+                    opening = '(',
+                    closing = ')',
+                )
+            }.toList()
+    }
+
     /** Snackbar calls in one source, as their balanced argument lists. */
     private fun hostCalls(source: String): List<String> =
         Regex("""\b(?:WhiteNoiseSnackbarHost|SnackbarHost)\(""")
@@ -165,4 +205,15 @@ class TopNoticePlacementCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android"),
             File("app/src/main/java/dev/ipf/whitenoise/android"),
         ).first(File::isDirectory)
+
+    private companion object {
+        /** A source that imports the app scaffold under the material name has no plain scaffold calls. */
+        const val SCAFFOLD_ALIAS = "WhiteNoiseScaffold as Scaffold"
+
+        /** The reviewed opt-out: a reason is required, so a bare marker never passes. */
+        val PLAIN_SCAFFOLD_OPT_OUT = Regex("""// top-notice-slot opt-out: \S.*""")
+
+        /** The plain scaffolds with a top bar known at the time of writing, so a broken search cannot pass. */
+        const val MIN_PLAIN_SCAFFOLD_TOP_BARS = 11
+    }
 }

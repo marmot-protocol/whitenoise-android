@@ -78,6 +78,7 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -144,16 +145,20 @@ internal fun PhotoEditorScreen(
         modifier = modifier.fillMaxSize().testTag("photo.editor").exposePerformanceTestTags(),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            PhotoEditorTopBar(
-                saving = state.isSaving,
-                frameIndex = frameIndex,
-                frameCount = frameCount,
-                onCancel = ::requestCancel,
-                onSave = {
-                    stateHolder.beginSaving()
-                    onSave(state.recipe, state.quality)
-                },
-            )
+            // App banners sit below this screen's bar rather than over it (#3312).
+            Column {
+                PhotoEditorTopBar(
+                    saving = state.isSaving,
+                    frameIndex = frameIndex,
+                    frameCount = frameCount,
+                    onCancel = ::requestCancel,
+                    onSave = {
+                        stateHolder.beginSaving()
+                        onSave(state.recipe, state.quality)
+                    },
+                )
+                TopNoticeSlot()
+            }
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
