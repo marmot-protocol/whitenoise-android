@@ -2,9 +2,13 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -152,7 +156,10 @@ internal fun rememberTopNoticeSlot(): TopNoticeSlotState {
 /**
  * Renders the owning slot's banners: the notice first, then any snackbar with its dismiss, retry and report-copy
  * actions. The region wraps long text and is bounded to part of the visible window, scrolling inside itself at
- * large font scales or in a short window, so the screen beneath always keeps room for its content.
+ * large font scales or in a short window, so the screen beneath always keeps room for its content. Regions sit
+ * outside padded content, in bar slots, the shell, the root and modal columns, so the region keeps itself clear
+ * of a side cutout or side navigation bar. That padding honours what an ancestor already consumed, so a region
+ * inside padded content, like the conversation's row, is not padded twice.
  */
 @Composable
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
@@ -170,6 +177,7 @@ internal fun TopNoticeRegion(
     Column(
         modifier
             .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
             .heightIn(max = topNoticeMaxHeight())
             .fadingVerticalScroll(rememberScrollState())
             .testTag(TOP_NOTICE_REGION_TAG),

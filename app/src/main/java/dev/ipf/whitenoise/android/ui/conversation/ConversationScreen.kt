@@ -4197,7 +4197,10 @@ internal fun ConversationScreen(
                         .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
                         // The composer bottomBar owns IME padding; consume here so the
                         // transcript does not count the keyboard a second time (#895).
-                        .consumeWindowInsets(WindowInsets.ime),
+                        .consumeWindowInsets(WindowInsets.ime)
+                        // The scaffold padding above already clears a side cutout or side navigation
+                        // bar, so the banner row inside must not pad for them again (#3312).
+                        .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
             ) {
                 when {
                     navigationState.initialTimelineBackfillNoProgress ->

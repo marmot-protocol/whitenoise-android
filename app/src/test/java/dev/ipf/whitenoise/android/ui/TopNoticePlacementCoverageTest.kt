@@ -89,6 +89,11 @@ class TopNoticePlacementCoverageTest {
         assertTrue("the conversation row is its slot", "rememberTopNoticeSlot()" in row && "TopNoticeRegion(" in row)
         val rowInUse = "ConversationTransientNoticeLayout(" in conversation
         assertTrue("the conversation's notice layout must stay in use", rowInUse)
+        val sideInsets = "consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))"
+        assertTrue("the padded conversation row must not pad for side insets twice", sideInsets in conversation)
+        val regionBody = mainSource("ui/common/TopNotice.kt").functionBody("TopNoticeRegion")
+        val sidePadding = "windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))"
+        assertTrue("the region keeps clear of side cutouts and side navigation bars", sidePadding in regionBody)
 
         val chats = mainSource("ui/chats/ChatsScreen.kt")
         assertTrue("topNoticeSlot = false" in chats)
