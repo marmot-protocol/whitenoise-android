@@ -10,12 +10,15 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.notifications.NotificationMessagePreloadState
 import dev.ipf.whitenoise.android.notifications.NotificationRouteFirstFrameGate
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
+import dev.ipf.whitenoise.android.notifications.NotificationScenario
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.notificationMessagePreloadKey
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -38,9 +41,10 @@ import java.util.concurrent.TimeUnit
  * state owners replaced by a recording port that answers acknowledgements as the Activity does. An
  * inactive-account tap starts its process-scoped switch with a read held: the exact preload, or the
  * activation at its first engine read. A newer tap, a runtime replacement, explicit navigation, Back,
- * account removal or an App Lock remount then changes what the route may still own, and only afterwards is
- * the retired read released. The retired route must not reopen a conversation, consume a tap it no longer
- * owns, lower a newer route's overlay or end a window it did not begin.
+ * account removal or a shell remount (what App Lock and Activity recreation do to a route in flight) then
+ * changes what the route may still own, and only afterwards is the retired read released. The retired route
+ * must not reopen a conversation, consume a tap it no longer owns, activate an account under a newer route,
+ * lower a newer route's overlay or end a window it did not begin.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -60,7 +64,7 @@ class NotificationOpenRouteSeamTest {
     private val composedRuntime = mutableIntStateOf(appState.runtimeGeneration)
     private val firstFrame = NotificationFirstFramePriority { appState.runtimeGeneration }
     private val shell = RecordingShell(request)
-    private val state = routeState(request, composedRuntime)
+    private val state = routeState(target, requestId, request, composedRuntime)
     private val router = NotificationOpenRouter(appState, ChatsController(appState), firstFrame, state, shell)
 
     /** Releases every held read and stops the app's process-scoped work so nothing outlives the case. */
@@ -107,11 +111,11 @@ class NotificationOpenRouteSeamTest {
      */
     @Test
     fun aRetiredSwitchFailingAfterExplicitNavigationLeavesTheExplicitSelectionAlone() {
-        openEarlyWhileActivationIsHeld()
+        val retiredWork = openEarlyWhileActivationIsHeld()
         firstFrame.release(requestId)
         shell.openExplicitly(EXPLICIT_CHAT)
 
-        releaseRetiredActivationAndAssertUnchanged(fails = true)
+        releaseRetiredActivationAndAssertUnchanged(retiredWork, fails = true)
 
         assertEquals(EXPLICIT_CHAT, shell.selectedChatId)
         assertEquals(listOf(requestId), shell.droppedAcknowledgements.toList())
@@ -126,12 +130,12 @@ class NotificationOpenRouteSeamTest {
      */
     @Test
     fun aRetiredSwitchFailingAfterBackDoesNotReopenOrFallBack() {
-        openEarlyWhileActivationIsHeld()
+        val retiredWork = openEarlyWhileActivationIsHeld()
         shell.backOut()
         firstFrame.release(requestId)
         NotificationRouteTrace.finishRequest(requestId)
 
-        releaseRetiredActivationAndAssertUnchanged(fails = true)
+        releaseRetiredActivationAndAssertUnchanged(retiredWork, fails = true)
 
         assertNull(shell.selectedChatId)
         assertEquals(listOf(requestId), shell.droppedAcknowledgements.toList())
@@ -146,13 +150,13 @@ class NotificationOpenRouteSeamTest {
      */
     @Test
     fun aRetiredSwitchReleasedAfterItsAccountWasRemovedOnlyLeavesTheConversation() {
-        openEarlyWhileActivationIsHeld()
+        val retiredWork = openEarlyWhileActivationIsHeld()
         firstFrame.release(requestId)
         removeAccount(NotificationRouteHarness.TARGET_ACCOUNT)
         val before = shell.calls.toList()
 
         activationHold.read(0).release.countDown()
-        awaitCondition("the retired switch never reported its failure") { shell.droppedAcknowledgements.isNotEmpty() }
+        awaitCompletion(retiredWork)
 
         assertEquals(before + "fallBack", shell.calls.toList())
         assertNull(shell.selectedChatId)
@@ -163,20 +167,20 @@ class NotificationOpenRouteSeamTest {
     }
 
     /**
-     * App Lock: the lock unmounts the shell while the switch is in flight, freezing the readers its route captured,
-     * and the unlocked shell re-runs the same request with fresh slots, so a successor switch for the same request
-     * id begins its own window. The retired switch then fails. Request identity cannot tell the two apart, so only
-     * the successor's held window retires it: it must not fall back, consume the still-offered target the successor
-     * owns, or end the successor's window, and the successor must still reach the conversation.
+     * Shell remount, which is what App Lock and Activity recreation do to a route in flight: the composition is
+     * dropped, freezing the readers the route captured, and the remounted shell re-runs the same request with
+     * fresh slots, so a successor switch for the same request id begins its own window. The retired switch then
+     * fails. Request identity cannot tell the two apart, so the process-owned route claim must: the retired
+     * switch may not fall back, consume the still-offered target the successor owns or end the successor's
+     * window, and the successor must still reach the conversation.
      */
     @Test
-    fun aRetiredSwitchFailingAfterAnAppLockRemountLeavesTheSuccessorRouteIntact() {
+    fun aRetiredSwitchFailingAfterAShellRemountLeavesTheSuccessorRouteIntact() {
         gate.releasePreload.countDown()
         val retired = routerWithFrozenReaders()
-        runBlocking { retired.route(target, requestId) }
+        val retiredWork = mutationsLaunchedBy { runBlocking { retired.route(target, requestId) } }
         val retiredGate = requireNotNull(firstFrame.gate)
         awaitHeldActivationRead(0)
-        lockAndUnlock()
         runBlocking { router.route(target, requestId) }
         val successorGate = requireNotNull(firstFrame.gate)
         assertNotSame(retiredGate, successorGate)
@@ -186,7 +190,7 @@ class NotificationOpenRouteSeamTest {
             state.preloadSlot.preload?.state is NotificationMessagePreloadState.Ready
         }
 
-        releaseRetiredActivationAndAssertUnchanged(fails = true)
+        releaseRetiredActivationAndAssertUnchanged(retiredWork, fails = true)
 
         assertSame(successorGate, firstFrame.gate)
         assertFalse(successorGate.isReleased)
@@ -200,6 +204,64 @@ class NotificationOpenRouteSeamTest {
         assertEquals(listOf("arm", "close", "arm", "close", open, "handled:$requestId"), shell.calls.toList())
     }
 
+    /**
+     * The same remount for an invite, which holds no first-frame window at all, so only the route claim can tell
+     * the retired switch from its same-request successor. The retired failure must not fall back or consume the
+     * invite tap the successor still owns, and once the successor lands the tap stays pending for the chat list.
+     */
+    @Test
+    fun anInviteSwitchRetiredByAShellRemountLeavesTheSameRequestToItsSuccessor() {
+        val invite = NotificationScenario.target(messageIdHex = null, kind = NotificationTargetKind.INVITE)
+        request.value = NotificationOpenRequest(invite, requestId)
+        val retired = routerWithFrozenReaders(invite, requestId)
+        val retiredWork = mutationsLaunchedBy { runBlocking { retired.route(invite, requestId) } }
+        assertNull("an invite route holds no window", firstFrame.gate)
+        awaitHeldActivationRead(0)
+        val live = liveRouter(invite, requestId)
+        runBlocking { live.route(invite, requestId) }
+        awaitHeldActivationRead(1)
+
+        releaseRetiredActivationAndAssertUnchanged(retiredWork, fails = true, live = live.state)
+
+        assertEquals(NotificationOpenRequest(invite, requestId), request.value)
+        activationHold.read(1).release.countDown()
+        awaitCondition("the successor never activated its account") {
+            appState.activeAccountRef == NotificationRouteHarness.TARGET_ACCOUNT
+        }
+        runBlocking { live.route(invite, requestId) }
+        assertEquals(listOf("arm", "close", "arm", "close"), shell.calls.toList())
+        assertEquals("the invite waits for its chat list", NotificationOpenRequest(invite, requestId), request.value)
+    }
+
+    /**
+     * A retired switch whose shell was disposed, followed by a newer tap for the already active account, which
+     * opens straight away and begins no window. The disposed route's request reader still shows its own tap, so
+     * only the route claim can retire it: released, it must neither activate its account under the newer
+     * conversation nor fall back over it.
+     */
+    @Test
+    fun aRetiredSwitchOutlivingItsShellCannotActivateUnderANewerActiveAccountTap() {
+        gate.releasePreload.countDown()
+        val retired = routerWithFrozenReaders()
+        val retiredWork = mutationsLaunchedBy { runBlocking { retired.route(target, requestId) } }
+        awaitHeldActivationRead(0)
+        val newer = NotificationRouteHarness.routedTarget(NotificationRouteHarness.SOURCE_ACCOUNT, current = routed)
+        val newerTarget = requireNotNull(newer.notificationTarget)
+        val newerId = newer.notificationRequestId
+        request.value = NotificationOpenRequest(newerTarget, newerId)
+        val live = liveRouter(newerTarget, newerId)
+        runBlocking { live.route(newerTarget, newerId) }
+        val open = "open:${newerTarget.groupIdHex}"
+        assertEquals(listOf("arm", "close", "arm", open, "handled:$newerId"), shell.calls.toList())
+
+        releaseRetiredActivationAndAssertUnchanged(retiredWork, fails = false, live = live.state)
+
+        assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
+        assertEquals(newerTarget.groupIdHex, shell.selectedChatId)
+        assertEquals(newerId, shell.selectedOpenContext.notificationRouteTraceRequestId)
+        assertTrue(shell.droppedAcknowledgements.isEmpty())
+    }
+
     /** Runs one routing pass for the inactive-account tap and waits until its exact preload is held. */
     private fun startRetiredSwitch() {
         runBlocking { router.route(target, requestId) }
@@ -210,11 +272,12 @@ class NotificationOpenRouteSeamTest {
     /**
      * Runs the inactive-account tap until its conversation is open early: the exact preload answers at once,
      * the pass re-runs on the Ready slot as the keyed effect would, and the commit opens the conversation and
-     * consumes the tap while the switch's activation is still held at its first engine read.
+     * consumes the tap while the switch's activation is still held at its first engine read. Returns the
+     * process-scoped work the switch launched, so a test can wait for its completion.
      */
-    private fun openEarlyWhileActivationIsHeld() {
+    private fun openEarlyWhileActivationIsHeld(): List<Job> {
         gate.releasePreload.countDown()
-        runBlocking { router.route(target, requestId) }
+        val retiredWork = mutationsLaunchedBy { runBlocking { router.route(target, requestId) } }
         awaitCondition("the exact preload never published") {
             state.preloadSlot.preload?.state is NotificationMessagePreloadState.Ready
         }
@@ -224,11 +287,28 @@ class NotificationOpenRouteSeamTest {
         assertEquals(requestId, shell.selectedOpenContext.notificationRouteTraceRequestId)
         assertEquals(NotificationOpenRequest(null, requestId), request.value)
         assertEquals(NotificationRouteHarness.SOURCE_ACCOUNT, appState.activeAccountRef)
+        return retiredWork
+    }
+
+    /** Runs [block] and returns the process-scoped mutations it launched, so their completion can be awaited. */
+    private fun mutationsLaunchedBy(block: () -> Unit): List<Job> {
+        val scope = requireNotNull(appState.mutationsScope.coroutineContext[Job])
+        val before = scope.children.toSet()
+        block()
+        val launched = scope.children.filterNot { it in before }.toList()
+        check(launched.isNotEmpty()) { "the pass launched no process-scoped work" }
+        return launched
     }
 
     /** Waits until the [index]-th activation of the target account is held at its first engine read. */
     private fun awaitHeldActivationRead(index: Int) {
         awaitCondition("activation read $index never arrived") { activationHold.read(index).started.count == 0L }
+    }
+
+    /** Waits until every job in [work] has run to completion, and checks none of them failed. */
+    private fun awaitCompletion(work: List<Job>) {
+        awaitCondition("the retired switch never completed") { work.all { it.isCompleted } }
+        assertTrue("the retired switch failed instead of standing down", work.none { it.isCancelled })
     }
 
     /** Releases the retired read, lets its completion run and checks that the newer owner kept everything. */
@@ -238,41 +318,55 @@ class NotificationOpenRouteSeamTest {
         assertFalse(newerGate.isReleased)
     }
 
-    /** Releases the held activation read, failing it when asked, and checks the retired switch changed nothing. */
-    private fun releaseRetiredActivationAndAssertUnchanged(fails: Boolean) {
+    /**
+     * Releases the held activation read, failing it when asked, waits until the retired switch's [retiredWork]
+     * has run to completion, so its reconciliation is known to have happened, and checks it changed nothing.
+     */
+    private fun releaseRetiredActivationAndAssertUnchanged(
+        retiredWork: List<Job>,
+        fails: Boolean,
+        live: NotificationOpenRouteState = state,
+    ) {
         val read = activationHold.read(0)
         read.fails = fails
-        assertUnchangedAfter(completed = { read.passed.count == 0L }) { read.release.countDown() }
+        assertUnchangedAfter(completed = { retiredWork.all { it.isCompleted } }, live = live) {
+            read.release.countDown()
+        }
+        assertTrue("the retired switch failed instead of standing down", retiredWork.none { it.isCancelled })
     }
 
     /** Runs [release], waits until [completed], then keeps polling and fails on the first change to [snapshot]. */
     private fun assertUnchangedAfter(
         completed: () -> Boolean,
+        live: NotificationOpenRouteState = state,
         release: () -> Unit,
     ) {
-        val before = snapshot()
+        val before = snapshot(live)
         release()
         awaitCondition("the retired work never completed", completed)
         repeat(SETTLE_POLLS) {
             ShadowLooper.idleMainLooper()
-            assertEquals("a retired callback changed the newer route", before, snapshot())
+            assertEquals("a retired callback changed the newer route", before, snapshot(live))
             Thread.sleep(POLL_MILLIS)
         }
     }
 
-    /** Everything a retired route must leave alone: shell writes, selection, pending tap, overlay and window. */
-    private fun snapshot(): List<Any?> =
+    /** Everything a retired route must leave alone: shell writes, selection, pending tap, account, overlay, window. */
+    private fun snapshot(live: NotificationOpenRouteState): List<Any?> =
         listOf(
             shell.calls.toList(),
             shell.selectedChatId,
             shell.selectedOpenContext,
             request.value,
-            state.routing,
+            appState.activeAccountRef,
+            live.routing,
             firstFrame.gate,
         )
 
-    /** The route slots a freshly composed shell holds for this tap, with currency read from the given readers. */
+    /** The route slots a freshly composed shell holds for [target] under [requestId], reading currency as given. */
     private fun routeState(
+        target: NotificationTarget,
+        requestId: Long,
         request: State<NotificationOpenRequest>,
         composedRuntime: State<Int>,
     ): NotificationOpenRouteState =
@@ -285,19 +379,26 @@ class NotificationOpenRouteSeamTest {
             currency = NotificationOpenCurrency(request, composedRuntime) { appState.runtimeGeneration },
         )
 
+    /** A router a freshly composed shell would run for [target] under [requestId], over the Activity's live request. */
+    private fun liveRouter(
+        target: NotificationTarget,
+        requestId: Long,
+    ): NotificationOpenRouter {
+        val live = routeState(target, requestId, request, composedRuntime)
+        return NotificationOpenRouter(appState, router.chats, firstFrame, live, shell)
+    }
+
     /**
      * A router whose request and runtime readers stop at their current values, as the rememberUpdatedState
      * readers of a shell that left composition do, over the same app state, priority owner and retained shell.
      */
-    private fun routerWithFrozenReaders(): NotificationOpenRouter {
-        val frozen = routeState(mutableStateOf(request.value), mutableIntStateOf(appState.runtimeGeneration))
+    private fun routerWithFrozenReaders(
+        target: NotificationTarget = this.target,
+        requestId: Long = this.requestId,
+    ): NotificationOpenRouter {
+        val frozen =
+            routeState(target, requestId, mutableStateOf(request.value), mutableIntStateOf(appState.runtimeGeneration))
         return NotificationOpenRouter(appState, router.chats, firstFrame, frozen, shell)
-    }
-
-    /** Shows the App Lock and dismisses it again, which unmounts and remounts the shell around a held switch. */
-    private fun lockAndUnlock() {
-        setAppStateField("setAppLockScreenVisible", Boolean::class.javaPrimitiveType!!, true)
-        setAppStateField("setAppLockScreenVisible", Boolean::class.javaPrimitiveType!!, false)
     }
 
     /** Replaces the runtime generation, both live and as the composition last saw it. */
