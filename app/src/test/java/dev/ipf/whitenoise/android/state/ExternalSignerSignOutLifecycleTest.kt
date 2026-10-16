@@ -409,10 +409,11 @@ class ExternalSignerSignOutLifecycleTest {
             assertNull(state.activeAccountRef)
         }
 
-    /** A post-admission exception must propagate instead of being reported as an unattempted sign-out. */
+    /** Push bookkeeping failure preserves the completed native sign-out and local cleanup. */
     @Test
-    fun signOutFailureAfterNativeAdmissionStillPropagates() =
+    fun postNativePushCleanupFailurePreservesSignOutCompletion() =
         runBlocking {
+            var failedPushReads = 0
             val original = context.getSharedPreferences("sign-out-push-corruption", Context.MODE_PRIVATE)
             val corruptAfterSignOut =
                 object : SharedPreferences by original {
@@ -420,13 +421,17 @@ class ExternalSignerSignOutLifecycleTest {
                         key: String?,
                         defValues: MutableSet<String>?,
                     ): MutableSet<String>? {
-                        check(!engineSignedOut) { "scripted encrypted push value corruption" }
+                        if (engineSignedOut) {
+                            failedPushReads += 1
+                            error("scripted encrypted push value corruption")
+                        }
                         return original.getStringSet(key, defValues)
                     }
                 }
             val state = appState(pushTokenStore = PushTokenStore(corruptAfterSignOut))
 
-            assertTrue(runCatching { state.signOutActiveAccount() }.isFailure)
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            assertTrue(failedPushReads > 0)
             assertEquals(1, signOutCalls.get())
             assertTrue(engineSignedOut)
             assertTrue(state.accounts.single().signedOut)
@@ -472,6 +477,7 @@ class ExternalSignerSignOutLifecycleTest {
     @Test
     fun completedWipePublishesRemovedOwnershipBeforePushCleanupCanThrow() =
         runBlocking {
+            var failedPushReads = 0
             val original = context.getSharedPreferences("wipe-push-corruption", Context.MODE_PRIVATE)
             val corruptAfterWipe =
                 object : SharedPreferences by original {
@@ -479,12 +485,16 @@ class ExternalSignerSignOutLifecycleTest {
                         key: String?,
                         defValues: MutableSet<String>?,
                     ): MutableSet<String>? {
-                        check(!engineWiped) { "scripted encrypted push value corruption" }
+                        if (engineWiped) {
+                            failedPushReads += 1
+                            error("scripted encrypted push value corruption")
+                        }
                         return original.getStringSet(key, defValues)
                     }
                 }
             val state = appState(pushTokenStore = PushTokenStore(corruptAfterWipe))
-            assertTrue(runCatching { state.signOutAndWipeActiveAccount() }.isFailure)
+            assertEquals(wipeOutcome, state.signOutAndWipeActiveAccount())
+            assertTrue(failedPushReads > 0)
             assertTrue(engineWiped)
             assertTrue(state.accounts.isEmpty())
         }

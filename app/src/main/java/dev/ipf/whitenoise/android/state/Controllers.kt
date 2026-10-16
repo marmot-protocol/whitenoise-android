@@ -11852,7 +11852,11 @@ class ConversationController(
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.START)
                 val refs =
                     resolveCanonicalInviteRefs(memberRefs, diagnostic) ?: run {
-                        diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.FAILURE, DmCreationFailure.UNKNOWN)
+                        diagnostic.record(
+                            DmCreationPhase.RECIPIENTS,
+                            DmCreationOutcome.FAILURE,
+                            DmCreationFailure.UNKNOWN,
+                        )
                         return@withMutationLockResult false
                     }
                 diagnostic.record(DmCreationPhase.RECIPIENTS, DmCreationOutcome.SUCCESS)
