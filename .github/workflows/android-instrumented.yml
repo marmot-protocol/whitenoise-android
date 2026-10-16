@@ -162,6 +162,11 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmissionDeviceTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/**'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox/**'
+      # The viewer controls device test asserts real decoded frames and Media3 control geometry on CI's emulator.
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerVideoControlsAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerVideoDeviceFixture.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerFrameProbe.kt'
+      - 'app/src/androidTest/assets/edge-*.mp4.b64'
       - 'cryptoBenchmark/**'
       - 'settings.gradle.kts'
       - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt'
