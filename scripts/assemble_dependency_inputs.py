@@ -7,10 +7,12 @@ import shutil
 import xml.etree.ElementTree as ET
 
 if __package__:
-    from .check_dependency_inputs import validate_bundle, validate_verification, REQUIRED_LOCKS, unique_object
+    from .check_dependency_inputs import (validate_bundle, validate_verification, is_standard_supplier_path,
+                                         REQUIRED_LOCKS, unique_object)
     from .retain_dependency_evidence import retain_capture, sha256
 else:
-    from check_dependency_inputs import validate_bundle, validate_verification, REQUIRED_LOCKS, unique_object
+    from check_dependency_inputs import (validate_bundle, validate_verification, is_standard_supplier_path,
+                                         REQUIRED_LOCKS, unique_object)
     from retain_dependency_evidence import retain_capture, sha256
 
 
@@ -105,13 +107,16 @@ def assemble(capture, review, output, evidence_url, supplements=(), inputs=None,
         raise ValueError('Malformed captured resolution coverage')
     if any(row.get('unresolved') for row in resolution['observations']):
         raise ValueError('Unresolved captured dependency configuration')
-    coverage = sorted([{key: row[key] for key in ['project', 'scope', 'configuration']}
-                       for row in resolution['observations']],
-                      key=lambda row: (row['project'], row['scope'], row['configuration']))
-    suppliers = [known[key] for key in sorted(records)]
-    for item in suppliers:
+    coverage = sorted(' '.join(row[key] for key in ['project', 'scope', 'configuration'])
+                      for row in resolution['observations'])
+    suppliers = {'/'.join(key): known[key]['source'] for key in sorted(records)}
+    for key in sorted(records):
+        item = known[key]
         mapping = item.get('publication_metadata')
-        if mapping:
+        # Only an artifact outside its coordinate's canonical path needs its module metadata retained.
+        if not is_standard_supplier_path(*key, item['source']):
+            if not mapping:
+                raise ValueError('Missing retained publication mapping path; re-audit this artifact')
             expected = 'publication-metadata/' + mapping['sha256'] + '.module'
             if mapping.get('path') != expected:
                 raise ValueError('Missing retained publication mapping path; re-audit this artifact')

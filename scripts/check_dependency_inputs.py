@@ -140,54 +140,55 @@ def unique_object(pairs):
 
 
 
-def payload_url(item):
-    """Resolve the artifact URL represented by a supplier checksum or payload read."""
-    url = item['source']
-    if item['method'] == 'published-sha256':
-        if not url.endswith('.sha256'):
-            raise ValueError('Supplier checksum URL is malformed')
-        return url[:-len('.sha256')]
-    return url
+def payload_url(source):
+    """Resolve the artifact URL that a published .sha256 file or a payload read covers."""
+    return source[:-len('.sha256')] if source.endswith('.sha256') else source
 
 
-def is_standard_supplier_path(item):
-    """Whether the supplier URL is exactly the registry's coordinate path ending in the recorded artifact name."""
-    group, module, version = item['coordinate'].split(':')
-    url = urllib.parse.urlsplit(payload_url(item))
+def is_standard_supplier_path(coordinate, name, source):
+    """Whether the URL is the registry's exact coordinate path to this artifact's canonical file.
+
+    Gradle shows some module-metadata artifacts under a display name, such as
+    benchmark-traceprocessor.aar or datastore-release.aar for the multiplatform modules
+    benchmark-traceprocessor-android and datastore-android. That file is still the
+    coordinate's canonical one, so it needs no retained module metadata.
+    """
+    group, module, version = coordinate.split(':')
+    url = urllib.parse.urlsplit(payload_url(source))
     registry = SUPPLIER_ROOTS.get(url.hostname)
-    expected = '/'.join([registry or '', *group.split('.'), module, version, item['name']])
-    return registry is not None and urllib.parse.unquote(url.path) == expected
+    directory, _, filename = urllib.parse.unquote(url.path).rpartition('/')
+    if registry is None or directory != '/'.join([registry, *group.split('.'), module, version]):
+        return False
+    stem, dot, extension = name.rpartition('.')
+    base = stem.removesuffix('-release')
+    display_name = bool(dot) and (base == module or module.startswith(base + '-'))
+    return filename == name or display_name and filename == f'{module}-{version}.{extension}'
 
 
-def validate_publication_mapping(item, records, suppliers, root):
-    """Rederive exceptional artifact URLs from retained authenticated module bytes."""
-    group, module, version = item['coordinate'].split(':')
-    mapping = item.get('publication_metadata', {})
-    key = (item['coordinate'], module + '-' + version + '.module')
-    sha = records.get(key)
-    expected_path = 'publication-metadata/' + str(sha) + '.module'
-    if (sha is None or mapping.get('coordinate') != key[0] or mapping.get('name') != key[1] or
-            mapping.get('sha256') != sha or mapping.get('path') != expected_path):
+def validate_publication_mapping(coordinate, name, sha, source, records, suppliers, root):
+    """Rederive an artifact URL outside its coordinate path from retained authenticated module bytes."""
+    group, module, version = coordinate.split(':')
+    module_name = module + '-' + version + '.module'
+    module_sha = records.get((coordinate, module_name))
+    module_source = suppliers.get(coordinate + '/' + module_name)
+    if module_sha is None or module_source is None:
         raise ValueError('Artifact supplier refers to another publication without authenticated mapping')
-    path = root / 'gradle' / expected_path
+    path = root / 'gradle/publication-metadata' / (module_sha + '.module')
     if (not path.is_file() or path.is_symlink() or path.stat().st_size > 2 * 1024 * 1024 or
             not path.resolve().is_relative_to((root / 'gradle').resolve())):
-        raise ValueError('Missing or unsafe publication metadata source')
+        raise ValueError('Artifact supplier refers to another publication without authenticated mapping')
     data = path.read_bytes()
-    if hashlib.sha256(data).hexdigest() != sha:
+    if hashlib.sha256(data).hexdigest() != module_sha:
         raise ValueError('Changed or truncated publication metadata source')
     metadata = json.loads(data.decode('utf-8'), object_pairs_hook=unique_object)
-    sources = [s for s in suppliers if (s.get('coordinate'), s.get('name')) == key]
-    if len(sources) != 1:
-        raise ValueError('Missing unique publication metadata supplier')
     locations = set()
     for variant in metadata.get('variants', []):
         for file in variant.get('files', []):
-            if file.get('name') == item['name']:
-                if file.get('sha256') not in [None, item['sha256']]:
+            if file.get('name') == name:
+                if file.get('sha256') not in [None, sha]:
                     raise ValueError('Publication metadata artifact digest differs')
-                locations.add(urllib.parse.urljoin(payload_url(sources[0]), file['url']))
-    if locations != {payload_url(item)}:
+                locations.add(urllib.parse.urljoin(payload_url(module_source), file['url']))
+    if locations != {payload_url(source)}:
         raise ValueError('Artifact supplier URL is not authenticated by publication metadata')
 
 
@@ -223,14 +224,15 @@ def validate_bundle(root):
     locks = {name: validate_lock(root / name) for name in actual_locks}
     if not locks['settings-gradle.lockfile']:
         raise ValueError('Missing settings dependency-management lock state')
-    coverage = manifest.get('coverage', [])
     observed = set()
-    for row in coverage:
-        module, scope, configuration = (row.get(k, '') for k in ['project', 'scope', 'configuration'])
-        identity = (module, scope, configuration)
-        if identity in observed or module not in [':', ':app', ':benchmark', ':cryptoBenchmark', ':fuzz']:
+    # Each row is "<project> <project|plugin> <configuration>", for example ":app plugin classpath".
+    for row in manifest.get('coverage', []):
+        identity = tuple(row.split(' ')) if isinstance(row, str) else ()
+        if len(identity) != 3 or identity in observed or identity[0] not in [':', ':app', ':benchmark',
+                                                                          ':cryptoBenchmark', ':fuzz']:
             raise ValueError('Duplicate or unknown configuration coverage')
         observed.add(identity)
+        module, scope, configuration = identity
         if scope not in ['project', 'plugin'] or not configuration:
             raise ValueError('Invalid configuration coverage')
         relative = (module[1:] + '/' if module != ':' else '')
@@ -247,21 +249,22 @@ def validate_bundle(root):
     if not required <= observed:
         raise ValueError('Incomplete application/plugin configuration coverage')
     records = validate_verification(root / 'gradle/verification-metadata.xml')
-    suppliers = {}
-    for item in manifest.get('suppliers', []):
-        key = (item.get('coordinate'), item.get('name'))
-        url = urllib.parse.urlsplit(item.get('source', ''))
-        if (key in suppliers or key not in records or item.get('sha256') != records[key] or
-                url.scheme != 'https' or url.hostname not in SUPPLIER_HOSTS or url.username or url.password or
-                url.port not in [None, 443] or url.query or url.fragment or
-                item.get('method') not in ['published-sha256', 'independent-payload-sha256']):
+    # Each supplier maps "<coordinate>/<artifact name>" to the official URL that confirmed its
+    # SHA-256: a published .sha256 file, or the payload itself downloaded and hashed.
+    suppliers = manifest.get('suppliers', {})
+    if not isinstance(suppliers, dict):
+        raise ValueError('Unreviewed or ambiguous artifact supplier evidence')
+    for key, source in suppliers.items():
+        coordinate, _, name = key.partition('/')
+        url = urllib.parse.urlsplit(source if isinstance(source, str) else '')
+        if ((coordinate, name) not in records or url.scheme != 'https' or url.hostname not in SUPPLIER_HOSTS or
+                url.username or url.password or url.port not in [None, 443] or url.query or url.fragment):
             raise ValueError('Unreviewed or ambiguous artifact supplier evidence')
         # Any other path, including another directory or a different filename, must be named by the
         # coordinate's own authenticated publication metadata.
-        if not is_standard_supplier_path(item):
-            validate_publication_mapping(item, records, manifest['suppliers'], root)
-        suppliers[key] = item
-    if set(suppliers) != set(records):
+        if not is_standard_supplier_path(coordinate, name, source):
+            validate_publication_mapping(coordinate, name, records[(coordinate, name)], source, records, suppliers, root)
+    if {tuple(key.split('/', 1)) for key in suppliers} != set(records):
         raise ValueError('Missing independent artifact supplier checks')
     validate_exceptions(manifest, records, root, actual_locks)
     return len(locks), len(records)

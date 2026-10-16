@@ -165,6 +165,10 @@ and updated, rather than weakening that floor or excluding transitives.
 The reviewed bootstrap evidence in `gradle/dependency-inputs.json` binds the exact
 lock and verification files to a hosted source revision, observed configuration
 coverage, official HTTPS supplier URLs and independent checksum/payload checks.
+Each coverage row is `<project> <project|plugin> <configuration>`. Each supplier
+entry maps `<coordinate>/<artifact name>` to the URL that confirmed the SHA-256
+recorded in `verification-metadata.xml`: a published `.sha256` file, or the
+payload itself downloaded and hashed.
 The check rejects missing module locks, stale byte evidence, incomplete app/plugin
 coverage, broad trust exceptions and missing supplier checks. The bootstrap is an
 independent supplier cross-check, not an upstream reproducible-build or signature
@@ -292,15 +296,17 @@ evidence during updates; never repair it with a global exclusion or unlocked
 classpath. Guava's two cross-version Android/JRE publications similarly retain
 explicit references to their authenticated Gradle module metadata rather than
 loosening supplier-path checks for unrelated artifacts. A supplier URL counts as
-direct evidence only when its path is exactly the registry root, the coordinate's
-group, module and version directories, and the recorded artifact name. Any other
-path, including an inserted directory or a different filename, needs the same
-authenticated mapping. That covers the Guava publications and the Gradle module
-metadata display names, such as `animation.aar`, published as
-`animation-android-1.13.0-beta01.aar`. The exact module JSON files are retained under
-`gradle/publication-metadata/`; normal offline validation checks their SHA-256 and
-rederives each selected artifact name, digest and unique resolved URL. Keeping a
-valid metadata anchor while changing the supplier URL therefore fails qualification.
+direct evidence only when its path is exactly the registry root and the
+coordinate's group, module and version directories, ending in either the recorded
+artifact name or, for a Gradle module metadata display name such as `animation.aar`
+or `datastore-release.aar`, the coordinate's own canonical
+`animation-android-1.13.0-beta01.aar` file. Any other path, including an inserted
+directory, a classifier or another file, needs an authenticated mapping. Only the
+two Guava publications and one clikt sources jar need that today; their exact
+module JSON files are retained under `gradle/publication-metadata/`, and offline
+validation checks their SHA-256 and rederives each artifact's unique resolved URL.
+Keeping a valid metadata anchor while changing the supplier URL therefore fails
+qualification.
 
 AGP creates `androidApis` lazily when resource tasks need local SDK jars. Its
 empty Maven lock state is committed for all three Android modules, and candidate

@@ -27,15 +27,19 @@ class DependencyInputsTest(unittest.TestCase):
         self.manifest = {'schema': 1, 'reviewed_from': {
             'repository': 'marmot-protocol/whitenoise-android', 'source_sha': 'b' * 40,
             'evidence': 'https://github.com/marmot-protocol/whitenoise-android/actions/runs/123/artifacts/456'},
-            'files': {}, 'coverage': [], 'suppliers': [{
-                'coordinate': 'example:library:1.0', 'name': 'library-1.0.jar', 'sha256': 'a' * 64,
-                'source': 'https://repo.maven.apache.org/maven2/example/library/1.0/library-1.0.jar.sha256',
-                'method': 'published-sha256'}]}
+            'files': {}, 'coverage': [], 'suppliers': {}}
+        # The audit's supplier records; the manifest keeps only each record's confirming URL.
+        self.provenance = [{
+            'coordinate': 'example:library:1.0', 'name': 'library-1.0.jar', 'sha256': 'a' * 64,
+            'source': 'https://repo.maven.apache.org/maven2/example/library/1.0/library-1.0.jar.sha256',
+            'method': 'published-sha256'}]
+        self.manifest['suppliers'] = {r['coordinate'] + '/' + r['name']: r['source'] for r in self.provenance}
+        self.observations = []
         for module in ['', 'app/', 'benchmark/', 'cryptoBenchmark/', 'fuzz/']:
             (self.root / module).mkdir(exist_ok=True)
             (self.root / module / 'buildscript-gradle.lockfile').write_text('empty=classpath\n')
-            self.manifest['coverage'].append({'project': ':' + module.rstrip('/'),
-                                             'scope': 'plugin', 'configuration': 'classpath'})
+            self.observations.append({'project': ':' + module.rstrip('/'),
+                                      'scope': 'plugin', 'configuration': 'classpath'})
             if module:
                 (self.root / module / 'gradle.lockfile').write_text('empty=\n')
         (self.root / 'settings-gradle.lockfile').write_text('empty=incomingCatalogForLibs0\n')
@@ -44,8 +48,8 @@ class DependencyInputsTest(unittest.TestCase):
             'stagingPlayRelease', 'stagingZapstoreRelease', 'previewPlayRelease', 'previewZapstoreRelease',
             'previewPlayDebug', 'previewZapstoreDebug'] for suffix in ['CompileClasspath', 'RuntimeClasspath']]
         (self.root / 'app/gradle.lockfile').write_text('empty=' + ','.join(sorted(names)) + '\n')
-        self.manifest['coverage'].extend({'project': ':app', 'scope': 'project', 'configuration': name}
-                                         for name in names)
+        self.observations.extend({'project': ':app', 'scope': 'project', 'configuration': name} for name in names)
+        self.manifest['coverage'] = sorted(' '.join(row.values()) for row in self.observations)
         for path in [self.metadata, *self.root.rglob('*gradle.lockfile')]:
             self.manifest['files'][str(path.relative_to(self.root))] = hashlib.sha256(path.read_bytes()).hexdigest()
         folder = self.root / 'gradle/dependency-evidence'
@@ -91,13 +95,13 @@ class DependencyInputsTest(unittest.TestCase):
             shutil.copyfile(self.root / relative, destination)
         (capture / 'source.txt').write_text('b' * 40 + '\n')
         (capture / 'source-inputs.json').write_text(json.dumps({'schema': 1, 'source_sha': 'b' * 40, 'files': {}}))
-        (capture / 'resolution.json').write_text(json.dumps({'schema': 1, 'observations': self.manifest['coverage']}))
+        (capture / 'resolution.json').write_text(json.dumps({'schema': 1, 'observations': self.observations}))
         runtime = capture / 'artifact-evidence.json'
         runtime.write_text(json.dumps({'schema': 1, 'artifacts': [{
             'coordinate': 'example:library:1.0', 'name': 'library-1.0.jar', 'sha256': 'a' * 64}]}))
         self.assertEqual(runtime_identities(runtime), {('example:library:1.0', 'library-1.0.jar')})
         review = self.root / 'review'; review.mkdir()
-        (review / 'provenance.json').write_text(json.dumps(self.manifest['suppliers']))
+        (review / 'provenance.json').write_text(json.dumps(self.provenance))
         destination = self.root / 'staged-candidate'
         result = assemble(capture, review, destination, self.manifest['reviewed_from']['evidence'])
         self.assertEqual(result['reviewed_from']['source_sha'], 'b' * 40)
@@ -142,9 +146,9 @@ class DependencyInputsTest(unittest.TestCase):
         (capture / 'source.txt').write_text('b' * 40 + '\n')
         for name in ['source-inputs.json', 'artifact-evidence.json']:
             (capture / name).write_text(json.dumps({'schema': 1, 'source_sha': 'b' * 40, 'artifacts': []}))
-        (capture / 'resolution.json').write_text(json.dumps({'schema': 1, 'observations': self.manifest['coverage']}))
+        (capture / 'resolution.json').write_text(json.dumps({'schema': 1, 'observations': self.observations}))
         review = self.root / 'review'; review.mkdir()
-        (review / 'provenance.json').write_text(json.dumps(self.manifest['suppliers']))
+        (review / 'provenance.json').write_text(json.dumps(self.provenance))
         return capture, review
 
     def test_assembly_rejects_unsafe_retained_paths_before_writing_anything(self):
@@ -211,7 +215,7 @@ class DependencyInputsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'wrong-source'):
             inputs.validate_bundle(self.root)
         self.manifest['reviewed_from']['repository'] = 'marmot-protocol/whitenoise-android'
-        self.manifest['suppliers'] = []
+        self.manifest['suppliers'] = {}
         self.save()
         with self.assertRaisesRegex(ValueError, 'Missing independent'):
             inputs.validate_bundle(self.root)
@@ -223,16 +227,26 @@ class DependencyInputsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Incomplete application'):
             inputs.validate_bundle(self.root)
         self.manifest['coverage'].append(row)
-        self.manifest['suppliers'][0]['sha256'] = 'c' * 64
+        self.manifest['suppliers']['example:library:1.0/library-1.0-unreviewed.jar'] = (
+            'https://repo.maven.apache.org/maven2/example/library/1.0/library-1.0-unreviewed.jar')
         self.save()
         with self.assertRaisesRegex(ValueError, 'supplier evidence'):
             inputs.validate_bundle(self.root)
 
+    def use_artifact(self, coordinate, name, source):
+        """Make one exact artifact, and its confirming URL, the fixture's whole trust root."""
+        group, module, version = coordinate.split(':')
+        self.metadata.write_text(XML.replace('group="example" name="library" version="1.0"',
+                                             f'group="{group}" name="{module}" version="{version}"')
+                                 .replace('name="library-1.0.jar"', f'name="{name}"'))
+        self.manifest['files']['gradle/verification-metadata.xml'] = hashlib.sha256(self.metadata.read_bytes()).hexdigest()
+        self.manifest['suppliers'] = {coordinate + '/' + name: source}
+        self.save()
+
     def test_cross_publication_requires_authenticated_module_mapping(self):
         """Capability aliases need pinned module metadata; arbitrary alternate paths fail."""
-        artifact = self.manifest['suppliers'][0]
-        artifact['method'] = 'independent-payload-sha256'
-        artifact['source'] = 'https://repo.maven.apache.org/maven2/example/library/2.0/library-2.0.jar'
+        self.manifest['suppliers'] = {
+            'example:library:1.0/library-1.0.jar': 'https://repo.maven.apache.org/maven2/example/library/2.0/library-2.0.jar'}
         self.save()
         with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
             inputs.validate_bundle(self.root)
@@ -242,45 +256,60 @@ class DependencyInputsTest(unittest.TestCase):
         metadata_sha = hashlib.sha256(publication).hexdigest()
         folder = self.root / 'gradle/publication-metadata'
         folder.mkdir()
-        (folder / (metadata_sha + '.module')).write_bytes(publication)
+        mirror = folder / (metadata_sha + '.module')
+        mirror.write_bytes(publication)
         self.metadata.write_text(XML.replace('</component>', '<artifact name="' + metadata_name +
                                             '"><sha256 value="' + metadata_sha + '"/></artifact></component>'))
         self.manifest['files']['gradle/verification-metadata.xml'] = hashlib.sha256(self.metadata.read_bytes()).hexdigest()
-        artifact['publication_metadata'] = {'coordinate': 'example:library:1.0', 'name': metadata_name,
-                                            'sha256': metadata_sha,
-                                            'path': 'publication-metadata/' + metadata_sha + '.module'}
-        self.manifest['suppliers'].append({
-            'coordinate': 'example:library:1.0', 'name': metadata_name, 'sha256': metadata_sha,
-            'source': 'https://repo.maven.apache.org/maven2/example/library/1.0/' + metadata_name,
-            'method': 'independent-payload-sha256'})
+        self.manifest['suppliers']['example:library:1.0/' + metadata_name] = (
+            'https://repo.maven.apache.org/maven2/example/library/1.0/' + metadata_name)
         self.save()
         self.assertEqual((10, 2), inputs.validate_bundle(self.root))
-        artifact['source'] = 'https://repo.maven.apache.org/maven2/unrelated/artifact/3.0/other.jar'
+        self.manifest['suppliers']['example:library:1.0/library-1.0.jar'] = (
+            'https://repo.maven.apache.org/maven2/unrelated/artifact/3.0/other.jar')
         self.save()
         with self.assertRaisesRegex(ValueError, 'URL is not authenticated'):
             inputs.validate_bundle(self.root)
-        artifact['source'] = 'https://repo.maven.apache.org/maven2/example/library/2.0/library-2.0.jar'
-        artifact['publication_metadata']['sha256'] = 'c' * 64
+        self.manifest['suppliers']['example:library:1.0/library-1.0.jar'] = (
+            'https://repo.maven.apache.org/maven2/example/library/2.0/library-2.0.jar')
         self.save()
+        mirror.write_bytes(publication + b' ')
+        with self.assertRaisesRegex(ValueError, 'Changed or truncated'):
+            inputs.validate_bundle(self.root)
+        mirror.unlink()
         with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
             inputs.validate_bundle(self.root)
 
     def test_supplier_url_with_an_inserted_path_segment_is_not_the_declared_coordinate(self):
         """An extra directory before the coordinate path is another location, not evidence for this artifact."""
-        artifact = self.manifest['suppliers'][0]
-        artifact['source'] = ('https://repo.maven.apache.org/maven2/not-the-declared-coordinate/'
-                              'example/library/1.0/library-1.0.jar.sha256')
+        self.manifest['suppliers']['example:library:1.0/library-1.0.jar'] = (
+            'https://repo.maven.apache.org/maven2/not-the-declared-coordinate/example/library/1.0/library-1.0.jar.sha256')
         self.save()
         with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
             inputs.validate_bundle(self.root)
 
     def test_supplier_url_filename_must_be_the_recorded_artifact_name(self):
         """The coordinate directory alone is not enough when the final URL names a different file."""
-        artifact = self.manifest['suppliers'][0]
-        artifact['source'] = 'https://repo.maven.apache.org/maven2/example/library/1.0/library-1.0-sources.jar.sha256'
+        self.manifest['suppliers']['example:library:1.0/library-1.0.jar'] = (
+            'https://repo.maven.apache.org/maven2/example/library/1.0/library-1.0-sources.jar.sha256')
         self.save()
         with self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
             inputs.validate_bundle(self.root)
+
+    def test_multiplatform_display_name_may_cite_the_coordinates_canonical_file(self):
+        """Gradle's short display name still resolves to the coordinate's own module-version file."""
+        directory = 'https://dl.google.com/dl/android/maven2/example/library-android/1.0/'
+        for name in ['library.aar', 'library-release.aar', 'library-android.aar']:
+            with self.subTest(name=name):
+                self.use_artifact('example:library-android:1.0', name, directory + 'library-android-1.0.aar.sha256')
+                self.assertEqual((10, 1), inputs.validate_bundle(self.root))
+        for name, file in [('library-sources.aar', 'library-android-1.0.aar'),
+                           ('library.aar', 'library-android-1.0-sources.aar'),
+                           ('library.aar', 'library-android-1.0.jar'),
+                           ('other.aar', 'library-android-1.0.aar')]:
+            with self.subTest(name=name, file=file), self.assertRaisesRegex(ValueError, 'without authenticated mapping'):
+                self.use_artifact('example:library-android:1.0', name, directory + file)
+                inputs.validate_bundle(self.root)
 
     def test_metadata_bypasses_and_malformed_records_fail(self):
         """Verification cannot be disabled, broadly trusted, entity-expanded or ambiguous."""
