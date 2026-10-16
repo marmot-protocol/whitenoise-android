@@ -118,7 +118,7 @@ private fun localDeleteNative(
         }
     } as MarmotInterface
 
-/** The revision is passed opaquely to the fake; never invoke or load its native handle. */
+/** The revision is passed opaquely to the fake — never invoke or load its native handle. */
 private fun draftRevisionStub(): MessageDraftRevisionFfi {
     val unsafeClass = Class.forName("sun.misc.Unsafe")
     val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)

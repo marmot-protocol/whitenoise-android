@@ -137,7 +137,7 @@ class GroupDetailsAbandonmentTest {
         composeRule.waitForIdle()
     }
 
-    /** A chat whose only admin is this account; a direct chat has no name. */
+    /** A chat whose only admin is this account, where a direct chat has no name. */
     private fun group(isDm: Boolean): AppGroupRecordFfi =
         AppGroupRecordFfi(
             selfMembership = SelfMembershipFfi.MEMBER,

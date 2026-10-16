@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.whitenoise.android.R
 
 /**
- * Shared confirmation lifetime; outcomes distinguish failed deletion from deferred client cleanup. A caller that
+ * Shared confirmation lifetime, whose outcomes tell a failed deletion from deferred client cleanup. A caller that
  * reports failures itself, such as the bulk abandonment's batch dialog, clears [presentsFailure] so a failed chat has
  * one report and one Retry, not a second notice whose Retry would bypass the batch's busy set.
  */
