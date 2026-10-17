@@ -1,0 +1,67 @@
+import groovy.json.JsonOutput
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
+// Explicit hosted update capture for #3253/#3255. It records candidates for review;
+// generated files are not an approved trust root until independently checked.
+gradle.beforeProject { project ->
+    project.dependencyLocking.lockAllConfigurations()
+    project.buildscript.configurations.configureEach {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}
+
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    root.tasks.register('captureDependencyInputs') {
+        group = 'verification'
+        description = 'Capture candidate dependency locks, checksums and source metadata for review'
+        doLast {
+            assert gradle.startParameter.writeDependencyLocks
+            assert !gradle.startParameter.writeDependencyVerifications.isEmpty()
+            def observations = []
+            def artifactFiles = [:]
+            root.allprojects.each { project ->
+                // AGP's BootClasspathConfigImpl lazily uses maybeCreate for this
+                // SDK-file-only configuration. Include its empty Maven state.
+                if (['com.android.application', 'com.android.library', 'com.android.test'].any {
+                    project.plugins.hasPlugin(it)
+                }) project.configurations.maybeCreate('androidApis')
+                [project: project.configurations, plugin: project.buildscript.configurations].each { scope, configurations ->
+                    configurations.findAll { it.canBeResolved }.sort { it.name }.each { configuration ->
+                        def resolution = configuration.incoming.resolutionResult
+                        def failures = resolution.allDependencies.findAll {
+                            it instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult
+                        }.collect { [requested: it.requested.displayName, failure: it.failure.message] }
+                        def components = resolution.allComponents.findAll {
+                            it.id instanceof ModuleComponentIdentifier
+                        }.collect { component ->
+                            [coordinate: "${component.id.group}:${component.id.module}:${component.id.version}".toString()]
+                        }.sort { it.coordinate }
+                        if (failures.isEmpty()) {
+                            configuration.incoming.artifactView {
+                                componentFilter { it instanceof ModuleComponentIdentifier }
+                            }.artifacts.artifacts.each { artifact ->
+                                def id = artifact.id.componentIdentifier
+                                def coordinate = "${id.group}:${id.module}:${id.version}".toString()
+                                artifactFiles["${coordinate}:${artifact.file.name}".toString()] =
+                                    [coordinate: coordinate, path: artifact.file.absolutePath]
+                            }
+                        }
+                        observations.add([project: project.path, scope: scope, configuration: configuration.name,
+                                          components: components, unresolved: failures])
+                    }
+                }
+            }
+            def directory = new File(root.rootDir, 'build/dependency-inputs-bootstrap')
+            directory.mkdirs()
+            new File(directory, 'resolution.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(
+                [schema: 1, observations: observations])) + '\n'
+            new File(directory, 'artifact-paths.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(
+                artifactFiles.values().sort { "${it.coordinate}:${it.path}" })) + '\n'
+            new File(directory, 'source.txt').text = System.getenv('GITHUB_SHA') + '\n'
+            if (observations.any { !it.unresolved.isEmpty() }) {
+                throw new GradleException('Dependency candidate capture contains unresolved configurations')
+            }
+        }
+    }
+}

@@ -16,9 +16,23 @@ data has narrow formatter/static-analysis/coverage exclusions; app-owned readers
 scanner owners and lifecycle code remain checked.
 
 ML Kit and Google's runtime licence activities are removed. ZXing already
-encoded QR data and now decodes bounded CameraX luminance crops. The existing
-Google build-time notice generator is retained until a replacement can preserve
-all notices. ExifInterface 1.4.2 remains explicitly test-only for privacy fixtures.
+encoded QR data and now decodes bounded CameraX luminance crops. The local build-time notice generator consumes exact runtime artifact fingerprints
+and reviewed attribution in `config/licenses/`. It preserves all 196 distinct
+name/text pairs from the original 197 production notice rows and the separate
+local Material icon notice. The extra original row repeated `0:46 Lifecycle
+ViewModel` exactly, and the reader already shows identical rows once.
+The baseline and catalogue pin their source revision and original capture.
+The original index, its gzip-compressed text and the build inputs are retained in
+`config/licenses/evidence/` so attribution remains auditable after hosted artifact
+expiry. The required notices are the rows of that retained original output, bound
+by the baseline's resource hashes. Every variant generation checks them and the
+icon copyright before writing resources.
+Additional inherited POM attributions, debug dependencies and the full alternate
+Dagger licence are retained too. J2ObjC uses the complete original notice, which
+includes the copyright and embedded native/source notices present in the shorter
+SDK variants. No new claim of complete MDK Rust-crate attribution is made: a
+reviewed native crate/feature-to-notice attestation remains an upstream prerequisite
+for expanding that coverage. ExifInterface 1.4.2 remains explicitly test-only for privacy fixtures.
 Security Crypto remains for legacy skipped-version imports. This is a reduction
 of shipped stacks, not a claim that every tool/test dependency is unnecessary.
 
@@ -26,3 +40,36 @@ The reader references generated raw resource IDs directly. Reflective name looku
 lost those resources in an optimized preview after the runtime licence SDK was
 removed. Existing release runtime verification now checks the APK's actual index,
 text and local attribution before installation, without another build or matrix.
+
+
+The generator runs without network access and rejects unreviewed artifact bytes,
+missing attribution, changed/truncated text and invalid UTF-8. A runtime file that
+is neither a Maven module nor a project, such as a `files(...)` dependency, fails
+generation because it has no reviewed notice. It emits the same
+`third_party_license_metadata` / `third_party_licenses` raw resources with byte
+ranges consumed by the existing reader. New dependency bytes require a reviewed
+catalogue update; do not reuse an old dependency's notice merely because its name
+matches. Record supplier/POM/embedded-notice provenance, pin the text digest and
+preserve every baseline attribution. An intentional baseline change requires an
+explicit attribution review rather than regenerating the baseline from a candidate.
+
+A failed generation lists every unreviewed artifact with its observed SHA-256 and
+whether it is new or changed. For each one, add or update the exact
+`artifacts[]` entry in `catalog.json` (`coordinate`, file `name`, `sha256` and
+the `notice_ids` it ships). A new licence text goes in `texts/<sha256>.txt` with
+a `notices[]` entry (`id`, `name`, `text`, `sha256`, `source`). Keep one artifact
+or notice per line.
+
+Where the original notice is only a licence URL, an optional `full_text`
+(`text`, `sha256`, `source`) appends the reviewed full licence after a blank line.
+The original line stays first, so the baseline still finds it unchanged. Apache 2.0
+uses the official text; Checker Qual's MIT text comes from its own jar; the BSD-3
+texts are libyuv's (bundled in Camera Core) and Protocol Buffers'; JNA's LGPL-2.1
+row uses the text from JNA's repository. The Google Play services and Firebase
+rows stay links to the Android SDK terms. The required notices come from the retained original plugin
+output in `config/licenses/evidence/`, so a catalogue edit cannot drop one.
+
+`verify_notice_resources.py` follows the optimized APK's resource table to the
+actual ZIP entries, validates every UTF-8 range, checks the baseline's full notice
+set and compares the local icon copyright bytes. Existing Zapstore ART lanes and
+the Play preview staging step use this check without another build matrix.
