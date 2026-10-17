@@ -166,4 +166,20 @@ class IncomingAttachmentSchedulingCoverageTest {
             File("src/main/java/dev/ipf/whitenoise/android/$path"),
             File("app/src/main/java/dev/ipf/whitenoise/android/$path"),
         ).firstOrNull(File::exists)?.readText() ?: error("Missing $path")
+
+    /**
+     * A narrowing records its wait before it updates WorkManager, and a sweep reads the registry under the same
+     * constraint lock, so a settings sweep can never find the registry empty while a narrowing is in flight.
+     */
+    @Test
+    fun narrowingAndSweepDiscoveryShareOneLock() {
+        val waits = source("state/AutomaticAttachmentNetworkWaits.kt")
+        val narrow = waits.functionBody("narrow")
+        assertTrue("the narrowing holds the constraint lock", "synchronized(constraintLock)" in narrow)
+        val recorded = narrow.indexOf("record(request, type, target)")
+        assertTrue("the wait is recorded before the update", recorded in 0 until narrow.indexOf("updateWork("))
+        val sweep = waits.functionBody("widenAll")
+        val lock = sweep.indexOf("synchronized(constraintLock)")
+        assertTrue("the sweep reads the registry under the lock", lock in 0 until sweep.indexOf("records.readAll()"))
+    }
 }

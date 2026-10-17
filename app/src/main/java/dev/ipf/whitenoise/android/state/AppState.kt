@@ -1491,13 +1491,6 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Widens waiting automatic downloads of the signed-in [accountRefs] to the network each one's type is allowed
-     * on now (#3308), so a policy that starts allowing a wider network, such as metered downloads turned on, reaches
-     * work queued under the old one without a new receipt or a reconnect. Only work recorded as narrowed is read;
-     * the policy is computed after queued settings saves, and the WorkManager reads run off the main thread.
-     */
-
-    /**
      * The network [accountRef]'s live policy allows [type] on, for settling a receipt against the current policy.
      * Null for an account that is not loaded and signed in, so an unknown policy never widens a waiting spec.
      */
@@ -1509,6 +1502,12 @@ class WhiteNoiseAppState private constructor(
         return runCatching { automaticAttachmentPolicy(accountRef).networkType(type) }.getOrNull()
     }
 
+    /**
+     * Widens waiting automatic downloads of the signed-in [accountRefs] to the network each one's type is allowed
+     * on now (#3308), so a policy that starts allowing a wider network, such as metered downloads turned on, reaches
+     * work queued under the old one without a new receipt or a reconnect. Only work recorded as narrowed is read;
+     * the policy is computed after queued settings saves, and the WorkManager reads run off the main thread.
+     */
     private fun widenWaitingAutomaticDownloads(accountRefs: List<String>) {
         if (accountRefs.isEmpty()) return
         val waits = AutomaticAttachmentNetworkWaits.get(appContext)

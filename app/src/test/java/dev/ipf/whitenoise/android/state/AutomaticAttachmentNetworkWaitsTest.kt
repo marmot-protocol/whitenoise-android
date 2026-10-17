@@ -71,7 +71,11 @@ class AutomaticAttachmentNetworkWaitsTest {
             }
         AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
 
-        assertEquals("registered before the settle", listOf(NetworkType.UNMETERED), waits.waiting(ACCOUNT).map { it.networkType })
+        assertEquals(
+            "registered before the settle",
+            listOf(NetworkType.UNMETERED),
+            waits.waiting(ACCOUNT).map { it.networkType },
+        )
         assertEquals(1, waits.widen(manager(), ACCOUNT) { NetworkType.CONNECTED })
         assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
         gate.countDown()
@@ -83,7 +87,8 @@ class AutomaticAttachmentNetworkWaitsTest {
     /** A receipt settles against the live policy, so one that widened while the enqueue landed is applied at once. */
     @Test
     fun aReceiptSettlesAgainstThePolicyAsItIsNow() {
-        AutomaticAttachmentNetworkWaits.policyNetworkType = { account, _ -> NetworkType.CONNECTED.takeIf { account == ACCOUNT } }
+        AutomaticAttachmentNetworkWaits.policyNetworkType =
+            { account, _ -> NetworkType.CONNECTED.takeIf { account == ACCOUNT } }
 
         receipt(NetworkType.UNMETERED)
 
