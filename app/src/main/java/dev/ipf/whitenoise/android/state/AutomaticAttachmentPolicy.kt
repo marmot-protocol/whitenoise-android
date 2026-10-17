@@ -2,16 +2,20 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.work.NetworkType
 
-/** Whether the receiving account is loaded locally, and signed in, when an automatic-download decision is made. */
+/**
+ * Whether the receiving account is loaded locally, and signed in, when an automatic-download decision is made.
+ * [Unknown] means a loaded account list lacks it, and [Unloaded] that no account list has loaded yet.
+ */
 internal enum class AutomaticPolicyAccount {
     SignedIn,
     SignedOut,
     Unknown,
+    Unloaded,
 }
 
 /**
- * Why automatic work for one attachment type cannot run right now. Only [Network] can clear without the user
- * acting, so it is the only hold that durable work waits out instead of finishing. [waits] is that rule.
+ * Why automatic work for one attachment type cannot run right now. Only [Network] and [AccountsUnloaded] can clear
+ * without the user acting, so they are the holds durable work waits out instead of finishing. [waits] is that rule.
  */
 internal enum class AutomaticAttachmentHold(
     val reason: String,
@@ -19,6 +23,7 @@ internal enum class AutomaticAttachmentHold(
     Paused("paused"),
     SignedOut("signed_out"),
     UnknownAccount("unknown_account"),
+    AccountsUnloaded("accounts_unloaded"),
     Disabled("disabled"),
     Network("network"),
     ;
@@ -28,10 +33,11 @@ internal enum class AutomaticAttachmentHold(
      * has no run limit: an allowed network may come back after any delay, and nothing else re-queues the
      * attachment, so finishing would lose the download. The worker's capped exponential backoff and its
      * narrowed network constraint keep each wait cheap, and the user's pause, cancel, sign-out or a type turned
-     * off still end the work.
+     * off still end the work. An account list that has not loaded yet, as when it failed to load on a cold start,
+     * also waits: finishing would end the work for good before the account could be found.
      */
     val waits: Boolean
-        get() = this == Network
+        get() = this == Network || this == AccountsUnloaded
 }
 
 /**
@@ -73,6 +79,7 @@ internal data class AutomaticAttachmentPolicy(
         when {
             account == AutomaticPolicyAccount.SignedOut -> AutomaticAttachmentHold.SignedOut
             account == AutomaticPolicyAccount.Unknown -> AutomaticAttachmentHold.UnknownAccount
+            account == AutomaticPolicyAccount.Unloaded -> AutomaticAttachmentHold.AccountsUnloaded
             paused -> AutomaticAttachmentHold.Paused
             MediaAutoDownloadType.entries.none(::enabledOnAnyNetwork) -> AutomaticAttachmentHold.Disabled
             else -> null
@@ -86,7 +93,8 @@ internal data class AutomaticAttachmentPolicy(
     fun receiptTypes(): Set<MediaAutoDownloadType> =
         when {
             account == AutomaticPolicyAccount.SignedOut || paused -> emptySet()
-            account == AutomaticPolicyAccount.Unknown -> MediaAutoDownloadType.entries.toSet()
+            account == AutomaticPolicyAccount.Unknown || account == AutomaticPolicyAccount.Unloaded ->
+                MediaAutoDownloadType.entries.toSet()
             else -> MediaAutoDownloadType.entries.filterTo(mutableSetOf(), ::enabledOnAnyNetwork)
         }
 
@@ -105,7 +113,8 @@ internal data class AutomaticAttachmentPolicy(
      */
     fun networkType(type: MediaAutoDownloadType): NetworkType =
         when {
-            account == AutomaticPolicyAccount.Unknown -> NetworkType.CONNECTED
+            account == AutomaticPolicyAccount.Unknown || account == AutomaticPolicyAccount.Unloaded ->
+                NetworkType.CONNECTED
             !matrix.isEnabled(type, MediaAutoDownloadNetwork.Metered) -> NetworkType.UNMETERED
             !matrix.isEnabled(type, MediaAutoDownloadNetwork.Roaming) -> NetworkType.NOT_ROAMING
             else -> NetworkType.CONNECTED

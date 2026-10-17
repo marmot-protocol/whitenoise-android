@@ -116,7 +116,7 @@ class AttachmentDownloadWorkerTransferTest {
     @Test
     fun automaticWorkDeferredByLivePolicyFinishesWithoutRetry() =
         runTest {
-            AutomaticAttachmentHold.entries.filter { it != AutomaticAttachmentHold.Network }.forEach { hold ->
+            AutomaticAttachmentHold.entries.filterNot { it.waits }.forEach { hold ->
                 val download: PerformDurableAttachmentDownload = { _, _, _ ->
                     throw AttachmentAutomaticPolicyDeferredException(MediaAutoDownloadType.Video, hold)
                 }
@@ -125,6 +125,17 @@ class AttachmentDownloadWorkerTransferTest {
             }
             assertFalse(attachmentIntentStore(appContext).hasSpentTransientRetry(request))
             assertTrue(lines.isEmpty())
+        }
+
+    /** Work held because no account list has loaded yet retries rather than finishing without a download. */
+    @Test
+    fun workHeldByAnUnloadedAccountListRetries() =
+        runTest {
+            val download: PerformDurableAttachmentDownload = { _, _, _ ->
+                throw AttachmentAutomaticPolicyDeferredException(null, AutomaticAttachmentHold.AccountsUnloaded)
+            }
+
+            assertEquals(Result.retry(), worker(0, request, download).doWork())
         }
 
     /**

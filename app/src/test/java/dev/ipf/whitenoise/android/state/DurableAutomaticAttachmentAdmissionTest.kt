@@ -89,6 +89,24 @@ class DurableAutomaticAttachmentAdmissionTest {
             assertEquals(0, fixture.automaticDemands.get())
         }
 
+    /**
+     * Before any account list has loaded, as when it failed to load on a cold start, the work waits and retries
+     * instead of finishing: only a loaded list that lacks the account ends it for good.
+     */
+    @Test
+    fun anUnloadedAccountListWaitsInsteadOfFinishing() =
+        runTest(dispatcher) {
+            fixture.close()
+            fixture = MediaDownloadIntegrationFixture(accounts = emptyList())
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+
+            expectDeferred(type = null, hold = AutomaticAttachmentHold.AccountsUnloaded)
+
+            assertTrue("an unloaded account list is waited out", AutomaticAttachmentHold.AccountsUnloaded.waits)
+            assertFalse("a loaded list lacking the account still ends the work", AutomaticAttachmentHold.UnknownAccount.waits)
+            assertEquals(0, fixture.automaticDemands.get())
+        }
+
     /** A connection without validated internet holds the type for the network only, so the work waits for one. */
     @Test
     fun automaticWorkWaitsForTheNetworkWithoutValidatedInternet() =

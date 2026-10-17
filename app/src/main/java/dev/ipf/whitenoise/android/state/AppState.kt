@@ -11602,6 +11602,7 @@ class WhiteNoiseAppState private constructor(
         return AutomaticAttachmentPolicy(
             account =
                 when {
+                    account == null && accounts.isEmpty() -> AutomaticPolicyAccount.Unloaded
                     account == null -> AutomaticPolicyAccount.Unknown
                     account.signedOut -> AutomaticPolicyAccount.SignedOut
                     else -> AutomaticPolicyAccount.SignedIn
