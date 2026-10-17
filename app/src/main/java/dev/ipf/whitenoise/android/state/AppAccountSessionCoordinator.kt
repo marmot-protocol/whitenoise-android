@@ -41,7 +41,10 @@ internal interface AppAccountSessionActivation {
     ): PreparedAccountSessionActivation?
 
     /** Rejects deleted/signed-out identities and replacement runtimes at the publication boundary. */
-    fun canPublish(label: String, runtime: Int): Boolean
+    fun canPublish(
+        label: String,
+        runtime: Int,
+    ): Boolean
 
     /** Removes old platform share targets before the target account becomes visible. */
     suspend fun hidePreviousAccountShortcuts()
@@ -106,7 +109,10 @@ internal class AppAccountSessionCoordinator(
         }
 
     /** A synchronous created-identity publication supersedes any suspended selection of an older account. */
-    fun publishCreatedIdentity(label: String, publish: () -> Unit) {
+    fun publishCreatedIdentity(
+        label: String,
+        publish: () -> Unit,
+    ) {
         val generation = handoff.beginRequest(label)
         try {
             publish()
@@ -123,7 +129,8 @@ internal class AppAccountSessionCoordinator(
         warmProfile: suspend () -> Unit,
     ) {
         val isCurrent = {
-            handoff.isCurrent(receipt.generation) && activation.activeAccount == receipt.label &&
+            handoff.isCurrent(receipt.generation) &&
+                activation.activeAccount == receipt.label &&
                 activation.canPublish(receipt.label, receipt.runtimeGeneration)
         }
         if (isCurrent()) {
@@ -160,7 +167,8 @@ internal class AppAccountSessionCoordinator(
         val switching = request.label != activation.activeAccount
         val prepared = activation.prepare(request, generation, switching) ?: return null
         val allowed = {
-            request.shouldActivate() && handoff.isCurrent(generation) &&
+            request.shouldActivate() &&
+                handoff.isCurrent(generation) &&
                 activation.canPublish(request.label, prepared.runtimeGeneration)
         }
         if (!allowed()) return null
@@ -183,7 +191,8 @@ internal class AppAccountSessionCoordinator(
     ) {
         val isCurrent = {
             activation.canPublish(request.label, runtimeGeneration) &&
-                activation.activeAccount == request.label && handoff.isCurrent(generation)
+                activation.activeAccount == request.label &&
+                handoff.isCurrent(generation)
         }
         if (!isCurrent()) return
         activation.warmAccountProfile(request.label)

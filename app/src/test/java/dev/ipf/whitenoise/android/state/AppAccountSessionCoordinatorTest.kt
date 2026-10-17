@@ -403,8 +403,10 @@ class AppAccountSessionCoordinatorTest {
         }
 
         /** Models the existing native/runtime admission result. */
-        override fun canPublish(label: String, runtime: Int): Boolean =
-            publicationAllowed && runtime == currentRuntimeGeneration
+        override fun canPublish(
+            label: String,
+            runtime: Int,
+        ): Boolean = publicationAllowed && runtime == currentRuntimeGeneration
 
         /** Exposes the last suspending platform step before publication. */
         override suspend fun hidePreviousAccountShortcuts() {

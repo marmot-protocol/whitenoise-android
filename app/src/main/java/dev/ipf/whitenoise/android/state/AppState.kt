@@ -6148,8 +6148,10 @@ class WhiteNoiseAppState private constructor(
         }
 
         /** Retains the native deletion/sign-out admission check in the facade's current account snapshot. */
-        override fun canPublish(label: String, runtime: Int): Boolean =
-            !networkNotificationRecoverySuppressed && canPublishAccountActivation(label, runtime)
+        override fun canPublish(
+            label: String,
+            runtime: Int,
+        ): Boolean = !networkNotificationRecoverySuppressed && canPublishAccountActivation(label, runtime)
 
         /** Hides platform share targets before publishing a different active account. */
         override suspend fun hidePreviousAccountShortcuts() = hideConversationShortcutsFromDirectShare()
@@ -8874,7 +8876,8 @@ class WhiteNoiseAppState private constructor(
                 }.getOrNull()
             }
         if (
-            activeAccountRef == account && runtimeGeneration == requestRuntimeGeneration &&
+            activeAccountRef == account &&
+            runtimeGeneration == requestRuntimeGeneration &&
             accountSwitchHandoff.isCurrent(activationGeneration)
         ) {
             localNotificationSettings = settings
