@@ -97,6 +97,7 @@ class ImportedIdentitySetupRoutingTest {
                 assertFalse("setup reconnect errors must fail the fixture", controller.state.value.error)
                 val checkpoint = controller.state.value.snapshot
                 assertEquals(fixture.imported.label, checkpoint?.accountIdHex)
+                assertTrue("the mounted setup must run native preflight", fixture.calls.contains("runOnboarding"))
             }
         } finally {
             runWithMainLooperPumping { state.accountSetup.close() }
@@ -205,20 +206,19 @@ class ImportedIdentitySetupRoutingTest {
                 ): AccountSummaryFfi = error("unexpected destructive recovery")
             }
 
-        /** Retains the native checkpoint while its stream completes without manufacturing setup success. */
+        /** Bypasses native Android cleaner setup for this inert Robolectric subscription, as other fixtures do. */
         private fun subscription(): OnboardingSubscription {
             openedSubscriptions.incrementAndGet()
-            return object : OnboardingSubscription(NoPointer) {
-                /** Provides the same pending native revision mounted by the account setup route. */
-                override fun snapshot() = pending
-
-                /** A terminated stream retains its last known pending checkpoint. */
-                override suspend fun next(): OnboardingSnapshotFfi? = null
-
-                /** The fake holds no native resources. */
-                override fun close() {
-                    closedSubscriptions.incrementAndGet()
-                }
+            val unsafeClass = Class.forName("sun.misc.Unsafe")
+            val field = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }
+            val unsafe = field.get(null)
+            val subscription =
+                unsafeClass
+                    .getMethod("allocateInstance", Class::class.java)
+                    .invoke(unsafe, PendingOnboardingSubscription::class.java) as PendingOnboardingSubscription
+            return subscription.apply {
+                checkpoint = pending
+                onClose = { closedSubscriptions.incrementAndGet() }
             }
         }
 
@@ -229,5 +229,20 @@ class ImportedIdentitySetupRoutingTest {
             continuation.resumeWithException(MarmotKitException.OnboardingActionUnavailable())
             return COROUTINE_SUSPENDED
         }
+    }
+
+    /** Holds only explicit fixture state and never allocates or releases a native handle. */
+    private class PendingOnboardingSubscription : OnboardingSubscription(NoPointer) {
+        lateinit var checkpoint: OnboardingSnapshotFfi
+        lateinit var onClose: () -> Unit
+
+        /** Provides the same pending native revision mounted by the account setup route. */
+        override fun snapshot() = checkpoint
+
+        /** A terminated stream retains its last known pending checkpoint. */
+        override suspend fun next(): OnboardingSnapshotFfi? = null
+
+        /** Records release of the fake subscription without entering native cleanup. */
+        override fun close() = onClose()
     }
 }
