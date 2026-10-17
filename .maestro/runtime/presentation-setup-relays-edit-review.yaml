@@ -1,0 +1,47 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-relays-edit-review
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-RELAYS
+- assertVisible: Read and write relays
+- tapOn:
+    id: setup-action-EDIT_RELAYS
+- assertVisible: Change a relay before reviewing a replacement.*
+- assertVisible: wss://Custom.example.invalid/path/
+- assertVisible:
+    id: setup-editor-save
+    enabled: false
+- tapOn:
+    id: setup.editor.writes
+- longPressOn:
+    id: setup.editor.writes
+- runFlow:
+    when:
+      notVisible: (?i)select all
+    commands:
+    - tapOn: More options
+- tapOn: (?i)select all
+- assertVisible:
+    id: setup.editor.writes
+    focused: true
+- eraseText: 1
+- assertNotVisible:
+    id: setup.editor.writes
+    text: (?s)^(?!Write relays$).+
+- inputText: wss://changed.example.invalid/
+- assertVisible:
+    id: setup.editor.writes
+    text: ^wss://changed\.example\.invalid/$
+- assertVisible:
+    id: setup.editor.reads
+    text: ^wss://Custom\.example\.invalid/path/$
+- hideKeyboard
+- assertVisible:
+    id: setup-editor-save
+    enabled: true
+- tapOn:
+    id: setup-editor-save
+- assertVisible:
+    id: presentation.complete

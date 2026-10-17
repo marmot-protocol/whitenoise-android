@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-contact-empty
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture contacts
+- assertVisible:
+    text: Fixture next
+- tapOn: Fixture next
+- assertVisible:
+    text: Fixture contacts
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

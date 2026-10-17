@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-image-banner-files
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    id: profile.banner_actions
+- assertVisible:
+    text: Choose files
+- tapOn:
+    text: Choose files
+- assertVisible:
+    text: Recent
+- back
+- tapOn:
+    id: profile.banner_actions
+- assertVisible:
+    text: Find Image on Web
+- tapOn:
+    text: Find Image on Web
+- assertVisible:
+    id: presentation.complete

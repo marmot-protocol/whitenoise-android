@@ -1,0 +1,31 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-control-reset
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    text: Reset and wait for a new invite
+- assertVisible:
+    text: Reset this group on this device\?
+- assertVisible:
+    text: White Noise erases this group’s history and encryption state on this device
+      only\. Nothing is sent to the group\. You’ll rejoin only when an admin sends
+      a new invite created after this reset\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Reset this group on this device\?
+- tapOn:
+    text: Reset and wait for a new invite
+- assertVisible:
+    text: Reset this group on this device\?
+- back
+- assertNotVisible:
+    text: Reset this group on this device\?
+- tapOn:
+    text: Reset and wait for a new invite
+- assertVisible:
+    text: Reset this group on this device\?
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
 import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.EmojiData
@@ -385,7 +386,7 @@ private fun EmojiCell(
             color = Color.Transparent,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                EmojiGlyph(emoji)
+                EmojiGlyph(emoji, fitPickerArtwork = true)
             }
         }
     }
@@ -397,12 +398,8 @@ internal fun EmojiGlyph(
     emoji: String,
     modifier: Modifier = Modifier,
     size: Dp = EmojiPickerEmojiSize,
+    fitPickerArtwork: Boolean = false,
 ) {
-    val art = EmojiShortcodes.art(emoji, LocalCustomEmoji.current, emptyMap())
-    if (art != null) {
-        EmojiArtImage(art, contentDescription = emoji, modifier = modifier.size(size))
-        return
-    }
     val baseStyle = MaterialTheme.typography.headlineMedium
     val (fontSize, lineHeight) =
         emojiPickerCellTextMetrics(
@@ -410,6 +407,19 @@ internal fun EmojiGlyph(
             baseStyle = baseStyle,
             densityFontScale = LocalDensity.current.fontScale,
         )
+    val art = EmojiShortcodes.art(emoji, LocalCustomEmoji.current, emptyMap())
+    if (art != null) {
+        val artSize =
+            if (fitPickerArtwork && art is EmojiArt.Bundled && art.drawable == R.drawable.builtin_emoji_marmot) {
+                with(LocalDensity.current) { fontSize.toDp() }
+            } else {
+                size
+            }
+        Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
+            EmojiArtImage(art, contentDescription = emoji, modifier = Modifier.size(artSize))
+        }
+        return
+    }
     Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
         Text(
             text = emoji,

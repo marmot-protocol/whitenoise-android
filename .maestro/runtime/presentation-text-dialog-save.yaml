@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-dialog-save
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture decoded.txt
+- assertVisible:
+    text: Fixture decoded first line.*
+- tapOn: More options
+- assertVisible: Save
+- assertVisible: Open in another app
+- tapOn: Save
+- assertVisible:
+    id: presentation.complete

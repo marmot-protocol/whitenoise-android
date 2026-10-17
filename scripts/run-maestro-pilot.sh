@@ -15,7 +15,9 @@ finish() {
   # Preserve the original result, end timestamp and bounded emulator logs.
   result=$?
   if [[ "${maestro_started:-false}" == true ]]; then
-    python3 scripts/maestro_suite.py report --destination "$reports" --maestro-exit "$result" || result=2
+    if ! python3 scripts/maestro_suite.py report --destination "$reports" --maestro-exit "$result"; then
+      [[ "$result" != 0 ]] || result=2
+    fi
   fi
   printf 'finished_at=%s\nexit_code=%s\n' "$(date +%s)" "$result" >> "$reports/timings.env"
   timeout --kill-after=5s 15s adb -s emulator-5554 logcat -d -t 1000 > "$reports/logcat.txt" 2>&1 || true
@@ -35,6 +37,4 @@ printf 'test_started_at=%s\n' "$(date +%s)" >> "$reports/timings.env"
 maestro --version > "$reports/maestro-version.txt"
 maestro_started=true
 # Leave time inside the 15-minute job for diagnostics and artifact upload.
-timeout --signal=TERM --kill-after=30s 10m maestro --device emulator-5554 test --format JUNIT --output "$reports/junit.xml" \
-  --test-suite-name 'White Noise onboarding pilot' --debug-output "$reports/debug" \
-  --test-output-dir "$reports/screenshots" "$reports/suite"
+timeout --signal=TERM --kill-after=30s 10m python3 scripts/maestro_offline_batches.py --reports "$reports"

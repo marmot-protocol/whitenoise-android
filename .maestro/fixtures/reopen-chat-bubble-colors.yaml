@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      text: Chat bubble colors
+    direction: DOWN
+- tapOn: Chat bubble colors
+- assertVisible:
+    id: bubble_colors.mine.picker

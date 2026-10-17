@@ -6,6 +6,8 @@ name: profiles-private-cancel
     element:
       id: person_profile.nickname
     direction: DOWN
+- assertVisible:
+    id: person_profile.nickname
 - tapOn:
     id: person_profile.nickname
 - assertVisible:

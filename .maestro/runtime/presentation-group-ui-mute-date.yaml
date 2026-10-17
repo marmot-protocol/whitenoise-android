@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-mute-date
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Mute for
+- tapOn: Custom time
+- assertVisible:
+    text: Next
+- tapOn: Cancel
+- assertVisible:
+    text: Mute for
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

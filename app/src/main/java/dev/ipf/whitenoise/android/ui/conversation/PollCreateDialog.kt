@@ -8,8 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -29,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -38,6 +43,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MAX_POLL_DEADLINE_SECONDS
@@ -59,6 +65,7 @@ import java.util.Locale
 internal fun PollCreateDialog(
     onDismiss: () -> Unit,
     onSubmit: (String, List<String>, PollTypeFfi, Long?, (Boolean) -> Unit) -> Unit,
+    viewportInsets: WindowInsets? = null,
 ) {
     var question by rememberSaveable { mutableStateOf("") }
     var options by rememberSaveable { mutableStateOf(listOf("", "")) }
@@ -79,7 +86,11 @@ internal fun PollCreateDialog(
     var deadlineAttempted by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = { if (!submitting) onDismiss() },
-        modifier = Modifier.exposePerformanceTestTags(),
+        modifier =
+            Modifier
+                .composed { windowInsetsPadding(viewportInsets ?: WindowInsets.safeDrawing.union(WindowInsets.ime)) }
+                .exposePerformanceTestTags(),
+        properties = DialogProperties(decorFitsSystemWindows = false),
         title = { Text(stringResource(R.string.poll_create)) },
         text = {
             PollCreateForm(
@@ -170,7 +181,7 @@ internal fun PollCreateForm(
     onDeadlineChange: (PollDeadlineSelection) -> Unit,
 ) {
     Column(
-        Modifier.heightIn(max = 400.dp).fadingVerticalScroll(rememberScrollState()),
+        Modifier.testTag("poll.create.form").fadingVerticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ProseTextField(

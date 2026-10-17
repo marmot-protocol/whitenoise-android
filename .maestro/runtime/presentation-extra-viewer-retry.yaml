@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-viewer-retry
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Couldn't open file
+- assertVisible:
+    id: media.viewer.retry
+    enabled: true
+- tapOn:
+    id: media.viewer.retry
+- assertVisible:
+    id: presentation.complete

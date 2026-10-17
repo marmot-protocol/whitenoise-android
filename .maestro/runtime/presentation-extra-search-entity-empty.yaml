@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-search-entity-empty
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Chats
+- back
+- assertVisible:
+    id: presentation.complete

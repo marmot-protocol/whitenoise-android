@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-image-picture-photos
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    id: profile.photo_actions
+- assertVisible:
+    text: Choose photos
+- tapOn:
+    text: Choose photos
+- assertVisible:
+    text: Photos
+- back
+- tapOn:
+    id: profile.photo_actions
+- assertVisible:
+    text: Find Image on Web
+- tapOn:
+    text: Find Image on Web
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-share-connect-gallery-busy
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: share_connect.share
+    enabled: false
+- tapOn:
+    id: share_connect.share
+- assertNotVisible: Save to Gallery
+- tapOn: Finish gallery control check
+- assertVisible:
+    id: presentation.complete

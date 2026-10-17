@@ -1,0 +1,33 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-viewer-menu-busy
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture viewer sender
+- tapOn:
+    text: More options
+- assertVisible:
+    text: Save
+- assertVisible:
+    text: Go to message
+- assertVisible:
+    enabled: false
+    containsDescendants:
+    - text: Set as group picture
+- tapOn:
+    text: Set as group picture
+- assertVisible:
+    enabled: false
+    containsDescendants:
+    - text: Set as group picture
+- back
+- assertNotVisible:
+    text: Save
+- tapOn:
+    text: More options
+- assertVisible:
+    text: Save
+- tapOn:
+    text: Save
+- assertVisible:
+    id: presentation.complete

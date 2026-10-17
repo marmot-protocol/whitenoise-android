@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-sort-unread-reopen
+---
+- runFlow: ../fixtures/new-folder-editor.yaml
+- tapOn:
+    id: folder.name
+- inputText: Maestro saved folder
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: folder.sort.UNREAD
+    direction: DOWN
+- tapOn:
+    id: folder.sort.UNREAD
+- runFlow: ../fixtures/save-folder-reopen.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.sort.UNREAD
+    direction: DOWN
+- assertVisible:
+    id: folder.sort.UNREAD
+- back
+- assertVisible:
+    id: chat-folders-content

@@ -25,6 +25,8 @@ name: folders-delete-cancel
     id: "chat-folders-content"
 - assertVisible: "Maestro saved folder"
 - longPressOn: "Maestro saved folder"
+- assertVisible: "Delete"
+- assertVisible: "Edit Folder"
 - tapOn: "Delete"
 - assertVisible:
     id: "folder.delete_dialog"

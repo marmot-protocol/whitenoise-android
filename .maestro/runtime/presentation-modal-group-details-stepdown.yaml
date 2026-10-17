@@ -1,0 +1,39 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-details-stepdown
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Step down as admin
+- assertVisible:
+    text: You will lose admin rights for this group\. Another admin can add you back later\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Alice
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Step down as admin
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Step down as admin
+- back
+- assertNotVisible:
+    text: Step down as admin
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Step down as admin
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-signin-recovery
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Recover this account\?
+- assertVisible:
+    text: Setup didn't finish\. Recovering clears it and tries signing in again\.
+      Invitation keys that were already published may stay on relays\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Recover this account\?
+- tapOn:
+    text: Reopen recovery consent
+- assertVisible:
+    text: Recover this account\?
+- back
+- assertNotVisible:
+    text: Recover this account\?
+- tapOn:
+    text: Reopen recovery consent
+- assertVisible:
+    text: Recover this account\?
+- tapOn:
+    text: Recover
+- assertVisible:
+    id: presentation.complete

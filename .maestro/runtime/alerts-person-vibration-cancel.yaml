@@ -31,6 +31,8 @@ name: alerts-person-vibration-cancel
 - tapOn:
     text: Vibration pattern
 - assertVisible: System default
+- assertVisible:
+    text: "Choose a pattern for new messages in this chat[.] Preview plays once[.]"
 - back
 - assertVisible:
     text: Use defaults

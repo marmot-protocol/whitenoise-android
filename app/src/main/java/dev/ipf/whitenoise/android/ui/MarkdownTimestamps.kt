@@ -36,6 +36,7 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
@@ -61,6 +62,7 @@ import dev.ipf.marmotkit.MarkdownTimestampStyleFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.Schedule
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -382,7 +384,11 @@ private fun TimestampOverlays(state: TimestampTextState) {
                     state.hoverPosition.y.roundToInt() + TIMESTAMP_HOVER_OFFSET_PX,
                 ),
         ) {
-            Surface(shape = MaterialTheme.shapes.small, tonalElevation = 4.dp) {
+            Surface(
+                modifier = Modifier.testTag("timestamp.hover").exposePerformanceTestTags(),
+                shape = MaterialTheme.shapes.small,
+                tonalElevation = 4.dp,
+            ) {
                 Text(
                     timestampDisclosure(token),
                     modifier = Modifier.padding(8.dp),
@@ -393,6 +399,7 @@ private fun TimestampOverlays(state: TimestampTextState) {
     }
     state.tapped?.let { token ->
         AlertDialog(
+            modifier = Modifier.testTag("timestamp.disclosure").exposePerformanceTestTags(),
             onDismissRequest = { state.tapped = null },
             text = { Text(timestampDisclosure(token)) },
             confirmButton = {

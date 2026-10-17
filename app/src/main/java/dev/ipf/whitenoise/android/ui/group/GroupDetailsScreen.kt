@@ -29,7 +29,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -106,6 +105,8 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
@@ -135,7 +136,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
-import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsContent
+import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsScreen
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileAccountWideGroups
 import dev.ipf.whitenoise.android.ui.profile.rememberProfileGroupPickerState
@@ -149,7 +150,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroupScope
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
-import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -194,6 +194,7 @@ internal fun GroupDetailsLocalDeleteControl(
     enabled: Boolean,
     inProgress: Boolean,
     onDeleteConfirmed: () -> Unit,
+    identity: (@Composable () -> Unit)? = null,
 ) {
     if (readOnlyInvite || isSelfMember || !membersVerified) return
     var confirmOpen by remember { mutableStateOf(false) }
@@ -218,6 +219,8 @@ internal fun GroupDetailsLocalDeleteControl(
             },
             onDismiss = { confirmOpen = false },
             destructive = true,
+            identity = identity.takeUnless { isDm },
+            confirmEnabled = enabled,
         )
     }
 }
@@ -402,6 +405,23 @@ internal fun GroupDetailsScreen(
         val groupTitleCopy = rememberGroupTitleCopy()
         appState.profileRevisionForCompose
         val conversationTitle = controller.title(groupTitleCopy)
+        val actingMemberHex = controller.boundAccountIdHex?.takeIf(String::isNotBlank)
+        val reviewIdentity: @Composable (String) -> Unit = { memberHex ->
+            val avatar = rememberConversationGroupAvatar(appState, controller)
+            GroupMemberReviewPair(
+                appState = appState,
+                group =
+                    MemberReviewGroup(
+                        controller.group.groupIdHex,
+                        conversationTitle,
+                        avatar.pictureUrl,
+                        avatar.image,
+                    ),
+                member = RecipientSearch.Candidate(memberHex, "", appState.npubForDisplay(memberHex)),
+            )
+        }
+        val ownIdentity: (@Composable () -> Unit)? =
+            if (actingMemberHex == null) null else ({ reviewIdentity(actingMemberHex) })
         val activeAccountIdHex = appState.activeAccount?.accountIdHex
         val dmPeerAccountIdHex =
             if (isDm) {
@@ -413,7 +433,6 @@ internal fun GroupDetailsScreen(
                 null
             }
         val dmPeerNpub = dmPeerAccountIdHex?.let(appState::npub)
-        val dmAddToGroupsScroll = rememberScrollState()
         // Chats beyond the retained chat-list window, read only while the picker is open (#2983).
         val dmAccountWideGroups =
             rememberProfileAccountWideGroups(appState, enabled = showDmAddToGroups && dmPeerAccountIdHex != null)
@@ -431,40 +450,34 @@ internal fun GroupDetailsScreen(
             }
         }
         if (showDmAddToGroups && dmPeerAccountIdHex != null) {
-            SettingsScaffold(
-                title = stringResource(R.string.person_add_to_group),
-                onBack = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
-            ) {
-                Box(Modifier.fillMaxSize().whiteNoiseVerticalScroll(dmAddToGroupsScroll)) {
-                    ProfileAddToGroupsContent(
-                        appState = appState,
-                        targetName = conversationTitle,
-                        state = dmAddableGroupsState,
-                        busy = addingDmPeerToGroups,
-                        onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
-                        onRetry = {
-                            dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds, retry = true)
-                        },
-                        onAdd = { groups ->
-                            if (!addingDmPeerToGroups) {
-                                addingDmPeerToGroups = true
-                                appState.launchMutation {
-                                    try {
-                                        val added =
-                                            appState.inviteProfileToGroups(
-                                                targetRef = dmPeerAccountIdHex,
-                                                targetGroupIds = groups.map { it.group.groupIdHex },
-                                            )
-                                        if (added) showDmAddToGroups = false
-                                    } finally {
-                                        addingDmPeerToGroups = false
-                                    }
-                                }
+            ProfileAddToGroupsScreen(
+                appState = appState,
+                target =
+                    RecipientSearch.Candidate(dmPeerAccountIdHex, conversationTitle, dmPeerNpub.orEmpty()),
+                state = dmAddableGroupsState,
+                busy = addingDmPeerToGroups,
+                onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
+                onRetry = {
+                    dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds, retry = true)
+                },
+                onAdd = { groups ->
+                    if (!addingDmPeerToGroups) {
+                        addingDmPeerToGroups = true
+                        appState.launchMutation {
+                            try {
+                                val added =
+                                    appState.inviteProfileToGroups(
+                                        targetRef = dmPeerAccountIdHex,
+                                        targetGroupIds = groups.map { it.group.groupIdHex },
+                                    )
+                                if (added) showDmAddToGroups = false
+                            } finally {
+                                addingDmPeerToGroups = false
                             }
-                        },
-                    )
-                }
-            }
+                        }
+                    }
+                },
+            )
             return@PreparedGroupAvatarContent
         }
         val canShowEditAction = !isDm && canEdit
@@ -828,7 +841,15 @@ internal fun GroupDetailsScreen(
                     showLargeGroupInviteConfirmation = false
                 }
             }
+            val reviewAvatar = rememberConversationGroupAvatar(appState, controller)
             ContactPickerScreen(
+                reviewGroup =
+                    MemberReviewGroup(
+                        controller.group.groupIdHex,
+                        conversationTitle,
+                        reviewAvatar.pictureUrl,
+                        reviewAvatar.image,
+                    ),
                 appState = appState,
                 title = stringResource(R.string.add_member),
                 selected = addSelection,
@@ -911,20 +932,12 @@ internal fun GroupDetailsScreen(
                     showTransferAdmin = false
                     val leaveName = transferThenLeaveName
                     transferThenLeaveName = null
-                    if (leaveName != null) {
-                        // Sole-admin Leave, 3+ members (#1131): transfer then leave as
-                        // one action. controller.group updates in-place after the
-                        // transfer, so the subsequent leave's gate sees the new admin.
-                        runGroupMutation(
-                            action = GroupMutationAction.Leave,
-                            mutation = {
-                                controller.transferAdmin(member) && controller.leaveGroup(displayName = leaveName)
-                            },
-                            onSuccess = { onLeft() },
-                        )
-                    } else {
-                        pendingConfirm = DetailsConfirm.TransferAdmin(member)
-                    }
+                    pendingConfirm =
+                        if (leaveName != null) {
+                            DetailsConfirm.LeaveSoleAdminTransfer(leaveName, member)
+                        } else {
+                            DetailsConfirm.TransferAdmin(member)
+                        }
                 },
                 onDismiss = {
                     showTransferAdmin = false
@@ -934,163 +947,169 @@ internal fun GroupDetailsScreen(
         }
 
         pendingConfirm?.let { confirm ->
+            val kind =
+                when (confirm) {
+                    is DetailsConfirm.RemoveMember -> GroupDetailsConfirmationKind.RemoveMember
+                    is DetailsConfirm.TransferAdmin -> GroupDetailsConfirmationKind.TransferAdmin
+                    is DetailsConfirm.StepDownAdmin -> GroupDetailsConfirmationKind.StepDown
+                    DetailsConfirm.StepDownSoleAdmin -> GroupDetailsConfirmationKind.StepDownSoleAdmin
+                    is DetailsConfirm.Leave -> GroupDetailsConfirmationKind.Leave
+                    is DetailsConfirm.LeaveSoleMember -> GroupDetailsConfirmationKind.LeaveSoleMember
+                    is DetailsConfirm.LeaveSoleAdmin -> GroupDetailsConfirmationKind.BlockedLeave
+                    is DetailsConfirm.LeaveSoleAdminTransfer -> GroupDetailsConfirmationKind.TransferThenLeave
+                }
+            val recipientHex =
+                when (confirm) {
+                    is DetailsConfirm.RemoveMember -> confirm.member.memberIdHex
+                    is DetailsConfirm.TransferAdmin -> confirm.member.memberIdHex
+                    is DetailsConfirm.LeaveSoleAdminTransfer -> confirm.newAdmin.memberIdHex
+                    else -> null
+                }
+            val memberHex = groupActionMemberHex(kind, actingMemberHex, recipientHex)
+            val identity: (@Composable () -> Unit)? =
+                if (memberHex == null) null else ({ reviewIdentity(memberHex) })
             when (confirm) {
                 is DetailsConfirm.RemoveMember ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_remove_member_title),
-                        message =
-                            stringResource(
-                                R.string.confirm_remove_member_message,
-                                controller.memberDisplayName(confirm.member),
+                    GroupDetailsConfirmation(
+                        identity = identity,
+                        confirmEnabled = memberHex != null,
+                        model =
+                            GroupDetailsConfirmationState.RemoveMember(
+                                memberName = controller.memberDisplayName(confirm.member),
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.RemoveMember,
+                                        mutation = { controller.removeMember(confirm.member) },
+                                        target = confirm.member.memberIdHex,
+                                    )
+                                },
                             ),
-                        confirmLabel = stringResource(R.string.remove_member),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.RemoveMember,
-                                mutation = { controller.removeMember(confirm.member) },
-                                target = confirm.member.memberIdHex,
-                            )
-                        },
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
                 is DetailsConfirm.TransferAdmin ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_transfer_admin_title),
-                        message =
-                            stringResource(
-                                R.string.confirm_transfer_admin_message,
-                                controller.memberDisplayName(confirm.member),
+                    GroupDetailsConfirmation(
+                        identity = identity,
+                        confirmEnabled = memberHex != null,
+                        model =
+                            GroupDetailsConfirmationState.TransferAdmin(
+                                memberName = controller.memberDisplayName(confirm.member),
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.TransferAdmin,
+                                        mutation = { controller.transferAdmin(confirm.member) },
+                                        target = confirm.member.memberIdHex,
+                                    )
+                                },
                             ),
-                        confirmLabel = stringResource(R.string.transfer_admin),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.TransferAdmin,
-                                mutation = { controller.transferAdmin(confirm.member) },
-                                target = confirm.member.memberIdHex,
-                            )
-                        },
                         onDismiss = { pendingConfirm = null },
                     )
                 is DetailsConfirm.StepDownAdmin ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.step_down_as_admin),
-                        message = stringResource(R.string.confirm_step_down_admin_message),
-                        confirmLabel = stringResource(R.string.step_down_as_admin),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.SelfDemoteAdmin,
-                                mutation = { controller.stepDownAsAdmin() },
-                                target = confirm.member.memberIdHex,
-                            )
-                        },
+                    GroupDetailsConfirmation(
+                        identity = identity,
+                        confirmEnabled = memberHex != null,
+                        model =
+                            GroupDetailsConfirmationState.StepDown(
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.SelfDemoteAdmin,
+                                        mutation = { controller.stepDownAsAdmin() },
+                                        target = confirm.member.memberIdHex,
+                                    )
+                                },
+                            ),
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
                 DetailsConfirm.StepDownSoleAdmin ->
-                    AlertDialog(
-                        onDismissRequest = { pendingConfirm = null },
-                        title = { Text(stringResource(R.string.sole_admin_leave_blocked_title)) },
-                        text = { Text(stringResource(R.string.sole_admin_transfer_hint)) },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
+                    GroupDetailsConfirmation(
+                        identity = identity,
+                        confirmEnabled = memberHex != null,
+                        model =
+                            GroupDetailsConfirmationState.StepDownSoleAdmin(
+                                onConfirm = {
                                     pendingConfirm = null
                                     showTransferAdmin = true
                                 },
-                            ) {
-                                Text(stringResource(R.string.transfer_admin))
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { pendingConfirm = null }) {
-                                Text(stringResource(R.string.cancel))
-                            }
-                        },
+                            ),
+                        onDismiss = { pendingConfirm = null },
                     )
                 is DetailsConfirm.Leave ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_leave_title_named, confirm.groupName),
-                        message = stringResource(R.string.confirm_leave_message_named),
-                        confirmLabel = stringResource(R.string.leave),
-                        onConfirm = {
-                            pendingConfirm = null
-                            // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
-                            // kill the toast/refresh; onDismiss + onLeft are safe Compose
-                            // state writes from Main.immediate.
-                            runGroupMutation(
-                                action = GroupMutationAction.Leave,
-                                mutation = { controller.leaveGroup(displayName = confirm.groupName) },
-                                onSuccess = {
-                                    onLeft()
+                    GroupDetailsConfirmation(
+                        identity = identity,
+                        confirmEnabled = memberHex != null,
+                        model =
+                            GroupDetailsConfirmationState.Leave(
+                                groupName = confirm.groupName,
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
+                                    // kill the toast/refresh; onDismiss + onLeft are safe Compose
+                                    // state writes from Main.immediate.
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Leave,
+                                        mutation = { controller.leaveGroup(displayName = confirm.groupName) },
+                                        onSuccess = {
+                                            onLeft()
+                                        },
+                                    )
                                 },
-                            )
-                        },
+                            ),
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
+                // A sole member dissolves the group instead of choosing an impossible successor.
                 is DetailsConfirm.LeaveSoleMember ->
-                    // Sole member: leaving dissolves the group entirely through local
-                    // cleanup (no other member to coordinate an MLS commit with). The
-                    // copy makes the destructive "this deletes the group" consequence clear.
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_leave_sole_member_title, confirm.groupName),
-                        message = stringResource(R.string.confirm_leave_sole_member_message),
-                        confirmLabel = stringResource(R.string.leave),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.Leave,
-                                mutation = { controller.leaveGroup(displayName = confirm.groupName) },
-                                onSuccess = {
-                                    onLeft()
+                    GroupDetailsConfirmation(
+                        identity = identity,
+                        confirmEnabled = memberHex != null,
+                        model =
+                            GroupDetailsConfirmationState.LeaveSoleMember(
+                                groupName = confirm.groupName,
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Leave,
+                                        mutation = { controller.leaveGroup(displayName = confirm.groupName) },
+                                        onSuccess = {
+                                            onLeft()
+                                        },
+                                    )
                                 },
-                            )
-                        },
+                            ),
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
+                // #1131: with no eligible successor, keep the sole admin in the group.
                 is DetailsConfirm.LeaveSoleAdmin ->
-                    // Fallback for the (unexpected) no-transfer-candidate case — still
-                    // an informational gate. The normal sole-admin Leave now routes to
-                    // LeaveSoleAdminTransfer or the picker in leave mode (#1131).
-                    AlertDialog(
-                        onDismissRequest = { pendingConfirm = null },
-                        title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
-                        text = {
-                            EmojiLabel(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName))
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { pendingConfirm = null }) {
-                                Text(stringResource(R.string.cancel))
-                            }
-                        },
+                    GroupDetailsConfirmation(
+                        identity = identity,
+                        confirmEnabled = memberHex != null,
+                        model =
+                            GroupDetailsConfirmationState.BlockedLeave(
+                                groupName = confirm.groupName,
+                            ),
+                        onDismiss = { pendingConfirm = null },
                     )
                 is DetailsConfirm.LeaveSoleAdminTransfer ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_leave_sole_admin_title),
-                        message =
-                            stringResource(
-                                R.string.confirm_sole_admin_transfer_then_leave_message,
-                                controller.memberDisplayName(confirm.newAdmin),
-                            ),
-                        confirmLabel = stringResource(R.string.leave),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.Leave,
-                                mutation = {
-                                    controller.transferAdmin(confirm.newAdmin) &&
-                                        controller.leaveGroup(displayName = confirm.groupName)
+                    GroupDetailsConfirmation(
+                        identity = identity,
+                        confirmEnabled = memberHex != null,
+                        model =
+                            GroupDetailsConfirmationState.TransferThenLeave(
+                                memberName = controller.memberDisplayName(confirm.newAdmin),
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Leave,
+                                        mutation = {
+                                            controller.transferAdmin(confirm.newAdmin) &&
+                                                controller.leaveGroup(displayName = confirm.groupName)
+                                        },
+                                        onSuccess = { onLeft() },
+                                    )
                                 },
-                                onSuccess = { onLeft() },
-                            )
-                        },
+                            ),
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
             }
         }
@@ -2052,6 +2071,8 @@ internal fun GroupDetailsScreen(
                     }
                     if (disbandConfirmOpen) {
                         GroupDisbandConfirmDialog(
+                            identity = ownIdentity,
+                            enabled = !mutationsBlocked && actingMemberHex != null,
                             onConfirm = {
                                 disbandConfirmOpen = false
                                 runGroupMutation(
@@ -2063,11 +2084,12 @@ internal fun GroupDetailsScreen(
                         )
                     }
                     GroupDetailsLocalDeleteControl(
+                        identity = ownIdentity,
                         isDm = isDm,
                         readOnlyInvite = readOnlyInvite,
                         isSelfMember = controller.isSelfMember,
                         membersVerified = controller.membersVerified,
-                        enabled = !mutationsBlocked,
+                        enabled = !mutationsBlocked && (isDm || actingMemberHex != null),
                         inProgress = activeMutation?.action == GroupMutationAction.Delete,
                         onDeleteConfirmed = {
                             runGroupMutation(
@@ -2078,9 +2100,10 @@ internal fun GroupDetailsScreen(
                         },
                     )
                     GroupDetailsResetControl(
+                        identity = ownIdentity,
                         isDm = isDm,
                         readOnlyInvite = readOnlyInvite,
-                        enabled = !mutationsBlocked,
+                        enabled = !mutationsBlocked && (isDm || actingMemberHex != null),
                         inProgress = activeMutation?.action == GroupMutationAction.Reset,
                         onResetConfirmed = {
                             runGroupMutation(

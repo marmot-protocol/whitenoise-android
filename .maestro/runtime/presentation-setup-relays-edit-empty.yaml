@@ -1,0 +1,64 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-relays-edit-empty
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-RELAYS
+- assertVisible: Read and write relays
+- tapOn:
+    id: setup-action-EDIT_RELAYS
+- assertVisible: Change a relay before reviewing a replacement.*
+- assertVisible: wss://Custom.example.invalid/path/
+- assertVisible:
+    id: setup-editor-save
+    enabled: false
+- tapOn:
+    id: setup.editor.writes
+- longPressOn:
+    id: setup.editor.writes
+- runFlow:
+    when:
+      notVisible: (?i)select all
+    commands:
+    - tapOn: More options
+- tapOn: (?i)select all
+- assertVisible:
+    id: setup.editor.writes
+    focused: true
+- eraseText: 1
+- assertNotVisible:
+    id: setup.editor.writes
+    text: (?s)^(?!Write relays$).+
+- hideKeyboard
+- tapOn:
+    id: setup.editor.reads
+- longPressOn:
+    id: setup.editor.reads
+- runFlow:
+    when:
+      notVisible: (?i)select all
+    commands:
+    - tapOn: More options
+- tapOn: (?i)select all
+- assertVisible:
+    id: setup.editor.reads
+    focused: true
+- eraseText: 1
+- assertNotVisible:
+    id: setup.editor.reads
+    text: (?s)^(?!Read relays$).+
+- hideKeyboard
+- assertVisible:
+    id: setup-editor-save
+    enabled: false
+- tapOn:
+    id: setup-editor-save
+- assertVisible: Change a relay before reviewing a replacement.*
+- tapOn: Cancel
+- assertVisible: Read and write relays
+- back
+- assertVisible: Account setup
+- back
+- assertVisible:
+    id: presentation.complete

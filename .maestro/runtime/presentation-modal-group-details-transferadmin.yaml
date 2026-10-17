@@ -1,0 +1,39 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-details-transferadmin
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Transfer admin\?
+- assertVisible:
+    text: Member\ becomes\ an\ admin\ and\ you\ step\ down\.\ You\ can\ be\ made\ admin\ again\ later\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Bob
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Transfer admin\?
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Transfer admin\?
+- back
+- assertNotVisible:
+    text: Transfer admin\?
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: Transfer admin\?
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

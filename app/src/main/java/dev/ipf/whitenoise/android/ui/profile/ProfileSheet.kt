@@ -19,19 +19,21 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -39,10 +41,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -103,8 +103,11 @@ import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMembersReviewDialog
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
@@ -112,14 +115,13 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
 import dev.ipf.whitenoise.android.ui.chats.newchat.withDmCreationOwner
-import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
@@ -133,7 +135,6 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.theme.Dimens
-import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -789,6 +790,12 @@ internal fun ProfileSheet(
         }
     val profileContent: @Composable () -> Unit = {
         PersonProfileContent(
+            startingAs =
+                if (hex != null && !targetIsSelf) {
+                    startingAccount(appState, accountAtOpen, runtimeAtOpen)
+                } else {
+                    null
+                },
             person =
                 PersonProfilePresentation(
                     displayTitle,
@@ -815,7 +822,7 @@ internal fun ProfileSheet(
                         promotableGroupsState.groups.isNotEmpty() ||
                             promotableGroupsState.loadState != ProfileGroupPickerLoadState.READY
                     ),
-            showSharedGroups = sharedRows.isNotEmpty() || shared.incomplete,
+            showSharedGroups = hex != null && !targetIsSelf,
             copied = copied,
             onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
             onMessage = { openOrCreateProfileChat() },
@@ -1020,25 +1027,22 @@ internal fun ProfileSheet(
             modifier = Modifier.fillMaxSize().testTag(PROFILE_SHEET_HOST_TAG),
         ) { targetPage ->
             when (targetPage) {
-                ProfileSheetPage.ADD_TO_GROUPS ->
-                    SettingsScaffold(
-                        title = stringResource(R.string.person_add_to_group),
-                        onBack = { if (!addingToGroups) page = pickerParent },
-                    ) {
-                        Box(Modifier.fillMaxSize().fadingVerticalScroll(rememberScrollState())) {
-                            ProfileAddToGroupsContent(
-                                appState = appState,
-                                targetName = displayTitle,
-                                state = addableGroupsState,
-                                busy = addingToGroups,
-                                onClose = { if (!addingToGroups) page = pickerParent },
-                                onRetry = {
-                                    accountWideGroups.requestMembers(addableGroupsState.pendingGroupIds, retry = true)
-                                },
-                                onAdd = ::addProfileToGroups,
-                            )
-                        }
+                ProfileSheetPage.ADD_TO_GROUPS -> {
+                    val recipientHex = hex
+                    if (recipientHex != null) {
+                        ProfileAddToGroupsScreen(
+                            target = RecipientSearch.Candidate(recipientHex, displayTitle, npub),
+                            appState = appState,
+                            state = addableGroupsState,
+                            busy = addingToGroups,
+                            onClose = { if (!addingToGroups) page = pickerParent },
+                            onRetry = {
+                                accountWideGroups.requestMembers(addableGroupsState.pendingGroupIds, retry = true)
+                            },
+                            onAdd = ::addProfileToGroups,
+                        )
                     }
+                }
                 ProfileSheetPage.MAKE_ADMIN ->
                     SettingsScaffold(
                         title = stringResource(R.string.person_promote_groups),
@@ -1048,6 +1052,7 @@ internal fun ProfileSheet(
                             ProfileMakeAdminContent(
                                 appState = appState,
                                 targetName = displayTitle,
+                                target = RecipientSearch.Candidate(hex.orEmpty(), displayTitle, npub),
                                 state = promotableGroupsState,
                                 busy = promotingAdmin,
                                 onClose = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
@@ -1246,6 +1251,7 @@ internal fun ContactPrivateDetailsDialog(
     onPickPicture: () -> Unit = {},
     onRepositionPicture: () -> Unit = {},
     onClearPicture: () -> Unit = {},
+    viewportInsets: WindowInsets? = null,
 ) {
     val nickname =
         remember(initialNickname) {
@@ -1263,6 +1269,7 @@ internal fun ContactPrivateDetailsDialog(
     ) {
         ContactPrivateDetailsFrame(
             securePolicy = securePolicy,
+            viewportInsets = viewportInsets,
             onDismiss = onDismiss,
             actions = {
                 TextButton(
@@ -1318,6 +1325,7 @@ internal fun ContactPrivateDetailsDialog(
     }
 }
 
+/** Keeps pre-mutation admin status stable while a grant or revoke action is pending. */
 internal fun stableAdminActionTargetIsAdmin(
     authoritativeAdmin: Boolean,
     pendingAction: GroupMemberMenuAction?,
@@ -1328,54 +1336,53 @@ internal fun stableAdminActionTargetIsAdmin(
         else -> authoritativeAdmin
     }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Keyboard space is consumed outside the scaffold, matching the other full-screen creation routes. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod")
-internal fun ProfileAddToGroupsSheet(
+@Suppress("FunctionNaming", "LongParameterList")
+internal fun ProfileAddToGroupsScreen(
     appState: WhiteNoiseAppState,
-    targetName: String,
+    target: RecipientSearch.Candidate,
     state: ProfileGroupPickerState,
     busy: Boolean,
-    onDismiss: () -> Unit,
+    onClose: () -> Unit,
     onRetry: () -> Unit,
     onAdd: (List<ChatListItem>) -> Unit,
+    keyboardInsets: WindowInsets = WindowInsets.ime,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = amoledSheetContainerColor(),
+    SettingsScaffold(
+        title = stringResource(R.string.person_add_to_group),
+        onBack = onClose,
+        modifier = Modifier.windowInsetsPadding(keyboardInsets),
     ) {
-        ProfileAddToGroupsContent(
-            appState = appState,
-            targetName = targetName,
-            state = state,
-            busy = busy,
-            onClose = onDismiss,
-            onRetry = onRetry,
-            onAdd = onAdd,
-        )
+        ProfileAddToGroupsContent(appState, target, state, busy, onClose, onRetry, onAdd)
     }
 }
 
+/** Keeps group choices scrollable while the selected-groups action stays reachable. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 internal fun ProfileAddToGroupsContent(
     appState: WhiteNoiseAppState,
-    targetName: String,
+    target: RecipientSearch.Candidate,
     state: ProfileGroupPickerState,
     busy: Boolean,
     onClose: () -> Unit,
     onRetry: () -> Unit,
     onAdd: (List<ChatListItem>) -> Unit,
 ) {
+    val targetName = target.displayName
     val groups = state.groups
     val groupTitleCopy = rememberGroupTitleCopy()
-    val selected = remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateListOf<String>() }
-    var confirmSelection by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+    val selected =
+        remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex) {
+            mutableStateListOf<String>()
+        }
+    var confirmSelection by remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex) {
         mutableStateOf<List<ChatListItem>?>(null)
     }
-    var query by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
+    var query by remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex) {
+        mutableStateOf("")
+    }
     val titledGroups =
         remember(groups, groupTitleCopy) {
             groups.map { it to chatListItemDisplayTitle(it, appState, groupTitleCopy) }
@@ -1399,87 +1406,82 @@ internal fun ProfileAddToGroupsContent(
         filteredGroups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.first.selectedAvatarAsset },
     ) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .testTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG),
+            Modifier.fillMaxSize().padding(bottom = 12.dp).testTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            EmojiLabel(
-                stringResource(R.string.profile_add_to_groups_title, targetName),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-            EmojiLabel(
-                stringResource(R.string.profile_add_to_groups_description, targetName),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-            if (groups.isEmpty() && state.loadState == ProfileGroupPickerLoadState.READY) {
-                Text(
-                    stringResource(R.string.profile_no_addable_groups),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
-                )
-                TextButton(
-                    onClick = onClose,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                ) {
-                    Text(stringResource(R.string.close))
-                }
-            } else if (groups.isEmpty()) {
-                ProfileGroupPickerPendingState(state.loadState, onRetry)
-            } else {
-                if (state.loadState != ProfileGroupPickerLoadState.READY) {
-                    ProfileGroupPickerPendingState(state.loadState, onRetry)
-                }
-                FlowSearchField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = stringResource(R.string.forward_search_chats),
-                    modifier = Modifier.padding(horizontal = Dimens.spaceLg),
-                )
-                WhiteNoiseLazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
-                ) {
-                    if (filteredGroups.isEmpty()) {
-                        item {
+            WhiteNoiseLazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f).testTag("profile.add_groups.list"),
+            ) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        EmojiLabel(
+                            stringResource(R.string.profile_add_to_groups_title, targetName),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                        )
+                        EmojiLabel(
+                            stringResource(R.string.profile_add_to_groups_description, targetName),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                        )
+                        if (state.loadState != ProfileGroupPickerLoadState.READY) {
+                            ProfileGroupPickerPendingState(state.loadState, onRetry)
+                        } else if (groups.isEmpty()) {
                             Text(
-                                stringResource(R.string.no_matches),
+                                stringResource(R.string.profile_no_addable_groups),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd),
+                            )
+                        }
+                        if (groups.isNotEmpty()) {
+                            FlowSearchField(
+                                value = query,
+                                onValueChange = { query = it },
+                                placeholder = stringResource(R.string.forward_search_chats),
+                                modifier = Modifier.padding(horizontal = Dimens.spaceLg),
                             )
                         }
                     }
-                    items(
-                        filteredGroups,
-                        key = { (item, _) -> item.group.groupIdHex },
-                    ) { (item, title) ->
-                        val groupId = item.group.groupIdHex
-                        val isSelected = selected.contains(groupId)
-                        val avatar = rememberChatListGroupAvatar(appState, item)
-                        ContactRow(
-                            title = title,
-                            subtitle = stringResource(R.string.members_count, item.memberCount),
-                            avatarSeed = item.group.groupIdHex,
-                            avatarUrl = avatar.pictureUrl,
-                            avatarImage = avatar.image,
-                            enabled = !busy,
-                            onClick = {
-                                if (isSelected) selected.remove(groupId) else selected.add(groupId)
-                            },
-                            trailing = { SelectionIndicator(selected = isSelected) },
+                }
+                if (groups.isNotEmpty() && filteredGroups.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(R.string.no_matches),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
                         )
                     }
                 }
+                items(filteredGroups, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
+                    val groupId = item.group.groupIdHex
+                    val isSelected = selected.contains(groupId)
+                    val avatar = rememberChatListGroupAvatar(appState, item)
+                    ContactRow(
+                        title = title,
+                        subtitle = stringResource(R.string.members_count, item.memberCount),
+                        avatarSeed = groupId,
+                        avatarUrl = avatar.pictureUrl,
+                        avatarImage = avatar.image,
+                        enabled = !busy,
+                        onClick = {
+                            if (isSelected) selected.remove(groupId) else selected.add(groupId)
+                        },
+                        trailing = { SelectionIndicator(selected = isSelected) },
+                    )
+                }
+            }
+            if (groups.isEmpty() && state.loadState == ProfileGroupPickerLoadState.READY) {
+                TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+                    Text(stringResource(R.string.close))
+                }
+            } else if (groups.isNotEmpty()) {
                 Button(
                     onClick = { confirmSelection = selectedGroups },
                     enabled = selectedGroups.isNotEmpty() && !busy,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).testTag("profile.add_groups.action"),
                 ) {
                     if (busy) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -1494,18 +1496,21 @@ internal fun ProfileAddToGroupsContent(
     }
 
     confirmSelection?.let { targets ->
-        val groupNames =
-            targets.joinToString { item ->
-                chatListItemDisplayTitle(item, appState, groupTitleCopy)
+        val reviewGroups =
+            targets.map { item ->
+                val avatar = rememberChatListGroupAvatar(appState, item)
+                MemberReviewGroup(
+                    item.group.groupIdHex,
+                    chatListItemDisplayTitle(item, appState, groupTitleCopy),
+                    avatar.pictureUrl,
+                    avatar.image,
+                )
             }
-        ConfirmDialog(
-            title = stringResource(R.string.profile_add_to_groups_confirm_title),
-            message =
-                stringResource(
-                    R.string.profile_add_to_groups_confirm_message,
-                    targetName,
-                    groupNames,
-                ),
+        GroupMembersReviewDialog(
+            appState = appState,
+            groups = reviewGroups,
+            members = listOf(target),
+            busy = busy,
             confirmLabel = stringResource(R.string.profile_add_to_groups_confirm_label),
             onConfirm = {
                 confirmSelection = null
@@ -1521,6 +1526,7 @@ internal fun ProfileAddToGroupsContent(
 internal fun ProfileMakeAdminContent(
     appState: WhiteNoiseAppState,
     targetName: String,
+    target: RecipientSearch.Candidate,
     state: ProfileGroupPickerState,
     busy: Boolean,
     onClose: () -> Unit,
@@ -1530,6 +1536,9 @@ internal fun ProfileMakeAdminContent(
     val groups = state.groups
     val groupTitleCopy = rememberGroupTitleCopy()
     var selectedGroupId by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<String?>(null)
+    }
+    var confirmGroupId by remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex) {
         mutableStateOf<String?>(null)
     }
     var query by remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
@@ -1548,6 +1557,7 @@ internal fun ProfileMakeAdminContent(
         }
     LaunchedEffect(groups) {
         if (groups.none { it.group.groupIdHex == selectedGroupId }) selectedGroupId = null
+        if (groups.none { it.group.groupIdHex == confirmGroupId }) confirmGroupId = null
     }
     val selectedGroup = groups.firstOrNull { it.group.groupIdHex == selectedGroupId }
     PreparedGroupAvatarContent(
@@ -1563,12 +1573,19 @@ internal fun ProfileMakeAdminContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             EmojiLabel(
-                stringResource(R.string.profile_make_admin_title, targetName),
+                stringResource(R.string.make_admin),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
             EmojiLabel(
-                stringResource(R.string.profile_make_admin_description, targetName),
+                stringResource(
+                    R.string.profile_make_admin_description,
+                    if (IdentityFormatter.isNostrIdentityFallback(targetName)) {
+                        IdentityFormatter.short(targetName, prefix = 10, suffix = 8)
+                    } else {
+                        targetName
+                    },
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
@@ -1628,8 +1645,8 @@ internal fun ProfileMakeAdminContent(
                     }
                 }
                 Button(
-                    onClick = { selectedGroup?.let(onPromote) },
-                    enabled = selectedGroup != null && !busy,
+                    onClick = { confirmGroupId = selectedGroup?.group?.groupIdHex },
+                    enabled = selectedGroup != null && target.accountIdHex.isNotBlank() && !busy,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
                 ) {
                     if (busy) {
@@ -1642,6 +1659,32 @@ internal fun ProfileMakeAdminContent(
                 }
             }
         }
+    }
+    groups.firstOrNull { it.group.groupIdHex == confirmGroupId }?.let { group ->
+        val avatar = rememberChatListGroupAvatar(appState, group)
+        GroupMembersReviewDialog(
+            appState = appState,
+            groups =
+                listOf(
+                    MemberReviewGroup(
+                        group.group.groupIdHex,
+                        chatListItemDisplayTitle(group, appState, groupTitleCopy),
+                        avatar.pictureUrl,
+                        avatar.image,
+                    ),
+                ),
+            members = listOf(target),
+            busy = busy,
+            title = stringResource(R.string.make_admin),
+            description = null,
+            invitation = false,
+            confirmLabel = stringResource(R.string.make_admin),
+            onConfirm = {
+                confirmGroupId = null
+                onPromote(group)
+            },
+            onDismiss = { confirmGroupId = null },
+        )
     }
 }
 
@@ -1705,9 +1748,9 @@ private fun ProfileSheetAdminActions(
 ) {
     // Keep the initiated action stable until its coroutine completes. Detailed
     // MDK state can land one frame before the local pending flag clears.
-    var pendingAction by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
-    var confirmRemove by remember(targetHex) { mutableStateOf(false) }
-    var confirmRoleChange by remember(targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
+    var pendingAction by remember(controller, targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
+    var confirmRemove by remember(controller, targetHex) { mutableStateOf(false) }
+    var confirmRoleChange by remember(controller, targetHex) { mutableStateOf<GroupMemberMenuAction?>(null) }
     val targetMember =
         remember(controller.presentedMembers, targetHex) {
             controller.presentedMembers.firstOrNull { it.memberIdHex.equals(targetHex, ignoreCase = true) }
@@ -1766,14 +1809,28 @@ private fun ProfileSheetAdminActions(
         onRemoveMember = { if (isCurrent()) confirmRemove = true },
     )
 
+    val groupAvatar = rememberConversationGroupAvatar(appState, controller)
+    val reviewGroup =
+        MemberReviewGroup(
+            controller.group.groupIdHex,
+            controller.title(rememberGroupTitleCopy()),
+            groupAvatar.pictureUrl,
+            groupAvatar.image,
+        )
+    val reviewMember =
+        RecipientSearch.Candidate(
+            targetHex,
+            controller.memberDisplayName(targetMember),
+            appState.npubForDisplay(targetHex),
+        )
     confirmRoleChange?.let { roleChange ->
         val promoting = roleChange == GroupMemberMenuAction.GrantAdmin
         ProfileSheetModerationConfirmDialog(
-            title =
-                stringResource(
-                    if (promoting) R.string.make_admin_question else R.string.remove_admin_question,
-                    controller.memberDisplayName(targetMember),
-                ),
+            appState = appState,
+            group = reviewGroup,
+            member = reviewMember,
+            busy = busy,
+            title = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
             confirmLabel = stringResource(if (promoting) R.string.make_admin else R.string.remove_admin),
             onConfirm = {
                 confirmRoleChange = null
@@ -1787,11 +1844,11 @@ private fun ProfileSheetAdminActions(
 
     if (confirmRemove) {
         ProfileSheetModerationConfirmDialog(
-            title =
-                stringResource(
-                    R.string.remove_member_question,
-                    controller.memberDisplayName(targetMember),
-                ),
+            appState = appState,
+            group = reviewGroup,
+            member = reviewMember,
+            busy = busy,
+            title = stringResource(R.string.remove_from_group),
             confirmLabel = stringResource(R.string.remove_from_group),
             onConfirm = {
                 confirmRemove = false
@@ -1805,34 +1862,34 @@ private fun ProfileSheetAdminActions(
     }
 }
 
-/**
- * Moderation confirmations carry the whole question in the title, as the prototype does, so no body
- * copy repeats it; a destructive confirm takes the error role and the dismiss is always Cancel.
- */
+/** Reviews the public member and destination before the existing scoped mutation runs. */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 private fun ProfileSheetModerationConfirmDialog(
+    appState: WhiteNoiseAppState,
+    group: MemberReviewGroup,
+    member: RecipientSearch.Candidate,
+    busy: Boolean,
     title: String,
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = false,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                colors =
-                    if (destructive) {
-                        ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    } else {
-                        ButtonDefaults.textButtonColors()
-                    },
-            ) { Text(confirmLabel) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-        title = { Text(title) },
+    GroupMembersReviewDialog(
+        appState = appState,
+        groups = listOf(group),
+        members = listOf(member),
+        busy = busy,
+        title = title,
+        description = null,
+        invitation = false,
+        dismissEnabled = true,
+        showProgress = false,
+        confirmLabel = confirmLabel,
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = destructive,
     )
 }
 

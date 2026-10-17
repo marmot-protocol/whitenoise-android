@@ -1,0 +1,6 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-message-footer
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: '12:34'

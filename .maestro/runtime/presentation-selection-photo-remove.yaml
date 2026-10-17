@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-photo-remove
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Remove Photo
+- tapOn: Remove Photo
+- assertVisible:
+    id: presentation.complete

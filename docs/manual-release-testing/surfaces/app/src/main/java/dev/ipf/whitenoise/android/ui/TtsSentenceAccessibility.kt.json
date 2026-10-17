@@ -1,0 +1,62 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+  "legacy_sha256": "eb74cf8459d08922105f912a7c7c113a5f9ae295d7205cec2b67760df43195cc",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TTS sentence chooser cancel label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TTS sentence chooser title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+        "anchor": "R.string.tts_choose_sentence",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TTS sentence chooser action label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+        "anchor": "R.string.tts_read_from_sentence",
+        "test_ids": [
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "ttsSentenceAccessibilityActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+        "anchor": "fun ttsSentenceAccessibilityActions(",
+        "test_ids": [
+          "TTS-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: TtsSentenceAccessibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "Cross-window sentence chooser selector",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+        "anchor": "exposePerformanceTestTags()",
+        "test_ids": [
+          "TTS-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,0 +1,89 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DictationDisclosureDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "fun DictationDisclosureDialog(",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_continue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_continue",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_disclosure_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_disclosure_message",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_disclosure_offline_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_disclosure_offline_message",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_disclosure_offline_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_disclosure_offline_title",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "R.string.dictation_disclosure_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_disclosure_title",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Offline speech disclosure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_disclosure_offline_title",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Offline speech disclosure message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_disclosure_offline_message",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Speech disclosure title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_disclosure_title",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "Speech disclosure message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/DictationDisclosureDialog.kt",
+        "anchor": "R.string.dictation_disclosure_message",
+        "test_ids": [
+          "DIC-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
