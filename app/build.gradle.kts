@@ -18,8 +18,10 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.roborazzi)
     alias(libs.plugins.kover)
-    alias(libs.plugins.oss.licenses)
 }
+
+// Generate the same raw-resource contract from reviewed local attribution inputs.
+apply(from = rootProject.file("gradle/local-notices.gradle"))
 
 // Dev, preview, and explicitly unsigned reproducible builds remain usable
 // without Firebase credentials. Production packaging is guarded below so a

@@ -18,6 +18,14 @@
         "test_ids": [
           "SET-019"
         ]
+      },
+      {
+        "surface": "OpenSourceLicensesList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/OpenSourceLicensesScreen.kt",
+        "anchor": "fun OpenSourceLicensesList(",
+        "test_ids": [
+          "SET-019"
+        ]
       }
     ],
     "settings_controls": [
