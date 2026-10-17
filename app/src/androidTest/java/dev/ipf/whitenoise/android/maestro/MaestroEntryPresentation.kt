@@ -11,7 +11,7 @@ import dev.ipf.whitenoise.android.ui.profile.ProfileQrSheet
 internal fun MaestroEntryPresentation(fixture: MaestroPresentationFixture) {
     when {
         fixture.scenario.startsWith("surface-onboarding-") ->
-            OnboardingScreen(fixture.appState, hasValidatedInternet = { false })
+            OnboardingScreen(fixture.appState, hasActiveNetwork = { false })
         fixture.scenario.startsWith("surface-addprofile-") ->
             AddIdentitySheet(fixture.appState, onDismiss = { fixture.finish("dismiss") })
         else ->

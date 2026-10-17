@@ -1,29 +1,39 @@
 package dev.ipf.whitenoise.android.ui.onboarding
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.NetworkInfo
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowNetworkCapabilities
+import org.robolectric.shadows.ShadowNetworkInfo
 
 /** Tests actual form navigation and explicit submission, not source-string wiring. */
 @RunWith(RobolectricTestRunner::class)
@@ -44,7 +54,7 @@ class SignUpProfileDraftSubmissionTest {
                 activeAccountRef = "",
                 marmotAccessObserver = { nativeAccess++ },
             )
-        composeRule.setContent { WhiteNoiseTheme { OnboardingScreen(app, hasValidatedInternet = { true }) } }
+        composeRule.setContent { WhiteNoiseTheme { OnboardingScreen(app, hasActiveNetwork = { true }) } }
         composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
         composeRule.runOnIdle { assertNotNull(app.pendingProfileSignUp) }
         composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Local name")
@@ -58,8 +68,51 @@ class SignUpProfileDraftSubmissionTest {
         }
     }
 
+    /** The real Welcome/form wiring reaches native creation once after an offline retry. */
+    @Test fun welcomeSignupRetriesMissingRouteThroughActualCreationAdapter() {
+        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
+        val creations = java.util.concurrent.atomic.AtomicInteger()
+        val native =
+            java.lang.reflect.Proxy.newProxyInstance(
+                MarmotInterface::class.java.classLoader,
+                arrayOf(MarmotInterface::class.java),
+            ) { _, method, _ ->
+                check(method.name == "createIdentity") { "Unexpected native call: ${method.name}" }
+                creations.incrementAndGet()
+                error("Synthetic creation failure")
+            } as MarmotInterface
+        val app =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = DraftStore.forContext(context),
+                accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = "",
+                initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("signup-route-test").path, native),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme { OnboardingScreen(app, hasActiveNetwork = { availability.hasActiveNetwork() }) }
+        }
+        composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Retained name")
+        composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
+        composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        composeRule.runOnIdle {
+            assertEquals(0, creations.get())
+            availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
+        }
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        composeRule.waitUntil(5_000) { creations.get() == 1 }
+        composeRule.waitUntil(5_000) { app.pendingProfileSignUp?.stage == SignUpStage.CreateFailed }
+        composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Retained name")
+        composeRule.runOnIdle { assertEquals(1, creations.get()) }
+    }
+
     /** Native field text at the explicit tap is published to the one returned account. */
-    @Test fun submitUsesCurrentFieldValuesExactlyOnce() {
+    @Test fun activeRouteWithoutOsValidationSubmitsCurrentFieldsExactlyOnce() {
+        val availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
         var owner = SignUpOwner(1, null)
         var creations = 0
         val publications = mutableListOf<UserProfileMetadataFfi>()
@@ -85,12 +138,12 @@ class SignUpProfileDraftSubmissionTest {
                         publish = { account, value ->
                             assertEquals("new", account)
                             publications += value
-                            true
+                            publications.size > 1
                         },
                         finish = { _, _ -> true },
                     )
                 }
-            WhiteNoiseTheme { SignUpScreen(controller, { true }, { "Quiet Otter" }, {}) }
+            WhiteNoiseTheme { SignUpScreen(controller, availability::hasActiveNetwork, { "Quiet Otter" }, {}) }
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Alice")
         composeRule.onNodeWithTag("onboarding.sign_up.about").performTextInput("Current text")
@@ -102,6 +155,13 @@ class SignUpProfileDraftSubmissionTest {
             assertEquals(1, creations)
             assertEquals("Quiet Otter", publications.single().displayName)
             assertEquals("Current text", publications.single().about)
+        }
+        // Retry the failed publication through the same production predicate; reuse the accepted identity.
+        composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, creations)
+            assertEquals(2, publications.size)
+            assertEquals(publications.first(), publications.last())
         }
     }
 
@@ -146,7 +206,8 @@ class SignUpProfileDraftSubmissionTest {
     }
 
     /** The new form remains editable offline; neither its primary action nor Retry creates an identity. */
-    @Test fun offlineSubmitRetainsDraftAndStartsNoNativeOperation() {
+    @Test fun missingActiveRouteRetainsDraftAndStartsNoNativeOperation() {
+        val availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
         var creations = 0
         composeRule.setContent {
             val scope = rememberCoroutineScope()
@@ -168,11 +229,58 @@ class SignUpProfileDraftSubmissionTest {
                         finish = { _, _ -> false },
                     )
                 }
-            WhiteNoiseTheme { SignUpScreen(controller, { false }, { "Quiet Otter" }, {}) }
+            WhiteNoiseTheme { SignUpScreen(controller, availability::hasActiveNetwork, { "Quiet Otter" }, {}) }
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Saved locally")
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
         composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
         composeRule.runOnIdle { assertEquals(0, creations) }
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Saved locally")
     }
+}
+
+/** Seed the production listener from an Android default route lacking VALIDATED and NOT_VPN. */
+internal fun unvalidatedSignUpAvailability(
+    context: Context,
+    hasDefaultRoute: Boolean,
+): WhiteNoiseAppState {
+    val app =
+        WhiteNoiseAppState(
+            context = context,
+            draftStore = DraftStore.forContext(context),
+            accountIdHexResolver = { null },
+            accounts = emptyList(),
+            activeAccountRef = "",
+        )
+    val connectivity = context.getSystemService(ConnectivityManager::class.java)
+    shadowOf(connectivity).setActiveNetworkInfo(
+        if (hasDefaultRoute) {
+            ShadowNetworkInfo.newInstance(
+                NetworkInfo.DetailedState.CONNECTED,
+                ConnectivityManager.TYPE_WIFI,
+                0,
+                true,
+                true,
+            )
+        } else {
+            null
+        },
+    )
+    connectivity.activeNetwork?.let { network ->
+        val capabilities =
+            ShadowNetworkCapabilities.newInstance().apply {
+                shadowOf(this).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                shadowOf(this).removeCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                shadowOf(this).removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            }
+        shadowOf(connectivity).setNetworkCapabilities(network, capabilities)
+    }
+    WhiteNoiseAppState::class.java
+        .getDeclaredMethod("registerActiveNetworkListener")
+        .apply { isAccessible = true }
+        .invoke(app)
+    assertFalse(app.hasValidatedInternet())
+    assertEquals(hasDefaultRoute, app.hasActiveNetwork())
+    return app
 }

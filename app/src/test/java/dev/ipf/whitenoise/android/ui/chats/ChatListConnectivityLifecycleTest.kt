@@ -148,7 +148,11 @@ class ChatListConnectivityLifecycleTest {
                     displayed = ConnectivityBannerState.Offline,
                     foregroundEpoch = foregroundEpoch,
                     connectivitySignals = {
-                        ConnectivitySignals(hasValidatedInternet = true, relaysConnected = false)
+                        ConnectivitySignals(
+                            hasValidatedInternet = false,
+                            relaysConnected = false,
+                            hasActiveNetwork = true,
+                        )
                     },
                     relaysConnectedFlow = relaysConnectedFlow,
                     refreshRelayConnectivity = { refreshCount += 1 },

@@ -29,14 +29,14 @@ class OnboardingOfflineSetupTest {
     private val nsec = "nsec1" + "q".repeat(58)
 
     @Test
-    fun onlyNewIdentityCreationIsHeldWhileOffline() {
+    fun onlyNewIdentityCreationIsHeldWithoutAnActiveRoute() {
         val offline = mutableListOf<OnboardingAction>()
         var starts = 0
 
         setupActions.forEach { action ->
             dispatchOnboardingAction(
                 inFlightAction = OnboardingAction.Idle,
-                hasValidatedInternet = false,
+                hasActiveNetwork = false,
                 requestedAction = action,
                 onOffline = offline::add,
                 onStart = { starts += 1 },
@@ -48,15 +48,15 @@ class OnboardingOfflineSetupTest {
     }
 
     @Test
-    fun retryStartsTheSameActionOnceAfterNetworkReturns() {
-        var online = false
+    fun retryStartsTheSameActionOnceAfterDefaultRouteReturns() {
+        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
         var pending: OnboardingAction? = null
         var starts = 0
 
         fun dispatch(action: OnboardingAction) {
             dispatchOnboardingAction(
                 inFlightAction = OnboardingAction.Idle,
-                hasValidatedInternet = online,
+                hasActiveNetwork = availability.hasActiveNetwork(),
                 requestedAction = action,
                 onOffline = { pending = it },
                 onStart = {
@@ -70,7 +70,7 @@ class OnboardingOfflineSetupTest {
         assertEquals(OnboardingAction.Creating, pending)
         assertEquals(0, starts)
 
-        online = true
+        availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
         dispatch(requireNotNull(pending))
 
         assertEquals(null, pending)
@@ -82,12 +82,26 @@ class OnboardingOfflineSetupTest {
         setupActions.forEach { requested ->
             dispatchOnboardingAction(
                 inFlightAction = OnboardingAction.Creating,
-                hasValidatedInternet = true,
+                hasActiveNetwork = true,
                 requestedAction = requested,
                 onOffline = { error("busy work must not be replaced by an offline prompt") },
                 onStart = { error("busy work must not start a second setup call") },
             )
         }
+    }
+
+    @Test
+    fun explicitCreateStartsWithAnActiveRouteWithoutAnOsValidationVeto() {
+        val availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
+        var starts = 0
+        dispatchOnboardingAction(
+            inFlightAction = OnboardingAction.Idle,
+            hasActiveNetwork = availability.hasActiveNetwork(),
+            requestedAction = OnboardingAction.Creating,
+            onOffline = { error("An active route must permit an explicit operation") },
+            onStart = { starts++ },
+        )
+        assertEquals(1, starts)
     }
 
     /** Valid nsec reaches identity acceptance even while offline. */
@@ -96,7 +110,7 @@ class OnboardingOfflineSetupTest {
         val engine = RecordingIdentityLoginCalls(loginFails = { MarmotKitException.Runtime("expected") })
         val appState = signInTestAppState(context, engine)
         composeRule.setContent {
-            WhiteNoiseTheme { OnboardingScreen(appState = appState, hasValidatedInternet = { false }) }
+            WhiteNoiseTheme { OnboardingScreen(appState = appState, hasActiveNetwork = { false }) }
         }
         composeRule.onNodeWithText(context.getString(R.string.onboarding_login)).performClick()
         composeRule.onNodeWithTag("onboarding.sign_in.private_key").performTextInput(nsec)
@@ -114,7 +128,7 @@ class OnboardingOfflineSetupTest {
         val appState = signInTestAppState(context, engine)
         composeRule.setContent {
             WhiteNoiseTheme {
-                OnboardingScreen(appState = appState, hasValidatedInternet = { false })
+                OnboardingScreen(appState = appState, hasActiveNetwork = { false })
             }
         }
 

@@ -410,6 +410,36 @@ class ChatListConnectionStateTest {
         )
     }
 
+    @Test
+    fun foregroundReadinessAcceptsWorkingRouteWithoutOsValidation() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var signals = ConnectivitySignals(hasValidatedInternet = false, hasActiveNetwork = true)
+            val owner =
+                ChatListConnectionOwner(
+                    runtimeGeneration = { 4 },
+                    hasValidatedInternet = { signals.hasAppNetwork },
+                    launchCatchUpRequest = {
+                        CompletableDeferred(AccountCatchUpResult(AccountCatchUpOutcome.Succeeded))
+                    },
+                    hasCurrentSubscriptions = { true },
+                )
+            try {
+                owner.beginSessionAttempt(accountRef = "personal", bindEpoch = 7)
+                owner.noteLiveUpdate(owner.state)
+                runCurrent()
+                assertEquals(ChatListConnectionPhase.Ready, owner.state.phase)
+                val attempt = owner.state
+                signals = signals.copy(hasActiveNetwork = false)
+                owner.refresh(presentAttempt = true)
+                owner.noteLiveUpdate(attempt)
+                assertEquals(ChatListConnectionPhase.Idle, owner.state.phase)
+            } finally {
+                owner.clear()
+                Dispatchers.resetMain()
+            }
+        }
+
     /** A readiness observer follows the replacement work instead of remaining mid-attempt. */
     @Test
     fun ownerFollowsSupersededCatchUpToReplacementSuccess() =

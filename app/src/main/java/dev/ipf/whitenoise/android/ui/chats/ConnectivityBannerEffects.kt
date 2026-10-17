@@ -117,7 +117,7 @@ internal fun RelayConnectivityPollingEffect(
             while (true) {
                 refreshRelayConnectivity()
                 val signals = connectivitySignals()
-                if (signals.hasValidatedInternet && !signals.relaysConnected) {
+                if (signals.hasAppNetwork && !signals.relaysConnected) {
                     revalidateConnectionReadiness()
                 }
                 val pollDelay = relayPollDelayMillis(currentDisplayed, signals.relaysConnected)
@@ -146,7 +146,7 @@ internal fun ValidatedInternetRefreshEffect(
     LaunchedEffect(controller, activeAccountRef, runtimeGeneration) {
         var firstSignal = true
         appState.connectivitySignals
-            .map { it.hasValidatedInternet }
+            .map { it.hasAppNetwork }
             .distinctUntilChanged()
             .collect { hasValidatedInternet ->
                 when {
