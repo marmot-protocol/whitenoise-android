@@ -129,7 +129,12 @@ private fun StartupStatusPage(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    WhiteNoiseScaffold(modifier = modifier, contentWindowInsets = WindowInsets.safeDrawing) { padding ->
+    // No top bar to sit below: banners use the app root's own slot over this surface.
+    WhiteNoiseScaffold(
+        modifier = modifier,
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topNoticeSlot = false,
+    ) { padding ->
         AdaptiveContent(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             Column(
                 modifier =

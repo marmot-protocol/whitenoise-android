@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -297,13 +298,17 @@ internal fun TextAttachmentReaderScreen(
                 .fillMaxSize()
                 .testTag(TEXT_ATTACHMENT_READER_TAG),
         topBar = {
-            TextAttachmentReaderTopBar(
-                onDismiss = onBack,
-                onOpenExternal = onOpenExternal,
-                onSave = onSave,
-                onReadFromTop = { preview?.let(onReadFromTop) },
-                canRead = !readAloudBusy && preview?.text?.isNotBlank() == true,
-            )
+            // App banners sit below this screen's bar rather than over it (#3312).
+            Column {
+                TextAttachmentReaderTopBar(
+                    onDismiss = onBack,
+                    onOpenExternal = onOpenExternal,
+                    onSave = onSave,
+                    onReadFromTop = { preview?.let(onReadFromTop) },
+                    canRead = !readAloudBusy && preview?.text?.isNotBlank() == true,
+                )
+                TopNoticeSlot()
+            }
         },
         bottomBar = {
             TextAttachmentReaderBottomBar(

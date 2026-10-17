@@ -175,6 +175,7 @@ class ConversationScrollIndicatorScreenshotTest {
         }
     }
 
+    /** The reversed fixture transcript under the viewport, padded for the measured bottom chrome. */
     @Composable
     private fun FixtureTimeline(
         viewport: ConversationTimelineViewport,
@@ -185,7 +186,7 @@ class ConversationScrollIndicatorScreenshotTest {
             state = state,
             reverseLayout = true,
             verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-            contentPadding = conversationTimelineContentPadding(0.dp, chrome.dp),
+            contentPadding = conversationTimelineContentPadding(chrome.dp),
             modifier =
                 Modifier
                     .fillMaxSize()

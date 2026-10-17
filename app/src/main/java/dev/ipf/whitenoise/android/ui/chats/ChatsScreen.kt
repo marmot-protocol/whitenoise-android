@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -110,9 +110,8 @@ import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
-import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
-import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
@@ -120,6 +119,7 @@ import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
+import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
@@ -142,6 +142,8 @@ internal fun ChatListBodyFrame(
 ) {
     Column(modifier) {
         ttsTransport()
+        // Temporary banners follow the list's bars and playback strip and precede its persistent notices (#3312).
+        TopNoticeSlot()
         notice()
         Box(
             modifier =
@@ -228,6 +230,9 @@ internal fun ChatsScreen(
         remember(appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateSetOf<String>()
         }
+    var pendingAbandonment by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<PendingChatAbandonment?>(null)
+    }
     val selectionMode = selectedChatIds.isNotEmpty()
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
@@ -285,19 +290,6 @@ internal fun ChatsScreen(
 
     fun clearSelection() {
         selectedChatIds.clear()
-    }
-
-    // Lift the app-level toast host (it flows through WhiteNoiseSnackbarHost,
-    // which reads LocalSnackbarBottomInset) above the quick-action FAB so a
-    // toast — e.g. the archive confirmation — can't sit over the FAB and
-    // intercept its taps for the toast's duration — issue #352. Resets to
-    // zero on dispose so other surfaces aren't affected, mirroring
-    // ConversationScreen's composer lift (#122).
-    val snackbarBottomInset = LocalSnackbarBottomInset.current
-    val snackbarContentInset = LocalSnackbarContentInset.current
-    DisposableEffect(Unit) {
-        snackbarBottomInset.value = FAB_SNACKBAR_INSET
-        onDispose { snackbarBottomInset.value = 0.dp }
     }
 
     LaunchedEffect(searchOpen) {
@@ -1566,6 +1558,11 @@ internal fun ChatsScreen(
                                 } else {
                                     null
                                 },
+                            onAbandon =
+                                ChatAbandonMenuAction(item.isDm()) {
+                                    pendingAbandonment =
+                                        PendingChatAbandonment.capture(item, controller, appState, groupTitleCopy)
+                                }.takeIf { item.offersLocalAbandonment() },
                             onDismiss = {
                                 if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
                                     actionSheetChatId = null
@@ -1590,6 +1587,8 @@ internal fun ChatsScreen(
         }
 
     Scaffold(
+        // The body frame places this screen's banner slot below the playback strip instead.
+        topNoticeSlot = false,
         topBar = {
             val connectivityState = rememberChatListConnectivityState(appState, controller)
             Column {
@@ -1661,6 +1660,11 @@ internal fun ChatsScreen(
                 val selectionAccount = appState.activeAccountRef
                 val selectionRuntime = appState.runtimeGeneration
                 val selectionIds = selectedChatIds.toSet()
+                // The review names the acting account, so a selection with no bound account offers nothing.
+                val abandonableSelection =
+                    selectedVisibleItems
+                        .takeIf { controller.accountRef != null && it.offerLocalAbandonment() }
+                        ?.map { it.isDm() }
                 dev.ipf.whitenoise.android.ui.common.AdaptiveContent(
                     Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 ) {
@@ -1709,6 +1713,19 @@ internal fun ChatsScreen(
                                 selectedVisibleItems
                                     .takeIf { it.isNotEmpty() }
                                     ?.let { PendingChatDeparture(it, controller, appState, groupTitleCopy) }
+                        },
+                        // #3310: bulk abandonment, only when every selected chat offers it, through the same
+                        // captured owner, busy set and batch dialog as Leave and delete.
+                        abandonLabel = abandonableSelection?.let { stringResource(groupAbandonmentBatchLabel(it)) },
+                        onAbandon = {
+                            if (selectedVisibleItems.any { it.group.groupIdHex in leavingAndDeleting }) {
+                                return@ChatListSelectionControls
+                            }
+                            val selected = selectedVisibleItems
+                            if (controller.accountRef != null && selected.offerLocalAbandonment()) {
+                                pendingLeaveAndDelete =
+                                    PendingChatDeparture(selected, controller, appState, groupTitleCopy, abandon = true)
+                            }
                         },
                         onAddToFolder = {
                             openFolderPicker(selectedVisibleItems)
@@ -1764,7 +1781,14 @@ internal fun ChatsScreen(
                 onStateChange = onGlobalSearchStateChange,
             )
         }
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                // The scaffold padding above already clears a side cutout or side navigation bar, so the
+                // body frame's banner slot must not pad for them again (#3312).
+                .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+        ) {
             // Chats reset and folder management remain available with an empty list.
             // Native folder models still own visibility/counts; this row stays above list/empty-state swaps.
             // The prototype swaps the whole top column for the search bar and its mode chips, so the
@@ -1856,7 +1880,7 @@ internal fun ChatsScreen(
                             items = libraryItems,
                             kinds = libraryKinds,
                             loading = libraryLoading,
-                            bottomPadding = snackbarContentInset.value,
+                            bottomPadding = 0.dp,
                             onOpenMessage = { groupIdHex, messageIdHex ->
                                 openSearchMessage(groupIdHex, messageIdHex)
                             },
@@ -1940,7 +1964,6 @@ internal fun ChatsScreen(
                                             chatListHeightPx = coordinates.size.height.toFloat()
                                         },
                                 state = chatListState,
-                                contentPadding = PaddingValues(bottom = snackbarContentInset.value),
                             ) {
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
@@ -2016,9 +2039,9 @@ internal fun ChatsScreen(
                 // floats above the rows. Fades + slides in from the bottom-right
                 // when the user is scrolled deep, hides near the top — the
                 // `jumpToTopVisible` hysteresis above debounces threshold
-                // jitter. Lifted by FAB_SNACKBAR_INSET (the same clearance the
-                // snackbar host uses, #352/#356) on top of the navigation-bar
-                // inset so it clears the quick-action FAB and the nav bar.
+                // jitter. Lifted by QUICK_ACTION_FAB_CLEARANCE on top of the
+                // navigation-bar inset so it clears the quick-action FAB and the
+                // nav bar (#352/#356).
                 // Fully-qualified so Kotlin binds the top-level overload rather
                 // than the ColumnScope extension (the outer Column is also an
                 // implicit receiver here) — the bottom-end alignment is carried
@@ -2035,7 +2058,7 @@ internal fun ChatsScreen(
                             // lines up with the 56dp quick-action FAB above it,
                             // which the Scaffold insets 16dp from the edge:
                             // 23 + 42/2 == 16 + 56/2 (#451).
-                            .padding(end = 23.dp, bottom = FAB_SNACKBAR_INSET),
+                            .padding(end = 23.dp, bottom = QUICK_ACTION_FAB_CLEARANCE),
                 ) {
                     val scrollToTopLabel = stringResource(R.string.scroll_to_top)
                     Box(
@@ -2091,6 +2114,16 @@ internal fun ChatsScreen(
                 clearSelection()
             },
             onDismiss = { folderHandoff.pickerChatIds = null },
+        )
+    }
+
+    pendingAbandonment?.let { request ->
+        ChatAbandonmentHost(
+            request = request,
+            appState = appState,
+            controller = controller,
+            busyChats = leavingAndDeleting,
+            onDismiss = { pendingAbandonment = null },
         )
     }
 
@@ -2278,13 +2311,10 @@ private fun ChatListIdentifierResult(
 }
 
 // Approximate clearance the chat-list quick-action FAB occupies above the
-// navigation bar. Used by ChatsScreen to push the global + chat-list snackbar
-// hosts above the FAB so a toast (e.g. "npub copied" from a profile sheet)
-// doesn't sit over the FAB and swallow its taps for the toast's duration —
-// issue #352. The toggle FAB is ~56.dp and the Scaffold floats it 16.dp above
-// the bottom inset; 80.dp clears that stack with a small gap so the lifted
-// snackbar reads as sitting *above* the FAB, per Material guidance.
-private val FAB_SNACKBAR_INSET = 80.dp
+// navigation bar. The toggle FAB is ~56.dp and the Scaffold floats it 16.dp
+// above the bottom inset; 80.dp clears that stack with a small gap, so the
+// jump-to-top control stacked above it never overlaps it (#352, #413).
+private val QUICK_ACTION_FAB_CLEARANCE = 80.dp
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back

@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
@@ -19,22 +19,14 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.NoticeTier
@@ -44,51 +36,27 @@ import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /**
- * Bottom inset the global snackbar host should reserve to clear any
- * persistent bottom chrome on the currently visible surface (e.g. the
- * conversation composer). Held as a `MutableState<Dp>` so screens
- * BELOW the host in the composition tree can push their chrome height
- * up to the parent-owned state — a plain CompositionLocal would only
- * flow values DOWN and couldn't reach the host. Default `0.dp` keeps
- * non-composer surfaces unaffected.
- *
- * See issue #122 (post-invite-accept toast overlapping message input).
+ * The app's snackbar presentation (#3312). It is placed in a top region below the owning screen's bars, so it
+ * needs no navigation-bar, keyboard or composer clearance: the screen's content absorbs its height and bottom
+ * chrome keeps its own size and position. Margins belong to each shown snackbar, so an empty host takes no space.
  */
-internal val LocalSnackbarBottomInset =
-    staticCompositionLocalOf<MutableState<Dp>> {
-        // Safe fallback for hosts rendered outside the app shell —
-        // androidTest fixtures, Compose previews, or any future caller
-        // that uses [WhiteNoiseSnackbarHost] without going through
-        // [WhiteNoiseApp]'s provider. The host reads `.value`, so the
-        // factory must return a real MutableState rather than throw;
-        // 0.dp matches the no-composer surface behaviour.
-        mutableStateOf(0.dp)
-    }
-
-/** Space occupied by the currently visible app-level notice. Conversation and
- * chat-list content consume this value so the last row remains reachable above
- * the notice instead of being painted underneath it. */
-internal val LocalSnackbarContentInset =
-    staticCompositionLocalOf<MutableState<Dp>> { mutableStateOf(0.dp) }
-
 @Composable
 fun WhiteNoiseSnackbarHost(
     hostState: SnackbarHostState,
     modifier: Modifier = Modifier,
     snackbar: @Composable (SnackbarData) -> Unit = { SwipeDismissibleSnackbar(it) },
 ) {
-    val extraInset = LocalSnackbarBottomInset.current.value
     SnackbarHost(
         hostState = hostState,
-        modifier =
-            modifier
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp + extraInset),
-        snackbar = snackbar,
+        modifier = modifier.fillMaxWidth(),
+        snackbar = { data ->
+            Box(Modifier.padding(horizontal = 16.dp, vertical = SNACKBAR_REGION_VERTICAL_MARGIN)) { snackbar(data) }
+        },
     )
 }
+
+/** The gap a top snackbar keeps from the bars above it and the content below it. */
+private val SNACKBAR_REGION_VERTICAL_MARGIN = 4.dp
 
 /**
  * Visuals for toasts pushed through `WhiteNoiseAppState.present`. Carries the
@@ -149,15 +117,6 @@ internal fun Modifier.snackbarSurfaceBoundary(): Modifier = amoledSurfaceBorder(
  */
 @Composable
 fun SwipeDismissibleSnackbar(data: SnackbarData) {
-    val density = LocalDensity.current
-    val contentInset = LocalSnackbarContentInset.current
-    DisposableEffect(data) {
-        onDispose { contentInset.value = 0.dp }
-    }
-    val reserveNoticeSpace =
-        Modifier.onSizeChanged { size ->
-            contentInset.value = with(density) { size.height.toDp() + 16.dp }
-        }
     val dismissState =
         key(data) {
             rememberSwipeToDismissBoxState(
@@ -178,7 +137,7 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
     ) {
         val deletionVisuals = (data.visuals as? ToastSnackbarVisuals)?.takeIf { it.details != null }
         if (deletionVisuals != null) {
-            LocalDeleteSnackbar(data, deletionVisuals, reserveNoticeSpace)
+            LocalDeleteSnackbar(data, deletionVisuals)
         } else if (snackbarShowsCopyAffordance(data.visuals)) {
             // Error/diagnostic toasts flagged copyable at their emit site get
             // a discoverable Copy affordance and a separate Dismiss control.
@@ -186,7 +145,7 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
             val clipboard = LocalClipboardManager.current
             val copyText = requireNotNull((data.visuals as ToastSnackbarVisuals).copyText)
             Snackbar(
-                modifier = reserveNoticeSpace.snackbarSurfaceBoundary(),
+                modifier = Modifier.snackbarSurfaceBoundary(),
                 action = {
                     IconButton(onClick = { clipboard.setText(AnnotatedString(copyText)) }) {
                         Icon(
@@ -211,7 +170,7 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
             // untouched) and non-copyable toasts like success confirmations —
             // renders plain, with the message text still selectable.
             SelectionContainer {
-                Snackbar(snackbarData = data, modifier = reserveNoticeSpace.snackbarSurfaceBoundary())
+                Snackbar(snackbarData = data, modifier = Modifier.snackbarSurfaceBoundary())
             }
         }
     }

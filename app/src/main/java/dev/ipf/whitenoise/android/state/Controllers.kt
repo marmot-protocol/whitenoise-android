@@ -4901,7 +4901,7 @@ class ChatsController private constructor(
         val deleted =
             deleteGroupLocalFromChatList(
                 groupIdHex,
-                failureMessage = R.string.toast_left_chat_delete_failed,
+                wording = LocalRemovalWording.Delete.copy(failureTitle = R.string.toast_left_chat_delete_failed),
                 observer = LocalChatDeleteObserver(onCleanupDeferred = { deferred = true }),
             )
         return (deleted && !deferred).also { if (it) onStage(ChatDepartureStage.COMPLETED) }
@@ -4960,7 +4960,7 @@ class ChatsController private constructor(
     internal suspend fun deleteGroupLocalFromChatList(
         groupIdHex: String,
         notify: Boolean = true,
-        failureMessage: Int = R.string.toast_couldnt_delete_chat,
+        wording: LocalRemovalWording = LocalRemovalWording.Delete,
         observer: LocalChatDeleteObserver = LocalChatDeleteObserver(),
         forgetProtocol: Boolean = false,
     ): Boolean =
@@ -4997,42 +4997,46 @@ class ChatsController private constructor(
                     }
                 }
                 if (failure is CancellationException) throw failure
-                if (isCurrent()) {
+                if (isCurrent() && observer.presentsFailure) {
+                    // The retry keeps this removal's wording, so a retried abandonment never reads as a delete.
                     appState.presentLocalDeleteFailure(
-                        failureMessage,
+                        wording.failureTitle,
                         failure,
+                        detail = AppText.Resource(wording.failureDetail),
                         notice =
                             appState.localDeleteRetryNotice(account, groupIdHex, isCurrent) {
                                 deleteGroupLocalFromChatList(
                                     groupIdHex,
-                                    failureMessage = failureMessage,
+                                    wording = wording,
                                     forgetProtocol = forgetProtocol,
                                 )
                             },
                     )
-                    observer.onFailure(failure)
                 }
+                if (isCurrent()) observer.onFailure(failure)
                 false
             } else if (isCurrent()) {
-                completeChatLocalRemoval(account, groupIdHex, wipe.getOrDefault(false), notify, observer)
+                val success = wording.success.takeIf { notify }
+                completeChatLocalRemoval(account, groupIdHex, wipe.getOrDefault(false), success, observer)
                 true
             } else {
                 false
             }
         } ?: false
 
+    /** Settles a committed removal, confirming it with [success] only once its Android cleanup also finished. */
     private fun completeChatLocalRemoval(
         account: String,
         groupIdHex: String,
         cleanupComplete: Boolean,
-        notify: Boolean,
+        @StringRes success: Int?,
         observer: LocalChatDeleteObserver,
     ) {
         appState.dismissLocalDeleteFailure(account, groupIdHex)
         removeChatRow(groupIdHex)
         finishRemovedChatRowClientState(groupIdHex)
         if (!cleanupComplete) observer.onCleanupDeferred()
-        if (notify && cleanupComplete) appState.presentTransient(R.string.toast_chat_deleted_local)
+        if (success != null && cleanupComplete) appState.presentTransient(success)
     }
 
     private fun requireChatListDepartureCurrent(
@@ -11553,14 +11557,36 @@ class ConversationController(
             R.string.toast_chat_deleted_local
         }
 
-    /** MDK 0.10.0 local reset: erase this device's state and wait for a Welcome newer than the reset. */
-    suspend fun forgetGroupLocal(): Boolean =
-        runLocalGroupRemoval(R.string.toast_couldnt_reset_group, "GROUP_LOCAL_RESET") { account ->
-            val reset = appState.forgetGroupLocalWithClientCleanup(account, group.groupIdHex)
-            if (reset) R.string.toast_group_reset_done else R.string.toast_group_reset_already_waiting
+    /**
+     * Confirmed local abandonment (#3310) of this DM or group: MDK 0.10.0's forget behind the durable cleanup
+     * journal. It sends no leave, admin change or disband, so a refused handover or an absent peer cannot block it.
+     */
+    suspend fun forgetGroupLocal(): Boolean {
+        val dm = isDm
+        val failure = if (dm) R.string.toast_couldnt_abandon_chat else R.string.toast_couldnt_reset_group
+        return runLocalGroupRemoval(failure, "GROUP_LOCAL_RESET") { account ->
+            val runtime = appState.runtimeGeneration
+            val reset =
+                appState.forgetGroupLocalWithClientCleanup(account, group.groupIdHex) {
+                    conversationAccountRef == account &&
+                        appState.runtimeGeneration == runtime &&
+                        !appState.signOutInProgress &&
+                        !appState.wipeInProgress
+                }
+            when {
+                !reset && dm -> R.string.toast_chat_already_abandoned
+                !reset -> R.string.toast_group_reset_already_waiting
+                dm -> R.string.toast_chat_abandoned
+                else -> R.string.toast_group_reset_done
+            }
         }
+    }
 
-    /** Shared shape of the two local removals: one mutation slot, a success toast chosen by the removal itself. */
+    /**
+     * Shared shape of the two local removals: one mutation slot, a success notice chosen by the removal itself. Both
+     * close this conversation, so the notice is app-wide instead of scoped to the closed route (#3310), and like a
+     * failure it is not shown on a replacement account or runtime.
+     */
     private suspend fun runLocalGroupRemoval(
         failureToast: Int,
         operationCode: String,
@@ -11570,7 +11596,9 @@ class ConversationController(
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
-                presentConversationTransient(removal(account))
+                val success = removal(account)
+                val sameRuntime = appState.runtimeGeneration == conversationRuntimeGeneration
+                if (sameRuntime && appState.activeAccountRef == account) appState.presentTransient(success)
                 true
             }.onFailure { recordMutationFailure(failureToast, operationCode, it) }.getOrDefault(false)
         }

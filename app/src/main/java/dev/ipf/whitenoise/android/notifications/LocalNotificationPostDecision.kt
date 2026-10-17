@@ -101,6 +101,11 @@ internal fun boundedNotificationMessageText(text: CharSequence): String {
  * still on the card keeps the conversation template, which is the only standard template that holds each
  * message separately. A long newest message behind carried history therefore shows as many lines as the platform
  * gives that template, and the history stays intact. A redacted card never qualifies, since it carries no text.
+ *
+ * By design the text block keeps the full long body readable (#1901) and carries the conversation's identity
+ * picture (#3311) as its explicit large picture on the right, while app attribution keeps its small system-owned
+ * place. Android does not classify this template as a conversation, so the next message, which returns the card to
+ * the conversation template, moves the picture into the conversation circle.
  */
 internal fun shouldUseExpandedSingleMessageStyle(
     body: CharSequence,
@@ -114,6 +119,21 @@ internal fun shouldUseExpandedSingleMessageStyle(
 private fun CharSequence.codePointCount(): Int {
     val value = toString()
     return value.codePointCount(0, value.length)
+}
+
+/**
+ * How many conversation shortcuts must go before [shortcutId] can be published, counting every dynamic shortcut in
+ * [dynamicShortcutIds] and the [manifestShortcutCount] manifest shortcuts against the per-activity [maxShortcuts] cap.
+ * Republishing an existing id needs no room.
+ */
+internal fun conversationShortcutPruneCount(
+    dynamicShortcutIds: Set<String>,
+    manifestShortcutCount: Int,
+    maxShortcuts: Int,
+    shortcutId: String,
+): Int {
+    if (shortcutId in dynamicShortcutIds) return 0
+    return (dynamicShortcutIds.size + manifestShortcutCount - maxShortcuts + 1).coerceAtLeast(0)
 }
 
 internal fun conversationShortcutRemovalOrder(

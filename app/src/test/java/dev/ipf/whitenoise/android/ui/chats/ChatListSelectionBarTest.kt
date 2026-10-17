@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -88,6 +89,60 @@ class ChatListSelectionBarTest {
         assertEquals(1, archives)
         assertEquals(1, deletes)
         assertEquals(1, selectAll)
+    }
+
+    /**
+     * #3310: bulk abandonment is its own destructive action beside Leave and delete, runs only while the selection is
+     * still current, and is absent when the selection does not offer it.
+     */
+    @Test
+    fun abandonActionIsSeparateFromDeleteAndFencedByTheSelection() {
+        var deletes = 0
+        var abandons = 0
+        var current = true
+        val offered = mutableStateOf<String?>(string(R.string.chats_abandon_action))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListSelectionControls(
+                    count = 2,
+                    archiveAction = ChatListBulkArchiveAction.Archive,
+                    actionsEnabled = true,
+                    allVisibleSelected = false,
+                    showMarkRead = false,
+                    showMarkUnread = false,
+                    showMuteToggle = false,
+                    muted = false,
+                    showPinToggle = false,
+                    pinned = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
+                    onArchive = {},
+                    onDelete = { deletes++ },
+                    onAddToFolder = {},
+                    onMarkRead = {},
+                    onMarkUnread = {},
+                    onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
+                    onSelectAll = {},
+                    onDeselectAll = {},
+                    isCurrent = { current },
+                    deleteLabel = string(R.string.leave_and_delete),
+                    abandonLabel = offered.value,
+                    onAbandon = { abandons++ },
+                )
+            }
+        }
+        val abandon = string(R.string.chats_abandon_action)
+        composeRule.onNodeWithContentDescription(abandon).performClick()
+        assertEquals(1, abandons)
+        assertEquals("abandoning never leaves or deletes", 0, deletes)
+        current = false
+        composeRule.onNodeWithContentDescription(abandon).performClick()
+        assertEquals("a replaced selection submits nothing", 1, abandons)
+        offered.value = null
+        composeRule.onNodeWithContentDescription(abandon).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.leave_and_delete)).assertIsDisplayed()
     }
 
     /** Shows select all when not all visible selected. */

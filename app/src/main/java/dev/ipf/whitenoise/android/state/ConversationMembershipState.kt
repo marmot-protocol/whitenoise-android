@@ -20,6 +20,17 @@ internal fun SelfMembershipFfi.isNonMember(): Boolean =
         else -> false
     }
 
+/**
+ * Whether local abandonment (#3310) is offered for this group. A read-only invite declines instead, and once MDK
+ * confirms the account no longer holds the group (it left, was removed, or the group is disbanded) there is nothing
+ * to abandon. A queued leave or a converging disband is not that confirmation, so abandonment stays the way out while
+ * either never finishes. Group Details and the chat list share this one rule.
+ */
+internal fun AppGroupRecordFfi.offersLocalAbandonment(): Boolean {
+    val confirmedNonMember = selfMembership.isNonMember() || disbanded
+    return !pendingConfirmation && !confirmedNonMember
+}
+
 internal data class ConversationMembershipSeed(
     val members: List<AppGroupMemberRecordFfi>,
     val membersLoaded: Boolean,
