@@ -159,9 +159,10 @@ internal class ConversationTimelineSession {
     }
 
     /** Bounds each replacement subscription's one-shot snapshot before waiting for live rows. */
-    suspend fun snapshot(stream: ConversationTimelineSubscriptionHandle): TimelinePageFfi? {
-        return initialSnapshotRead.await { stream.snapshot() }
-    }
+    suspend fun snapshot(stream: ConversationTimelineSubscriptionHandle): TimelinePageFfi? =
+        initialSnapshotRead.await(
+            read = { stream.snapshot() },
+        )
 
     /** Stops future opens after a native-open timeout without cancelling accepted mutations. */
     fun cancelInitialOpen() = initialSubscriptionRead.cancel()
