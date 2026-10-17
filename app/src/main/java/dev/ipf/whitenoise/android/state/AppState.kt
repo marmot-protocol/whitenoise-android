@@ -35,6 +35,7 @@ import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -50,6 +51,7 @@ import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
+import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
@@ -11368,11 +11370,24 @@ class WhiteNoiseAppState private constructor(
      * waits in WorkManager for a network that policy could allow. The worker persists only the lookup identity
      * and re-checks the live policy against MDK's reference when it runs.
      */
-    @Suppress("ReturnCount") // A non-message, a held account and a failed lookup each end the receipt early.
     private suspend fun scheduleIncomingAttachmentDownloads(update: NotificationUpdateFfi) {
         val messageIdHex = update.messageIdHex
         if (update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isFromSelf || messageIdHex == null) return
-        val policy = automaticAttachmentPolicy(update.accountRef)
+        scheduleReceivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex, update.timestampMs)
+    }
+
+    /**
+     * The receipt scheduling both receipt sources share, for one received message of [accountRef]'s group
+     * [groupIdHex]: a bounded authoritative lookup of its attachments, each queued under its own type's policy.
+     */
+    @Suppress("ReturnCount") // A held account and a failed lookup each end the receipt early.
+    private suspend fun scheduleReceivedMessageAttachments(
+        accountRef: String,
+        groupIdHex: String,
+        messageIdHex: String,
+        receivedAtMillis: Long,
+    ) {
+        val policy = automaticAttachmentPolicy(accountRef)
         val wanted = policy.receiptTypes()
         if (wanted.isEmpty()) {
             Log.i(INCOMING_ATTACHMENT_TAG, "attachment_receipt_skipped reason=${policy.receiptSkipReason().reason}")
@@ -11380,7 +11395,7 @@ class WhiteNoiseAppState private constructor(
         }
         val lookup =
             runCatchingCancellable {
-                receivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex, update.timestampMs)
+                receivedMessageAttachments(accountRef, groupIdHex, messageIdHex, receivedAtMillis)
             }.onFailure {
                 Log.w(INCOMING_ATTACHMENT_TAG, "attachment_receipt_lookup_failed type=${it.javaClass.simpleName}")
             }.getOrNull() ?: return
@@ -11808,6 +11823,77 @@ class WhiteNoiseAppState private constructor(
             runNotificationListenerLoop(marmot())
         }
 
+    /**
+     * Schedules the media of messages the notification stream never carries: those in muted chats, and every
+     * message of an account whose local notifications are off. MarmotKit 0.13.0 resolves an ordinary message in a
+     * muted chat to no notification update, and refuses every update while notifications are off, so receipt
+     * scheduling, which rides that stream, would leave their attachments unscheduled even though #3308 holds them
+     * to the account's media policy. MDK offers no opt-in for those updates, so this follows the runtime's
+     * own event stream for received chat messages and schedules only those it drops, through the same
+     * bounded lookup and policy as a notification receipt; anything the notification stream did carry, such as a
+     * mention, joins the same durable identity. A stream that ends or fails is reopened with backoff, but one that
+     * cannot be opened at all ends the loop until the listener restarts.
+     */
+    internal suspend fun runMutedChatReceiptLoop(marmot: MarmotInterface) {
+        var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+        while (currentCoroutineContext().isActive) {
+            val subscription =
+                runCatchingCancellable { marmot.subscribeEvents() }
+                    .onFailure {
+                        val type = it.javaClass.simpleName
+                        Log.w(INCOMING_ATTACHMENT_TAG, "muted_receipt_stream_unavailable type=$type")
+                    }.getOrNull() ?: return
+            try {
+                runCatchingCancellable {
+                    var event = subscription.next()
+                    while (event != null) {
+                        backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                        val received = (event as? MarmotEventFfi.MessageReceived)?.received
+                        if (received != null && isMutedChatReceipt(received)) scheduleMutedChatReceipt(received)
+                        event = subscription.next()
+                    }
+                }.onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "muted_receipt_stream_failed") }
+            } finally {
+                withContext(NonCancellable) { runCatching { subscription.destroy() } }
+            }
+            delay(backoffMillis)
+            backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
+        }
+    }
+
+    /**
+     * Whether [received] is a chat message from someone else that the notification stream drops: its account has
+     * turned local notifications off, which MDK resolves to no update for any message, or its chat is muted. Only
+     * chat messages carry attachments, and each read fails closed to the notification stream.
+     */
+    private suspend fun isMutedChatReceipt(received: RuntimeMessageReceivedFfi): Boolean {
+        val message = received.message
+        if (message.kind != MARMOT_CHAT_EVENT_KIND || message.sender.equals(received.accountIdHex, ignoreCase = true)) {
+            return false
+        }
+        val notificationsOff =
+            runCatchingCancellable {
+                !marmotIo { notificationSettings(received.accountLabel) }.localNotificationsEnabled
+            }.getOrDefault(false)
+        return notificationsOff ||
+            runCatchingCancellable {
+                chatMuteRepository.settings(received.accountLabel, message.groupIdHex).getOrThrow().muted
+            }.getOrDefault(false)
+    }
+
+    /** Runs one muted-chat receipt's scheduling beside the stream, so a slow lookup never delays the next event. */
+    private fun scheduleMutedChatReceipt(received: RuntimeMessageReceivedFfi) {
+        val message = received.message
+        notificationScope.launch(notificationDispatcher) {
+            scheduleReceivedMessageAttachments(
+                accountRef = received.accountLabel,
+                groupIdHex = message.groupIdHex,
+                messageIdHex = message.messageIdHex,
+                receivedAtMillis = message.receivedAt.toLong() * MILLIS_PER_SECOND_LONG,
+            )
+        }
+    }
+
     internal suspend fun runNotificationListenerLoop(marmot: MarmotInterface) {
         // Restart the subscription on any failure (or clean end-of-stream)
         // with exponential backoff, so a transient relay/binding error
@@ -11815,10 +11901,17 @@ class WhiteNoiseAppState private constructor(
         // each received update; cancellation propagates and stops the loop.
         // See #56.
         var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+        var receiptLoop: Job? = null
         while (currentCoroutineContext().isActive) {
             val retryWakeGeneration = notificationReceiverRetryWake.value
             try {
                 val subscription = notificationSubscriber(marmot)
+                // Only once the notification subscription is open, so start's no-replay window stays unwidened, and
+                // as a child of this listener on IO, so it stops with notifications without delaying them.
+                receiptLoop =
+                    receiptLoop ?: CoroutineScope(currentCoroutineContext()).launch(Dispatchers.IO) {
+                        runMutedChatReceiptLoop(marmot)
+                    }
                 runtimeListenerTeardownOwner.withNotificationSubscription(subscription) {
                     while (currentCoroutineContext().isActive) {
                         val update = subscription.next() ?: break
@@ -12399,6 +12492,12 @@ class WhiteNoiseAppState private constructor(
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
         private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
+
+        /** The Marmot app-event kind of a chat message, the only kind that carries attachments. */
+        private const val MARMOT_CHAT_EVENT_KIND = 9uL
+
+        /** Converts the runtime's second timestamps for receipt lookups, which work in milliseconds. */
+        private const val MILLIS_PER_SECOND_LONG = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
         private const val NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS = 5_000L
         private const val NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS = 3_000L

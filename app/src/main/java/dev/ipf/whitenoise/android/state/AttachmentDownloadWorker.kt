@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -463,8 +464,13 @@ class AttachmentDownloadWorker : CoroutineWorker {
         private const val EXPLICIT_LOOKUP_RETRIES = 1
         internal const val RETIRED_TAG = "attachment_download_retired"
 
-        /** Runs a future's listener on the thread that completed it, for listeners that only chain more futures. */
-        private val DIRECT = Executor { task -> task.run() }
+        /**
+         * Settles receipts off WorkManager's own serial task thread, where waiting on another WorkManager future
+         * would deadlock, and off the caller's thread, which may be the main thread. Tests replace it to observe
+         * when each settle has finished.
+         */
+        @Volatile
+        internal var receiptSettleExecutor: Executor = Dispatchers.IO.asExecutor()
         private val explicitFence = ExplicitEnqueueFence()
 
         /**
@@ -581,46 +587,27 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 runCatching {
                     manager.enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.KEEP, work)
                 }.onSuccess { operation ->
-                    if (type != null) {
-                        runCatching { AutomaticAttachmentNetworkWaits.get(context).record(request, type, networkType) }
-                            .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
-                    }
-                    operation.result.addListener({ widenKeptAutomatic(manager, request, networkType) }, DIRECT)
+                    val waits = AutomaticAttachmentNetworkWaits.get(context.applicationContext)
+                    val settle = Runnable { settleReceipt(waits, manager, request, type, networkType) }
+                    operation.result.addListener(settle, receiptSettleExecutor)
                 }.onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
             }
         }
 
         /**
-         * After a KEEP enqueue, widens the automatic spec it kept when that spec still waits on a network narrower
-         * than [networkType], in place by id so the attempt count stays. Only waiting automatic work changes:
-         * a retired, explicit, running or finished spec is never touched or resurrected. Chained on WorkManager's
-         * own futures, so it never blocks the caller.
+         * Settles one automatic receipt once its KEEP enqueue has completed, through the same widening rule as the
+         * policy sweep: the spec it kept, waiting or running, takes [networkType] when that is wider, and the
+         * narrowed-wait record follows only what the live spec actually waits on.
          */
-        private fun widenKeptAutomatic(
+        private fun settleReceipt(
+            waits: AutomaticAttachmentNetworkWaits,
             manager: WorkManager,
             request: AttachmentTransferRequest,
+            type: MediaAutoDownloadType?,
             networkType: NetworkType,
         ) {
-            runCatching {
-                val lookup = manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(request))
-                lookup.addListener({
-                    val automaticTag = attachmentAutomaticAccountTag(request.accountRef)
-                    runCatching { lookup.get() }
-                        .getOrDefault(emptyList())
-                        .filter { info ->
-                            info.state == WorkInfo.State.ENQUEUED &&
-                                automaticTag in info.tags &&
-                                RETIRED_TAG !in info.tags &&
-                                info.constraints.requiredNetworkType.isNarrowerThan(networkType)
-                        }.forEach { info ->
-                            runCatching {
-                                manager.updateWork(
-                                    buildRequest(request, AttachmentDownloadPriority.Automatic, info.id, networkType),
-                                )
-                            }.onFailure { Log.w(TAG, "attachment_network_widening_failed") }
-                        }
-                }, DIRECT)
-            }.onFailure { Log.w(TAG, "attachment_network_widening_failed") }
+            runCatching { waits.settleReceipt(manager, request, type, networkType) }
+                .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
         }
 
         /**
