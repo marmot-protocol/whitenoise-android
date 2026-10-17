@@ -53,8 +53,8 @@ internal class ConversationMutationPresentation(
         if (archiveIntent === intent) archiveIntent = null
     }
 
-    /** Drops repeated taps while one logical action holds the presentation slot. */
-    suspend fun <T> withLock(
+    /** Runs one action immediately, returning [defaultValue] for overlapping calls rather than queueing them. */
+    suspend fun <T> runIfIdle(
         defaultValue: T,
         block: suspend () -> T,
     ): T {

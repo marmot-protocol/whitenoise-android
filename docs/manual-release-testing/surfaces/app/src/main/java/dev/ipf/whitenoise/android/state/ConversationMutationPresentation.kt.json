@@ -13,7 +13,7 @@
       {
         "surface": "Mutation single-flight releases on failure and cancellation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationMutationPresentation.kt",
-        "anchor": "suspend fun <T> withLock(",
+        "anchor": "suspend fun <T> runIfIdle(",
         "test_ids": [
           "CHL-007",
           "MSG-007"

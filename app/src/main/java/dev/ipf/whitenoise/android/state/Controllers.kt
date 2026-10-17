@@ -6600,7 +6600,7 @@ class ConversationController(
     private suspend fun <T> withMutationLockResult(
         defaultValue: T,
         block: suspend () -> T,
-    ): T = mutationPresentation.withLock(defaultValue, block)
+    ): T = mutationPresentation.runIfIdle(defaultValue, block)
 
     private val conversationAccountRef = accountRefOverride ?: appState.activeAccountRef
     private val conversationRuntimeGeneration = appState.runtimeGeneration
