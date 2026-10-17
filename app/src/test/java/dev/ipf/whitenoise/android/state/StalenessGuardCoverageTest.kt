@@ -70,6 +70,8 @@ class StalenessGuardCoverageTest {
         val controllers = productionSource("Controllers.kt")
         val nativePushFallback = productionSource("NativePushFallbackRuntime.kt")
         val directChatResolution = productionSource("DirectChatResolution.kt")
+        val timelineSession = productionSource("ConversationTimelineSession.kt")
+        val mutationPresentation = productionSource("ConversationMutationPresentation.kt")
         val guardedPaths =
             mapOf(
                 "AppState.kt:refreshAccountUnreadCounts" to
@@ -307,8 +309,8 @@ class StalenessGuardCoverageTest {
             asyncPublicationCandidates("AppState.kt", appState) +
                 asyncPublicationCandidates("Controllers.kt", controllers) +
                 asyncPublicationCandidates("DirectChatResolution.kt", directChatResolution) +
-                asyncPublicationCandidates("ConversationTimelineSession.kt", productionSource("ConversationTimelineSession.kt")) +
-                asyncPublicationCandidates("ConversationMutationPresentation.kt", productionSource("ConversationMutationPresentation.kt"))
+                asyncPublicationCandidates("ConversationTimelineSession.kt", timelineSession) +
+                asyncPublicationCandidates("ConversationMutationPresentation.kt", mutationPresentation)
         val unclassified = candidates - guardedNames - exemptions.keys
         assertTrue(
             "suspend-then-publish paths need a StalenessGuard or a commented exemption: $unclassified",

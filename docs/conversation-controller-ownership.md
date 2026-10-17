@@ -5,7 +5,10 @@ The chat-list projection/action extraction in #3242 remains separate.
 
 ## Source and overlap audit
 
-The extraction starts at master `50fb85b39647d89700aace5b8217fc33fc06ed77`.
+The extraction started at master `50fb85b39647d89700aace5b8217fc33fc06ed77`.
+Qualification was rebased onto `57ad7aceff291391d682e264c05630dd2ca88703`,
+which merged #3335's reviewed immutable MarmotKit adoption while validation was running.
+The PR inherits that pin from master and makes no independent native-artifact change.
 Before editing, #3244 was assigned only to `mubarakcoded`, with no implementation PR;
 Project 7 recorded it In Progress. The source overlap was checked against:
 
@@ -14,7 +17,7 @@ Project 7 recorded it In Progress. The source overlap was checked against:
 | #3318, Datawav's subscription owner | `32a924b03924ae9c5216d7405e8d082e65036441` | Chat-list source is untouched; no replacement list subscription owner. |
 | #3322, local removal and presentation fixes | `94b7c90689a8b0ef49e454d82ed92818f0fdf073` | Leave `forgetGroupLocal`, `runLocalGroupRemoval`, and runtime-scoped removal notices in the facade; no blanket suppression of app-wide removal feedback. |
 | #3315, background media downloads | `34a2f8d624536664004e07675d652002e5688b45` | AppState scheduler, durable download work and native transfer ownership are untouched. |
-| #3335, pending MarmotKit adoption | `8b2b3c6f8a27faad32a78f6971310505c2f6303f` | No native pin/binding change is imported. Recheck the complete lock before requesting previews. |
+| #3335, pending MarmotKit adoption | `8b2b3c6f8a27faad32a78f6971310505c2f6303f` | Merged in the qualification base `57ad7ace`; the complete native lock is inherited unchanged from master. Recheck it before requesting previews. |
 
 The controller's `withMutationLockResult` remains the shared admission entry for
 #3322's removal changes. It delegates to the extracted presentation owner with the

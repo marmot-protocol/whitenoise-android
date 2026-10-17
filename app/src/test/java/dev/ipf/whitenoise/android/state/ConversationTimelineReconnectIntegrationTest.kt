@@ -239,7 +239,10 @@ class ConversationTimelineReconnectIntegrationTest {
             val controller = conversationController(scripts.subscriptions)
             try {
                 awaitConversationCondition { controller.hasMoreBefore && !controller.isLoading }
-                val page = async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) { controller.loadOlderTimelinePage() }
+                val page =
+                    async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                        controller.loadOlderTimelinePage()
+                    }
                 awaitConversationCondition { pageEntered.isCompleted }
                 val teardown =
                     async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {

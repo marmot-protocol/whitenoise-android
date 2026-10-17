@@ -452,15 +452,17 @@ class GroupMemberAdministrationGateTest {
         (field.get(controller) as MutableState<AppGroupRecordFfi>).value = group
     }
 
-    @Suppress("UNCHECKED_CAST")
+    /** Seeds a prior error through the production mutation-presentation boundary. */
     private fun replaceLastMutationError(
         controller: ConversationController,
         error: String,
     ) {
-        val field = ConversationController::class.java.getDeclaredField("lastMutationError\$delegate")
-        field.isAccessible = true
-        (field.get(controller) as MutableState<ErrorPresentation?>).value =
-            ErrorPresentation(AppText.Plain(error), "operation=TEST\nerror=TEST")
+        controller.recordMutationFailure(
+            R.string.toast_couldnt_add_members,
+            "TEST",
+            IllegalStateException("fixture failure"),
+            detail = AppText.Plain(error),
+        )
     }
 
     private fun appState(

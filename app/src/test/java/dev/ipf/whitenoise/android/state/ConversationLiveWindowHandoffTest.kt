@@ -76,7 +76,10 @@ class ConversationLiveWindowHandoffTest {
     fun repeatedStartKeepsOneFirstFrameOwnerAndDisposalClosesIt() =
         runBlocking {
             val rosterReply = CompletableDeferred<GroupRosterFfi>()
-            val timeline = ScriptedConversationTimelineSubscription(timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL)))
+            val timeline =
+                ScriptedConversationTimelineSubscription(
+                    timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_A, 1uL)),
+                )
             val scripts = ScriptedConversationLiveSubscriptions(listOf(timeline), conversationTimelineTestGroup())
             val controller =
                 ConversationController(

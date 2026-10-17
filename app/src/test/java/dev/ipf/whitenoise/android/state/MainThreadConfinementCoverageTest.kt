@@ -57,7 +57,9 @@ class MainThreadConfinementCoverageTest {
             "cacheThumbnail" to listOf("cacheMediaThumbnail"),
             "handoffOwnMediaCacheOnReconcile" to listOf("cacheUploadedAttachment", "cacheMediaThumbnail"),
         ).forEach { (functionName, guardedCalls) ->
-            val body = source.functionSection(functionName)
+            val moved = functionName in setOf("hasCachedAttachment", "thumbnailFor", "cacheThumbnail")
+            val body =
+                if (moved) source.attachmentPresentationFunction(functionName) else source.functionSection(functionName)
             guardedCalls.forEach { guardedCall ->
                 assertTrue("$functionName must route through $guardedCall", guardedCall in body)
             }
@@ -67,7 +69,7 @@ class MainThreadConfinementCoverageTest {
         assertTrue("own-send publication must keep disk writes off Main", "withContext(Dispatchers.IO)" in ownSend)
         assertTrue(
             "downloadAttachment must use the shared guarded AppState boundary",
-            "downloadAttachmentPlaintext" in source.functionSection("downloadAttachment"),
+            "downloadAttachmentPlaintext" in source.attachmentPresentationFunction("downloadAttachment"),
         )
 
         val eviction = source.functionSection("removeMediaMemoryCacheKeys")
@@ -191,11 +193,21 @@ class MainThreadConfinementCoverageTest {
         return substring(declaration.range.first, nextDeclaration)
     }
 
+    /** Requires both the facade's delegation and the extracted owner's guarded cache access. */
+    private fun String.attachmentPresentationFunction(functionName: String): String {
+        val facade = functionSection(functionName)
+        assertTrue(
+            "$functionName must delegate to the attachment presentation owner",
+            "attachmentPresentation.$functionName(" in facade,
+        )
+        return sourceFile("ConversationAttachmentPresentation.kt").readText().functionSection(functionName)
+    }
+
     private fun appStateSource(): File = sourceFile("AppState.kt")
 
     /** Reads every source file that contributes attachment-cache behavior to conversation controllers. */
     private fun controllerSources(): String =
-        listOf("Controllers.kt", "AttachmentControllerCache.kt")
+        listOf("Controllers.kt", "AttachmentControllerCache.kt", "ConversationAttachmentPresentation.kt")
             .joinToString(separator = "\n") { sourceFile(it).readText() }
 
     private fun sourceFile(name: String): File =

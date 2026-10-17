@@ -64,8 +64,7 @@ internal class ConversationAttachmentPresentation(
     ): Boolean {
         val account = accountRef ?: return false
         val cacheKey = mediaCacheKey(account, messageIdHex, attachmentIndex)
-        if (appState.cachedMediaPlaintext(cacheKey) != null) return true
-        return appState.diskMediaCache.contains(cacheKey)
+        return appState.cachedMediaPlaintext(cacheKey) != null || appState.diskMediaCache.contains(cacheKey)
     }
 
     /** Resolve a cold disk-index state without performing main-thread I/O. */

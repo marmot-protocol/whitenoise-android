@@ -490,7 +490,10 @@ class AppStateSendLockCoverageTest {
     fun closeTimelineSubscriptionWaitsNonCancellablyForActiveCallMutex() {
         val session = controllersSource().resolveSibling("ConversationTimelineSession.kt").readText()
         val close = functionBodyIn(session, "closeTimeline")
-        assertTrue("paging must use the session's actual retirement mutex", "timelineSession.activeCallMutex" in controllersSource().readText())
+        assertTrue(
+            "paging must use the session's actual retirement mutex",
+            "timelineSession.activeCallMutex" in controllersSource().readText(),
+        )
 
         assertTrue(
             "timeline subscription close must wrap mutex acquisition and close in NonCancellable",
