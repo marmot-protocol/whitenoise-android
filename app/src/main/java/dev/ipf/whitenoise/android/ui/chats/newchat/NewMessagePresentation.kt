@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
+import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -99,10 +101,12 @@ internal fun NewMessageContent(
     retryableIdentifier: Boolean = false,
     identifierLookupFailed: Boolean = false,
     addressFallback: Boolean = false,
+    startingAs: StartingAccount? = null,
 ) {
     val query = queryState.text.toString()
     val busy = creatingHex != null
     SettingsScaffold(
+        topBarActions = { StartingAccountIndicator(startingAs) },
         title = stringResource(R.string.new_message),
         onBack = { if (!busy) actions.back() },
         modifier = Modifier.imePadding().testTag("new_message.screen"),

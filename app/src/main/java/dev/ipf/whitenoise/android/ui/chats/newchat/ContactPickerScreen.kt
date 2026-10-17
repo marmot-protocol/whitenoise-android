@@ -81,6 +81,7 @@ internal fun ContactPickerScreen(
     footer: (@Composable () -> Unit)? = null,
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
+    reviewGroup: MemberReviewGroup? = null,
 ) {
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
@@ -88,7 +89,9 @@ internal fun ContactPickerScreen(
     // The selection itself is owned by the caller and is not saveable. Keep
     // this transient navigation state in the same lifetime so process
     // recreation cannot restore an empty review screen over a rebuilt picker.
-    var reviewingSelection by remember { mutableStateOf(false) }
+    var reviewingSelection by remember(appState.activeAccountRef, appState.runtimeGeneration, reviewGroup?.id) {
+        mutableStateOf(false)
+    }
     var searchRetry by remember { mutableIntStateOf(0) }
     val resolution = rememberRecipientResolution(query, appState, searchRetry)
     val addressQuery = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05
@@ -101,7 +104,7 @@ internal fun ContactPickerScreen(
         }
     }
 
-    if (reviewingSelection) {
+    if (reviewingSelection && reviewGroup == null) {
         SelectedMembersReviewScreen(
             members = selected,
             appState = appState,
@@ -119,6 +122,25 @@ internal fun ContactPickerScreen(
             onInitialAdminChange = onInitialAdminChange,
         )
         return
+    }
+
+    if (reviewingSelection && reviewGroup != null) {
+        GroupMembersReviewDialog(
+            appState = appState,
+            groups = listOf(reviewGroup),
+            members = selected,
+            busy = busy,
+            onDismiss = { reviewingSelection = false },
+            onConfirm = onConfirm,
+            confirmLabel = confirmLabel,
+            onRemove = { member ->
+                onInitialAdminChange?.invoke(member, false)
+                selected.removeAll { it.accountIdHex.equals(member.accountIdHex, ignoreCase = true) }
+                if (selected.isEmpty()) reviewingSelection = false
+            },
+            initialAdminIds = initialAdminIds,
+            onInitialAdminChange = onInitialAdminChange,
+        )
     }
 
     val activeHex = appState.activeAccount?.accountIdHex
@@ -147,6 +169,7 @@ internal fun ContactPickerScreen(
     val selectedHexes = selected.map { it.accountIdHex.lowercase(Locale.ROOT) }.toSet()
     val canConfirm = (allowEmptyConfirm || selected.isNotEmpty()) && !busy
 
+    /** Toggles an eligible candidate in the selection owned by this picker. */
     fun toggle(candidate: RecipientSearch.Candidate) {
         val hex = candidate.accountIdHex.lowercase(Locale.ROOT)
         if (hex in selectedHexes) {
@@ -188,7 +211,11 @@ internal fun ContactPickerScreen(
             FloatingActionButton(
                 onClick = {
                     if (canConfirm) {
-                        if (onInitialAdminChange != null) reviewingSelection = true else onConfirm()
+                        if (onInitialAdminChange != null || reviewGroup != null) {
+                            reviewingSelection = true
+                        } else {
+                            onConfirm()
+                        }
                     }
                 },
                 modifier = Modifier.performanceTestTag(PerformanceTestTags.CONTACT_PICKER_NEXT),

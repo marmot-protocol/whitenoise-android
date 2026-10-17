@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -152,6 +153,7 @@ private fun NewGroupRecipientAccountScreen(
             selected,
             appState,
             busy = false,
+            startingAs = startingAccount(appState, account, runtime),
             onBack = { if (owner.isCurrent()) reviewing = false },
             onRemove = ::toggle,
             onConfirm = { leave(onConfirm) },
@@ -163,6 +165,7 @@ private fun NewGroupRecipientAccountScreen(
             queryState,
             matches.map { person(it, addressFallback) },
             selected.map { person(it) },
+            startingAs = startingAccount(appState, account, runtime),
             searching = resolution.state == RecipientPreviewState.Resolving || search.isSearching,
             failed = search.failed,
             incomplete = search.isIncomplete,

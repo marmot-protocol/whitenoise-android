@@ -6,6 +6,18 @@ name: presentation-modal-group-details-leavesolemember
     text: Leave Fixture confirmation group\?
 - assertVisible:
     text: You're the only member\. Leaving deletes this group entirely\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Alice
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
 - tapOn:
     text: Cancel
 - assertNotVisible:

@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupCreationPerson
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupDraft
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupRecipientActions
@@ -144,6 +145,7 @@ class NewGroupScreenshotTest {
                         partial,
                         NewGroupRecipientActions({}, {}, {}, {}, {}, {}, {}, {}),
                         isValidNpub = { true },
+                        startingAs = StartingAccount("a".repeat(64), "Carol", null, "npub1carol"),
                         addressLookupFailed = addressFailed,
                     )
                 }
@@ -200,6 +202,7 @@ class NewGroupScreenshotTest {
                             hasUnacceptedFailure = recovery || unknown,
                         ),
                         NewGroupSetupActions({}, {}, {}, {}, {}),
+                        startingAs = StartingAccount("a".repeat(64), "Carol", null, "npub1carol"),
                     )
                 }
             }

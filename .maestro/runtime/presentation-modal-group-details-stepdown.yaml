@@ -5,8 +5,19 @@ name: presentation-modal-group-details-stepdown
 - assertVisible:
     text: Step down as admin
 - assertVisible:
-    text: You will lose admin rights for this group\. Another admin can add you back
-      later\.
+    text: You will lose admin rights for this group\. Another admin can add you back later\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Alice
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
 - tapOn:
     text: Cancel
 - assertNotVisible:

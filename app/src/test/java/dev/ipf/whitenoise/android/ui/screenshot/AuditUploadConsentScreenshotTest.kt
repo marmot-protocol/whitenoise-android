@@ -3,8 +3,10 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -14,6 +16,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.settings.AuditUploadConsentContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,7 +34,22 @@ class AuditUploadConsentScreenshotTest {
 
     @Test fun dark() = render("dark", true)
 
+    /** Captures audit-upload consent with large text and RTL layout. */
     @Test fun largeRtl() = render("large_rtl", true, 1.6f, LayoutDirection.Rtl)
+
+    /** Uses the available tall-window height for audit-upload consent. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h1200dp-mdpi")
+    fun tallWindowUsesSpareHeight() {
+        render("tall_light", false, fontScale = 1.2f)
+        val surface = composeRule.onNodeWithTag("audit.consent.surface").fetchSemanticsNode()
+        assertTrue(
+            "Consent height ${surface.boundsInRoot.height} should exceed the old cap",
+            surface.boundsInRoot.height > 640f,
+        )
+        val disclosure = composeRule.onNodeWithTag("audit.consent.disclosure").fetchSemanticsNode()
+        assertEquals(0f, disclosure.config[SemanticsProperties.VerticalScrollAxisRange].maxValue(), 0f)
+    }
 
     private fun render(
         name: String,

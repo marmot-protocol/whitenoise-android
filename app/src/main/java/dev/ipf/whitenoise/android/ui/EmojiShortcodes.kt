@@ -11,12 +11,16 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.em
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.Nip30Emoji
@@ -158,7 +162,24 @@ internal fun EmojiArtImage(
     modifier: Modifier = Modifier,
 ) {
     when (art) {
-        is EmojiArt.Bundled -> Image(painterResource(art.drawable), contentDescription, modifier)
+        is EmojiArt.Bundled -> {
+            // The bundled Marmot's 72px canvas includes padding around its 51px artwork.
+            // Crop only this resource at draw time; authored custom/received images keep their bounds.
+            val painter =
+                if (art.drawable == R.drawable.builtin_emoji_marmot) {
+                    val bitmap = ImageBitmap.imageResource(art.drawable)
+                    remember(bitmap) {
+                        BitmapPainter(
+                            bitmap,
+                            srcOffset = IntOffset(x = 11, y = 10),
+                            srcSize = IntSize(width = 51, height = 51),
+                        )
+                    }
+                } else {
+                    painterResource(art.drawable)
+                }
+            Image(painter, contentDescription, modifier)
+        }
         is EmojiArt.Decoded -> Image(art.image, contentDescription, modifier)
     }
 }
