@@ -6277,7 +6277,8 @@ class ConversationController(
     private val mutationPresentation =
         ConversationMutationPresentation(
             ownsPresentation = {
-                !controllerCleared && !isAccountTeardownRequested() &&
+                !controllerCleared &&
+                    !isAccountTeardownRequested() &&
                     appState.runtimeGeneration == conversationRuntimeGeneration
             },
         )
@@ -7353,8 +7354,9 @@ class ConversationController(
      * from [start] so R8 can compile the smaller suspend entrypoint (the
      * monolithic method hit an invalid stack-map-table bug in release builds).
      */
-    private suspend fun runConversationSubscriptionLoop(account: String) =
+    private suspend fun runConversationSubscriptionLoop(account: String) {
         timelineSession.runReconnectLoop { runConversationSubscriptionIteration(account) }
+    }
 
     /**
      * One connect/reconnect attempt. Returns whether the caller should exit
@@ -7749,8 +7751,9 @@ class ConversationController(
     ): Boolean = !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
 
     /** Captures only pages already received by the current local subscription attempt. */
-    internal fun pendingTimelineAtForeground(): CompletableDeferred<Boolean>? =
-        timelineSession.pendingAtForeground()
+    internal fun pendingTimelineAtForeground(): CompletableDeferred<Boolean>? {
+        return timelineSession.pendingAtForeground()
+    }
 
     /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
@@ -10404,8 +10407,11 @@ class ConversationController(
         messageIdHex: String,
         attachmentIndex: Int,
         initiallyAvailable: Boolean,
-    ): StateFlow<AttachmentTransferState> =
-        attachmentPresentation.attachmentTransferState(messageIdHex, attachmentIndex, initiallyAvailable)
+    ): StateFlow<AttachmentTransferState> = attachmentPresentation.attachmentTransferState(
+        messageIdHex,
+        attachmentIndex,
+        initiallyAvailable,
+    )
 
     /** Releases the row observer independently of app/native transfer work. */
     internal fun releaseAttachmentTransferState(
@@ -10470,8 +10476,11 @@ class ConversationController(
         messageIdHex: String,
         attachmentIndex: Int,
         fallback: MediaAttachmentReferenceFfi,
-    ): MediaAttachmentReferenceFfi =
-        attachmentPresentation.authoritativeAttachmentReference(messageIdHex, attachmentIndex, fallback)
+    ): MediaAttachmentReferenceFfi = attachmentPresentation.authoritativeAttachmentReference(
+        messageIdHex,
+        attachmentIndex,
+        fallback,
+    )
 
     /** Materializes plaintext within the requested presentation budget. */
     internal suspend fun downloadAttachment(
@@ -10480,8 +10489,13 @@ class ConversationController(
         reference: MediaAttachmentReferenceFfi,
         priority: AttachmentDownloadPriority,
         maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
-    ): ByteArray =
-        attachmentPresentation.downloadAttachment(messageIdHex, attachmentIndex, reference, priority, maxBytes)
+    ): ByteArray = attachmentPresentation.downloadAttachment(
+        messageIdHex,
+        attachmentIndex,
+        reference,
+        priority,
+        maxBytes,
+    )
 
     /** Returns a decoded thumbnail from the existing app cache. */
     fun thumbnailFor(

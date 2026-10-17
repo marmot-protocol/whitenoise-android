@@ -40,16 +40,20 @@ internal class ConversationAttachmentPresentation(
         account: String,
         messageIdHex: String,
         attachmentIndex: Int,
-    ): String =
-        mediaCacheKey(account, groupIdHex, messageIdHex, attachmentIndex)
+    ): String = mediaCacheKey(account, groupIdHex, messageIdHex, attachmentIndex)
 
     /** Preserves native source identity instead of guessing from the displayed row id. */
     private fun attachmentRequest(
         account: String,
         messageIdHex: String,
         attachmentIndex: Int,
-    ): AttachmentTransferRequest =
-        AttachmentTransferRequest(account, groupIdHex, messageIdHex, attachmentIndex, sourceMessageId(messageIdHex))
+    ): AttachmentTransferRequest = AttachmentTransferRequest(
+        account,
+        groupIdHex,
+        messageIdHex,
+        attachmentIndex,
+        sourceMessageId(messageIdHex),
+    )
 
     /**
      * Yes/no probe: are the decrypted bytes for [messageIdHex] /
