@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PushTokenStore.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Encrypted push state and skipped-version migration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PushTokenStore.kt",
+        "anchor": "fun create(context: Context)",
+        "test_ids": [
+          "SEC-017"
+        ]
+      },
+      {
+        "surface": "Legacy quarantine retains sources and blocks uncertain cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PushTokenStore.kt",
+        "anchor": "private fun importSource(",
+        "test_ids": [
+          "SEC-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

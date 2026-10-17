@@ -2321,4 +2321,7 @@
     <string name="share_connect_save_to_gallery">Enregistrer dans la galerie</string>
     <string name="starting_as">Démarrer en tant que</string>
     <string name="starting_as_account">Démarrer en tant que %1$s</string>
+    <string name="notification_push_storage_unavailable">Impossible de lire les paramètres push enregistrés. Ils ont été conservés et l’inscription push est suspendue. Réessayez lorsque l’appareil est déverrouillé.</string>
+    <string name="notification_push_import_pending">Certains anciens paramètres push n’ont pas pu être récupérés. Ils ont été conservés et l’inscription push est suspendue. Réessayez pour les vérifier à nouveau.</string>
+    <string name="notification_push_cleanup_unknown">Un ancien nettoyage push ne peut pas être confirmé. L’inscription push est suspendue. Réessayer vérifie à nouveau l’état enregistré, sans l’effacer ni le réinitialiser.</string>
 </resources>

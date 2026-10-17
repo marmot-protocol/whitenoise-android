@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.diagnostics
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.BuildConfig
@@ -50,7 +51,19 @@ internal fun dmCreationFailure(error: Throwable): DmCreationFailure =
     }
 
 /** Closed Android-visible operation boundaries; native subphase distinctions remain unavailable. */
-internal enum class DmCreationPhase { PREWARM, EXISTING_LOOKUP, CREATE, PROJECTION, FIRST_FRAME, OWNER }
+internal enum class DmCreationPhase {
+    PREWARM,
+    EXISTING_LOOKUP,
+    CREATE,
+    PROJECTION,
+    FIRST_FRAME,
+    OWNER,
+    RECIPIENTS,
+    ROSTER,
+    RECONCILIATION,
+}
+
+internal enum class CreationOperation { DM_CREATE_OPEN, GROUP_CREATE, GROUP_INVITE }
 
 internal enum class DmCreationOutcome { START, SUCCESS, FAILURE, CANCELLED, REPLACED }
 
@@ -58,6 +71,7 @@ internal enum class DmCreationOutcome { START, SUCCESS, FAILURE, CANCELLED, REPL
 internal class DmCreationInteraction(
     private val emit: (Map<String, Any>) -> Unit = DmCreationDiagnostics::record,
     private val nowNanos: () -> Long = System::nanoTime,
+    private val operation: CreationOperation = CreationOperation.DM_CREATE_OPEN,
 ) {
     private val token = UUID.randomUUID().toString()
     private val start = nowNanos()
@@ -78,7 +92,7 @@ internal class DmCreationInteraction(
             val duration = starts[phase]?.let { ((now - it) / NANOS_PER_MS).coerceIn(0, MAX_ELAPSED_MS) } ?: -1L
             emit(
                 mapOf(
-                    "operation" to "dm_create_open",
+                    "operation" to operation.name.lowercase(java.util.Locale.ROOT),
                     "interaction" to token,
                     "attempt" to ordinal,
                     "phase" to phase.name.lowercase(java.util.Locale.ROOT),
@@ -179,8 +193,11 @@ internal object DmCreationDiagnostics {
 
     /** Adds only compile-time/public platform context; unsupported revision fields say unknown. */
     fun record(fields: Map<String, Any>) {
-        if (!enabled) return
-        recorder?.recordFields(fields.filterKeys { it in TRACE_FIELDS } + buildContext)
+        val safe = creationDiagnosticFields(fields) ?: return
+        val context = safe + buildContext
+        // Logging never throws into an invitation, and never carries raw exceptions or identities.
+        runCatching { Log.i("GroupCreation", context.entries.joinToString(" ") { "${it.key}=${it.value}" }) }
+        if (enabled) runCatching { recorder?.recordFields(context) }
     }
 
     private val buildContext by lazy {
@@ -278,18 +295,90 @@ internal object DmCreationDiagnostics {
     )
 
     private val BUILD_TOKEN = Regex("[A-Za-z0-9._-]{1,80}")
-    private val TRACE_FIELDS =
-        setOf(
-            "operation",
-            "interaction",
-            "attempt",
-            "phase",
-            "outcome",
-            "failure",
-            "elapsed_ms",
-            "phase_duration_ms",
-            "native_phase_detail",
-        )
     private const val MAX_PENDING_FRAMES = 8
     private const val FRAME_TTL_MS = 30_000L
 }
+
+private const val CREATION_FIELD_COUNT = 9
+private const val MAX_CREATION_ELAPSED_MS = 86_400_000L
+private val CREATION_INTERACTION_TOKEN = Regex("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}")
+private val CREATION_CODES =
+    mapOf(
+        "operation" to CreationOperation.entries.map { it.name.lowercase(java.util.Locale.ROOT) }.toSet(),
+        "phase" to DmCreationPhase.entries.map { it.name.lowercase(java.util.Locale.ROOT) }.toSet(),
+        "outcome" to DmCreationOutcome.entries.map { it.name.lowercase(java.util.Locale.ROOT) }.toSet(),
+        "failure" to DmCreationFailure.entries.map { it.name.lowercase(java.util.Locale.ROOT) }.toSet(),
+    )
+
+/** Validate values as well as names before either diagnostic sink sees a record. */
+internal fun creationDiagnosticFields(fields: Map<String, Any>): Map<String, Any>? {
+    val safe = linkedMapOf<String, Any>()
+    for ((key, allowed) in CREATION_CODES) {
+        val value = fields[key] as? String
+        if (value != null && value in allowed) safe[key] = value
+    }
+    val token = (fields["interaction"] as? String)?.takeIf { CREATION_INTERACTION_TOKEN.matches(it) }
+    if (token != null) safe["interaction"] = token
+    for (key in listOf("attempt", "elapsed_ms", "phase_duration_ms")) {
+        val value = (fields[key] as? Number)?.toLong()?.takeIf { it in -1L..MAX_CREATION_ELAPSED_MS }
+        if (value != null) safe[key] = value
+    }
+    safe["native_phase_detail"] = "unavailable"
+    if (safe.size != CREATION_FIELD_COUNT) return null
+    return listOf(
+        "operation",
+        "interaction",
+        "attempt",
+        "phase",
+        "outcome",
+        "failure",
+        "elapsed_ms",
+        "phase_duration_ms",
+        "native_phase_detail",
+    ).associateWithTo(linkedMapOf()) { safe.getValue(it) }
+}
+
+/** Keep operation terminal records independent of early returns from mutation admission. */
+@Suppress("TooGenericExceptionCaught") // Trace unexpected admission failures without changing their propagation.
+internal suspend fun DmCreationAttempt.traceInvitation(block: suspend () -> Boolean): Boolean {
+    record(DmCreationPhase.OWNER, DmCreationOutcome.START)
+    return try {
+        block().also { finished(DmCreationPhase.OWNER, it) }
+    } catch (cancelled: CancellationException) {
+        failed(DmCreationPhase.OWNER, cancelled)
+        throw cancelled
+    } catch (failure: Exception) {
+        failed(DmCreationPhase.OWNER, failure)
+        throw failure
+    }
+}
+
+internal fun DmCreationAttempt.finished(
+    phase: DmCreationPhase,
+    accepted: Boolean,
+) = record(
+    phase,
+    if (accepted) DmCreationOutcome.SUCCESS else DmCreationOutcome.FAILURE,
+    if (accepted) DmCreationFailure.NONE else DmCreationFailure.UNKNOWN,
+)
+
+internal fun DmCreationAttempt.projectionFinished(current: Boolean) {
+    if (current) {
+        record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS)
+    } else {
+        record(DmCreationPhase.PROJECTION, DmCreationOutcome.REPLACED, DmCreationFailure.OWNER_REPLACED)
+    }
+}
+
+internal fun DmCreationAttempt.invitationFailed(
+    error: Throwable,
+    invoked: Boolean,
+    accepted: Boolean,
+) = failed(
+    when {
+        accepted -> DmCreationPhase.PROJECTION
+        invoked -> DmCreationPhase.CREATE
+        else -> DmCreationPhase.RECIPIENTS
+    },
+    error,
+)

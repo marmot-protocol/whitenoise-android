@@ -144,6 +144,7 @@ internal class NotificationBootstrapTestFixture(
     private val onChatNotificationSettings: ((String, String) -> ChatNotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
     pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
+    fcmTokenReader: suspend () -> String? = { null },
     nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
         NativePushCapability.MissingPushServerConfiguration
     },
@@ -563,6 +564,7 @@ internal class NotificationBootstrapTestFixture(
             bootstrapActionableTimeoutMillis = { bootstrapActionableTimeoutMillis },
             nativePushFallbackPlatform = nativePushFallbackPlatform,
             pushServerConfigProvider = pushServerConfigProvider,
+            fcmTokenReader = fcmTokenReader,
             nativePushCapabilityResolver = nativePushCapabilityResolver,
             notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
         )

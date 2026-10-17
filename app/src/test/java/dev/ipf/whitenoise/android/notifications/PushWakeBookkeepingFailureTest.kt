@@ -4,7 +4,10 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
+import dev.ipf.whitenoise.android.state.KeystoreSecureStore
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
+import dev.ipf.whitenoise.android.state.SecureStoreKeyProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -18,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -25,15 +29,21 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
 import java.io.IOException
+import java.security.GeneralSecurityException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
 
 /** Verifies that best-effort durable bookkeeping failures never mask recovery outcomes. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class PushWakeBookkeepingFailureTest {
+    @get:Rule
+    val pushTokenKey = PushTokenKeyRule()
+
     private var previousKeepConnected = false
 
     /** Uses one-shot delivery so each test exercises the push-wake owner. */
@@ -50,6 +60,173 @@ class PushWakeBookkeepingFailureTest {
         val context: Application = RuntimeEnvironment.getApplication()
         BackgroundConnectionPreferences.setEnabled(context, previousKeepConnected)
     }
+
+    /** Locked encrypted storage defers startup draining and preserves the exact wake for later recovery. */
+    @Test
+    fun unavailableKeyDefersStartupWithoutLosingThePendingWake() =
+        runBlocking {
+            val context: Application = RuntimeEnvironment.getApplication()
+            val unavailable = AtomicBoolean(false)
+            val store = unavailableKeyStore(context, unavailable)
+            val nativeCatchUps = AtomicInteger(0)
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    emitStartupNotification = false,
+                    onCatchUpAccounts = { nativeCatchUps.incrementAndGet() },
+                )
+            try {
+                fixture.bootstrap()
+                fixture.replacePushTokenStore(store)
+                assertTrue(store.recordPendingPushWakeCatchUp())
+                val generation = store.pendingPushWakeCatchUpGeneration()
+                val phase = fixture.appState.phase
+                unavailable.set(true)
+
+                val drained =
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.ensureNotificationRuntimeStarted()
+                    }
+
+                assertFalse(drained)
+                fixture.appState.javaClass
+                    .getDeclaredMethod("schedulePendingPushWakeCatchUpDrain")
+                    .apply { isAccessible = true }
+                    .invoke(fixture.appState)
+                assertEquals(phase, fixture.appState.phase)
+                val callsBeforeRejectedWake = nativeCatchUps.get()
+                val rejectedWake =
+                    fixture.runWithMainLooperPumping {
+                        launchRejectedPushWake(fixture)
+                    }
+                assertFalse(rejectedWake.succeeded)
+                assertEquals(callsBeforeRejectedWake, nativeCatchUps.get())
+                assertTrue(
+                    fixture.runWithMainLooperPumping { fixture.appState.launchCatchUpAccounts().await() }.succeeded,
+                )
+                assertFalse(store.registrationAllowed())
+                unavailable.set(false)
+                assertEquals(generation, store.pendingPushWakeCatchUpGeneration())
+                assertTrue(
+                    fixture.runWithMainLooperPumping {
+                        fixture.appState.ensureNotificationRuntimeStarted()
+                    },
+                )
+                assertFalse(store.pushWakeCatchUpPending())
+            } finally {
+                unavailable.set(false)
+                store.clearPendingPushWakeCatchUp()
+                fixture.close()
+            }
+        }
+
+    /** Keeps the scripted key separate from app startup's rule-owned encrypted store. */
+    private fun unavailableKeyStore(
+        context: Context,
+        unavailable: AtomicBoolean,
+    ): PushTokenStore {
+        val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        return PushTokenStore(
+            PushTokenPreferences(
+                KeystoreSecureStore(
+                    context,
+                    "push-wake-unavailable-key",
+                    object : SecureStoreKeyProvider {
+                        override fun secretKey(): SecretKey {
+                            if (unavailable.get()) throw GeneralSecurityException("scripted unavailable key")
+                            return key
+                        }
+                    },
+                ),
+                Any(),
+            ),
+        )
+    }
+
+    /** Invokes the production push-wake admission path without another lifecycle trigger. */
+    private suspend fun launchRejectedPushWake(
+        fixture: NotificationBootstrapTestFixture,
+    ): dev.ipf.whitenoise.android.state.AccountCatchUpResult {
+        val launch =
+            fixture.appState.javaClass
+                .getDeclaredMethod(
+                    "launchAccountCatchUp",
+                    java.lang.Long::class.java,
+                    PerformanceTrigger::class.java,
+                    Boolean::class.javaPrimitiveType,
+                ).apply { isAccessible = true }
+
+        @Suppress("UNCHECKED_CAST")
+        val work =
+            launch.invoke(fixture.appState, null, PerformanceTrigger.PUSH_WAKE, true) as
+                kotlinx.coroutines.Deferred<dev.ipf.whitenoise.android.state.AccountCatchUpResult>
+        return work.await()
+    }
+
+    /** A token commit followed by Keystore loss cannot escape the launched marker-write coroutine. */
+    @Test
+    fun tokenRotationSurvivesKeyLossBeforePendingSyncCommit() =
+        runBlocking {
+            val context: Application = RuntimeEnvironment.getApplication()
+            val unavailable = AtomicBoolean(false)
+            val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+            val preferences =
+                PushTokenPreferences(
+                    KeystoreSecureStore(
+                        context,
+                        "rotation-key-race",
+                        object : SecureStoreKeyProvider {
+                            override fun secretKey(): SecretKey {
+                                if (unavailable.get()) throw GeneralSecurityException("scripted key loss")
+                                return key
+                            }
+                        },
+                    ),
+                    Any(),
+                )
+            val store =
+                PushTokenStore(
+                    object : SharedPreferences by preferences {
+                        override fun edit(): SharedPreferences.Editor {
+                            val editor = preferences.edit()
+                            return object : SharedPreferences.Editor by editor {
+                                override fun putString(
+                                    name: String,
+                                    value: String?,
+                                ): SharedPreferences.Editor = apply { editor.putString(name, value) }
+
+                                override fun apply() {
+                                    editor.apply()
+                                    unavailable.set(true)
+                                }
+                            }
+                        }
+                    },
+                )
+            val fixture = NotificationBootstrapTestFixture(context, emitStartupNotification = false)
+            try {
+                fixture.bootstrap()
+                fixture.replacePushTokenStore(store)
+                ShadowLog.clear()
+                fixture.appState.onPushTokenRotated("rotated-token")
+                fixture.runWithMainLooperPumping {
+                    withTimeout(5_000L) {
+                        while (
+                            ShadowLog.getLogsForTag("PushTokenStorage").none { it.msg == "lifecycle_work_deferred" }
+                        ) {
+                            delay(5L)
+                        }
+                    }
+                }
+                assertTrue(fixture.upsertedPushTokens.isEmpty())
+                unavailable.set(false)
+                assertEquals("rotated-token", store.lastToken())
+                assertFalse(store.nativePushRegistrationSyncPending())
+            } finally {
+                unavailable.set(false)
+                fixture.close()
+            }
+        }
 
     /** Concurrent acknowledgement cannot replace runtime failure with a bookkeeping assertion. */
     @Test

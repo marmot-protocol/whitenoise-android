@@ -14,8 +14,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
+import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
 import dev.ipf.whitenoise.android.ui.settings.NotificationDeliverySelector
+import dev.ipf.whitenoise.android.ui.settings.PushStorageRecoveryControl
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -49,6 +51,55 @@ class NotificationDeliverySelectorScreenshotTest {
             fontScale = 1.4f,
         )
         capture("notification_delivery_local_unavailable_dark_large_rtl.png")
+    }
+
+    /** Keeps transient storage failure readable without exposing sensitive saved values. */
+    @Test
+    fun retainedPushStorageUnavailableLight() {
+        renderRecovery(PushStorageRecovery.StorageUnavailable)
+        capture("notification_push_storage_unavailable_light.png")
+    }
+
+    /** Shows historical cleanup uncertainty separately under large-font RTL and dark theme. */
+    @Test
+    fun retainedPushCleanupDarkLargeRtl() {
+        renderRecovery(
+            PushStorageRecovery.CleanupReconciliationRequired,
+            darkTheme = true,
+            rtl = true,
+            fontScale = 1.4f,
+        )
+        capture("notification_push_cleanup_unknown_dark_large_rtl.png")
+    }
+
+    /** Keeps retry disabled while an original legacy source is being checked again. */
+    @Test
+    fun retainedPushLegacyRetryBusy() {
+        renderRecovery(PushStorageRecovery.LegacyImportPending, busy = true)
+        capture("notification_push_import_pending_busy.png")
+    }
+
+    /** Renders the real settings action without running storage or native calls from composition. */
+    private fun renderRecovery(
+        state: PushStorageRecovery,
+        busy: Boolean = false,
+        darkTheme: Boolean = false,
+        rtl: Boolean = false,
+        fontScale: Float = 1f,
+    ) {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = darkTheme) {
+                    Surface(modifier = Modifier.width(360.dp).testTag(TAG)) {
+                        PushStorageRecoveryControl(state, busy, onRetry = {})
+                    }
+                }
+            }
+        }
     }
 
     /** Renders the production mode selector under the requested accessibility conditions. */

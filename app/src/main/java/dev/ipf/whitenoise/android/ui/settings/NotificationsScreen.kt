@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.notifications.openNotificationBatterySettings
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
@@ -74,6 +75,7 @@ internal fun NotificationsScreen(
                 if (event == Lifecycle.Event.ON_RESUME) {
                     appState.refreshLocalNotificationPermission()
                     appState.refreshNotificationBatteryPolicy()
+                    appState.launchMutation { appState.refreshPushStorageRecovery() }
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -104,6 +106,18 @@ internal fun NotificationsScreen(
                     enabled = hasAccount && permissionGranted && !appState.notificationDeliveryModeBusy,
                     onSelect = { mode -> appState.launchMutation { appState.setNotificationDeliveryMode(mode) } },
                 )
+            }
+            if (
+                appState.pushStorageRecovery != PushStorageRecovery.Checking &&
+                appState.pushStorageRecovery != PushStorageRecovery.Ready
+            ) {
+                item {
+                    PushStorageRecoveryControl(
+                        state = appState.pushStorageRecovery,
+                        busy = appState.pushStorageRecoveryBusy,
+                        onRetry = { appState.launchMutation { appState.retryPushStorageRecovery() } },
+                    )
+                }
             }
             if (!capability.isAvailable) {
                 item { SettingsExplainer(stringResource(capability.subtitleResource())) }

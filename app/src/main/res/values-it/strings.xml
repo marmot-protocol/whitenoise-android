@@ -2321,4 +2321,7 @@
     <string name="share_connect_save_to_gallery">Salva nella galleria</string>
     <string name="starting_as">Avvio come</string>
     <string name="starting_as_account">Avvio come %1$s</string>
+    <string name="notification_push_storage_unavailable">Impossibile leggere le impostazioni push salvate. Sono state conservate e la registrazione push è in pausa. Riprova quando il dispositivo è sbloccato.</string>
+    <string name="notification_push_import_pending">Impossibile recuperare alcune impostazioni push precedenti. Sono state conservate e la registrazione push è in pausa. Riprova per verificarle di nuovo.</string>
+    <string name="notification_push_cleanup_unknown">Impossibile confermare una precedente pulizia push. La registrazione push è in pausa. Un nuovo tentativo verifica lo stato salvato, senza cancellarlo o reimpostarlo.</string>
 </resources>

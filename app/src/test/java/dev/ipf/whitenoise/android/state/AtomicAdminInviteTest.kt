@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -21,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -36,6 +38,7 @@ class AtomicAdminInviteTest {
                 assertTrue(PEER in fixture.controller.group.admins)
                 assertFalse(OTHER in fixture.controller.group.admins)
                 assertEquals(3, fixture.controller.members.size)
+                assertDiagnosticTerminal("success")
             } finally {
                 fixture.controller.onCleared()
             }
@@ -64,6 +67,7 @@ class AtomicAdminInviteTest {
                 assertFalse(fixture.controller.inviteMembers(listOf(PEER), initialAdminRefs = listOf(OTHER)))
                 assertTrue(fixture.invocations.isEmpty())
                 assertEquals(1, fixture.controller.members.size)
+                assertReconciliationOutcomes(emptyList())
             } finally {
                 fixture.controller.onCleared()
             }
@@ -80,6 +84,7 @@ class AtomicAdminInviteTest {
                 assertEquals(2, fixture.snapshotReads)
                 assertEquals(listOf(SELF, PEER), fixture.controller.group.admins)
                 assertNull(fixture.controller.lastMutationError)
+                assertReconciliationOutcomes(listOf("start", "success"))
             } finally {
                 fixture.controller.onCleared()
             }
@@ -95,6 +100,8 @@ class AtomicAdminInviteTest {
                 assertEquals(1, fixture.invocations.size)
                 assertEquals(listOf(SELF), fixture.controller.members.map { it.memberIdHex })
                 assertTrue(fixture.controller.lastMutationError != null)
+                assertDiagnosticTerminal("failure")
+                assertReconciliationOutcomes(listOf("start", "failure"))
             } finally {
                 fixture.controller.onCleared()
             }
@@ -115,10 +122,47 @@ class AtomicAdminInviteTest {
             }
         }
 
+    @Test
+    fun typedPreCommitRejectionDoesNotStartReconciliation() =
+        runTest {
+            val fixture = Fixture(rejection = MarmotKitException.MissingKeyPackage(PEER))
+            try {
+                fixture.controller.refreshManagementState()
+                assertFalse(fixture.controller.inviteMembers(listOf(PEER)))
+                assertEquals(1, fixture.snapshotReads)
+                assertReconciliationOutcomes(emptyList())
+            } finally {
+                fixture.controller.onCleared()
+            }
+        }
+
+    private fun assertReconciliationOutcomes(outcomes: List<String>) {
+        val events = ShadowLog.getLogsForTag("GroupCreation").filter { it.msg.contains("phase=reconciliation") }
+        assertEquals(outcomes.size, events.size)
+        outcomes.zip(events).forEach { (outcome, event) -> assertTrue(event.msg.contains("outcome=$outcome")) }
+    }
+
+    private fun assertDiagnosticTerminal(outcome: String) {
+        val terminal =
+            ShadowLog.getLogsForTag("GroupCreation").filter {
+                it.msg.contains("operation=group_invite") &&
+                    it.msg.contains("phase=owner") &&
+                    !it.msg.contains("outcome=start")
+            }
+        assertEquals(1, terminal.size)
+        assertTrue(terminal.single().msg.contains("outcome=$outcome"))
+        assertFalse(terminal.single().msg.contains(PEER))
+    }
+
     private class Fixture(
         private val loseReply: Boolean = false,
         private val failBeforeCommit: Boolean = false,
+        private val rejection: Throwable? = null,
     ) {
+        init {
+            ShadowLog.clear()
+        }
+
         val invocations = mutableListOf<Pair<List<String>, List<String>>>()
         var snapshotReads = 0
         var revokeOnRecipientResolution = false
@@ -151,6 +195,7 @@ class AtomicAdminInviteTest {
                     assertEquals(ACCOUNT, account)
                     assertEquals(ConversationTimelineTestIds.GROUP_ID, group)
                     invocations += members.toList() to admins.toList()
+                    rejection?.let { throw it }
                     if (failBeforeCommit) error("native commit rejected")
                     current = snapshot(listOf(SELF) + members, listOf(SELF) + admins)
                     if (loseReply) error("native response lost after commit")
