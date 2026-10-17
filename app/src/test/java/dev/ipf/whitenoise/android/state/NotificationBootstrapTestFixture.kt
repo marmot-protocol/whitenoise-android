@@ -544,7 +544,7 @@ internal class NotificationBootstrapTestFixture(
                     signInRequests += accountRef
                     signInFailure?.let { throw it }
                     onSignInAccount?.invoke(accountRef)
-                    Unit
+                    accounts.first { it.label == accountRef }
                 }
                 "toString" -> "NotificationBootstrapMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
