@@ -78,6 +78,10 @@ internal class GroupChangeConfirmations {
  * device or the group's last change has not reached every relay. The user is asked whether to wait or continue, and
  * continuing acknowledges that refusal for one attempt and retries. [invite] selects the stronger wording MDK asks for
  * when inviting. See [admitGroupChange] for the retry rules.
+ *
+ * A caller may hold the group's commit lock. It is released while the user decides, because sends to the group take
+ * the same lock, and held again for the acknowledgement and retry. MDK checks the retried change against the group as
+ * it is then.
  */
 internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
     accountRef: String,
@@ -86,7 +90,9 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
     change: suspend () -> T,
 ): T =
     admitGroupChange(
-        ask = { caution -> groupChangeConfirmations.ask(caution, invite) },
+        ask = { caution ->
+            outsideGroupCommitLock(accountRef, groupIdHex) { groupChangeConfirmations.ask(caution, invite) }
+        },
         acknowledge = { caution ->
             marmotIo {
                 when (caution) {

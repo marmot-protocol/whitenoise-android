@@ -38,7 +38,8 @@ Snapshot `88d1683e` adds typed outcomes that Android must not collapse into gene
 
 - `GroupCatchingUp` and `GroupCommitUndelivered` refuse group changes advisorily. Route every guarded binding
   call through `runGroupChange`, which asks the user, calls the matching `acknowledge…` for one attempt and
-  retries. `GroupChangeAdmissionCoverageTest` lists the guarded methods; extend it when MDK guards another.
+  retries. The group's commit lock is released while the user decides, because sends take it too.
+  `GroupChangeAdmissionCoverageTest` lists the guarded methods; extend it when MDK guards another.
 - `DirectoryLookupIncomplete` means nothing is known to be missing: offer Retry and keep the selection. A
   `MissingKeyPackage` with reason `OBSOLETE_ONLY` asks the recipient to update; only `NOT_FOUND` is missing setup.
 - `STORAGE_BLOCKED` keeps the checkpoint and readmits on free space or Retry. Present it as a storage problem,

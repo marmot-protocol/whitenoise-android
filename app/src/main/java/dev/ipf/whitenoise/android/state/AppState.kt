@@ -3054,11 +3054,22 @@ class WhiteNoiseAppState private constructor(
     private val groupCommitLocks = KeyedMutexPool()
     private val conversationTextSendOrderLocks = KeyedMutexPool()
 
+    /** Runs [block] as the only commit-producing call for this account's group. */
     suspend fun <T> withGroupCommitLock(
         accountRef: String,
         groupIdHex: String,
         block: suspend () -> T,
     ): T = groupCommitLocks.withLock("$accountRef|$groupIdHex", block)
+
+    /**
+     * Runs [block], which produces no commit, with this group's commit lock released if the caller holds it, so sends
+     * and other changes to the group are not held up while the user answers a question.
+     */
+    internal suspend fun <T> outsideGroupCommitLock(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T = groupCommitLocks.releasedWhile("$accountRef|$groupIdHex", block)
 
     suspend fun <T> withConversationTextSendOrder(
         accountRef: String,
@@ -4122,6 +4133,7 @@ class WhiteNoiseAppState private constructor(
         chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex, accountWide)
             ?: ProfileGroupPickerState.empty()
 
+    /** Makes [targetRef] an admin of [groupIdHex], asking first if MDK holds the change back. True once committed. */
     suspend fun promoteProfileInGroup(
         targetRef: String,
         groupIdHex: String,
