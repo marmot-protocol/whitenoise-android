@@ -49,26 +49,48 @@ class NostrEventReaderTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun readerLongPressCopiesDestinationAndRetainsTapConfirmation() {
+    fun screenLongPressCopiesExactlyOnceWithoutConfirmationOrMediaActivation() {
         val destination = "https://example.com/path?q=value#section"
         val label = "other.example"
+        val writes = mutableListOf<String>()
+        var mediaActivations = 0
+        val clipboard =
+            object : Clipboard {
+                override suspend fun getClipEntry(): ClipEntry? = null
+
+                override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+                    writes += requireNotNull(clipEntry).clipData.getItemAt(0).text.toString()
+                }
+            }
         composeRule.setContent {
-            WhiteNoiseTheme {
-                NostrEventReaderBlock(
-                    block =
-                        MarkdownBlockFfi.Paragraph(
-                            listOf(
-                                MarkdownInlineFfi.Link(
-                                    destination,
-                                    null,
-                                    listOf(MarkdownInlineFfi.Text(label)),
-                                    MarkdownLinkDestinationKindFfi.WEB,
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
+                WhiteNoiseTheme {
+                    NostrEventReaderScreen(
+                        card = noteCard().copy(mediaUrl = destination),
+                        document =
+                            MarkdownDocumentFfi(
+                                listOf(
+                                    paragraph(
+                                        MarkdownInlineFfi.Link(
+                                            destination,
+                                            null,
+                                            listOf(MarkdownInlineFfi.Text(label)),
+                                            MarkdownLinkDestinationKindFfi.WEB,
+                                        ),
+                                    ),
                                 ),
+                                false,
+                                byteArrayOf(),
                             ),
-                        ),
-                    mentionDisplayName = { null },
-                    onNostrProfileTap = {},
-                )
+                        parsing = false,
+                        authorDisplayName = { "Alex" },
+                        mentionDisplayName = { null },
+                        onNostrProfileTap = {},
+                        onDismiss = {},
+                        onPlayVideo = { mediaActivations++ },
+                        onViewImage = { mediaActivations++ },
+                    )
+                }
             }
         }
         composeRule.onNodeWithText(label).performTouchInput {
@@ -77,18 +99,9 @@ class NostrEventReaderTest {
             up()
         }
         composeRule.waitForIdle()
-        val clipboard =
-            ApplicationProvider
-                .getApplicationContext<Context>()
-                .getSystemService(ClipboardManager::class.java)
         composeRule.runOnIdle {
-            assertEquals(
-                destination,
-                clipboard.primaryClip
-                    ?.getItemAt(0)
-                    ?.text
-                    .toString(),
-            )
+            assertEquals(listOf(destination), writes)
+            assertEquals(0, mediaActivations)
         }
         assertEquals(
             0,
@@ -98,6 +111,12 @@ class NostrEventReaderTest {
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
         composeRule.onNodeWithText(label).performClick()
         composeRule.onNodeWithText(destination).assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, mediaActivations) }
+        composeRule.onNodeWithText(string(R.string.link_confirm_open)).performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, mediaActivations)
+            assertEquals(listOf(destination), writes)
+        }
     }
 
     @Test
@@ -143,6 +162,56 @@ class NostrEventReaderTest {
                     .toString(),
             )
         }
+        composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
+    }
+
+    @Test
+    fun replacingEvictedReaderRowCannotCopyItsOldDestination() {
+        val destination = "https://example.com/removed"
+        val replacement = "Ordinary replacement text"
+        var block by mutableStateOf(readerLink(destination))
+        val tail = "End of the scrolling reader"
+        val filler = (1..80).map { paragraph(MarkdownInlineFfi.Text("Context paragraph $it ".repeat(20))) }
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventReaderScreen(
+                    card = noteCard(),
+                    document =
+                        MarkdownDocumentFfi(
+                            listOf(block) + filler + paragraph(MarkdownInlineFfi.Text(tail)),
+                            false,
+                            byteArrayOf(),
+                        ),
+                    parsing = false,
+                    authorDisplayName = { "Alex" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText(destination).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            up()
+        }
+        composeRule.runOnIdle { assertClipboardText(clipboard, destination) }
+        composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(hasText(tail))
+        composeRule.onNodeWithText(tail).assertIsDisplayed()
+        composeRule.onNodeWithText(destination).assertDoesNotExist()
+        composeRule.runOnIdle {
+            clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", "keep this"))
+            block = paragraph(MarkdownInlineFfi.Text(replacement))
+        }
+        composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(hasText(replacement))
+        composeRule.onNodeWithText(replacement).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            up()
+        }
+        composeRule.runOnIdle { assertClipboardText(clipboard, "keep this") }
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
     }
 

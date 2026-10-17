@@ -15,8 +15,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -64,6 +66,48 @@ class SignUpProfileDraftSubmissionTest {
             assertEquals("", app.activeAccountRef)
             assertEquals(0, nativeAccess)
         }
+    }
+
+    /** The real Welcome/form wiring reaches native creation once after an offline retry. */
+    @Test fun welcomeSignupRetriesMissingRouteThroughActualCreationAdapter() {
+        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
+        val creations = java.util.concurrent.atomic.AtomicInteger()
+        val native =
+            java.lang.reflect.Proxy.newProxyInstance(
+                MarmotInterface::class.java.classLoader,
+                arrayOf(MarmotInterface::class.java),
+            ) { _, method, _ ->
+                check(method.name == "createIdentity") { "Unexpected native call: ${method.name}" }
+                creations.incrementAndGet()
+                error("Synthetic creation failure")
+            } as MarmotInterface
+        val app =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = DraftStore.forContext(context),
+                accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = "",
+                initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("signup-route-test").path, native),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme { OnboardingScreen(app, hasActiveNetwork = { availability.hasActiveNetwork() }) }
+        }
+        composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Retained name")
+        composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
+        composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        composeRule.runOnIdle {
+            assertEquals(0, creations.get())
+            availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
+        }
+        composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
+        composeRule.waitUntil(5_000) { creations.get() == 1 }
+        composeRule.waitUntil(5_000) { app.pendingProfileSignUp?.stage == SignUpStage.CreateFailed }
+        composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Retained name")
+        composeRule.runOnIdle { assertEquals(1, creations.get()) }
     }
 
     /** Native field text at the explicit tap is published to the one returned account. */
