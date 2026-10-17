@@ -181,6 +181,55 @@ internal class AutomaticAttachmentNetworkWaits(
         recordable: Boolean = true,
         registeredAtMs: Long? = null,
         nowMs: Long = System.currentTimeMillis(),
+    ): Int =
+        synchronized(constraintLock) {
+            // Under the one constraint lock, the live policy wins over the target the caller read earlier, so an
+            // older sweep or receipt that finishes after a newer one can never write back an outdated network.
+            val live = type?.let { policyNetworkType?.invoke(request.accountRef, it) } ?: target
+            val stored = synchronized(this) { records.readAll()[attachmentDownloadWorkName(request)] }?.let(::decode)
+            settleLocked(
+                manager,
+                request,
+                type,
+                live,
+                stored?.networkType ?: recorded,
+                recordable,
+                stored?.registeredAtMs ?: registeredAtMs,
+                nowMs,
+            )
+        }
+
+    /**
+     * Narrows the automatic work [workId] of [request] for a run its policy deferred, to the network its live policy
+     * allows [type] on now, or [captured] when that is unknown. It shares the constraint lock with every widening,
+     * so a settings change that lands while the worker is narrowing is applied after it, not overwritten by it, and
+     * the wait is recorded so a later sweep can widen it again.
+     */
+    fun narrow(
+        manager: WorkManager,
+        request: AttachmentTransferRequest,
+        type: MediaAutoDownloadType?,
+        workId: java.util.UUID,
+        captured: NetworkType,
+    ) {
+        synchronized(constraintLock) {
+            val target = type?.let { policyNetworkType?.invoke(request.accountRef, it) } ?: captured
+            manager.updateWork(AttachmentDownloadWorker.buildRequest(request, AttachmentDownloadPriority.Automatic, workId, target)).get()
+            if (type != null) record(request, type, target)
+        }
+    }
+
+    /** [settle]'s decision, run while the constraint lock is held. */
+    @Suppress("LongParameterList") // The same facts as [settle], resolved under its lock.
+    private fun settleLocked(
+        manager: WorkManager,
+        request: AttachmentTransferRequest,
+        type: MediaAutoDownloadType?,
+        target: NetworkType,
+        recorded: NetworkType?,
+        recordable: Boolean,
+        registeredAtMs: Long?,
+        nowMs: Long,
     ): Int {
         val infos = manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(request)).get()
         val live = infos.filter { it.isLiveAutomatic(request.accountRef) }
@@ -217,6 +266,9 @@ internal class AutomaticAttachmentNetworkWaits(
             .onFailure { Log.w(TAG, "attachment_network_widening_failed") }
             .getOrDefault(false)
     }
+
+    /** Serialises every constraint write, widening or narrowing, so overlapping updates apply in order. */
+    private val constraintLock = Any()
 
     /** Applies [change] to the sealed record under the process-wide lock. */
     private fun update(change: (Map<String, String>) -> Map<String, String>) {

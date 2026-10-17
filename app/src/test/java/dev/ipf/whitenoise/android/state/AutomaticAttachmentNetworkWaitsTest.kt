@@ -91,6 +91,36 @@ class AutomaticAttachmentNetworkWaitsTest {
         assertTrue("work on any network keeps no record", waits.waiting(ACCOUNT).isEmpty())
     }
 
+    /**
+     * A worker narrowing a deferred run applies the live policy, not the network it captured, so mobile downloads
+     * enabled while it was deferring are not overwritten by its older Wi-Fi restriction.
+     */
+    @Test
+    fun aDeferredNarrowingAppliesTheLivePolicyNotItsCapturedNetwork() {
+        receipt(NetworkType.CONNECTED)
+        val id = single().id
+        AutomaticAttachmentNetworkWaits.policyNetworkType = { _, _ -> NetworkType.CONNECTED }
+
+        waits.narrow(manager(), request, IMAGE, id, captured = NetworkType.UNMETERED)
+
+        assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+        assertTrue("work on any network keeps no record", waits.waiting(ACCOUNT).isEmpty())
+    }
+
+    /**
+     * A sweep that read an older policy and finishes after a newer one never writes back the older network: every
+     * update applies the live policy under one lock, so a stale "no roaming" cannot follow "any connection".
+     */
+    @Test
+    fun anOlderPolicyUpdateNeverOverwritesANewerOne() {
+        receipt(NetworkType.UNMETERED)
+        AutomaticAttachmentNetworkWaits.policyNetworkType = { _, _ -> NetworkType.CONNECTED }
+
+        waits.widen(manager(), ACCOUNT) { NetworkType.NOT_ROAMING }
+
+        assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+    }
+
     /** A registration whose work never landed survives a sweep within its grace period and is pruned after it. */
     @Test
     fun aRegistrationWithoutWorkIsKeptForItsGraceAndThenPruned() {
