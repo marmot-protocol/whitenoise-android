@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -113,7 +114,10 @@ class TopNoticeComposerBoundsAndroidTest {
         assertTheComposerSurvivesClearing(composerBefore)
     }
 
-    /** The banner sits below the header and playback strip, the composer bounds are unchanged, the field focused. */
+    /**
+     * The banner starts directly under the header and playback strip, the composer bounds are unchanged, and the
+     * field stays focused.
+     */
     private fun assertBannerBelowTheHeader(
         tag: String,
         composerBefore: Rect,
@@ -126,6 +130,10 @@ class TopNoticeComposerBoundsAndroidTest {
         val header = composeRule.onNodeWithTag(HEADER_TAG).fetchSemanticsNode().boundsInRoot
         assertTrue("the banner overlaps the header", banner.top >= header.bottom - TOLERANCE_PX)
         assertTrue("the banner overlaps the playback strip", banner.top >= playback.bottom - TOLERANCE_PX)
+        // Below the strip is not enough: a banner at the foot of the transcript, over the composer, is also below it.
+        val gap = banner.top - playback.bottom
+        val maxGap = MAX_TOP_GAP.value * context.resources.displayMetrics.density
+        assertTrue("the banner starts ${gap}px under the playback strip, not in the top row", gap <= maxGap)
         val keyboard = keyboardInsetPx()
         assertTrue(
             "the keyboard was not up ($keyboard px), so the composer bounds were never under test",
@@ -135,12 +143,12 @@ class TopNoticeComposerBoundsAndroidTest {
         composeRule.onNodeWithTag(FIELD_TAG).assertIsFocused()
     }
 
-    /** Clearing the banner, as its timeout does, also leaves the composer in place. */
+    /** Clearing the banner, as its timeout does, also leaves the composer in place with its draft and focus. */
     private fun assertTheComposerSurvivesClearing(composerBefore: Rect) {
         composeRule.runOnUiThread { appState.clearTransientNotice() }
         composeRule.waitForIdle()
         assertEquals(composerBefore, composerBounds())
-        composeRule.onNodeWithTag(FIELD_TAG).assertIsFocused()
+        composeRule.onNodeWithTag(FIELD_TAG).assertIsFocused().assertTextContains(DRAFT)
     }
 
     /** Focuses and types into the composer, waits for the real keyboard, and returns the composer's resting bounds. */
@@ -148,8 +156,25 @@ class TopNoticeComposerBoundsAndroidTest {
         composeRule.onNodeWithTag(FIELD_TAG).performClick()
         composeRule.onNodeWithTag(FIELD_TAG).performTextReplacement(DRAFT)
         composeRule.waitUntil(KEYBOARD_TIMEOUT_MILLIS) { keyboardInsetPx() >= MINIMUM_KEYBOARD_PX }
-        composeRule.waitForIdle()
-        return composerBounds()
+        return settledComposerBounds()
+    }
+
+    /**
+     * The composer's bounds once the keyboard animation has finished moving it. The inset reports the keyboard
+     * before its animation ends, so the bounds must read the same [SETTLED_READS] times in a row first.
+     */
+    private fun settledComposerBounds(): Rect {
+        var last = composerBounds()
+        var unchanged = 0
+        composeRule.waitUntil(KEYBOARD_TIMEOUT_MILLIS) {
+            Thread.sleep(SETTLE_POLL_MILLIS)
+            composeRule.waitForIdle()
+            val now = composerBounds()
+            unchanged = if (now == last) unchanged + 1 else 0
+            last = now
+            unchanged >= SETTLED_READS
+        }
+        return last
     }
 
     /** The composer's bounds in the window. */
@@ -245,5 +270,10 @@ class TopNoticeComposerBoundsAndroidTest {
         // A keyboard covers a large part of a phone screen; anything shorter is a bar, not an IME.
         const val MINIMUM_KEYBOARD_PX = 200
         const val TOLERANCE_PX = 1f
+
+        // The top row's own spacing above a banner; the transcript's height is far larger than this.
+        val MAX_TOP_GAP = 24.dp
+        const val SETTLED_READS = 3
+        const val SETTLE_POLL_MILLIS = 150L
     }
 }

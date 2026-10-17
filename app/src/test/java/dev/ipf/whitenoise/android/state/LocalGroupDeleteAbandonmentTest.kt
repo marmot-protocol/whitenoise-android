@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.ui.chats.abandonmentDepartureCallbacks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
@@ -47,6 +48,23 @@ class LocalGroupDeleteAbandonmentTest {
             assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
             assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
             assertGlobalNotice(fixture, R.string.toast_chat_abandoned)
+        }
+
+    /**
+     * A second confirm that arrives while the first forget is still running, such as a double tap, submits nothing:
+     * the conversation's one mutation slot answers it false, so MDK forgets the reviewed chat exactly once.
+     */
+    @Test
+    fun duplicateConfirmsWhileTheForgetRunsSubmitItOnce() =
+        runTest {
+            val fixture = fixture()
+            val conversation = conversation(fixture, isDm = true)
+            val first = async { conversation.forgetGroupLocal() }
+            val second = async { conversation.forgetGroupLocal() }
+            assertTrue("the first confirm abandons the chat", first.await())
+            assertFalse("the duplicate confirm submits nothing", second.await())
+            assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
+            assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
         }
 
     /** A group reset and a local delete from Group Details confirm app-wide, since both close the conversation. */
@@ -128,7 +146,7 @@ class LocalGroupDeleteAbandonmentTest {
             }
         }
 
-    /** A group's failed reset keeps the reset wording through its notice and its retry's confirmation. */
+    /** A group's failed reset keeps the reset wording through its notice, and its retry resets the group once. */
     @Test
     fun chatListGroupResetFailureAndRetryKeepTheResetWording() =
         runTest {
@@ -140,7 +158,10 @@ class LocalGroupDeleteAbandonmentTest {
                 assertEquals(AppText.Resource(R.string.toast_couldnt_reset_group), failure.title)
                 assertEquals(AppText.Resource(R.string.local_reset_retry_detail), failure.detail)
                 fixture.failureMethod.set(null)
+                val forgetsBefore = fixture.calls.count { it == "forgetGroupLocal" }
                 retry(fixture, failure)
+                val forgets = fixture.calls.count { it == "forgetGroupLocal" }
+                assertEquals("the retry resets the group once", forgetsBefore + 1, forgets)
                 assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
                 assertEquals(AppText.Resource(R.string.toast_group_reset_done), fixture.state.transientNotice?.title)
             } finally {

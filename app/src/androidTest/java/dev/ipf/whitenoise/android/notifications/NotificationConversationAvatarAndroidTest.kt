@@ -13,7 +13,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
@@ -104,19 +103,24 @@ class NotificationConversationAvatarAndroidTest {
 
         device.openNotification()
         device.wait(Until.hasObject(By.text(DM_NAME)), WAIT_MS)
+        // SystemUI first bundles the app's cards into one-line rows, where each conversation keeps its circle.
+        val bundled = capture("first_card_bundled")
+        assertColor("bundled direct-chat circle", Color.RED, colorOf(bundled, DM_NAME, "conversation_icon"))
+        assertColor("bundled group circle", Color.BLUE, colorOf(bundled, GROUP_NAME, "conversation_icon"))
+        expandBundle()
         val collapsed = capture("first_card_collapsed")
         assertColor("first direct-chat circle", Color.RED, colorOf(collapsed, DM_NAME, "conversation_icon"))
         assertColor("first group circle", Color.BLUE, colorOf(collapsed, GROUP_NAME, "conversation_icon"))
-        assertColor("first long-message picture", Color.MAGENTA, colorOf(collapsed, LONG_NAME, "right_icon"))
+        assertColor("first long-message picture", Color.MAGENTA, largeIconColor(collapsed, LONG_NAME))
         // assertColor fails when the circle was never resolved, so a missing heads-up cannot pass silently.
         assertColor("first heads-up circle", Color.RED, headsUpCircle)
 
-        device.findObject(By.text(DM_NAME))?.swipe(Direction.DOWN, EXPAND_SWIPE)
-        device.waitForIdle()
+        expandCard(DM_NAME)
         val expanded = capture("first_card_expanded")
         assertColor("expanded first direct-chat circle", Color.RED, colorOf(expanded, DM_NAME, "conversation_icon"))
         val appIcon = colorOf(expanded, LONG_NAME, "icon")
-        if (appIcon != null) assertFalse("the small app icon is not the identity", close(Color.MAGENTA, appIcon))
+        assertNotNull("the long-message card draws its small app icon", appIcon)
+        assertFalse("the small app icon is not the identity", close(Color.MAGENTA, checkNotNull(appIcon)))
     }
 
     /** A second message in the same conversation keeps the same picture in its circle. */
@@ -130,6 +134,27 @@ class NotificationConversationAvatarAndroidTest {
         device.wait(Until.hasObject(By.text(DM_NAME)), WAIT_MS)
         val shade = capture("second_card_collapsed")
         assertColor("second direct-chat circle", Color.RED, colorOf(shade, DM_NAME, "conversation_icon"))
+    }
+
+    /**
+     * Expands the app's bundle, which SystemUI shows as one-line rows, so each conversation draws its own collapsed
+     * card. Fails when the bundle cannot be expanded, rather than sampling the one-line rows again.
+     */
+    private fun expandBundle() {
+        val expand = device.wait(Until.findObject(By.res("android", "expand_button")), WAIT_MS)
+        assertNotNull("the app's bundled cards can be expanded", expand)
+        checkNotNull(expand).click()
+        device.waitForIdle()
+        Thread.sleep(SETTLE_MS)
+    }
+
+    /** Expands the card titled [title] with its own expand button, which a swipe on the title can miss as a tap. */
+    private fun expandCard(title: String) {
+        val button = cardView(title, "expand_button")
+        assertNotNull("the $title card can be expanded", button)
+        checkNotNull(button).click()
+        device.waitForIdle()
+        Thread.sleep(SETTLE_MS)
     }
 
     /** Posts one message through the production presenter with ready pictures, as the first post supplies them. */
@@ -175,12 +200,27 @@ class NotificationConversationAvatarAndroidTest {
         return shot
     }
 
+    /**
+     * The color of a long-message card's large picture. SystemUI draws it on the right before Android 16 and, in the
+     * Android 16 headerless child row, as the row's left icon, so either slot counts and a missing picture is null.
+     */
+    private fun largeIconColor(
+        shot: Bitmap,
+        title: String,
+    ): Int? = colorOf(shot, title, "right_icon") ?: colorOf(shot, title, "left_icon")
+
     /** The average color SystemUI drew in the named view of the card titled [title], or null when absent. */
     private fun colorOf(
         shot: Bitmap,
         title: String,
         viewId: String,
-    ): Int? {
+    ): Int? = cardView(title, viewId)?.let { averageColor(shot, it.visibleBounds) }
+
+    /** The nearest view named [viewId] in the card titled [title], searching outward from its title, or null. */
+    private fun cardView(
+        title: String,
+        viewId: String,
+    ): UiObject2? {
         var node: UiObject2? = device.findObject(By.text(title))
         var view: UiObject2? = null
         var depth = 0
@@ -189,7 +229,7 @@ class NotificationConversationAvatarAndroidTest {
             node = node.parent
             depth++
         }
-        return view?.let { averageColor(shot, it.visibleBounds) }
+        return view
     }
 
     /** Averages the central quarter of [bounds], away from the circle's anti-aliased edge. */
@@ -257,6 +297,5 @@ class NotificationConversationAvatarAndroidTest {
         const val TOLERANCE = 48
         const val PICTURE_PX = 96
         const val PNG_QUALITY = 100
-        const val EXPAND_SWIPE = 0.5f
     }
 }

@@ -8,12 +8,13 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.whitenoise.android.ManualDeviceFixture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -30,13 +31,13 @@ import java.util.UUID
  *
  * A list-row disappearance alone is not the assertion. The test reads the native row and messages for the old
  * group after the forget, after the peer accepts and sends into the old group, and again after reopening the same
- * MDK state, and it checks that the abandonment itself published nothing to the relay.
+ * MDK state, and it checks that the abandonment itself published nothing to the relay. The old-group delivery must
+ * really happen: the peer reads its own message and the relay records it, so an empty owner state is never the
+ * result of a delivery that was silently skipped. Swapping the forget for a local delete resurrects the chat here.
  *
  * Both identities live in one runtime behind an in-process loopback relay, so no external relay or account is
- * needed, and drafts stay in memory. Run it on an emulator or a disposable profile: it stays a manual fixture until
- * its first green device run is recorded for this MarmotKit pin.
+ * needed, and drafts stay in memory.
  */
-@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class DmAbandonmentAndroidTest {
     /** Abandonment succeeds after a refused handover and keeps the old DM forgotten through delivery and restart. */
@@ -56,15 +57,20 @@ class DmAbandonmentAndroidTest {
                 val peer = native.createIdentity(relays, relays)
                 val groupIdHex = withTimeout(ESTABLISH_TIMEOUT_MS) { startDirectChat(native, owner, peer) }
 
-                // The reported dead end: an admin handover MDK refuses. Granting admin to an account outside the
-                // chat must fail, which forces the refusal however MDK treats the unaccepted peer.
-                val handover = runCatching { native.promoteAdminDetailed(owner.label, groupIdHex, NON_MEMBER_ID) }
+                // The reported dead end: handing admin to the peer who has not accepted. Should MDK allow that
+                // handover, granting admin to an account outside the chat is refused instead, so the abandonment
+                // below always follows a refused handover.
+                val handover =
+                    runCatching { native.promoteAdminDetailed(owner.label, groupIdHex, peer.accountIdHex) }
+                        .takeIf { it.isFailure }
+                        ?: runCatching { native.promoteAdminDetailed(owner.label, groupIdHex, NON_MEMBER_ID) }
                 assertTrue("the handover is refused before abandonment", handover.isFailure)
                 Log.i(TAG, "handover refused type=${handover.exceptionOrNull()?.javaClass?.simpleName}")
 
                 val app = appState(context, root, native, owner, peer)
                 val publishedBefore = relay.publicationAttempts(MLS_GROUP_EVENT_KIND).size
-                val reset = app.forgetGroupLocalWithClientCleanup(owner.label, groupIdHex) { true }
+                // The confirmation, as the dialog submits it.
+                val reset = whenWorkerIdle { app.forgetGroupLocalWithClientCleanup(owner.label, groupIdHex) { true } }
                 assertTrue("the first confirmation resets the native group", reset)
                 assertEquals(
                     "abandonment sends no leave, admin change or other group event",
@@ -74,11 +80,16 @@ class DmAbandonmentAndroidTest {
                 assertForgotten(native, owner, groupIdHex, "after the forget")
                 assertFalse("committed cleanup is not pending", app.localGroupDeleteCleanupJournal.hasPending())
 
-                // Old-group delivery: the peer joins the old group and writes into it.
-                runCatching { native.acceptGroupInvite(peer.label, groupIdHex) }
-                    .onFailure { Log.i(TAG, "peer acceptance failed type=${it.javaClass.simpleName}") }
-                runCatching { native.sendText(peer.label, groupIdHex, "into the abandoned chat") }
-                    .onFailure { Log.i(TAG, "peer send failed type=${it.javaClass.simpleName}") }
+                // Old-group delivery: the peer joins the old group and writes into it. Each step must really happen,
+                // or the owner's empty state below would prove nothing.
+                val publishedAfterForget = relay.publicationAttempts(MLS_GROUP_EVENT_KIND).size
+                whenWorkerIdle { native.acceptGroupInvite(peer.label, groupIdHex) }
+                whenWorkerIdle { native.sendText(peer.label, groupIdHex, OLD_GROUP_TEXT) }
+                assertTrue("the peer itself reads the message it sent", peerReads(native, peer, groupIdHex))
+                assertTrue(
+                    "the peer's message reached the relay as an old-group event",
+                    awaitPublication(relay, publishedAfterForget),
+                )
                 native.catchUpAccounts()
                 delay(DELIVERY_SETTLE_MS)
                 assertForgotten(native, owner, groupIdHex, "after old-group delivery")
@@ -115,6 +126,48 @@ class DmAbandonmentAndroidTest {
         }
         return groupIdHex
     }
+
+    /**
+     * Runs [call] once the account's native worker accepts it. A worker still finishing earlier work answers
+     * [MarmotKitException.AccountWorkerBusy] before anything commits, which the app shows as a retryable failure. Only
+     * that answer is retried, within [ESTABLISH_TIMEOUT_MS], so every other failure still fails the test.
+     */
+    private suspend fun <T> whenWorkerIdle(call: suspend () -> T): T =
+        withTimeout(ESTABLISH_TIMEOUT_MS) {
+            var result: Result<T>
+            while (true) {
+                result = runCatching { call() }
+                val busy = result.exceptionOrNull() as? MarmotKitException.AccountWorkerBusy ?: break
+                Log.i(TAG, "worker busy, retrying type=${busy.javaClass.simpleName}")
+                delay(POLL_MS)
+            }
+            result.getOrThrow()
+        }
+
+    /** Whether [peer]'s own history holds the old-group message, so its delivery was real rather than skipped. */
+    private suspend fun peerReads(
+        native: Marmot,
+        peer: AccountSummaryFfi,
+        groupIdHex: String,
+    ): Boolean =
+        withTimeout(ESTABLISH_TIMEOUT_MS) {
+            val history = { native.messages(peer.label, groupIdHex, HISTORY_LIMIT, null) }
+            while (history().none { it.plaintext == OLD_GROUP_TEXT }) delay(POLL_MS)
+            true
+        }
+
+    /** Whether the relay records a group event beyond [before] attempts, since sends publish in the background. */
+    private suspend fun awaitPublication(
+        relay: LoopbackNostrRelay,
+        before: Int,
+    ): Boolean =
+        withTimeoutOrNull(ESTABLISH_TIMEOUT_MS) {
+            while (relay.publicationAttempts(MLS_GROUP_EVENT_KIND).size <= before) delay(POLL_MS)
+            true
+        } ?: false.also {
+            val attempts = relay.publicationAttempts(MLS_GROUP_EVENT_KIND).size
+            Log.i(TAG, "no old-group publication attempts=$attempts")
+        }
 
     /** Native, not list-row, evidence: no row, no listed chat and no readable history for the owner. */
     private fun assertForgotten(
@@ -171,6 +224,7 @@ class DmAbandonmentAndroidTest {
         const val POLL_MS = 100L
         const val MLS_GROUP_EVENT_KIND = 445
         const val HISTORY_LIMIT = 50u
+        const val OLD_GROUP_TEXT = "into the abandoned chat"
 
         /** A well-formed account id that is not in the chat, so granting it admin must be refused. */
         val NON_MEMBER_ID = "0f".repeat(32)
