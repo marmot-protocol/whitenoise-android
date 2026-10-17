@@ -1,0 +1,15 @@
+{
+  "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/38764302223/artifacts/11989365775",
+  "material_icons_sha256": "16c2dd2481aee441fbf5da4aa4e0fbdb5621b527bb9503854ad06dba5a25de45",
+  "original_plugin": "com.google.android.gms.oss-licenses-plugin:0.13.0",
+  "resources": {
+    "metadata_sha256": "21e1f84533ea2ff5ebf079795681dc4a8521ad8916c01bd32d46afe228a2ff43",
+    "text_sha256": "efbb64c3f61f06abbad17bb534894bb6605e8e39050e77af2421211971e0b718"
+  },
+  "retained": {
+    "path": "config/licenses/evidence/capture.json",
+    "sha256": "6eeaea7e3930a63c0843aa94287bd4d9417ae243b944bdd414e0a94b3fd29bbb"
+  },
+  "schema": 1,
+  "source_sha": "a14aa1a41bfb72d6933b1bb584823eec513125ec"
+}
