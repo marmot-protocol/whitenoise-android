@@ -106,11 +106,7 @@ class StartupRecoveryRouteTest {
                 },
             )
         app.markDefaultNotificationsEnableAttempted()
-        attempts =
-            WhiteNoiseAppState::class.java.getDeclaredField("bootstrapAttempts").let {
-                it.isAccessible = true
-                it.get(app) as BootstrapAttemptCoordinator
-            }
+        attempts = app.accountSession.bootstrapAttempts
         runBlocking { attempts.currentOrStart { pendingAttempt } }
         shell = MainShellStateHolder(app, SavedStateHandle())
         composeRule.setContent {
