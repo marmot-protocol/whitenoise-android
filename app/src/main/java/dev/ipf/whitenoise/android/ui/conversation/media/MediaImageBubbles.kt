@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentParkedForStorage
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
@@ -243,6 +244,13 @@ internal fun MediaImageBubble(
     val cacheAvailabilityResolved by cacheAvailability.resolved
     // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
     val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, key, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedForStorage = { controller.attachmentParkedForStorage(key, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterInteractiveRequest()
+    }
     val transfer =
         rememberTileTransfer(controller, key, attachmentIndex, reference, mine, cancelledByReader, startDownload)
 
@@ -756,6 +764,13 @@ internal fun MediaImageGridTile(
     val cacheAvailabilityResolved by cacheAvailability.resolved
     // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
     val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, messageIdHex, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedForStorage = { controller.attachmentParkedForStorage(messageIdHex, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterInteractiveRequest()
+    }
     val transfer =
         rememberTileTransfer(
             controller,

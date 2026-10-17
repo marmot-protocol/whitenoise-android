@@ -87,6 +87,17 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachmentFeed(
         marmotIo { subscribeAttachmentTransfers(request.accountRef, request.groupIdHex, listOf(target.toFfi())) },
     )
 
+/**
+ * Whether MDK holds [request]'s body parked for lack of storage, read once and without demanding anything. A park only
+ * follows a demand, so a surface entered after one can restore the reader's earlier download instead of offering
+ * Download again. Only a request whose native target is already known is read, so no history paging runs.
+ */
+internal suspend fun WhiteNoiseAppState.nativeAttachmentParkedForStorage(request: AttachmentTransferRequest): Boolean {
+    val target = request.nativeTarget() ?: return false
+    return runCatchingCancellable { peekNativeTransferState(request, target.toFfi()) }.getOrNull() ==
+        AttachmentTransferStateFfi.STORAGE_BLOCKED
+}
+
 /** Reads the authoritative state of one target without demanding, retrying or cancelling anything. */
 private suspend fun WhiteNoiseAppState.peekNativeTransferState(
     request: AttachmentTransferRequest,

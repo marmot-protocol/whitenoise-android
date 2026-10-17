@@ -87,6 +87,17 @@ internal fun ConversationController.attachmentNativeProgress(
     }
 }
 
+/** Whether MDK holds this attachment parked for storage from a demand made before this screen; never demands. */
+internal suspend fun ConversationController.attachmentParkedForStorage(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): Boolean {
+    val request =
+        attachmentTransferRequest(messageIdHex, attachmentIndex)
+            ?.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)) ?: return false
+    return appState.nativeAttachmentParkedForStorage(request)
+}
+
 /** An actual Retry/Download again gesture may recover terminal work; ordinary Open/Save only joins. */
 internal fun ConversationController.performAttachmentUserAction(
     messageIdHex: String,

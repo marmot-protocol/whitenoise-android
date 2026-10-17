@@ -110,6 +110,40 @@ class TileTransferTest {
             assertTrue(awaitStorageReadmission(flowOf(parked, failed)))
         }
 
+    /** A surface entered while MDK still holds its body parked restores the reader's download once, by itself. */
+    @Test
+    fun aSurfaceEnteredWhileParkedRestoresTheReadersDownload() {
+        var restored = 0
+        composeRule.setContent {
+            restoreParkedDownloadOnEntry(identity = "photo#0", enabled = true, parkedForStorage = { true }) {
+                restored += 1
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(1, restored)
+    }
+
+    /** A surface already downloading never asks MDK, and one whose body is not parked restores nothing. */
+    @Test
+    fun onlyAnIdleSurfaceWithAParkedBodyRestoresAnything() {
+        var asked = 0
+        var restored = 0
+        composeRule.setContent {
+            restoreParkedDownloadOnEntry(identity = "downloading#0", enabled = false, parkedForStorage = {
+                asked += 1
+                true
+            }) { restored += 1 }
+            restoreParkedDownloadOnEntry(identity = "idle#0", enabled = true, parkedForStorage = { false }) {
+                restored += 1
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals("a downloading surface asked MDK", 0, asked)
+        assertEquals(0, restored)
+    }
+
     /** Observation that ends while the body is still parked asks for nothing, so nothing loops. */
     @Test
     fun observationEndingWhileParkedAsksForNothing() =

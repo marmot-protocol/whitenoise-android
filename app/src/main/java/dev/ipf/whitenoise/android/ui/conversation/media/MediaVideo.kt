@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentParkedForStorage
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
@@ -260,6 +261,13 @@ internal fun MediaVideoGridTile(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, messageIdHex, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedForStorage = { controller.attachmentParkedForStorage(messageIdHex, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterInteractiveRequest()
+    }
     val transfer =
         rememberTileTransfer(
             controller,
@@ -683,6 +691,13 @@ internal fun MediaVideoBubble(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, messageIdHex, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedForStorage = { controller.attachmentParkedForStorage(messageIdHex, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterInteractiveRequest()
+    }
     val transfer =
         rememberTileTransfer(
             controller,
