@@ -147,3 +147,178 @@ the optional licence reader rather than Gradle's own POM parser.
 Source archives retain enforcement without Git; CI separately requires
 valid commit identity. Detached configurations, settings-plugin classpaths and
 included builds are outside this hook and must keep their own dependency checks.
+
+## Reviewed resolution and byte inputs
+
+`gradle/dependency-inputs.settings.gradle` activates strict dependency locking for
+project configurations and project buildscript classpaths. The separate
+`settings-gradle.lockfile` contains the settings dependency-management/version-
+catalog state. Gradle plugin-DSL resolution in settings (including Foojay) does
+not persist its plugin graph through that classpath lock; its exact marker, POM,
+module and binary checksums remain covered by artifact verification. Do not
+report that settings plugin graph as resolution-locked. `gradle/verification-metadata.xml`
+verifies SHA-256 for dependency binaries and their metadata; normal invocations
+must keep Gradle verification strict. Version/security floors still apply before
+selection. A lock that conflicts with an intentional floor/update must be reviewed
+and updated, rather than weakening that floor or excluding transitives.
+
+The reviewed bootstrap evidence in `gradle/dependency-inputs.json` binds the exact
+lock and verification files to a hosted source revision, observed configuration
+coverage, official HTTPS supplier URLs and independent checksum/payload checks.
+Each coverage row is `<project> <project|plugin> <configuration>`. Each supplier
+entry maps `<coordinate>/<artifact name>` to the URL that confirmed the SHA-256
+recorded in `verification-metadata.xml`: a published `.sha256` file, or the
+payload itself downloaded and hashed.
+The check rejects missing module locks, stale byte evidence, incomplete app/plugin
+coverage, broad trust exceptions and missing supplier checks. The bootstrap is an
+independent supplier cross-check, not an upstream reproducible-build or signature
+attestation. Preserve this distinction during updates.
+
+Gradle cannot apply the same project lock mechanism to detached configurations,
+its own distribution, SDK manager packages, Robolectric's runtime-fetched SDK
+jars or arbitrary external downloads.
+Artifact verification still covers Maven artifacts resolved by detached/plugin
+configurations. The wrapper distribution hash, pinned Android command-line tools
+and existing MarmotKit source/archive/native hashes retain their separate checks.
+Do not describe those external inputs as covered by a Maven lock. Synthetic Maven
+fixtures deliberately create their own temporary trust roots and never share or
+update the production evidence; source archives consume the checked-in inputs
+without needing Git metadata.
+
+Dependency updates, including Dependabot PRs, intentionally remain blocked until a
+maintainer reviews their new selections and supplier evidence. Dependabot does
+not approve a checksum or repin evidence automatically. Its version-change PR is
+the starting point; finish the following procedure on that same branch/PR before
+merge. This adds a required maintainer review step to Gradle updates.
+
+1. Change declared versions, commit the candidate branch, then request the existing
+   hosted tooling lane with `gh workflow run android-ci.yml --ref <update-branch>
+   -f capture_dependency_inputs=true`. The explicit capture uses
+   `--refresh-dependencies --write-locks --write-verification-metadata sha256`,
+   including optional preview-debug variants. It runs even after an earlier normal
+   build fails against stale inputs, and never turns that failure into a pass.
+   After the candidates are retained, the job restores the committed locks and
+   verification metadata and deletes newly created lockfiles. The later strict
+   dependency-submission qualification therefore reads the committed trust root,
+   never the captured downloads. Every tooling run checks this before qualifying.
+   Download its `dependency-inputs-bootstrap` artifact into `<capture>`.
+2. Cross-check the captured runtime evidence and checksum candidates:
+
+   ```sh
+   python3 scripts/audit_dependency_candidates.py \
+     --metadata <capture>/candidate-inputs/gradle/verification-metadata.xml \
+     --runtime <capture>/artifact-evidence.json --output <review>
+   python3 scripts/audit_dependency_metadata.py \
+     --metadata <capture>/candidate-inputs/gradle/verification-metadata.xml --review <review>
+   ```
+
+   The runtime input is the capture's `{schema, artifacts}` object. The audit
+   checks published SHA-256 or independently downloaded official payloads; it
+   retains runtime and publication-mapping bytes. The second command follows
+   POM/module counterparts, parent properties and imported BOMs, retaining exact
+   supplemental metadata. Unresolved references fail for explicit review. This
+   handles metadata missed by a warm Gradle cache without hand-writing records.
+3. Assemble a staged candidate, without editing the active checkout:
+
+   ```sh
+   python3 scripts/assemble_dependency_inputs.py --capture <capture> --review <review> \
+     --supplemental <review>/metadata-closure.json --output <staged> \
+     --carry-forward gradle/dependency-inputs.json \
+     --evidence-url https://github.com/marmot-protocol/whitenoise-android/actions/runs/<run>/artifacts/<artifact>
+   ```
+
+   This generates the lock/checksum manifest, exact coverage, retained compressed
+   capture/build inputs and authenticated publication paths. It requires every
+   candidate byte to have independent supplier evidence and validates the staged
+   bundle. `--carry-forward` keeps the reviewed `post_lock_selection` and
+   `supplemental_tools` records and their retained evidence; remove an entry
+   only after the new graph no longer needs it. Inspect the complete diff before
+   copying `<staged>`'s files into the branch; assembly is not approval. Additional exact platform/tool records can be passed
+   as another `--supplemental` file after independent review.
+4. Review changed transitive selections, supplier URLs and runtime notices. Update
+   the local catalogue for changed runtime bytes while preserving the pinned
+   original notice baseline. Run normal hosted strict CI on the final candidate.
+   If normal lock constraints expose another plugin path, retain that evidence
+   and reassemble using `--inputs <normal-qualified-lock-and-xml-directory>`.
+   Never repair an unknown download with broad trust, a global exclusion or an
+   unlocked classpath. Keep any failed candidate's evidence for diagnosis.
+
+Land Gradle dependency updates one at a time. Each assembly rewrites
+`reviewed_from` and the retained `gradle/dependency-evidence/` files, so two update
+branches always conflict; rebase the next one onto the merged update and capture
+it again. Grouping a week's Dependabot bumps into one branch keeps that to one
+review. Pushing evidence commits to a Dependabot branch stops Dependabot from
+rebasing it, and `@dependabot recreate` or `@dependabot rebase` discards those
+commits, so finish the update by hand once the evidence is pushed. Gradle only
+adds checksum entries; records for versions the build no longer reads stay in
+the XML until a reviewed cleanup removes them, and the locks keep them unselected.
+
+`gradle/dependency-evidence/` retains the original captured reports, original
+candidate inputs and build-source snapshots as deterministic gzip with a pinned
+source-bound receipt. `config/licenses/evidence/` retains the original plugin's
+actual notice index/text and its source snapshot. Historical CI links are context;
+validation no longer depends on those artifacts or temporary merge commits being
+reachable. The original source identity is preserved rather than relabelled as a
+later revision. The supplier audit remains a cross-check, not a reproducible-build
+or upstream signature attestation.
+
+Dependency submission pins graph plugin 1.5.0 and independently checked POM/module/
+shadow JAR hashes. Both its master action and the PR tooling qualification override
+the action's default verification-off flag with strict verification. The PR step
+runs the same pinned action's generate-and-upload mode, without permission to
+submit to GitHub's dependency API; only the master workflow publishes the graph.
+The plugin's detached init-script classpath is checksum-verified, not project-locked.
+
+For a missing platform classifier, review that exact supplier artifact and add its
+SHA-256 plus provenance. Do not add a group-wide trusted-artifact rule, turn off
+metadata verification, accept arbitrary alternate checksums or disable verification.
+Any unavoidable exception needs an explicit artifact/metadata identity, owning
+upstream limitation, reviewed evidence and removal condition; broad exceptions are
+not supported by the committed validator. Use the same review process for initial
+bootstrap or recovery of a source archive missing its input files. The hosted
+integration fixture proves that changed transitives and substituted bytes fail and
+that an inspectable, deliberately approved update succeeds without another build
+matrix.
+
+Qualify the generated locks with a normal strict invocation before accepting them.
+Gradle's lock constraints can introduce additional paths to an already selected
+plugin component that bypass an edge-specific exclusion. This bootstrap observed
+that with Roborazzi: its core/core-jvm lock constraints expose the upstream JUnit
+4.13.2 → Hamcrest 1.3 runtime dependency despite the plugin edge's JUnit exclusion.
+Those exact tooling-only selections are retained in the root classpath lock, with
+the normal-resolution graph report recorded under `post_lock_selection` and
+retained in `gradle/dependency-evidence/post-lock-selection/`. The validator
+requires each exception's coordinates in a committed lock, its metadata in the
+checksum records and any retained copy to match its pinned SHA-256. Their
+checksums were independently checked with the other test/tooling inputs. A bulk
+`--write-locks` capture can omit that path, so preserve/requalify this normal-graph
+evidence during updates; never repair it with a global exclusion or unlocked
+classpath. Guava's two cross-version Android/JRE publications similarly retain
+explicit references to their authenticated Gradle module metadata rather than
+loosening supplier-path checks for unrelated artifacts. A supplier URL counts as
+direct evidence only when its path is exactly the registry root and the
+coordinate's group, module and version directories, ending in either the recorded
+artifact name or, for a Gradle module metadata display name such as `animation.aar`
+or `datastore-release.aar`, the coordinate's own canonical
+`animation-android-1.13.0-beta01.aar` file. Any other path, including an inserted
+directory, a classifier or another file, needs an authenticated mapping. Only the
+two Guava publications and one clikt sources jar need that today; their exact
+module JSON files are retained under `gradle/publication-metadata/`, and offline
+validation checks their SHA-256 and rederives each artifact's unique resolved URL.
+Keeping a valid metadata anchor while changing the supplier URL therefore fails
+qualification.
+
+AGP creates `androidApis` lazily when resource tasks need local SDK jars. Its
+empty Maven lock state is committed for all three Android modules, and candidate
+capture predeclares that known `maybeCreate` configuration so regeneration keeps
+it. Strict locking remains active: adding a Maven module to that SDK-only path
+fails instead of becoming an unreviewed exception. The hosted fixture resolves a
+late local-file configuration and exercises that negative case.
+
+External artifacts transformed into directories are reported under
+`unfingerprinted_artifacts` with an explicit kind/reason and partial fingerprint
+coverage. The collector never opens such a directory as an archive or invents a
+binary checksum. Selected components/security floors remain checked; comparisons
+report that configuration's artifact comparison as unavailable while its other
+evidence stays comparable. A hosted real directory-transform fixture exercises
+this reporting seam.
