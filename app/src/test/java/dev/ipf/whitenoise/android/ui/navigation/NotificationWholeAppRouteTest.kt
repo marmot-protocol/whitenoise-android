@@ -21,7 +21,6 @@ import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationScenario
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.state.AppPhase
-import dev.ipf.whitenoise.android.state.BootstrapAttemptCoordinator
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatListWindowHandle
 import dev.ipf.whitenoise.android.state.ChatsSubscriptionHandle
@@ -270,11 +269,7 @@ class NotificationWholeAppRouteTest {
                 .getDeclaredMethod("setPhase", AppPhase::class.java)
                 .apply { isAccessible = true }
                 .invoke(app, AppPhase.Ready)
-            val attempts =
-                WhiteNoiseAppState::class.java
-                    .getDeclaredField("bootstrapAttempts")
-                    .apply { isAccessible = true }
-                    .get(app) as BootstrapAttemptCoordinator
+            val attempts = app.accountSession.bootstrapAttempts
             runBlocking { attempts.currentOrStart { pendingAttempt } }
             app.setAppInForeground(true)
         }
