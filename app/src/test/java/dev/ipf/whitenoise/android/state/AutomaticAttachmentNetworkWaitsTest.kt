@@ -49,8 +49,59 @@ class AutomaticAttachmentNetworkWaitsTest {
     @After
     fun tearDown() {
         AutomaticAttachmentNetworkWaits.installForTest(null)
+        AutomaticAttachmentNetworkWaits.policyNetworkType = null
         AttachmentDownloadWorker.receiptSettleExecutor = Dispatchers.IO.asExecutor()
         settles.shutdown()
+    }
+
+    /**
+     * The wait is registered before the enqueue lands, so a policy that widens before the receipt settles still
+     * finds a record, and its sweep widens the spec rather than leaving it on Wi-Fi.
+     */
+    @Test
+    fun aWaitRegisteredBeforeItsEnqueueLetsAnEarlySweepWidenIt() {
+        val held = Executors.newSingleThreadExecutor()
+        val gate = CountDownLatch(1)
+        AttachmentDownloadWorker.receiptSettleExecutor =
+            Executor { command ->
+                held.execute {
+                    gate.await()
+                    command.run()
+                }
+            }
+        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+
+        assertEquals("registered before the settle", listOf(NetworkType.UNMETERED), waits.waiting(ACCOUNT).map { it.networkType })
+        assertEquals(1, waits.widen(manager(), ACCOUNT) { NetworkType.CONNECTED })
+        assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+        gate.countDown()
+        held.shutdown()
+        held.awaitTermination(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+    }
+
+    /** A receipt settles against the live policy, so one that widened while the enqueue landed is applied at once. */
+    @Test
+    fun aReceiptSettlesAgainstThePolicyAsItIsNow() {
+        AutomaticAttachmentNetworkWaits.policyNetworkType = { account, _ -> NetworkType.CONNECTED.takeIf { account == ACCOUNT } }
+
+        receipt(NetworkType.UNMETERED)
+
+        assertEquals(NetworkType.CONNECTED, single().constraints.requiredNetworkType)
+        assertTrue("work on any network keeps no record", waits.waiting(ACCOUNT).isEmpty())
+    }
+
+    /** A registration whose work never landed survives a sweep within its grace period and is pruned after it. */
+    @Test
+    fun aRegistrationWithoutWorkIsKeptForItsGraceAndThenPruned() {
+        waits.register(request, IMAGE, NetworkType.UNMETERED)
+        waits.widen(manager(), ACCOUNT) { NetworkType.CONNECTED }
+        assertEquals("kept within its grace", 1, waits.waiting(ACCOUNT).size)
+
+        val other = request.copy(attachmentIndex = 1)
+        waits.register(other, IMAGE, NetworkType.UNMETERED, nowMs = 0L)
+        waits.widen(manager(), ACCOUNT) { NetworkType.CONNECTED }
+        assertEquals("the stale one is pruned", listOf(request), waits.waiting(ACCOUNT).map { it.request })
     }
 
     /**
