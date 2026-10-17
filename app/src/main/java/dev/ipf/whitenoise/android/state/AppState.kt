@@ -6599,6 +6599,7 @@ class WhiteNoiseAppState private constructor(
             }
             return SignOutCompletion.AccountCleanupIncomplete
         }
+        accountSession.retireSelectionsForSignOut()
         engineResult.exceptionOrNull()?.let { failure ->
             appStateDebug(failure) {
                 "signOut failed account=${signedOutRef.take(8)}: ${failure.readableMessage()}"

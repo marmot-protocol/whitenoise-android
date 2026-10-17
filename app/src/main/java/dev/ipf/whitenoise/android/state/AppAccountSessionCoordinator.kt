@@ -115,6 +115,11 @@ internal class AppAccountSessionCoordinator(
         }
     }
 
+    /** Admitted local sign-out retires older selections before its suspended platform/account cleanup. */
+    fun retireSelectionsForSignOut() {
+        handoff.beginRequest()
+    }
+
     /** Final local sign-out retires pending selections even when native sign-out used its fail-open path. */
     fun publishSignedOutIdentity(publish: () -> Unit) {
         val generation = handoff.beginRequest()
