@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsMentionPresentation
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.messageContainsOnlyNostrEventReferences
 import dev.ipf.whitenoise.android.core.nostrEventReferences
+import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -593,11 +594,21 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     emptyList()
                 }
             }
+        // The cards represent these events, so the prose leaves out references
+        // that only repeat them, and a body of nothing else is hidden (#3317).
+        // References past the card cap are not represented and stay visible.
+        val representedEventIds =
+            remember(eventReferences) { eventReferences.mapTo(HashSet()) { it.reference.stableId } }
+        val bodyOnlyRepeatsCards =
+            remember(markdownDocument, representedEventIds) {
+                markdownDocument?.onlyRepeatsRepresentedEvents(representedEventIds) == true
+            }
         val showMessageTextBody =
-            !messageContainsOnlyNostrEventReferences(
-                message = bodyText,
-                references = eventReferences,
-            )
+            !bodyOnlyRepeatsCards &&
+                !messageContainsOnlyNostrEventReferences(
+                    message = bodyText,
+                    references = eventReferences,
+                )
         val density = LocalDensity.current
         val lineHeightPx =
             with(density) { (MaterialTheme.typography.bodyLarge.lineHeight).toPx() }
@@ -723,6 +734,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                             ttsReadAloudHighlightStyle = highlightStyle,
                             ttsSentenceLayoutReporter = presentedTtsSentenceLayoutReporter,
                             searchHighlight = searchHighlight,
+                            hiddenEventIds = representedEventIds,
                         )
                     }
                 }

@@ -75,6 +75,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -508,6 +509,7 @@ private fun ProfileKeysList(
                         context = context,
                         value = npub,
                         valueModifier = Modifier.testTag("profile_keys.public_key_value"),
+                        fullPublicKey = true,
                     ) {
                         val copied = ui.copiedKey == CopiedProfileKey.Public
                         IconButton(onClick = onCopyPublic) {
@@ -658,6 +660,7 @@ private fun ProfileKeyValueRow(
     value: String,
     valueModifier: Modifier = Modifier,
     overflow: TextOverflow = TextOverflow.MiddleEllipsis,
+    fullPublicKey: Boolean = false,
     trailingAction: @Composable () -> Unit,
 ) {
     Surface(
@@ -673,13 +676,22 @@ private fun ProfileKeyValueRow(
                     .padding(start = WhiteNoiseSpacing.CompactScreenMargin, end = ProfileKeysDefaults.ValueRowEndInset),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = value,
-                modifier = valueModifier.weight(1f),
-                maxLines = 1,
-                overflow = overflow,
-                fontFamily = FontFamily.Monospace,
-            )
+            if (fullPublicKey) {
+                // The public key in full, grouped for comparison (#3321); secret values keep one ellipsized line.
+                FullPublicKey(
+                    npub = value,
+                    modifier = valueModifier.weight(1f).padding(vertical = WhiteNoiseSpacing.Related),
+                    textAlign = TextAlign.Start,
+                )
+            } else {
+                Text(
+                    text = value,
+                    modifier = valueModifier.weight(1f),
+                    maxLines = 1,
+                    overflow = overflow,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
             trailingAction()
         }
     }

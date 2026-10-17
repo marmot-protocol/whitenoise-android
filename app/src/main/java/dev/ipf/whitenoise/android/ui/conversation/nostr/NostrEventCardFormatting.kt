@@ -47,11 +47,15 @@ internal fun NostrEventCardKind.label(eventKind: Int): String =
 
 private const val KIND_IMAGE_EVENT = 20
 
+/** The author and the one date of [card], an article's publication date when it has a valid one (#3317). */
 @Composable
 internal fun eventByline(
     card: NostrEventCardModel,
     authorDisplayName: (String) -> String,
-): String = listOf(eventAuthorLabel(card, authorDisplayName), eventDateLabel(card.createdAt)).joinToString(" · ")
+): String {
+    val date = eventDateLabel(card.displayEpochSeconds())
+    return listOf(eventAuthorLabel(card, authorDisplayName), date).joinToString(" · ")
+}
 
 internal fun eventAuthorLabel(
     card: NostrEventCardModel,

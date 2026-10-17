@@ -116,6 +116,14 @@
         "test_ids": [
           "MED-010"
         ]
+      },
+      {
+        "surface": "Text reader Share menu item: R.string.share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.share",
+        "test_ids": [
+          "MED-010"
+        ]
       }
     ],
     "source_coverage": [
