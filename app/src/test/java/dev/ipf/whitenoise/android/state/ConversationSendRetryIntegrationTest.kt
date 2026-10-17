@@ -3127,7 +3127,7 @@ class ConversationSendRetryIntegrationTest {
                 runCurrent()
 
                 val shown = controller.timeline.single()
-                assertEquals("original", shown.record.plaintext)
+                assertEquals("the refused revision is still shown", "original", controller.displayedText(shown.record))
                 assertEquals("a Retry that can never succeed was offered", MessageStatus.Sent, shown.status)
                 assertEquals(AppText.Resource(R.string.error_message_not_editable), state.toast?.detail)
             } finally {
@@ -3165,6 +3165,8 @@ class ConversationSendRetryIntegrationTest {
                 assertNull("the editor stayed open on a message that can never be edited", controller.editingMessageId)
                 assertEquals(AppText.Resource(R.string.error_message_not_editable), state.toast?.detail)
                 assertFalse(controller.timeline.any { it.status == MessageStatus.Failed })
+                val shown = controller.timeline.single()
+                assertEquals("the refused revision is still shown", "hello", controller.displayedText(shown.record))
             } finally {
                 clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
