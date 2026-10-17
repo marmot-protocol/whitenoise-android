@@ -1113,13 +1113,13 @@ class WhiteNoiseAppState private constructor(
             initialActiveAccountRef = null,
         )
 
-    /** JVM Compose tests inject the profile resolver/state and do not start Android platform services. */
+    /** Tests inject runtime/state seams; a null account override preserves production preference restoration. */
     internal constructor(
         context: Context,
         draftStore: DraftStore,
         accountIdHexResolver: suspend (String) -> String?,
         accounts: List<AccountSummaryFfi>,
-        activeAccountRef: String,
+        activeAccountRef: String?,
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
