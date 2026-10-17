@@ -6184,7 +6184,12 @@ class ConversationDictationControllerTest {
                 f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
                 platform.listener.onReady()
                 if (alreadyProcessing) platform.listener.onEndOfSpeech()
+                val processingSchedules = if (alreadyProcessing) 1 else 0
+                assertEquals(processingSchedules, f.scheduler.scheduledTaskCount(20_000L))
                 f.controller.send()
+                assertEquals(1, f.scheduler.scheduledTaskCount(90_000L))
+                assertEquals(processingSchedules, f.scheduler.scheduledTaskCount(20_000L))
+                assertEquals(0, f.scheduler.liveTaskCount(20_000L))
                 f.controller.onAppBackgrounded()
                 f.edit(other, TextFieldValue("edited in another chat"))
                 // Simulate a slow 30-second caller-audio chunk after the accepted Send.
@@ -6196,6 +6201,9 @@ class ConversationDictationControllerTest {
                 f.scheduler.runDelay(500L)
                 platform.listener.onReady()
                 platform.listener.onEndOfSpeech()
+                assertEquals(1, f.scheduler.scheduledTaskCount(90_000L))
+                assertEquals(processingSchedules, f.scheduler.scheduledTaskCount(20_000L))
+                assertEquals(0, f.scheduler.liveTaskCount(20_000L))
                 f.scheduler.advanceBy(30_000L)
                 assertTrue(sent.isEmpty())
                 platform.pendingCallerAudio = false
@@ -6317,6 +6325,9 @@ class ConversationDictationControllerTest {
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         f.platform.listener.onReady()
         f.controller.send()
+        assertEquals(1, f.scheduler.scheduledTaskCount(20_000L))
+        assertEquals(1, f.scheduler.liveTaskCount(20_000L))
+        assertEquals(0, f.scheduler.scheduledTaskCount(90_000L))
         f.scheduler.advanceBy(19_999L)
         assertTrue(f.controller.state is ConversationDictationState.Processing)
         f.scheduler.advanceBy(1L)
@@ -8991,6 +9002,12 @@ class ConversationDictationControllerTest {
 
         /** Counts live callbacks so late provider events cannot silently schedule another completion. */
         fun liveTaskCount(): Int = tasks.count { !it.cancelled && !it.ran }
+
+        /** Includes cancelled timers so suppression must prevent scheduling, not just cancel later. */
+        fun scheduledTaskCount(delayMillis: Long): Int = tasks.count { it.delayMillis == delayMillis }
+
+        /** Counts active timers for a specific production delay. */
+        fun liveTaskCount(delayMillis: Long): Int = tasks.count { it.delayMillis == delayMillis && !it.cancelled && !it.ran }
 
         private data class Task(
             val delayMillis: Long,
