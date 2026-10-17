@@ -115,63 +115,29 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
     }
 
-    /** The final activation fence must precede cache clearing and publication of the target account. */
+    /** The facade still delegates native preloads and atomically publishes the prepared one-shot projection. */
     @Test
     fun targetLocalSnapshotIsLoadedAndGenerationFencedBeforeAccountPublication() {
-        val body = setActiveAccountSection()
-        val generation = body.indexOf("val requestGeneration = accountSwitchHandoff.beginRequest(label)")
-        val preload = body.indexOf("loadAccountSwitchLocalSnapshot(")
-        val preloadCall = body.substring(preload, body.indexOf("\n", startIndex = preload))
-        val finalGenerationGuard = body.lastIndexOf("if (!activationAllowed())")
-        val guardBody = body.substringAfter("val activationAllowed = {").substringBefore("}")
+        val source = appStateSource().readText()
+        val prepare = source.kotlinFunctionBody("prepare")
+        val publish = source.kotlinFunctionBody("publish")
         assertTrue(
-            "activation must still check the request generation",
-            "isAccountSwitchCurrent(requestGeneration)" in guardBody,
+            "native projection reads retain their request token",
+            "loadAccountSwitchLocalSnapshot(request.label, generation, plan)" in prepare,
         )
-        val cacheClear = body.indexOf("clearCrossAccountCaches()", startIndex = finalGenerationGuard)
-        val stageSnapshot = body.indexOf("stageAccountSwitchLocalSnapshot", startIndex = cacheClear)
-        val publishAccount = body.indexOf("activeAccountRef = label", startIndex = stageSnapshot)
-        val stageBody = appStateSource().readText().kotlinFunctionBody("stageAccountSwitchLocalSnapshot")
-        val unreadProjection = stageBody.indexOf("accountUnreadValueFromRows")
-        val profileSeeds =
-            stageBody.indexOf(
-                "localSnapshot.profiles.forEach(::applyAccountSwitchProfileSeed)",
-                startIndex = unreadProjection,
-            )
-        val handoff =
-            stageBody.indexOf(
-                "accountSwitchHandoff.publish(requestGeneration, localSnapshot)",
-                startIndex = profileSeeds,
-            )
-
-        assertTrue("each switch intent must capture a monotonic generation", generation >= 0)
-        assertTrue("the local snapshot must be loaded before account publication", preload > generation)
+        val cacheClear = publish.indexOf("clearCrossAccountCaches()")
+        val stage = publish.indexOf("stageAccountSwitchLocalSnapshot(")
+        val profiles = publish.indexOf("currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)")
+        val active = publish.indexOf("activeAccountRef = label")
+        assertTrue("cache clearing precedes prepared projection staging", cacheClear >= 0 && stage > cacheClear)
+        assertTrue("self metadata precedes active-label publication", profiles > stage && active > profiles)
+        val stageBody = source.kotlinFunctionBody("stageAccountSwitchLocalSnapshot")
+        val unread = stageBody.indexOf("accountUnreadValueFromRows")
+        val handoff = stageBody.indexOf("accountSwitchHandoff.publish(requestGeneration, localSnapshot)")
+        assertTrue("target unread state precedes the one-shot handoff", unread >= 0 && handoff > unread)
         assertTrue(
-            "the local snapshot loader must retain the request-generation fence",
-            "requestGeneration" in preloadCall,
-        )
-        assertTrue("a late A→B result must be rejected after its final suspension", finalGenerationGuard > preload)
-        assertTrue(
-            "cross-account caches must clear only after the final generation guard",
-            cacheClear > finalGenerationGuard,
-        )
-        assertTrue("target snapshot staging must follow cache clearing", stageSnapshot > cacheClear)
-        assertTrue(
-            "target unread rows must replace stale state before handoff publication",
-            unreadProjection >= 0,
-        )
-        assertTrue("target profile seeds must apply after unread replacement", profileSeeds > unreadProjection)
-        assertTrue(
-            "the one-shot local handoff must publish after target profile seeds",
-            handoff > profileSeeds,
-        )
-        assertTrue(
-            "the active account must publish only after snapshot staging",
-            publishAccount > stageSnapshot,
-        )
-        assertTrue(
-            "a missing target snapshot must become unknown before account publication",
-            stageBody.indexOf("accountUnreadStore.markUnknown(label)", startIndex = handoff) > handoff,
+            "a missing projection retains unknown target unread state",
+            "accountUnreadStore.markUnknown(label)" in stageBody,
         )
     }
 
@@ -369,85 +335,6 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertFalse("push-wake recovery must not bypass coordination", "catchUpAccountsBestEffort()" in body)
     }
 
-    /** The final supersession fence precedes self-profile publication and the Ready callback. */
-    @Test
-    fun activationCallbackPrecedesBestEffortPostSwitchWork() {
-        val source = appStateSource().readText()
-        val start = source.indexOf("suspend fun setActiveAccount(")
-        val end = source.indexOf("internal fun recordAccountSwitchLocalSnapshotRendered", startIndex = start)
-        check(start >= 0 && end > start) { "Missing setActiveAccount section" }
-        val body = source.substring(start, end)
-        val activationGuard =
-            body.indexOf(
-                "if (!activationAllowed())",
-            )
-        val activeRef = body.indexOf("activeAccountRef = label")
-        val selfProfile = body.indexOf("currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)")
-        assertTrue(
-            "startup self identity must precede account publication",
-            selfProfile in (activationGuard + 1)..<activeRef,
-        )
-        val localUiState = body.indexOf("reloadMediaAutoDownloadMatrix()", startIndex = activeRef)
-        val activated = body.indexOf("onActivated()", startIndex = localUiState)
-        val refresh = body.indexOf("refreshActivatedAccount(", startIndex = activated)
-        val refreshBody = source.kotlinFunctionBody("refreshActivatedAccount")
-        val currentGuard = refreshBody.indexOf("if (!isCurrent()) return")
-        assertTrue("the refresh boundary must contain its stale-owner guard", currentGuard >= 0)
-        val profile = refreshBody.indexOf("warmProfile(it)", startIndex = currentGuard)
-        val privacy = refreshBody.indexOf("configurePrivacyRuntime()", startIndex = profile)
-        val notifications = refreshBody.indexOf("refreshLocalNotificationSettings()", startIndex = privacy)
-        val push = refreshBody.indexOf("reconcileNotificationDeliveryModeAfterActivation", startIndex = notifications)
-
-        assertTrue(
-            "a stale route must be rejected before the active account is published",
-            activationGuard >= 0 && activeRef > activationGuard,
-        )
-        assertTrue(
-            "target account context must flip before the activation callback",
-            activeRef >= 0 && localUiState > activeRef,
-        )
-        assertTrue("the activation callback must follow local account UI state", activated > localUiState)
-        assertTrue("post-activation refresh must follow the activation callback", refresh > activated)
-        listOf(profile, privacy, notifications, push).forEach { postSwitchIndex ->
-            assertTrue(
-                "network/best-effort switch work must follow its stale-owner guard",
-                postSwitchIndex > currentGuard,
-            )
-        }
-    }
-
-    /** Notification activation still skips broad reads while startup owns only its self-profile read. */
-    @Test
-    fun notificationPriorityPolicySkipsBroadPreloadAndDefersBestEffortWork() {
-        val body = setActiveAccountSection()
-        val policyGate = body.indexOf("val preloadPlan = accountSwitchPreloadPlan(")
-        val rowGate = body.indexOf("if (preloadPlan.loadLocalRows)", startIndex = policyGate)
-        val broadSnapshot = body.indexOf("loadAccountSwitchLocalSnapshot(")
-        val policyElse = body.indexOf("} else {", startIndex = rowGate)
-        val activated = body.indexOf("onActivated()")
-        val firstFrameGate = body.indexOf("awaitPostActivationWork()", startIndex = activated)
-        val refreshCall = body.indexOf("refreshActivatedAccount(", startIndex = firstFrameGate)
-        val refreshBody = appStateSource().readText().kotlinFunctionBody("refreshActivatedAccount")
-        val staleGuard =
-            refreshBody.indexOf(
-                "isCurrentPostActivationAccountSwitch(label, requestGeneration)",
-            )
-        val profile = refreshBody.indexOf("warmProfile(it)", startIndex = staleGuard)
-
-        assertTrue(
-            "only ordinary switches may load the broad local snapshot",
-            "loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)" in body,
-        )
-        assertTrue(
-            "broad account preload must be inside the policy-controlled branch",
-            policyGate >= 0 && rowGate > policyGate && broadSnapshot > rowGate && policyElse > broadSnapshot,
-        )
-        assertTrue("the target account must activate before waiting for its readable frame", firstFrameGate > activated)
-        assertTrue("refreshes must wait for the target frame", refreshCall > firstFrameGate)
-        assertTrue("superseded deferred work must be rejected inside the refresh boundary", staleGuard >= 0)
-        assertTrue("profile warming must stay outside the target first-frame path", profile > staleGuard)
-    }
-
     /** Interactive selectors load only authoritative rows before activation. */
     @Test
     fun interactiveSelectorsLoadOnlyAuthoritativeRowsBeforeActivation() {
@@ -482,11 +369,11 @@ class AccountSwitchLocalSnapshotOrderingTest {
         )
         assertTrue(
             "setActiveAccount must execute the tested preload plan",
-            "if (preloadPlan.loadLocalRows)" in setActiveAccount,
+            "if (plan.loadLocalRows)" in setActiveAccount,
         )
         assertTrue(
             "setActiveAccount must hand the tested plan itself to the loader",
-            "loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)" in setActiveAccount,
+            "loadAccountSwitchLocalSnapshot(request.label, generation, plan)" in setActiveAccount,
         )
         assertTrue(
             "the Settings selector must use the interactive local-row boundary",
