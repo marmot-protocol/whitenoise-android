@@ -346,7 +346,7 @@ internal fun MediaVoiceBubble(
         enabled = !mine && !startDownload && !cancelledByReader,
         parkedForStorage = { controller.attachmentParkedForStorage(messageIdHex, attachmentIndex) },
     ) {
-        materializationIntent = materializationIntent.afterInteractiveRequest()
+        materializationIntent = materializationIntent.afterParkedDownloadFound()
     }
     val transfer =
         rememberTileTransfer(

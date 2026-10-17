@@ -249,7 +249,7 @@ internal fun MediaImageBubble(
         enabled = !mine && !startDownload && !cancelledByReader,
         parkedForStorage = { controller.attachmentParkedForStorage(key, attachmentIndex) },
     ) {
-        materializationIntent = materializationIntent.afterInteractiveRequest()
+        materializationIntent = materializationIntent.afterParkedDownloadFound()
     }
     val transfer =
         rememberTileTransfer(controller, key, attachmentIndex, reference, mine, cancelledByReader, startDownload)
@@ -769,7 +769,7 @@ internal fun MediaImageGridTile(
         enabled = !mine && !startDownload && !cancelledByReader,
         parkedForStorage = { controller.attachmentParkedForStorage(messageIdHex, attachmentIndex) },
     ) {
-        materializationIntent = materializationIntent.afterInteractiveRequest()
+        materializationIntent = materializationIntent.afterParkedDownloadFound()
     }
     val transfer =
         rememberTileTransfer(

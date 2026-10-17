@@ -73,6 +73,12 @@ internal enum class AttachmentMaterializationIntent {
     fun afterInteractiveRequest(): AttachmentMaterializationIntent = Interactive
 
     /**
+     * MDK still holds the body parked from the reader's earlier download, so that download resumes as the reader's own.
+     * Joining the park demands nothing new.
+     */
+    fun afterParkedDownloadFound(): AttachmentMaterializationIntent = Interactive
+
+    /**
      * Only an explicit stop revokes accepted work: the gate's queued-automatic cancellation or the reader's own Cancel.
      * Any other cancellation is the composition leaving and keeps propagating.
      */
