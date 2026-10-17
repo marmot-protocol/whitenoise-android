@@ -33,5 +33,13 @@ private fun fixtureScopeJob(
 }
 
 /** Follows the production owner when a scope moves out of the facade. */
-private fun fixtureField(owner: Any, name: String): Any =
-    requireNotNull(owner.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(owner))
+private fun fixtureField(
+    owner: Any,
+    name: String,
+): Any =
+    requireNotNull(
+        owner.javaClass
+            .getDeclaredField(name)
+            .apply { isAccessible = true }
+            .get(owner),
+    )
