@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -69,22 +70,39 @@ class MarmotKitRecoveryQualificationTest {
     /**
      * A receiver whose runtime is closed while more events accumulate than the relay returns for one query recovers
      * every message once it reopens, because MDK pages backwards past the clamp (MDK #2274). Six senders send 100
-     * messages each, so each sender stays within MLS's 100-message reorder tolerance.
+     * messages each, so each sender stays within MLS's 100-message reorder tolerance. A device too slow to send them
+     * within MDK's two-minute replay lookback meets mdk#2381 instead, as the next case does on purpose.
      */
     @Test
     fun offlineReplayBeyondTheRelayClampRecoversEveryMessage() =
         runBlocking<Unit> {
-            val group = establishedGroup(extraSenders = REPLAY_SENDERS - 1)
-            close(group.receiver)
-            val perSender = argument("replayMessagesPerSender")?.toInt() ?: REPLAY_MESSAGES_PER_SENDER
-            val sent =
-                group.senders.flatMapIndexed { index, (account, runtime) ->
-                    (1..perSender).map { "replay-$index-%03d".format(it) }.onEach {
-                        runtime.sendText(account.label, group.id, it)
-                    }
-                }
-            assertReplayed(group, sent)
+            assertReplayed(replay = sixSendersOffline(), offlineMillis = argument("offlineMillis")?.toLong() ?: 0L)
         }
+
+    /**
+     * The same replay after the receiver stayed offline longer than MDK's two-minute replay lookback. With a relay
+     * that cannot compare history, the clamped replay is not paged and the oldest messages never arrive.
+     */
+    @Ignore("mdk#2381: catch-up after more than two minutes offline skips events beyond the relay's 500 clamp")
+    @Test
+    fun offlineReplayAfterTheLookbackRecoversEveryMessage() =
+        runBlocking<Unit> {
+            assertReplayed(replay = sixSendersOffline(), offlineMillis = LONG_OFFLINE_MILLIS)
+        }
+
+    /** Closes the receiver, then has six senders send 100 messages each, returning the group and what was sent. */
+    private suspend fun sixSendersOffline(): Pair<EstablishedGroup, List<String>> {
+        val group = establishedGroup(extraSenders = REPLAY_SENDERS - 1)
+        close(group.receiver)
+        val perSender = argument("replayMessagesPerSender")?.toInt() ?: REPLAY_MESSAGES_PER_SENDER
+        val sent =
+            group.senders.flatMapIndexed { index, (account, runtime) ->
+                (1..perSender).map { "replay-$index-%03d".format(it) }.onEach {
+                    runtime.sendText(account.label, group.id, it)
+                }
+            }
+        return group to sent
+    }
 
     /**
      * One sender's messages beyond MLS's 100-message reorder tolerance are lost on catch-up, because the relay's
@@ -99,14 +117,22 @@ class MarmotKitRecoveryQualificationTest {
             val count = argument("replayMessages")?.toInt() ?: SINGLE_SENDER_MESSAGES
             val sent = (1..count).map { "replay-%04d".format(it) }
             sent.forEach { group.sender.runtime.sendText(group.sender.account.label, group.id, it) }
-            assertReplayed(group, sent)
+            assertReplayed(group to sent)
         }
 
-    /** Reopens the receiver and requires every one of [sent], having needed to page past the relay clamp. */
+    /**
+     * After [offlineMillis] more offline, reopens the receiver of [replay]'s group and requires every message sent,
+     * having needed to page past the relay clamp. A device offline longer than MDK's replay lookback catches up
+     * differently.
+     */
     private suspend fun assertReplayed(
-        group: EstablishedGroup,
-        sent: List<String>,
+        replay: Pair<EstablishedGroup, List<String>>,
+        offlineMillis: Long = 0L,
     ) {
+        val (group, sent) = replay
+        delay(offlineMillis)
+        // Only the reopened receiver's own group reads count, not setup traffic or the sender's runtime.
+        val requestsBefore = relay.recordedRequests().size
         val receiver = reopen(group.receiver)
         val recoverStarted = System.nanoTime()
         val recovered = awaitTexts(receiver, group.id, sent.toSet(), REPLAY_TIMEOUT_MILLIS)
@@ -119,7 +145,7 @@ class MarmotKitRecoveryQualificationTest {
         )
         assertTrue(
             "the receiver never had to page past the relay clamp, so this run proves nothing",
-            relay.recordedRequests().any { it.has("until") },
+            relay.recordedRequests().drop(requestsBefore).any { it.has("until") && it.queriesKind(GROUP_MESSAGE_KIND) },
         )
         Log.i(TAG, "replay_qualified messages=${sent.size} recover_ms=$recoverMillis")
     }
@@ -175,6 +201,60 @@ class MarmotKitRecoveryQualificationTest {
             val windows = relay.queriesThatReturned(commit).filter { filters -> filters.any { it.has("limit") } }
             assertTrue("the late commit did not come from a newest-events window", windows.isNotEmpty())
             Log.i(TAG, "gap_qualified refused_comparisons=${relay.refusedComparisons()} windows=${windows.size}")
+        }
+
+    /**
+     * Once an admin's device knows its group moved on without it, MDK refuses that admin's group change as catching up,
+     * and after one acknowledgement the same change goes through (MDK #2273). This is the refusal runGroupChange turns
+     * into the app-level question. The receiver's newest-events query is the signal that MDK recorded the gap, so no
+     * change is attempted before it; the acknowledged change then commits on the device's own epoch, which is fine for
+     * a disposable group.
+     */
+    @Test
+    fun catchingUpRefusalIsAcknowledgedForOneChange() =
+        runBlocking<Unit> {
+            val group = establishedGroup()
+            val sender = group.sender
+            val receiver = group.receiver
+            sender.runtime.promoteAdminDetailed(sender.account.label, group.id, receiver.account.accountIdHex)
+            awaitAdmin(receiver, group.id)
+            val queriesBefore = relay.answeredQueries(GROUP_MESSAGE_KIND).size
+
+            relay.withholdNextPublicationOfKind = GROUP_MESSAGE_KIND
+            sender.runtime.updateGroupProfile(sender.account.label, group.id, RENAMED, null)
+            checkNotNull(relay.withheldEventId()) { "the rename commit was not withheld" }
+            (1..POST_COMMIT_MESSAGES).forEach { sender.runtime.sendText(sender.account.label, group.id, "ahead-$it") }
+            val gapFetched =
+                withTimeoutOrNull(CATCHING_UP_TIMEOUT_MILLIS) {
+                    while (relay.answeredQueries(GROUP_MESSAGE_KIND).drop(queriesBefore).none { (filters, _) ->
+                            filters.any { it.has("limit") && it.has("until") }
+                        }
+                    ) {
+                        delay(POLL_MILLIS)
+                    }
+                    true
+                }
+            assertTrue(
+                "the receiver never looked for the missing commit: ${diagnose(receiver, group.id)}",
+                gapFetched == true,
+            )
+
+            val label = receiver.account.label
+            val rename = suspend { receiver.runtime.updateGroupProfile(label, group.id, BEHIND_NAME, null) }
+            val refusal = runCatching { rename() }.exceptionOrNull()
+            assertTrue("a change while behind was not refused as catching up: $refusal", refusal.isCatchingUp())
+            assertTrue(
+                "acknowledging must find the group catching up",
+                receiver.runtime.acknowledgeGroupCatchingUp(receiver.account.label, group.id),
+            )
+            rename()
+            assertEquals(
+                BEHIND_NAME,
+                receiver.runtime
+                    .groupDetails(receiver.account.label, group.id)
+                    .group.name,
+            )
+            Log.i(TAG, "catching_up_qualified")
         }
 
     /**
@@ -257,6 +337,23 @@ class MarmotKitRecoveryQualificationTest {
         return EstablishedGroup(id, sender, receiver, others)
     }
 
+    /** Waits until [participant]'s own projection lists it as an admin of [groupId]. */
+    private suspend fun awaitAdmin(
+        participant: Participant,
+        groupId: String,
+    ) {
+        withTimeout(INVITE_TIMEOUT_MILLIS) {
+            val self = participant.account.accountIdHex
+            while (participant.runtime
+                    .groupDetails(participant.account.label, groupId)
+                    .group.admins
+                    .none { it.equals(self, ignoreCase = true) }
+            ) {
+                delay(POLL_MILLIS)
+            }
+        }
+    }
+
     /** Asks [sender]'s runtime to create the lookup case's group with [recipient]. */
     private suspend fun createLookupGroup(
         sender: Participant,
@@ -264,6 +361,15 @@ class MarmotKitRecoveryQualificationTest {
     ): String {
         val members = listOf(recipient.account.accountIdHex)
         return sender.runtime.createGroup(sender.account.label, "Lookup", members, null)
+    }
+
+    /** True for MDK's refusal of a group change while the device may be behind its group. */
+    private fun Throwable?.isCatchingUp(): Boolean = this is MarmotKitException.GroupCatchingUp
+
+    /** True when this request filter asks for [kind]. */
+    private fun JSONObject.queriesKind(kind: Int): Boolean {
+        val kinds = optJSONArray("kinds") ?: return false
+        return (0 until kinds.length()).any { kinds.getInt(it) == kind }
     }
 
     /** Opens a fresh root and runtime with one generated identity. */
@@ -373,6 +479,9 @@ class MarmotKitRecoveryQualificationTest {
         const val RELAY_CLAMP = 500
         const val REPLAY_SENDERS = 6
         const val REPLAY_MESSAGES_PER_SENDER = 100
+        const val BEHIND_NAME = "Renamed while behind"
+        const val LONG_OFFLINE_MILLIS = 150_000L
+        const val CATCHING_UP_TIMEOUT_MILLIS = 60_000L
         const val SINGLE_SENDER_MESSAGES = 600
 
         /** More than the 8 distinct undecryptable envelopes MDK's epoch-stall detector needs to arm recovery. */

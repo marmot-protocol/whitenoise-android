@@ -59,8 +59,12 @@ adb shell am instrument -w -r \
   dev.ipf.whitenoise.android.dev.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-Pass `-e comparison ignore` to make the relay drop comparison requests instead of refusing them. The
-single-sender case stays ignored until [MDK #2375](https://github.com/marmot-protocol/mdk/issues/2375) ships.
+Pass `-e comparison ignore` to make the relay drop comparison requests instead of refusing them, and
+`-e offlineMillis <ms>` to keep the replay receiver offline longer. Two cases stay ignored until MDK fixes
+ship: one sender beyond 100 messages ([MDK #2375](https://github.com/marmot-protocol/mdk/issues/2375)) and
+a receiver offline past the two-minute replay lookback ([MDK #2381](https://github.com/marmot-protocol/mdk/issues/2381)).
+A physical phone sends the 600 replay messages too slowly to stay inside that lookback, so run the replay case
+on an emulator; the other cases also pass on a Pixel 9a.
 
 ## 1. Select and inspect the release
 
