@@ -243,8 +243,20 @@ class AttachmentDownloadWorker : CoroutineWorker {
         this.performDownloadOverride = performDownloadOverride
     }
 
-    /** Resumes a durable download, promoting explicit work to a typed foreground service. */
-    override suspend fun doWork(): Result {
+    /**
+     * Resumes a durable download, promoting explicit work to a typed foreground service. A run that ends the
+     * work, rather than retrying it, drops any recorded network wait for it.
+     */
+    override suspend fun doWork(): Result =
+        runWork().also { result ->
+            val request = AttachmentDownloadWorkData.decode(inputData)
+            if (request != null && result != Result.retry()) {
+                runCatching { AutomaticAttachmentNetworkWaits.get(applicationContext).forget(request) }
+            }
+        }
+
+    /** Decides and runs one durable attempt for the encoded request. */
+    private suspend fun runWork(): Result {
         val request = AttachmentDownloadWorkData.decode(inputData)
         val application = applicationContext as? WhiteNoiseApplication
         return if (request == null || application == null) {
@@ -350,7 +362,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
                     "reason=${deferred.hold.reason} retry=$retry",
             )
             if (retry) {
-                narrowAutomaticNetwork(request, deferred.networkType)
+                narrowAutomaticNetwork(request, deferred.type, deferred.networkType)
                 Result.retry()
             } else {
                 intentStore.resetTransientRetry(request)
@@ -416,16 +428,19 @@ class AttachmentDownloadWorker : CoroutineWorker {
     /**
      * Narrows this automatic work's network constraint to [networkType], the narrowest network its live policy
      * could allow, so a spec queued wider than the policy (before its account loaded, or before a settings
-     * change) next runs only on such a network. The update applies to the next run and keeps the attempt count.
+     * change) next runs only on such a network. The update applies to the next run and keeps the attempt count,
+     * and the wait is recorded under its [type] so a policy that later allows a wider network can widen it.
      */
     private fun narrowAutomaticNetwork(
         request: AttachmentTransferRequest,
+        type: MediaAutoDownloadType?,
         networkType: NetworkType,
     ) {
         runCatching {
             WorkManager
                 .getInstance(applicationContext)
                 .updateWork(buildRequest(request, AttachmentDownloadPriority.Automatic, id, networkType))
+            if (type != null) AutomaticAttachmentNetworkWaits.get(applicationContext).record(request, type, networkType)
         }.onFailure { Log.w(TAG, "attachment_network_narrowing_failed") }
     }
 
@@ -447,6 +462,9 @@ class AttachmentDownloadWorker : CoroutineWorker {
         internal const val BACKOFF_SECONDS = 30L
         private const val EXPLICIT_LOOKUP_RETRIES = 1
         internal const val RETIRED_TAG = "attachment_download_retired"
+
+        /** Runs a future's listener on the thread that completed it, for listeners that only chain more futures. */
+        private val DIRECT = Executor { task -> task.run() }
         private val explicitFence = ExplicitEnqueueFence()
 
         /**
@@ -522,9 +540,10 @@ class AttachmentDownloadWorker : CoroutineWorker {
 
         /**
          * Persists one transfer as unique WorkManager work. Automatic work coalesces onto any existing
-         * work, waits for [networkType] and backs off after platform interruptions. An explicit request
-         * replaces waiting automatic work instead, and on Android 14 or later a visible one runs as a
-         * user-initiated job.
+         * work, waits for [networkType] and backs off after platform interruptions; a duplicate receipt for
+         * waiting work queued on a narrower network widens it in place, and work of a known [type] queued on a
+         * narrowed network is recorded so a later policy can widen it. An explicit request replaces waiting
+         * automatic work instead, and on Android 14 or later a visible one runs as a user-initiated job.
          */
         internal fun enqueue(
             context: Context,
@@ -532,6 +551,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
             priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
             userVisible: Boolean = false,
             networkType: NetworkType = NetworkType.CONNECTED,
+            type: MediaAutoDownloadType? = null,
         ) {
             val intentStore = attachmentIntentStore(context.applicationContext)
             if (
@@ -557,14 +577,50 @@ class AttachmentDownloadWorker : CoroutineWorker {
             if (priority == AttachmentDownloadPriority.Interactive) {
                 enqueueExplicit(context.applicationContext, request, work, intentStore)
             } else {
+                val manager = WorkManager.getInstance(context.applicationContext)
                 runCatching {
-                    WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-                        attachmentDownloadWorkName(request),
-                        ExistingWorkPolicy.KEEP,
-                        work,
-                    )
+                    manager.enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.KEEP, work)
+                }.onSuccess { operation ->
+                    if (type != null) {
+                        runCatching { AutomaticAttachmentNetworkWaits.get(context).record(request, type, networkType) }
+                            .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
+                    }
+                    operation.result.addListener({ widenKeptAutomatic(manager, request, networkType) }, DIRECT)
                 }.onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
             }
+        }
+
+        /**
+         * After a KEEP enqueue, widens the automatic spec it kept when that spec still waits on a network narrower
+         * than [networkType], in place by id so the attempt count stays. Only waiting automatic work changes:
+         * a retired, explicit, running or finished spec is never touched or resurrected. Chained on WorkManager's
+         * own futures, so it never blocks the caller.
+         */
+        private fun widenKeptAutomatic(
+            manager: WorkManager,
+            request: AttachmentTransferRequest,
+            networkType: NetworkType,
+        ) {
+            runCatching {
+                val lookup = manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(request))
+                lookup.addListener({
+                    val automaticTag = attachmentAutomaticAccountTag(request.accountRef)
+                    runCatching { lookup.get() }
+                        .getOrDefault(emptyList())
+                        .filter { info ->
+                            info.state == WorkInfo.State.ENQUEUED &&
+                                automaticTag in info.tags &&
+                                RETIRED_TAG !in info.tags &&
+                                info.constraints.requiredNetworkType.isNarrowerThan(networkType)
+                        }.forEach { info ->
+                            runCatching {
+                                manager.updateWork(
+                                    buildRequest(request, AttachmentDownloadPriority.Automatic, info.id, networkType),
+                                )
+                            }.onFailure { Log.w(TAG, "attachment_network_widening_failed") }
+                        }
+                }, DIRECT)
+            }.onFailure { Log.w(TAG, "attachment_network_widening_failed") }
         }
 
         /**

@@ -123,7 +123,7 @@ class IncomingAttachmentSchedulingCoverageTest {
         val worker = source("state/AttachmentDownloadWorker.kt")
         assertTrue(
             "a network hold must narrow the queued spec to the network its policy allows",
-            "narrowAutomaticNetwork(request, deferred.networkType)" in worker,
+            "narrowAutomaticNetwork(request, deferred.type, deferred.networkType)" in worker,
         )
         assertTrue(
             "a pending native approval must wait rather than spend the failure retry",
@@ -132,6 +132,23 @@ class IncomingAttachmentSchedulingCoverageTest {
         assertFalse(
             "a network hold must not expire after a run count",
             "runAttemptCount" in source("state/AutomaticAttachmentPolicy.kt"),
+        )
+    }
+
+    /**
+     * Waiting narrowed work widens when the policy does: every permission refresh sweeps it, even before the native
+     * runtime exists, and a duplicate receipt widens the spec it keeps.
+     */
+    @Test
+    fun waitingWorkWidensWithThePolicy() {
+        val refresh = appState().functionBody("refreshNativeAttachmentPermissions")
+        val sweep = refresh.indexOf("widenWaitingAutomaticDownloads(accountRefs)")
+        assertTrue("a permission refresh must widen waiting work", sweep >= 0)
+        val runtimeGuard = refresh.indexOf("runtime?.marmot ?: return")
+        assertTrue("the sweep must not wait for the native runtime", sweep < runtimeGuard)
+        assertTrue(
+            "a duplicate receipt must widen the spec it keeps",
+            "widenKeptAutomatic(manager, request, networkType)" in source("state/AttachmentDownloadWorker.kt"),
         )
     }
 
