@@ -1166,6 +1166,8 @@ internal fun GroupDetailsScreen(
                     }
                 },
                 onDismiss = abandonment::dismiss,
+                // The screen's error banner sits behind this modal, so the failed review carries its Copy action.
+                error = controller.lastMutationError.takeIf { abandonment.attempted },
             )
         }
         // #3310: the escape path after a Leave that did not finish, under the error banner wherever it shows.

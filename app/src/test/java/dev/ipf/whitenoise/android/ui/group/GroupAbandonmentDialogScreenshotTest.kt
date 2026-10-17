@@ -7,6 +7,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -16,6 +19,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -176,6 +181,27 @@ class GroupAbandonmentDialogScreenshotTest {
         assertEquals(1, confirms)
     }
 
+    /** A failed attempt keeps the error's detail and its Copy action inside the dialog, which copies the report. */
+    @Test
+    fun failedReviewOwnsTheErrorDetailAndCopy() {
+        render(DM, FAILED, error = ERROR)
+        val detail = app.getString(R.string.latest_group_error, ERROR_MESSAGE)
+        composeRule.onNode(hasText(detail) and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        composeRule
+            .onNode(hasTestTag("group.abandon.error.copy") and hasAnyAncestor(isDialog()))
+            .assertIsDisplayed()
+            .performClick()
+        val clipboard = app.getSystemService(android.content.ClipboardManager::class.java)
+        assertEquals(
+            ERROR.report,
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                ?.toString(),
+        )
+        composeRule.onNodeWithTag("group.abandon.confirm").assertIsEnabled()
+    }
+
     /** Composes the leave-blocked notice under the requested appearance and records it. */
     private fun captureLeaveBlocked(
         name: String,
@@ -248,7 +274,8 @@ class GroupAbandonmentDialogScreenshotTest {
         scale: Float = 1f,
         rtl: Boolean = false,
     ) {
-        render(target, status, dark = dark, amoled = amoled, scale = scale, rtl = rtl)
+        val error = ERROR.takeIf { status == FAILED }
+        render(target, status, dark = dark, amoled = amoled, scale = scale, rtl = rtl, error = error)
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_abandon_$name.png")
     }
 
@@ -263,13 +290,14 @@ class GroupAbandonmentDialogScreenshotTest {
         amoled: Boolean = false,
         scale: Float = 1f,
         rtl: Boolean = false,
+        error: ErrorPresentation? = null,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
-                    GroupAbandonmentDialog(target, status, onConfirm, onDismiss)
+                    GroupAbandonmentDialog(target, status, onConfirm, onDismiss, error)
                 }
             }
         }
@@ -281,5 +309,7 @@ class GroupAbandonmentDialogScreenshotTest {
         val GROUP = GroupAbandonmentTarget("account-a", "Carol", "group-hiking", "Hiking club", isDm = false)
         val LONG_DM = DM.copy(conversationTitle = "Alexandria Montgomery-Fitzwilliam (work phone, second account)")
         val FAILED = GroupAbandonmentStatus.Failed
+        const val ERROR_MESSAGE = "The relay did not answer."
+        val ERROR = ErrorPresentation(AppText.Plain(ERROR_MESSAGE), "operation=group_forget code=timeout")
     }
 }

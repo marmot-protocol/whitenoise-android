@@ -61,6 +61,20 @@ class GroupAbandonmentCoverageTest {
         )
     }
 
+    /** A failed forget hands its detail to the open review, whose modal window hides the screen's error banner. */
+    @Test
+    fun failedReviewCarriesTheMutationErrorItHides() {
+        val screen = source("ui/group/GroupDetailsScreen.kt")
+        val dialog =
+            screen
+                .substringAfter("abandonment.target?.let { target ->")
+                .substringBefore("// #3310: the escape path")
+        assertTrue(
+            "the review receives the error the banner behind it would show",
+            "error = controller.lastMutationError.takeIf { abandonment.attempted }" in dialog,
+        )
+    }
+
     /** The confirmation fixes the acting account and the exact conversation before anything is submitted. */
     @Test
     fun confirmationCapturesTheAccountAndConversation() {
