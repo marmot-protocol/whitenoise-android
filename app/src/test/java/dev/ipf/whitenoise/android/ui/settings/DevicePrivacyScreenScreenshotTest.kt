@@ -26,7 +26,6 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
-import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshotHandoff
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
@@ -191,11 +190,7 @@ class DevicePrivacyScreenScreenshotTest {
         }
         state.markDefaultNotificationsEnableAttempted()
         if (phase == AppPhase.Ready) {
-            val handoff =
-                WhiteNoiseAppState::class.java
-                    .getDeclaredField("accountSwitchHandoff")
-                    .apply { isAccessible = true }
-                    .get(state) as AccountSwitchLocalSnapshotHandoff
+            val handoff = state.accountSession.handoff
             handoff.publish(
                 handoff.beginRequest("account"),
                 AccountSwitchLocalSnapshot(

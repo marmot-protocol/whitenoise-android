@@ -12,7 +12,6 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshotHandoff
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -139,11 +138,7 @@ class ProfileSwitcherNativeDeliveryTest {
             // The UI change must be composed before the held native read returns, as it is on a live device.
             composeRule.waitForIdle()
             release.countDown()
-            val handoff =
-                WhiteNoiseAppState::class.java
-                    .getDeclaredField("accountSwitchHandoff")
-                    .apply { isAccessible = true }
-                    .get(app) as AccountSwitchLocalSnapshotHandoff
+            val handoff = app.accountSession.handoff
             composeRule.waitUntil(5_000) {
                 shadowOf(Looper.getMainLooper()).idle()
                 handoff.captureForAccount("a") != null

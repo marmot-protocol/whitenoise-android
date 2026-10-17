@@ -40,6 +40,7 @@ class AccountSetupRecoveryTest {
         assertEquals(IdentityImportOutcome.Failed, identityImportOutcome(IllegalStateException("boom")))
     }
 
+    /** Ordinary imports and setup recovery share the same receipt-fenced completion path. */
     @Test
     fun recoverySuccessActivatesTheAccountExactlyLikeAnOrdinaryImport() {
         val source = appStateSource()
@@ -50,7 +51,7 @@ class AccountSetupRecoveryTest {
         val activation = source.functionBody("activateImportedIdentity")
         listOf(
             "refreshAccounts()",
-            "setActiveAccount(summary.label)",
+            "activateAccountSession(AccountSessionActivationRequest(summary.label))",
             "phase = AppPhase.Ready",
             "warmProfile(summary.accountIdHex)",
         ).forEach { assertTrue("activation must keep $it", activation.contains(it)) }
