@@ -427,10 +427,10 @@ class AttachmentDownloadWorker : CoroutineWorker {
     }
 
     /**
-     * Narrows this automatic work's network constraint to [networkType], the narrowest network its live policy
-     * could allow, so a spec queued wider than the policy (before its account loaded, or before a settings
-     * change) next runs only on such a network. The update applies to the next run and keeps the attempt count,
-     * and the wait is recorded under its [type] so a policy that later allows a wider network can widen it.
+     * Narrows this automatic work's network constraint for its next run, so a spec queued wider than the policy
+     * (before its account loaded, or before a settings change) next runs only on a network the policy allows. The
+     * registry applies the live policy under the lock it shares with every widening, falling back to the captured
+     * [networkType], so a settings change made meanwhile is never overwritten, and records the wait under [type].
      */
     private fun narrowAutomaticNetwork(
         request: AttachmentTransferRequest,
@@ -438,10 +438,9 @@ class AttachmentDownloadWorker : CoroutineWorker {
         networkType: NetworkType,
     ) {
         runCatching {
-            WorkManager
-                .getInstance(applicationContext)
-                .updateWork(buildRequest(request, AttachmentDownloadPriority.Automatic, id, networkType))
-            if (type != null) AutomaticAttachmentNetworkWaits.get(applicationContext).record(request, type, networkType)
+            AutomaticAttachmentNetworkWaits
+                .get(applicationContext)
+                .narrow(WorkManager.getInstance(applicationContext), request, type, id, networkType)
         }.onFailure { Log.w(TAG, "attachment_network_narrowing_failed") }
     }
 
