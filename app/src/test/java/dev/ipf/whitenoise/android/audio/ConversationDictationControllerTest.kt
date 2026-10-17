@@ -933,6 +933,7 @@ class ConversationDictationControllerTest {
         assertTrue(active.controller.state is ConversationDictationState.Failed)
     }
 
+    /** Distinguishes an audio-drain timeout from a rejected callback in diagnostic outcomes. */
     @Test
     fun callerAudioDrainAndStaleCallbackHaveDistinctDiagnosticOutcomes() {
         ShadowLog.clear()
@@ -943,7 +944,7 @@ class ConversationDictationControllerTest {
         active.platform.listener.onResult("PRIVATE_SPEECH")
         active.scheduler.runDelay(500L)
         active.controller.paste()
-        active.scheduler.advanceBy(20_000L)
+        active.scheduler.advanceBy(90_000L)
         active.controller.retry()
         active.scheduler.runDelay(500L)
         active.platform.listener.onReady()
@@ -5789,7 +5790,7 @@ class ConversationDictationControllerTest {
         fixture.platform.listener.onResult("body")
         fixture.scheduler.runDelay(500L)
         fixture.controller.paste()
-        fixture.scheduler.advanceBy(20_000L)
+        fixture.scheduler.advanceBy(90_000L)
         val failed = fixture.controller.state as ConversationDictationState.Failed
         assertEquals("body", failed.retainedTranscript)
         assertEquals("body", fixture.drafts.getValue(key()).text)
@@ -6154,6 +6155,184 @@ class ConversationDictationControllerTest {
         assertEquals("Draft dictated", fixture.drafts.getValue(key()).text)
         assertEquals(0, sendCalls)
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    /** Slow queued audio keeps the accepted Send across navigation and provider generations. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun slowCallerAudioSendSurvivesProcessingAndBackgrounding() =
+        runTest {
+            listOf(false, true).forEach { alreadyProcessing ->
+                val sent = mutableListOf<Triple<String, String, String>>()
+                val platform = FakePlatform().apply { pendingCallerAudio = true }
+                val f =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        platform = platform,
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = {
+                            it.beginDispatch().also { accepted ->
+                                if (accepted) {
+                                    sent += Triple(it.accountRef, it.groupIdHex, it.payload)
+                                    it.onPendingShown()
+                                }
+                            }
+                        },
+                    )
+                val other = ACCOUNT to "other-chat"
+                f.drafts[other] = TextFieldValue("untouched")
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                platform.listener.onReady()
+                if (alreadyProcessing) platform.listener.onEndOfSpeech()
+                val processingSchedules = if (alreadyProcessing) 1 else 0
+                assertEquals(processingSchedules, f.scheduler.scheduledTaskCount(20_000L))
+                f.controller.send()
+                assertEquals(1, f.scheduler.scheduledTaskCount(90_000L))
+                assertEquals(processingSchedules, f.scheduler.scheduledTaskCount(20_000L))
+                assertEquals(0, f.scheduler.liveTaskCount(20_000L))
+                f.controller.onAppBackgrounded()
+                f.edit(other, TextFieldValue("edited in another chat"))
+                // Simulate a slow 30-second caller-audio chunk after the accepted Send.
+                f.scheduler.advanceBy(30_000L)
+                assertEquals(ConversationDictationDeliveryMode.SendOnFinish, f.controller.processingDeliveryMode)
+                assertTrue(sent.isEmpty())
+                assertEquals("", f.drafts.getValue(key()).text)
+                platform.listener.onResult("first")
+                f.scheduler.runDelay(500L)
+                platform.listener.onReady()
+                platform.listener.onEndOfSpeech()
+                assertEquals(1, f.scheduler.scheduledTaskCount(90_000L))
+                assertEquals(processingSchedules, f.scheduler.scheduledTaskCount(20_000L))
+                assertEquals(0, f.scheduler.liveTaskCount(20_000L))
+                f.scheduler.advanceBy(30_000L)
+                assertTrue(sent.isEmpty())
+                platform.pendingCallerAudio = false
+                platform.listener.onResult("tail")
+                advanceUntilIdle()
+                assertEquals(listOf(Triple(ACCOUNT, GROUP, "first tail")), sent)
+                assertEquals("edited in another chat", f.drafts.getValue(other).text)
+                assertTrue(f.controller.state is ConversationDictationState.Idle)
+            }
+        }
+
+    /** Once all PCM settles, the audio deadline cannot interrupt an independently bounded send. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun completedAudioReleasesItsDeadlineBeforeDelayedDispatch() =
+        runTest {
+            ShadowLog.clear()
+            val accepted = CompletableDeferred<Boolean>()
+            val payloads = mutableListOf<String>()
+            val platform = FakePlatform().apply { pendingCallerAudio = true }
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    platform = platform,
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        if (request.beginDispatch()) {
+                            payloads += request.payload
+                            accepted.await().also { if (it) request.onPendingShown() }
+                        } else {
+                            false
+                        }
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            platform.listener.onReady()
+            f.controller.send()
+            f.scheduler.advanceBy(89_000L)
+            platform.pendingCallerAudio = false
+            platform.listener.onResult("complete recording")
+            runCurrent()
+            assertEquals(listOf("complete recording"), payloads)
+            assertTrue(f.controller.deliveryInProgress)
+            f.scheduler.advanceBy(2_000L)
+            assertTrue(f.controller.state is ConversationDictationState.Processing)
+            val logs = ShadowLog.getLogsForTag("WNDictation").joinToString("\n") { it.msg }
+            val drainTimeoutFired =
+                logs.lineSequence().any { "event=watchdog_fired" in it && "phase=caller_audio_drain" in it }
+            assertFalse(drainTimeoutFired)
+            accepted.complete(true)
+            advanceUntilIdle()
+            assertEquals(listOf("complete recording"), payloads)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** Send before Ready keeps startup bounded and acknowledges readiness without reopening capture. */
+    @Test
+    fun callerAudioSendBeforeReadyKeepsTheRightDeadline() {
+        listOf(false, true).forEach { readyArrives ->
+            val platform = FakePlatform().apply { pendingCallerAudio = true }
+            val f = fixture(draft = TextFieldValue(""), platform = platform)
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.send()
+            f.scheduler.advanceBy(1_000L)
+            if (readyArrives) platform.listener.onReady()
+            f.scheduler.advanceBy(9_000L)
+            if (readyArrives) {
+                assertTrue(f.controller.state is ConversationDictationState.Processing)
+                f.scheduler.advanceBy(20_000L)
+                assertTrue(f.controller.state is ConversationDictationState.Processing)
+                assertEquals(ConversationDictationDeliveryMode.SendOnFinish, f.controller.processingDeliveryMode)
+                f.controller.cancel()
+                platform.listener.onResult("late")
+                assertEquals("", f.drafts.getValue(key()).text)
+                assertTrue(f.controller.state is ConversationDictationState.Idle)
+            } else {
+                assertTrue(f.controller.state is ConversationDictationState.Failed)
+                platform.listener.onReady()
+                assertTrue(f.controller.state is ConversationDictationState.Failed)
+            }
+        }
+    }
+
+    /** A real hang retains the prefix and PCM at the original total drain deadline. */
+    @Test
+    fun callerAudioHangRetainsRecoveryAtOneTotalDeadline() {
+        val platform = FakePlatform().apply { pendingCallerAudio = true }
+        val f = fixture(draft = TextFieldValue(""), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        platform.listener.onReady()
+        f.controller.send()
+        f.scheduler.advanceBy(30_000L)
+        platform.listener.onResult("prefix")
+        f.scheduler.runDelay(500L)
+        platform.listener.onReady()
+        platform.listener.onEndOfSpeech()
+        f.scheduler.advanceBy(59_499L)
+        assertFalse(f.controller.state is ConversationDictationState.Failed)
+        f.scheduler.advanceBy(1L)
+        val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+        assertEquals(ConversationDictationFailure.TimedOut, failed.cause)
+        assertEquals("prefix", failed.retainedTranscript)
+        assertEquals("prefix", f.drafts.getValue(key()).text)
+        assertTrue(platform.pendingCallerAudio)
+        f.controller.retry()
+        f.scheduler.runDelay(500L)
+        platform.listener.onReady()
+        f.scheduler.advanceBy(20_000L)
+        assertFalse(f.controller.state is ConversationDictationState.Failed)
+        f.scheduler.advanceBy(70_000L)
+        assertTrue(f.controller.state is ConversationDictationState.Failed)
+    }
+
+    /** A provider-owned recording still has its ordinary bounded final-result wait. */
+    @Test
+    fun providerOwnedSendStillTimesOutAfterTwentySeconds() {
+        val f = fixture(draft = TextFieldValue(""))
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.platform.listener.onReady()
+        f.controller.send()
+        assertEquals(1, f.scheduler.scheduledTaskCount(20_000L))
+        assertEquals(1, f.scheduler.liveTaskCount(20_000L))
+        assertEquals(0, f.scheduler.scheduledTaskCount(90_000L))
+        f.scheduler.advanceBy(19_999L)
+        assertTrue(f.controller.state is ConversationDictationState.Processing)
+        f.scheduler.advanceBy(1L)
+        val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.TimedOut, failed.reason)
     }
 
     /** Provider segment processing is still capture; only an accepted completion action owns a button spinner. */
@@ -8823,6 +9002,13 @@ class ConversationDictationControllerTest {
 
         /** Counts live callbacks so late provider events cannot silently schedule another completion. */
         fun liveTaskCount(): Int = tasks.count { !it.cancelled && !it.ran }
+
+        /** Includes cancelled timers so suppression must prevent scheduling, not just cancel later. */
+        fun scheduledTaskCount(delayMillis: Long): Int = tasks.count { it.delayMillis == delayMillis }
+
+        /** Counts active timers for a specific production delay. */
+        fun liveTaskCount(delayMillis: Long): Int =
+            tasks.count { it.delayMillis == delayMillis && !it.cancelled && !it.ran }
 
         private data class Task(
             val delayMillis: Long,
