@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-autoread-off
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Read messages aloud
+- assertVisible: 'Off'
+- tapOn: 'Off'
+- assertVisible:
+    id: presentation.complete

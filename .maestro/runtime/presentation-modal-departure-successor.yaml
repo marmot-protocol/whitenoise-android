@@ -1,0 +1,45 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-departure-successor
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Transfer administration
+- assertVisible:
+    text: Fixture successor group
+- assertVisible:
+    text: Maestro Carol
+- assertNotVisible:
+    text: Maestro Alice
+- tapOn:
+    text: Maestro Bob
+- assertVisible:
+    text: Transfer admin\?
+- assertVisible:
+    text: You're the only admin\. Maestro Bob becomes admin and you leave the group\.
+- tapOn:
+    text: Cancel
+- tapOn:
+    text: Reopen departure choice
+- assertVisible:
+    text: Maestro Carol
+- assertNotVisible:
+    text: Maestro Alice
+- tapOn:
+    text: Maestro Bob
+- assertVisible:
+    text: Transfer admin\?
+- back
+- tapOn:
+    text: Reopen departure choice
+- assertVisible:
+    text: Maestro Carol
+- assertNotVisible:
+    text: Maestro Alice
+- tapOn:
+    text: Maestro Bob
+- assertVisible:
+    text: Transfer admin\?
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,6 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-startup-loading
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: startup-loading

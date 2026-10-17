@@ -1,0 +1,36 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-developer-create
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: "developer.demo"
+- scrollUntilVisible:
+    element:
+      id: developer.demo.action
+    direction: DOWN
+    timeout: 60000
+- tapOn:
+    id: developer.demo.action
+- assertVisible:
+    text: Create a real demo conversation\?
+- assertVisible:
+    text: This creates one additional profile and publishes real profile, KeyPackage,
+      group, message, reply, and reaction events to your configured relays\. Setup
+      can take a minute and can be resumed\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    id: developer.demo.confirm
+- tapOn:
+    id: developer.demo.action
+- assertVisible:
+    text: Create a real demo conversation\?
+- back
+- tapOn:
+    id: developer.demo.action
+- assertVisible:
+    text: Create a real demo conversation\?
+- tapOn:
+    id: developer.demo.confirm
+- assertVisible:
+    id: presentation.complete

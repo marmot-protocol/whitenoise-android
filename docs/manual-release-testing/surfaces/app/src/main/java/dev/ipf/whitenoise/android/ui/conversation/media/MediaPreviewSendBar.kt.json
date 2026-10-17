@@ -61,6 +61,14 @@
         "test_ids": [
           "MED-001"
         ]
+      },
+      {
+        "surface": "Stable native-popup render target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewSendBar.kt",
+        "anchor": "stableRenderTarget = true",
+        "test_ids": [
+          "SCR-001"
+        ]
       }
     ],
     "source_coverage": [

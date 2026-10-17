@@ -9,6 +9,8 @@ name: search-date-cancel
     id: "chat-list-search-filters-action"
 - tapOn: "Date"
 - assertVisible: "Date"
+- assertVisible:
+    id: "global-search-date-dialog"
 - tapOn: "Today"
 - tapOn: "Cancel"
 - assertNotVisible:

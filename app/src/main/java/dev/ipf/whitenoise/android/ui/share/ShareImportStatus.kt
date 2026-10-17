@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.ShareImportError
@@ -22,6 +23,7 @@ import dev.ipf.whitenoise.android.share.ShareImportProgress
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
 /** Payload-free progress and recovery stay behind the shell's existing app-lock gate. */
 @Composable
@@ -49,10 +51,20 @@ internal fun ShareImportStatus(
                         if (progress != null && total != null) {
                             LinearProgressIndicator(
                                 progress = { (progress.bytes.toFloat() / total).coerceIn(0f, 1f) },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .exposePerformanceTestTags()
+                                        .testTag("share.import.determinate"),
                             )
                         } else {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            LinearProgressIndicator(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .exposePerformanceTestTags()
+                                        .testTag("share.import.indeterminate"),
+                            )
                         }
                     }
                 },
@@ -66,7 +78,7 @@ internal fun ShareImportStatus(
 
 /** Requires explicit partial-batch acknowledgement; an empty batch offers close without staging a destination. */
 @Composable
-private fun ShareImportErrorDialog(
+internal fun ShareImportErrorDialog(
     payload: SharePayload,
     hasContent: Boolean,
     onCancel: () -> Unit,

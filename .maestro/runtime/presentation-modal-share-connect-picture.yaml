@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-share-connect-picture
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    text: Share profile
+- assertVisible:
+    text: Share profile URL
+- assertVisible:
+    text: Share profile card
+- assertVisible: Save to Gallery
+- back
+- assertNotVisible:
+    text: Share profile URL
+- tapOn:
+    text: Share profile
+- assertVisible:
+    text: Share profile URL
+- tapOn:
+    text: Share profile card
+- assertVisible:
+    id: presentation.complete

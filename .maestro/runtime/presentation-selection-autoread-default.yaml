@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-autoread-default
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Read messages aloud
+- assertVisible: Use default \(On\)
+- tapOn: Use default \(On\)
+- assertVisible:
+    id: presentation.complete

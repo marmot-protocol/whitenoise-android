@@ -140,12 +140,18 @@ class DetailsSurfacePolishScreenshotTest {
     /** The danger zone's reset row and its confirmation are the admin's path to MDK 0.10.0's local group reset. */
     @Test
     fun groupAdminResetConfirmationLight() {
-        renderGroupDetails(group = group(admin = true), members = groupMembers(), darkTheme = false)
+        renderGroupDetails(
+            group = group(admin = true),
+            members = groupMembers(),
+            darkTheme = false,
+            selfProfile = UserProfileMetadataFfi("Alice", "Alice", null, null, null, null, null),
+        )
         val reset = app.getString(R.string.group_reset_action)
         composeRule.onNodeWithText(reset).performScrollTo()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/group_details_reset_row_light.png")
         composeRule.onNodeWithText(reset).performClick()
         composeRule.onNodeWithText(app.getString(R.string.group_reset_dialog_title)).assertIsDisplayed()
+        composeRule.onNodeWithText("Alice").assertIsDisplayed()
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_details_reset_dialog_light.png")
     }
 
@@ -168,8 +174,10 @@ class DetailsSurfacePolishScreenshotTest {
         members: List<AppGroupMemberRecordFfi>,
         darkTheme: Boolean,
         amoled: Boolean = false,
+        selfProfile: UserProfileMetadataFfi? = null,
     ) {
-        val appState = appState()
+        val appState = appState(profileHex = SELF_HEX.takeIf { selfProfile != null }, profile = selfProfile)
+        if (selfProfile != null) appState.presentDiscoveredProfile(SELF_NPUB, selfProfile)
         val controller =
             ConversationController(
                 appState = appState,

@@ -1,0 +1,39 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/StartingAccountIndicator.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StartingAccountIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/StartingAccountIndicator.kt",
+        "anchor": "fun StartingAccountIndicator(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/StartingAccountIndicator.kt",
+        "surface": "R.string.starting_as",
+        "anchor": "R.string.starting_as",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-002"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/StartingAccountIndicator.kt",
+        "surface": "R.string.starting_as_account",
+        "anchor": "R.string.starting_as_account",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "ACC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

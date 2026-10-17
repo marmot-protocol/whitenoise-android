@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.search.civilDateFromPickerUtcMillis
 import dev.ipf.whitenoise.android.search.pickerUtcMillisForCivilDate
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.time.Instant
 import java.time.LocalDate
@@ -160,7 +161,7 @@ private fun GlobalSearchDatePresetDialog(
     var stagedSelection by remember(selection) { mutableStateOf(selection) }
     AlertDialog(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG),
+        modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG).exposePerformanceTestTags(),
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.global_search_date_filter_title)) },
         text = {
@@ -222,7 +223,7 @@ private fun GlobalSearchCustomRangeReviewDialog(
     val validation = customSelection.validateCustomRange()
     AlertDialog(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG),
+        modifier = Modifier.testTag(GLOBAL_SEARCH_DATE_DIALOG_TAG).exposePerformanceTestTags(),
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.global_search_date_custom)) },
         text = {

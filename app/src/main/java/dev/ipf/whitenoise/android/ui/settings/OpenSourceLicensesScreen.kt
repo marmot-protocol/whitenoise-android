@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -37,14 +39,18 @@ import kotlinx.coroutines.withContext
 /** Local, selectable notices retain the existing generated attribution without an external Activity. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun OpenSourceLicensesScreen(onBack: () -> Unit) {
+internal fun OpenSourceLicensesScreen(
+    onBack: () -> Unit,
+    noticesLoader: suspend (Resources) -> List<OpenSourceNotice> = { readOpenSourceNotices(it) },
+) {
     val context = LocalContext.current
+    val loader by rememberUpdatedState(noticesLoader)
     var retry by rememberSaveable { mutableIntStateOf(0) }
     val notices by
         produceState<Result<List<OpenSourceNotice>>?>(null, retry, context.resources) {
             value =
                 withContext(Dispatchers.IO) {
-                    runCatchingCancellable { readOpenSourceNotices(context.resources) }
+                    runCatchingCancellable { loader(context.resources) }
                 }
         }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }

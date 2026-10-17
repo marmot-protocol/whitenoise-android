@@ -23,6 +23,14 @@
           "SET-028",
           "GRP-025"
         ]
+      },
+      {
+        "surface": "NewGroupSetupAccountScreen UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "fun NewGroupSetupAccountScreen(",
+        "test_ids": [
+          "NCH-002"
+        ]
       }
     ],
     "settings_controls": [

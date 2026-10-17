@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-members-expanded
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible:
+    text: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Maestro group
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      id: chat_info.all_members
+    direction: DOWN
+- tapOn:
+    id: chat_info.all_members
+- assertVisible:
+    id: chat_info.members_screen
+- assertVisible:
+    text: Members
+- assertVisible:
+    text: Maestro Grace
+- back
+- assertVisible:
+    id: chat_info.list

@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-sentences-boundary
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    text: Invoke sentence chooser
+- assertVisible:
+    id: tts_sentence_chooser
+- assertVisible:
+    text: 1\. Fixture sentence 1
+- scrollUntilVisible:
+    element:
+      text: 200\. Fixture sentence 200
+    direction: DOWN
+    speed: 60
+    timeout: 60000
+- swipe:
+    direction: UP
+- assertVisible:
+    text: 200\. Fixture sentence 200
+- assertNotVisible:
+    text: 201\. Fixture sentence 201
+- tapOn:
+    text: 200\. Fixture sentence 200
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-review-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Review selection
+- assertVisible:
+    text: Maestro Bob
+- assertVisible:
+    text: Fixture confirm
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

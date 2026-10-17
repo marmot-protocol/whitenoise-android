@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-viewer-malformed
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Couldn't open file
+- assertVisible:
+    id: media.viewer.retry
+    enabled: true
+- back
+- assertVisible:
+    id: presentation.complete

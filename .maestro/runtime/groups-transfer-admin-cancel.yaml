@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-transfer-admin-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible:
+    text: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Maestro group
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      id: chat_info.transfer_admin
+    direction: DOWN
+- tapOn:
+    id: chat_info.transfer_admin
+- assertVisible:
+    text: Transfer administration
+- assertVisible:
+    text: Maestro Bob
+- back
+- assertVisible:
+    id: chat_info.list

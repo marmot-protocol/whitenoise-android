@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-info-populated
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Group identifiers
+- assertVisible:
+    text: MLS group ID
+- assertVisible:
+    text: Nostr group ID
+- scrollUntilVisible:
+    element:
+      text: wss://fixture.example.invalid
+    direction: DOWN
+- assertVisible:
+    text: wss://fixture.example.invalid
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

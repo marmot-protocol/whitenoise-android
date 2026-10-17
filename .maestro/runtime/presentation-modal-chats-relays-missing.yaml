@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-chats-relays-missing
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    id: performance.new_message
+- assertVisible:
+    text: Relays
+- back
+- tapOn:
+    id: performance.new_message
+- assertVisible:
+    text: Relays
+- back
+- tapOn:
+    text: Finish relay route check
+- assertVisible:
+    id: presentation.complete

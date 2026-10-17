@@ -953,7 +953,7 @@ private fun FileLibraryTab(
 
 /** One file row with open and save actions. */
 @Composable
-private fun FileLibraryRow(
+internal fun FileLibraryRow(
     row: SharedMediaRow,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
@@ -1120,7 +1120,7 @@ private fun FileLibraryRow(
                 val menuScrollState = rememberScrollState()
                 DropdownMenu(
                     scrollState = menuScrollState,
-                    modifier = Modifier.scrollEdgeFade(menuScrollState),
+                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                     shape = MenuDefaults.shape,

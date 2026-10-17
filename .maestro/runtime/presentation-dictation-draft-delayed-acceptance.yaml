@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-draft-delayed-acceptance
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Draft
+- tapOn: Produce failed dictation result
+- assertVisible: Draft recognized
+- assertNotVisible:
+    id: dictation-partial-send-dialog
+- tapOn: Send
+- assertVisible: Draft recognized
+- tapOn: Draft recognized
+- eraseText: 100
+- inputText: Edited recovery
+- assertVisible: Edited recovery
+- hideKeyboard
+- tapOn: Accept old send after editing
+- assertVisible:
+    id: presentation.complete

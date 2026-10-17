@@ -5,13 +5,14 @@ name: folder-rules-mentions-reopen
 - scrollUntilVisible:
     element:
       id: folder.presetMentions
-    direction: DOWN
+    direction: UP
+    centerElement: true
 - tapOn:
     id: folder.presetMentions
 - scrollUntilVisible:
     element:
       id: folder.condition.2
-    direction: DOWN
+    direction: UP
 - assertVisible:
     id: folder.condition.2
 - assertVisible: ^Has unread mentions$
