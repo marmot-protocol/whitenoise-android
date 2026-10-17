@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.ActivityNotFoundException
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.AttachmentOpenIntentClaim
 import dev.ipf.whitenoise.android.state.AttachmentTransferCancelledByUserException
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
@@ -521,6 +522,21 @@ class AttachmentPresentationTest {
                 automaticDownloadsPaused = false,
             ),
         )
+    }
+
+    /** A body MDK still holds parked resumes as the reader's own download, which policy cannot revoke either. */
+    @Test
+    fun aParkedDownloadFoundOnEntryResumesAsTheReadersOwn() {
+        val restored = AttachmentMaterializationIntent.Idle.afterParkedDownloadFound()
+
+        assertEquals(AttachmentMaterializationIntent.Interactive, restored)
+        assertEquals(AttachmentDownloadPriority.Interactive, restored.priority)
+        assertTrue(restored.readerRequested)
+        assertFalse(
+            "a policy grant is not the reader's own download",
+            AttachmentMaterializationIntent.Idle.withPolicyAllowed(allowed = true).readerRequested,
+        )
+        assertEquals(restored, restored.withPolicyAllowed(allowed = false))
     }
 
     @Test

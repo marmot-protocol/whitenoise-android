@@ -240,13 +240,18 @@ import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
 
+/**
+ * How inviting one profile to several groups went: of [attempted] groups, [failures] failed and in [waited] the user
+ * chose to wait on a group-change question, so those groups were not invited either.
+ */
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,
     val firstFailure: AppText? = null,
+    val waited: Int = 0,
 ) {
-    val delivered: Int = attempted - failures
-    val completedSuccessfully: Boolean = attempted > 0 && failures == 0
+    val delivered: Int = attempted - failures - waited
+    val completedSuccessfully: Boolean = attempted > 0 && failures == 0 && waited == 0
 }
 
 internal object ChatScreenshotPreferences {
@@ -1423,6 +1428,9 @@ class WhiteNoiseAppState private constructor(
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
     private val nativeAttachmentPermissions = NativeAttachmentPermissions()
 
+    /** Questions about overriding MDK's advisory refusals of a group change, shown at app level (#3289). */
+    internal val groupChangeConfirmations = GroupChangeConfirmations()
+
     /** Refreshes runtime-scoped permissions after network, preference, or account changes. */
     internal fun refreshNativeAttachmentPermissions() {
         val runtime = marmotRuntime
@@ -2429,6 +2437,9 @@ class WhiteNoiseAppState private constructor(
 
     internal val attachmentUserActions = AttachmentUserActions(mutationsScope)
 
+    /** Attachments whose download the reader started and MDK parked for storage, for this process only. */
+    internal val readerParkedDownloads: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
+
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
             intentStore = attachmentDownloadIntents,
@@ -3059,11 +3070,42 @@ class WhiteNoiseAppState private constructor(
     private val groupCommitLocks = KeyedMutexPool()
     private val conversationTextSendOrderLocks = KeyedMutexPool()
 
+    /** Runs [block] as the only commit-producing call for this account's group. */
     suspend fun <T> withGroupCommitLock(
         accountRef: String,
         groupIdHex: String,
         block: suspend () -> T,
     ): T = groupCommitLocks.withLock("$accountRef|$groupIdHex", block)
+
+    /** The chat list's title for [groupIdHex] while the chat list shows [accountRef], or null when it is not listed. */
+    internal fun chatTitle(
+        accountRef: String,
+        groupIdHex: String,
+    ): String? {
+        val controller = chatsController?.takeIf { it.accountRef == accountRef }
+        val item =
+            controller
+                ?.let { (it.items + it.archivedItems) }
+                ?.firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+        return item?.let { chatListItemDisplayTitle(it, this, notificationGroupTitleCopy(appContext)) }
+    }
+
+    /** Runs [block] holding this group's commit lock, taking it only when the caller does not hold it already. */
+    internal suspend fun <T> withGroupCommitLockHeld(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T = groupCommitLocks.withLockUnlessHeld("$accountRef|$groupIdHex", block)
+
+    /**
+     * Runs [block], which produces no commit, with this group's commit lock released if the caller holds it, so sends
+     * and other changes to the group are not held up while the user answers a question.
+     */
+    internal suspend fun <T> outsideGroupCommitLock(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T = groupCommitLocks.releasedWhile("$accountRef|$groupIdHex", block)
 
     suspend fun <T> withConversationTextSendOrder(
         accountRef: String,
@@ -4130,6 +4172,7 @@ class WhiteNoiseAppState private constructor(
         chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex, accountWide)
             ?: ProfileGroupPickerState.empty()
 
+    /** Makes [targetRef] an admin of [groupIdHex], asking first if MDK holds the change back. True once committed. */
     suspend fun promoteProfileInGroup(
         targetRef: String,
         groupIdHex: String,
@@ -4139,12 +4182,15 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef
         if (target.isEmpty() || groupId.isEmpty() || account == null) return false
         return runCatchingCancellable {
+            // The lock is released only while the user decides, and held again for the acknowledgement and retry.
             withGroupCommitLock(account, groupId) {
-                val result =
-                    marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
-                        promoteAdminDetailed(account, groupId, target)
-                    }
-                chatsController?.applyProfileGroupDetails(account, result.details)
+                runGroupChange(account, groupId) {
+                    val result =
+                        marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                            promoteAdminDetailed(account, groupId, target)
+                        }
+                    chatsController?.applyProfileGroupDetails(account, result.details)
+                }
             }
             presentConversationTransient(
                 accountRef = account,
@@ -4163,7 +4209,9 @@ class WhiteNoiseAppState private constructor(
      * method keeps the commit-producing calls serialized per group and surfaces
      * a single result toast after the fan-out completes. Returns true only when
      * every attempted group accepted the invite, so partial failures can keep the
-     * picker open with the failed groups still selected for retry.
+     * picker open with the failed groups still selected for retry. Choosing Wait on
+     * one group's change question skips only that group and is reported as part of
+     * the result; cancellation still stops the fan-out.
      */
     @Suppress("LongMethod", "ReturnCount") // The fan-out and aggregate result share one failure accumulator.
     suspend fun inviteProfileToGroups(
@@ -4178,47 +4226,46 @@ class WhiteNoiseAppState private constructor(
                 .distinctBy { it.lowercase() }
         if (targets.isEmpty()) return false
         val account = activeAccountRef ?: return false
+        val runtime = runtimeGeneration
+        val stillCurrent = { activeAccountRef == account && runtimeGeneration == runtime }
         var failures = 0
+        var waited = 0
         var firstFailure: AppText? = null
         var firstFailureThrowable: Throwable? = null
         for (groupIdHex in targets) {
-            runCatchingCancellable {
-                withGroupCommitLock(account, groupIdHex) {
-                    val result =
-                        marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
-                            inviteMembersDetailed(account, groupIdHex, listOf(ref))
-                        }
-                    chatsController?.applyProfileGroupDetails(account, result.details)
-                }
-            }.onFailure { error ->
+            // A switch mid-fan-out ends it: the rest belonged to the previous account.
+            if (!stillCurrent()) return false
+            val attempt = inviteProfileToGroup(account, groupIdHex, ref)
+            if (attempt == null) {
+                waited += 1
+                continue
+            }
+            attempt.onFailure { error ->
                 failures += 1
                 if (firstFailure == null) {
                     firstFailureThrowable = error
-                    val message = error.readableMessage()
-                    firstFailure =
-                        if (isDuplicateSignatureKeyError(message)) {
-                            AppText.Resource(
-                                R.string.toast_couldnt_add_member_duplicate_detail,
-                                listOf(displayName(ref)),
-                            )
-                        } else {
-                            inviteFailureDetail(
-                                error,
-                                ::displayName,
-                                if (error is MarmotKitException.InvalidKeyPackageEvent) displayName(ref) else null,
-                            )
-                        }
+                    firstFailure = profileGroupInviteFailureDetail(error, ref)
                 }
             }
         }
+        if (!stillCurrent()) return false
         val outcome =
             ProfileGroupInviteOutcome(
                 attempted = targets.size,
                 failures = failures,
                 firstFailure = firstFailure,
+                waited = waited,
             )
+        presentProfileGroupInvite(outcome, firstFailureThrowable)
+        return outcome.completedSuccessfully
+    }
+
+    /** Shows the one toast that sums up a profile fan-out, with [failure]'s report when it is copyable. */
+    private fun presentProfileGroupInvite(
+        outcome: ProfileGroupInviteOutcome,
+        failure: Throwable?,
+    ) {
         profileGroupInviteToast(outcome)?.let { toast ->
-            val failure = firstFailureThrowable
             if (toast.copyable && failure != null) {
                 presentFailure(
                     titleRes = toast.messageRes,
@@ -4234,8 +4281,47 @@ class WhiteNoiseAppState private constructor(
                 present(toast.messageRes, toast.detail, copyable = toast.copyable)
             }
         }
-        return outcome.completedSuccessfully
     }
+
+    /**
+     * Invites [ref] to one group of a profile fan-out. Returns null when the user chose to wait on that group's
+     * change question, so only that group stays uninvited; cancellation still propagates and stops the fan-out.
+     */
+    private suspend fun inviteProfileToGroup(
+        account: String,
+        groupIdHex: String,
+        ref: String,
+    ): Result<Unit>? =
+        try {
+            runCatchingCancellable {
+                withGroupCommitLock(account, groupIdHex) {
+                    runGroupChange(account, groupIdHex, invite = true) {
+                        val result =
+                            marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
+                                inviteMembersDetailed(account, groupIdHex, listOf(ref))
+                            }
+                        chatsController?.applyProfileGroupDetails(account, result.details)
+                    }
+                }
+            }.map { }
+        } catch (_: GroupChangeDeclinedException) {
+            null
+        }
+
+    /** The detail the fan-out's toast gives for its first failed group, naming [ref] when it is about them. */
+    private fun profileGroupInviteFailureDetail(
+        error: Throwable,
+        ref: String,
+    ): AppText =
+        if (isDuplicateSignatureKeyError(error.readableMessage())) {
+            AppText.Resource(R.string.toast_couldnt_add_member_duplicate_detail, listOf(displayName(ref)))
+        } else {
+            inviteFailureDetail(
+                error,
+                ::displayName,
+                if (error is MarmotKitException.InvalidKeyPackageEvent) displayName(ref) else null,
+            )
+        }
 
     /**
      * Compose-tracked snapshot of the active account's projected chat list.

@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
@@ -260,6 +261,7 @@ class NewChatFlowTest {
             assertEquals("created-group", failure.error.retryGroupIdHex)
         }
 
+    /** Starting a chat with someone who has no KeyPackage explains it and offers the optional share link. */
     @Test
     fun sharedStartChatAttemptExplainsMissingKeyPackageWithOptionalShare() =
         runTest {
@@ -268,7 +270,9 @@ class NewChatFlowTest {
                     npub = "npub1support",
                     progressHex = "support",
                     recipientName = "White Noise support",
-                    createGroup = { throw MarmotKitException.MissingKeyPackage("support") },
+                    createGroup = {
+                        throw MarmotKitException.MissingKeyPackage("support", MissingKeyPackageReasonFfi.NOT_FOUND)
+                    },
                     loadCreatedChatListItem = { error("must not load a failed create") },
                     displayName = { "White Noise support" },
                 )

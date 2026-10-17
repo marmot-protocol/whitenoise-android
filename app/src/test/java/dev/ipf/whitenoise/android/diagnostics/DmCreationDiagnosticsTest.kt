@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticRecorder
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticStore
@@ -67,7 +68,7 @@ class DmCreationDiagnosticsTest {
                         ),
                         prewarm = {
                             finishPrewarm.await()
-                            throw MarmotKitException.MissingKeyPackage(PRIVATE)
+                            throw MarmotKitException.MissingKeyPackage(PRIVATE, MissingKeyPackageReasonFfi.NOT_FOUND)
                         },
                         lookup = { NewMessageDirectChatResolution(null, true) },
                         diagnosticAttempt = interaction.preparation(),
@@ -168,6 +169,23 @@ class DmCreationDiagnosticsTest {
         }
     }
 
+    /** Obsolete-only packages stay an unusable package, and an incomplete lookup is unavailable, never missing. */
+    @Test
+    fun typedKeyAndLookupFailuresKeepTheirDiagnosticClass() {
+        assertEquals(
+            DmCreationFailure.MISSING_KEY_PACKAGE,
+            dmCreationFailure(MarmotKitException.MissingKeyPackage(PRIVATE, MissingKeyPackageReasonFfi.NOT_FOUND)),
+        )
+        assertEquals(
+            DmCreationFailure.INVALID_KEY_PACKAGE,
+            dmCreationFailure(MarmotKitException.MissingKeyPackage(PRIVATE, MissingKeyPackageReasonFfi.OBSOLETE_ONLY)),
+        )
+        assertEquals(
+            DmCreationFailure.LOOKUP_UNAVAILABLE,
+            dmCreationFailure(MarmotKitException.DirectoryLookupIncomplete(PRIVATE)),
+        )
+    }
+
     /** Calls the production lookup/create/projection machine while preparation is genuinely overlapping. */
     private suspend fun exerciseCreateRetries(
         interaction: DmCreationInteraction,
@@ -175,7 +193,7 @@ class DmCreationDiagnosticsTest {
     ) {
         val failures =
             listOf(
-                MarmotKitException.MissingKeyPackage(PRIVATE),
+                MarmotKitException.MissingKeyPackage(PRIVATE, MissingKeyPackageReasonFfi.NOT_FOUND),
                 MarmotKitException.MissingMemberInboxRoute(PRIVATE),
                 MarmotKitException.InvalidKeyPackageEvent(PRIVATE),
                 MarmotKitException.Publish(PRIVATE),

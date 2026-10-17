@@ -777,6 +777,14 @@
           "GRP-001",
           "GRP-030"
         ]
+      },
+      {
+        "surface": "Edit that MarmotKit refuses because the message can no longer be edited",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_message_not_editable",
+        "test_ids": [
+          "MSG-007"
+        ]
       }
     ]
   },

@@ -886,6 +886,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">Не удалось добавить %1$s. Этот участник уже в группе, либо его ключ подписи конфликтует с ключом существующего участника.</string>
     <string name="toast_invites_sent_to_groups">Приглашения отправлены в выбранные группы</string>
     <string name="toast_invites_sent_to_groups_partial">Приглашения отправлены в некоторые группы; часть не удалась</string>
+    <string name="toast_invites_sent_to_groups_waited">Приглашения отправлены в некоторые группы; остальные ждут повторной попытки</string>
     <string name="toast_member_removed">Участник удален</string>
     <string name="toast_couldnt_remove_member">Не удалось удалить участника. Попробуйте снова.</string>
     <string name="toast_group_roster_changed">Состав группы изменился. Проверьте группу и попробуйте снова.</string>
@@ -2409,6 +2410,21 @@
     <string name="media_reply_draft_conflict">Ваш черновик изменился. Сохраните этот ответ и повторите попытку или отмените ответ перед отправкой.</string>
     <string name="photo_editor_budget_exceeded">Для этой обрезки требуется больше данных изображения или памяти, чем можно безопасно обработать. Выберите более широкую область обрезки или более низкое качество. Предыдущее вложение останется без изменений.</string>
     <string name="share_connect_save_to_gallery">Сохранить в галерею</string>
+    <string name="media_storage_blocked_short">Недостаточно места</string>
+    <string name="media_storage_blocked">Недостаточно места. Освободите место и нажмите, чтобы повторить.</string>
+    <string name="error_obsolete_key_package">Этому человеку нужно обновить White Noise, прежде чем его можно будет добавить. Попросите обновить и открыть приложение, затем повторите попытку.</string>
+    <string name="error_obsolete_key_package_for">%1$s нужно обновить White Noise, прежде чем его можно будет добавить. Попросите обновить и открыть приложение, затем повторите попытку.</string>
+    <string name="error_directory_lookup_incomplete">Не удалось до конца проверить, можно ли добавить этого человека. Проверьте подключение и повторите попытку.</string>
+    <string name="error_directory_lookup_incomplete_for">Не удалось до конца проверить, можно ли добавить %1$s. Проверьте подключение и повторите попытку.</string>
+    <string name="error_message_not_editable">Это сообщение больше нельзя изменить.</string>
+    <string name="group_change_catching_up_title">Этот чат может быть устаревшим</string>
+    <string name="group_change_catching_up_message">Этот чат на этом устройстве может быть устаревшим. Изменение группы сейчас может разделить её для всех. Подождать синхронизации или всё равно продолжить?</string>
+    <string name="group_change_catching_up_invite_message">Этот чат на этом устройстве может быть устаревшим. Если группа ушла вперёд, приглашённые сейчас люди могут получить уже недействительное приглашение, а группа может разделиться для всех. Подождать синхронизации или всё равно пригласить?</string>
+    <string name="group_change_undelivered_title">Ваше последнее изменение ещё доставляется</string>
+    <string name="group_change_undelivered_message">Ваше последнее изменение в этой группе ещё не дошло до всех её реле. Если вы продолжите, участники, которые используют только эти реле, могут потерять связь с группой. Подождать или всё равно продолжить?</string>
+    <string name="group_change_wait">Подождать</string>
+    <string name="group_change_continue_anyway">Всё равно продолжить</string>
+    <string name="group_change_invite_anyway">Всё равно пригласить</string>
     <string name="starting_as">Начать от имени</string>
     <string name="starting_as_account">Начать от имени %1$s</string>
 </resources>

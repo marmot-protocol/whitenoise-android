@@ -2125,6 +2125,23 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+      "symbol": "GroupChangeConfirmationDialog",
+      "bindings": [
+        {
+          "case": "presentation-modal-group-change-catchingup",
+          "selector": {
+            "text": "This chat may be out of date"
+          },
+          "scope": "Actual app-level question for a catching-up refusal with Wait/Back/reopen and the Continue anyway callback; the answer reaches only the fixture, never acknowledge or a group change. Undelivered and invite wording are pinned by GroupChangeConfirmationScreenshotTest.",
+          "entry_assertion": {
+            "text": "This chat may be out of date"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
       "symbol": "DeveloperInfoPanel",
       "bindings": [

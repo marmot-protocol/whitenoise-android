@@ -65,6 +65,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
+import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
+import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -232,6 +234,13 @@ internal fun MediaVideoGridTile(
         mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
     }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
+    var storageFailed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
+
+    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
+    fun markFailed(cause: Throwable? = null) {
+        storageFailed = cause.parksForStorage()
+        failed = true
+    }
     var tileDurationMs by remember(messageIdHex, attachmentIndex, epoch) { mutableLongStateOf(0L) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
@@ -253,6 +262,15 @@ internal fun MediaVideoGridTile(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, messageIdHex, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedByReader = failed && storageFailed && materializationIntent.readerRequested,
+        recordParkedByReader = { controller.recordReaderParkedDownload(messageIdHex, attachmentIndex) },
+        readerParkHeld = { controller.readerDownloadParkedForStorage(messageIdHex, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterParkedDownloadFound()
+    }
     val transfer =
         rememberTileTransfer(
             controller,
@@ -263,10 +281,16 @@ internal fun MediaVideoGridTile(
             cancelledByReader,
             startDownload,
             failedLocally = failed && localFile == null,
+            storageBlockedLocally = storageFailed && failed && localFile == null,
         )
     // The transfer owns the play disc while it is queued, running, being cancelled, cancelled or failed.
     val transferShown = transfer.visible && localFile == null
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
     val materializationLock = remember(messageIdHex, attachmentIndex, epoch) { Mutex() }
 
     /**
@@ -291,7 +315,7 @@ internal fun MediaVideoGridTile(
             onTap()
         }
         if (retry) {
-            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { failed = true })
+            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { markFailed(it) })
         } else {
             open()
         }
@@ -330,7 +354,7 @@ internal fun MediaVideoGridTile(
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
                 Log.w("MediaVideoGridTile", "video_tile_auto_materialize_failed")
-                failed = true
+                markFailed(it)
             }
         }
     }
@@ -628,6 +652,13 @@ internal fun MediaVideoBubble(
     val sendingFromStagedFile = pendingAttachment?.sourceFile != null
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
+    var storageFailed by remember(pillKey, epoch) { mutableStateOf(false) }
+
+    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
+    fun markFailed(cause: Throwable? = null) {
+        storageFailed = cause.parksForStorage()
+        failed = true
+    }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageBubble). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -663,6 +694,15 @@ internal fun MediaVideoBubble(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, messageIdHex, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedByReader = failed && storageFailed && materializationIntent.readerRequested,
+        recordParkedByReader = { controller.recordReaderParkedDownload(messageIdHex, attachmentIndex) },
+        readerParkHeld = { controller.readerDownloadParkedForStorage(messageIdHex, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterParkedDownloadFound()
+    }
     val transfer =
         rememberTileTransfer(
             controller,
@@ -673,6 +713,7 @@ internal fun MediaVideoBubble(
             cancelledByReader,
             startDownload,
             failedLocally = failed && localFile == null && !loading,
+            storageBlockedLocally = storageFailed && failed && localFile == null && !loading,
         )
     // The transfer owns the play disc while it is queued, running, being cancelled, cancelled or failed.
     val transferShown = transfer.visible && localFile == null
@@ -700,17 +741,22 @@ internal fun MediaVideoBubble(
                         } catch (t: Throwable) {
                             currentCoroutineContext().ensureActive()
                             if (t is CancellationException) throw t
-                            failed = true
+                            markFailed(t)
                             localFile = null
                         } finally {
                             loading = false
                         }
                     }
             },
-            onFailure = { failed = true },
+            onFailure = { markFailed(it) },
         )
     }
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
     val materializationLock = remember(pillKey, epoch) { Mutex() }
 
     LaunchedEffect(
@@ -746,7 +792,7 @@ internal fun MediaVideoBubble(
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
                 Log.w("MediaVideoBubble", "video_auto_materialize_failed")
-                failed = true
+                markFailed(it)
             }
         }
         loading = false
@@ -777,7 +823,7 @@ internal fun MediaVideoBubble(
             )
         }
         if (retry) {
-            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { failed = true })
+            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { markFailed(it) })
         } else {
             open()
         }

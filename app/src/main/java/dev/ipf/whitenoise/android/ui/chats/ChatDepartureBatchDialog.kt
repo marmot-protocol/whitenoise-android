@@ -115,9 +115,15 @@ internal fun ChatDepartureBatchDialog(
         ui.busy = true
         actions.onBusyChange(true)
         ui.result = null
+        val departingGroups = targets.mapTo(mutableSetOf()) { it.groupId }
         appState.launchMutation {
             try {
-                val callbacks = departureCallbacks(request, controller, ui, isCurrent)
+                // Only a question about one of these chats pauses the budget, not one from elsewhere.
+                val questionOpen = {
+                    val question = appState.groupChangeConfirmations.pending
+                    question != null && question.target.groupIdHex in departingGroups
+                }
+                val callbacks = departureCallbacks(request, controller, ui, isCurrent, questionOpen)
                 val result = runChatDepartureBatch(targets, isCurrent, callbacks)
                 if (isCurrent()) ui.result = result
             } finally {
@@ -208,13 +214,15 @@ internal fun ChatDepartureReview(
 
 /**
  * The batch steps. An abandonment takes the same journaled forget as the row action, never a leave or a receiving
- * delete (#3310), and a departure prepares and confirms any handover before it leaves.
+ * delete (#3310), and a departure prepares and confirms any handover before it leaves, pausing its step budget while
+ * [questionOpen] reports a group-change question about one of the departing chats.
  */
 private fun departureCallbacks(
     request: PendingChatDeparture,
     controller: ChatsController,
     ui: ChatDepartureUi,
     isCurrent: () -> Boolean,
+    questionOpen: () -> Boolean,
 ): ChatDepartureCallbacks {
     val onProgress = { title: String, completed: Int, total: Int -> ui.progress = "$completed / $total · $title" }
     if (request.abandon) return abandonmentDepartureCallbacks(controller, onProgress)
@@ -223,6 +231,7 @@ private fun departureCallbacks(
         choose = { target, members -> chooseDepartureSuccessor(ui, target, members) },
         remove = { target, successor -> removeChatDepartureTarget(target, successor, controller, ui, isCurrent) },
         onProgress = onProgress,
+        questionOpen = questionOpen,
     )
 }
 
