@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.NetworkInfo
+import android.os.Looper
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.test.assertTextContains
@@ -104,7 +105,11 @@ class SignUpProfileDraftSubmissionTest {
         }
         composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()
         composeRule.waitUntil(5_000) { creations.get() == 1 }
-        composeRule.waitUntil(5_000) { app.pendingProfileSignUp?.stage == SignUpStage.CreateFailed }
+        // The process-owned adapter resumes on Main after native IO, outside the Compose test clock.
+        composeRule.waitUntil(5_000) {
+            shadowOf(Looper.getMainLooper()).idle()
+            app.pendingProfileSignUp?.stage == SignUpStage.CreateFailed
+        }
         composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Retained name")
         composeRule.runOnIdle { assertEquals(1, creations.get()) }
