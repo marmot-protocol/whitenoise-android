@@ -117,6 +117,7 @@ internal class NotificationBootstrapTestFixture(
     private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
     private val markReadRow: ChatListRowFfi? = null,
     private val signInFailure: Throwable? = null,
+    private val onSignInAccount: ((String) -> Unit)? = null,
     initialNotificationSettings: NotificationSettingsFfi? = null,
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
@@ -195,6 +196,7 @@ internal class NotificationBootstrapTestFixture(
     val directChatListCalls = AtomicInteger(0)
     val memberProjectionCalls = AtomicInteger(0)
     val signerRegistrationCalls = AtomicInteger(0)
+    val signInRequests = CopyOnWriteArrayList<String>()
     val markReadRequests = CopyOnWriteArrayList<Triple<String, String, String>>()
     val markReadCalls = AtomicInteger(0)
     val manualUnreadWrites = CopyOnWriteArrayList<Triple<String, String, Boolean>>()
@@ -536,7 +538,13 @@ internal class NotificationBootstrapTestFixture(
                     signerRegistrationCalls.incrementAndGet()
                     Unit
                 }
-                "signInAccount" -> signInFailure?.let { throw it } ?: Unit
+                "signInAccount" -> {
+                    val accountRef = arguments?.first() as String
+                    signInRequests += accountRef
+                    signInFailure?.let { throw it }
+                    onSignInAccount?.invoke(accountRef)
+                    Unit
+                }
                 "toString" -> "NotificationBootstrapMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
