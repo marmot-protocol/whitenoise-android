@@ -223,6 +223,42 @@ class NotificationIdentityShortcutBeforePostTest {
         assertFalse("nothing was rebuilt bare", InFlightConversationShortcuts.consumeIdentityLost(shortcutId))
     }
 
+    /**
+     * Account A's card publishes a share-eligible shortcut, and account B becomes active before the card is written.
+     * B's Direct Share refresh keeps A's held shortcut with its picture and Person but never as a share target, so
+     * Android cannot suggest A's conversation while B is active.
+     */
+    @Test
+    fun anotherAccountsRefreshKeepsAHeldShortcutWithoutShareEligibility() {
+        val recorder = Recorder()
+        var refreshed = emptyList<ShortcutInfoCompat>()
+        val share =
+            dev.ipf.whitenoise.android.share.ShareShortcutPublisher(
+                context = context,
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = { shortcuts ->
+                    refreshed = shortcuts
+                    ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
+                },
+                existingShortcuts = { emptyList() },
+                dynamicShortcuts = { ShortcutManagerCompat.getDynamicShortcuts(context) },
+                cardShortcutIds = { emptySet() },
+            )
+        recorder.beforePost = { share.publish(OTHER_ACCOUNT, emptyList()) { it.group.name } }
+        val presenter = presenter(recorder)
+
+        post(presenter, update(isDm = false), picture = solid(Color.BLUE), directShareEligible = true)
+
+        val shortcutId = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        val published = recorder.shortcuts.single()
+        assertTrue("A published its shortcut as a share target", CONVERSATION_SHARE_TARGET_CATEGORY in published.categories.orEmpty())
+        val kept = refreshed.single()
+        assertEquals("B's refresh kept A's held shortcut", shortcutId, kept.id)
+        assertFalse("but never as a share target", CONVERSATION_SHARE_TARGET_CATEGORY in kept.categories.orEmpty())
+        assertEquals("with its picture", Color.BLUE, iconPixel(kept))
+        assertEquals("and its Person", personsOf(published), personsOf(kept))
+    }
+
     /** A card write cancelled after the shortcut was published still releases that shortcut's hold. */
     @Test
     fun cancelledCardWriteReleasesItsHeldShortcut() {
@@ -389,6 +425,7 @@ class NotificationIdentityShortcutBeforePostTest {
         update: NotificationUpdateFfi,
         picture: Bitmap? = null,
         sender: Bitmap? = picture,
+        directShareEligible: Boolean = false,
     ) {
         assertTrue(
             runBlocking {
@@ -398,6 +435,7 @@ class NotificationIdentityShortcutBeforePostTest {
                     conversationAvatarBitmap = picture,
                     senderAvatarBitmap = sender,
                     shortNpub = { "npub" },
+                    directShareEligible = directShareEligible,
                 )
             },
         )
@@ -465,6 +503,7 @@ class NotificationIdentityShortcutBeforePostTest {
 
     private companion object {
         const val ACCOUNT = NotificationFixtureDefaults.ACCOUNT_REF
+        const val OTHER_ACCOUNT = "account-b"
         const val GROUP = NotificationFixtureDefaults.GROUP_ID_HEX
         const val OTHER_GROUP = "group-b"
         const val SENDER = NotificationFixtureDefaults.SENDER_ACCOUNT_ID_HEX

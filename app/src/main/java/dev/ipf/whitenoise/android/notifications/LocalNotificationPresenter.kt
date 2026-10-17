@@ -2623,7 +2623,7 @@ class LocalNotificationPresenter(
                 reuseCachedShortcut(shortcutId, snapshot, isPublishAllowed, holdForPost)?.let { return it }
             }
             val intent = conversationShortcutOpenIntent(update, content)
-            val shortcut =
+            val build = { shareEligible: Boolean ->
                 conversationShortcutInfo(
                     shortcutId = shortcutId,
                     snapshot = snapshot,
@@ -2631,35 +2631,42 @@ class LocalNotificationPresenter(
                     locusId = locusId,
                     sender = ownedSender,
                     conversationAvatarBitmap = ownedConversationAvatar,
-                    directShareEligible = directShareEligible,
+                    directShareEligible = shareEligible,
                 )
+            }
+            val shortcut = build(directShareEligible)
+            // A refresh that retains this shortcut for its card keeps a twin that is never a share target (#3322).
+            val retainable = if (directShareEligible) build(false) else shortcut
             synchronized(UserEventNotificationGroup.mutationLock) {
                 // A cap filled by protected shortcuts skips the publication, and the card keeps the existing fallback.
                 if (isPublishAllowed() && pruneConversationShortcutsBeforePublish(shortcutId)) {
                     val (currentChoice, pixels) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
                     val preview = NotificationPreviewPreferences.capture(context)
-                    shortcut.extras?.let { stampShortcutPreview(preview, it) }
-                    stampContactPictureShortcut(shortcut, update.sender.accountIdHex, update.isDm)
-                    val currentShortcut =
-                        if (!shortcutPreviewAllowed(context, shortcut)) {
-                            genericNotificationShortcut(context, shortcut)
+                    val finish = { built: ShortcutInfoCompat ->
+                        built.extras?.let { stampShortcutPreview(preview, it) }
+                        stampContactPictureShortcut(built, update.sender.accountIdHex, update.isDm)
+                        if (!shortcutPreviewAllowed(context, built)) {
+                            genericNotificationShortcut(context, built)
                         } else if (currentChoice) {
                             withContactPictureIcon(
                                 context,
-                                shortcut,
+                                built,
                                 update.sender.accountIdHex,
                                 pixels,
                                 initialConversationIcon =
                                     notificationConversationIcon(title, shortcutId, ownedConversationAvatar),
                             )
                         } else {
-                            shortcut
+                            built
                         }
+                    }
+                    val currentShortcut = finish(shortcut)
+                    val retainedShortcut = if (retainable === shortcut) currentShortcut else finish(retainable)
                     shortcutPublisher(currentShortcut)
                     shortcutSnapshots[shortcutId] = snapshot
                     InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
                     ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
-                    InFlightConversationShortcuts.rememberPublished(shortcutId, currentShortcut)
+                    InFlightConversationShortcuts.rememberPublished(shortcutId, currentShortcut, retainedShortcut)
                     if (holdForPost) InFlightConversationShortcuts.hold(shortcutId)
                     holdForPost
                 } else {

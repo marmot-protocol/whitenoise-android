@@ -160,11 +160,13 @@ private fun rebuildRichShareShortcut(
     )
 
 /**
- * Keeps a card-backed shortcut through a refresh. A shortcut held for a pending card is retained exactly as the
- * presenter published it moments ago, picture, Person, preview stamp and share eligibility included. AndroidX
- * restricts copying a shortcut, and the public readback carries neither icon nor Person, so it is not rebuilt. Any
- * other is rebuilt from the readback, which carries no icon, so the presenter is told to publish its picture again.
- * The caller's final privacy pass still turns a hidden-preview shortcut generic.
+ * Keeps a card-backed shortcut through a refresh. A shortcut held for a pending card is retained as the presenter
+ * published it moments ago, picture, Person and preview stamp included, but as its share-ineligible twin: a retained
+ * entry is not a recent chat of the active account, and a pending card of the account just switched away from must
+ * not become a share suggestion. AndroidX restricts copying a shortcut, and the public readback carries neither icon
+ * nor Person, so the presenter builds that twin when it publishes. Any other is rebuilt from the readback, which
+ * carries no icon, so the presenter is told to publish its picture again. The caller's final privacy pass still
+ * turns a hidden-preview shortcut generic.
  */
 private fun retainCardBackedShortcut(
     context: Context,
@@ -172,7 +174,7 @@ private fun retainCardBackedShortcut(
     rank: Int,
     previewToken: NotificationPreviewToken,
 ): ShortcutInfoCompat =
-    InFlightConversationShortcuts.publishedShortcut(existing.id) ?: run {
+    InFlightConversationShortcuts.retainedShortcut(existing.id) ?: run {
         InFlightConversationShortcuts.markIdentityLost(existing.id)
         rebuildCardBackedShortcut(context, existing, rank, previewToken)
     }

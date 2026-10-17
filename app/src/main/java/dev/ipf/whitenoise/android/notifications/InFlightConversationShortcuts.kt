@@ -25,21 +25,31 @@ internal object InFlightConversationShortcuts {
     )
 
     private val holds = HashMap<String, Hold>()
-    private val published = HashMap<String, ShortcutInfoCompat>()
+
+    /** One presenter publication: the shortcut as published, and its twin for a refresh that retains it. */
+    private data class Publication(
+        val shortcut: ShortcutInfoCompat,
+        val retained: ShortcutInfoCompat,
+    )
+
+    private val published = HashMap<String, Publication>()
     private val identityLost = HashSet<String>()
 
     /**
      * Adds one hold on [shortcutId] for a pending post, keeping [publishedShortcut] when the presenter has just
-     * published it, or else the copy kept from its last publication. The caller already holds the publication lock.
+     * published it, or else the copy kept from its last publication. [retainedShortcut] is its share-ineligible twin
+     * for a refresh that retains it, the same shortcut when it was never a share target. The caller already holds
+     * the publication lock.
      */
     fun hold(
         shortcutId: String,
         publishedShortcut: ShortcutInfoCompat? = null,
+        retainedShortcut: ShortcutInfoCompat? = publishedShortcut,
         nowMs: Long = SystemClock.elapsedRealtime(),
     ) {
         synchronized(UserEventNotificationGroup.mutationLock) {
             holds[shortcutId] = Hold((holds[shortcutId]?.count ?: 0) + 1, nowMs)
-            publishedShortcut?.let { published[shortcutId] = it }
+            publishedShortcut?.let { published[shortcutId] = Publication(it, retainedShortcut ?: it) }
         }
     }
 
@@ -57,14 +67,30 @@ internal object InFlightConversationShortcuts {
 
     /** The shortcut the presenter published for a held [shortcutId], picture included, or null. */
     fun publishedShortcut(shortcutId: String): ShortcutInfoCompat? =
-        synchronized(UserEventNotificationGroup.mutationLock) { published[shortcutId]?.takeIf { shortcutId in holds } }
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            published[shortcutId]?.shortcut?.takeIf { shortcutId in holds }
+        }
 
-    /** Keeps [shortcut] as the presenter's latest publication of [shortcutId], for holds that reuse it unchanged. */
+    /**
+     * What a Direct Share refresh keeps for a held [shortcutId] it does not target: the presenter's publication with
+     * its picture and Person, but without share eligibility, so a pending card for another account, or for a chat
+     * outside the active account's recent targets, never becomes a share suggestion. Null when it is not held.
+     */
+    fun retainedShortcut(shortcutId: String): ShortcutInfoCompat? =
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            published[shortcutId]?.retained?.takeIf { shortcutId in holds }
+        }
+
+    /**
+     * Keeps [shortcut] as the presenter's latest publication of [shortcutId], for holds that reuse it unchanged,
+     * with [retained] as its share-ineligible twin for refreshes that retain it.
+     */
     fun rememberPublished(
         shortcutId: String,
         shortcut: ShortcutInfoCompat,
+        retained: ShortcutInfoCompat = shortcut,
     ) {
-        synchronized(UserEventNotificationGroup.mutationLock) { published[shortcutId] = shortcut }
+        synchronized(UserEventNotificationGroup.mutationLock) { published[shortcutId] = Publication(shortcut, retained) }
     }
 
     /** Forgets the kept publication of [shortcutId], when the presenter forgets or replaces its snapshot. */
