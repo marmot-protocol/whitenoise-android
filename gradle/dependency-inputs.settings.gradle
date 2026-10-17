@@ -1,0 +1,22 @@
+import org.gradle.api.artifacts.dsl.LockMode
+
+// Gradle's update flags explicitly create review candidates. Normal/source-archive
+// builds require the checked-in trust root and cannot opt into lenient verification.
+def writingCandidates = gradle.startParameter.writeDependencyLocks &&
+    gradle.startParameter.writeDependencyVerifications == ['sha256']
+if (gradle.startParameter.dependencyVerificationMode.name() != 'STRICT') {
+    throw new GradleException('Dependency verification must remain strict; update reviewed inputs instead')
+}
+if (!writingCandidates && !new File(settingsDir, 'gradle/verification-metadata.xml').isFile()) {
+    throw new GradleException('Missing reviewed dependency verification metadata; see docs/dependency-security.md')
+}
+
+gradle.beforeProject { project ->
+    project.dependencyLocking.lockAllConfigurations()
+    project.dependencyLocking.lockMode = LockMode.STRICT
+    project.buildscript.dependencyLocking.lockAllConfigurations()
+    project.buildscript.dependencyLocking.lockMode = LockMode.STRICT
+    project.buildscript.configurations.configureEach {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}

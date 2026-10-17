@@ -378,13 +378,88 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)', root_build)
         self.assertIn('outputs.doNotCacheIf("CI test assertions must execute")', root_build)
 
+    def test_dependency_qualification_follows_a_restored_committed_trust_root(self):
+        """After a capture, qualification runs only once the trust-root check has restored and proved committed bytes."""
+        job = self.build_contracts
+        retain = job.index('      - name: Retain dependency-control bootstrap candidates\n')
+        require = job.index('      - name: Require the committed dependency trust root for qualification\n')
+        qualify = job.index('      - name: Qualify dependency submission graph generation\n')
+        self.assertLess(retain, require)
+        self.assertLess(require, qualify)
+        step = self.named_step(job, 'Require the committed dependency trust root for qualification')
+        self.assertIn("if: matrix.phase == 'tooling'", step)
+        self.assertIn("RESTORE_CAPTURE: ${{ github.event_name == 'workflow_dispatch' && "
+                      "inputs.capture_dependency_inputs }}", step)
+        self.assertIn('./scripts/require-committed-dependency-trust-root.sh', step)
+
+    def test_trust_root_check_restores_capture_rewrites_and_rejects_them_otherwise(self):
+        """A capture's rewritten or new locks are restored in capture mode and rejected in every other mode."""
+        script = WORKFLOW.parents[2] / 'scripts/require-committed-dependency-trust-root.sh'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            # The throwaway repository ignores the machine's git configuration, such as commit signing.
+            isolated = {**os.environ, 'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1'}
+
+            def git(*arguments):
+                """Run git in the throwaway repository and return its output."""
+                return subprocess.run(['git', *arguments], cwd=root, check=True, capture_output=True,
+                                      text=True, env=isolated).stdout
+
+            def check(restore):
+                """Run the trust-root check with or without capture restoration."""
+                return subprocess.run(['bash', str(script)], cwd=root, capture_output=True, text=True, check=False,
+                                      env={**isolated, 'RESTORE_CAPTURE': restore})
+
+            git('init', '-q')
+            git('config', 'user.email', 'ci@example.invalid')
+            git('config', 'user.name', 'CI')
+            (root / 'gradle').mkdir()
+            (root / 'app').mkdir()
+            committed = {'gradle/verification-metadata.xml': '<committed/>\n', 'gradle.lockfile': 'empty=\n',
+                         'app/gradle.lockfile': 'example:library:1.0=releaseRuntimeClasspath\nempty=\n'}
+            for relative, text in committed.items():
+                (root / relative).write_text(text)
+            git('add', '.')
+            git('commit', '-q', '-m', 'trust root')
+            self.assertEqual(0, check('false').returncode)
+
+            def capture():
+                """Rewrite the trust root the way a capture run does, including a new lockfile."""
+                (root / 'gradle/verification-metadata.xml').write_text('<captured/>\n')
+                (root / 'app/gradle.lockfile').write_text('example:library:2.0=releaseRuntimeClasspath\nempty=\n')
+                (root / 'app/buildscript-gradle.lockfile').write_text('empty=classpath\n')
+
+            capture()
+            self.assertNotEqual(0, check('false').returncode)
+            (root / 'gradle/verification-metadata.xml').write_text('<committed/>\n')
+            (root / 'app/gradle.lockfile').write_text(committed['app/gradle.lockfile'])
+            rejected = check('false')
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertIn('uncommitted lockfiles', rejected.stderr)
+            capture()
+            restored = check('true')
+            self.assertEqual(0, restored.returncode, restored.stderr)
+            for relative, text in committed.items():
+                self.assertEqual(text, (root / relative).read_text())
+            self.assertFalse((root / 'app/buildscript-gradle.lockfile').exists())
+            self.assertEqual('', git('status', '--porcelain'))
+
     def test_lightweight_tooling_and_test_builds_reuse_the_gradle_daemon(self):
         """Measured lightweight steps reuse a JVM; heavier tooling stays isolated."""
         invocations = self.gradle_steps(self.tests_job)
         self.assertGreaterEqual(len(invocations), 3)
         tooling = [step for step in self.gradle_steps(self.build_contracts)
-                   if "if: matrix.phase == 'tooling'" in step]
+                   if "if: matrix.phase == 'tooling'" in step and
+                   '- name: Capture dependency-control bootstrap candidates' not in step]
         self.assertEqual(len(tooling), 4)
+        capture = self.named_step(self.build_contracts, 'Capture dependency-control bootstrap candidates')
+        self.assertIn("if: always() && matrix.phase == 'tooling' && github.event_name == 'workflow_dispatch' "
+                      "&& inputs.capture_dependency_inputs", capture)
+        self.assertNotIn('assemble', capture)
+        retained = self.named_step(self.build_contracts, 'Retain dependency-control bootstrap candidates')
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.capture_dependency_inputs", retained)
+        self.assertIn('--write-locks --write-verification-metadata sha256', capture)
+        self.assertIn('--no-daemon', capture)
         label_step = self.named_step(self.build_contracts,
                                      'Verify packaged system labels for every app variant')
         self.assertIn('./scripts/test-system-labels.sh', label_step)
