@@ -73,8 +73,8 @@ def ledger(retry_first_background_fetch=False):
         book.fetch(token)
     book.control("background_end")
     book.control("marker", 10)
-    book.add("e", "upload")
-    book.add("f", "upload")
+    book.add("e", "upload", 64 * 1024)
+    book.add("f", "upload", 2 * 1024 * 1024)
     book.fetch("e")
     book.control("marker", 11)
     book.control("marker", 20)
@@ -121,6 +121,23 @@ class BackgroundReceiptCheckerTest(unittest.TestCase):
     def test_a_fetched_disabled_type_fails(self):
         """The slot sent while its type was off must never be fetched, even much later."""
         self.assertFalse(check_background_receipt(rows(), appended(ledger(), "f", "get"))["passed"])
+
+    def test_swapped_disabled_identities_fail(self):
+        """Fetching the padded video while leaving the small image untouched is the disabled type downloading."""
+        events = [dict(e, value=2 * 1024 * 1024) if e["kind"] == "upload" and e["fixture"] == "e"
+                  else dict(e, value=64 * 1024) if e["kind"] == "upload" and e["fixture"] == "f" else e
+                  for e in ledger()]
+        self.assertFalse(check_background_receipt(rows(), events)["passed"])
+
+    def test_return_local_reads_must_all_be_proven(self):
+        """The no-fetch-on-return claim needs every attachment read back; missing, zero or wrong counts fail."""
+        for value in (None, 0, 3, True):
+            report = rows()
+            if value is None:
+                del report[0]["returned"]["local_reads"]
+            else:
+                report[0]["returned"]["local_reads"] = value
+            self.assertFalse(check_background_receipt(report, ledger())["passed"], value)
 
     def test_a_network_held_fetch_before_wifi_returns_fails(self):
         """The Wi-Fi-only video must not be fetched while Wi-Fi is off."""

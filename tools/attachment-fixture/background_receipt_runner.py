@@ -48,14 +48,22 @@ def ended_abruptly(output):
     return not passed(output) and held and any(marker in output for marker in CRASH_MARKERS)
 
 
+def held_request_ended(events):
+    """Whether the held acquisition itself, matched by its request id, ended after the last platform stop marker."""
+    stops = [e["seq"] for e in events if e["kind"] == "platform_stop_marker"]
+    held = {e["request"] for e in events if e["kind"] == "held"}
+    ended = ("disconnect", "hold_timeout")
+    return bool(stops) and any(
+        e["kind"] in ended and e["seq"] > stops[-1] and e["request"] in held for e in events
+    )
+
+
 def await_held_disconnect(server, start, timeout=DISCONNECT_WAIT_SECONDS):
     """Wait for the ended process's held request to end after the platform stop, so no two acquisitions overlap."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         events = server.ledger.snapshot()[start:]
-        stops = [e["seq"] for e in events if e["kind"] == "platform_stop_marker"]
-        ended = ("disconnect", "hold_timeout")
-        if stops and any(e["kind"] in ended and e["seq"] > stops[-1] for e in events):
+        if held_request_ended(events):
             return True
         time.sleep(0.05)
     return False

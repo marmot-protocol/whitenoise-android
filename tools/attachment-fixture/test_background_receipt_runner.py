@@ -57,5 +57,17 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
             self.assertFalse(runner.ended_abruptly(crash))
 
 
+    def test_only_the_held_request_ending_releases_the_hand_off(self):
+        """An unrelated disconnect after the stop does not end the wait; the held request's own disconnect does."""
+        events = [
+            {"seq": 1, "request": 7, "kind": "held"},
+            {"seq": 2, "request": None, "kind": "platform_stop_marker"},
+            {"seq": 3, "request": 9, "kind": "disconnect"},
+        ]
+        self.assertFalse(runner.held_request_ended(events))
+        self.assertTrue(runner.held_request_ended(events + [{"seq": 4, "request": 7, "kind": "hold_timeout"}]))
+        self.assertFalse(runner.held_request_ended([{"seq": 1, "request": 7, "kind": "disconnect"}]))
+
+
 if __name__ == "__main__":
     unittest.main()

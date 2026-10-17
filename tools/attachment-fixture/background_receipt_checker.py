@@ -17,6 +17,7 @@ MAIN_FACTS = (
     (("background", "durable_work_succeeded"), BACKGROUND_ATTACHMENTS),
     (("background", "interactive_intent"), False),
     (("background", "plaintext_exact"), True),
+    (("returned", "local_reads"), BACKGROUND_ATTACHMENTS),
     (("returned", "new_http_gets"), 0),
     (("disabled_type", "enabled_fetched"), 1),
     (("disabled_type", "disabled_queued"), False),
@@ -106,6 +107,13 @@ def _check_disabled(events, full, start, end, violations):
     untouched = [f for f in pair if not _gets(events, f)]
     if len(fetched) != 1 or len(untouched) != 1:
         violations.append("exactly the enabled attachment must be fetched and the disabled one never")
+        return
+    # The ledger carries no content identity, only sizes: the enabled image is a small JPEG and the disabled video
+    # is padded to megabytes, so the fetched upload must be the smaller one or the identities were swapped.
+    sizes = {e["fixture"]: e["value"] for e in events if e["kind"] == "upload" and start < e["seq"] < end}
+    fetched_size, untouched_size = sizes.get(fetched[0]), sizes.get(untouched[0])
+    if not isinstance(fetched_size, int) or not isinstance(untouched_size, int) or fetched_size >= untouched_size:
+        violations.append("the fetched attachment must be the small enabled image, not the padded disabled video")
 
 
 def _check_network(events, full, start, restored, stop, violations):
