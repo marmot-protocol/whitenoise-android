@@ -6756,7 +6756,8 @@ class ConversationController(
     internal val attachmentTransfers: AttachmentTransferCoordinator get() = attachmentPresentation.transfers
 
     /** The installed native handle; paging and commits share the session's retirement authorities. */
-    internal val timelineSubscription: ConversationTimelineSubscriptionHandle? get() = timelineSession.timelineSubscription
+    internal val timelineSubscription: ConversationTimelineSubscriptionHandle?
+        get() = timelineSession.timelineSubscription
     internal val window = ConversationWindowState()
     internal val liveSubscriptionLock: Any get() = timelineSession.lock
     internal val timelineSubscriptionActiveCallMutex: Mutex get() = timelineSession.activeCallMutex
@@ -10403,7 +10404,8 @@ class ConversationController(
         messageIdHex: String,
         attachmentIndex: Int,
         initiallyAvailable: Boolean,
-    ): StateFlow<AttachmentTransferState> = attachmentPresentation.attachmentTransferState(messageIdHex, attachmentIndex, initiallyAvailable)
+    ): StateFlow<AttachmentTransferState> =
+        attachmentPresentation.attachmentTransferState(messageIdHex, attachmentIndex, initiallyAvailable)
 
     /** Releases the row observer independently of app/native transfer work. */
     internal fun releaseAttachmentTransferState(
@@ -10424,7 +10426,14 @@ class ConversationController(
         reference: MediaAttachmentReferenceFfi,
         retainedPlaintext: ByteArray? = null,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
-    ): Deferred<ByteArray> = attachmentPresentation.requestAttachmentTransfer(messageIdHex, attachmentIndex, reference, retainedPlaintext, priority)
+    ): Deferred<ByteArray> =
+        attachmentPresentation.requestAttachmentTransfer(
+            messageIdHex,
+            attachmentIndex,
+            reference,
+            retainedPlaintext,
+            priority,
+        )
 
     /** Captures an open intent for the visible attachment destination. */
     internal fun requestAttachmentOpen(
@@ -10461,7 +10470,8 @@ class ConversationController(
         messageIdHex: String,
         attachmentIndex: Int,
         fallback: MediaAttachmentReferenceFfi,
-    ): MediaAttachmentReferenceFfi = attachmentPresentation.authoritativeAttachmentReference(messageIdHex, attachmentIndex, fallback)
+    ): MediaAttachmentReferenceFfi =
+        attachmentPresentation.authoritativeAttachmentReference(messageIdHex, attachmentIndex, fallback)
 
     /** Materializes plaintext within the requested presentation budget. */
     internal suspend fun downloadAttachment(
@@ -10470,7 +10480,8 @@ class ConversationController(
         reference: MediaAttachmentReferenceFfi,
         priority: AttachmentDownloadPriority,
         maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
-    ): ByteArray = attachmentPresentation.downloadAttachment(messageIdHex, attachmentIndex, reference, priority, maxBytes)
+    ): ByteArray =
+        attachmentPresentation.downloadAttachment(messageIdHex, attachmentIndex, reference, priority, maxBytes)
 
     /** Returns a decoded thumbnail from the existing app cache. */
     fun thumbnailFor(
@@ -11198,7 +11209,11 @@ class ConversationController(
         authorityEpochBefore: Long,
     ) {
         val confirmed =
-            if (mutationPresentation.authorityEpoch == authorityEpochBefore) acceptedGroup else group.copy(pendingConfirmation = false)
+            if (mutationPresentation.authorityEpoch == authorityEpochBefore) {
+                acceptedGroup
+            } else {
+                group.copy(pendingConfirmation = false)
+            }
         group = inviteConfirmationAuthority.reconcile(confirmed)
         inviteConfirmationAuthority.finish()
     }
@@ -11966,7 +11981,8 @@ class ConversationController(
         }.onSuccess { refreshed ->
             managementStateLifetime.runIfCurrent(requestToken) {
                 val staleRead =
-                    !ownsCurrentMemberRead(rosterGeneration, runtimeGeneration) || mutationPresentation.authorityEpoch != authorityEpoch
+                    !ownsCurrentMemberRead(rosterGeneration, runtimeGeneration) ||
+                        mutationPresentation.authorityEpoch != authorityEpoch
                 val changedOwner = group != startingGroup || appState.activeAccountRef != activeAccount
                 val wrongTarget =
                     !refreshed.details.group.groupIdHex

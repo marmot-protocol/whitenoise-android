@@ -121,7 +121,9 @@ internal class ConversationTimelineSession {
     }
 
     /** Opens once, retaining bounded-read ownership until a late native result can be released. */
-    suspend fun openTimeline(open: suspend () -> ConversationTimelineSubscriptionHandle): ConversationTimelineSubscriptionHandle? {
+    suspend fun openTimeline(
+        open: suspend () -> ConversationTimelineSubscriptionHandle,
+    ): ConversationTimelineSubscriptionHandle? {
         val stream = initialSubscriptionRead.await(open)
         val admitted =
             synchronized(lock) {
@@ -138,7 +140,9 @@ internal class ConversationTimelineSession {
     }
 
     /** Registers a paired group handle, releasing it immediately if the controller has retired. */
-    suspend fun openGroup(open: suspend () -> ConversationGroupStateSubscriptionHandle): ConversationGroupStateSubscriptionHandle? {
+    suspend fun openGroup(
+        open: suspend () -> ConversationGroupStateSubscriptionHandle,
+    ): ConversationGroupStateSubscriptionHandle? {
         val stream = open()
         val admitted =
             synchronized(lock) {
@@ -155,7 +159,8 @@ internal class ConversationTimelineSession {
     }
 
     /** Bounds each replacement subscription's one-shot snapshot before waiting for live rows. */
-    suspend fun snapshot(stream: ConversationTimelineSubscriptionHandle): TimelinePageFfi? = initialSnapshotRead.await { stream.snapshot() }
+    suspend fun snapshot(stream: ConversationTimelineSubscriptionHandle): TimelinePageFfi? =
+        initialSnapshotRead.await { stream.snapshot() }
 
     /** Stops future opens after a native-open timeout without cancelling accepted mutations. */
     fun cancelInitialOpen() = initialSubscriptionRead.cancel()

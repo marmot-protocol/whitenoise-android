@@ -197,7 +197,10 @@ class ConversationControllerAccountPinningTest {
                         )
                     },
                 )
-            val send = async(start = CoroutineStart.UNDISPATCHED) { state.sendConversationText(controller, "pending acknowledgement") }
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    state.sendConversationText(controller, "pending acknowledgement")
+                }
             try {
                 entered.await()
                 controller.onCleared()
