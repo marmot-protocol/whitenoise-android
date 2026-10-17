@@ -8,7 +8,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 
-/** A yes/no confirmation on the app dialog; a destructive confirm takes the error role. */
+/**
+ * A yes/no confirmation on the app dialog; a destructive confirm takes the error role, and [dismissLabel] replaces
+ * Cancel.
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun ConfirmDialog(
@@ -18,6 +21,7 @@ internal fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = false,
+    dismissLabel: String? = null,
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
@@ -32,7 +36,9 @@ internal fun ConfirmDialog(
                     },
             ) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(dismissLabel ?: stringResource(R.string.cancel)) }
+        },
         title = { Text(title) },
         text = { Text(message) },
     )

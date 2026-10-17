@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import org.junit.Assert.assertEquals
@@ -62,7 +63,7 @@ class StartChatErrorCardTest {
             startChatErrorUiState(
                 npub = "npub1alice",
                 progressHex = "alice",
-                error = MarmotKitException.MissingKeyPackage("alice"),
+                error = MarmotKitException.MissingKeyPackage("alice", MissingKeyPackageReasonFfi.NOT_FOUND),
                 recipientName = "Alice",
                 displayName = { "Alice" },
             )

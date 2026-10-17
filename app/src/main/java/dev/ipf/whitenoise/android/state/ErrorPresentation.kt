@@ -87,6 +87,8 @@ fun WhiteNoiseAppState.presentFailure(
     detail: AppText = AppText.Resource(R.string.error_try_again),
     sendAttempt: SendFailureAttempt? = null,
 ) {
+    // The user chose to wait for the group in the confirmation itself; there is no failure to report.
+    if (throwable is GroupChangeDeclinedException) return
     val presentation = privacySafeErrorPresentation(operationCode, throwable, detail)
     presentText(
         title = title,

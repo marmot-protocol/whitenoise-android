@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.media.holdCacheFileInUse
 import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
 import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -65,6 +66,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
+import dev.ipf.whitenoise.android.state.failedTransferState
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -232,6 +234,7 @@ internal fun MediaVideoGridTile(
         mutableStateOf(controller.thumbnailFor(messageIdHex, attachmentIndex)?.asImageBitmap())
     }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
+    var storageFailed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     var tileDurationMs by remember(messageIdHex, attachmentIndex, epoch) { mutableLongStateOf(0L) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
@@ -263,6 +266,7 @@ internal fun MediaVideoGridTile(
             cancelledByReader,
             startDownload,
             failedLocally = failed && localFile == null,
+            storageBlockedLocally = storageFailed && failed && localFile == null,
         )
     // The transfer owns the play disc while it is queued, running, being cancelled, cancelled or failed.
     val transferShown = transfer.visible && localFile == null
@@ -330,6 +334,7 @@ internal fun MediaVideoGridTile(
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
                 Log.w("MediaVideoGridTile", "video_tile_auto_materialize_failed")
+                storageFailed = it.failedTransferState() == AttachmentTransferState.StorageBlocked
                 failed = true
             }
         }
@@ -628,6 +633,7 @@ internal fun MediaVideoBubble(
     val sendingFromStagedFile = pendingAttachment?.sourceFile != null
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
+    var storageFailed by remember(pillKey, epoch) { mutableStateOf(false) }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageBubble). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -673,6 +679,7 @@ internal fun MediaVideoBubble(
             cancelledByReader,
             startDownload,
             failedLocally = failed && localFile == null && !loading,
+            storageBlockedLocally = storageFailed && failed && localFile == null && !loading,
         )
     // The transfer owns the play disc while it is queued, running, being cancelled, cancelled or failed.
     val transferShown = transfer.visible && localFile == null
@@ -746,6 +753,7 @@ internal fun MediaVideoBubble(
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
                 Log.w("MediaVideoBubble", "video_auto_materialize_failed")
+                storageFailed = it.failedTransferState() == AttachmentTransferState.StorageBlocked
                 failed = true
             }
         }

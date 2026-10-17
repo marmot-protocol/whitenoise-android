@@ -69,8 +69,9 @@ private val TileTransferCaptionGap = 6.dp
 /**
  * What one visual-media tile knows about its native transfer: the state the file card would show, the real body
  * progress, whether the reader's Cancel is still pending acknowledgement, whether an earlier Cancel suppresses the
- * automatic path, and whether the tile's own materialization already failed ([failedLocally]). [onCancel] revokes
- * platform delivery at once and publishes Cancelled only after native acknowledgement.
+ * automatic path, and whether the tile's own materialization already failed ([failedLocally]), for lack of free space
+ * ([storageBlockedLocally]). [onCancel] revokes platform delivery at once and publishes Cancelled only after native
+ * acknowledgement.
  */
 @Immutable
 internal class TileTransfer(
@@ -79,6 +80,7 @@ internal class TileTransfer(
     val cancellation: AttachmentCancellationState,
     val suppressed: Boolean,
     val failedLocally: Boolean = false,
+    val storageBlockedLocally: Boolean = false,
     val onCancel: () -> Unit,
 ) {
     /** The reader's Cancel was sent and the engine has not yet acknowledged it. */
@@ -96,11 +98,19 @@ internal class TileTransfer(
     /** The reader cancelled and the engine confirmed it, so the tile offers Download again. */
     val cancelled: Boolean get() = unobstructed && state == AttachmentTransferState.Cancelled
 
-    /** The transfer failed, the tile's own materialization failed, or the engine did not confirm a Cancel: Retry. */
+    /** The engine parked the body for lack of free space; it resumes on its own once space frees, or on Retry. */
+    val storageBlocked: Boolean
+        get() = storageBlockedLocally || (unobstructed && state == AttachmentTransferState.StorageBlocked)
+
+    /**
+     * The transfer failed or is parked for storage, the tile's own materialization failed, or the engine did not
+     * confirm a Cancel: Retry.
+     */
     val failed: Boolean
         get() =
             failedLocally ||
                 cancellation == AttachmentCancellationState.Unconfirmed ||
+                storageBlocked ||
                 (unobstructed && state == AttachmentTransferState.Failed)
 
     /** The tile replaces its spinner or Download action with the transfer control. */
@@ -127,6 +137,7 @@ internal fun rememberTileTransfer(
     suppressed: Boolean,
     observeNative: Boolean,
     failedLocally: Boolean = false,
+    storageBlockedLocally: Boolean = false,
 ): TileTransfer {
     val key = "$messageIdHex#$attachmentIndex"
     val initiallyAvailable =
@@ -150,12 +161,23 @@ internal fun rememberTileTransfer(
     // A sample outlives its flow, so once observation stops the last one would describe a transfer that is over.
     val native = if (observing) observed else null
     val state = attachmentFilePresentationState(tileHostState(host, native, materializing), native, cancellation)
-    return remember(state, native, cancellation, suppressed, failedLocally, controller, key) {
-        TileTransfer(state, native, cancellation, suppressed, failedLocally) {
+    return remember(state, native, cancellation, suppressed, failedLocally, storageBlockedLocally, controller, key) {
+        TileTransfer(state, native, cancellation, suppressed, failedLocally, storageBlockedLocally) {
             controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex)
         }
     }
 }
+
+/** A tile whose own load stopped for lack of free space, for surfaces that draw Retry without a live transfer. */
+internal fun storageBlockedTileTransfer(): TileTransfer =
+    TileTransfer(
+        AttachmentTransferState.StorageBlocked,
+        null,
+        AttachmentCancellationState.None,
+        suppressed = false,
+        storageBlockedLocally = true,
+        onCancel = {},
+    )
 
 /**
  * The engine feed is opened only while this tile is materializing or another surface is downloading its attachment,
@@ -196,6 +218,7 @@ internal fun tileTransferDescription(transfer: TileTransfer): String =
         transfer.cancellation == AttachmentCancellationState.Unconfirmed ->
             stringResource(R.string.media_cancel_unconfirmed)
         transfer.cancelled -> stringResource(R.string.media_download_cancelled)
+        transfer.storageBlocked -> stringResource(R.string.media_storage_blocked)
         transfer.failed -> stringResource(R.string.media_tap_to_retry)
         else ->
             nativeProgressDescription(transfer.progress, transfer.state)

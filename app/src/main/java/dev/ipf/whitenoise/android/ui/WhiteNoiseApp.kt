@@ -787,6 +787,12 @@ internal fun WhiteNoiseApp(
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
+    // A refused group change waits for the user's answer wherever it was started, even after its screen closed.
+    val groupChangeQuestion = appState.groupChangeConfirmations.pending
+    if (!appState.appLockScreenVisible && groupChangeQuestion != null) {
+        dev.ipf.whitenoise.android.ui.group
+            .GroupChangeConfirmationDialog(groupChangeQuestion)
+    }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         val offlineSpeechToTextSelected = dictationState.usesOfflineSpeechToText
         val disclosureTitle =

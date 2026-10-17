@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.onEach
 private val DELIBERATE_RECOVERY_STATES =
     setOf(
         AttachmentTransferState.Failed,
+        AttachmentTransferState.StorageBlocked,
         AttachmentTransferState.Cancelled,
         AttachmentTransferState.NotRetained,
     )

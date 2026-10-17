@@ -100,7 +100,8 @@ internal fun MediaFileBubbleContent(
         transferState = transferState,
         openPending = openPending,
         metadataText = progressDescription ?: attachmentTypeLabel(presentation),
-        metadataIsError = transferState == AttachmentTransferState.Failed,
+        metadataIsError =
+            transferState == AttachmentTransferState.Failed || transferState == AttachmentTransferState.StorageBlocked,
         trailingMetadataText = timestampText,
         trailingMetadataIsError = false,
         trailingStatus = status.takeIf { showStatus },
@@ -188,7 +189,9 @@ internal fun FileBubbleContent(
 @Composable
 private fun FileCardTrailingAffordance(transferState: AttachmentTransferState) {
     val unavailable =
-        transferState == AttachmentTransferState.Failed || transferState == AttachmentTransferState.NotRetained
+        transferState == AttachmentTransferState.Failed ||
+            transferState == AttachmentTransferState.StorageBlocked ||
+            transferState == AttachmentTransferState.NotRetained
     Icon(
         painter =
             painterResource(if (unavailable) R.drawable.ic_warning else R.drawable.ic_chevron_right),
@@ -372,7 +375,9 @@ private data class FileTransferControlColors(
 @Composable
 private fun fileTransferControlColors(state: AttachmentTransferState): FileTransferControlColors =
     when (state) {
-        AttachmentTransferState.Failed ->
+        AttachmentTransferState.Failed,
+        AttachmentTransferState.StorageBlocked,
+        ->
             FileTransferControlColors(
                 MaterialTheme.colorScheme.errorContainer,
                 MaterialTheme.colorScheme.onErrorContainer,
@@ -399,6 +404,7 @@ private fun fileTransferStateDescription(
         AttachmentTransferState.Resolving -> stringResource(R.string.media_preparing_download)
         AttachmentTransferState.Downloading -> loadingDescription
         AttachmentTransferState.Failed -> stringResource(R.string.media_tap_to_retry)
+        AttachmentTransferState.StorageBlocked -> stringResource(R.string.media_storage_blocked)
         AttachmentTransferState.Cancelled -> stringResource(R.string.media_download_cancelled)
         AttachmentTransferState.Remote,
         AttachmentTransferState.NotRetained,
@@ -449,7 +455,9 @@ private fun FileTransferIcon(
                 modifier = Modifier.size(18.dp),
             )
         }
-        AttachmentTransferState.Failed ->
+        AttachmentTransferState.Failed,
+        AttachmentTransferState.StorageBlocked,
+        ->
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(21.dp))
         AttachmentTransferState.Remote,
         AttachmentTransferState.NotRetained,

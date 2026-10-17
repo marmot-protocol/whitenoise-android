@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +25,9 @@ internal enum class AttachmentTransferState {
     Available,
     NotRetained,
     Failed,
+
+    /** The device lacks free space for this body; MDK keeps its checkpoint and readmits it once space frees. */
+    StorageBlocked,
     Cancelled,
 }
 
@@ -40,6 +44,7 @@ internal fun AttachmentTransferState.isTransferInProgress(): Boolean =
         AttachmentTransferState.Available,
         AttachmentTransferState.NotRetained,
         AttachmentTransferState.Failed,
+        AttachmentTransferState.StorageBlocked,
         AttachmentTransferState.Cancelled,
         -> false
     }
@@ -213,7 +218,7 @@ internal class AttachmentTransferCoordinator(
                             )
                             throw cancellation
                         } catch (exception: Exception) {
-                            publishOwnedTerminalState(key, state, lifetime, token, AttachmentTransferState.Failed)
+                            publishOwnedTerminalState(key, state, lifetime, token, exception.failedTransferState())
                             throw exception
                         }
                     }.also {
@@ -467,9 +472,22 @@ private fun refreshedState(
         available == null -> previous
         previous == AttachmentTransferState.NotRetained -> AttachmentTransferState.NotRetained
         previous == AttachmentTransferState.Failed -> AttachmentTransferState.Failed
+        previous == AttachmentTransferState.StorageBlocked -> AttachmentTransferState.StorageBlocked
         previous == AttachmentTransferState.Cancelled -> AttachmentTransferState.Cancelled
         else -> AttachmentTransferState.Remote
     }
+
+/**
+ * A transfer MDK parked for lack of free space presents as such, even when a publication step wrapped the native
+ * refusal; every other failure is an ordinary failure.
+ */
+internal fun Throwable.failedTransferState(): AttachmentTransferState {
+    val parked =
+        generateSequence(this) { it.cause }.any {
+            (it as? NativeAttachmentTerminalException)?.state == AttachmentTransferStateFfi.STORAGE_BLOCKED
+        }
+    return if (parked) AttachmentTransferState.StorageBlocked else AttachmentTransferState.Failed
+}
 
 private fun attachmentStateAfterRetention(retained: Boolean): AttachmentTransferState =
     if (retained) AttachmentTransferState.Available else AttachmentTransferState.NotRetained

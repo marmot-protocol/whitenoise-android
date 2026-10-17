@@ -2484,4 +2484,19 @@
     <string name="group_create_unattributed_failure">We could not identify an affected person. Retry or edit your members.</string>
     <string name="media_reply_draft_conflict">Your draft changed. Keep this reply and try again, or cancel the reply before sending.</string>
     <string name="share_connect_save_to_gallery">Save to Gallery</string>
+    <string name="media_storage_blocked_short">Not enough storage</string>
+    <string name="media_storage_blocked">Not enough storage. Free up space, then tap to retry.</string>
+    <string name="error_obsolete_key_package">This person needs to update White Noise before they can be added. Ask them to update and open it, then retry.</string>
+    <string name="error_obsolete_key_package_for">%1$s needs to update White Noise before they can be added. Ask them to update and open it, then retry.</string>
+    <string name="error_directory_lookup_incomplete">We couldn’t finish checking whether this person can be added. Check your connection, then retry.</string>
+    <string name="error_directory_lookup_incomplete_for">We couldn’t finish checking whether %1$s can be added. Check your connection, then retry.</string>
+    <string name="error_message_not_editable">This message can no longer be edited.</string>
+    <string name="group_change_catching_up_title">This chat may be out of date</string>
+    <string name="group_change_catching_up_message">This chat may be out of date on this device. Changing the group now could split it for everyone. Wait for it to sync, or continue anyway?</string>
+    <string name="group_change_catching_up_invite_message">This chat may be out of date on this device. If the group has moved on, people you invite now could get an invitation that no longer works, and the group could split for everyone. Wait for it to sync, or invite anyway?</string>
+    <string name="group_change_undelivered_title">Your last change is still being delivered</string>
+    <string name="group_change_undelivered_message">Your last change to this group hasn’t reached all of its relays yet. Members who only use those relays may not be able to follow the group if you continue. Wait, or continue anyway?</string>
+    <string name="group_change_wait">Wait</string>
+    <string name="group_change_continue_anyway">Continue anyway</string>
+    <string name="group_change_invite_anyway">Invite anyway</string>
 </resources>

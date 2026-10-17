@@ -53,12 +53,14 @@ import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.Thumbhash
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
+import dev.ipf.whitenoise.android.state.failedTransferState
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
@@ -193,6 +195,7 @@ internal fun MediaImageBubble(
         onDispose(mediaApplyHostAttempt::cancel)
     }
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
+    var storageFailed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     // A verified image above the preview budget is not a failure: Retry cannot shrink it, so the tile opens the
     // viewer instead, where Save and Share still work.
     var tooLargeToPreview by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
@@ -294,8 +297,12 @@ internal fun MediaImageBubble(
             materializationIntent = materializationIntent.afterProducerCancellation(cancel)
         } catch (_: AttachmentTooLargeToPresentException) {
             tooLargeToPreview = true
-        } catch (_: Throwable) {
+        } catch (
+            // Any failure leaves Retry; only a storage-parked body changes what it says.
+            @Suppress("TooGenericExceptionCaught") failure: Throwable,
+        ) {
             android.util.Log.w("MediaImageBubble", "image_auto_download_failed")
+            storageFailed = failure.failedTransferState() == AttachmentTransferState.StorageBlocked
             failed = true
         }
     }
@@ -390,6 +397,20 @@ internal fun MediaImageBubble(
                     when {
                         tooLargeToPreview ->
                             MediaTooLargeToPreviewControl(onOpen = ::dispatchViewerOpen, showCaption = true)
+                        // A load parked for lack of free space names storage beside its Retry.
+                        failed && storageFailed ->
+                            TileTransferControl(
+                                transfer = storageBlockedTileTransfer(),
+                                onRetry = {
+                                    controller.retryAttachmentTransfer(
+                                        key,
+                                        attachmentIndex,
+                                        onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
+                                        onFailure = { failed = true },
+                                    )
+                                },
+                                showCaption = true,
+                            )
                         failed ->
                             MediaCircleAction(
                                 icon = Icons.Default.Refresh,
@@ -671,6 +692,7 @@ internal fun MediaImageGridTile(
         onDispose(mediaApplyHostAttempt::cancel)
     }
     var failed by remember(decodeKey) { mutableStateOf(false) }
+    var storageFailed by remember(decodeKey) { mutableStateOf(false) }
     // Mirrors the single bubble: a verified image above the preview budget opens the viewer instead of retrying.
     var tooLargeToPreview by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
@@ -772,8 +794,12 @@ internal fun MediaImageGridTile(
             materializationIntent = materializationIntent.afterProducerCancellation(cancel)
         } catch (_: AttachmentTooLargeToPresentException) {
             tooLargeToPreview = true
-        } catch (_: Throwable) {
+        } catch (
+            // Any failure leaves Retry; only a storage-parked body changes what it says.
+            @Suppress("TooGenericExceptionCaught") failure: Throwable,
+        ) {
             android.util.Log.w("MediaImageGridTile", "image_tile_auto_download_failed")
+            storageFailed = failure.failedTransferState() == AttachmentTransferState.StorageBlocked
             failed = true
         }
     }
@@ -854,7 +880,10 @@ internal fun MediaImageGridTile(
                     failed ->
                         MediaCircleAction(
                             icon = Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.media_tap_to_retry),
+                            contentDescription =
+                                stringResource(
+                                    if (storageFailed) R.string.media_storage_blocked else R.string.media_tap_to_retry,
+                                ),
                             onClick = {
                                 controller.retryAttachmentTransfer(
                                     messageIdHex,

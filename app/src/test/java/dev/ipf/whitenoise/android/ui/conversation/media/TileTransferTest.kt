@@ -11,6 +11,7 @@ import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -53,6 +54,17 @@ class TileTransferTest {
             transfer(AttachmentTransferState.Downloading, progress(received = 8, total = 8, verifying = true))
         assertTrue(verifying.active)
         assertNull(verifying.fraction)
+    }
+
+    /** A body parked for lack of free space offers Retry and names storage, unless the tile itself failed first. */
+    @Test
+    fun aStorageParkedBodyOffersRetryAndNamesStorage() {
+        val parked = transfer(AttachmentTransferState.StorageBlocked, null)
+        assertTrue(parked.storageBlocked && parked.failed && parked.visible)
+        assertFalse(parked.active || parked.cancelled)
+
+        composeRule.setContent { androidx.compose.material3.Text(tileTransferDescription(parked)) }
+        composeRule.onNodeWithText("Not enough storage. Free up space, then tap to retry.").assertExists()
     }
 
     /** The feed opens for a materializing tile or a download another surface started, never for an idle one. */

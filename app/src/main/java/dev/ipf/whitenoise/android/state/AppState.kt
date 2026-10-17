@@ -1422,6 +1422,9 @@ class WhiteNoiseAppState private constructor(
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
     private val nativeAttachmentPermissions = NativeAttachmentPermissions()
 
+    /** Questions about overriding MDK's advisory refusals of a group change, shown at app level (#3289). */
+    internal val groupChangeConfirmations = GroupChangeConfirmations()
+
     /** Refreshes runtime-scoped permissions after network, preference, or account changes. */
     internal fun refreshNativeAttachmentPermissions() {
         val runtime = marmotRuntime
@@ -4128,12 +4131,15 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef
         if (target.isEmpty() || groupId.isEmpty() || account == null) return false
         return runCatchingCancellable {
-            withGroupCommitLock(account, groupId) {
-                val result =
-                    marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
-                        promoteAdminDetailed(account, groupId, target)
-                    }
-                chatsController?.applyProfileGroupDetails(account, result.details)
+            // The lock is released while the user decides whether to override a refused change.
+            runGroupChange(account, groupId) {
+                withGroupCommitLock(account, groupId) {
+                    val result =
+                        marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                            promoteAdminDetailed(account, groupId, target)
+                        }
+                    chatsController?.applyProfileGroupDetails(account, result.details)
+                }
             }
             presentConversationTransient(
                 accountRef = account,
@@ -4172,12 +4178,14 @@ class WhiteNoiseAppState private constructor(
         var firstFailureThrowable: Throwable? = null
         for (groupIdHex in targets) {
             runCatchingCancellable {
-                withGroupCommitLock(account, groupIdHex) {
-                    val result =
-                        marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
-                            inviteMembersDetailed(account, groupIdHex, listOf(ref))
-                        }
-                    chatsController?.applyProfileGroupDetails(account, result.details)
+                runGroupChange(account, groupIdHex, invite = true) {
+                    withGroupCommitLock(account, groupIdHex) {
+                        val result =
+                            marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
+                                inviteMembersDetailed(account, groupIdHex, listOf(ref))
+                            }
+                        chatsController?.applyProfileGroupDetails(account, result.details)
+                    }
                 }
             }.onFailure { error ->
                 failures += 1

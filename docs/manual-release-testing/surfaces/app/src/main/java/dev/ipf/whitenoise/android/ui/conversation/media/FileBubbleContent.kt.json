@@ -1,0 +1,119 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+  "legacy_sha256": "ad2ef6be5c44ec27cebf4c642d4200247182deced8c98659cd60b68981e6b36f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "R.string.media_preparing_attachment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "R.string.media_preparing_attachment",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "FileBodyProgressIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "private fun FileBodyProgressIndicator(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_cancel_unconfirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "R.string.media_cancel_unconfirmed",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_cancelling_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "R.string.media_cancelling_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "FileBubbleContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "fun FileBubbleContent(",
+        "test_ids": [
+          "MED-001",
+          "MED-009",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "FileCardTrailingAffordance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "fun FileCardTrailingAffordance(",
+        "test_ids": [
+          "MED-001",
+          "MED-009",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "FileMetadataRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "fun FileMetadataRow(",
+        "test_ids": [
+          "MED-001",
+          "MED-009",
+          "MSG-013",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "FileTrailingMetadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "fun FileTrailingMetadata(",
+        "test_ids": [
+          "MED-001",
+          "MED-009",
+          "MSG-013",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "FileTransferControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "fun FileTransferControl(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "FileTransferIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "fun FileTransferIcon(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "MediaFileBubbleContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "fun MediaFileBubbleContent(",
+        "test_ids": [
+          "MED-001",
+          "MED-009",
+          "MSG-015"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "File card control for a storage-parked body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "R.string.media_storage_blocked",
+        "test_ids": [
+          "MED-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

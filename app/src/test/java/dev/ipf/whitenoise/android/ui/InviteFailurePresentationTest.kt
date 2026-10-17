@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
@@ -18,7 +19,7 @@ import org.junit.Test
 class InviteFailurePresentationTest {
     /** Unmatched typed identities keep the precise reason without blaming a selected person. */
     @Test fun foundingFailureRequiresCapturedRecipientForNamedCopy() {
-        val missing = MarmotKitException.MissingKeyPackage("outside-selection")
+        val missing = MarmotKitException.MissingKeyPackage("outside-selection", MissingKeyPackageReasonFfi.NOT_FOUND)
         assertEquals(
             AppText.Resource(R.string.error_missing_key_package),
             groupCreateSelectionFailureDetail(missing, null),
@@ -41,9 +42,52 @@ class InviteFailurePresentationTest {
         )
     }
 
+    /** Obsolete-only KeyPackages ask the recipient to update, never to set up, and offer no install link. */
+    @Test
+    fun obsoleteOnlyKeyPackagesAskTheRecipientToUpdate() {
+        val obsolete = MarmotKitException.MissingKeyPackage("deadbeef", MissingKeyPackageReasonFfi.OBSOLETE_ONLY)
+
+        assertEquals(
+            AppText.Resource(R.string.error_obsolete_key_package_for, listOf("Alice")),
+            startProfileChatFailureDetail(obsolete) { "Alice" },
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_obsolete_key_package),
+            groupCreateSelectionFailureDetail(obsolete, null),
+        )
+        assertFalse(startProfileChatFailureIsMissingSetup(obsolete))
+        assertTrue(
+            startProfileChatFailureIsMissingSetup(
+                MarmotKitException.MissingKeyPackage("deadbeef", MissingKeyPackageReasonFfi.NOT_FOUND),
+            ),
+        )
+        assertFalse(startProfileChatFailureCopyable(obsolete))
+    }
+
+    /** An incomplete directory lookup is a retryable problem for that recipient, never proof of missing setup. */
+    @Test
+    fun incompleteLookupIsRetryableNotMissingSetup() {
+        val incomplete = MarmotKitException.DirectoryLookupIncomplete("deadbeef")
+
+        assertEquals(
+            AppText.Resource(R.string.error_directory_lookup_incomplete_for, listOf("Alice")),
+            startProfileChatFailureDetail(incomplete) { "Alice" },
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_directory_lookup_incomplete),
+            startProfileChatFailureDetail(MarmotKitException.DirectoryLookupIncomplete(" ")) { "ignored" },
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_directory_lookup_incomplete),
+            groupCreateSelectionFailureDetail(incomplete, null),
+        )
+        assertFalse(startProfileChatFailureIsMissingSetup(incomplete))
+        assertFalse(startProfileChatFailureCopyable(incomplete))
+    }
+
     @Test
     fun startProfileChatFailureMapsMissingSetupToHumanCopy() {
-        val missing = MarmotKitException.MissingKeyPackage("deadbeef")
+        val missing = MarmotKitException.MissingKeyPackage("deadbeef", MissingKeyPackageReasonFfi.NOT_FOUND)
 
         assertEquals(
             AppText.Resource(
@@ -54,7 +98,7 @@ class InviteFailurePresentationTest {
         )
         assertFalse(startProfileChatFailureCopyable(missing))
 
-        val missingBlankAccount = MarmotKitException.MissingKeyPackage("  ")
+        val missingBlankAccount = MarmotKitException.MissingKeyPackage("  ", MissingKeyPackageReasonFfi.NOT_FOUND)
         assertEquals(
             AppText.Resource(R.string.error_missing_key_package),
             startProfileChatFailureDetail(missingBlankAccount) { "ignored" },

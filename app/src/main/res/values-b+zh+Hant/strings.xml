@@ -2286,4 +2286,19 @@
     <string name="media_reply_draft_conflict">草稿已變更。請保留此回覆並重試，或在傳送前取消回覆。</string>
     <string name="photo_editor_budget_exceeded">此裁切所需的影像細節或記憶體超出安全處理範圍。請選擇更大的裁切區域或降低畫質。原附件保持不變。</string>
     <string name="share_connect_save_to_gallery">儲存至相簿</string>
+    <string name="media_storage_blocked_short">儲存空間不足</string>
+    <string name="media_storage_blocked">儲存空間不足。請釋放空間，然後輕觸重試。</string>
+    <string name="error_obsolete_key_package">此使用者需要先更新 White Noise 才能被加入。請對方更新並開啟應用程式，然後重試。</string>
+    <string name="error_obsolete_key_package_for">%1$s 需要先更新 White Noise 才能被加入。請對方更新並開啟應用程式，然後重試。</string>
+    <string name="error_directory_lookup_incomplete">未能完成檢查此使用者是否可以被加入。請檢查網路連線，然後重試。</string>
+    <string name="error_directory_lookup_incomplete_for">未能完成檢查 %1$s 是否可以被加入。請檢查網路連線，然後重試。</string>
+    <string name="error_message_not_editable">此訊息已無法編輯。</string>
+    <string name="group_change_catching_up_title">此聊天可能不是最新的</string>
+    <string name="group_change_catching_up_message">此聊天在此裝置上可能不是最新的。現在變更群組可能會讓群組為所有人分裂。等待同步，還是仍要繼續？</string>
+    <string name="group_change_catching_up_invite_message">此聊天在此裝置上可能不是最新的。如果群組已經更新，你現在邀請的人可能會收到無法使用的邀請，群組也可能為所有人分裂。等待同步，還是仍要邀請？</string>
+    <string name="group_change_undelivered_title">你的上一次變更仍在傳送中</string>
+    <string name="group_change_undelivered_message">你對此群組的上一次變更尚未到達其所有 relay。如果繼續，只使用這些 relay 的成員可能無法繼續跟上群組。等待，還是仍要繼續？</string>
+    <string name="group_change_wait">等待</string>
+    <string name="group_change_continue_anyway">仍要繼續</string>
+    <string name="group_change_invite_anyway">仍要邀請</string>
 </resources>

@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
@@ -119,7 +120,7 @@ class NewMessageScreenshotTest {
     @Test fun missingKeyLight() =
         capture(
             "new_message_missing_key_light.png",
-            error = inviteError(MarmotKitException.MissingKeyPackage("ada")),
+            error = inviteError(MarmotKitException.MissingKeyPackage("ada", MissingKeyPackageReasonFfi.NOT_FOUND)),
         )
 
     @Test fun invalidKeyDark() =

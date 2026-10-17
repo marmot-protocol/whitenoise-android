@@ -157,6 +157,7 @@ private fun rememberKeptAttachmentTransfer(
 /** Uses current observable availability instead of inferring success from a thumbnail or ciphertext. */
 private fun keptTransferLabel(transfer: TileTransfer?): Int =
     when {
+        transfer?.storageBlocked == true -> R.string.media_storage_blocked_short
         transfer?.failed == true -> R.string.floating_attachment_failed
         transfer?.active == true -> R.string.media_downloading
         transfer?.state == AttachmentTransferState.Resolving -> R.string.floating_attachment_resolving
