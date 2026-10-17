@@ -240,7 +240,7 @@ internal fun rememberChatListConnectivityState(
     val runtimeGeneration = appState.runtimeGeneration
     val target =
         connectivityBannerTarget(
-            hasValidatedInternet = signals.hasValidatedInternet,
+            hasValidatedInternet = signals.hasAppNetwork,
             activeAccountRef = activeAccountRef,
             runtimeGeneration = runtimeGeneration,
             connectionState = controller.connectionState,
@@ -273,7 +273,7 @@ internal fun rememberChatListConnectivityState(
         effectOwner = controller,
         activeAccountRef = activeAccountRef,
         runtimeGeneration = runtimeGeneration,
-        hasValidatedInternet = signals.hasValidatedInternet,
+        hasValidatedInternet = signals.hasAppNetwork,
         relaysConnected = signals.relaysConnected,
         foregroundEpoch = foregroundEpoch,
         revalidateConnectionReadiness = controller::revalidateConnectionReadiness,

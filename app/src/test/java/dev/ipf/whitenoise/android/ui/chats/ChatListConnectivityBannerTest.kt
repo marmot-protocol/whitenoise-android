@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.whitenoise.android.state.ConnectivitySignals
 import dev.ipf.whitenoise.android.state.ChatListConnectionPhase
 import dev.ipf.whitenoise.android.state.ChatListConnectionState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,6 +19,27 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatListConnectivityBannerTest {
+    @Test
+    fun blockedOsProbeDoesNotOverrideForegroundConnectionEvidence() {
+        val signals = ConnectivitySignals(hasValidatedInternet = false, hasActiveNetwork = true)
+        assertEquals(
+            ConnectivityBannerTarget.Connecting,
+            target(signals.hasAppNetwork, connectionState(ChatListConnectionPhase.Attempting)),
+        )
+        assertEquals(
+            ConnectivityBannerTarget.Connected,
+            target(signals.hasAppNetwork, connectionState(ChatListConnectionPhase.Ready)),
+        )
+        assertEquals(
+            ConnectivityBannerTarget.NoAttempt,
+            target(signals.hasAppNetwork, connectionState(ChatListConnectionPhase.Idle)),
+        )
+        assertEquals(
+            ConnectivityBannerTarget.Offline,
+            target(signals.copy(hasActiveNetwork = false).hasAppNetwork, connectionState(ChatListConnectionPhase.Ready)),
+        )
+    }
+
     @Test
     fun reducerKeepsInternetAttemptAndReadinessSeparate() {
         val idle = connectionState(ChatListConnectionPhase.Idle)

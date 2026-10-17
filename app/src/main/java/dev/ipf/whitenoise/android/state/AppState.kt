@@ -8097,7 +8097,8 @@ class WhiteNoiseAppState private constructor(
     private fun updateConnectivitySignals(
         hasValidatedInternet: Boolean? = null,
         relaysConnected: Boolean? = null,
-    ) = connectivitySignalOwner.update(hasValidatedInternet, relaysConnected)
+        hasActiveNetwork: Boolean? = null,
+    ) = connectivitySignalOwner.update(hasValidatedInternet, relaysConnected, hasActiveNetwork)
 
     /**
      * Refresh [connectivitySignals] from the engine's relay-health snapshot.
@@ -8109,7 +8110,7 @@ class WhiteNoiseAppState private constructor(
     suspend fun refreshRelayConnectivity() {
         // Offline needs no sample: the write clamp already pinned the signal
         // false, and pool counts read while offline are stale by definition.
-        if (!appInForeground || !connectivitySignals.value.hasValidatedInternet) return
+        if (!appInForeground || !connectivitySignals.value.hasAppNetwork) return
         val generation = connectivitySignalOwner.captureNetworkGeneration()
         val health = runCatchingCancellable { marmotIo { relayHealth() } }.getOrNull()
         // A snapshot that straddled a network transition describes the wrong
@@ -8141,7 +8142,10 @@ class WhiteNoiseAppState private constructor(
         runCatchingCancellable {
             val network = cm.activeNetwork
             hasActiveNetworkSnapshot = activeDefaultNetwork.seed(network?.networkHandle)
-            updateConnectivitySignals(hasValidatedInternet = hasValidatedInternet())
+            updateConnectivitySignals(
+                hasValidatedInternet = hasValidatedInternet(),
+                hasActiveNetwork = hasActiveNetworkSnapshot,
+            )
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
             if (network != null) schedulePendingPushWakeCatchUpDrain()
@@ -8277,7 +8281,10 @@ class WhiteNoiseAppState private constructor(
                 hasActiveDefaultNetwork = hasActiveNetworkSnapshot,
                 hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
             )
-        updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
+        updateConnectivitySignals(
+            hasValidatedInternet = recovery.hasUsableInternet,
+            hasActiveNetwork = hasActiveNetworkSnapshot,
+        )
         refreshNativeAttachmentPermissions()
         if (!recovery.restored) return
         resumePushWakeEpisodeFromLifecycle()
