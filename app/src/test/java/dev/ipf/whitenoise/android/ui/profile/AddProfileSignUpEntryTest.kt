@@ -242,8 +242,7 @@ class AddProfileSignUpEntryTest {
 
     /** Uses the actual caller dialog and production root route, with a retained Chats handoff for Alice. */
     private fun show(app: WhiteNoiseAppState) {
-        app.accountSession.bootstrapCompleted = true
-        listOf("networkNotificationRecoverySuppressed").forEach { name ->
+        listOf("bootstrapCompleted", "networkNotificationRecoverySuppressed").forEach { name ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField(name)
                 .apply { isAccessible = true }

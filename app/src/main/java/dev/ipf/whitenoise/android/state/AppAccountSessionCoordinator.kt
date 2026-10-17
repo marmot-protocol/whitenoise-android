@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.whitenoise.android.notifications.NotificationCatchUpWindow
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -81,26 +80,21 @@ internal data class AccountSessionTeardown(
 )
 
 /**
- * Owns Android account-session ordering. Bootstrap dispatches through [stateDispatcher]; catch-up retains
- * its recovery scope. Activation, identity publication and teardown inherit the facade caller's state
+ * Owns Android account-session ordering. Bootstrap attempts dispatch through [stateDispatcher].
+ * Activation, identity publication and teardown inherit the facade caller's state
  * confinement and cancellation context, including its continuation dispatcher. Native startup, one-shot
  * projection handoff and listener cleanup reuse their shipped owners without competing runtime lifetimes.
  */
 internal class AppAccountSessionCoordinator(
     private val mutationScope: CoroutineScope,
-    recoveryScope: CoroutineScope,
     private val stateDispatcher: CoroutineDispatcher,
-    catchUpWindow: NotificationCatchUpWindow?,
     private val listenerTeardown: () -> AppRuntimeListenerTeardownOwner,
     private val activation: AppAccountSessionActivation,
 ) {
     val bootstrapAttempts = BootstrapAttemptCoordinator()
-    val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
-    val handoff = AccountSwitchLocalSnapshotHandoff()
-    val catchUp = AccountCatchUpCoordinator(recoveryScope, catchUpWindow)
 
-    @Volatile
-    var bootstrapCompleted = false
+    /** One selection receipt authority, also consumed by the facade's native projection adapters. */
+    val handoff = AccountSwitchLocalSnapshotHandoff()
 
     /** UI cancellation only abandons the wait; the existing mutation scope retains the single bootstrap. */
     suspend fun bootstrapAttempt(start: suspend () -> Unit): Deferred<Unit> =
@@ -114,6 +108,16 @@ internal class AppAccountSessionCoordinator(
         publish: () -> Unit,
     ) {
         val generation = handoff.beginRequest(label)
+        try {
+            publish()
+        } finally {
+            handoff.finishRequest(generation)
+        }
+    }
+
+    /** Final local sign-out retires pending selections even when native sign-out used its fail-open path. */
+    fun publishSignedOutIdentity(publish: () -> Unit) {
+        val generation = handoff.beginRequest()
         try {
             publish()
         } finally {

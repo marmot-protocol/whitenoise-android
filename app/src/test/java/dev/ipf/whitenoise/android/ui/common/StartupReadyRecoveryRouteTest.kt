@@ -121,8 +121,7 @@ class StartupReadyRecoveryRouteTest {
                 .getDeclaredMethod("setPhase", AppPhase::class.java)
                 .apply { isAccessible = true }
                 .invoke(state, AppPhase.Ready)
-            state.accountSession.bootstrapCompleted = true
-            listOf("networkNotificationRecoverySuppressed").forEach { name ->
+            listOf("bootstrapCompleted", "networkNotificationRecoverySuppressed").forEach { name ->
                 WhiteNoiseAppState::class.java
                     .getDeclaredField(name)
                     .apply { isAccessible = true }

@@ -1482,7 +1482,7 @@ class WhiteNoiseAppState private constructor(
         nativeAttachmentPermissions.invalidate(null)
     }
 
-    private val bootstrapRuntime get() = accountSession.bootstrapRuntime
+    private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
     private val startupPerformance = StartupPerformanceDiagnostics()
     private var startupSystemSplashHandoffRecorded = false
     private var startupLocalRowsRecorded = false
@@ -1492,11 +1492,8 @@ class WhiteNoiseAppState private constructor(
     private val accountListLifetime = StalenessGuard()
     private var pendingStartupUnreadRefresh: StartupUnreadRefresh? = null
 
-    private var bootstrapCompleted: Boolean
-        get() = accountSession.bootstrapCompleted
-        set(value) {
-            accountSession.bootstrapCompleted = value
-        }
+    @Volatile
+    private var bootstrapCompleted = false
     private val nativePushSyncMutex = Mutex()
     private val nativePushFallback = NativePushFallbackCoordinator(nativePushFallbackPlatform)
     private val notificationDeliveryModeMutex = Mutex()
@@ -2616,14 +2613,13 @@ class WhiteNoiseAppState private constructor(
     internal val accountSession by lazy {
         AppAccountSessionCoordinator(
             mutationScope = mutationsScope,
-            recoveryScope = notificationScope,
             stateDispatcher = Dispatchers.Main.immediate,
-            catchUpWindow = localNotificationPresenter.catchUpWindow,
             listenerTeardown = { runtimeListenerTeardownOwner },
             activation = AccountSessionActivation(),
         )
     }
-    private val accountCatchUpCoordinator get() = accountSession.catchUp
+    private val accountCatchUpCoordinator =
+        AccountCatchUpCoordinator(notificationScope, localNotificationPresenter.catchUpWindow)
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
     private val accountSwitchHandoff get() = accountSession.handoff
 
@@ -5447,7 +5443,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Qualifies a returned import receipt before Android publishes or activates the account. */
+    /** Pending setup keeps its route; only a completed activation receipt can announce an imported identity. */
     private suspend fun activateImportedIdentity(summary: AccountSummaryFfi) {
         marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
         refreshAccounts()
@@ -6147,7 +6143,7 @@ class WhiteNoiseAppState private constructor(
             return PreparedAccountSessionActivation(activationRuntimeGeneration, profile, snapshot)
         }
 
-        /** Retains the native deletion/sign-out admission check in the facade's current account snapshot. */
+        /** Rejects revoked identities, replacement runtimes and publication during destructive account teardown. */
         override fun canPublish(
             label: String,
             runtime: Int,
@@ -6566,6 +6562,8 @@ class WhiteNoiseAppState private constructor(
      * the established local fail-open behavior; a structured unfinished-local
      * outcome retains the active session. Credential revocation failure returns an incomplete result before
      * native admission; errors after admission retain their established propagation.
+     * Final deactivation retires selections through the account session; native per-account cleanup remains
+     * here, while the shared process runtime/listener is retained for other identities and later sign-in.
      * Returns null when no account is active.
      */
     @Suppress("ReturnCount") // No account, retained engine session, or completed local sign-out.
@@ -6642,9 +6640,11 @@ class WhiteNoiseAppState private constructor(
         if (next != null) {
             setActiveAccount(next)
         } else {
-            activeAccountRef = null
-            preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
-            reloadMediaAutoDownloadMatrix()
+            accountSession.publishSignedOutIdentity {
+                activeAccountRef = null
+                preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
+                reloadMediaAutoDownloadMatrix()
+            }
         }
         // Signing out the last active account must leave a usable state, not a
         // MainShell with no active account. See issue #11.

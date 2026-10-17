@@ -182,8 +182,7 @@ class DevicePrivacyScreenScreenshotTest {
             .getDeclaredMethod("setPhase", AppPhase::class.java)
             .apply { isAccessible = true }
             .invoke(state, phase)
-        state.accountSession.bootstrapCompleted = true
-        listOf("networkNotificationRecoverySuppressed").forEach { field ->
+        listOf("bootstrapCompleted", "networkNotificationRecoverySuppressed").forEach { field ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField(field)
                 .apply { isAccessible = true }

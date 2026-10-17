@@ -102,8 +102,7 @@ class AppStateSignUpReentryTest {
                 initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("signup-native-test").path, native),
             )
         // Match an already-completed process bootstrap; root recreation must call the real resume path.
-        app.accountSession.bootstrapCompleted = true
-        listOf("networkNotificationRecoverySuppressed").forEach { field ->
+        listOf("bootstrapCompleted", "networkNotificationRecoverySuppressed").forEach { field ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField(field)
                 .apply { isAccessible = true }

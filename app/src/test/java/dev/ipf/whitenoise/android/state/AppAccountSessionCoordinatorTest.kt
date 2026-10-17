@@ -280,6 +280,25 @@ class AppAccountSessionCoordinatorTest {
             assertFalse(host.events.any { it.startsWith("publish:") })
         }
 
+    /** Final local sign-out retires an older selection without closing the shared process runtime. */
+    @Test
+    fun signedOutIdentitySupersedesSuspendedSelection() =
+        runTest {
+            val host = Activation()
+            val release = CompletableDeferred<Unit>()
+            host.beforePrepare = { release.await() }
+            val owner = coordinator(backgroundScope, host)
+            val selection =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("old-request"))
+                }
+            owner.publishSignedOutIdentity { host.activeAccount = null }
+            release.complete(Unit)
+            assertNull(selection.await())
+            assertNull(host.activeAccount)
+            assertEquals(listOf("prepare:old-request"), host.events)
+        }
+
     /** Import enrichment cannot republish Ready or start warmup after a different account takes ownership. */
     @Test
     fun importedIdentityCompletionCannotRepublishAfterAccountSwitch() =
@@ -364,9 +383,7 @@ class AppAccountSessionCoordinatorTest {
         teardownEvents: MutableList<String> = mutableListOf(),
     ) = AppAccountSessionCoordinator(
         mutationScope = CoroutineScope(scope.coroutineContext + UnconfinedTestDispatcher(testScheduler)),
-        recoveryScope = scope,
         stateDispatcher = UnconfinedTestDispatcher(testScheduler),
-        catchUpWindow = null,
         listenerTeardown = {
             AppRuntimeListenerTeardownOwner(
                 cancelNetworkRecovery = { teardownEvents += "network" },
