@@ -47,13 +47,14 @@ internal class ConversationAttachmentPresentation(
         account: String,
         messageIdHex: String,
         attachmentIndex: Int,
-    ): AttachmentTransferRequest = AttachmentTransferRequest(
-        account,
-        groupIdHex,
-        messageIdHex,
-        attachmentIndex,
-        sourceMessageId(messageIdHex),
-    )
+    ): AttachmentTransferRequest =
+        AttachmentTransferRequest(
+            account,
+            groupIdHex,
+            messageIdHex,
+            attachmentIndex,
+            sourceMessageId(messageIdHex),
+        )
 
     /**
      * Yes/no probe: are the decrypted bytes for [messageIdHex] /
