@@ -573,10 +573,56 @@ class IncomingAttachmentAutoDownloadTest {
 
                 targetSlots().forEach { assertEquals(1, queued(request(it.index))) }
                 assertEquals(4, fixture.attachmentHistoryPageCalls.get())
+                // The restarted read counts its own pages: the page read before the restart is not spent.
+                assertTrue(receiptLogs().any { "pages=2 end=passed" in it })
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /**
+     * The restarted read gets the whole page budget again: a target on its last permitted page is queued, even
+     * though a page was already read before the restart.
+     */
+    @Test
+    fun theRestartedReadReachesItsLastPermittedPage() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = newerPages(2) + mixedHistory(), historyRestarts = 1)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                targetSlots().forEach { assertEquals(1, queued(request(it.index))) }
                 assertTrue(receiptLogs().any { "pages=3 end=passed" in it })
             } finally {
                 fixture.close()
             }
+        }
+
+    /** The restarted read still stops at its budget: a target one page beyond it is not queued. */
+    @Test
+    fun theRestartedReadStopsAtItsBudget() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = newerPages(3) + mixedHistory(), historyRestarts = 1)
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+
+                targetSlots().forEach { assertEquals(0, queued(request(it.index))) }
+                assertTrue(receiptLogs().any { "pages=3 end=exhausted" in it })
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** [count] full pages of newer image slots from other messages, ahead of the target in newest-first order. */
+    private fun newerPages(count: Int): List<AttachmentEntryFfi> =
+        (0 until RECEIPT_ATTACHMENT_PAGE_LIMIT.toInt() * count).map { index ->
+            entry("%064x".format(index + 1_000), 0, AttachmentCategoryFfi.IMAGE)
         }
 
     /** Receipt logs carry counts and types only, never the account, group or message they describe. */

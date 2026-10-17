@@ -170,8 +170,10 @@ internal suspend fun WhiteNoiseAppState.receivedMessageAttachments(
                     AttachmentPageReadFfi.CursorMismatch,
                     -> {
                         if (restarts++ >= RECEIPT_LOOKUP_RESTARTS) return lookup(ReceiptLookupEnd.Unavailable)
+                        // The restarted read gets the whole page budget again, as documented above.
                         found.clear()
                         seen = false
+                        pages = 0
                         continue
                     }
                     AttachmentPageReadFfi.InvalidLimit -> return lookup(ReceiptLookupEnd.Unavailable)
