@@ -368,8 +368,10 @@ internal object ApkInstallerAttachmentProbe {
         }
         val verified = requireNotNull(file).readBytes()
         assertArrayEquals("received bytes differ from sent bytes for ${case.key}", case.bytes, verified)
+        // MDK keeps one verified copy per content, so the checker needs to know which cases repeat earlier bytes.
         val received = JSONObject().put("phase", "apk-received").put("case", case.key)
-        ControlledAttachmentProbe.report(received.put("bytes", case.bytes.size).put("exact", true))
+        received.put("content", sha256Hex(case.bytes)).put("bytes", case.bytes.size).put("exact", true)
+        ControlledAttachmentProbe.report(received)
         return JSONObject()
             .put("case", case.key)
             .put("file", case.fileName)

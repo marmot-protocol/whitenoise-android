@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.media.decodeAdmittedAttachmentImage
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewStill
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
@@ -383,35 +384,39 @@ internal fun MediaPreviewContent(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            MediaPreviewTopBar(
-                editAction =
-                    currentMedia
-                        // The prototype withholds Edit from video and GIF. Unresolved metadata is
-                        // not evidence of either, so a still whose probe is still in flight keeps
-                        // its action rather than losing it for the life of the screen.
-                        ?.takeIf { onEditMediaAt != null && currentMetadata?.isVideo != true }
-                        ?.takeIf { currentMetadata?.isGif != true }
-                        ?.let { media ->
-                            MediaPreviewEditAction(
-                                enabled =
-                                    !sending &&
-                                        !applying &&
-                                        !preparing &&
-                                        media.slot.id !in nonEditableMediaSlotIds,
-                                description =
-                                    editActionDescription(
-                                        slotId = media.slot.id,
-                                        descriptions = nonEditableMediaDescriptions,
-                                        nonEditableSlotIds = nonEditableMediaSlotIds,
-                                        genericRefusal = genericEditRefusal,
-                                    ),
-                                onEdit = { onEditMediaAt?.invoke(pagerState.currentPage) },
-                            )
-                        },
-                onClose = onClose,
-                onDone = { applying = true },
-                doneEnabled = !sending && !applying,
-            )
+            // App banners sit below this screen's bar rather than over it (#3312).
+            Column {
+                MediaPreviewTopBar(
+                    editAction =
+                        currentMedia
+                            // The prototype withholds Edit from video and GIF. Unresolved metadata is
+                            // not evidence of either, so a still whose probe is still in flight keeps
+                            // its action rather than losing it for the life of the screen.
+                            ?.takeIf { onEditMediaAt != null && currentMetadata?.isVideo != true }
+                            ?.takeIf { currentMetadata?.isGif != true }
+                            ?.let { media ->
+                                MediaPreviewEditAction(
+                                    enabled =
+                                        !sending &&
+                                            !applying &&
+                                            !preparing &&
+                                            media.slot.id !in nonEditableMediaSlotIds,
+                                    description =
+                                        editActionDescription(
+                                            slotId = media.slot.id,
+                                            descriptions = nonEditableMediaDescriptions,
+                                            nonEditableSlotIds = nonEditableMediaSlotIds,
+                                            genericRefusal = genericEditRefusal,
+                                        ),
+                                    onEdit = { onEditMediaAt?.invoke(pagerState.currentPage) },
+                                )
+                            },
+                    onClose = onClose,
+                    onDone = { applying = true },
+                    doneEnabled = !sending && !applying,
+                )
+                TopNoticeSlot()
+            }
         },
     ) { contentPadding ->
         Column(Modifier.fillMaxSize().padding(contentPadding)) {

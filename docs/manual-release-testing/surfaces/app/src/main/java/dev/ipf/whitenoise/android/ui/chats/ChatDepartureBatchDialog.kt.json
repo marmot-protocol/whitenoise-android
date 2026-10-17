@@ -32,6 +32,14 @@
           "CHL-027",
           "CHL-028"
         ]
+      },
+      {
+        "surface": "ChatDepartureReview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "fun ChatDepartureReview(",
+        "test_ids": [
+          "CHL-026"
+        ]
       }
     ],
     "settings_controls": [

@@ -4797,19 +4797,27 @@ class ChatsController private constructor(
         }
     }
 
-    private suspend fun demoteAndLeaveChat(attempt: ChatListDepartureAttempt) =
-        withContext(NonCancellable) {
-            val demotion =
-                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                    selfDemoteAdminDetailed(attempt.account, attempt.groupId)
+    /**
+     * Steps down as admin, asking first if MDK holds that back, then leaves, even if the chat list goes away. The
+     * question stays cancellable, so a departure cancelled while the user decides changes nothing; once the step-down
+     * starts, it and the leave after it run to completion together.
+     */
+    private suspend fun demoteAndLeaveChat(attempt: ChatListDepartureAttempt) {
+        appState.runGroupChange(attempt.account, attempt.groupId) {
+            withContext(NonCancellable) {
+                val demotion =
+                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                        selfDemoteAdminDetailed(attempt.account, attempt.groupId)
+                    }
+                attempt.demoted = true
+                if (attempt.isCurrent()) {
+                    attempt.onStage(ChatDepartureStage.ADMIN_DEMOTED)
+                    appState.applyLocalGroupUpdate(demotion.details.group)
                 }
-            attempt.demoted = true
-            if (attempt.isCurrent()) {
-                attempt.onStage(ChatDepartureStage.ADMIN_DEMOTED)
-                appState.applyLocalGroupUpdate(demotion.details.group)
+                appState.marmotIo { leaveGroup(attempt.account, attempt.groupId) }
             }
-            appState.marmotIo { leaveGroup(attempt.account, attempt.groupId) }
         }
+    }
 
     private fun chatListDepartureAllowed(
         group: AppGroupRecordFfi,
@@ -4893,7 +4901,7 @@ class ChatsController private constructor(
         val deleted =
             deleteGroupLocalFromChatList(
                 groupIdHex,
-                failureMessage = R.string.toast_left_chat_delete_failed,
+                wording = LocalRemovalWording.Delete.copy(failureTitle = R.string.toast_left_chat_delete_failed),
                 observer = LocalChatDeleteObserver(onCleanupDeferred = { deferred = true }),
             )
         return (deleted && !deferred).also { if (it) onStage(ChatDepartureStage.COMPLETED) }
@@ -4952,7 +4960,7 @@ class ChatsController private constructor(
     internal suspend fun deleteGroupLocalFromChatList(
         groupIdHex: String,
         notify: Boolean = true,
-        failureMessage: Int = R.string.toast_couldnt_delete_chat,
+        wording: LocalRemovalWording = LocalRemovalWording.Delete,
         observer: LocalChatDeleteObserver = LocalChatDeleteObserver(),
         forgetProtocol: Boolean = false,
     ): Boolean =
@@ -4989,42 +4997,46 @@ class ChatsController private constructor(
                     }
                 }
                 if (failure is CancellationException) throw failure
-                if (isCurrent()) {
+                if (isCurrent() && observer.presentsFailure) {
+                    // The retry keeps this removal's wording, so a retried abandonment never reads as a delete.
                     appState.presentLocalDeleteFailure(
-                        failureMessage,
+                        wording.failureTitle,
                         failure,
+                        detail = AppText.Resource(wording.failureDetail),
                         notice =
                             appState.localDeleteRetryNotice(account, groupIdHex, isCurrent) {
                                 deleteGroupLocalFromChatList(
                                     groupIdHex,
-                                    failureMessage = failureMessage,
+                                    wording = wording,
                                     forgetProtocol = forgetProtocol,
                                 )
                             },
                     )
-                    observer.onFailure(failure)
                 }
+                if (isCurrent()) observer.onFailure(failure)
                 false
             } else if (isCurrent()) {
-                completeChatLocalRemoval(account, groupIdHex, wipe.getOrDefault(false), notify, observer)
+                val success = wording.success.takeIf { notify }
+                completeChatLocalRemoval(account, groupIdHex, wipe.getOrDefault(false), success, observer)
                 true
             } else {
                 false
             }
         } ?: false
 
+    /** Settles a committed removal, confirming it with [success] only once its Android cleanup also finished. */
     private fun completeChatLocalRemoval(
         account: String,
         groupIdHex: String,
         cleanupComplete: Boolean,
-        notify: Boolean,
+        @StringRes success: Int?,
         observer: LocalChatDeleteObserver,
     ) {
         appState.dismissLocalDeleteFailure(account, groupIdHex)
         removeChatRow(groupIdHex)
         finishRemovedChatRowClientState(groupIdHex)
         if (!cleanupComplete) observer.onCleanupDeferred()
-        if (notify && cleanupComplete) appState.presentTransient(R.string.toast_chat_deleted_local)
+        if (success != null && cleanupComplete) appState.presentTransient(success)
     }
 
     private fun requireChatListDepartureCurrent(
@@ -5091,8 +5103,10 @@ class ChatsController private constructor(
                             "Administrator successor changed"
                         }
                         val promoted =
-                            appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
-                                promoteAdminDetailed(account, groupIdHex, newAdmin.memberIdHex)
+                            appState.runGroupChange(account, groupIdHex) {
+                                appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                                    promoteAdminDetailed(account, groupIdHex, newAdmin.memberIdHex)
+                                }
                             }
                         if (isCurrent()) {
                             onStage(ChatDepartureStage.ADMIN_GRANTED)
@@ -6219,7 +6233,9 @@ class ConversationController(
         },
     private val groupProfileUpdater: suspend (String, String, String?, String?) -> Unit =
         { account, groupIdHex, name, description ->
-            appState.marmotIo { updateGroupProfile(account, groupIdHex, name, description) }
+            appState.runGroupChange(account, groupIdHex) {
+                appState.marmotIo { updateGroupProfile(account, groupIdHex, name, description) }
+            }
         },
     private val clockMillis: () -> Long = System::currentTimeMillis,
     private val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
@@ -6235,8 +6251,10 @@ class ConversationController(
     private val initialAdminInviteWriter:
         suspend (String, String, List<String>, List<String>) -> dev.ipf.marmotkit.GroupMutationResultFfi =
         { account, groupId, members, admins ->
-            appState.marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
-                inviteMembersDetailedWithInitialAdmins(account, groupId, members, admins)
+            appState.runGroupChange(account, groupId, invite = true) {
+                appState.marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
+                    inviteMembersDetailedWithInitialAdmins(account, groupId, members, admins)
+                }
             }
         },
 ) {
@@ -10097,11 +10115,22 @@ class ConversationController(
             // overlay and restores the original body. Guarded the same way as
             // the success path: a newer in-flight attempt's overlay must not be
             // clobbered back to this stale attempt's Failed/pre-edit text.
+            // MDK refuses an edit of a message this account cannot edit; retrying could never succeed, so the
+            // original body returns instead of a Failed overlay with Retry.
+            val notEditable = throwable is MarmotKitException.InvalidEditTarget
             optimisticEdits[target]
                 ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
-                ?.let { optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed) }
+                ?.let {
+                    if (notEditable) {
+                        optimisticEdits.remove(target)
+                    } else {
+                        optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed)
+                    }
+                }
             publishTimelineFromIndexes()
-            appState.presentFailure(R.string.toast_couldnt_edit_message, "MESSAGE_EDIT", throwable)
+            val detail = if (notEditable) R.string.error_message_not_editable else R.string.error_try_again
+            val title = R.string.toast_couldnt_edit_message
+            appState.presentFailure(title, "MESSAGE_EDIT", throwable, AppText.Resource(detail))
         }
     }
 
@@ -10153,7 +10182,8 @@ class ConversationController(
                         true
                     } else {
                         failPendingEditAdmission(intent, target, account, cause)
-                        false
+                        // A message MDK will never let this account edit ends the edit too, so the editor closes.
+                        cause is MarmotKitException.InvalidEditTarget
                     }
                 },
             )
@@ -10202,6 +10232,7 @@ class ConversationController(
             }
     }
 
+    /** Shows a refused pending edit as Failed with Retry, or restores the original text when MDK says it is final. */
     private fun failPendingEditAdmission(
         intent: DurablePendingEditIntent,
         target: String,
@@ -10209,8 +10240,10 @@ class ConversationController(
         cause: Throwable,
     ) {
         val current = optimisticEdits.entries.firstOrNull { it.value.durableIntent == intent }
+        // A message that can no longer be edited gets its original text back; a Retry could never succeed.
+        val notEditable = cause is MarmotKitException.InvalidEditTarget
         if (current != null) {
-            if (optimisticMessages["msg:$target"]?.status == MessageStatus.Failed) {
+            if (notEditable || optimisticMessages["msg:$target"]?.status == MessageStatus.Failed) {
                 optimisticEdits.remove(current.key)
             } else {
                 optimisticEdits[current.key] = current.value.copy(status = MessageStatus.Failed)
@@ -10218,7 +10251,9 @@ class ConversationController(
         }
         publishTimelineFromIndexes()
         if (current != null && appState.activeAccountRef == account) {
-            appState.presentFailure(R.string.toast_couldnt_edit_message, "MESSAGE_EDIT", cause)
+            val detail = if (notEditable) R.string.error_message_not_editable else R.string.error_try_again
+            val title = R.string.toast_couldnt_edit_message
+            appState.presentFailure(title, "MESSAGE_EDIT", cause, AppText.Resource(detail))
         }
     }
 
@@ -11244,12 +11279,7 @@ class ConversationController(
                         appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
                     } else {
                         if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
-                            withContext(NonCancellable) {
-                                val demoteResult = selfDemoteBeforeLeave(account)
-                                demotedBeforeLeave = true
-                                applyMutationDetails(account, demoteResult.details)
-                                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-                            }
+                            demoteThenLeave(account) { demotedBeforeLeave = true }
                         } else {
                             appState.marmotIo { leaveGroup(account, group.groupIdHex) }
                         }
@@ -11299,10 +11329,26 @@ class ConversationController(
             }
         }
 
-    private suspend fun selfDemoteBeforeLeave(account: String): GroupMutationResultFfi =
-        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-            selfDemoteAdminDetailed(account, group.groupIdHex)
+    /**
+     * Steps [account] down as admin, then leaves, asking first if MDK holds the step-down back. The question stays
+     * cancellable; once the step-down starts, it, [onDemoted] and the leave run to completion together.
+     */
+    private suspend fun demoteThenLeave(
+        account: String,
+        onDemoted: () -> Unit,
+    ) {
+        appState.runGroupChange(account, group.groupIdHex) {
+            withContext(NonCancellable) {
+                val demoteResult =
+                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                        selfDemoteAdminDetailed(account, group.groupIdHex)
+                    }
+                onDemoted()
+                applyMutationDetails(account, demoteResult.details)
+                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
+            }
         }
+    }
 
     suspend fun dismissConversationNotifications() {
         val account = conversationAccountRef ?: return
@@ -11511,14 +11557,36 @@ class ConversationController(
             R.string.toast_chat_deleted_local
         }
 
-    /** MDK 0.10.0 local reset: erase this device's state and wait for a Welcome newer than the reset. */
-    suspend fun forgetGroupLocal(): Boolean =
-        runLocalGroupRemoval(R.string.toast_couldnt_reset_group, "GROUP_LOCAL_RESET") { account ->
-            val reset = appState.forgetGroupLocalWithClientCleanup(account, group.groupIdHex)
-            if (reset) R.string.toast_group_reset_done else R.string.toast_group_reset_already_waiting
+    /**
+     * Confirmed local abandonment (#3310) of this DM or group: MDK 0.10.0's forget behind the durable cleanup
+     * journal. It sends no leave, admin change or disband, so a refused handover or an absent peer cannot block it.
+     */
+    suspend fun forgetGroupLocal(): Boolean {
+        val dm = isDm
+        val failure = if (dm) R.string.toast_couldnt_abandon_chat else R.string.toast_couldnt_reset_group
+        return runLocalGroupRemoval(failure, "GROUP_LOCAL_RESET") { account ->
+            val runtime = appState.runtimeGeneration
+            val reset =
+                appState.forgetGroupLocalWithClientCleanup(account, group.groupIdHex) {
+                    conversationAccountRef == account &&
+                        appState.runtimeGeneration == runtime &&
+                        !appState.signOutInProgress &&
+                        !appState.wipeInProgress
+                }
+            when {
+                !reset && dm -> R.string.toast_chat_already_abandoned
+                !reset -> R.string.toast_group_reset_already_waiting
+                dm -> R.string.toast_chat_abandoned
+                else -> R.string.toast_group_reset_done
+            }
         }
+    }
 
-    /** Shared shape of the two local removals: one mutation slot, a success toast chosen by the removal itself. */
+    /**
+     * Shared shape of the two local removals: one mutation slot, a success notice chosen by the removal itself. Both
+     * close this conversation, so the notice is app-wide instead of scoped to the closed route (#3310), and like a
+     * failure it is not shown on a replacement account or runtime.
+     */
     private suspend fun runLocalGroupRemoval(
         failureToast: Int,
         operationCode: String,
@@ -11528,7 +11596,9 @@ class ConversationController(
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
-                presentConversationTransient(removal(account))
+                val success = removal(account)
+                val sameRuntime = appState.runtimeGeneration == conversationRuntimeGeneration
+                if (sameRuntime && appState.activeAccountRef == account) appState.presentTransient(success)
                 true
             }.onFailure { recordMutationFailure(failureToast, operationCode, it) }.getOrDefault(false)
         }
@@ -11598,29 +11668,24 @@ class ConversationController(
                         // Queuing behind another commit can outlive this editor or account.
                         if (!commitIfCurrent()) return@withGroupCommitLock false
                         val wroteAvatar =
-                            appState.marmotIo {
-                                // Dispatch to IO can also wait after the group lock was acquired.
-                                if (!commitIfCurrent()) {
-                                    false
-                                } else {
-                                    updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
-                                    true
+                            appState.runGroupChange(account, group.groupIdHex, stillWanted = commitIfCurrent) {
+                                // A retry the user continued past must reach MDK, or its acknowledgement outlives it.
+                                val admitted = isAdmittedGroupChange()
+                                appState.marmotIo {
+                                    // Dispatch to IO can also wait after the group lock was acquired.
+                                    if (!admitted && !commitIfCurrent()) {
+                                        false
+                                    } else {
+                                        updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
+                                        true
+                                    }
                                 }
                             }
                         if (!wroteAvatar) return@withGroupCommitLock false
                         // A public avatar supersedes the encrypted component. Clear it
                         // after the URL is durable so another client cannot resurrect it.
                         if (normalized != null && group.imageHashHex != null) {
-                            encryptedImageCleared =
-                                runCatchingCancellable {
-                                    appState.marmotIo {
-                                        clearGroupImage(account, group.groupIdHex)
-                                    }
-                                }.onFailure {
-                                    if (BuildConfig.DEBUG) {
-                                        Log.w("DMConversation", "encrypted avatar cleanup failed", it)
-                                    }
-                                }.isSuccess
+                            encryptedImageCleared = clearSupersededGroupImage(account)
                         }
                         true
                     }
@@ -11635,6 +11700,20 @@ class ConversationController(
                 if (report()) recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_AVATAR_URL_UPDATE", it)
             }.getOrDefault(false)
         }
+
+    /**
+     * Best-effort clean-up of the encrypted image a public avatar supersedes. The user never asked for it, so when MDK
+     * holds it back nobody is asked: the refusal, like any failure, leaves the encrypted image in place, and the
+     * public avatar still wins for display.
+     */
+    private suspend fun clearSupersededGroupImage(account: String): Boolean =
+        runCatchingCancellable {
+            appState.runGroupChange(account, group.groupIdHex, askUser = false) {
+                appState.marmotIo { clearGroupImage(account, group.groupIdHex) }
+            }
+        }.onFailure {
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "encrypted avatar cleanup failed", it)
+        }.isSuccess
 
     /** Commits the encrypted image and reports failure only while [change] owns the attempt. */
     internal suspend fun updateGroupImage(change: ScopedGroupImageMutation<ImageUploadDraft?>): Boolean {
@@ -11708,11 +11787,18 @@ class ConversationController(
             ) {
                 pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
                 onLegacyClearAttempt()
-                appState.marmotIo {
-                    if (change.viewerPermissionCheck && !change.isActive()) {
-                        throw CancellationException("Viewer owner replaced")
+                try {
+                    appState.runGroupChange(account, capturedGroupId, stillWanted = { change.stillOwned() }) {
+                        val admitted = isAdmittedGroupChange()
+                        appState.marmotIo {
+                            if (!admitted && !change.stillOwned()) throw CancellationException("Viewer owner replaced")
+                            updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
+                        }
                     }
-                    updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
+                } catch (declined: GroupChangeDeclinedException) {
+                    // Waiting after the new image landed must say so, not end quietly behind the old URL avatar.
+                    if (!change.stillOwned()) throw declined
+                    throw declined.refusal
                 }
                 pendingLegacyAvatarClearAfterImageMutationKey = null
             }
@@ -11734,21 +11820,26 @@ class ConversationController(
         return applicable
     }
 
-    /** Native command entry rechecks viewer ownership after dispatcher/lock suspension. */
+    /**
+     * Native command entry rechecks viewer ownership after dispatcher/lock suspension, except on the retry of a change
+     * the user continued past, which must reach MDK to spend its acknowledgement.
+     */
     private suspend fun commitGroupImageBytes(
         account: String,
         groupId: String,
         draft: ImageUploadDraft?,
         change: ScopedGroupImageMutation<ImageUploadDraft?>,
     ) {
-        appState.marmotIo {
-            if (change.viewerPermissionCheck && !change.isActive()) {
-                throw CancellationException("Viewer owner replaced")
-            }
-            if (draft != null) {
-                updateGroupImage(account, groupId, draft.plaintext, draft.mediaType)
-            } else {
-                clearGroupImage(account, groupId)
+        appState.runGroupChange(account, groupId, stillWanted = { change.stillOwned() }) {
+            // A retry the user continued past must reach MDK, or its acknowledgement outlives it.
+            val admitted = isAdmittedGroupChange()
+            appState.marmotIo {
+                if (!admitted && !change.stillOwned()) throw CancellationException("Viewer owner replaced")
+                if (draft != null) {
+                    updateGroupImage(account, groupId, draft.plaintext, draft.mediaType)
+                } else {
+                    clearGroupImage(account, groupId)
+                }
             }
         }
     }
@@ -11942,12 +12033,15 @@ class ConversationController(
         }
     }
 
-    /** These typed key/routing rejections happen before the native membership commit. */
+    /** These typed key, routing, lookup and admission rejections happen before the native membership commit. */
     private fun inviteReplyNeedsReconciliation(throwable: Throwable): Boolean =
         when (throwable) {
             is MarmotKitException.MissingKeyPackage,
             is MarmotKitException.MissingMemberInboxRoute,
             is MarmotKitException.InvalidKeyPackageEvent,
+            is MarmotKitException.DirectoryLookupIncomplete,
+            is MarmotKitException.GroupCatchingUp,
+            is MarmotKitException.GroupCommitUndelivered,
             -> false
             else -> true
         }
@@ -11983,6 +12077,7 @@ class ConversationController(
         }
     }
 
+    /** Removes [member] from the group, asking first if MDK holds the change back. True once they are gone. */
     suspend fun removeMember(member: AppGroupMemberRecordFfi): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
@@ -11997,8 +12092,10 @@ class ConversationController(
                             authoritativeAdministrationTarget(target)
                                 ?: return@withGroupCommitLock GroupAdministrationCommitOutcome.ROSTER_CHANGED
                             val result =
-                                appState.marmotIo(MarmotTraceSection.REMOVE_MEMBERS) {
-                                    removeMembersDetailed(account, group.groupIdHex, listOf(target))
+                                appState.runGroupChange(account, group.groupIdHex) {
+                                    appState.marmotIo(MarmotTraceSection.REMOVE_MEMBERS) {
+                                        removeMembersDetailed(account, group.groupIdHex, listOf(target))
+                                    }
                                 }
                             applyMutationDetails(account, result.details)
                             GroupAdministrationCommitOutcome.COMMITTED
@@ -12027,6 +12124,7 @@ class ConversationController(
             }
         }
 
+    /** Promotes or demotes [member], asking first if MDK holds the change back. True once committed. */
     suspend fun setMemberAdmin(
         member: AppGroupMemberRecordFfi,
         admin: Boolean,
@@ -12057,14 +12155,18 @@ class ConversationController(
                             }
                             if (admin) {
                                 val result =
-                                    appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
-                                        promoteAdminDetailed(account, group.groupIdHex, target)
+                                    appState.runGroupChange(account, group.groupIdHex) {
+                                        appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                                            promoteAdminDetailed(account, group.groupIdHex, target)
+                                        }
                                     }
                                 applyMutationDetails(account, result.details)
                             } else {
                                 val result =
-                                    appState.marmotIo(MarmotTraceSection.DEMOTE_ADMIN) {
-                                        demoteAdminDetailed(account, group.groupIdHex, target)
+                                    appState.runGroupChange(account, group.groupIdHex) {
+                                        appState.marmotIo(MarmotTraceSection.DEMOTE_ADMIN) {
+                                            demoteAdminDetailed(account, group.groupIdHex, target)
+                                        }
                                     }
                                 applyMutationDetails(account, result.details)
                             }
@@ -12092,7 +12194,9 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
+                    appState.runGroupChange(account, group.groupIdHex) {
+                        appState.marmotIo { updateMessageRetention(account, group.groupIdHex, disappearingMessageSecs) }
+                    }
                 }
                 val previousRetention = group.disappearingMessageSecs
                 group = group.copy(disappearingMessageSecs = disappearingMessageSecs)
@@ -12160,7 +12264,10 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    val result = appState.marmotIo { enableGroupDisbanding(account, group.groupIdHex) }
+                    val result =
+                        appState.runGroupChange(account, group.groupIdHex) {
+                            appState.marmotIo { enableGroupDisbanding(account, group.groupIdHex) }
+                        }
                     applyMutationDetails(account, result.details)
                 }
                 refreshManagementState()
@@ -12180,7 +12287,9 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo { disbandGroup(account, group.groupIdHex) }
+                    appState.runGroupChange(account, group.groupIdHex) {
+                        appState.marmotIo { disbandGroup(account, group.groupIdHex) }
+                    }
                 }
                 refreshManagementState()
                 true
@@ -12202,6 +12311,7 @@ class ConversationController(
             }.getOrDefault(false)
         }
 
+    /** Steps this account down as admin while another admin remains, asking first if MDK holds it back. */
     suspend fun stepDownAsAdmin(): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
@@ -12222,8 +12332,10 @@ class ConversationController(
                             return@withGroupCommitLock GroupAdministrationCommitOutcome.KEEP_ONE_ADMIN
                         }
                         val result =
-                            appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                selfDemoteAdminDetailed(account, group.groupIdHex)
+                            appState.runGroupChange(account, group.groupIdHex) {
+                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                    selfDemoteAdminDetailed(account, group.groupIdHex)
+                                }
                             }
                         applyMutationDetails(account, result.details)
                         GroupAdministrationCommitOutcome.COMMITTED
@@ -12274,8 +12386,10 @@ class ConversationController(
                             return@withGroupCommitLock false
                         }
                         val promoteResult =
-                            appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
-                                promoteAdminDetailed(account, group.groupIdHex, target)
+                            appState.runGroupChange(account, group.groupIdHex) {
+                                appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                                    promoteAdminDetailed(account, group.groupIdHex, target)
+                                }
                             }
                         grantedBeforeDemote = true
                         applyMutationDetails(account, promoteResult.details)
@@ -12285,8 +12399,15 @@ class ConversationController(
                         // cancellation past the partial-state branch). Run it to completion.
                         withContext(NonCancellable) {
                             val demoteResult =
-                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                    selfDemoteAdminDetailed(account, group.groupIdHex)
+                                try {
+                                    appState.runGroupChange(account, group.groupIdHex) {
+                                        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                            selfDemoteAdminDetailed(account, group.groupIdHex)
+                                        }
+                                    }
+                                } catch (declined: GroupChangeDeclinedException) {
+                                    // Waiting leaves both admins: report the partial transfer, not a quiet cancel.
+                                    throw declined.refusal
                                 }
                             applyMutationDetails(account, demoteResult.details)
                         }

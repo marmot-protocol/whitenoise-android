@@ -13,6 +13,8 @@ private val NATIVE_TRANSFER_DELIBERATE_RETRY_STATES =
         AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
         AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
         AttachmentTransferStateFfi.RETRY_EXHAUSTED,
+        // Only download-again readmits a storage-parked body at once; an explicit request leaves it parked.
+        AttachmentTransferStateFfi.STORAGE_BLOCKED,
     )
 
 /** Host action intent; observing or joining native work never authorizes a retry-budget reset. */

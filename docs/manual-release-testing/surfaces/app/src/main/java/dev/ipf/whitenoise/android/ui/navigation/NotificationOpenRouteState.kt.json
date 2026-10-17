@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationOpenRouteState.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NotificationOpenRouteEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationOpenRouteState.kt",
+        "anchor": "fun NotificationOpenRouteEffect(",
+        "test_ids": [
+          "NTF-009",
+          "NTF-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

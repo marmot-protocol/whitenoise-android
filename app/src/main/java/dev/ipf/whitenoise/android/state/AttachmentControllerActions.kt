@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.onEach
 private val DELIBERATE_RECOVERY_STATES =
     setOf(
         AttachmentTransferState.Failed,
+        AttachmentTransferState.StorageBlocked,
         AttachmentTransferState.Cancelled,
         AttachmentTransferState.NotRetained,
     )
@@ -19,7 +20,7 @@ internal fun ConversationController.retryAttachmentTransfer(
     messageIdHex: String,
     attachmentIndex: Int,
     onAccepted: () -> Unit,
-    onFailure: () -> Unit,
+    onFailure: (Throwable) -> Unit,
 ): Boolean {
     val request =
         attachmentTransferRequest(messageIdHex, attachmentIndex)
@@ -52,7 +53,7 @@ internal fun ConversationController.retryAttachmentTransfer(
                     reopen = { destination != null && requestAttachmentOpen(messageIdHex, attachmentIndex) },
                     notify = {
                         appState.present(R.string.media_couldnt_load)
-                        onFailure()
+                        onFailure(failure)
                     },
                 )
             }
@@ -86,6 +87,25 @@ internal fun ConversationController.attachmentNativeProgress(
     }
 }
 
+/** Records that the reader's own download of this attachment is parked for storage, so reopening can restore it. */
+internal fun ConversationController.recordReaderParkedDownload(
+    messageIdHex: String,
+    attachmentIndex: Int,
+) {
+    attachmentTransferRequest(messageIdHex, attachmentIndex)?.let { appState.recordReaderParkedDownload(it) }
+}
+
+/** Whether the reader's own download of this attachment is still parked for storage; reads, never demands. */
+internal suspend fun ConversationController.readerDownloadParkedForStorage(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): Boolean {
+    val request =
+        attachmentTransferRequest(messageIdHex, attachmentIndex)
+            ?.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)) ?: return false
+    return appState.readerDownloadParkedForStorage(request)
+}
+
 /** An actual Retry/Download again gesture may recover terminal work; ordinary Open/Save only joins. */
 internal fun ConversationController.performAttachmentUserAction(
     messageIdHex: String,
@@ -95,7 +115,7 @@ internal fun ConversationController.performAttachmentUserAction(
     onFailure: () -> Unit,
 ) {
     if (attachmentActionNeedsRetry(state, automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex))) {
-        retryAttachmentTransfer(messageIdHex, attachmentIndex, onAccepted, onFailure)
+        retryAttachmentTransfer(messageIdHex, attachmentIndex, onAccepted) { onFailure() }
     } else {
         onAccepted()
     }

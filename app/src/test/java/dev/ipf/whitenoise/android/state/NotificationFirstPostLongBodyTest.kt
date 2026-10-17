@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
+import android.Manifest
+import android.app.Notification
+import android.app.NotificationManager
+import android.graphics.Bitmap
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -7,16 +11,20 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.LongBodies
 import dev.ipf.whitenoise.android.notifications.MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS
+import dev.ipf.whitenoise.android.notifications.notificationUpdate
 import dev.ipf.whitenoise.android.ui.MARKDOWN_PREVIEW_MAX_LENGTH
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 /**
@@ -58,6 +66,36 @@ class NotificationFirstPostLongBodyTest {
             val posted = postedBody(body)
 
             assertEquals(body, posted)
+        }
+
+    /** #3311: the text block posted for a resolved long direct-chat body keeps the conversation identity image. */
+    @Test
+    fun longBodyTextBlockKeepsTheConversationIdentityImage() =
+        runBlocking {
+            val context = RuntimeEnvironment.getApplication()
+            Shadows.shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.cancelAll()
+            val presenter = LocalNotificationPresenter(context, groupReconciliation = {}).also { it.ensureChannels() }
+            val body = LongBodies.plain(MARKDOWN_PREVIEW_MAX_LENGTH * 3)
+            val picture = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+
+            val posted =
+                presenter.show(
+                    notificationUpdate(isDm = true),
+                    previewTextOverride = postedBody(body),
+                    conversationAvatarBitmap = picture,
+                    senderAvatarBitmap = picture,
+                    shortNpub = { "npub" },
+                )
+
+            assertTrue(posted)
+            val card =
+                manager.activeNotifications
+                    .single { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 }
+                    .notification
+            assertEquals(body, card.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
+            assertNotNull(card.getLargeIcon())
         }
 
     /** Resolves [body] as a new message and returns the text the formatter would post. */

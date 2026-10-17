@@ -507,7 +507,10 @@ internal fun createNotificationContentResolutionServices(
     )
 }
 
-/** Post-first-draw remote avatar work primes future cards without repainting the current card. */
+/**
+ * Post-first-draw remote avatar work primes future cards. The URLs it resolves also let a card first drawn without
+ * its picture get it once, silently (#3311), and a card that already showed its pictures is never repainted.
+ */
 internal class NotificationAvatarCoordinator(
     private val appLocked: () -> Boolean,
     private val shouldPost: (NotificationUpdateFfi, Boolean) -> Boolean,

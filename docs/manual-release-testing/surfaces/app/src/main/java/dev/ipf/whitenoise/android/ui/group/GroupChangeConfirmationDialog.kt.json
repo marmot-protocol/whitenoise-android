@@ -1,0 +1,83 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Wait instead of overriding a refused group change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_wait",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Catching-up caution title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_catching_up_title",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Catching-up caution for invitations",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_catching_up_invite_message",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Invite anyway",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_invite_anyway",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Catching-up caution for other group changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_catching_up_message",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Continue anyway",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_continue_anyway",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Undelivered last change title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_undelivered_title",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Undelivered last change caution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_undelivered_message",
+        "test_ids": [
+          "GRP-032"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "GroupChangeConfirmationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "fun GroupChangeConfirmationDialog(",
+        "test_ids": [
+          "GRP-032"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

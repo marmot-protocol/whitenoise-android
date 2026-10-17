@@ -11,6 +11,7 @@ import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -19,7 +20,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentCancellationState
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
+import dev.ipf.whitenoise.android.state.NativeAttachmentTerminalException
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -55,7 +59,21 @@ class TileTransferTest {
         assertNull(verifying.fraction)
     }
 
-    /** The feed opens for a materializing tile or a download another surface started, never for an idle one. */
+    /** A body parked for lack of free space offers Retry and names storage, unless the tile itself failed first. */
+    @Test
+    fun aStorageParkedBodyOffersRetryAndNamesStorage() {
+        val parked = transfer(AttachmentTransferState.StorageBlocked, null)
+        assertTrue(parked.storageBlocked && parked.failed && parked.visible)
+        assertFalse(parked.active || parked.cancelled)
+
+        composeRule.setContent { androidx.compose.material3.Text(tileTransferDescription(parked)) }
+        composeRule.onNodeWithText("Not enough storage. Free up space, then tap to retry.").assertExists()
+    }
+
+    /**
+     * The feed opens for a materializing tile, a download another surface started or a storage-parked body MDK may
+     * readmit, never for an idle one.
+     */
     @Test
     fun theEngineFeedOpensOnlyForMaterializingOrSharedDownloads() {
         val downloading = AttachmentTransferState.Downloading
@@ -64,6 +82,122 @@ class TileTransferTest {
         assertFalse(tileObservesNative(materializing = false, mine = false, host = AttachmentTransferState.Remote))
         assertFalse(tileObservesNative(false, false, AttachmentTransferState.Cancelled))
         assertFalse("own sends have no download to show", tileObservesNative(true, true, downloading))
+        assertTrue(
+            "MDK readmits a parked body without a tap",
+            tileObservesNative(false, false, AttachmentTransferState.StorageBlocked),
+        )
+    }
+
+    /** A parked surface loads again as soon as MDK resumes the body, so it shows progress and Cancel, not storage. */
+    @Test
+    fun aParkedSurfaceLoadsAgainOnceTheBodyResumes() =
+        runBlocking {
+            val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
+            val resumed = progress(2, 4)
+
+            assertTrue(awaitStorageReadmission(flowOf(null, parked, resumed)))
+            val ready = progress(4, 4, phase = AttachmentTransferStateFfi.READY)
+            assertTrue(awaitStorageReadmission(flowOf(parked, ready)))
+        }
+
+    /** A different failure after the park also moves the surface on, so the new failure is classified afresh. */
+    @Test
+    fun aDifferentFailureAfterTheParkIsClassifiedAfresh() =
+        runBlocking {
+            val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
+            val failed = progress(0, 4, phase = AttachmentTransferStateFfi.FAILED)
+
+            assertTrue(awaitStorageReadmission(flowOf(parked, failed)))
+        }
+
+    /** A surface entered while the reader's own download is still parked restores it once, by itself. */
+    @Test
+    fun aSurfaceEnteredWhileTheReadersDownloadIsParkedRestoresIt() {
+        var restored = 0
+        composeRule.setContent {
+            restoreParkedDownloadOnEntry(
+                identity = "photo#0",
+                enabled = true,
+                parkedByReader = false,
+                recordParkedByReader = {},
+                readerParkHeld = { true },
+            ) { restored += 1 }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(1, restored)
+    }
+
+    /** A surface already downloading never asks, and one whose reader download is not parked restores nothing. */
+    @Test
+    fun onlyAnIdleSurfaceWithTheReadersParkedDownloadRestoresAnything() {
+        var asked = 0
+        var restored = 0
+        composeRule.setContent {
+            restoreParkedDownloadOnEntry(
+                identity = "downloading#0",
+                enabled = false,
+                parkedByReader = false,
+                recordParkedByReader = {},
+                readerParkHeld = {
+                    asked += 1
+                    true
+                },
+            ) { restored += 1 }
+            restoreParkedDownloadOnEntry(
+                identity = "idle#0",
+                enabled = true,
+                parkedByReader = false,
+                recordParkedByReader = {},
+                readerParkHeld = { false },
+            ) { restored += 1 }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals("a downloading surface asked MDK", 0, asked)
+        assertEquals(0, restored)
+    }
+
+    /** Only a surface parked on the reader's own download records it, so an automatic park is never restored. */
+    @Test
+    fun onlyAParkOnTheReadersOwnDownloadIsRecorded() {
+        val recorded = mutableListOf<String>()
+        composeRule.setContent {
+            for ((identity, byReader) in listOf("tapped#0" to true, "automatic#0" to false)) {
+                restoreParkedDownloadOnEntry(
+                    identity = identity,
+                    enabled = false,
+                    parkedByReader = byReader,
+                    recordParkedByReader = { recorded += identity },
+                    readerParkHeld = { false },
+                ) {}
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(listOf("tapped#0"), recorded)
+    }
+
+    /** Observation that ends while the body is still parked asks for nothing, so nothing loops. */
+    @Test
+    fun observationEndingWhileParkedAsksForNothing() =
+        runBlocking {
+            val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
+
+            assertFalse(awaitStorageReadmission(flowOf(null, parked, null)))
+            assertFalse(awaitStorageReadmission(flowOf()))
+        }
+
+    /** Only a storage park, even wrapped, reads as storage; anything else, or no cause, is an ordinary failure. */
+    @Test
+    fun onlyAStorageParkReadsAsStorage() {
+        val park = NativeAttachmentTerminalException(AttachmentTransferStateFfi.STORAGE_BLOCKED)
+
+        assertTrue(park.parksForStorage())
+        assertTrue(IllegalStateException("wrapped", park).parksForStorage())
+        assertFalse(NativeAttachmentTerminalException(AttachmentTransferStateFfi.FAILED).parksForStorage())
+        assertFalse(IllegalStateException("decode").parksForStorage())
+        assertFalse(null.parksForStorage())
     }
 
     /** Each step owns exactly one meaning, and an idle or finished attachment shows no control. */

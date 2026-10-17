@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
+import dev.ipf.whitenoise.android.notifications.InFlightConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewToken
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
@@ -157,6 +158,26 @@ private fun rebuildRichShareShortcut(
         categories = existing.categories.orEmpty() + CONVERSATION_SHARE_TARGET_CATEGORY,
         extras = shareShortcutExtras(target.accountRef, existing.extras, previewToken),
     )
+
+/**
+ * Keeps a card-backed shortcut through a refresh. A shortcut held for a pending card is retained as the presenter
+ * published it moments ago, picture, Person and preview stamp included, but as its share-ineligible twin: a retained
+ * entry is not a recent chat of the active account, and a pending card of the account just switched away from must
+ * not become a share suggestion. AndroidX restricts copying a shortcut, and the public readback carries neither icon
+ * nor Person, so the presenter builds that twin when it publishes. Any other is rebuilt from the readback, which
+ * carries no icon, so the presenter is told to publish its picture again. The caller's final privacy pass still
+ * turns a hidden-preview shortcut generic.
+ */
+private fun retainCardBackedShortcut(
+    context: Context,
+    existing: ShortcutInfoCompat,
+    rank: Int,
+    previewToken: NotificationPreviewToken,
+): ShortcutInfoCompat =
+    InFlightConversationShortcuts.retainedShortcut(existing.id) ?: run {
+        InFlightConversationShortcuts.markIdentityLost(existing.id)
+        rebuildCardBackedShortcut(context, existing, rank, previewToken)
+    }
 
 /**
  * Re-expresses a dynamic shortcut that still backs a live card so replacing the dynamic set cannot delete its
@@ -309,15 +330,18 @@ class ShareShortcutPublisher(
             val targetShortcuts = targetShortcuts(accountRef, plan.targets, existingById, previewToken)
             val retainedShortcuts =
                 plan.retained.mapIndexed { index, shortcut ->
-                    rebuildCardBackedShortcut(context, shortcut, targetShortcuts.size + index, previewToken)
+                    retainCardBackedShortcut(context, shortcut, targetShortcuts.size + index, previewToken)
                 }
             setDynamicShortcuts(currentPublicationShortcuts(accountRef, chats, targetShortcuts + retainedShortcuts))
         }
     }
 
-    /** Dynamic conversation shortcuts that still back a live card, which replacing the dynamic set must not delete. */
+    /**
+     * Dynamic conversation shortcuts that still back a live card, or that the presenter published for a card it is
+     * about to post, which replacing the dynamic set must not delete. Both are read under the shared publication lock.
+     */
     private fun cardBackedShortcuts(): List<ShortcutInfoCompat> {
-        val cards = cardShortcutIds()
+        val cards = cardShortcutIds() + InFlightConversationShortcuts.ids()
         if (cards.isEmpty()) return emptyList()
         return dynamicShortcuts().filter { it.id in cards && isConversationShortcutId(it.id) }
     }

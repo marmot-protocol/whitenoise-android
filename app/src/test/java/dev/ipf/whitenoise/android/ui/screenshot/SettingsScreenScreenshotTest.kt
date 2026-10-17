@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -34,6 +35,8 @@ import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
 import dev.ipf.whitenoise.android.ui.settings.DictationSettingsScreen
 import dev.ipf.whitenoise.android.ui.settings.SETTINGS_HOME_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeAccount
@@ -99,16 +102,23 @@ class SettingsScreenScreenshotTest {
         capture("settings_screen_available_update_light")
     }
 
-    /** Settings screen with global confirmation dark. */
+    /**
+     * A global confirmation over Settings, under the app's top-notice host: it shows below the Settings bar, where
+     * the screen's own banner slot sits, and the list gives up the space (#3312).
+     */
     @Test
     fun settingsScreenWithGlobalConfirmationDark() {
+        val notice = TransientNotice(id = 1L, title = AppText.Plain("Notifications enabled"))
+        val noticeHost = TopNoticeHost(SnackbarHostState(), notice = { notice })
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                ShellTransientNoticeLayout(
-                    notice = TransientNotice(id = 1L, title = AppText.Plain("Notifications enabled")),
-                    modifier = Modifier.testTag(SETTINGS_WITH_CONFIRMATION_TAG),
-                ) {
-                    settingsHomeContent()
+            CompositionLocalProvider(LocalTopNoticeHost provides noticeHost) {
+                WhiteNoiseTheme(darkTheme = true) {
+                    ShellTransientNoticeLayout(
+                        notice = notice,
+                        modifier = Modifier.testTag(SETTINGS_WITH_CONFIRMATION_TAG),
+                    ) {
+                        settingsHomeContent()
+                    }
                 }
             }
         }

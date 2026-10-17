@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -106,95 +107,102 @@ internal fun MessageFullScreenView(
             modifier = Modifier.exposePerformanceTestTags().testTag(MESSAGE_FULL_SCREEN_TAG),
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            EmojiLabel(
-                                senderDisplayName,
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                if (showStatus) {
-                                    OutgoingMessageStatusIcon(status, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                                Text(
-                                    timeText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // App banners sit below this screen's bar rather than over it (#3312).
+                Column {
+                    TopAppBar(
+                        title = {
+                            Column {
+                                EmojiLabel(
+                                    senderDisplayName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = {
-                                if (selection.active) selection.reset() else onDismiss()
-                            },
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_arrow_back),
-                                contentDescription = stringResource(R.string.back),
-                            )
-                        }
-                    },
-                    actions = {
-                        Box {
-                            IconButton(onClick = { overflowOpen = true }) {
-                                Icon(
-                                    painterResource(R.drawable.ic_more_vert),
-                                    contentDescription = stringResource(R.string.message_actions),
-                                )
-                            }
-                            WhiteNoiseDropdownMenu(
-                                expanded = overflowOpen,
-                                onDismissRequest = { overflowOpen = false },
-                                items =
-                                    buildList {
-                                        if (canReply) {
-                                            add(
-                                                WhiteNoiseMenuItem(
-                                                    label = stringResource(R.string.reply),
-                                                    icon = R.drawable.ic_reply,
-                                                    onClick = onReply,
-                                                ),
-                                            )
-                                        }
-                                        if (canReact) {
-                                            add(
-                                                WhiteNoiseMenuItem(
-                                                    label = stringResource(R.string.message_react),
-                                                    icon = R.drawable.ic_add,
-                                                    onClick = onReact,
-                                                ),
-                                            )
-                                        }
-                                        add(
-                                            WhiteNoiseMenuItem(
-                                                label = stringResource(R.string.copy_text),
-                                                icon = R.drawable.ic_content_copy,
-                                                onClick = onCopy,
-                                            ),
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    if (showStatus) {
+                                        OutgoingMessageStatusIcon(
+                                            status,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                        if (canDelete) {
+                                    }
+                                    Text(
+                                        timeText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = {
+                                    if (selection.active) selection.reset() else onDismiss()
+                                },
+                            ) {
+                                Icon(
+                                    painterResource(R.drawable.ic_arrow_back),
+                                    contentDescription = stringResource(R.string.back),
+                                )
+                            }
+                        },
+                        actions = {
+                            Box {
+                                IconButton(onClick = { overflowOpen = true }) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_more_vert),
+                                        contentDescription = stringResource(R.string.message_actions),
+                                    )
+                                }
+                                WhiteNoiseDropdownMenu(
+                                    expanded = overflowOpen,
+                                    onDismissRequest = { overflowOpen = false },
+                                    items =
+                                        buildList {
+                                            if (canReply) {
+                                                add(
+                                                    WhiteNoiseMenuItem(
+                                                        label = stringResource(R.string.reply),
+                                                        icon = R.drawable.ic_reply,
+                                                        onClick = onReply,
+                                                    ),
+                                                )
+                                            }
+                                            if (canReact) {
+                                                add(
+                                                    WhiteNoiseMenuItem(
+                                                        label = stringResource(R.string.message_react),
+                                                        icon = R.drawable.ic_add,
+                                                        onClick = onReact,
+                                                    ),
+                                                )
+                                            }
                                             add(
                                                 WhiteNoiseMenuItem(
-                                                    label = stringResource(R.string.delete),
-                                                    icon = R.drawable.ic_delete,
-                                                    destructive = true,
-                                                    onClick = onDelete,
+                                                    label = stringResource(R.string.copy_text),
+                                                    icon = R.drawable.ic_content_copy,
+                                                    onClick = onCopy,
                                                 ),
                                             )
-                                        }
-                                    },
-                            )
-                        }
-                    },
-                )
+                                            if (canDelete) {
+                                                add(
+                                                    WhiteNoiseMenuItem(
+                                                        label = stringResource(R.string.delete),
+                                                        icon = R.drawable.ic_delete,
+                                                        destructive = true,
+                                                        onClick = onDelete,
+                                                    ),
+                                                )
+                                            }
+                                        },
+                                )
+                            }
+                        },
+                    )
+                    TopNoticeSlot()
+                }
             },
             bottomBar = bottomBar,
         ) { padding ->

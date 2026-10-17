@@ -67,6 +67,20 @@ class ChatContextMenuScreenshotTest {
     @Config(sdk = [36], qualifiers = "en-w640dp-h300dp-land-mdpi")
     fun shortLandscapeLargeRtl() = capture("chat_context_menu_landscape_rtl_200", rtl = true)
 
+    /** #3310: a group whose leave is still queued keeps the reset action, since that leave may never finish. */
+    @Test
+    fun queuedLeaveKeepsTheResetAction() =
+        withOpenMenu(leavePending = true) {
+            composeRule.onNodeWithTag("chat.action.Abandon", useUnmergedTree = true).assertExists()
+        }
+
+    /** A group this account has confirmed it left has nothing to reset, so its menu omits the action. */
+    @Test
+    fun confirmedLeftGroupOffersNoResetAction() =
+        withOpenMenu(left = true) {
+            composeRule.onNodeWithTag("chat.action.Abandon", useUnmergedTree = true).assertDoesNotExist()
+        }
+
     /** Renders the fixture and records its screenshot baseline. */
     @Suppress("LongParameterList")
     private fun capture(
@@ -76,6 +90,22 @@ class ChatContextMenuScreenshotTest {
         rtl: Boolean = false,
         left: Boolean = false,
         folder: Boolean = false,
+    ) = withOpenMenu(dark, amoled, rtl, left, folder) {
+        composeRule
+            .onNode(isPopup(), useUnmergedTree = true)
+            .captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** Opens the real row menu for one group under the requested appearance and membership, then runs [check]. */
+    @Suppress("LongParameterList")
+    private fun withOpenMenu(
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+        left: Boolean = false,
+        folder: Boolean = false,
+        leavePending: Boolean = false,
+        check: () -> Unit,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context
@@ -90,7 +120,8 @@ class ChatContextMenuScreenshotTest {
             app.chatFolderPreferences.setChatInFolder(ChatRowPortFixtures.ACCOUNT_REF, it.id, "Study group", true)
         }
         val membership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER
-        val controller = leftScopeController(app, listOf(leftScopeRow("Study group", membership)))
+        val row = leftScopeRow("Study group", membership, leavePending = leavePending)
+        val controller = leftScopeController(app, listOf(row))
         try {
             composeRule.setContent {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
@@ -105,9 +136,7 @@ class ChatContextMenuScreenshotTest {
                 .onNodeWithTag("chat.row.Study group")
                 .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
             composeRule.onNodeWithTag("chat.menu.Study group").assertIsDisplayed()
-            composeRule
-                .onNode(isPopup(), useUnmergedTree = true)
-                .captureRoboImage("src/test/snapshots/$name.png")
+            check()
         } finally {
             controller.onCleared()
             app.mutationsScope.cancel()

@@ -13,8 +13,8 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineLayout.kt",
-        "surface": "Timeline content padding preserves composer and snackbar clearance",
-        "anchor": "bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap",
+        "surface": "Timeline content padding preserves the composer tail gap and foreground overlap with no banner clearance",
+        "anchor": "bottom = CONVERSATION_TIMELINE_TAIL_GAP + foregroundOverlap",
         "test_ids": [
           "CON-032"
         ]

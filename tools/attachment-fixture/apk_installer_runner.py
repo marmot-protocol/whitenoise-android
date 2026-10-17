@@ -8,7 +8,7 @@ import threading
 import time
 import uuid
 
-from apk_checker import CASES, check_apk
+from apk_checker import CASES, check_apk, expected_fetches
 from budget_checker import PROFILES
 from device_runner import APP, adb_command
 from fixture_relay import FixtureRelay
@@ -91,8 +91,10 @@ def run(adb, serial, root, output, distribution, budget_profile="reference-api30
         failure = error
         report["failure_class"] = type(error).__name__
     finally:
-        # Failed and partial attempts stay in the ledger and report; nothing is reset.
-        events, report["ledger_finalized"] = wait_for_completion(server.ledger, start, len(CASES), len(CASES))
+        # Failed and partial attempts stay in the ledger and report; nothing is reset. A case repeating earlier bytes
+        # is served from MDK's verified copy, so only distinct contents are fetched.
+        events, report["ledger_finalized"] = wait_for_completion(
+            server.ledger, start, len(CASES), expected_fetches(report["metrics"], CASES))
         time.sleep(0.5)
         events = server.ledger.snapshot()[start:]
         report["ledger"] = events

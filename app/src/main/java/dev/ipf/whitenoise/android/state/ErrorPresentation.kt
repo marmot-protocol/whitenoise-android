@@ -80,6 +80,7 @@ fun WhiteNoiseAppState.presentFailure(
     presentFailure(AppText.Resource(titleRes), operationCode, throwable, detail, sendAttempt)
 }
 
+/** Shows [throwable] as a copyable, privacy-safe failure, except a group change the user chose to wait on. */
 fun WhiteNoiseAppState.presentFailure(
     title: AppText,
     operationCode: String,
@@ -87,6 +88,8 @@ fun WhiteNoiseAppState.presentFailure(
     detail: AppText = AppText.Resource(R.string.error_try_again),
     sendAttempt: SendFailureAttempt? = null,
 ) {
+    // The user chose to wait for the group in the confirmation itself; there is no failure to report.
+    if (throwable is GroupChangeDeclinedException) return
     val presentation = privacySafeErrorPresentation(operationCode, throwable, detail)
     presentText(
         title = title,

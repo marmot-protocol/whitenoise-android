@@ -268,6 +268,20 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/TopNotice.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseAnchoredMenu.kt",
       "calls": {
         "fadingVerticalScroll": 1
@@ -743,6 +757,22 @@
         "SCR-002",
         "SCR-003",
         "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+      "calls": {
+        "fadingVerticalScroll": 2
+      },
+      "family": "group",
+      "policy": "Scroll the abandonment identities, consequences and failure, and the sole-admin gate's explanation, while Cancel and the destructive action stay reachable at large text sizes.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "GRP-010",
+        "GRP-033"
       ]
     },
     {

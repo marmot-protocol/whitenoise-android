@@ -211,6 +211,15 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Blocked-send failure status stays in the dictation control beside its recovery actions while the temporary banner is at the top",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "if (state.reason == ConversationDictationFailure.SendBlocked && state.cause != null) {",
+        "test_ids": [
+          "CON-034",
+          "DIC-002"
+        ]
       }
     ]
   },
