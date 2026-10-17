@@ -42,6 +42,16 @@ internal class KeyedMutexPool {
         }
     }
 
+    /** Runs [block] holding [key], taking it only when the calling coroutine does not hold it already. */
+    suspend fun <T> withLockUnlessHeld(
+        key: String,
+        block: suspend () -> T,
+    ): T {
+        val entry = synchronized(entriesLock) { entries[key] }
+        val held = currentCoroutineContext()[Held]?.entries.orEmpty()
+        return if (entry != null && entry in held) block() else withLock(key, block)
+    }
+
     /**
      * Runs [block] with [key] released when the calling coroutine holds it, and holds it again before returning, even
      * when [block] is cancelled. Others may take the lock meanwhile, so state read under it before [block] can be

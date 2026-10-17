@@ -3061,6 +3061,26 @@ class WhiteNoiseAppState private constructor(
         block: suspend () -> T,
     ): T = groupCommitLocks.withLock("$accountRef|$groupIdHex", block)
 
+    /** The chat list's title for [groupIdHex] while the chat list shows [accountRef], or null when it is not listed. */
+    internal fun chatTitle(
+        accountRef: String,
+        groupIdHex: String,
+    ): String? {
+        val controller = chatsController?.takeIf { it.accountRef == accountRef }
+        val item =
+            controller
+                ?.let { (it.items + it.archivedItems) }
+                ?.firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+        return item?.let { chatListItemDisplayTitle(it, this, notificationGroupTitleCopy(appContext)) }
+    }
+
+    /** Runs [block] holding this group's commit lock, taking it only when the caller does not hold it already. */
+    internal suspend fun <T> withGroupCommitLockHeld(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T = groupCommitLocks.withLockUnlessHeld("$accountRef|$groupIdHex", block)
+
     /**
      * Runs [block], which produces no commit, with this group's commit lock released if the caller holds it, so sends
      * and other changes to the group are not held up while the user answers a question.
@@ -4143,9 +4163,9 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef
         if (target.isEmpty() || groupId.isEmpty() || account == null) return false
         return runCatchingCancellable {
-            // The lock is released while the user decides whether to override a refused change.
-            runGroupChange(account, groupId) {
-                withGroupCommitLock(account, groupId) {
+            // The lock is released only while the user decides, and held again for the acknowledgement and retry.
+            withGroupCommitLock(account, groupId) {
+                runGroupChange(account, groupId) {
                     val result =
                         marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
                             promoteAdminDetailed(account, groupId, target)
@@ -4190,8 +4210,8 @@ class WhiteNoiseAppState private constructor(
         var firstFailureThrowable: Throwable? = null
         for (groupIdHex in targets) {
             runCatchingCancellable {
-                runGroupChange(account, groupIdHex, invite = true) {
-                    withGroupCommitLock(account, groupIdHex) {
+                withGroupCommitLock(account, groupIdHex) {
+                    runGroupChange(account, groupIdHex, invite = true) {
                         val result =
                             marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
                                 inviteMembersDetailed(account, groupIdHex, listOf(ref))

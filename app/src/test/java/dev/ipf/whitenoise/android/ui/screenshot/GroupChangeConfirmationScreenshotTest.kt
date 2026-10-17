@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.GroupChangeCaution
 import dev.ipf.whitenoise.android.state.GroupChangeConfirmation
+import dev.ipf.whitenoise.android.state.GroupChangeTarget
 import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -24,7 +25,8 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * The app-level question before overriding a group change MDK refused (#3289): Wait is the safe dismissal, and the
- * continue action takes the error role. Covers both cautions, the stronger invite wording, themes and large RTL type.
+ * continue action takes the error role. It names the chat the change is for. Covers both cautions, the stronger invite
+ * wording, themes and large RTL type.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -40,6 +42,7 @@ class GroupChangeConfirmationScreenshotTest {
         val decision = render(GroupChangeCaution.CatchingUp)
         capture("catching_up_light")
 
+        composeRule.onNodeWithText("Weekend hikers").assertExists()
         composeRule.onNodeWithText("Wait").performClick()
         assertEquals(false, decision.getCompleted())
     }
@@ -74,7 +77,7 @@ class GroupChangeConfirmationScreenshotTest {
         fontScale: Float = 1f,
     ): CompletableDeferred<Boolean> {
         val decision = CompletableDeferred<Boolean>()
-        val question = GroupChangeConfirmation(caution, invite, decision)
+        val question = GroupChangeConfirmation(caution, invite, TARGET, decision)
         composeRule.setContent {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
@@ -91,5 +94,6 @@ class GroupChangeConfirmationScreenshotTest {
 
     private companion object {
         const val LARGE = 2f
+        val TARGET = GroupChangeTarget("alice", "0a".repeat(16), runtimeGeneration = 0, title = "Weekend hikers")
     }
 }

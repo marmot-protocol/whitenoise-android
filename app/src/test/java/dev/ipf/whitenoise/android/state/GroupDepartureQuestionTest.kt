@@ -4,9 +4,19 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupMlsStateFfi
+import dev.ipf.marmotkit.GroupDetailsFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
+import dev.ipf.marmotkit.GroupManagementStateFfi
+import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
+import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
+import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -31,7 +41,8 @@ import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 /**
  * Leaving as one of several admins steps down first, and MDK may hold that step back (#3289). A departure cancelled
  * while the user is still deciding must withdraw its question and change nothing, rather than demoting and leaving
- * later when someone taps Continue anyway.
+ * later when someone taps Continue anyway. An admin transfer whose grant already landed must report the partial
+ * state when the user waits on the step-down, instead of ending quietly with two admins.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -64,6 +75,36 @@ class GroupDepartureQuestionTest {
             assertNull("the question outlived its departure", state.groupChangeConfirmations.pending)
             assertEquals(1, calls.count { it == "selfDemoteAdminDetailed" })
             assertFalse("the group was left without an answer", "leaveGroup" in calls)
+        }
+
+    /** Waiting on the step-down after the grant landed reports the partial transfer instead of ending quietly. */
+    @Test
+    fun waitingOnTheStepDownReportsThePartialTransfer() =
+        runBlocking {
+            val state = appState()
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = conversationTimelineTestGroup().copy(admins = listOf(SELF)),
+                    initialMemberSnapshot = GroupMemberSnapshot(roster()),
+                )
+            rosterTracker(controller).transition(GroupRosterRefreshEvent.SUCCEEDED)
+            val successor = roster().single { it.memberIdHex == OTHER_ADMIN }
+            val transfer =
+                CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) { controller.transferAdmin(successor) }
+            try {
+                awaitWithMainLooper { state.groupChangeConfirmations.pending != null }
+                checkNotNull(state.groupChangeConfirmations.pending).answer(proceed = false)
+                awaitWithMainLooper { transfer.isCompleted }
+            } finally {
+                state.groupChangeConfirmations.pending?.answer(proceed = false)
+            }
+
+            assertFalse("waiting after the grant ended the transfer silently", transfer.isCancelled)
+            assertFalse(transfer.await())
+            val commits = calls.filter { it.endsWith("Detailed") }
+            assertEquals(listOf("promoteAdminDetailed", "selfDemoteAdminDetailed"), commits)
+            assertEquals(AppText.Resource(R.string.toast_granted_but_couldnt_step_down), state.toast?.title)
         }
 
     /** The test thread is Robolectric's main thread, so its looper runs between polls for main-thread steps. */
@@ -111,6 +152,7 @@ class GroupDepartureQuestionTest {
                 "npub" -> null
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "selfDemoteAdminDetailed" -> failSuspendedCall(arguments, MarmotKitException.GroupCatchingUp(GROUP))
+                "promoteAdminDetailed" -> promoted()
                 else -> error("Unexpected native call: $name")
             }
         } as MarmotInterface
@@ -124,6 +166,70 @@ class GroupDepartureQuestionTest {
         val continuation = arguments?.last() as Continuation<Any?>
         continuation.resumeWith(Result.failure(failure))
         return COROUTINE_SUSPENDED
+    }
+
+    /** The grant as MDK returns it: the successor joins self as admin. */
+    private fun promoted(): GroupMutationResultFfi {
+        val admins = listOf(SELF, OTHER_ADMIN)
+        val group = conversationTimelineTestGroup().copy(admins = admins)
+        val ids = listOf(SELF, OTHER_ADMIN, MEMBER)
+        val details =
+            GroupDetailsFfi(
+                group,
+                ids.map { id ->
+                    GroupMemberDetailsFfi(
+                        id,
+                        ConversationTimelineTestIds.ACCOUNT_REF.takeIf { id == SELF },
+                        id == SELF,
+                        id in admins,
+                        id == SELF,
+                        "npub-$id",
+                        null,
+                    )
+                },
+                AppGroupMlsStateFfi(
+                    group.groupIdHex,
+                    group.protocolProfile,
+                    GroupLifecycleStateFfi.STABLE,
+                    0uL,
+                    ids.size.toUInt(),
+                    false,
+                    emptyList(),
+                    false,
+                    false,
+                    emptyList(),
+                    null,
+                ),
+            )
+        val management =
+            GroupManagementStateFfi(
+                myAccountIdHex = SELF,
+                isSelfAdmin = true,
+                isLastAdmin = false,
+                canInvite = true,
+                canLeave = false,
+                requiresSelfDemoteBeforeLeave = true,
+                leaveRequestPending = false,
+                leaveRequestedAtMs = null,
+                lifecycleState = GroupLifecycleStateFfi.STABLE,
+                disbandingEnabled = false,
+                disbanding = false,
+                canEnableDisbanding = false,
+                canDisband = false,
+                disbandingBlockers = emptyList(),
+                disbandRequest = null,
+                memberActions = emptyList(),
+            )
+        val sent =
+            SendSummaryFfi(1u, emptyList(), SendAcceptDispositionFfi.PUBLISHED, SendMaintenanceDispositionFfi.READY)
+        return GroupMutationResultFfi(sent, details, management)
+    }
+
+    /** The controller's roster tracker, so a test can mark its roster authoritative. */
+    private fun rosterTracker(controller: ConversationController): GroupRosterLoadTracker {
+        val field = ConversationController::class.java.getDeclaredField("memberRosterLoadTracker")
+        field.isAccessible = true
+        return field.get(controller) as GroupRosterLoadTracker
     }
 
     /** Self, a second admin and one member, so leaving needs a self-demotion first. */

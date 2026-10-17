@@ -7,6 +7,9 @@ name: presentation-modal-group-change-catchingup
 - assertVisible:
     text: This chat may be out of date on this device\. Changing the group now could split it for everyone\. Wait for it to sync, or continue anyway\?
 - assertVisible:
+    text: Fixture confirmation group
+    id: group.change.target
+- assertVisible:
     text: Wait
     id: confirmation.cancel
 - assertVisible:

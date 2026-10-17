@@ -27,15 +27,30 @@ internal fun Throwable.groupChangeCaution(): GroupChangeCaution? =
     }
 
 /**
- * The user chose to wait instead of overriding a refused group change. It is a cancellation, so callers that already
- * treat cancellation as "nothing to report" stay quiet, and failure presentation ignores it too.
+ * The user chose to wait instead of overriding [refusal]. It is a cancellation, so a change that has done nothing yet
+ * stays quiet, and failure presentation ignores it too. A flow whose earlier step already committed reports [refusal]
+ * instead, so its partial state is never hidden.
  */
-internal class GroupChangeDeclinedException : CancellationException("the group change waits for the group")
+internal class GroupChangeDeclinedException(
+    val refusal: MarmotKitException,
+) : CancellationException("the group change waits for the group")
 
-/** One question to the user: wait, or let this one group change through despite [caution]. */
+/**
+ * The change a question is about: [accountRef]'s group [groupIdHex] in runtime [runtimeGeneration], named [title]
+ * when the chat list knows it. A question belongs to that account and runtime only.
+ */
+internal data class GroupChangeTarget(
+    val accountRef: String,
+    val groupIdHex: String,
+    val runtimeGeneration: Int,
+    val title: String?,
+)
+
+/** One question to the user: wait, or let this one group change to [target] through despite [caution]. */
 internal class GroupChangeConfirmation(
     val caution: GroupChangeCaution,
     val invite: Boolean,
+    val target: GroupChangeTarget,
     private val decision: CompletableDeferred<Boolean>,
 ) {
     /** Records the user's answer; only the first answer counts. */
@@ -56,14 +71,15 @@ internal class GroupChangeConfirmations {
     var pending: GroupChangeConfirmation? by mutableStateOf(null)
         private set
 
-    /** Shows one question and returns whether the user chose to continue. */
+    /** Shows one question about [target] and returns whether the user chose to continue. */
     suspend fun ask(
         caution: GroupChangeCaution,
         invite: Boolean,
+        target: GroupChangeTarget,
     ): Boolean =
         questions.withLock {
             val decision = CompletableDeferred<Boolean>()
-            val question = GroupChangeConfirmation(caution, invite, decision)
+            val question = GroupChangeConfirmation(caution, invite, target, decision)
             pending = question
             try {
                 decision.await()
@@ -79,9 +95,13 @@ internal class GroupChangeConfirmations {
  * continuing acknowledges that refusal for one attempt and retries. [invite] selects the stronger wording MDK asks for
  * when inviting. See [admitGroupChange] for the retry rules.
  *
- * A caller may hold the group's commit lock. It is released while the user decides, because sends to the group take
- * the same lock, and held again for the acknowledgement and retry. MDK checks the retried change against the group as
- * it is then.
+ * The change runs holding the group's commit lock, taken here unless the caller already holds it, so [change] must
+ * not take it again. The lock is released while the user decides, because sends to the group take it too, and held
+ * again before the acknowledgement, so no other change can spend that one-attempt acknowledgement before the retry.
+ * MDK checks the retried change against the group as it is then.
+ *
+ * The question belongs to [accountRef] in the current runtime. Continue counts only while both are still current, so
+ * an answer given after switching accounts never changes the previous account's group.
  */
 internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
     accountRef: String,
@@ -89,26 +109,38 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
     invite: Boolean = false,
     change: suspend () -> T,
 ): T =
-    admitGroupChange(
-        ask = { caution ->
-            outsideGroupCommitLock(accountRef, groupIdHex) { groupChangeConfirmations.ask(caution, invite) }
-        },
-        acknowledge = { caution ->
-            marmotIo {
-                when (caution) {
-                    GroupChangeCaution.CatchingUp -> acknowledgeGroupCatchingUp(accountRef, groupIdHex)
-                    GroupChangeCaution.Undelivered -> acknowledgeGroupCommitUndelivered(accountRef, groupIdHex)
+    withGroupCommitLockHeld(accountRef, groupIdHex) {
+        admitGroupChange(
+            ask = { caution ->
+                val title = chatTitle(accountRef, groupIdHex)
+                val target = GroupChangeTarget(accountRef, groupIdHex, runtimeGeneration, title)
+                val proceed =
+                    outsideGroupCommitLock(accountRef, groupIdHex) {
+                        groupChangeConfirmations.ask(caution, invite, target)
+                    }
+                proceed && ownsGroupChange(target)
+            },
+            acknowledge = { caution ->
+                marmotIo {
+                    when (caution) {
+                        GroupChangeCaution.CatchingUp -> acknowledgeGroupCatchingUp(accountRef, groupIdHex)
+                        GroupChangeCaution.Undelivered -> acknowledgeGroupCommitUndelivered(accountRef, groupIdHex)
+                    }
                 }
-            }
-        },
-        change = change,
-    )
+            },
+            change = change,
+        )
+    }
+
+/** True while [target]'s account is still the active one in the runtime the question was asked in. */
+internal fun WhiteNoiseAppState.ownsGroupChange(target: GroupChangeTarget): Boolean =
+    activeAccountRef == target.accountRef && runtimeGeneration == target.runtimeGeneration
 
 /**
  * Runs [change], and after each overridable refusal [ask]s the user and, if they continue, [acknowledge]s that caution
  * and retries. A change can need both acknowledgements, and each is asked at most once per run, so the same refusal
- * again is rethrown as an ordinary failure. Waiting ends the change with [GroupChangeDeclinedException]; any other
- * failure is rethrown unchanged.
+ * again is rethrown as an ordinary failure. Waiting ends the change with a [GroupChangeDeclinedException] carrying
+ * the refusal; any other failure is rethrown unchanged.
  */
 internal suspend fun <T> admitGroupChange(
     ask: suspend (GroupChangeCaution) -> Boolean,
@@ -125,7 +157,7 @@ internal suspend fun <T> admitGroupChange(
             }
         val caution = refusal.groupChangeCaution()
         if (caution == null || !asked.add(caution)) throw refusal
-        if (!ask(caution)) throw GroupChangeDeclinedException()
+        if (!ask(caution)) throw GroupChangeDeclinedException(refusal)
         acknowledge(caution)
     }
 }

@@ -14,9 +14,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 
 /**
- * MDK readmits a body it parked for lack of storage once space frees, and finishes it without the reader asking
- * (#3289). While [parked], a visible surface waits for that body to become ready, then [onReady] lets it reload, so it
- * does not keep saying "Not enough storage" until someone taps Retry. Observing never demands or retries anything.
+ * MDK readmits a body it parked for lack of storage once space frees, and resumes it without the reader asking
+ * (#3289). While [parked], a visible surface watches that body, and as soon as MDK moves it off the park, whether it
+ * resumes, finishes or fails another way, [onMovedOn] lets the surface load again. The load joins the live download,
+ * so the surface shows its progress and Cancel instead of "Not enough storage", and a different failure is classified
+ * afresh. Observing never demands or retries anything.
  */
 @Composable
 internal fun storageReadmissionEffect(
@@ -24,18 +26,18 @@ internal fun storageReadmissionEffect(
     messageIdHex: String,
     attachmentIndex: Int,
     parked: Boolean,
-    onReady: () -> Unit,
+    onMovedOn: () -> Unit,
 ) {
-    val ready by rememberUpdatedState(onReady)
+    val movedOn by rememberUpdatedState(onMovedOn)
     LaunchedEffect(controller, messageIdHex, attachmentIndex, parked) {
         if (!parked) return@LaunchedEffect
-        if (awaitStorageReadmission(controller.attachmentNativeProgress(messageIdHex, attachmentIndex))) ready()
+        if (awaitStorageReadmission(controller.attachmentNativeProgress(messageIdHex, attachmentIndex))) movedOn()
     }
 }
 
-/** True once native progress reports the parked body ready, false when observation ends first. */
+/** True once native progress shows the body off its storage park, false when observation ends while still parked. */
 internal suspend fun awaitStorageReadmission(progress: Flow<NativeAttachmentProgress?>): Boolean =
-    progress.firstOrNull { it?.phase == AttachmentTransferStateFfi.READY } != null
+    progress.firstOrNull { it != null && it.phase != AttachmentTransferStateFfi.STORAGE_BLOCKED } != null
 
 /**
  * True when this failure is MDK parking the body for lack of storage. A surface sets its storage wording from this on

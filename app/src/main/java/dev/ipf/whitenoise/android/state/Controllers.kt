@@ -12348,10 +12348,15 @@ class ConversationController(
                         // cancellation past the partial-state branch). Run it to completion.
                         withContext(NonCancellable) {
                             val demoteResult =
-                                appState.runGroupChange(account, group.groupIdHex) {
-                                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                        selfDemoteAdminDetailed(account, group.groupIdHex)
+                                try {
+                                    appState.runGroupChange(account, group.groupIdHex) {
+                                        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                            selfDemoteAdminDetailed(account, group.groupIdHex)
+                                        }
                                     }
+                                } catch (declined: GroupChangeDeclinedException) {
+                                    // Waiting leaves both admins: report the partial transfer, not a quiet cancel.
+                                    throw declined.refusal
                                 }
                             applyMutationDetails(account, demoteResult.details)
                         }

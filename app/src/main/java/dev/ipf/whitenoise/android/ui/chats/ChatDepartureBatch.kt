@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.whitenoise.android.state.GroupChangeDeclinedException
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -101,9 +102,17 @@ private suspend fun prepareChatDeparture(
     }
 }
 
-/** A UI deadline means unfinished/uncertain; retry reconciles native state before any further mutation. */
+/**
+ * A UI deadline means unfinished/uncertain; retry reconciles native state before any further mutation. A group change
+ * the user chose to wait on is unfinished too, never a silent end to the whole batch.
+ */
 private suspend fun <T> departureStep(block: suspend () -> T): Result<T> =
-    runCatchingCancellable {
-        withTimeoutOrNull(CHAT_DEPARTURE_STEP_TIMEOUT_MS) { Result.success(block()) }
-            ?: Result.failure(IllegalStateException("Native operation has not settled within the UI budget"))
-    }.getOrElse { Result.failure(it) }
+    try {
+        runCatchingCancellable {
+            withTimeoutOrNull(CHAT_DEPARTURE_STEP_TIMEOUT_MS) { Result.success(block()) }
+                ?: Result.failure(IllegalStateException("Native operation has not settled within the UI budget"))
+        }.getOrElse { Result.failure(it) }
+    } catch (declined: GroupChangeDeclinedException) {
+        // Waiting on one chat's group change leaves that chat unfinished, with its stage shown, and the batch goes on.
+        Result.failure(declined.refusal)
+    }

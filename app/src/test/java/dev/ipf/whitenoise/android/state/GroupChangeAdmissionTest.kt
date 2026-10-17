@@ -56,6 +56,10 @@ class GroupChangeAdmissionTest {
             val failure = runCatching { admit(proceed = false, attempts) }.exceptionOrNull()
 
             assertTrue("$failure", failure is GroupChangeDeclinedException)
+            assertTrue(
+                "a flow with a committed earlier step needs the refusal the user waited on",
+                (failure as GroupChangeDeclinedException).refusal is MarmotKitException.GroupCommitUndelivered,
+            )
             assertTrue(failure is kotlinx.coroutines.CancellationException)
             assertEquals(listOf(GroupChangeCaution.Undelivered), asked)
             assertTrue(acknowledged.isEmpty())
@@ -106,10 +110,11 @@ class GroupChangeAdmissionTest {
             val confirmations = GroupChangeConfirmations()
             val answered =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    confirmations.ask(GroupChangeCaution.CatchingUp, invite = true)
+                    confirmations.ask(GroupChangeCaution.CatchingUp, invite = true, TARGET)
                 }
             val question = checkNotNull(confirmations.pending)
             assertTrue(question.invite)
+            assertEquals("the question names the change it is about", TARGET, question.target)
             question.answer(proceed = true)
             question.answer(proceed = false)
             assertTrue(answered.await())
@@ -117,7 +122,7 @@ class GroupChangeAdmissionTest {
 
             val abandoned =
                 async(start = CoroutineStart.UNDISPATCHED) {
-                    confirmations.ask(GroupChangeCaution.Undelivered, invite = false)
+                    confirmations.ask(GroupChangeCaution.Undelivered, invite = false, TARGET)
                 }
             assertEquals(GroupChangeCaution.Undelivered, confirmations.pending?.caution)
             abandoned.cancel()
@@ -174,5 +179,6 @@ class GroupChangeAdmissionTest {
 
     private companion object {
         const val GROUP = "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+        val TARGET = GroupChangeTarget("alice", GROUP, runtimeGeneration = 0, title = "Weekend hikers")
     }
 }

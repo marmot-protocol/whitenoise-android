@@ -31,6 +31,25 @@ class GroupChangeAdmissionCoverageTest {
         )
     }
 
+    /**
+     * runGroupChange holds the group's commit lock for the acknowledgement and retry, so a change it runs must not take
+     * that lock again, which would deadlock. Callers take it outside, as the controllers do.
+     */
+    @Test
+    fun noGroupChangeTakesTheCommitLockInside() {
+        val nested =
+            sources().flatMap { file ->
+                val lines = file.readLines()
+                lines.indices
+                    .filter { "runGroupChange(" in lines[it] && "fun " !in lines[it] }
+                    .filter { index ->
+                        val change = lines.subList(index + 1, minOf(lines.size, index + NESTED_WINDOW))
+                        change.any { "withGroupCommitLock(" in it }
+                    }.map { "${file.name}:${it + 1}" }
+            }
+        assertTrue("runGroupChange must not take the commit lock inside its change: $nested", nested.isEmpty())
+    }
+
     /** The admission helper acknowledges exactly the two advisory refusals MDK lets a user override. */
     @Test
     fun admissionAcknowledgesBothAdvisoryRefusals() {
@@ -87,6 +106,9 @@ class GroupChangeAdmissionCoverageTest {
 
         /** How far above a call its runGroupChange may open. */
         const val WINDOW = 8
+
+        /** How far below a runGroupChange call its change could open the commit lock. */
+        const val NESTED_WINDOW = 4
 
         /** Fewer matches than this means the gate stopped seeing the call sites. */
         const val MIN_CALLS = 15

@@ -88,15 +88,36 @@ class TileTransferTest {
         )
     }
 
-    /** A parked surface reloads once MDK reports the readmitted body ready, whatever it reported before. */
+    /** A parked surface loads again as soon as MDK resumes the body, so it shows progress and Cancel, not storage. */
     @Test
-    fun aParkedSurfaceReloadsOnceTheReadmittedBodyIsReady() =
+    fun aParkedSurfaceLoadsAgainOnceTheBodyResumes() =
         runBlocking {
             val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
             val resumed = progress(2, 4)
-            val ready = progress(4, 4, phase = AttachmentTransferStateFfi.READY)
 
-            assertTrue(awaitStorageReadmission(flowOf(null, parked, resumed, ready)))
+            assertTrue(awaitStorageReadmission(flowOf(null, parked, resumed)))
+            val ready = progress(4, 4, phase = AttachmentTransferStateFfi.READY)
+            assertTrue(awaitStorageReadmission(flowOf(parked, ready)))
+        }
+
+    /** A different failure after the park also moves the surface on, so the new failure is classified afresh. */
+    @Test
+    fun aDifferentFailureAfterTheParkIsClassifiedAfresh() =
+        runBlocking {
+            val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
+            val failed = progress(0, 4, phase = AttachmentTransferStateFfi.FAILED)
+
+            assertTrue(awaitStorageReadmission(flowOf(parked, failed)))
+        }
+
+    /** Observation that ends while the body is still parked asks for nothing, so nothing loops. */
+    @Test
+    fun observationEndingWhileParkedAsksForNothing() =
+        runBlocking {
+            val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
+
+            assertFalse(awaitStorageReadmission(flowOf(null, parked, null)))
+            assertFalse(awaitStorageReadmission(flowOf()))
         }
 
     /** Only a storage park, even wrapped, reads as storage; anything else, or no cause, is an ordinary failure. */
@@ -110,16 +131,6 @@ class TileTransferTest {
         assertFalse(IllegalStateException("decode").parksForStorage())
         assertFalse(null.parksForStorage())
     }
-
-    /** Observation that ends while the body is still parked asks for no reload, so nothing loops. */
-    @Test
-    fun observationEndingWhileParkedAsksForNoReload() =
-        runBlocking {
-            val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
-
-            assertFalse(awaitStorageReadmission(flowOf(null, parked, null)))
-            assertFalse(awaitStorageReadmission(flowOf()))
-        }
 
     /** Each step owns exactly one meaning, and an idle or finished attachment shows no control. */
     @Test

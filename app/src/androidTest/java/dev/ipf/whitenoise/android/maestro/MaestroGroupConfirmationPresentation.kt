@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.GroupChangeCaution
 import dev.ipf.whitenoise.android.state.GroupChangeConfirmation
+import dev.ipf.whitenoise.android.state.GroupChangeTarget
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.conversation.media.GroupPictureFailureDialog
@@ -109,7 +110,10 @@ private fun GroupChangeQuestionPresentation(fixture: MaestroPresentationFixture)
     var showing by remember { mutableStateOf(true) }
     if (showing) {
         val decision = remember { CompletableDeferred<Boolean>() }
-        val question = remember(decision) { GroupChangeConfirmation(GroupChangeCaution.CatchingUp, false, decision) }
+        val question =
+            remember(decision) {
+                GroupChangeConfirmation(GroupChangeCaution.CatchingUp, false, GROUP_CHANGE_FIXTURE_TARGET, decision)
+            }
         LaunchedEffect(decision) {
             if (decision.await()) {
                 fixture.finish("group-change-continue")
@@ -145,3 +149,7 @@ private fun maestroGroupConfirmationState(
         GroupDetailsConfirmationKind.TransferThenLeave ->
             GroupDetailsConfirmationState.TransferThenLeave("Fixture successor", confirm)
     }
+
+/** The fixture question's chat; its account and runtime never reach the app-level host. */
+private val GROUP_CHANGE_FIXTURE_TARGET =
+    GroupChangeTarget("fixture", "fixture-group-change", runtimeGeneration = 0, title = "Fixture confirmation group")
