@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-signin-busy
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertNotVisible:
+    text: Recover this account\?
+- assertVisible:
+    id: onboarding.sign_in.private_key
+    enabled: false
+- tapOn:
+    text: Finish consent check
+- assertVisible:
+    id: presentation.complete

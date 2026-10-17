@@ -29,7 +29,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -936,161 +935,130 @@ internal fun GroupDetailsScreen(
         pendingConfirm?.let { confirm ->
             when (confirm) {
                 is DetailsConfirm.RemoveMember ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_remove_member_title),
-                        message =
-                            stringResource(
-                                R.string.confirm_remove_member_message,
-                                controller.memberDisplayName(confirm.member),
+                    GroupDetailsConfirmation(
+                        model =
+                            GroupDetailsConfirmationState.RemoveMember(
+                                memberName = controller.memberDisplayName(confirm.member),
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.RemoveMember,
+                                        mutation = { controller.removeMember(confirm.member) },
+                                        target = confirm.member.memberIdHex,
+                                    )
+                                },
                             ),
-                        confirmLabel = stringResource(R.string.remove_member),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.RemoveMember,
-                                mutation = { controller.removeMember(confirm.member) },
-                                target = confirm.member.memberIdHex,
-                            )
-                        },
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
                 is DetailsConfirm.TransferAdmin ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_transfer_admin_title),
-                        message =
-                            stringResource(
-                                R.string.confirm_transfer_admin_message,
-                                controller.memberDisplayName(confirm.member),
+                    GroupDetailsConfirmation(
+                        model =
+                            GroupDetailsConfirmationState.TransferAdmin(
+                                memberName = controller.memberDisplayName(confirm.member),
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.TransferAdmin,
+                                        mutation = { controller.transferAdmin(confirm.member) },
+                                        target = confirm.member.memberIdHex,
+                                    )
+                                },
                             ),
-                        confirmLabel = stringResource(R.string.transfer_admin),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.TransferAdmin,
-                                mutation = { controller.transferAdmin(confirm.member) },
-                                target = confirm.member.memberIdHex,
-                            )
-                        },
                         onDismiss = { pendingConfirm = null },
                     )
                 is DetailsConfirm.StepDownAdmin ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.step_down_as_admin),
-                        message = stringResource(R.string.confirm_step_down_admin_message),
-                        confirmLabel = stringResource(R.string.step_down_as_admin),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.SelfDemoteAdmin,
-                                mutation = { controller.stepDownAsAdmin() },
-                                target = confirm.member.memberIdHex,
-                            )
-                        },
+                    GroupDetailsConfirmation(
+                        model =
+                            GroupDetailsConfirmationState.StepDown(
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.SelfDemoteAdmin,
+                                        mutation = { controller.stepDownAsAdmin() },
+                                        target = confirm.member.memberIdHex,
+                                    )
+                                },
+                            ),
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
                 DetailsConfirm.StepDownSoleAdmin ->
-                    AlertDialog(
-                        onDismissRequest = { pendingConfirm = null },
-                        title = { Text(stringResource(R.string.sole_admin_leave_blocked_title)) },
-                        text = { Text(stringResource(R.string.sole_admin_transfer_hint)) },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
+                    GroupDetailsConfirmation(
+                        model =
+                            GroupDetailsConfirmationState.StepDownSoleAdmin(
+                                onConfirm = {
                                     pendingConfirm = null
                                     showTransferAdmin = true
                                 },
-                            ) {
-                                Text(stringResource(R.string.transfer_admin))
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { pendingConfirm = null }) {
-                                Text(stringResource(R.string.cancel))
-                            }
-                        },
+                            ),
+                        onDismiss = { pendingConfirm = null },
                     )
                 is DetailsConfirm.Leave ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_leave_title_named, confirm.groupName),
-                        message = stringResource(R.string.confirm_leave_message_named),
-                        confirmLabel = stringResource(R.string.leave),
-                        onConfirm = {
-                            pendingConfirm = null
-                            // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
-                            // kill the toast/refresh; onDismiss + onLeft are safe Compose
-                            // state writes from Main.immediate.
-                            runGroupMutation(
-                                action = GroupMutationAction.Leave,
-                                mutation = { controller.leaveGroup(displayName = confirm.groupName) },
-                                onSuccess = {
-                                    onLeft()
+                    GroupDetailsConfirmation(
+                        model =
+                            GroupDetailsConfirmationState.Leave(
+                                groupName = confirm.groupName,
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    // Process-lifetime scope so a swipe-dismiss mid-leave doesn't
+                                    // kill the toast/refresh; onDismiss + onLeft are safe Compose
+                                    // state writes from Main.immediate.
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Leave,
+                                        mutation = { controller.leaveGroup(displayName = confirm.groupName) },
+                                        onSuccess = {
+                                            onLeft()
+                                        },
+                                    )
                                 },
-                            )
-                        },
+                            ),
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
+                // A sole member dissolves the group instead of choosing an impossible successor.
                 is DetailsConfirm.LeaveSoleMember ->
-                    // Sole member: leaving dissolves the group entirely through local
-                    // cleanup (no other member to coordinate an MLS commit with). The
-                    // copy makes the destructive "this deletes the group" consequence clear.
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_leave_sole_member_title, confirm.groupName),
-                        message = stringResource(R.string.confirm_leave_sole_member_message),
-                        confirmLabel = stringResource(R.string.leave),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.Leave,
-                                mutation = { controller.leaveGroup(displayName = confirm.groupName) },
-                                onSuccess = {
-                                    onLeft()
+                    GroupDetailsConfirmation(
+                        model =
+                            GroupDetailsConfirmationState.LeaveSoleMember(
+                                groupName = confirm.groupName,
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Leave,
+                                        mutation = { controller.leaveGroup(displayName = confirm.groupName) },
+                                        onSuccess = {
+                                            onLeft()
+                                        },
+                                    )
                                 },
-                            )
-                        },
+                            ),
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
+                // #1131: with no eligible successor, keep the sole admin in the group.
                 is DetailsConfirm.LeaveSoleAdmin ->
-                    // Fallback for the (unexpected) no-transfer-candidate case — still
-                    // an informational gate. The normal sole-admin Leave now routes to
-                    // LeaveSoleAdminTransfer or the picker in leave mode (#1131).
-                    AlertDialog(
-                        onDismissRequest = { pendingConfirm = null },
-                        title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
-                        text = {
-                            EmojiLabel(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName))
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { pendingConfirm = null }) {
-                                Text(stringResource(R.string.cancel))
-                            }
-                        },
+                    GroupDetailsConfirmation(
+                        model =
+                            GroupDetailsConfirmationState.BlockedLeave(
+                                groupName = confirm.groupName,
+                            ),
+                        onDismiss = { pendingConfirm = null },
                     )
                 is DetailsConfirm.LeaveSoleAdminTransfer ->
-                    ConfirmDialog(
-                        title = stringResource(R.string.confirm_leave_sole_admin_title),
-                        message =
-                            stringResource(
-                                R.string.confirm_sole_admin_transfer_then_leave_message,
-                                controller.memberDisplayName(confirm.newAdmin),
-                            ),
-                        confirmLabel = stringResource(R.string.leave),
-                        onConfirm = {
-                            pendingConfirm = null
-                            runGroupMutation(
-                                action = GroupMutationAction.Leave,
-                                mutation = {
-                                    controller.transferAdmin(confirm.newAdmin) &&
-                                        controller.leaveGroup(displayName = confirm.groupName)
+                    GroupDetailsConfirmation(
+                        model =
+                            GroupDetailsConfirmationState.TransferThenLeave(
+                                memberName = controller.memberDisplayName(confirm.newAdmin),
+                                onConfirm = {
+                                    pendingConfirm = null
+                                    runGroupMutation(
+                                        action = GroupMutationAction.Leave,
+                                        mutation = {
+                                            controller.transferAdmin(confirm.newAdmin) &&
+                                                controller.leaveGroup(displayName = confirm.groupName)
+                                        },
+                                        onSuccess = { onLeft() },
+                                    )
                                 },
-                                onSuccess = { onLeft() },
-                            )
-                        },
+                            ),
                         onDismiss = { pendingConfirm = null },
-                        destructive = true,
                     )
             }
         }

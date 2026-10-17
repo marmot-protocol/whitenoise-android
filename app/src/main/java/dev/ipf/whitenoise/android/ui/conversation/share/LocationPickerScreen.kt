@@ -79,6 +79,8 @@ internal fun LocationPickerScreen(
     hasFineGrant: Boolean,
     onDismiss: () -> Unit,
     onPick: (SharedLocation) -> Unit,
+    useDataConnection: Boolean = true,
+    locationLookup: suspend (Context, Boolean) -> SharedLocation? = ::fetchCurrentLocation,
 ) {
     PlaybackDialog(
         onDismissRequest = onDismiss,
@@ -98,6 +100,7 @@ internal fun LocationPickerScreen(
                 configureOsmdroid(context)
                 MapView(context).apply {
                     setTileSource(TileSourceFactory.MAPNIK)
+                    setUseDataConnection(useDataConnection)
                     setMultiTouchControls(true)
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     controller.setZoom(PICKER_ZOOM)
@@ -150,7 +153,7 @@ internal fun LocationPickerScreen(
         fun centerOnCurrent() {
             locating = true
             scope.launch {
-                val current = fetchCurrentLocation(context, hasFineGrant)
+                val current = locationLookup(context, hasFineGrant)
                 if (current != null) {
                     selectedCenter = current
                     mapView.controller.animateTo(GeoPoint(current.latitude, current.longitude))

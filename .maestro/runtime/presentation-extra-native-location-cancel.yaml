@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-location-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Share location
+- assertVisible:
+    text: Send this location
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-voice-unavailable
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Recording unavailable
+- assertVisible:
+    text: This recording could not be restored\. Record again to make a new take\.
+- tapOn:
+    text: Dismiss
+- assertNotVisible:
+    text: Recording unavailable
+- tapOn:
+    text: Reopen recording notice
+- assertVisible:
+    text: Recording unavailable
+- back
+- assertNotVisible:
+    text: Recording unavailable
+- tapOn:
+    text: Reopen recording notice
+- assertVisible:
+    text: Recording unavailable
+- tapOn:
+    text: Record again
+- assertVisible:
+    id: presentation.complete

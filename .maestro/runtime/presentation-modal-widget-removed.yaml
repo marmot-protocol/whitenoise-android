@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-widget-removed
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: widget.configuration
+- assertVisible: Choose an account for this widget[.] Message text stays hidden[.]
+- assertVisible:
+    id: widget.save
+    enabled: true
+- tapOn: Remove current fixture account
+- assertNotVisible: Maestro Widget A
+- assertVisible: Maestro Widget B
+- assertVisible:
+    id: widget.save
+    enabled: false
+- assertNotVisible:
+    id: presentation.complete

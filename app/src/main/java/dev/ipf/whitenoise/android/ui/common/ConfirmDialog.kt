@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 
@@ -28,6 +30,7 @@ internal fun ConfirmDialog(
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
+                modifier = Modifier.testTag("confirmation.confirm"),
                 colors =
                     if (destructive) {
                         ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -37,7 +40,9 @@ internal fun ConfirmDialog(
             ) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(dismissLabel ?: stringResource(R.string.cancel)) }
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("confirmation.cancel")) {
+                Text(dismissLabel ?: stringResource(R.string.cancel))
+            }
         },
         title = { Text(title) },
         text = { Text(message) },

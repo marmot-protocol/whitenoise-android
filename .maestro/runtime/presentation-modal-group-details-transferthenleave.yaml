@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-details-transferthenleave
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: You're the only admin
+- assertVisible:
+    text: You're the only admin\. Fixture successor becomes admin and you leave the
+      group\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: You're the only admin
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: You're the only admin
+- back
+- assertNotVisible:
+    text: You're the only admin
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: You're the only admin
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

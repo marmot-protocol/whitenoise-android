@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-contact-phone
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Share contact
+- assertVisible: Fixture Contact
+- tapOn: fixture@example.invalid
+- tapOn: Send
+- assertVisible:
+    id: presentation.complete

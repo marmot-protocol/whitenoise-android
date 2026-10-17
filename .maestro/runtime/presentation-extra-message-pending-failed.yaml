@@ -1,0 +1,6 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-message-pending-failed
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture attachment status

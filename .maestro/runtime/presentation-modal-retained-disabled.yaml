@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-retained-disabled
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertNotVisible:
+    text: Recover sign-in setup\?
+- assertVisible:
+    id: onboarding-saved-account
+    enabled: false
+- tapOn:
+    text: Finish retained check
+- assertVisible:
+    id: presentation.complete

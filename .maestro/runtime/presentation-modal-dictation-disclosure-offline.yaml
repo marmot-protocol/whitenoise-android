@@ -1,0 +1,29 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-dictation-disclosure-offline
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Offline speech recognition
+- assertVisible:
+    text: Offline Speech to Text processes what you say on this device\. After a failure,
+      recognized text can be saved automatically in the original draft\. Sending automatically
+      is off unless you turn it on in Dictation settings\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Offline speech recognition
+- tapOn:
+    text: Reopen dictation disclosure
+- assertVisible:
+    text: Offline speech recognition
+- back
+- assertNotVisible:
+    text: Offline speech recognition
+- tapOn:
+    text: Reopen dictation disclosure
+- assertVisible:
+    text: Offline speech recognition
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

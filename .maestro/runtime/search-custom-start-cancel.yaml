@@ -9,6 +9,8 @@ name: search-custom-start-cancel
     id: "chat-list-search-filters-action"
 - tapOn: "Date"
 - assertVisible: "Date"
+- assertVisible:
+    id: "global-search-date-dialog"
 - tapOn: "Custom Range"
 - assertVisible: "Start date"
 - tapOn: "Cancel"

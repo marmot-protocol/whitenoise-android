@@ -1,0 +1,61 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: navigation-licenses-system-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Help"
+    direction: DOWN
+- tapOn: "Help"
+- tapOn:
+    id: "help.about"
+- assertVisible:
+    id: "about.app"
+- assertVisible:
+    id: "about.version"
+- scrollUntilVisible:
+    element:
+      id: about.licenses
+    direction: DOWN
+- tapOn:
+    id: about.licenses
+- assertVisible:
+    id: licenses.list
+- scrollUntilVisible:
+    element:
+      text: AndroidX Material icon definitions
+    direction: DOWN
+- tapOn: AndroidX Material icon definitions
+- assertVisible:
+    id: licenses.text
+    text: "(?s).*Apache License.*"
+- back
+- assertVisible:
+    id: licenses.list
+- back
+- scrollUntilVisible:
+    element:
+      id: about.licenses
+    direction: DOWN
+- assertVisible:
+    id: about.licenses
+- tapOn:
+    id: about.licenses
+- assertVisible:
+    id: licenses.list
+- assertNotVisible:
+    id: licenses.text
+- back
+- scrollUntilVisible:
+    element:
+      id: about.licenses
+    direction: DOWN
+- assertVisible:
+    id: about.licenses
+- back
+- assertVisible:
+    id: help.destinations

@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-native-library-menu
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Fixture library document.txt
+- tapOn: File actions
+- assertVisible: Save
+- assertVisible: Share
+- back
+- assertVisible: Fixture library document.txt
+- assertNotVisible: Save
+- assertNotVisible: Share
+- tapOn: File actions
+- assertVisible: Save
+- assertVisible: Share
+- back
+- assertVisible: Fixture library document.txt
+- assertNotVisible: Save
+- assertNotVisible: Share
+- back

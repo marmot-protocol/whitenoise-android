@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-preview-view-only
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Preview
+- assertVisible:
+    id: conversation.media.preview.image.0
+- assertNotVisible: Send
+- tapOn: Cancel Media Changes
+- assertVisible:
+    id: presentation.complete

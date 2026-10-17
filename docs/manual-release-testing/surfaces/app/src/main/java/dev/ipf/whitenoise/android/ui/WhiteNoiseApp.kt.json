@@ -13,38 +13,6 @@
         ]
       },
       {
-        "surface": "Offline speech disclosure title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "R.string.dictation_disclosure_offline_title",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
-        "surface": "Offline speech disclosure message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "R.string.dictation_disclosure_offline_message",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
-        "surface": "Speech disclosure title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "R.string.dictation_disclosure_title",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
-        "surface": "Speech disclosure message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "R.string.dictation_disclosure_message",
-        "test_ids": [
-          "DIC-001"
-        ]
-      },
-      {
         "surface": "GlobalTransientNotice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "fun GlobalTransientNotice(",
@@ -143,9 +111,9 @@
         ]
       },
       {
-        "surface": "Dictation disclosure continue action",
+        "surface": "Shared modal presentation: DictationDisclosureDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "R.string.dictation_continue",
+        "anchor": "DictationDisclosureDialog(",
         "test_ids": [
           "DIC-001"
         ]

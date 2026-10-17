@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-preview-back
+---
+- runFlow: ../fixtures/new-folder-editor.yaml
+- scrollUntilVisible:
+    element:
+      id: folder.preview
+    direction: DOWN
+- tapOn:
+    id: folder.preview
+- assertVisible: Preview
+- assertVisible: No results
+- back
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP
+- assertVisible:
+    id: folder.name
+- back
+- assertVisible:
+    id: chat-folders-content

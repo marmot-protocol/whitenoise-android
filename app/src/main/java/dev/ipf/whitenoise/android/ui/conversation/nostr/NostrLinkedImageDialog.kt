@@ -10,9 +10,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
@@ -22,6 +24,7 @@ import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
 internal fun NostrLinkedImageDialog(
     url: String,
     onDismiss: () -> Unit,
+    loadImage: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::retryBanner,
 ) {
     PlaybackDialog(
         onDismissRequest = onDismiss,
@@ -32,7 +35,12 @@ internal fun NostrLinkedImageDialog(
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
-                NostrEventImagePane(url = url, initiallyRequested = true, onFullscreenDismiss = onDismiss)
+                NostrEventImagePane(
+                    url = url,
+                    loadImage = loadImage,
+                    initiallyRequested = true,
+                    onFullscreenDismiss = onDismiss,
+                )
             }
         }
     }

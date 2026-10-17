@@ -44,7 +44,7 @@ internal class PendingChatDeparture(
         }
 }
 
-private class ChatDepartureUi {
+internal class ChatDepartureUi {
     var confirmed by mutableStateOf(false)
     var busy by mutableStateOf(false)
     var progress by mutableStateOf("")
@@ -55,7 +55,7 @@ private class ChatDepartureUi {
     var active = true
 }
 
-private class ChatDepartureDecision(
+internal class ChatDepartureDecision(
     val target: ChatDepartureTarget,
     val members: List<AppGroupMemberRecordFfi>,
 ) {
@@ -160,7 +160,7 @@ internal fun ChatDepartureBatchDialog(
     }
 }
 
-private suspend fun chooseDepartureSuccessor(
+internal suspend fun chooseDepartureSuccessor(
     ui: ChatDepartureUi,
     target: ChatDepartureTarget,
     members: List<AppGroupMemberRecordFfi>,
@@ -169,7 +169,11 @@ private suspend fun chooseDepartureSuccessor(
     val decision = ChatDepartureDecision(target, members)
     ui.selected = members.singleOrNull()
     ui.decision = decision
-    return decision.answer.await().also { ui.decision = null }
+    return try {
+        decision.answer.await()
+    } finally {
+        if (ui.decision === decision) ui.decision = null
+    }
 }
 
 private suspend fun removeChatDepartureTarget(
@@ -206,7 +210,7 @@ private suspend fun removeChatDepartureTarget(
 
 @Composable
 @Suppress("FunctionNaming")
-private fun ChatDepartureSuccessor(
+internal fun ChatDepartureSuccessor(
     ui: ChatDepartureUi,
     appState: WhiteNoiseAppState,
 ) {

@@ -12,6 +12,10 @@ name: settings-translation
     direction: DOWN
 - tapOn: "Translate"
 - assertVisible: "Automatically translate messages"
+- tapOn: "Target language: English"
+- assertVisible: Arabic
+- back
+- assertNotVisible: Arabic
 - tapOn: "Back"
 - assertVisible: "Settings"
 - tapOn: "Back"

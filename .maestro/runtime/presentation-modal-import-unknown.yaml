@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-import-unknown
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: share.import.indeterminate
+- assertVisible: Importing shared files
+- assertVisible: 'File 1 of 3: 100 bytes'
+- back
+- assertVisible:
+    id: presentation.complete

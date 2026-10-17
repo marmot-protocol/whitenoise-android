@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-translation-unverified
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: translation.form
+- assertVisible:
+    id: translation.confirm
+- assertVisible: "This engine is unverified or unsupported[.] No text was sent[.]"
+- assertVisible:
+    id: translation.engine
+- assertVisible: Install from GitHub
+- back
+- assertVisible:
+    id: presentation.complete

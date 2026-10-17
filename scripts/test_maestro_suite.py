@@ -26,7 +26,8 @@ class MaestroSuiteTest(unittest.TestCase):
         for filename, _ in suite.CASES.values():
             with self.subTest(flow=filename):
                 flow = (suite.ROOT / '.maestro' / filename).read_text()
-                self.assertIn('clearState: true', flow)
+                self.assertIn('clearState: false', flow)
+                self.assertNotIn('clearState: true', flow)
                 self.assertLess(flow.index('- stopApp'), flow.index('- setOrientation: PORTRAIT'))
                 self.assertLess(flow.index('- setOrientation: PORTRAIT'), flow.index('- launchApp:'))
                 self.assertIn('all: deny', flow)
@@ -198,8 +199,63 @@ class MaestroSuiteTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary)
             suite.prepare('offline', '1', 'false', destination)
-            with self.assertRaises(FileNotFoundError):
+            with self.assertRaises(ValueError):
                 suite.report(destination, 0)
+            saved = json.loads((destination / 'suite-results.json').read_text())
+            self.assertFalse(saved['evidence_complete'])
+            self.assertEqual(saved['positive_passed'], 0)
+            self.assertEqual(len(saved['missing_cases']), 6)
+            self.assertEqual(saved['discovery_error'], 'FileNotFoundError')
+
+    def test_timeout_keeps_all_missing_cases_and_original_exit(self):
+        """The observed CLI hang must retain nine unqualified cases without inventing JUnit from console output."""
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary)
+            suite.prepare('offline-signin', '1', 'false', destination)
+            with self.assertRaises(ValueError):
+                suite.report(destination, 124)
+            saved = json.loads((destination / 'suite-results.json').read_text())
+            self.assertEqual(saved['maestro_exit'], 124)
+            self.assertEqual(saved['positive_count'], 9)
+            self.assertEqual(saved['positive_passed'], 0)
+            self.assertEqual(len(saved['missing_cases']), 9)
+            self.assertEqual(saved['cases'], [])
+
+    def test_invalid_xml_and_duration_keep_failed_diagnostics(self):
+        """Malformed and nonfinite duration evidence cannot discard the ledger or qualify a flow."""
+        for fault in ('xml', 'NaN', 'Infinity', '-1', 'bad'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                destination = Path(temporary)
+                document, root = self.write_results(destination)
+                if fault == 'xml':
+                    (destination / 'junit.xml').write_text('<broken')
+                else:
+                    root[0].set('time', fault)
+                    ET.ElementTree(document).write(destination / 'junit.xml')
+                with self.assertRaises(ValueError):
+                    suite.report(destination, 0)
+                saved = json.loads((destination / 'suite-results.json').read_text())
+                self.assertFalse(saved['evidence_complete'])
+                self.assertEqual(saved['positive_passed'], 0 if fault == 'xml' else 5)
+
+    def test_unexpected_duplicate_and_absent_control_never_inflate_verified_counts(self):
+        """A failed discovery ledger must still report truthful selected positives and control evidence."""
+        for fault in ('foreign', 'duplicate', 'missing-control'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                destination = Path(temporary)
+                document, root = self.write_results(destination, negative=True)
+                if fault == 'foreign':
+                    root[0].set('name', 'foreign')
+                elif fault == 'duplicate':
+                    root.append(ET.fromstring(ET.tostring(root[0])))
+                else:
+                    root.remove(root[-1])
+                ET.ElementTree(document).write(destination / 'junit.xml')
+                with self.assertRaises(ValueError):
+                    suite.report(destination, 1)
+                saved = json.loads((destination / 'suite-results.json').read_text())
+                self.assertEqual(saved['positive_passed'], 6 if fault == 'missing-control' else 5)
+                self.assertEqual(saved['negative_control_verified'], fault != 'missing-control')
 
 
 if __name__ == '__main__':

@@ -1,0 +1,35 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-developer-resume
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: "developer.demo"
+- scrollUntilVisible:
+    element:
+      id: developer.demo.action
+    direction: DOWN
+    timeout: 60000
+- tapOn:
+    id: developer.demo.action
+- assertVisible:
+    text: Resume the demo conversation\?
+- assertVisible:
+    text: White Noise will inspect the saved account and conversation before continuing\.
+      Any remaining real events will be sent to your configured relays\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    id: developer.demo.confirm
+- tapOn:
+    id: developer.demo.action
+- assertVisible:
+    text: Resume the demo conversation\?
+- back
+- tapOn:
+    id: developer.demo.action
+- assertVisible:
+    text: Resume the demo conversation\?
+- tapOn:
+    id: developer.demo.confirm
+- assertVisible:
+    id: presentation.complete

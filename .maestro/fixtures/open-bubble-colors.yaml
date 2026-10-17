@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Appearance
+    direction: DOWN
+- tapOn: Appearance
+- tapOn: Light
+- runFlow: reopen-bubble-colors.yaml
+- assertVisible:
+    id: bubble_colors.save
+    enabled: false

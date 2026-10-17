@@ -63,7 +63,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
-import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
@@ -794,23 +793,8 @@ internal fun WhiteNoiseApp(
             .GroupChangeConfirmationDialog(groupChangeQuestion)
     }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
-        val offlineSpeechToTextSelected = dictationState.usesOfflineSpeechToText
-        val disclosureTitle =
-            if (offlineSpeechToTextSelected) {
-                R.string.dictation_disclosure_offline_title
-            } else {
-                R.string.dictation_disclosure_title
-            }
-        val disclosureMessage =
-            if (offlineSpeechToTextSelected) {
-                R.string.dictation_disclosure_offline_message
-            } else {
-                R.string.dictation_disclosure_message
-            }
-        ConfirmDialog(
-            title = stringResource(disclosureTitle),
-            message = stringResource(disclosureMessage),
-            confirmLabel = stringResource(R.string.dictation_continue),
+        DictationDisclosureDialog(
+            offlineSpeechToText = dictationState.usesOfflineSpeechToText,
             onConfirm = dictation::acceptDisclosure,
             onDismiss = dictation::cancel,
         )

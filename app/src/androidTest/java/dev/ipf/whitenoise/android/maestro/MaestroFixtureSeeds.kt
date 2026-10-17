@@ -11,14 +11,61 @@ internal suspend fun seedMaestroFixtureMessages(
     group: String,
     fixture: String,
 ) {
+    requireMaestroSeedScenario(fixture)
+    native.sendText(account, group, "Generated fixture message")
+    if (fixture == "creation") {
+        // Declare navigation metadata through MDK, publishing only via the existing loopback bootstrap.
+        // This reserved hostname is not a functioning receiver and never proves network delivery.
+        val declared = listOf("wss://maestro-inbox.example.invalid")
+        val status = native.setAccountInboxRelays(account, declared, native.accountRelayLists(account).nip65.relays)
+        check(status.inbox.relays.map { it.trimEnd('/') } == declared)
+    }
+    when (fixture) {
+        "reactions" -> seedMaestroReactions(native, account, peer, group)
+        "incoming" -> native.sendText(peer, group, "Generated incoming fixture message")
+        "reader" -> native.sendText(account, group, maestroReaderMessage())
+        "links" -> native.sendText(account, group, "Maestro link https://example.invalid/maestro")
+        "poll-single", "poll-multiple", "poll-closed", "poll-unicode" ->
+            native.createPoll(
+                account,
+                group,
+                if (fixture == "poll-unicode") "Maestro ¿Qué comemos? 🍜" else "Maestro fixture poll",
+                if (fixture == "poll-unicode") {
+                    listOf("שלום עולם", "寿司", "Cafe\u0301")
+                } else {
+                    listOf("Maestro Tea", "Maestro Coffee", "Maestro Water")
+                },
+                if (fixture == "poll-multiple") PollTypeFfi.MULTIPLE_CHOICE else PollTypeFfi.SINGLE_CHOICE,
+                if (fixture == "poll-closed") (System.currentTimeMillis() / 1_000L + 15L).toULong() else null,
+            )
+    }
+}
+
+/** Synthetic long Markdown forces the actual Read More route without fetching external content. */
+private fun maestroReaderMessage(): String =
+    buildString {
+        appendLine("# Maestro reader heading")
+        repeat(20) { index ->
+            appendLine()
+            appendLine("Maestro paragraph $index contains synthetic text for scrolling the expanded message.")
+        }
+        appendLine()
+        appendLine("Maestro reader ending")
+    }
+
+/** Only named generated-account seeds may initialize this disposable native fixture. */
+private fun requireMaestroSeedScenario(fixture: String) {
     require(
         fixture in
             listOf(
                 "basic",
+                "large-roster",
                 "reader",
                 "links",
                 "poll-single",
                 "poll-multiple",
+                "poll-closed",
+                "poll-unicode",
                 "consent",
                 "notifications",
                 "incoming",
@@ -47,39 +94,4 @@ internal suspend fun seedMaestroFixtureMessages(
                 "share-external-mixed-types",
             ),
     )
-    native.sendText(account, group, "Generated fixture message")
-    if (fixture == "creation") {
-        // Declare navigation metadata through MDK, publishing only via the existing loopback bootstrap.
-        // This reserved hostname is not a functioning receiver and never proves network delivery.
-        val declared = listOf("wss://maestro-inbox.example.invalid")
-        val status = native.setAccountInboxRelays(account, declared, native.accountRelayLists(account).nip65.relays)
-        check(status.inbox.relays.map { it.trimEnd('/') } == declared)
-    }
-    when (fixture) {
-        "reactions" -> seedMaestroReactions(native, account, peer, group)
-        "incoming" -> native.sendText(peer, group, "Generated incoming fixture message")
-        "reader" -> native.sendText(account, group, maestroReaderMessage())
-        "links" -> native.sendText(account, group, "Maestro link https://example.invalid/maestro")
-        "poll-single", "poll-multiple" ->
-            native.createPoll(
-                account,
-                group,
-                "Maestro fixture poll",
-                listOf("Maestro Tea", "Maestro Coffee", "Maestro Water"),
-                if (fixture == "poll-single") PollTypeFfi.SINGLE_CHOICE else PollTypeFfi.MULTIPLE_CHOICE,
-                null,
-            )
-    }
 }
-
-/** Synthetic long Markdown forces the actual Read More route without fetching external content. */
-private fun maestroReaderMessage(): String =
-    buildString {
-        appendLine("# Maestro reader heading")
-        repeat(20) { index ->
-            appendLine()
-            appendLine("Maestro paragraph $index contains synthetic text for scrolling the expanded message.")
-        }
-        appendLine()
-        appendLine("Maestro reader ending")
-    }
