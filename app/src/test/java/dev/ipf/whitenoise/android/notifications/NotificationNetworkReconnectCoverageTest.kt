@@ -241,7 +241,8 @@ class NotificationNetworkReconnectCoverageTest {
         val session = File(appStateSource().parentFile, "AppAccountSessionCoordinator.kt").readText()
         val sessionTeardown = session.substringAfter("suspend fun stopListenersForAccountTeardown()")
         val sessionBindings =
-            appState.substringAfter("internal val accountSession by lazy {")
+            appState
+                .substringAfter("internal val accountSession by lazy {")
                 .substringBefore("private val accountCatchUpCoordinator")
         val teardownBindings = appState.propertyInitializerCall("runtimeListenerTeardownOwner")
         val teardownOwner =
