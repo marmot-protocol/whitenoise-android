@@ -45,6 +45,22 @@ Snapshot `88d1683e` adds typed outcomes that Android must not collapse into gene
   never as a retry timer or an ordinary failure.
 - `InvalidEditTarget` restores the original text; retrying such an edit can never succeed.
 
+### Recovery qualification
+
+`MarmotKitRecoveryQualificationTest` checks a candidate's offline replay, epoch-gap fallback and lookup retry
+on recovered messages, against a loopback relay that clamps queries to 500 events and refuses history
+comparison. It is a manual device fixture of about five minutes; run it on an emulator before adopting a pin
+that touches replay or recovery:
+
+```bash
+adb shell am instrument -w -r \
+  -e class dev.ipf.whitenoise.android.state.MarmotKitRecoveryQualificationTest \
+  dev.ipf.whitenoise.android.dev.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Pass `-e comparison ignore` to make the relay drop comparison requests instead of refusing them. The
+single-sender case stays ignored until [MDK #2375](https://github.com/marmot-protocol/mdk/issues/2375) ships.
+
 ## 1. Select and inspect the release
 
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,
