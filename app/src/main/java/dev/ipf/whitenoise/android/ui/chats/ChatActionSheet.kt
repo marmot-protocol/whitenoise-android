@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAnchoredMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.group.groupAbandonmentActionLabel
 
 /** Row-anchored prototype commands retain the production action policy and existing confirmation callbacks. */
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod") // Declarative native action availability.
@@ -45,6 +46,7 @@ internal fun ChatContextMenu(
     actions: ChatListRowActionsFfi? = null,
     onLeaveAndDelete: (() -> Unit)? = null,
     onExcludeFromFolder: (() -> Unit)? = null,
+    onAbandon: ChatAbandonMenuAction? = null,
 ) {
     val items =
         buildList {
@@ -105,6 +107,17 @@ internal fun ChatContextMenu(
                     chatMenuItem(R.string.delete_from_device, R.drawable.ic_delete, "Delete", destructive = true) {
                         onDelete()
                     },
+                )
+            }
+            // #3310: local abandonment stays distinct from leaving and from the receiving local delete above.
+            if (onAbandon != null && actions?.canDeleteLocal != false) {
+                add(
+                    chatMenuItem(
+                        groupAbandonmentActionLabel(onAbandon.isDm),
+                        R.drawable.ic_person_remove,
+                        "Abandon",
+                        destructive = true,
+                    ) { onAbandon.onClick() },
                 )
             }
             add(

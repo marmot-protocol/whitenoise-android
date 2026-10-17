@@ -17,6 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.state.observePlaybackTransportVisible
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeScope
+import dev.ipf.whitenoise.android.ui.common.TopNoticeRegion
+import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
 
 private val LocalPlaybackSourceAllowed = staticCompositionLocalOf { true }
 private val LocalPlaybackDismissals = staticCompositionLocalOf<List<() -> Unit>> { emptyList() }
@@ -24,6 +27,9 @@ private val LocalPlaybackDismissals = staticCompositionLocalOf<List<() -> Unit>>
 /**
  * Full-screen destinations retain their own secure window and Back behavior while sharing transport controls.
  * Source navigation closes the current modal stack through its normal dismissal callbacks before routing.
+ * The modal also claims the app's temporary-banner slot directly below that transport region, so a banner raised
+ * while it is open is shown here rather than behind it in the window underneath, and the slot returns to the
+ * screen below when the modal closes (#3312). A modal with its own slot below its bars claims after this one.
  * Non-shell previews and fixtures keep their original layout when no host is installed.
  */
 @Composable
@@ -60,6 +66,12 @@ internal fun PlaybackDialog(
                 LocalPlaybackSourceAllowed provides sourceAllowed,
             ) {
                 val visible = host.appState.observePlaybackTransportVisible() && !host.appState.appLockScreenVisible
+                val noticeSlot = rememberTopNoticeSlot()
+                // With no strip above it, a presented banner is the first thing under the status bar.
+                val bannerOwnsStatusBar =
+                    !visible &&
+                        !properties.decorFitsSystemWindows &&
+                        noticeSlot.presents(noticeSlot.hostNotice, LocalTopNoticeScope.current)
                 Column(Modifier.fillMaxSize()) {
                     if (visible) {
                         Box(if (properties.decorFitsSystemWindows) Modifier else Modifier.statusBarsPadding()) {
@@ -76,7 +88,12 @@ internal fun PlaybackDialog(
                             )
                         }
                     }
-                    val insets = if (visible) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier
+                    TopNoticeRegion(
+                        slot = noticeSlot,
+                        modifier = if (bannerOwnsStatusBar) Modifier.statusBarsPadding() else Modifier,
+                    )
+                    val statusBarOwned = visible || bannerOwnsStatusBar
+                    val insets = if (statusBarOwned) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier
                     Box(Modifier.weight(1f).then(insets)) { content() }
                 }
             }

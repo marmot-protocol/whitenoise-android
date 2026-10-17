@@ -6,10 +6,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
+import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentDialog
+import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentStatus
+import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsLocalDeleteControl
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsResetControl
+import dev.ipf.whitenoise.android.ui.group.GroupSoleAdminLeaveDialog
 import dev.ipf.whitenoise.android.ui.profile.ProfileImageActions
 import dev.ipf.whitenoise.android.ui.profile.ProfileImageTarget
 import dev.ipf.whitenoise.android.ui.settings.DeveloperBuildFacts
@@ -22,6 +29,7 @@ internal fun MaestroActionModalPresentation(fixture: MaestroPresentationFixture)
     when {
         fixture.scenario.startsWith("modal-image-") -> ProfileImageMenuPresentation(fixture)
         fixture.scenario.startsWith("modal-group-control-") -> GroupControlPresentation(fixture)
+        fixture.scenario == "modal-group-sole-admin-leave" -> SoleAdminLeavePresentation(fixture)
         fixture.scenario.startsWith("modal-developer-") -> DeveloperConfirmationPresentation(fixture)
         else -> MediaViewerMenuPresentation(fixture)
     }
@@ -53,6 +61,26 @@ private fun ProfileImageMenuPresentation(fixture: MaestroPresentationFixture) {
     }
 }
 
+/** The real sole-admin Leave fallback offers local abandonment; choosing it only records the bounded callback. */
+@Composable
+@Suppress("FunctionNaming")
+private fun SoleAdminLeavePresentation(fixture: MaestroPresentationFixture) {
+    var open by remember(fixture) { mutableStateOf(true) }
+    if (open) {
+        GroupSoleAdminLeaveDialog(
+            groupName = "Fixture group",
+            isDm = false,
+            onAbandon = { fixture.finish("sole-admin-abandon") },
+            onDismiss = {
+                fixture.record("sole-admin-dismiss")
+                open = false
+            },
+        )
+    } else {
+        Button(onClick = { open = true }) { Text("Reopen sole admin leave") }
+    }
+}
+
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupControlPresentation(fixture: MaestroPresentationFixture) {
@@ -63,13 +91,22 @@ private fun GroupControlPresentation(fixture: MaestroPresentationFixture) {
     val unverified = fixture.scenario.endsWith("unverified")
     Column {
         if (reset) {
+            var reviewing by remember { mutableStateOf(false) }
             GroupDetailsResetControl(
-                isDm = hidden,
-                readOnlyInvite = invitation,
+                isDm = false,
+                offered = !hidden && !invitation,
                 enabled = !busy,
                 inProgress = busy,
-                onResetConfirmed = { fixture.finish("reset-confirm") },
+                onRequest = { reviewing = true },
             )
+            if (reviewing) {
+                GroupAbandonmentDialog(
+                    target = FIXTURE_ABANDONMENT_TARGET,
+                    status = GroupAbandonmentStatus.Review,
+                    onConfirm = { fixture.finish("reset-confirm") },
+                    onDismiss = { reviewing = false },
+                )
+            }
         } else {
             GroupDetailsLocalDeleteControl(
                 isDm = fixture.scenario.contains("direct"),
@@ -124,3 +161,13 @@ private fun MediaViewerMenuPresentation(fixture: MaestroPresentationFixture) {
         body = { Image(fixture.image, contentDescription = "Fixture viewer image") },
     )
 }
+
+/** A fixed group identity for the shared abandonment review, so the reset check never names a real account. */
+private val FIXTURE_ABANDONMENT_TARGET =
+    GroupAbandonmentTarget(
+        accountRef = "fixture-account",
+        accountName = "Fixture account",
+        groupIdHex = "0".repeat(64),
+        conversationTitle = "Fixture group",
+        isDm = false,
+    )

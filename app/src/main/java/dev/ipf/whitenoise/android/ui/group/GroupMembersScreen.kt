@@ -24,10 +24,9 @@ internal fun GroupMembersScreen(
     onBack: () -> Unit,
     scrollState: ScrollState,
     feedback: @Composable () -> Unit = {},
-    bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    SettingsScaffold(title = stringResource(R.string.members), onBack = onBack, bottomBar = bottomBar) {
+    SettingsScaffold(title = stringResource(R.string.members), onBack = onBack) {
         Column(Modifier.fillMaxSize().testTag("chat_info.members_screen")) {
             feedback()
             Column(

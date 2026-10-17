@@ -45,6 +45,22 @@
         "test_ids": [
           "GRP-030"
         ]
+      },
+      {
+        "surface": "R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "R.string.review_selection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "R.string.review_selection",
+        "test_ids": [
+          "NCH-002"
+        ]
       }
     ],
     "composable_surfaces": [

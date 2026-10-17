@@ -80,6 +80,14 @@
           "CHL-011",
           "CHL-012"
         ]
+      },
+      {
+        "surface": "chat row abandon action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "\"Abandon\"",
+        "test_ids": [
+          "CHL-026"
+        ]
       }
     ],
     "source_coverage": [

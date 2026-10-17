@@ -55,11 +55,27 @@ internal suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     }
 }
 
+/** One reviewed local removal. [onForgetResult] receives MDK's forget answer, false when already awaiting a Welcome. */
 internal data class LocalGroupRemovalRequest(
     val account: String,
     val groupIdHex: String,
     val forgetProtocol: Boolean,
-)
+    val onForgetResult: (Boolean) -> Unit = {},
+) {
+    /**
+     * A forget, like the reset it replaced, proceeds without media keys when its media listing fails, so a listing
+     * never blocks the escape path (#3310). A local delete has no fallback and keeps its strict preflight.
+     */
+    fun mediaPreflightFallback(): ((Throwable) -> PendingLocalGroupDeleteCleanup)? =
+        if (forgetProtocol) {
+            { failure ->
+                appStateDebug(failure) { "local forget media listing failed, continuing without media keys" }
+                PendingLocalGroupDeleteCleanup(account, groupIdHex, emptyList(), emptySet())
+            }
+        } else {
+            null
+        }
+}
 
 /**
  * Preserve client data until native commit, then retry trailing Android cleanup without another mutation.
@@ -95,15 +111,14 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
                             accountRef = account,
                             groupIdHex = groupIdHex,
                         ) {
-                            marmotIo {
-                                if (request.forgetProtocol) {
-                                    forgetGroupLocal(account, groupIdHex)
-                                } else {
-                                    deleteGroupLocal(account, groupIdHex)
-                                }
+                            if (request.forgetProtocol) {
+                                request.onForgetResult(marmotIo { forgetGroupLocal(account, groupIdHex) })
+                            } else {
+                                marmotIo { deleteGroupLocal(account, groupIdHex) }
                             }
                         }
                     },
+                    preflightFallback = request.mediaPreflightFallback(),
                 ),
             )
         onNativeCommitted()
@@ -269,25 +284,33 @@ internal suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
 }
 
 /**
- * MDK 0.10.0 `forgetGroupLocal`: erases this device's history and protocol state for the group without
- * sending a leave or disband, so the account rejoins only through a Welcome whose authenticated timestamp
- * is strictly newer than the reset. Android owns decrypted media caches, drafts, dictation targets and
- * tray notifications, so those are cleared before the group's rows disappear, mirroring the local delete.
+ * MDK 0.10.0 `forgetGroupLocal` behind the durable local-removal journal — the one owner of confirmed local
+ * abandonment (#3310) for a DM or a group. It erases this account-device's history and protocol state and drops
+ * the group's routing without sending a leave, admin change or disband, so it never waits on a peer. The account
+ * rejoins only through a Welcome whose authenticated timestamp is strictly newer than the reset.
+ *
+ * The native forget runs at most once per confirmation. Android's media caches, drafts, dictation target, shortcuts
+ * and tray cards are cleared after the commit from the staged journal entry, so a cleanup failure is retried from
+ * the journal without replaying the forget, and an uncertain native outcome keeps its entry for reconciliation.
  *
  * Returns false when MDK was already waiting for a fresh Welcome for this group.
  */
 internal suspend fun WhiteNoiseAppState.forgetGroupLocalWithClientCleanup(
     account: String,
     groupIdHex: String,
+    isCurrent: () -> Boolean,
 ): Boolean {
-    conversationDictation.onTargetRemoved(account, groupIdHex)
-    evictGroupMediaCaches(account, groupIdHex)
-    deleteDraftBeforeGroupRemoval(account, groupIdHex)
-    return withRevokedPinnedTarget(account, groupIdHex) {
-        val reset = marmotIo { forgetGroupLocal(account, groupIdHex) }
-        removeRevokedPinnedConversationShortcuts(account, groupIdHex)
-        removeComposerExpansionForGroup(account, groupIdHex)
-        dismissConversationNotifications(account, groupIdHex)
-        reset
+    var reset = false
+    runCatching {
+        deleteChatGroupLocalWithRecovery(
+            LocalGroupRemovalRequest(account, groupIdHex, forgetProtocol = true) { reset = it },
+            isCurrent,
+            LocalGroupDeleteReadinessBudget(),
+            onNativeCommitted = {},
+        )
+    }.onFailure {
+        schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
+        throw it
     }
+    return reset
 }

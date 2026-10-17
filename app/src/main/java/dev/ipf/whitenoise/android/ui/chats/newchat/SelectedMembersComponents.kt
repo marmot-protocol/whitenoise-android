@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
@@ -188,27 +189,31 @@ internal fun SelectedMembersReviewScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                actions = { StartingAccountIndicator(startingAs) },
-                title = {
-                    Column {
-                        Text(stringResource(R.string.review_selection))
-                        Text(
-                            pluralStringResource(R.plurals.selected_members_count, members.size, members.size),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack, enabled = !busy) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                },
-            )
+            // App banners sit below this screen's bar rather than over it (#3312).
+            Column {
+                TopAppBar(
+                    actions = { StartingAccountIndicator(startingAs) },
+                    title = {
+                        Column {
+                            Text(stringResource(R.string.review_selection))
+                            Text(
+                                pluralStringResource(R.plurals.selected_members_count, members.size, members.size),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack, enabled = !busy) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    },
+                )
+                TopNoticeSlot()
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(

@@ -180,10 +180,11 @@ class MediaViewerScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_chrome_restored.png")
     }
 
-    /** Hidden chrome leaves snackbar feedback above the synthetic navigation safe area. */
+    /** With the chrome hidden, the viewer's snackbar sits below the top safe area and clear of the side insets. */
     @Test
-    fun hiddenChromeSnackbarStaysAboveBottomSafeArea() {
-        val bottomInset = 48.dp
+    fun hiddenChromeSnackbarSitsBelowTheTopSafeAreaAndClearOfTheSides() {
+        val topInset = 24.dp
+        val sideInset = 40.dp
         val snackbarText = "Image saved"
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
@@ -198,7 +199,7 @@ class MediaViewerScreenshotTest {
                     onSave = {},
                     onShare = {},
                     snackbarHostState = snackbarHostState,
-                    contentWindowInsets = WindowInsets(bottom = bottomInset),
+                    contentWindowInsets = WindowInsets(left = sideInset, top = topInset, right = sideInset),
                     modifier = Modifier.fillMaxSize(),
                     chromeVisible = false,
                 ) {}
@@ -210,7 +211,11 @@ class MediaViewerScreenshotTest {
                 .onNodeWithText(snackbarText)
                 .assertIsDisplayed()
                 .getUnclippedBoundsInRoot()
-        assertTrue(snackbarBounds.bottom <= 780.dp - bottomInset)
+        val root = composeRule.onRoot().getUnclippedBoundsInRoot()
+        assertTrue("the snackbar starts under the top inset", snackbarBounds.top >= topInset)
+        assertTrue("the snackbar is not pushed to the bottom", snackbarBounds.bottom < root.bottom / 2)
+        assertTrue("the snackbar clears the left inset", snackbarBounds.left >= sideInset)
+        assertTrue("the snackbar clears the right inset", snackbarBounds.right <= root.right - sideInset)
     }
 
     /** Directly opened video offers save and share. */

@@ -382,7 +382,15 @@ private fun ConversationDictationDismissAction(
     }
 }
 
-/** Maps controller phases to concise, localized live-region announcements. */
+/**
+ * Maps controller phases to concise, localized live-region announcements.
+ *
+ * The Failed label is the control's persistent state, kept beside Cancel, Paste and Send with the retained
+ * transcript until it is dismissed or acted on. A blocked send also raises one temporary banner at the top of the
+ * owning screen through the controller's `onSendBlocked`, that banner is the notification of the event and times
+ * out, this label is the recovery state, so the two are one event with its notice and its control, not a duplicate
+ * presentation (#3312, manual case CON-034).
+ */
 @Composable
 private fun dictationStatusLabel(
     state: ConversationDictationState,

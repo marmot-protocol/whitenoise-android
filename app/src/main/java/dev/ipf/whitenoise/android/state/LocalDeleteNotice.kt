@@ -3,6 +3,42 @@ package dev.ipf.whitenoise.android.state
 import androidx.annotation.StringRes
 import dev.ipf.whitenoise.android.R
 
+/**
+ * The wording of one chat-list local removal: its failure title and detail, and the confirmation of a success. A
+ * failed removal's retry keeps the same wording, so a retried abandonment never reads as a delete (#3310).
+ */
+internal data class LocalRemovalWording(
+    @StringRes val failureTitle: Int,
+    @StringRes val failureDetail: Int,
+    @StringRes val success: Int,
+) {
+    companion object {
+        /** Delete from this device, which keeps protocol membership and can receive the chat again. */
+        val Delete =
+            LocalRemovalWording(
+                failureTitle = R.string.toast_couldnt_delete_chat,
+                failureDetail = R.string.local_delete_retry_detail,
+                success = R.string.toast_chat_deleted_local,
+            )
+
+        /** MDK's forget: abandoning a direct chat, or resetting a group to wait for a new invite. */
+        fun abandonment(isDm: Boolean): LocalRemovalWording =
+            if (isDm) {
+                LocalRemovalWording(
+                    failureTitle = R.string.toast_couldnt_abandon_chat,
+                    failureDetail = R.string.local_abandon_retry_detail,
+                    success = R.string.toast_chat_abandoned,
+                )
+            } else {
+                LocalRemovalWording(
+                    failureTitle = R.string.toast_couldnt_reset_group,
+                    failureDetail = R.string.local_reset_retry_detail,
+                    success = R.string.toast_group_reset_done,
+                )
+            }
+    }
+}
+
 /** UI-only identity for retiring a resolved deletion warning without clearing unrelated failures. */
 data class LocalDeleteNotice(
     val accountRef: String,

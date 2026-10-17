@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -137,19 +138,23 @@ internal fun MessageDetailsScreen(
             contentWindowInsets = WindowInsets.safeDrawing,
             containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.message_details)) },
-                    navigationIcon = {
-                        IconButton(onClick = onDismissRequest) {
-                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
-                        }
-                    },
-                    colors =
-                        TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        ),
-                )
+                // App banners sit below this screen's bar rather than over it (#3312).
+                Column {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.message_details)) },
+                        navigationIcon = {
+                            IconButton(onClick = onDismissRequest) {
+                                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
+                            }
+                        },
+                        colors =
+                            TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
+                    )
+                    TopNoticeSlot()
+                }
             },
         ) { padding ->
             AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {

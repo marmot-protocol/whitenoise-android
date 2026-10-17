@@ -1,0 +1,29 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-sole-admin-leave
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: You're the only admin
+- assertVisible:
+    text: Make another member an admin before leaving Fixture group, so the group keeps an admin\.
+- assertVisible:
+    text: If no one can receive admin, resetting this group on this device is the way out, and nothing is sent to the group\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: You're the only admin
+- tapOn:
+    text: Reopen sole admin leave
+- assertVisible:
+    text: You're the only admin
+- back
+- assertNotVisible:
+    text: You're the only admin
+- tapOn:
+    text: Reopen sole admin leave
+- assertVisible:
+    text: You're the only admin
+- tapOn:
+    id: chat_info.sole_admin_leave.abandon
+- assertVisible:
+    id: presentation.complete
