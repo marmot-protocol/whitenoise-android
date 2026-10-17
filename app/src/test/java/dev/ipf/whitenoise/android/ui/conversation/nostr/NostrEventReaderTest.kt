@@ -134,7 +134,15 @@ class NostrEventReaderTest {
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
             up()
         }
-        composeRule.runOnIdle { assertEquals("keep this", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
+        composeRule.runOnIdle {
+            assertEquals(
+                "keep this",
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    .toString(),
+            )
+        }
         composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
     }
 
@@ -160,7 +168,13 @@ class NostrEventReaderTest {
             up()
         }
         composeRule.runOnIdle {
-            assertEquals(destination, clipboard.primaryClip?.getItemAt(0)?.text.toString())
+            assertEquals(
+                destination,
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    .toString(),
+            )
             clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", "keep this"))
             block = paragraph(MarkdownInlineFfi.Text(replacement))
         }
@@ -171,7 +185,13 @@ class NostrEventReaderTest {
             up()
         }
         composeRule.runOnIdle {
-            assertEquals("keep this", clipboard.primaryClip?.getItemAt(0)?.text.toString())
+            assertEquals(
+                "keep this",
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    .toString(),
+            )
             visible = false
         }
         composeRule.onNodeWithText(replacement).assertDoesNotExist()
@@ -181,7 +201,15 @@ class NostrEventReaderTest {
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
             up()
         }
-        composeRule.runOnIdle { assertEquals("keep this", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
+        composeRule.runOnIdle {
+            assertEquals(
+                "keep this",
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    .toString(),
+            )
+        }
     }
 
     private fun readerLink(destination: String): MarkdownBlockFfi =
