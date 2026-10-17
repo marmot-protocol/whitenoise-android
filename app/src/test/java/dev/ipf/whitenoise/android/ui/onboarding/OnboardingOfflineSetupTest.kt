@@ -49,14 +49,14 @@ class OnboardingOfflineSetupTest {
 
     @Test
     fun retryStartsTheSameActionOnceAfterDefaultRouteReturns() {
-        var online = false
+        var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
         var pending: OnboardingAction? = null
         var starts = 0
 
         fun dispatch(action: OnboardingAction) {
             dispatchOnboardingAction(
                 inFlightAction = OnboardingAction.Idle,
-                hasActiveNetwork = online,
+                hasActiveNetwork = availability.hasActiveNetwork(),
                 requestedAction = action,
                 onOffline = { pending = it },
                 onStart = {
@@ -70,7 +70,7 @@ class OnboardingOfflineSetupTest {
         assertEquals(OnboardingAction.Creating, pending)
         assertEquals(0, starts)
 
-        online = true
+        availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
         dispatch(requireNotNull(pending))
 
         assertEquals(null, pending)
@@ -92,10 +92,11 @@ class OnboardingOfflineSetupTest {
 
     @Test
     fun explicitCreateStartsWithAnActiveRouteWithoutAnOsValidationVeto() {
+        val availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = true)
         var starts = 0
         dispatchOnboardingAction(
             inFlightAction = OnboardingAction.Idle,
-            hasActiveNetwork = true,
+            hasActiveNetwork = availability.hasActiveNetwork(),
             requestedAction = OnboardingAction.Creating,
             onOffline = { error("An active route must permit an explicit operation") },
             onStart = { starts++ },

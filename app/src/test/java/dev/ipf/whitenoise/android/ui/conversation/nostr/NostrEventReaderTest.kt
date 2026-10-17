@@ -1,8 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
@@ -94,6 +99,98 @@ class NostrEventReaderTest {
         composeRule.onNodeWithText(label).performClick()
         composeRule.onNodeWithText(destination).assertIsDisplayed()
     }
+
+    @Test
+    fun draggingReaderLinkBeforeTimeoutLeavesClipboardUnchanged() {
+        val destination = "https://example.com/drag"
+        val clipboard = ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", "keep this"))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventReaderScreen(
+                    card = noteCard(),
+                    document =
+                        MarkdownDocumentFfi(
+                            listOf(
+                                paragraph(MarkdownInlineFfi.Text("Context above link ".repeat(10))),
+                                readerLink(destination),
+                                paragraph(MarkdownInlineFfi.Text("Scrollable article body ".repeat(500))),
+                            ),
+                            false,
+                            byteArrayOf(),
+                        ),
+                    parsing = false,
+                    authorDisplayName = { "Alex" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText(destination).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, -viewConfiguration.touchSlop * 3), delayMillis = 32)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            up()
+        }
+        composeRule.runOnIdle { assertEquals("keep this", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
+        composeRule.onNodeWithText(string(R.string.link_confirm_title)).assertDoesNotExist()
+    }
+
+    @Test
+    fun replacingLinkBlockAndReopeningCannotCopyItsOldDestination() {
+        val destination = "https://example.com/removed"
+        val replacement = "Ordinary replacement text"
+        var block by mutableStateOf(readerLink(destination))
+        var visible by mutableStateOf(true)
+        val clipboard = ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (visible) {
+                    NostrEventReaderBlock(block, mentionDisplayName = { null }, onNostrProfileTap = {})
+                }
+            }
+        }
+        // First prove the original geometry is registered and copies successfully.
+        composeRule.onNodeWithText(destination).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            up()
+        }
+        composeRule.runOnIdle {
+            assertEquals(destination, clipboard.primaryClip?.getItemAt(0)?.text.toString())
+            clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", "keep this"))
+            block = paragraph(MarkdownInlineFfi.Text(replacement))
+        }
+        composeRule.onNodeWithText(destination).assertDoesNotExist()
+        composeRule.onNodeWithText(replacement).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            up()
+        }
+        composeRule.runOnIdle {
+            assertEquals("keep this", clipboard.primaryClip?.getItemAt(0)?.text.toString())
+            visible = false
+        }
+        composeRule.onNodeWithText(replacement).assertDoesNotExist()
+        composeRule.runOnIdle { visible = true }
+        composeRule.onNodeWithText(replacement).performTouchInput {
+            down(center)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 200)
+            up()
+        }
+        composeRule.runOnIdle { assertEquals("keep this", clipboard.primaryClip?.getItemAt(0)?.text.toString()) }
+    }
+
+    private fun readerLink(destination: String): MarkdownBlockFfi =
+        paragraph(
+            MarkdownInlineFfi.Link(
+                destination,
+                null,
+                listOf(MarkdownInlineFfi.Text(destination)),
+                MarkdownLinkDestinationKindFfi.WEB,
+            ),
+        )
 
     @Test
     @Config(sdk = [30])
