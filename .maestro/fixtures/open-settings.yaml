@@ -5,3 +5,5 @@ appId: dev.ipf.whitenoise.android.maestrolab
 - assertVisible: "Switch Profile"
 - tapOn: "Settings"
 - assertVisible: "Settings"
+- assertVisible:
+    id: "settings-home-content"

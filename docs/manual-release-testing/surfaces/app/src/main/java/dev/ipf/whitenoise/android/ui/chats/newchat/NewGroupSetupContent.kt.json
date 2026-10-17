@@ -56,6 +56,14 @@
         "test_ids": [
           "NCH-002"
         ]
+      },
+      {
+        "surface": "NewGroupSetupContent UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+        "anchor": "fun NewGroupSetupContent(",
+        "test_ids": [
+          "NCH-002"
+        ]
       }
     ],
     "settings_controls": [

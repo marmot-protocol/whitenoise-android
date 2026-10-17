@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-widget-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: widget.configuration
+- assertVisible: Choose an account for this widget[.] Message text stays hidden[.]
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

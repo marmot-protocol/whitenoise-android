@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-image-crop-rotate
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: identity_crop.dialog
+- assertVisible:
+    id: identity_crop.canvas
+- tapOn:
+    id: identity_crop.rotate
+- tapOn:
+    id: identity_crop.confirm
+- assertVisible:
+    id: presentation.complete

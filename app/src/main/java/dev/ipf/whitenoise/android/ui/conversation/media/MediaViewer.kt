@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +32,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -56,6 +54,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -351,6 +350,7 @@ internal fun ConversationMediaViewer(
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
+    imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
 ) {
     val messagePages =
         remember(messageIdHex, attachments, mine, sender, recordedAt) {
@@ -386,6 +386,7 @@ internal fun ConversationMediaViewer(
         videoFileResolver = videoFileResolver,
         onGoToMessage = onGoToMessage,
         forwardActions = forwardActions,
+        imageBytes = imageBytes,
     )
 }
 
@@ -407,6 +408,7 @@ internal fun FullScreenMediaViewer(
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
+    imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
 ) {
     if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -743,6 +745,9 @@ internal fun FullScreenMediaViewer(
                         mine = pageDescriptor.mine,
                         onPlayerChanged = onVideoPlayerChanged,
                         videoFileResolver = videoFileResolver,
+                        // One tap reveals or hides Media3's controls and the viewer chrome together, and they
+                        // time out together while playing, so the frame and time bar are never covered.
+                        onControllerVisibilityChange = { visible -> if (isCurrent) chromeVisible = visible },
                     )
                 } else {
                     ViewerPage(
@@ -757,6 +762,7 @@ internal fun FullScreenMediaViewer(
                         mine = pageDescriptor.mine,
                         isCurrent = isCurrent,
                         onChromeToggle = { if (isCurrent) chromeVisible = !chromeVisible },
+                        imageBytes = imageBytes?.let { loader -> { loader(pageDescriptor) } },
                     )
                 }
             }
@@ -785,31 +791,22 @@ internal fun FullScreenMediaViewer(
         )
     }
     if (pictureSession.failedDraft != null && pictureSession.isCurrent() && !pictureSession.busy) {
-        AlertDialog(
-            onDismissRequest = {
+        GroupPictureFailureDialog(
+            onRetry = { scope.launch { pictureSession.retry(::commitPicture) } },
+            onDismiss = {
                 pictureSession.cancel()
                 pictureFailures.clear()
                 pictureNotice = null
-            },
-            title = { Text(stringResource(R.string.toast_couldnt_update_group)) },
-            text = { Text(stringResource(R.string.error_try_again)) },
-            confirmButton = {
-                TextButton(onClick = { scope.launch { pictureSession.retry(::commitPicture) } }) {
-                    Text(stringResource(R.string.retry))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    pictureSession.cancel()
-                    pictureFailures.clear()
-                    pictureNotice = null
-                }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
 }
 
-/** Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. */
+/**
+ * Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. The media
+ * [body] gets only the space the visible chrome and safe insets leave free, so opaque bars never cover the frame
+ * or a player's time bar, and hiding the chrome gives that space back to the media.
+ */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun MediaViewerFrame(
@@ -834,38 +831,20 @@ internal fun MediaViewerFrame(
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
     var bottomChromeHeight by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
+    // An open overflow menu keeps its chrome until dismissed, even when a video's controls time out under it.
+    val chromeShown = chromeVisible || moreExpanded
     val snackbarInsetSides =
-        if (chromeVisible) {
+        if (chromeShown) {
             WindowInsetsSides.Horizontal
         } else {
             WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
         }
-    LaunchedEffect(chromeVisible) {
-        if (!chromeVisible) moreExpanded = false
-    }
-    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        body()
-        if (groupPictureBusy) {
-            Surface(
-                Modifier.align(Alignment.Center).testTag("conversation.media.viewer.group-picture-progress"),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Column(
-                    Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator()
-                    Text(stringResource(R.string.group_preparing_photo))
-                }
-            }
-        }
-        if (chromeVisible) {
+    val topChrome: @Composable () -> Unit = {
+        if (chromeShown) {
             Surface(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
                         .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
                 color = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
@@ -950,11 +929,26 @@ internal fun MediaViewerFrame(
                     }
                 }
             }
+        }
+    }
+    // The body keeps one composition slot whether or not chrome shows, so toggling chrome resizes the pager
+    // and player instead of recreating them.
+    val content: @Composable () -> Unit = {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(contentWindowInsets.only(mediaViewerContentInsetSides(chromeShown)))
+                    .testTag(MEDIA_VIEWER_CONTENT_TAG),
+            content = body,
+        )
+    }
+    val bottomChrome: @Composable () -> Unit = {
+        if (chromeShown) {
             Surface(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
                         .testTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG)
                         .onSizeChanged { bottomChromeHeight = with(density) { it.height.toDp() } },
                 color = MaterialTheme.colorScheme.background,
@@ -990,12 +984,34 @@ internal fun MediaViewerFrame(
                 }
             }
         }
+    }
+    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Layout(
+            contents = listOf(topChrome, content, bottomChrome),
+            modifier = Modifier.fillMaxSize(),
+            measurePolicy = mediaViewerChromeMeasurePolicy,
+        )
+        if (groupPictureBusy) {
+            Surface(
+                Modifier.align(Alignment.Center).testTag("conversation.media.viewer.group-picture-progress"),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Column(
+                    Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.group_preparing_photo))
+                }
+            }
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier =
                 Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = if (chromeVisible) bottomChromeHeight else 0.dp)
+                    .padding(bottom = if (chromeShown) bottomChromeHeight else 0.dp)
                     .windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
@@ -1016,6 +1032,7 @@ internal fun ViewerPage(
     mine: Boolean,
     isCurrent: Boolean,
     onChromeToggle: () -> Unit,
+    imageBytes: (suspend () -> ByteArray)? = null,
 ) {
     // `pointerInput(pageKey)` only restarts when the key changes — its
     // coroutine outlives any single gesture. Function parameters
@@ -1030,6 +1047,7 @@ internal fun ViewerPage(
     val latestOnScaleChange by rememberUpdatedState(onScaleChange)
     val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
     val latestOnChromeToggle by rememberUpdatedState(onChromeToggle)
+    val latestImageBytes by rememberUpdatedState(imageBytes)
     // `sourceEpoch` is folded into the page key so a viewer that failed
     // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
     // and retries when the real reference arrives.
@@ -1079,7 +1097,9 @@ internal fun ViewerPage(
         viewerFailed = false
         viewerTooLarge = false
         try {
-            val data = attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
+            val data =
+                latestImageBytes?.invoke()
+                    ?: attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
             val decoded =
                 decodeMessageAttachmentImage(
                     bytes = data,

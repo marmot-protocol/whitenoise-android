@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-image-editor-quality
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Edit photo
+- tapOn:
+    id: photo.editor.quality
+- assertVisible: Photo quality
+- assertVisible: Standard
+- back
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

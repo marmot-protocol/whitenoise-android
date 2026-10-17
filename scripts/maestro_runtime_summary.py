@@ -8,15 +8,19 @@ import re
 import xml.etree.ElementTree as ET
 
 try:
-    from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result
+    from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation, fixture_account_count
     from scripts.maestro_runtime_selection import matrix_selection
     from scripts.maestro_environment import qualify
     from scripts.maestro_credential import qualify_credential
+    from scripts.maestro_screen_coverage import flow_assertions, executed_screens, screen_bindings
+    from scripts.maestro_suite import CASES as OFFLINE
 except ModuleNotFoundError:
-    from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result
+    from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result, qualify_presentation, fixture_account_count
     from maestro_runtime_selection import matrix_selection
     from maestro_environment import qualify
     from maestro_credential import qualify_credential
+    from maestro_screen_coverage import flow_assertions, executed_screens, screen_bindings
+    from maestro_suite import CASES as OFFLINE
 
 
 def read_json(path):
@@ -92,12 +96,18 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 actual = read_json(leaf / 'result.json')
                 if actual != row or row.get('passed') is not True or row.get('cleanup_safe') is not True:
                     raise ValueError(row.get('failure', 'UI or teardown did not pass'))
+                root_source = Path(__file__).resolve().parents[1]
+                _, hashes = flow_assertions(root_source / f'.maestro/runtime/{name}.yaml', root_source)
+                if row.get('flow_sha256') != hashes:
+                    raise ValueError('Executed flow differs from maintained assertions')
+                result['flow_sha256'] = hashes
                 generation = row.get('generation', '')
                 if not re.fullmatch('[0-9a-f]{32}', generation) or generation in generations:
                     raise ValueError('Missing or reused fixture generation')
                 generations.add(generation)
                 for flag in ('ready', 'verified', 'closed'):
                     receipt(json.dumps(read_json(leaf / f'{flag}.json')), generation, flag)
+                qualify_presentation(CASES[name], read_json(leaf / 'verified.json'))
                 if (CASES[name]['postcondition'] == 'composer-recreated'
                         and read_json(leaf / 'verified.json').get('activityRecreated') is not True):
                     raise ValueError('Actual Activity recreation was not verified')
@@ -113,6 +123,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'].startswith('smart-rule-')
                         and read_json(leaf / 'verified.json').get('smartFolderRuleVerified') is not True):
                     raise ValueError('Persisted smart-folder rules were not verified')
+                if (CASES[name]['postcondition'].startswith('folder-details-')
+                        and read_json(leaf / 'verified.json').get('folderDetailsVerified') is not True):
+                    raise ValueError('Persisted folder metadata and account isolation were not verified')
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and read_json(leaf / 'verified.json').get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')
@@ -138,7 +151,8 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'] == 'app-lock-unavailable'
                         and ready.get('appLockFixtureNoCredential') is not True):
                     raise ValueError('Actual no-credential app-lock prerequisite was not verified')
-                if (ready.get('accounts') != 3 or ready.get('fixture') != CASES[name].get('fixture', 'basic')
+                if (ready.get('accounts') != fixture_account_count(CASES[name].get('fixture', 'basic'))
+                        or ready.get('fixture') != CASES[name].get('fixture', 'basic')
                         or ready.get('uiObserver') != 'maestro'):
                     raise ValueError('Native fixture handoff mismatch')
                 if CASES[name]['postcondition'].startswith('app-lock-credential-'):
@@ -174,6 +188,16 @@ def main():
                       os.environ['GITHUB_RUN_ID'], os.environ['GITHUB_RUN_ATTEMPT'],
                       os.environ.get('MAESTRO_ANDROID_API', '34'),
                       os.environ.get('MAESTRO_NAVIGATION_MODE', 'button'))
+    # Derive screen results from this reconciler, never from a supplied aggregate pass flag.
+    # Full discovery is checked by coverage CI. Reconcile its maintained assertions without
+    # rescanning every Kotlin source or the manual release guide for each shard summary.
+    root = Path(__file__).resolve().parents[1]
+    configured = json.loads((root / 'config/maestro-screen-assertions.json').read_text())['screens']
+    cases = {name: {'flow': '.maestro/' + values[0]} for name, values in OFFLINE.items()}
+    cases.update({name: {'flow': f'.maestro/runtime/{name}.yaml'} for name in CASES})
+    screens = screen_bindings(root, configured, cases)
+    result['screens'] = (executed_screens(screens, result, os.environ['GITHUB_SHA'])
+                         if not result['errors'] else screens)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + '\n')
     message = f"Maestro campaign: {result['passed_count']}/{result['expected_count']} selected UI cases passed."

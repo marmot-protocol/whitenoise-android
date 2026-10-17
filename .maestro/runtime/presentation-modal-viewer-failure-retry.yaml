@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-viewer-failure-retry
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Couldn't update group
+- assertVisible:
+    text: Something went wrong\. Try again; if it keeps happening, copy the error
+      report\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Couldn't update group
+- tapOn:
+    text: Reopen picture failure
+- assertVisible:
+    text: Couldn't update group
+- back
+- assertNotVisible:
+    text: Couldn't update group
+- tapOn:
+    text: Reopen picture failure
+- assertVisible:
+    text: Couldn't update group
+- tapOn:
+    text: Retry
+- assertVisible:
+    id: presentation.complete

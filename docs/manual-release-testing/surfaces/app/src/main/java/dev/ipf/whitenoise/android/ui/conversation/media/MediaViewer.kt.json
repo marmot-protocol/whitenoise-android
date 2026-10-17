@@ -19,7 +19,8 @@
           "MED-007",
           "MED-015",
           "MED-016",
-          "MED-017"
+          "MED-017",
+          "MED-033"
         ]
       },
       {
@@ -28,7 +29,8 @@
         "anchor": "fun FullScreenMediaViewer(",
         "test_ids": [
           "MED-001",
-          "MED-015"
+          "MED-015",
+          "MED-033"
         ]
       },
       {
@@ -37,7 +39,8 @@
         "anchor": "fun MediaViewerFrame(",
         "test_ids": [
           "MED-001",
-          "MED-015"
+          "MED-015",
+          "MED-033"
         ]
       },
       {
@@ -45,7 +48,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun StableMediaViewerPager(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-033"
         ]
       },
       {
@@ -54,7 +58,8 @@
         "anchor": "fun ViewerPage(",
         "test_ids": [
           "MED-001",
-          "MED-015"
+          "MED-015",
+          "MED-033"
         ]
       }
     ],
@@ -116,22 +121,6 @@
         ]
       },
       {
-        "surface": "R.string.cancel",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
-        "surface": "R.string.error_try_again",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.error_try_again",
-        "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
         "surface": "R.string.group_photo_error",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "R.string.group_photo_error",
@@ -156,19 +145,19 @@
         ]
       },
       {
-        "surface": "R.string.retry",
+        "surface": "Shared modal presentation: GroupPictureFailureDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.retry",
+        "anchor": "GroupPictureFailureDialog(",
         "test_ids": [
-          "GRP-003"
+          "MED-015"
         ]
       },
       {
-        "surface": "R.string.toast_couldnt_update_group",
+        "surface": "Video pages reveal and hide viewer chrome with their controller",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.toast_couldnt_update_group",
+        "anchor": "onControllerVisibilityChange =",
         "test_ids": [
-          "GRP-003"
+          "MED-033"
         ]
       }
     ]

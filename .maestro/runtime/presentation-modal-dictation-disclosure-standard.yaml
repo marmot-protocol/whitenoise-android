@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-dictation-disclosure-standard
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: External speech recognition
+- assertVisible:
+    text: The speech service installed on this device processes what you say and may
+      send the audio to its provider\. After a failure, recognized text can be saved
+      automatically in the original draft\. Sending automatically is off unless you
+      turn it on in Dictation settings\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: External speech recognition
+- tapOn:
+    text: Reopen dictation disclosure
+- assertVisible:
+    text: External speech recognition
+- back
+- assertNotVisible:
+    text: External speech recognition
+- tapOn:
+    text: Reopen dictation disclosure
+- assertVisible:
+    text: External speech recognition
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,33 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-sentences-select
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    text: Invoke sentence chooser
+- assertVisible:
+    id: tts_sentence_chooser
+- assertVisible:
+    text: 1\. Fixture sentence 1
+- assertVisible:
+    text: 2\. Fixture sentence 2
+- assertVisible:
+    text: 3\. Fixture sentence 3
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    id: tts_sentence_chooser
+- tapOn:
+    text: Invoke sentence chooser
+- assertVisible:
+    id: tts_sentence_chooser
+- back
+- assertNotVisible:
+    id: tts_sentence_chooser
+- tapOn:
+    text: Invoke sentence chooser
+- assertVisible:
+    id: tts_sentence_chooser
+- tapOn:
+    text: 2\. Fixture sentence 2
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-selection-photo-files
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Choose from Files
+- tapOn: Choose from Files
+- assertVisible:
+    id: presentation.complete

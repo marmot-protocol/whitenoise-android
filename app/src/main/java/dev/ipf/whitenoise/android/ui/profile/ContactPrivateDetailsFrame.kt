@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -40,7 +41,7 @@ internal fun ContactPrivateDetailsFrame(
     onDismiss: () -> Unit,
     actions: @Composable () -> Unit,
     form: @Composable () -> Unit,
-    viewportInsets: WindowInsets = WindowInsets.safeDrawing.union(WindowInsets.ime),
+    viewportInsets: WindowInsets? = null,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -54,7 +55,7 @@ internal fun ContactPrivateDetailsFrame(
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(viewportInsets)
+                .windowInsetsPadding(viewportInsets ?: WindowInsets.safeDrawing.union(WindowInsets.ime))
                 .padding(WhiteNoiseSpacing.Section)
                 .exposePerformanceTestTags(),
             contentAlignment = Alignment.Center,
@@ -73,7 +74,7 @@ internal fun ContactPrivateDetailsFrame(
                     Column(
                         Modifier
                             .weight(1f, fill = false)
-                            .heightIn(max = 360.dp)
+                            .testTag("private_details.form")
                             .fadingVerticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
                     ) {

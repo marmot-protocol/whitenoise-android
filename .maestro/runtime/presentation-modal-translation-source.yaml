@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-translation-source
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: translation.form
+- assertVisible:
+    id: translation.confirm
+- tapOn: Source language
+- assertVisible: Arabic
+- tapOn: Arabic
+- assertVisible: Arabic
+- tapOn:
+    id: translation.confirm
+- assertVisible:
+    id: presentation.complete

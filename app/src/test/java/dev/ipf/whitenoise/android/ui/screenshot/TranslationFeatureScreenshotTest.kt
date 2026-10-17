@@ -38,21 +38,29 @@ class TranslationFeatureScreenshotTest {
 
     @Test fun largeRtl() = capture("translation_settings_large_rtl.png", enabled = true, scale = 2f, rtl = true)
 
+    /** A saved target outside the catalog shows its recovery notice and a language prompt, not a substitute. */
+    @Test
+    fun unsupportedTargetLight() = capture("translation_settings_unsupported_target_light.png", savedTarget = "xx")
+
+    /** Renders global translation settings for [savedTarget], written raw as an older or corrupt value would be. */
+    @Suppress("LongParameterList")
     private fun capture(
         name: String,
         enabled: Boolean = false,
         dark: Boolean = false,
         scale: Float = 1f,
         rtl: Boolean = false,
+        savedTarget: String = "de",
     ) {
         val context: android.content.Context = ApplicationProvider.getApplicationContext()
         context
             .getSharedPreferences("translation_choices", 0)
             .edit()
             .clear()
+            .putString("target", savedTarget)
             .commit()
         val preferences = TranslationPreferences(context)
-        preferences.setGlobal(enabled, "de")
+        preferences.setGlobal(enabled, null)
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalDensity provides Density(1f, scale),

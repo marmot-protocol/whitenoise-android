@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -19,6 +20,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.BrokenImage
 import dev.ipf.whitenoise.android.ui.icons.outlined.OpenInFull
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
 /** Load failure state of the viewer with a retry action. */
 @Composable
@@ -43,7 +45,10 @@ internal fun MediaViewerLoadFailed(
             stringResource(R.string.media_couldnt_open),
             color = contentColor,
         )
-        TextButton(onClick = onRetry) {
+        TextButton(
+            onClick = onRetry,
+            modifier = Modifier.exposePerformanceTestTags().testTag("media.viewer.retry"),
+        ) {
             Text(stringResource(R.string.media_tap_to_retry), color = contentColor)
         }
     }

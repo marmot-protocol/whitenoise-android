@@ -1,0 +1,31 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-retained-recovery
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    id: onboarding-saved-account
+- assertVisible:
+    text: Recover sign-in setup\?
+- assertVisible:
+    text: This signs the profile out and clears the setup that didn’t finish\. You’ll
+      need its private key to sign in again\. Anything already published to relays
+      stays there, and nothing new is published\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: Recover sign-in setup\?
+- tapOn:
+    id: onboarding-saved-account
+- assertVisible:
+    text: Recover sign-in setup\?
+- back
+- assertNotVisible:
+    text: Recover sign-in setup\?
+- tapOn:
+    id: onboarding-saved-account
+- assertVisible:
+    text: Recover sign-in setup\?
+- tapOn:
+    text: Recover setup
+- assertVisible:
+    id: presentation.complete

@@ -27,7 +27,26 @@ def matrix_selection(value):
             # The producer and executor must admit the same maintained, path-safe case names.
             case_selection(suite, part)
             result.append({'slice': suite, 'partition': part, 'partitions': partitions})
-    return result
+    # Exercise recovery and decode regressions before spending hours on the full
+    # campaign. Sorting only schedules existing partitions; membership, limits,
+    # cleanup and final reconciliation remain identical.
+    return sorted(result, key=feedback_priority)
+
+
+def feedback_priority(partition):
+    """Prefer controlled recovery/media and modal checks without omitting any case."""
+    names = case_selection(partition['slice'], partition['partition'])
+    presentations = [CASES[name].get('presentation', '') for name in names]
+    if any(name.startswith(('dictation-draft-', 'dictation-status-')) for name in presentations):
+        return 0
+    if any(name.startswith(('preview-', 'extra-native-viewer-'))
+           or name == 'surface-animated-avatar' for name in presentations):
+        return 1
+    if partition['slice'] == 'modals':
+        return 2
+    if partition['slice'] == 'presentation':
+        return 3
+    return 4
 
 
 def validate_credential_platform(value, api):

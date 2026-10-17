@@ -9,6 +9,8 @@ name: search-content-back
     id: "chat-list-search-filters-action"
 - tapOn: "Content"
 - assertVisible: "Content"
+- assertVisible:
+    id: "chat-list-search-filter-dialog"
 - back
 - assertVisible:
     id: "chats.searchField"

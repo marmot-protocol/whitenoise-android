@@ -29,6 +29,7 @@ class TranslationEngineDiscoveryTest {
         assertFailure(TranslationFailure.MISSING_ENGINE)
     }
 
+    /** Each reviewed release is discovered and carries its version name, which selects its own language catalog. */
     @Test
     fun reviewedPublisherReleasesRemainAvailableWithTheUiPrivacyWarning() {
         for ((version, code) in listOf("0.8.3" to 282L, "0.8.4" to 292L, "0.8.5" to 302L)) {
@@ -36,7 +37,16 @@ class TranslationEngineDiscoveryTest {
             val service = discoverOfflineTranslator(context)
             assertEquals(OFFLINE_TRANSLATOR_PACKAGE, service.component.packageName)
             assertEquals(code, service.identity.version)
+            assertEquals(version, service.engineVersion)
         }
+    }
+
+    /** The publisher-signed release Zapstore offered at review stays rejected: install source changes nothing. */
+    @Test
+    fun zapstoreOfferedReleaseIsRejectedDespiteThePublisherSigner() {
+        assertEquals(OFFLINE_TRANSLATOR_SIGNER, offlineTranslatorZapstoreRelease.signer)
+        installEngine(offlineTranslatorZapstoreRelease.versionName, 272L)
+        assertFailure(TranslationFailure.INCOMPATIBLE_ENGINE)
     }
 
     @Test

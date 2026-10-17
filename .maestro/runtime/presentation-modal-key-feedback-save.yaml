@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-key-feedback-save
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Couldn’t Save File
+- assertVisible:
+    text: Choose another location and try again\.
+- tapOn:
+    text: OK
+- assertNotVisible:
+    text: Couldn’t Save File
+- tapOn:
+    text: Reopen key feedback
+- assertVisible:
+    text: Couldn’t Save File
+- back
+- assertNotVisible:
+    text: Couldn’t Save File
+- tapOn:
+    text: Finish key feedback check
+- assertVisible:
+    id: presentation.complete

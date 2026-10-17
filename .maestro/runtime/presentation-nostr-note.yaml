@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-nostr-note
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Note
+- assertVisible: Maestro resolved reader body
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

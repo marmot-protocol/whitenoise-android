@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-key-feedback-expired
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Export expired
+- assertVisible:
+    text: Return to Profile Keys and start the export again\. No key data was written\.
+- tapOn:
+    text: Close
+- assertNotVisible:
+    text: Export expired
+- tapOn:
+    text: Reopen key feedback
+- assertVisible:
+    text: Export expired
+- back
+- assertNotVisible:
+    text: Export expired
+- tapOn:
+    text: Finish key feedback check
+- assertVisible:
+    id: presentation.complete

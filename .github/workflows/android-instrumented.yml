@@ -67,7 +67,7 @@ on:
         description: Offline retained-APK coverage or opt-in generated-account runtime slice
         required: false
         type: choice
-        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-polls, runtime-folders, runtime-nested, runtime-reader, runtime-composer, runtime-developer, runtime-support, runtime-ballots, runtime-profiles, runtime-chats, runtime-chatstate, runtime-consent, runtime-keys, runtime-search, runtime-permissions, runtime-reports, runtime-acquisition, runtime-speech, runtime-speech-validation, runtime-dictation, runtime-reactions, runtime-alert-dialogs, runtime-smart-folders, runtime-account-guards, runtime-account-actions, runtime-app-lock, runtime-settings-lifecycle, runtime-speech-persistence, runtime-profile-text, runtime-folder-rules, runtime-relay-validation, runtime-inbound-share, runtime-all]
+        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-polls, runtime-folders, runtime-nested, runtime-reader, runtime-composer, runtime-developer, runtime-support, runtime-ballots, runtime-profiles, runtime-chats, runtime-chatstate, runtime-consent, runtime-keys, runtime-search, runtime-permissions, runtime-reports, runtime-acquisition, runtime-speech, runtime-speech-validation, runtime-dictation, runtime-reactions, runtime-alert-dialogs, runtime-smart-folders, runtime-account-guards, runtime-account-actions, runtime-app-lock, runtime-settings-lifecycle, runtime-speech-persistence, runtime-profile-text, runtime-folder-rules, runtime-relay-validation, runtime-inbound-share, runtime-presentation, runtime-modals, runtime-all]
         default: onboarding
       maestro_repetitions:
         description: Suite repetitions (onboarding 1–20, offline 1–3, focused suites 1)
@@ -162,6 +162,11 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmissionDeviceTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/**'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox/**'
+      # The viewer controls device test asserts real decoded frames and Media3 control geometry on CI's emulator.
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerVideoControlsAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerVideoDeviceFixture.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerFrameProbe.kt'
+      - 'app/src/androidTest/assets/edge-*.mp4.b64'
       - 'cryptoBenchmark/**'
       - 'settings.gradle.kts'
       - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt'
@@ -472,7 +477,7 @@ jobs:
           printf 'setup_started_at=%s\n' "$(date +%s)" > build/maestro-pilot/timings.env
           [[ "$REVIEW_DEMO" != true && "$DOCUMENT_MATRIX" != true ]] || { echo 'Select only the Maestro pilot'; exit 2; }
           [[ "$MAESTRO_ANDROID_API" == 34 && "$MAESTRO_NAVIGATION_MODE" == button ]] || { echo 'OS/navigation qualification requires a runtime suite'; exit 2; }
-          python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py
+          python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py scripts/test_maestro_offline_batches.py
           python3 scripts/maestro_suite.py validate --suite "$MAESTRO_SUITE" \
             --repetitions "$MAESTRO_REPETITIONS" --negative "$MAESTRO_NEGATIVE_CONTROL"
           python3 scripts/maestro_apk.py fetch --artifact-id "$ARTIFACT_ID" --source "$SOURCE_SHA" \
@@ -541,6 +546,7 @@ jobs:
             build/maestro-pilot/*.xml
             build/maestro-pilot/*.txt
             build/maestro-pilot/*.env
+            build/maestro-pilot/batches/
             build/maestro-pilot/debug/
             build/maestro-pilot/screenshots/
           if-no-files-found: warn
@@ -573,7 +579,7 @@ jobs:
           [[ "$REPEATS" == 1 && "$NEGATIVE" == false && "$DEMO" == false && "$DOCUMENTS" == false ]] || exit 2
           python3 scripts/maestro_environment.py validate --api "$ANDROID_API" --navigation "$NAVIGATION"
           python3 -m scripts.maestro_runtime_selection "$SELECTED" "$ANDROID_API" >> "$GITHUB_OUTPUT"
-          python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_suite.py scripts/test_maestro_apk.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py
+          python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_screen_coverage.py scripts/test_maestro_suite.py scripts/test_maestro_apk.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -702,6 +708,9 @@ jobs:
         if: inputs.maestro_android_api == '37.0'
         run: ./scripts/test-android17-emulator-stabilization.sh
 
+      - name: Verify the emulator system image before launch
+        run: python3 scripts/maestro_sdk_image.py --api "$MAESTRO_ANDROID_API" --reports build/maestro-sdk-image
+
       - name: Run generated native-account UI cases
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
@@ -731,6 +740,7 @@ jobs:
             build/maestro-runtime-${{ matrix.slice }}-${{ matrix.partition }}/
             build/maestro-runtime-pair/pair.json
             build/maestro-runtime-environment.json
+            build/maestro-sdk-image/
           if-no-files-found: warn
           retention-days: 7
 

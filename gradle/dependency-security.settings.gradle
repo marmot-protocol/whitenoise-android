@@ -4,6 +4,69 @@ import org.gradle.api.GradleException
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult
+import java.security.MessageDigest
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
+
+/** Fingerprint selected files and read only already-cached licence declarations. */
+class DependencyInventoryFiles {
+    /** Hash artifact bytes without loading complete archives into the Gradle heap. */
+    private final Map<String, String> hashes = [:]
+    private final Map<String, List> licenseDeclarations = [:]
+
+    /** Reuse immutable cache bytes within this settings/build instance only. */
+    synchronized String sha256(File file) {
+        def key = "${file.canonicalPath}:${file.length()}:${file.lastModified()}".toString()
+        if (hashes.containsKey(key)) return hashes[key]
+        def digest = MessageDigest.getInstance('SHA-256')
+        file.withInputStream { stream ->
+            byte[] buffer = new byte[1024 * 1024]
+            int count
+            while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
+        }
+        def value = digest.digest().encodeHex().toString()
+        hashes[key] = value
+        return value
+    }
+
+    /** Memoize adjacent cached POM licences per coordinate without fetching metadata. */
+    synchronized List licenses(File artifact, String group, String module, String version) {
+        def coordinate = "${group}:${module}:${version}".toString()
+        if (licenseDeclarations.containsKey(coordinate)) return licenseDeclarations[coordinate]
+        def parents = [artifact.parentFile]
+        def siblings = artifact.parentFile.parentFile?.listFiles()
+        parents.addAll((siblings ?: []).findAll { it.isDirectory() })
+        def declarations = []
+        parents.unique().each { parent ->
+            def pom = new File(parent, "${module}-${version}.pom")
+            if (pom.isFile() && pom.length() <= 256 * 1024) {
+                def document
+                try {
+                    def factory = DocumentBuilderFactory.newInstance()
+                    factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+                    factory.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true)
+                    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, '')
+                    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, '')
+                    document = factory.newDocumentBuilder().parse(pom)
+                } catch (org.xml.sax.SAXException | IOException | javax.xml.parsers.ParserConfigurationException ignored) {
+                    // Optional cached licence metadata never weakens or blocks dependency selection.
+                    return
+                }
+                def nodes = document.getElementsByTagName('license')
+                for (int index = 0; index < nodes.length; index++) {
+                    def node = nodes.item(index)
+                    if (node.parentNode.nodeName != 'licenses' || node.parentNode.parentNode != document.documentElement) continue
+                    def name = node.getElementsByTagName('name').item(0)?.textContent?.trim() ?: ''
+                    def url = node.getElementsByTagName('url').item(0)?.textContent?.trim() ?: ''
+                    declarations.add([name: name, url: url, pom_sha256: sha256(pom)])
+                }
+            }
+        }
+        def result = declarations.unique().sort { a, b -> "${a.name}:${a.url}:${a.pom_sha256}" <=> "${b.name}:${b.url}:${b.pom_sha256}" }
+        licenseDeclarations[coordinate] = result
+        return result
+    }
+}
 
 // No dependencies are added here. Only existing requests for affected modules
 // are raised, before metadata is downloaded (including project plugin classpaths).
@@ -61,6 +124,11 @@ try {
     // ZIP/source archives and machines without git retain the floor policy.
 }
 
+// GitHub opts in through CI=true; developers can explicitly enable or disable collection.
+def inventoryRequested = providers.gradleProperty('dependencySecurity.inventory')
+    .orElse(providers.environmentVariable('CI')).getOrElse('false').equalsIgnoreCase('true')
+def inventoryFiles = inventoryRequested ? new DependencyInventoryFiles() : null
+
 gradle.beforeProject { project ->
     def install = { configuration, scope ->
         configuration.resolutionStrategy.eachDependency { details ->
@@ -88,20 +156,57 @@ gradle.beforeProject { project ->
             }
         }
         configuration.incoming.afterResolve { dependencies ->
+            // Filter before artifact selection: AGP project variants need task-specific attributes.
+            def unresolved = dependencies.resolutionResult.allDependencies
+                .findAll { it instanceof UnresolvedDependencyResult }
+                .collect { it.requested.displayName }.sort()
+            def unfingerprinted = []
+            def artifacts = []
+            if (inventoryRequested && unresolved.isEmpty()) {
+                def view = configuration.incoming.artifactView {
+                    lenient = true
+                    componentFilter { it instanceof ModuleComponentIdentifier }
+                }.artifacts
+                view.failures.each { failure ->
+                    // Gradle does not expose a reliable component identity for every failure.
+                    unfingerprinted.add([kind: 'resolution_failure',
+                        reason: "Artifact resolution unavailable (${failure.class.simpleName})".toString()])
+                }
+                artifacts = view.artifacts.collect { artifact ->
+                    def id = artifact.id.componentIdentifier
+                    if (!artifact.file.isFile()) {
+                        unfingerprinted.add([
+                            coordinate: "${id.group}:${id.module}:${id.version}".toString(), name: artifact.file.name,
+                            kind: artifact.file.isDirectory() ? 'directory' : 'non_regular',
+                            reason: 'Transformed/non-regular artifact has no regular-file fingerprint'])
+                        return null
+                    }
+                    try {
+                        return [coordinate: "${id.group}:${id.module}:${id.version}".toString(),
+                            name: artifact.file.name, sha256: inventoryFiles.sha256(artifact.file),
+                            bytes: artifact.file.length(),
+                            licenses: inventoryFiles.licenses(artifact.file, id.group, id.module, id.version)]
+                    } catch (IOException ignored) {
+                        unfingerprinted.add([coordinate: "${id.group}:${id.module}:${id.version}".toString(),
+                            name: artifact.file.name, kind: 'read_failure', reason: 'Artifact bytes unavailable'])
+                        return null
+                    }
+                }.findAll { it != null }.sort { a, b -> "${a.coordinate}:${a.name}" <=> "${b.coordinate}:${b.name}" }
+            }
+            unfingerprinted.sort { a, b -> JsonOutput.toJson(a) <=> JsonOutput.toJson(b) }
             def components = dependencies.resolutionResult.allComponents
                 .findAll { it.id instanceof ModuleComponentIdentifier }
                 .collect { component ->
                     [group: component.id.group, name: component.id.module,
                      version: component.id.version,
-                     reasons: component.selectionReason.descriptions.collect { it.description }.sort()]
+                     reasons: component.selectionReason.descriptions.collect { it.description }.sort(),
+                     licenses: artifacts.findAll { it.coordinate == "${component.id.group}:${component.id.module}:${component.id.version}" }
+                         .collectMany { it.licenses }.unique()]
                 }.sort { a, b -> "${a.group}:${a.name}:${a.version}" <=> "${b.group}:${b.name}:${b.version}" }
             def edges = dependencies.resolutionResult.allDependencies
                 .findAll { it instanceof ResolvedDependencyResult }
-                .collect { edge -> [from: edge.from.id.displayName, to: edge.selected.id.displayName] }
+                .collect { edge -> [from: edge.from.id.displayName, to: edge.selected.id.displayName, requested: edge.requested.displayName] }
                 .sort { a, b -> "${a.from}:${a.to}" <=> "${b.from}:${b.to}" }
-            def unresolved = dependencies.resolutionResult.allDependencies
-                .findAll { it instanceof UnresolvedDependencyResult }
-                .collect { it.requested.displayName }.sort()
             def violations = components.findAll { component ->
                 def minimum = minimums["${component.group}:${component.name}".toString()]
                 def coordinate = "${component.group}:${component.name}".toString()
@@ -114,6 +219,9 @@ gradle.beforeProject { project ->
             new File(reportDir, "${name}.json").text = JsonOutput.prettyPrint(JsonOutput.toJson(
                 [schema: 1, source_sha: sourceSha, project: project.path, scope: scope,
                  configuration: configuration.name, components: components,
+                 artifacts: artifacts, unfingerprinted_artifacts: unfingerprinted,
+                 artifact_coverage: !inventoryRequested ? 'not_requested' : (!unresolved.isEmpty() ? 'failed' :
+                     (unfingerprinted.isEmpty() ? 'resolved_configuration' : 'partial')),
                  edges: edges, unresolved: unresolved, violations: violations])) + '\n'
             if (!violations.isEmpty()) {
                 throw new GradleException("Vulnerable dependency selected in ${project.path}:${configuration.name}")

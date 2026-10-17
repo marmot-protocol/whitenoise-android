@@ -16,6 +16,14 @@ appId: dev.ipf.whitenoise.android.maestrolab
 - assertVisible:
     id: folder.name
     text: ^Maestro rules folder$
+- runFlow: reveal-folder-description.yaml
 - assertVisible:
     id: folder.description
     text: ^Maestro rules description$
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP
+- assertVisible:
+    id: folder.name
+    text: ^Maestro rules folder$

@@ -46,18 +46,47 @@ class TranslationPrivacyGateTest {
             assertEquals(0, engine.requests)
         }
 
+    /** Catalog codes, including Slovak and engine-only variant identifiers, reach the provider unchanged. */
+    @Test
+    fun catalogCodesIncludingSlovakAndVariantsReachTheProviderUnchanged() =
+        runTest {
+            val engine = CountingEngine(TranslationTrust.LOCAL)
+            val pairs = listOf("en" to "sk", "sk" to "en", "" to "sk", "" to "zh_hant", "zh_hant" to "nb", "en" to "ka")
+            for ((source, target) in pairs) translateWithPrivacyGate(engine, "text", source, target)
+            assertEquals(pairs, engine.pairs)
+        }
+
+    /** Display tags, regional tags, unknown codes and into-English-only targets never reach the provider. */
+    @Test
+    fun codesOutsideTheEngineCatalogNeverReachTheProvider() =
+        runTest {
+            val engine = CountingEngine(TranslationTrust.LOCAL)
+            val rejected = listOf("" to "zh-Hant", "" to "zh-TW", "" to "sk-SK", "" to "xx", "" to "be", "eng" to "en")
+            for ((source, target) in rejected) {
+                try {
+                    translateWithPrivacyGate(engine, "text", source, target)
+                    fail("unsupported pair $source -> $target ran")
+                } catch (failure: TranslationException) {
+                    assertEquals(TranslationFailure.INVALID_REQUEST, failure.failure)
+                }
+            }
+            assertEquals(0, engine.requests)
+        }
+
     private class CountingEngine(
         override val trust: TranslationTrust,
     ) : TranslationEngine {
         override val identity = TranslationEngineIdentity("provider", "verified", 1)
-        var requests = 0
+        val pairs = mutableListOf<Pair<String, String>>()
+        val requests get() = pairs.size
 
+        /** Records the submitted language pair and returns a fixed rendition. */
         override suspend fun translate(
             text: String,
             source: String,
             target: String,
         ): String {
-            requests += 1
+            pairs += source to target
             return "translated"
         }
     }

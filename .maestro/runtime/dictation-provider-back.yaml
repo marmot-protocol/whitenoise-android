@@ -16,6 +16,8 @@ name: dictation-provider-back
 - assertVisible:
     text: "Choose a provider for future dictation[.].*"
 - assertVisible: Automatic
+- assertVisible:
+    id: "dictation_provider_choices"
 - back
 - assertNotVisible:
     text: "Choose a provider for future dictation[.].*"

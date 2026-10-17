@@ -5,7 +5,8 @@ name: folder-rules-title-save-reopen
 - scrollUntilVisible:
     element:
       id: folder.add.
-    direction: DOWN
+    direction: UP
+    centerElement: true
 - tapOn:
     id: folder.add.
 - assertVisible:

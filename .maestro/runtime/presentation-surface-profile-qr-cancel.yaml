@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-profile-qr-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Maestro Alice
+- assertVisible:
+    text: npub.*
+- back
+- assertVisible:
+    id: presentation.complete

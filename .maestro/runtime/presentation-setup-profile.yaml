@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-setup-profile
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Account setup
+- tapOn:
+    id: setup-step-PROFILE
+- assertVisible: Profile
+- back
+- assertVisible: Account setup
+- back
+- assertVisible:
+    id: presentation.complete

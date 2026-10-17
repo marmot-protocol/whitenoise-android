@@ -38,6 +38,7 @@ import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
@@ -496,6 +497,7 @@ private fun NewGroupSetupAccountScreen(
         }
     val displayedRecovery = recovery
     NewGroupSetupContent(
+        startingAs = startingAccount(appState, accountRef, runtime),
         draft = draft,
         state =
             NewGroupSetupPresentation(

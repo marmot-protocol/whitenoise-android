@@ -14,12 +14,12 @@ internal suspend fun verifyMaestroPoll(
     group: String,
     postcondition: String,
 ) {
-    val question = if (postcondition == "poll-published") "Maestro published poll" else "Maestro fixture poll"
+    val question = maestroPollQuestion(postcondition)
     val labels =
         when (postcondition) {
             "poll-single-vote" -> setOf("Maestro Tea")
             "poll-change-vote" -> setOf("Maestro Coffee")
-            "poll-multiple-vote" -> setOf("Maestro Tea", "Maestro Coffee")
+            "poll-multiple-vote", "poll-copy-multiple" -> setOf("Maestro Tea", "Maestro Coffee")
             else -> emptySet()
         }
     withTimeout(30_000L) {
@@ -36,7 +36,12 @@ internal suspend fun verifyMaestroPoll(
                         .filter { it.id in local.localSelection }
                         .map { it.label }
                         .toSet()
-                if (tallyMatches && selection == labels) return@withTimeout
+                if (
+                    tallyMatches && selection == labels && maestroPollCopyDeadlinePassed(local, remote, postcondition)
+                ) {
+                    verifyMaestroPollCopyDidNotSend(native, owner, peer, group, postcondition)
+                    return@withTimeout
+                }
             }
             delay(100L)
         }
@@ -68,3 +73,39 @@ private fun matchesMaestroTally(
     poll.participants == (if (labels.isEmpty()) 0uL else 1uL) &&
         labels.all { label -> poll.options.any { it.label == label } } &&
         poll.options.all { it.votes == (if (it.label in labels) 1uL else 0uL) }
+
+/** Keep the Unicode seed's authored question independent of its expected clipboard payload. */
+private fun maestroPollQuestion(postcondition: String): String =
+    when (postcondition) {
+        "poll-published" -> "Maestro published poll"
+        "poll-copy-unicode" -> "Maestro ¿Qué comemos? 🍜"
+        else -> "Maestro fixture poll"
+    }
+
+/** Closed UI is asserted by Maestro; native deadline metadata must agree on both accounts. */
+private fun maestroPollCopyDeadlinePassed(
+    local: PollProjectionFfi,
+    peer: PollProjectionFfi,
+    postcondition: String,
+): Boolean {
+    if (postcondition != "poll-copy-closed") return true
+    val nowSeconds = (System.currentTimeMillis() / 1_000L).toULong()
+    return listOf(local, peer).all { poll -> poll.endsAt?.let { it < nowSeconds } == true }
+}
+
+/** Clipboard actions may not publish a chat on either real native account. */
+private fun verifyMaestroPollCopyDidNotSend(
+    native: Marmot,
+    owner: String,
+    peer: String,
+    group: String,
+    postcondition: String,
+) {
+    if (!postcondition.startsWith("poll-copy-")) return
+    for (account in listOf(owner, peer)) {
+        val chats = readMaestroMessages(native, account, group).filter { it.kind == 9uL }
+        check(chats.size == 1 && chats.single().plaintext == "Generated fixture message") {
+            "Poll Copy unexpectedly published a chat message"
+        }
+    }
+}

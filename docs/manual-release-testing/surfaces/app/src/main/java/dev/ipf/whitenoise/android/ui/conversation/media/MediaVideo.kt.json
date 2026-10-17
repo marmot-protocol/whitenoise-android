@@ -46,7 +46,8 @@
         "anchor": "fun VideoViewerPage(",
         "test_ids": [
           "MED-007",
-          "MED-017"
+          "MED-017",
+          "MED-033"
         ]
       },
       {
@@ -55,7 +56,8 @@
         "anchor": "fun VideoViewerUnavailable(",
         "test_ids": [
           "MED-007",
-          "MED-017"
+          "MED-017",
+          "MED-033"
         ]
       },
       {
@@ -83,6 +85,17 @@
         "anchor": "R.string.voice_message_failed",
         "test_ids": [
           "MED-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Viewer video fit, native controls and chrome coordination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "fun viewerPlayerView(",
+        "test_ids": [
+          "MED-007",
+          "MED-033"
         ]
       }
     ]

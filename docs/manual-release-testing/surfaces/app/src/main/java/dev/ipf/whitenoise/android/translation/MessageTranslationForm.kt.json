@@ -4,22 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "R.string.translation_detect_language",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
-        "anchor": "R.string.translation_detect_language",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
-        "surface": "R.string.translation_open_engine",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
-        "anchor": "R.string.translation_open_engine",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
         "surface": "R.string.translation_source_language",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
         "anchor": "R.string.translation_source_language",
@@ -56,7 +40,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
         "anchor": "private fun TranslationLanguageRow(",
         "test_ids": [
-          "SET-033"
+          "SET-033",
+          "SET-036"
         ]
       },
       {
@@ -81,6 +66,15 @@
         "anchor": "R.string.translation_privacy_warning",
         "test_ids": [
           "SET-033"
+        ]
+      },
+      {
+        "surface": "Message recovery engine install route",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
+        "anchor": "OfflineTranslatorEngineAction(onOpen = onOpenEngine)",
+        "test_ids": [
+          "SET-033",
+          "SET-037"
         ]
       }
     ]

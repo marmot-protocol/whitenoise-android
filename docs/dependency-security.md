@@ -7,12 +7,109 @@ receive the same policy. It does not add a dependency or downgrade a newer
 release. Metadata and version conflicts remain build failures.
 
 Each resolved configuration writes selected coordinates, selection reasons and
-parent edges under `build/reports/dependency-security`. The validator checks the
+parent edges (including requested selectors) under `build/reports/dependency-security`. The validator checks the
 selected versions independently of the hook's violation field, rejects missing
 or unresolved evidence, and does not invoke Gradle or download anything. Existing
 Gradle CI jobs upload their own reports; there is no additional build/test matrix.
 The report represents resolutions observed by that job, not every configuration
 or the R8-retained APK. Native MarmotKit requires its own target/feature inventory.
+
+## Distribution and native inventories
+
+Inventory collection is enabled by `CI=true` on GitHub. Local builds keep the
+security-floor policy and graph reports without selecting or fingerprinting
+artifacts or inspecting POMs. Request local inventory observations explicitly with
+`-PdependencySecurity.inventory=true`; `false` overrides the CI default.
+When enabled, the hook fingerprints external module artifacts on each already-selected
+configuration, memoizing file hashes within the build and licence declarations per
+Maven coordinate, using a lenient, component-filtered [artifact view](https://docs.gradle.org/current/userguide/artifact_views.html).
+Project components remain in graph edges but are excluded before artifact
+selection, so AGP's task-specific project variants are not selected by this hook.
+Missing artifacts and variant-selection failures are recorded as configuration-level
+`resolution_failure` observations without inventing a component identity. Non-regular
+or unreadable files retain their known coordinate and name. These gaps produce
+`artifact_coverage: partial` and `unfingerprinted_artifacts`; graph-only consumers
+remain usable. Graph resolution failures and selected security-floor violations
+still fail verification.
+It adds no configurations or compilation tasks. Cached adjacent
+POMs supply declared licence names/URLs and their POM hashes when available.
+Only the POM's project-level licence declarations qualify. Unparseable cached
+POMs, including rejected DOCTYPEs, leave licences `not_observed` without changing
+dependency selection; external XML access remains disabled.
+Missing declarations remain `not_observed`; a Maven namespace is a supplier hint,
+not verified legal ownership. These records are observations, not dependency locks
+or a replacement for the existing licence/notices generator.
+
+After the existing blocking security-floor validator succeeds, a separate
+`continue-on-error` step in every core lane and dependency submission writes
+`build/reports/dependency-security/inventory/selected.json`. The existing
+`dependency-security-*` artifacts retain it alongside the raw observations.
+Only `:app`'s `productionPlayReleaseRuntimeClasspath` and
+`productionZapstoreReleaseRuntimeClasspath` enter `release_runtime`.
+Plugin and named test/analysis configurations enter `tooling_test`; other graphs,
+including debug runtime and compile classpaths, stay in `other_configurations`.
+A job that never resolved a release runtime graph does not claim to have one.
+Reports from another source, failed resolution or conflicting selections for the
+same configuration are rejected before inventory output.
+Inventory-only validation failures warn through the failed observational step
+without failing the lane. Explicit artifact coverage and component usage fields
+are required by the first schema; no earlier inventory format is assumed.
+
+MarmotKit preparation stages `native-provenance.json` with the API signature.
+It binds the complete Android lock hash, upstream source/artifact/manifest hashes,
+ABI/target pairs and verified JNI hashes. Features declared only by the Android
+lock remain distinct from upstream manifest attestation. If upstream declares
+features, preparation and release export require them to equal the Android pin. Workspace Cargo.lock
+identity does **not** establish the Android crate link set or licences; absent
+upstream target-resolved evidence remains explicitly unverified.
+
+The existing production build additionally uploads
+`dependency-inventory-production-<source>-<run>-<attempt>`. Its
+`inventory/release.json` requires both release runtime graphs, matching source and
+lock identities, exact APK/AAB and mapping hashes from the release manifest, and
+matching packaged MarmotKit bytes for the direct APK's one ABI and Play's four.
+Other packaged native libraries are hashed but remain unattributed unless their
+supplier is established. R8 mappings are retained evidence, not proof of retained
+Maven classes. The verified bundle is uploaded first. Inventory generation and
+retention are observational and warn on failure without changing the successful
+release-run conclusion required by the bundle retrieval tool. This production
+export is not yet qualified on a real signed production bundle; that gap is
+explicit until an authorized release runs it. Payload bytes, signatures and
+distribution permissions are unchanged.
+
+To compare two downloaded inventories, identify both expected source commits:
+
+```sh
+python3 scripts/dependency_inventory.py compare \
+  --before before.json --before-source <base-commit> \
+  --after after.json --after-source <candidate-commit> --output delta.json
+```
+
+The delta compares shared configurations, listing newly/missing observations
+separately so an absent graph never becomes a dependency removal. Each component
+retains its configuration purpose, selection reasons and incoming edges/requested
+selectors as observed usage evidence, without inventing a semantic purpose or
+legal supplier. Graph-edge, artifact-byte, native-provenance and packaging changes
+are reported, including changes at the same coordinate. Unfingerprinted artifacts
+make only that configuration's artifact comparison unavailable; other evidence
+remains comparable. Native/packaging layers absent from either input are explicit
+coverage gaps, never empty deltas.
+
+The existing tooling lane runs this comparison against the same lane's retained
+successful `master` push at the tested merge commit's first parent (`HEAD^1`),
+not the potentially stale PR event base. It uses the newest unexpired matching
+artifact by creation time, with artifact ID breaking ties, so reruns can retain
+earlier attempts. No extra Gradle resolution, build, job or matrix is added.
+The retained `inventory/base-delta.json` binds both source SHAs and the baseline
+run/artifact.
+Missing or expired baseline evidence and GitHub API failures, including non-JSON
+metadata responses, yield an `unavailable`
+receipt; API failures also warn. Malformed or wrong-source evidence writes a
+`rejected` receipt with both source SHAs and the error type, warns and exits
+unsuccessfully; it never becomes a usable baseline or an empty delta.
+The comparison step is informational and continues on error without weakening
+the preceding blocking dependency-security checks. The first adoption has no
+historical inventory and therefore cannot claim a successful comparison.
 
 ## Reviewed floors
 
@@ -43,7 +140,10 @@ the requested range.
 
 The graph-only fixture runs in the existing tooling job using a temporary local
 Maven repository and no app compilation. It checks exact lower/newer requests,
-dynamic selectors, affected-only range rejection and plugin/project report
-coverage. Source archives retain enforcement withoutGit; CI separately requires
+dynamic selectors, affected-only range rejection, plugin/project report coverage
+and external artifacts alongside ambiguous project artifact variants.
+The DOCTYPE fixture resolves its JAR using artifact-only metadata so it exercises
+the optional licence reader rather than Gradle's own POM parser.
+Source archives retain enforcement without Git; CI separately requires
 valid commit identity. Detached configurations, settings-plugin classpaths and
 included builds are outside this hook and must keep their own dependency checks.

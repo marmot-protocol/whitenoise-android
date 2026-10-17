@@ -1,0 +1,36 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-developer-clear
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: "developer.demo"
+- scrollUntilVisible:
+    element:
+      text: Clear saved demo setup
+    direction: DOWN
+    timeout: 60000
+- tapOn:
+    text: Clear saved demo setup
+- assertVisible:
+    text: Clear saved demo setup
+- assertVisible:
+    text: Clearing the saved setup only removes the local resume record\. It does
+      not delete either profile, the conversation, or events already published to
+      relays\.
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    id: developer.demo.clear.confirm
+- tapOn:
+    text: Clear saved demo setup
+- assertVisible:
+    text: Clear saved demo setup
+- back
+- tapOn:
+    text: Clear saved demo setup
+- assertVisible:
+    text: Clear saved demo setup
+- tapOn:
+    id: developer.demo.clear.confirm
+- assertVisible:
+    id: presentation.complete
