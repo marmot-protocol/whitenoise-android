@@ -74,10 +74,13 @@ internal class AutomaticAttachmentNetworkWaits(
     }
 
     /**
-     * Widens every waiting automatic spec of [accountRef] whose recorded type [networkTypeFor] now allows on a
-     * wider network, in place by id so its attempt count and backoff stay. Work that is retired, explicit,
-     * running or finished is left alone, and a record whose work no longer waits is pruned. Blocks on WorkManager,
-     * so callers run it off the main thread. Returns how many specs were widened.
+     * Widens every live automatic spec of [accountRef] whose recorded type [networkTypeFor] now allows on a wider
+     * network, in place by id so its attempt count and backoff stay. A waiting spec takes the wider network at
+     * once, and a running one for its next run, so an interruption after the policy widened still waits on the
+     * wider network. Retired, explicit and finished work is left alone. A record moves to the new network only once
+     * every live spec is at least that wide, so a failed update keeps it for the next refresh, and a record whose
+     * work has finished is pruned. Blocks on WorkManager, so callers run it off the main thread. Returns how many
+     * specs were widened.
      */
     fun widen(
         manager: WorkManager,
@@ -88,8 +91,9 @@ internal class AutomaticAttachmentNetworkWaits(
         waiting(accountRef).forEach { wait ->
             val infos = manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(wait.request)).get()
             val target = networkTypeFor(wait.type)
-            val queued = infos.filter { it.isQueuedAutomatic(accountRef) }
-            queued.filter { it.constraints.requiredNetworkType.isNarrowerThan(target) }.forEach { info ->
+            val live = infos.filter { it.isLiveAutomatic(accountRef) }
+            var allWide = true
+            live.filter { it.constraints.requiredNetworkType.isNarrowerThan(target) }.forEach { info ->
                 val work =
                     AttachmentDownloadWorker.buildRequest(
                         wait.request,
@@ -98,12 +102,16 @@ internal class AutomaticAttachmentNetworkWaits(
                         target,
                     )
                 runCatching { manager.updateWork(work).get() }
-                    .onSuccess { widened += 1 }
-                    .onFailure { Log.w(TAG, "attachment_network_widening_failed") }
+                    .onSuccess { result ->
+                        if (result == WorkManager.UpdateResult.NOT_APPLIED) allWide = false else widened += 1
+                    }.onFailure {
+                        allWide = false
+                        Log.w(TAG, "attachment_network_widening_failed")
+                    }
             }
             when {
                 infos.none { !it.state.isFinished } -> forget(wait.request)
-                target != wait.networkType -> record(wait.request, wait.type, target)
+                allWide && wait.networkType.isNarrowerThan(target) -> record(wait.request, wait.type, target)
             }
         }
         return widened
@@ -169,9 +177,12 @@ internal class AutomaticAttachmentNetworkWaits(
                 )
             }.getOrNull()
 
-        /** Whether this is live automatic work of [accountRef] still waiting to run, not a retired or explicit spec. */
-        private fun WorkInfo.isQueuedAutomatic(accountRef: String): Boolean =
-            state == WorkInfo.State.ENQUEUED &&
+        /**
+         * Whether this is live automatic work of [accountRef], waiting or running, not a retired or explicit spec. A
+         * running spec is included because Android can still interrupt it and run it again under its constraint.
+         */
+        private fun WorkInfo.isLiveAutomatic(accountRef: String): Boolean =
+            (state == WorkInfo.State.ENQUEUED || state == WorkInfo.State.RUNNING) &&
                 attachmentAutomaticAccountTag(accountRef) in tags &&
                 AttachmentDownloadWorker.RETIRED_TAG !in tags
     }
