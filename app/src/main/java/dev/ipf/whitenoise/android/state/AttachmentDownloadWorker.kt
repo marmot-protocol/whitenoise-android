@@ -203,11 +203,13 @@ internal class AttachmentReferenceNotReadyException : IllegalStateException("att
 /**
  * Automatic work the live policy does not allow when it runs, for the [hold] reason, after a network or settings
  * change since it was queued. No fetch starts. A [AutomaticAttachmentHold.Network] hold waits for a network the
- * policy allows; any other finishes, and the attachment's bubble still offers it on demand.
+ * policy allows, which [networkType] narrows the queued work to; any other finishes, and the attachment's bubble
+ * still offers it on demand.
  */
 internal class AttachmentAutomaticPolicyDeferredException(
     val type: MediaAutoDownloadType?,
     val hold: AutomaticAttachmentHold,
+    val networkType: NetworkType = NetworkType.CONNECTED,
 ) : IllegalStateException("automatic attachment policy does not allow this download now")
 
 /** The native runtime does not hold the live automatic approval yet, so the work retries after its backoff. */
@@ -339,19 +341,26 @@ class AttachmentDownloadWorker : CoroutineWorker {
             }
         } catch (deferred: AttachmentAutomaticPolicyDeferredException) {
             // Not a failure: the live policy holds this type back, and no network work was started. A network
-            // hold waits for an allowed connection without spending the failure retry.
-            val retry = deferred.hold.waitsAfterRun(runAttemptCount)
+            // hold waits for an allowed connection without spending the failure retry, however long that takes,
+            // and first narrows the queued work so it waits in WorkManager rather than waking on this network.
+            val retry = deferred.hold.waits
             Log.i(
                 TAG,
                 "attachment_work_policy_deferred type=${deferred.type?.preferenceKey ?: "unknown"} " +
                     "reason=${deferred.hold.reason} retry=$retry",
             )
             if (retry) {
+                narrowAutomaticNetwork(request, deferred.networkType)
                 Result.retry()
             } else {
                 intentStore.resetTransientRetry(request)
                 Result.success()
             }
+        } catch (_: AttachmentPermissionPendingException) {
+            // The policy allows the type, but the native approval for the live network has not landed. That is
+            // a network change still settling, not a failed transfer, so it waits without spending the retry.
+            Log.i(TAG, "attachment_work_permission_pending run_attempt=$runAttemptCount")
+            Result.retry()
         } catch (cancel: CancellationException) {
             // A cancelled shared fetch does not mean WorkManager stopped this
             // worker. Finish that transfer so its foreground notification and
@@ -402,6 +411,22 @@ class AttachmentDownloadWorker : CoroutineWorker {
             request = request,
             priority = priority,
         )
+    }
+
+    /**
+     * Narrows this automatic work's network constraint to [networkType], the narrowest network its live policy
+     * could allow, so a spec queued wider than the policy (before its account loaded, or before a settings
+     * change) next runs only on such a network. The update applies to the next run and keeps the attempt count.
+     */
+    private fun narrowAutomaticNetwork(
+        request: AttachmentTransferRequest,
+        networkType: NetworkType,
+    ) {
+        runCatching {
+            WorkManager
+                .getInstance(applicationContext)
+                .updateWork(buildRequest(request, AttachmentDownloadPriority.Automatic, id, networkType))
+        }.onFailure { Log.w(TAG, "attachment_network_narrowing_failed") }
     }
 
     /**

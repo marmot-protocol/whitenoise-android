@@ -114,6 +114,27 @@ class IncomingAttachmentSchedulingCoverageTest {
         )
     }
 
+    /**
+     * Network-deferred automatic work never expires without downloading: a network hold narrows the queued spec
+     * and retries with no run limit, and a pending native approval waits without spending the failure retry.
+     */
+    @Test
+    fun networkDeferredWorkWaitsWithoutExpiring() {
+        val worker = source("state/AttachmentDownloadWorker.kt")
+        assertTrue(
+            "a network hold must narrow the queued spec to the network its policy allows",
+            "narrowAutomaticNetwork(request, deferred.networkType)" in worker,
+        )
+        assertTrue(
+            "a pending native approval must wait rather than spend the failure retry",
+            "catch (_: AttachmentPermissionPendingException)" in worker,
+        )
+        assertFalse(
+            "a network hold must not expire after a run count",
+            "runAttemptCount" in source("state/AutomaticAttachmentPolicy.kt"),
+        )
+    }
+
     /** Reads AppState from either the module or the repository working directory. */
     private fun appState(): String = source("state/AppState.kt")
 

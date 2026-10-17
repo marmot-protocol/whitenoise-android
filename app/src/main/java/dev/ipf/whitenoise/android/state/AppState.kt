@@ -4926,7 +4926,8 @@ class WhiteNoiseAppState private constructor(
      * Holds automatic work to the live policy for [type], then waits until the native runtime holds an approval
      * that allows [type], and returns that approval's host revision. Live inputs can change before their refresh
      * runs, so an approval that was merely applied could still be the previous network's denial. An approval
-     * that never lands asks for a fresh one before the work retries.
+     * that never lands asks for a fresh one before the work retries. A network hold carries the narrowest network
+     * the policy could allow [type] on, so the worker can wait for it in WorkManager.
      */
     private suspend fun awaitAutomaticAttachmentAdmission(
         accountRef: String,
@@ -4935,7 +4936,11 @@ class WhiteNoiseAppState private constructor(
         val policy = automaticAttachmentPolicy(accountRef)
         val hold = if (type == null) AutomaticAttachmentHold.Disabled else policy.hold(type)
         if (hold != null || type == null) {
-            throw AttachmentAutomaticPolicyDeferredException(type, hold ?: AutomaticAttachmentHold.Disabled)
+            throw AttachmentAutomaticPolicyDeferredException(
+                type = type,
+                hold = hold ?: AutomaticAttachmentHold.Disabled,
+                networkType = type?.let(policy::networkType) ?: NetworkType.CONNECTED,
+            )
         }
         return withTimeoutOrNull(NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS) {
             nativeAttachmentPermissions.awaitApplied(accountRef) { it.allows(type) }

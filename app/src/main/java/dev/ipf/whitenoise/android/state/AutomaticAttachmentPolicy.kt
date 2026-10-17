@@ -11,7 +11,7 @@ internal enum class AutomaticPolicyAccount {
 
 /**
  * Why automatic work for one attachment type cannot run right now. Only [Network] can clear without the user
- * acting, so it is the only hold that durable work waits out instead of finishing.
+ * acting, so it is the only hold that durable work waits out instead of finishing. [waits] is that rule.
  */
 internal enum class AutomaticAttachmentHold(
     val reason: String,
@@ -24,18 +24,15 @@ internal enum class AutomaticAttachmentHold(
     ;
 
     /**
-     * Whether durable work held back for this reason, on its [runAttemptCount]th run, runs again later. Only a
-     * network hold can clear without the user, and only for a bounded number of runs, so a connection that never
-     * validates cannot keep the work alive.
+     * Whether durable work held back for this reason runs again later rather than finishing. A network hold
+     * has no run limit: an allowed network may come back after any delay, and nothing else re-queues the
+     * attachment, so finishing would lose the download. The worker's capped exponential backoff and its
+     * narrowed network constraint keep each wait cheap, and the user's pause, cancel, sign-out or a type turned
+     * off still end the work.
      */
-    fun waitsAfterRun(runAttemptCount: Int): Boolean {
-        val withinBound = runAttemptCount < AUTOMATIC_NETWORK_DEFERRAL_RUNS
-        return this == Network && withinBound
-    }
+    val waits: Boolean
+        get() = this == Network
 }
-
-/** Runs a network-held automatic download may wait through, about two hours at the worker's backoff. */
-internal const val AUTOMATIC_NETWORK_DEFERRAL_RUNS = 8
 
 /**
  * One account's automatic-download inputs at one instant (#3308). [allowedNow] evaluates them exactly as the

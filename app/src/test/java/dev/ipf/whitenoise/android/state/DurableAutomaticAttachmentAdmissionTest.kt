@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import androidx.work.NetworkType
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.ACCOUNT
@@ -95,6 +96,23 @@ class DurableAutomaticAttachmentAdmissionTest {
             setNetwork(setOf(MediaAutoDownloadNetwork.WiFi), validated = false)
 
             expectDeferred(MediaAutoDownloadType.Image, AutomaticAttachmentHold.Network)
+            assertEquals(0, fixture.automaticDemands.get())
+        }
+
+    /**
+     * Work that runs on a metered mobile network under the default settings is held for the network only and
+     * carries the unmetered network its policy allows, so the worker can narrow the queued spec to wait for it.
+     */
+    @Test
+    fun networkHoldCarriesTheNetworkThePolicyAllows() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.Mobile, MediaAutoDownloadNetwork.Metered))
+
+            expectDeferred(
+                MediaAutoDownloadType.Image,
+                AutomaticAttachmentHold.Network,
+                networkType = NetworkType.UNMETERED,
+            )
             assertEquals(0, fixture.automaticDemands.get())
         }
 
@@ -316,11 +334,15 @@ class DurableAutomaticAttachmentAdmissionTest {
             .apply { isAccessible = true }
             .get(fixture.state) as AttachmentDownloadIntentStore
 
-    /** Asserts the durable entry point defers [type] for [hold] without demanding anything. */
+    /**
+     * Asserts the durable entry point defers [type] for [hold] without demanding anything, and waits for
+     * [networkType] when one is given.
+     */
     private suspend fun expectDeferred(
         type: MediaAutoDownloadType?,
         hold: AutomaticAttachmentHold,
         account: String = ACCOUNT,
+        networkType: NetworkType? = null,
     ) {
         try {
             durable(AttachmentDownloadPriority.Automatic, account)
@@ -328,6 +350,7 @@ class DurableAutomaticAttachmentAdmissionTest {
         } catch (deferred: AttachmentAutomaticPolicyDeferredException) {
             assertEquals(type, deferred.type)
             assertEquals(hold, deferred.hold)
+            networkType?.let { assertEquals(it, deferred.networkType) }
             assertFalse(isTransientAttachmentDownloadFailure(deferred))
         }
     }
