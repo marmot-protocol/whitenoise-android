@@ -28,10 +28,15 @@ or master change; it is source evidence, not contributor approval or merge proof
 | --- | --- | --- |
 | `ConversationController` | Immutable account/group/runtime binding, visible projection, group/member presentation, command facade, and the single guarded atomic native page + sidecar commit | Screen disposal retires publication; app-owned command results may still settle their retained account/group state. |
 | `ConversationTimelineSession` | Start/retry admission, controller read scope, per-attempt scope, bounded initial open/snapshot, reconnect wait, installed subscription handles, foreground handoff receipt | Attempt finalization retires its handles; account teardown fences future opens; screen disposal cancels reads and receipts. Paging and close use the same active-call mutex. |
-| `ConversationMutationPresentation` | Transient mutation slot, errors, archive overlay identity, existing authoritative group-application receipt | Each command releases its own slot/overlay in `finally`; timeline reconnect/disposal does not own command execution. |
+| `ConversationMutationPresentation` | Transient mutation slot, errors, archive overlay identity, existing authoritative group-application receipt and archive publication ownership | Each command releases its own slot/overlay in `finally`; timeline reconnect/disposal does not own command execution. |
 | `ConversationAttachmentPresentation` | Row transfer observers, availability waiters, open-intent adapters, pinned cache/source identities and bounded byte/thumbnail adapters | Screen disposal cancels presentation waiters. Native downloads/retries/cancellation acknowledgements remain app-owned. |
 | Existing `inviteStreamScope` | Post-accept warm-up and agent stream observation | Controller disposal, never a single failed/ended timeline attempt (#279). |
 | Existing AppState/native owners | Optimistic sends/edits, retained upload bytes, durable command acceptance, transfer acquisition/retry and encrypted caches | Existing command/native lifetime, including acknowledgement arriving after screen disposal. |
+
+A held archive command still finishes after disposal, but its old record and feedback
+cannot replace a newer route. Its local record is routed with the captured account
+instead of the legacy unqualified attached-list fallback. Local-removal notices keep
+their existing app-owned path, including #3322's runtime checks.
 
 No second subscription, message store, durable Kotlin state, retry policy, generation
 authority, API migration, or visual redesign is introduced. The existing authority

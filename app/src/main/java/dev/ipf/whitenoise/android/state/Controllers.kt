@@ -6270,7 +6270,13 @@ class ConversationController(
     )
         private set
 
-    private val mutationPresentation = ConversationMutationPresentation()
+    private val mutationPresentation =
+        ConversationMutationPresentation(
+            ownsPresentation = {
+                !controllerCleared && !isAccountTeardownRequested() &&
+                    appState.runtimeGeneration == conversationRuntimeGeneration
+            },
+        )
 
     // A typed native refusal proves only that this Welcome is no longer
     // pending. Keep its action retired until an authoritative roster resolves
@@ -11225,6 +11231,7 @@ class ConversationController(
      */
     suspend fun setArchived(archived: Boolean): Boolean =
         withMutationLockResult(false) {
+            if (!mutationPresentation.ownsCurrentPresentation()) return@withMutationLockResult false
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val groupIdHex = group.groupIdHex
@@ -11239,17 +11246,21 @@ class ConversationController(
                         // or details round-trip) that landed while this commit
                         // was in flight wins over the late success; the engine's
                         // own archive-change event reconverges the projection.
-                        if (mutationPresentation.authorityEpoch == authorityEpochBefore) {
+                        mutationPresentation.applyIfCurrent(authorityEpochBefore) {
                             group = updated
-                            appState.applyLocalGroupUpdate(updated)
+                            appState.applyLocalGroupUpdate(updated, account)
                         }
                     }
-                    presentConversationTransient(
-                        if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
-                    )
+                    if (mutationPresentation.ownsCurrentPresentation()) {
+                        presentConversationTransient(
+                            if (archived) R.string.toast_chat_archived else R.string.toast_chat_restored,
+                        )
+                    }
                     true
                 }.onFailure {
-                    recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
+                    if (mutationPresentation.ownsCurrentPresentation()) {
+                        recordMutationFailure(R.string.toast_couldnt_update_chat, "GROUP_ARCHIVE_UPDATE", it)
+                    }
                 }.getOrDefault(false)
             } finally {
                 // Identity-compared so a newer action's intent is never cleared
@@ -14543,7 +14554,6 @@ class ConversationController(
 
         // Cap retained transient debug rows while the toggle stays on, oldest-first.
         private const val MAX_STREAM_DEBUG_ROWS = 200
-
 
         /**
          * 32 MiB cap on retained compressed bytes for in-flight/failed

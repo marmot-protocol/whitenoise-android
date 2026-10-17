@@ -212,10 +212,6 @@ internal class ConversationAttachmentPresentation(
      * Resolves one attachment's plaintext as an array of at most [maxBytes], which defaults to the presentation
      * budget so a preview cannot allocate an unbounded array, explicit Save and Share name their own budget.
      */
-    /**
-     * Resolves one attachment's plaintext as an array of at most [maxBytes], which defaults to the presentation
-     * budget so a preview cannot allocate an unbounded array, explicit Save and Share name their own budget.
-     */
     suspend fun downloadAttachment(
         messageIdHex: String,
         attachmentIndex: Int,

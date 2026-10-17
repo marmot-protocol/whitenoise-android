@@ -7,7 +7,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationMutationPresentation.kt",
         "anchor": "fun beginArchive(",
         "test_ids": [
-          "CON-015"
+          "CHL-007"
         ]
       },
       {
@@ -15,7 +15,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationMutationPresentation.kt",
         "anchor": "suspend fun <T> withLock(",
         "test_ids": [
-          "CON-015",
+          "CHL-007",
           "MSG-007"
         ]
       }
