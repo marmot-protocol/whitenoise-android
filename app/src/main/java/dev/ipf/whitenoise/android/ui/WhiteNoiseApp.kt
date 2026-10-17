@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
+import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.NotificationFirstFrameWatchdog
@@ -789,8 +790,7 @@ internal fun WhiteNoiseApp(
     // A refused group change waits for the user's answer wherever it was started, even after its screen closed.
     val groupChangeQuestion = appState.groupChangeConfirmations.pending
     if (!appState.appLockScreenVisible && groupChangeQuestion != null) {
-        dev.ipf.whitenoise.android.ui.group
-            .GroupChangeConfirmationDialog(groupChangeQuestion)
+        GroupChangeConfirmationDialog(groupChangeQuestion)
     }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(
