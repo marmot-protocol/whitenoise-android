@@ -459,8 +459,9 @@ class LocalNotificationPresenterConversationTest {
         )
 
         assertUsefulInitialPost(posts)
-        assertFalse(shortcutWasPublishedBeforeFirstPost)
-        assertEquals(0, shortcutPublishCount)
+        // #3311: the identity shortcut, here the monogram, exists before the first post so its card is a conversation.
+        assertTrue(shortcutWasPublishedBeforeFirstPost)
+        assertEquals(1, shortcutPublishCount)
 
         runBlocking { checkNotNull(pendingEnrichment).invoke() }
 
@@ -474,7 +475,7 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(0, posts[1].third.defaults)
         assertNull(posts[1].third.sound)
         assertNotNull(publishedShortcut)
-        assertEquals(1, shortcutPublishCount)
+        assertEquals("the late picture republishes the shortcut once", 2, shortcutPublishCount)
         val messages =
             checkNotNull(
                 NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(posts[1].third),
@@ -503,19 +504,30 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
-    /** Carries the cached group image in the first payload, before shortcut publication. */
+    /**
+     * Carries the cached group image in the first payload, with its identity shortcut already published, in one
+     * alerting post and no hidden second write (#2531, #3311).
+     */
     @Test
     fun cachedAvatarsKeepTheAlertToOnePost() {
         val posts = mutableListOf<Notification>()
         val cachedAvatar = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        var publications = 0
         val cachedPresenter =
             LocalNotificationPresenter(
                 context = context,
                 groupReconciliation = {},
-                shortcutPublisher = { shortcut -> publishedShortcut = shortcut },
+                shortcutPublisher = { shortcut ->
+                    publishedShortcut = shortcut
+                    publications++
+                },
                 notificationPoster = { notificationManager, tag, id, notification ->
                     assertNotNull("First group card must already carry its image", notification.getLargeIcon())
-                    assertNull("Shortcut enrichment must remain after first publication", publishedShortcut)
+                    assertEquals(
+                        "The identity shortcut must exist before the first post",
+                        IconCompat.TYPE_BITMAP,
+                        publishedShortcut?.icon?.type,
+                    )
                     posts += notification
                     notificationManager.notify(tag, id, notification)
                 },
@@ -537,7 +549,7 @@ class LocalNotificationPresenterConversationTest {
         )
 
         assertEquals(1, posts.size)
-        assertNotNull(publishedShortcut)
+        assertEquals("an unchanged snapshot is not published again after the post", 1, publications)
         assertNotNull(
             NotificationCompat.MessagingStyle
                 .extractMessagingStyleFromNotification(posts.single())

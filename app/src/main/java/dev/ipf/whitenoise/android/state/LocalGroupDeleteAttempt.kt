@@ -140,13 +140,17 @@ internal class LocalGroupDeleteAttempt(
     }
 }
 
-/** The platform supplies native reads and its own cleanup journal, not a second protocol cache. */
+/**
+ * The platform supplies native reads and its own cleanup journal, not a second protocol cache. A non-null
+ * [preflightFallback] lets a failed media listing proceed without media keys instead of stopping the removal.
+ */
 internal class LocalGroupDeleteOperations(
     val previous: suspend () -> PendingLocalGroupDeleteCleanup?,
     val present: suspend () -> Boolean,
     val prepare: suspend () -> PendingLocalGroupDeleteCleanup,
     val stage: suspend (PendingLocalGroupDeleteCleanup) -> Unit,
     val delete: suspend () -> Unit,
+    val preflightFallback: ((Throwable) -> PendingLocalGroupDeleteCleanup)? = null,
 )
 
 /** An explicit retry reconciles the prior intent before replacing it or repeating the native mutation. */
@@ -158,7 +162,7 @@ internal suspend fun stageAndDeleteLocalGroup(
     if (previous != null) attempt.recoverOnce()
     // Already absent with no intent is also deleted; old media keys cannot be reconstructed here.
     if (!attempt.present(operations.present)) return previous
-    val prepared = attempt.read(LocalDeletePhase.MediaPreflight, operations.prepare)
+    val prepared = preflightLocalGroupDelete(attempt, operations)
     val pending =
         attempt.phase(LocalDeletePhase.ClientJournal) {
             val merged = mergeLocalGroupDeleteCleanup(previous, prepared)
@@ -167,6 +171,20 @@ internal suspend fun stageAndDeleteLocalGroup(
         }
     attempt.delete(operations.delete, operations.present)
     return pending
+}
+
+/**
+ * Lists the media whose cache keys the journal will clear. A local delete stops when the listing fails, while a
+ * removal with a [LocalGroupDeleteOperations.preflightFallback] — the forget behind abandonment (#3310) — proceeds
+ * without those keys, so a listing failure never blocks the escape path.
+ */
+private suspend fun preflightLocalGroupDelete(
+    attempt: LocalGroupDeleteAttempt,
+    operations: LocalGroupDeleteOperations,
+): PendingLocalGroupDeleteCleanup {
+    val fallback = operations.preflightFallback
+    val listed = runCatchingCancellable { attempt.read(LocalDeletePhase.MediaPreflight, operations.prepare) }
+    return if (fallback == null) listed.getOrThrow() else listed.getOrElse(fallback)
 }
 
 /** A retry must not lose previously captured cache keys when the native media projection changes. */

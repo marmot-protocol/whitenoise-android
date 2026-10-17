@@ -4,14 +4,10 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.union
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Modifier
@@ -117,20 +113,16 @@ internal fun ConversationBottomBar(
     onKeyboardRestoreFromCustomInputFailed: () -> Unit,
     recentEmojis: List<String>,
     onEmojiUsed: (String) -> Unit,
-    onBottomChromeMeasured: (heightPx: Int, chromeBottomPx: Int) -> Unit,
+    onBottomChromeMeasured: (heightPx: Int) -> Unit,
     onTimelineComposerMeasured: (foregroundHeightPx: Int, compactHeightPx: Int) -> Unit = { _, _ -> },
 ) {
-    val chromeInsets = WindowInsets.navigationBars.union(WindowInsets.ime)
-    val density = LocalDensity.current
     val renderedInviteGroupIdHex = controller.group.groupIdHex
     val renderedInviteWelcomeMessageIdHex = controller.group.viaWelcomeMessageIdHex
     Box(
         Modifier
             .fillMaxWidth()
             .testTag(CONVERSATION_BOTTOM_BAR_TAG)
-            .onSizeChanged { size ->
-                onBottomChromeMeasured(size.height, chromeInsets.getBottom(density))
-            },
+            .onSizeChanged { size -> onBottomChromeMeasured(size.height) },
     ) {
         when {
             selectionMode ->

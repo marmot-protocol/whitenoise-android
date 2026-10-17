@@ -54,7 +54,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
-import dev.ipf.whitenoise.android.ui.common.reserveSnackbarSpace
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
@@ -206,7 +205,6 @@ internal fun SignUpContent(
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .imePadding()
-                    .reserveSnackbarSpace()
                     .padding(WhiteNoiseSpacing.PinnedActionInset),
                 contentAlignment = Alignment.Center,
             ) {

@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedConversationNavigation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,24 +26,42 @@ internal fun WhiteNoiseAppState.pinnedShortcutTargetIsCurrent(target: Notificati
     )
 }
 
-/** Confirmed local removal invalidates pending launcher requests as well as already-visible pins. */
+/**
+ * Confirmed local removal invalidates pending launcher requests as well as already-visible pins. The notification
+ * presenter's snapshot of the removed conversation shortcut is dropped in the same publication-lock section as the
+ * platform removal, off the main thread, so no card can publish between the two and a new conversation under the
+ * same group id publishes its shortcut again before its first card.
+ */
 internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
     accountRef: String,
     groupIdHex: String,
 ) {
     withContext(Dispatchers.IO) {
-        PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex)
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            try {
+                PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex)
+            } finally {
+                forgetNotificationConversationShortcut(accountRef, groupIdHex)
+            }
+        }
     }
 }
 
-/** Platform failure cannot undo native removal after durable revocation; later refresh retries presentation cleanup. */
+/**
+ * Platform failure cannot undo native removal after durable revocation; later refresh retries presentation cleanup.
+ * The notification presenter's snapshot of the removed conversation shortcut is dropped either way, in the same
+ * publication-lock section as the platform removal and off the main thread.
+ */
 internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts(
     accountRef: String,
     groupIdHex: String,
 ) {
     withContext(Dispatchers.IO) {
-        runCatching { PinnedConversationShortcuts(appContext).removeRevokedGroup(accountRef, groupIdHex) }
-            .onFailure { appStateDebug(it) { "revoked launcher presentation cleanup deferred" } }
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            runCatching { PinnedConversationShortcuts(appContext).removeRevokedGroup(accountRef, groupIdHex) }
+                .onFailure { appStateDebug(it) { "revoked launcher presentation cleanup deferred" } }
+            forgetNotificationConversationShortcut(accountRef, groupIdHex)
+        }
     }
 }
 

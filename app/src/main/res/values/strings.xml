@@ -209,6 +209,22 @@
     <string name="toast_group_reset_done">Group reset. It will reappear when a new invite arrives.</string>
     <string name="toast_group_reset_already_waiting">This group is already waiting for a new invite.</string>
     <string name="toast_couldnt_reset_group">Couldn’t reset the group. Try again.</string>
+    <string name="chat_abandon_action">Abandon chat on this device</string>
+    <string name="chat_abandon_dialog_title">Abandon this chat on this device?</string>
+    <string name="chat_abandon_dialog_message">White Noise erases this chat’s history and encryption state for this account on this device, and this device stops receiving it. Nothing is sent: the other person may still see you in the chat, and your other devices keep their copy. To talk again, start a new chat or accept a new invite.</string>
+    <string name="chat_abandon_confirm">Abandon</string>
+    <string name="abandon_identity_chat">Direct chat: %1$s</string>
+    <string name="abandon_identity_group">Group: %1$s</string>
+    <string name="abandon_identity_account">Your account: %1$s</string>
+    <string name="chats_abandon_action">Abandon chats on this device</string>
+    <string name="chats_abandon_dialog_title">Abandon the selected chats on this device?</string>
+    <string name="toast_chat_abandoned">Chat abandoned on this device.</string>
+    <string name="toast_chat_already_abandoned">This chat is already abandoned on this device.</string>
+    <string name="toast_couldnt_abandon_chat">Couldn’t abandon the chat. Try again.</string>
+    <string name="leave_blocked_abandon_hint_dm">Leaving didn’t finish. You can abandon this chat on this device instead. Nothing is sent to the other person.</string>
+    <string name="leave_blocked_abandon_hint_group">Leaving didn’t finish. You can reset this group on this device instead. Nothing is sent to the group.</string>
+    <string name="sole_admin_abandon_hint_dm">If no one can receive admin, abandoning this chat on this device is the way out, and nothing is sent to the other person.</string>
+    <string name="sole_admin_abandon_hint_group">If no one can receive admin, resetting this group on this device is the way out, and nothing is sent to the group.</string>
     <string name="key_package_relay_history">Relay history</string>
     <string name="key_package_current">Current</string>
     <string name="key_package_superseded">Superseded</string>
@@ -2382,6 +2398,8 @@
     <string name="onboarding_details_collapsed">Collapsed</string>
     <!-- Keep first-strong isolation balanced so counts and punctuation stay readable in RTL layouts. -->
     <string name="local_delete_retry_detail">\u2068Deletion stopped. Try Delete from this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
+    <string name="local_abandon_retry_detail">\u2068Abandoning stopped. Try Abandon chat on this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
+    <string name="local_reset_retry_detail">\u2068Reset stopped. Try Reset and wait for a new invite again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
     <string name="chat_list_delete_stopped">Deletion stopped</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>

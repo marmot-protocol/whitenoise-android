@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui
 
 import android.content.Context
 import android.os.SystemClock
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -30,9 +32,12 @@ import dev.ipf.whitenoise.android.state.isForConversation
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_ROW_PLACEMENT_MAX_MILLIS
+import dev.ipf.whitenoise.android.ui.common.GLOBAL_TRANSIENT_NOTICE_TAG
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.STARTUP_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
+import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_TOP_BAR_TAG
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
@@ -217,13 +222,19 @@ class AppNavigationTest {
         assertEquals(headerBefore, headerAfter)
     }
 
-    /** Global confirmation stays clear of settings account actions during navigation. */
+    /**
+     * A global confirmation follows navigation into Settings and shows below its top bar, above and clear of the
+     * account actions, under the same top-notice host the app root installs (#3312).
+     */
     @Test
     fun globalConfirmationStaysClearOfSettingsAccountActionsDuringNavigation() {
         val appState = appState()
+        val noticeHost = TopNoticeHost(SnackbarHostState(), notice = { appState.transientNotice })
         composeRule.setContent {
-            WhiteNoiseTheme {
-                MainShell(appState = appState)
+            CompositionLocalProvider(LocalTopNoticeHost provides noticeHost) {
+                WhiteNoiseTheme {
+                    MainShell(appState = appState)
+                }
             }
         }
         awaitAttachedChatsController(appState)
@@ -242,7 +253,10 @@ class AppNavigationTest {
         val notice = composeRule.onNodeWithTag(GLOBAL_TRANSIENT_NOTICE_TAG).assertIsDisplayed()
 
         val noticeBounds = notice.fetchSemanticsNode().boundsInRoot
-        assertTrue(profile.fetchSemanticsNode().boundsInRoot.bottom <= noticeBounds.top)
+        val title = composeRule.onNodeWithText("Settings").fetchSemanticsNode().boundsInRoot
+        assertTrue("the banner sits below the Settings bar", title.bottom <= noticeBounds.top)
+        val profileTop = profile.fetchSemanticsNode().boundsInRoot.top
+        assertTrue("the banner stays clear of the account row", noticeBounds.bottom <= profileTop)
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()

@@ -73,6 +73,7 @@ import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
@@ -344,14 +345,18 @@ internal fun ForwardMessagePickerContent(
                 },
         containerColor = amoledSheetContainerColor(),
         topBar = {
-            TopAppBar(
-                title = { Text(forwardTitle) },
-                navigationIcon = {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
-                    }
-                },
-            )
+            // App banners sit below this screen's bar rather than over it (#3312).
+            Column {
+                TopAppBar(
+                    title = { Text(forwardTitle) },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                        }
+                    },
+                )
+                TopNoticeSlot()
+            }
         },
         bottomBar = {
             StickyFormActionBar {
