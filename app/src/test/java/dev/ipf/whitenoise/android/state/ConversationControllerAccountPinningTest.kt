@@ -15,6 +15,9 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsConfirmationKind
 import dev.ipf.whitenoise.android.ui.group.groupActionMemberHex
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -161,6 +164,126 @@ class ConversationControllerAccountPinningTest {
 
         assertEquals(PREVIOUS_REF, controller.boundAccountRef)
         assertEquals(PREVIOUS_ID, controller.boundAccountIdHex)
+    }
+
+    /** Native acknowledgement belongs to the send owner even if its presenting controller is disposed. */
+    @Test
+    fun disposalBeforeSendAcknowledgementKeepsThePinnedSendAndRetainedDraftOwner() =
+        runTest {
+            val state = appState(activeAccountRef = PREVIOUS_REF)
+            state.setDraft(TARGET_REF, GROUP_ID, TextFieldValue("pending acknowledgement"))
+            state.setDraft(PREVIOUS_REF, GROUP_ID, TextFieldValue("other account draft"))
+            val entered = CompletableDeferred<Unit>()
+            val acknowledge = CompletableDeferred<Unit>()
+            var nativeCalls = 0
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = targetMemberSnapshot(),
+                    accountRefOverride = TARGET_REF,
+                    markdownParser = { dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT },
+                    textPublisher = { _, account, groupId, _ ->
+                        assertEquals(TARGET_REF, account)
+                        assertEquals(GROUP_ID, groupId)
+                        nativeCalls += 1
+                        entered.complete(Unit)
+                        acknowledge.await()
+                        SendSummaryFfi(
+                            published = 0u,
+                            messageIds = listOf(MESSAGE_ID),
+                            acceptDisposition = SendAcceptDispositionFfi.ACCEPTED_PENDING,
+                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
+                        )
+                    },
+                )
+            val send = async(start = CoroutineStart.UNDISPATCHED) { state.sendConversationText(controller, "pending acknowledgement") }
+            try {
+                entered.await()
+                controller.onCleared()
+                assertFalse("disposal must leave the native admission waiter alive", send.isCancelled)
+                acknowledge.complete(Unit)
+                assertTrue(send.await())
+                assertEquals(1, nativeCalls)
+                assertEquals(null, state.draftFor(TARGET_REF, GROUP_ID))
+                assertEquals("other account draft", state.draftFor(PREVIOUS_REF, GROUP_ID))
+                assertFalse(controller.acceptsConversationActionOwner(TARGET_REF, GROUP_ID))
+                val replacement =
+                    ConversationController(
+                        appState = state,
+                        initialGroup = group(),
+                        initialMemberSnapshot = targetMemberSnapshot(),
+                        accountRefOverride = TARGET_REF,
+                    )
+                try {
+                    assertEquals(1, replacement.timeline.count { it.record.plaintext == "pending acknowledgement" })
+                    assertEquals(1, nativeCalls)
+                } finally {
+                    replacement.onCleared()
+                }
+            } finally {
+                acknowledge.complete(Unit)
+                controller.onCleared()
+            }
+        }
+
+    /** Observer disposal cannot revoke an app-owned Retry whose native acknowledgement has not returned. */
+    @Test
+    fun attachmentObserverDisposalLeavesPendingNativeAdmissionWithTheAppOwner() =
+        runTest {
+            val state = appState(activeAccountRef = TARGET_REF)
+            val controller = ConversationController(state, group(), targetMemberSnapshot())
+            val entered = CompletableDeferred<Unit>()
+            val acknowledge = CompletableDeferred<Unit>()
+            val accepted = CompletableDeferred<Unit>()
+            val key = mediaCacheKey(TARGET_REF, GROUP_ID, MESSAGE_ID, 0)
+            var nativeCalls = 0
+            controller.attachmentTransferState(MESSAGE_ID, 0, initiallyAvailable = false)
+            assertTrue(
+                state.attachmentUserActions.retry(
+                    key,
+                    admit = {
+                        nativeCalls += 1
+                        entered.complete(Unit)
+                        acknowledge.await()
+                    },
+                    onAccepted = { accepted.complete(Unit) },
+                    onFailure = { accepted.completeExceptionally(it) },
+                ),
+            )
+            try {
+                awaitConversationCondition { entered.isCompleted }
+                controller.releaseAttachmentTransferState(MESSAGE_ID, 0)
+                controller.onCleared()
+                assertTrue(key in state.attachmentUserActions.pendingRetries.value)
+                assertFalse(accepted.isCompleted)
+                acknowledge.complete(Unit)
+                awaitConversationCondition { accepted.isCompleted }
+                accepted.await()
+                assertEquals(1, nativeCalls)
+                assertFalse(key in state.attachmentUserActions.pendingRetries.value)
+            } finally {
+                acknowledge.complete(Unit)
+                controller.onCleared()
+            }
+        }
+
+    /** Matching display ids on another account or group cannot satisfy the extracted owner's cache probe. */
+    @Test
+    fun attachmentPresentationKeepsItsPinnedAccountAndGroupCacheIdentity() {
+        val state = appState(activeAccountRef = PREVIOUS_REF)
+        val controller =
+            ConversationController(state, group(), targetMemberSnapshot(), accountRefOverride = TARGET_REF)
+        try {
+            state.cacheMediaPlaintext(mediaCacheKey(PREVIOUS_REF, GROUP_ID, MESSAGE_ID, 0), byteArrayOf(1))
+            state.cacheMediaPlaintext(mediaCacheKey(TARGET_REF, "other-group", MESSAGE_ID, 0), byteArrayOf(2))
+            assertFalse(controller.hasCachedAttachment(MESSAGE_ID, 0))
+            state.cacheMediaPlaintext(mediaCacheKey(TARGET_REF, GROUP_ID, MESSAGE_ID, 0), byteArrayOf(3))
+            assertTrue(controller.hasCachedAttachment(MESSAGE_ID, 0))
+            assertFalse(controller.hasCachedAttachment(MESSAGE_ID, 1))
+        } finally {
+            controller.onCleared()
+        }
     }
 
     private fun appState(activeAccountRef: String) =
