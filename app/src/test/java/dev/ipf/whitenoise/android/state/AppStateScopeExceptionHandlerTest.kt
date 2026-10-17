@@ -116,8 +116,7 @@ class AppStateScopeExceptionHandlerTest {
         override suspend fun refreshNotificationSettings(): Unit = error("bootstrap must not read notifications")
 
         /** Detects unexpected service reconciliation. */
-        override suspend fun reconcileNotificationDelivery(includeBackgroundAccountModes: Boolean): Unit =
-            error("bootstrap must not reconcile delivery")
+        override suspend fun reconcileNotificationDelivery(includeBackgroundAccountModes: Boolean): Unit = error("bootstrap must not reconcile delivery")
 
         /** Detects unexpected service-admission inspection. */
         override fun isInForeground(): Boolean = error("bootstrap must not inspect foreground admission")
