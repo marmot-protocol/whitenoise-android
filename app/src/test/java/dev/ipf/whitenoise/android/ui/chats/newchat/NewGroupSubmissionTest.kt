@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.compose.foundation.text.input.TextFieldState
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import kotlinx.coroutines.CancellationException
@@ -71,7 +72,10 @@ class NewGroupSubmissionTest {
                             assertEquals(300uL, options.disappearingMessageSecs)
                             assertArrayEquals(byteArrayOf(1, 2), options.initialImage!!.plaintext)
                             when (attempt) {
-                                1 -> throw MarmotKitException.MissingKeyPackage("3")
+                                1 -> throw MarmotKitException.MissingKeyPackage(
+                                    "3",
+                                    MissingKeyPackageReasonFfi.NOT_FOUND,
+                                )
                                 2 -> throw MarmotKitException.MissingMemberInboxRoute("7")
                                 else -> "canonical"
                             }

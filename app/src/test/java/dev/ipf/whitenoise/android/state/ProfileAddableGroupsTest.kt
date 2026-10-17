@@ -166,6 +166,24 @@ class ProfileAddableGroupsTest {
         assertFalse(ProfileGroupInviteOutcome(attempted = 0, failures = 0).completedSuccessfully)
     }
 
+    /** Groups the user waited on are never reported as failures, and waiting on all of them stays quiet. */
+    @Test
+    fun waitedGroupsAreReportedAsWaitingNotFailed() {
+        assertInviteToast(
+            outcome = ProfileGroupInviteOutcome(attempted = 3, failures = 0, waited = 1),
+            messageRes = R.string.toast_invites_sent_to_groups_waited,
+        )
+        assertNull(profileGroupInviteToast(ProfileGroupInviteOutcome(attempted = 2, failures = 0, waited = 2)))
+        val failure = AppText.Plain("relay unavailable")
+        assertInviteToast(
+            outcome = ProfileGroupInviteOutcome(attempted = 3, failures = 1, firstFailure = failure, waited = 1),
+            messageRes = R.string.toast_invites_sent_to_groups_partial,
+            detail = failure,
+            copyable = true,
+        )
+        assertFalse(ProfileGroupInviteOutcome(attempted = 3, failures = 0, waited = 1).completedSuccessfully)
+    }
+
     @Test
     fun noInviteToastWhenNothingWasAttempted() {
         assertNull(profileGroupInviteToast(ProfileGroupInviteOutcome(attempted = 0, failures = 0)))

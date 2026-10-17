@@ -241,6 +241,15 @@
         ]
       },
       {
+        "surface": "Signed-in-only startup selection with retained-profile onboarding",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private fun startupAccount(): AccountSummaryFfi?",
+        "test_ids": [
+          "ACC-013",
+          "INT-003"
+        ]
+      },
+      {
         "surface": "Account-session native and platform activation adapters",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "private inner class AccountSessionActivation",
@@ -351,6 +360,14 @@
         "test_ids": [
           "ONB-006",
           "NAV-006"
+        ]
+      },
+      {
+        "surface": "Profile invite failure: toast_couldnt_add_member_duplicate_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_add_member_duplicate_detail",
+        "test_ids": [
+          "PRO-005"
         ]
       }
     ]

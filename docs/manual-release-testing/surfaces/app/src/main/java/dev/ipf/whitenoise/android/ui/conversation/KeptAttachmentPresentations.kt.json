@@ -1,0 +1,123 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+  "legacy_sha256": "d51bde1981e8d5023b6d4e06223b75baa186f70ca9e246ed9b509723ad488904",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Kept media label: attachment_type_audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.attachment_type_audio",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: attachment_type_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.attachment_type_file",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: attachment_type_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.attachment_type_image",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: attachment_type_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.attachment_type_video",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: floating_attachment_available",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.floating_attachment_available",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: floating_attachment_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.floating_attachment_failed",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: floating_attachment_remote",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.floating_attachment_remote",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: floating_attachment_resolving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.floating_attachment_resolving",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: media_attachment_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.media_attachment_unavailable",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: media_downloading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: media_upload_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.media_upload_failed",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Kept media label: media_uploading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.media_uploading",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "keptAttachmentPresentations",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "fun keptAttachmentPresentations(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Kept attachment parked for lack of storage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.media_storage_blocked_short",
+        "test_ids": [
+          "MED-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -25,6 +25,8 @@ internal val NATIVE_TRANSFER_TERMINAL_FAILURES =
         AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
         AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
         AttachmentTransferStateFfi.RETRY_EXHAUSTED,
+        // MDK readmits a storage-parked body itself once space frees, so observation ends rather than waiting.
+        AttachmentTransferStateFfi.STORAGE_BLOCKED,
     )
 
 /**
@@ -64,6 +66,7 @@ internal fun AttachmentTransferStatusFfi.toPresentationState(): AttachmentTransf
         AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
         -> AttachmentTransferState.NotRetained
         AttachmentTransferStateFfi.CANCELLED -> AttachmentTransferState.Cancelled
+        AttachmentTransferStateFfi.STORAGE_BLOCKED -> AttachmentTransferState.StorageBlocked
     }
 
 internal interface NativeTransferFeed : Closeable {
