@@ -222,6 +222,13 @@ class MessageOutboundShareTest {
             assertTrue(sharedFiles().isEmpty())
         }
 
+    /** A Markdown or text file message keeps the menu's Share, so long-pressing it can share the file (#3331). */
+    @Test
+    fun aMarkdownFileMessageIsShareableFromItsMenu() {
+        assertTrue(messageHasShareablePayload(null, listOf(reference("notes.md", "text/markdown")), emptyList()))
+        assertTrue(messageHasShareablePayload("caption", listOf(reference("notes.txt", "text/plain")), emptyList()))
+    }
+
     /** A chooser that fails to launch deletes the completed staged set. */
     @Test
     fun launchFailureDeletesCompletedPlaintextSet() =
