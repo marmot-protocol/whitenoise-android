@@ -56,7 +56,7 @@ def menu_scroll_state_bound(text: str) -> bool:
     code = code_only(text)
     return (re.search(r'\bscrollState\s*=\s*menuScrollState\b', code) is not None
             and re.search(r'\.scrollEdgeFade\(\s*menuScrollState\s*'
-                          r'(?:,\s*stableRenderTarget\s*=\s*true\s*)?\)', code) is not None)
+                          r',\s*stableRenderTarget\s*=\s*true\s*\)', code) is not None)
 
 
 def inventory_errors(root: Path = ROOT) -> list[str]:
@@ -83,7 +83,7 @@ def inventory_errors(root: Path = ROOT) -> list[str]:
             if (short, method) not in RAW_ALLOWED:
                 errors.append(f'{relative}: use the shared fade container for {method}')
         if 'DropdownMenu' in found and not menu_scroll_state_bound(text):
-            errors.append(f'{relative}: native menu must bind its mask to its actual scroll state')
+            errors.append(f'{relative}: native menu must bind its mask to its actual scroll state with a stable render target')
     for stale in entries.keys() - observed:
         errors.append(f'{stale}: stale viewport inventory')
     return errors

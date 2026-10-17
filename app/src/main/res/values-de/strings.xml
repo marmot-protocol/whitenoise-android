@@ -2336,4 +2336,6 @@
     <string name="media_reply_draft_conflict">Dein Entwurf wurde geändert. Behalte diese Antwort und versuche es erneut, oder brich die Antwort vor dem Senden ab.</string>
     <string name="photo_editor_budget_exceeded">Dieser Zuschnitt benötigt mehr Bilddaten oder Arbeitsspeicher, als sicher verarbeitet werden können. Wähle einen größeren Bildausschnitt oder eine niedrigere Qualität. Der bisherige Anhang bleibt unverändert.</string>
     <string name="share_connect_save_to_gallery">In Galerie speichern</string>
+    <string name="starting_as">Starten als</string>
+    <string name="starting_as_account">Starten als %1$s</string>
 </resources>

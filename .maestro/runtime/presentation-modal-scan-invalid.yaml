@@ -1,0 +1,41 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-scan-invalid
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn:
+    id: onboarding.sign_in.scan
+- assertVisible:
+    text: Fixture scanner session
+- tapOn:
+    text: Deliver decoded result
+- assertVisible:
+    id: onboarding.sign_in.scan_error
+- assertVisible:
+    text: That doesn't look like a valid nsec or npub key\.
+- tapOn:
+    text: OK
+- assertNotVisible:
+    id: onboarding.sign_in.scan_error
+- tapOn:
+    id: onboarding.sign_in.scan
+- assertVisible:
+    text: Fixture scanner session
+- tapOn:
+    text: Deliver previous scanner result
+- assertVisible:
+    text: Fixture scanner session
+- assertNotVisible:
+    id: onboarding.sign_in.scan_error
+- tapOn:
+    text: Deliver decoded result
+- assertVisible:
+    id: onboarding.sign_in.scan_error
+- assertVisible:
+    text: That doesn't look like a valid nsec or npub key\.
+- back
+- assertNotVisible:
+    id: onboarding.sign_in.scan_error
+- tapOn:
+    text: Finish scanner check
+- assertVisible:
+    id: presentation.complete

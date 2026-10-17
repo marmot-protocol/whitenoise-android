@@ -183,6 +183,7 @@ internal fun SignInKeyField(
     }
     scanError?.let { message ->
         WhiteNoiseAlertDialog(
+            modifier = Modifier.testTag("onboarding.sign_in.scan_error"),
             onDismissRequest = { scanError = null },
             title = { Text(stringResource(R.string.scan_qr_code)) },
             text = { Text(stringResource(message)) },

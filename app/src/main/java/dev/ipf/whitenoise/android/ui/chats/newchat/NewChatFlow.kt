@@ -64,6 +64,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
+import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Share
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
@@ -712,6 +713,7 @@ private fun NewMessageAccountScreen(
         )
     } else {
         NewMessageContent(
+            startingAs = startingAccount(appState, accountRef, runtimeGeneration),
             isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },
             queryState = queryState,
             people = people,

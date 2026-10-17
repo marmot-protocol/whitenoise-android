@@ -27,6 +27,14 @@
         "test_ids": [
           "TTS-001"
         ]
+      },
+      {
+        "surface": "ConversationTopBar UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "fun ConversationTopBar(",
+        "test_ids": [
+          "CON-001"
+        ]
       }
     ],
     "source_coverage": [

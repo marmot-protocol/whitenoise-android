@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-animated-avatar
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: avatar.static.overlay
+- assertNotVisible:
+    id: animated-profile-avatar
+- tapOn: Open animated avatar
+- assertVisible:
+    id: animated-profile-avatar
+- back
+- assertVisible:
+    id: presentation.complete

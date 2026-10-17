@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-update-permission
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Allow installs from this app
+- assertVisible:
+    id: appUpdate.settings
+    enabled: true
+- tapOn:
+    id: appUpdate.settings
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrLinkedImageDialog.kt",
+  "legacy_sha256": "1de57c48bd4941deca0d2d13f9f7260bdc809eb016b1f7b3321e61fd579c7741",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NostrLinkedImageDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrLinkedImageDialog.kt",
+        "anchor": "fun NostrLinkedImageDialog(",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "Linked image Back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrLinkedImageDialog.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "RDR-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Linked image controlled loading boundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrLinkedImageDialog.kt",
+        "anchor": "loadImage = loadImage",
+        "test_ids": [
+          "RDR-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

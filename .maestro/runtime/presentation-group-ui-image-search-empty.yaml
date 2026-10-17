@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-image-search-empty
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture image chooser
+- tapOn: Image search
+- inputText: fixture search
+- hideKeyboard
+- tapOn: Search
+- assertVisible:
+    text: No images found
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

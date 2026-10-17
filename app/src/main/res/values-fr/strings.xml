@@ -2319,4 +2319,6 @@
     <string name="media_reply_draft_conflict">Votre brouillon a changé. Conservez cette réponse et réessayez, ou annulez la réponse avant l’envoi.</string>
     <string name="photo_editor_budget_exceeded">Ce recadrage dépasse les limites de traitement sécurisé de l’image ou de la mémoire. Choisissez un recadrage plus large ou une qualité inférieure. La pièce jointe précédente reste inchangée.</string>
     <string name="share_connect_save_to_gallery">Enregistrer dans la galerie</string>
+    <string name="starting_as">Démarrer en tant que</string>
+    <string name="starting_as_account">Démarrer en tant que %1$s</string>
 </resources>

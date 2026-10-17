@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -28,6 +27,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
@@ -284,15 +284,23 @@ internal fun AuditUploadConsentContent(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+    Surface(
+        modifier = Modifier.testTag("audit.consent.surface"),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
         Column(
-            Modifier.widthIn(max = 360.dp).heightIn(max = 640.dp).padding(24.dp),
+            Modifier.widthIn(max = 360.dp).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.audit_upload_confirm_title), style = MaterialTheme.typography.headlineSmall)
             Text(
                 stringResource(R.string.audit_upload_disclosure),
-                modifier = Modifier.weight(1f, fill = false).fadingVerticalScroll(rememberScrollState()),
+                modifier =
+                    Modifier
+                        .weight(1f, fill = false)
+                        .testTag("audit.consent.disclosure")
+                        .fadingVerticalScroll(rememberScrollState()),
                 style = MaterialTheme.typography.bodyMedium,
             )
             TextButton(modifier = Modifier.fillMaxWidth(), onClick = onConfirm) {

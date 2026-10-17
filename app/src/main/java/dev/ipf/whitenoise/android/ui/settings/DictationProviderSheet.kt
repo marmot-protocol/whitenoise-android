@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
 /** Re-enumerates on entry and return from provider setup. This list belongs only to this UI. */
 @Composable
@@ -77,7 +78,7 @@ internal fun DictationProviderSheet(
     onSelect: (ConversationDictationProviderChoice?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.exposePerformanceTestTags()) {
         WhiteNoiseLazyColumn(Modifier.selectableGroup().testTag("dictation_provider_choices").padding(bottom = 24.dp)) {
             item {
                 Column(Modifier.padding(16.dp)) {

@@ -12,5 +12,22 @@ name: advanced-gestures
 - tapOn: "Swipe actions"
 - assertVisible:
     id: "gestures.MessageLeft"
+- tapOn:
+    id: gestures.MessageLeft
+- assertVisible:
+    id: speech.choice.0
+- assertVisible: "Off"
+- tapOn: Cancel
+- assertNotVisible:
+    id: speech.choice.0
+- tapOn:
+    id: gestures.MessageLeft
+- assertVisible:
+    id: speech.choice.0
+- back
+- assertNotVisible:
+    id: speech.choice.0
+- assertVisible:
+    id: gestures.MessageLeft
 - back
 - assertVisible: "Settings"

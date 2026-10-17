@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-timestamp-hover
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertNotVisible:
+    id: timestamp.hover
+- tapOn:
+    text: Hover timestamp
+- assertVisible:
+    id: timestamp.hover
+- assertVisible:
+    text: (?s).*2027.*<t:1800000000:F>.*
+- tapOn:
+    text: End timestamp hover
+- assertNotVisible:
+    id: timestamp.hover
+- tapOn:
+    text: Finish disclosure check
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,502 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupDetailsConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "fun GroupDetailsConfirmation(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_message_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_message_named",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_sole_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_admin_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_sole_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_admin_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_sole_member_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_member_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_sole_member_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_member_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_title_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_title_named",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_remove_member_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_remove_member_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_remove_member_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_remove_member_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_sole_admin_transfer_then_leave_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_sole_admin_transfer_then_leave_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_step_down_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_step_down_admin_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_transfer_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_transfer_admin_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_transfer_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_transfer_admin_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.leave",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.remove_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.remove_member",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.sole_admin_leave_blocked_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.sole_admin_leave_blocked_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.sole_admin_transfer_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.sole_admin_transfer_hint",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.step_down_as_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.step_down_as_admin",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      },
+      {
+        "surface": "R.string.transfer_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.transfer_admin",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_leave_message_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_message_named",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_leave_sole_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_admin_message",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_leave_sole_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_admin_title",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_leave_sole_member_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_member_message",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_leave_sole_member_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_member_title",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_leave_title_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_title_named",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_remove_member_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_remove_member_message",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_remove_member_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_remove_member_title",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_sole_admin_transfer_then_leave_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_sole_admin_transfer_then_leave_message",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_step_down_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_step_down_admin_message",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_transfer_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_transfer_admin_message",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_transfer_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_transfer_admin_title",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:remove_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.remove_member",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:sole_admin_leave_blocked_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.sole_admin_leave_blocked_title",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:sole_admin_transfer_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.sole_admin_transfer_hint",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_message_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_message_named",
+        "test_ids": [
+          "GRP-001",
+          "GRP-009",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_sole_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_admin_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-009",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_sole_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_admin_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-009",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_sole_member_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_member_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-009",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_sole_member_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_sole_member_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-009",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_leave_title_named",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_leave_title_named",
+        "test_ids": [
+          "GRP-001",
+          "GRP-009",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_remove_member_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_remove_member_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-006"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_remove_member_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_remove_member_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-006"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_sole_admin_transfer_then_leave_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_sole_admin_transfer_then_leave_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_step_down_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_step_down_admin_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_transfer_admin_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_transfer_admin_message",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008"
+        ]
+      },
+      {
+        "surface": "R.string.confirm_transfer_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.confirm_transfer_admin_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008"
+        ]
+      },
+      {
+        "surface": "R.string.remove_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.remove_member",
+        "test_ids": [
+          "GRP-001",
+          "GRP-006"
+        ]
+      },
+      {
+        "surface": "R.string.sole_admin_leave_blocked_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.sole_admin_leave_blocked_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-009",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.sole_admin_transfer_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "anchor": "R.string.sole_admin_transfer_hint",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "surface": "R.string.member",
+        "anchor": "R.string.member",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

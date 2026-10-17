@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.media.decodeLocalPreviewStill
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -378,7 +379,7 @@ internal fun MediaPreviewContent(
         },
     )
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().exposePerformanceTestTags(),
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {

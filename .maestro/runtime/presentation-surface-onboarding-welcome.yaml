@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-onboarding-welcome
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: onboarding.welcome.mark
+- assertVisible:
+    id: onboarding.welcome.sign_in
+- assertVisible:
+    id: onboarding.welcome.sign_up

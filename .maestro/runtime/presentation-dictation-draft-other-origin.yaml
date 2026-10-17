@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-draft-other-origin
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- tapOn: Produce failed dictation result
+- assertVisible: Draft recognized
+- tapOn: Change displayed conversation
+- assertVisible: Other conversation
+- tapOn: Deliver previous Dictate gesture
+- assertVisible: Other conversation
+- assertNotVisible:
+    id: dictation-recovery-panel
+- tapOn: Dictate text
+- tapOn: Check other conversation ownership
+- assertVisible:
+    id: presentation.complete

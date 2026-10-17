@@ -20,5 +20,6 @@ name: profiles-add-group-back
     direction: DOWN
 - tapOn: "Add to a group"
 - assertVisible: "Add to a group"
+- assertVisible: Add Maestro Bob to groups
 - back
 - assertVisible: "User Profile"

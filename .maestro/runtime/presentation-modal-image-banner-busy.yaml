@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-image-banner-busy
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: profile.banner_actions
+    enabled: false
+- assertNotVisible:
+    text: Find Image on Web
+- assertVisible:
+    text: Uploading…
+- tapOn:
+    text: Finish image action check
+- assertVisible:
+    id: presentation.complete

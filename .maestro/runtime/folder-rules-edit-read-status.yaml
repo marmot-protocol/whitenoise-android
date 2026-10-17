@@ -9,6 +9,7 @@ name: folder-rules-edit-read-status
     enabled: true
 - tapOn:
     id: folder.mode
+- assertVisible: Has unread messages
 - tapOn: Has unread messages
 - assertVisible:
     id: folder.mode

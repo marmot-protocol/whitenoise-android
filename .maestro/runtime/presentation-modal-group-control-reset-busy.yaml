@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-control-reset-busy
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertNotVisible:
+    text: Reset this group on this device\?
+- assertNotVisible:
+    text: Delete group\?
+- assertVisible:
+    enabled: false
+    containsDescendants:
+    - text: Reset and wait for a new invite
+- tapOn:
+    text: Reset and wait for a new invite
+- assertNotVisible:
+    text: Reset this group on this device\?
+- tapOn:
+    text: Finish group control check
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-relay-role
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Relay
+- assertVisible:
+    id: relay.details.metadata
+- assertVisible:
+    text: wss://fixture.example.invalid
+- tapOn: Profile
+- assertVisible:
+    id: presentation.complete

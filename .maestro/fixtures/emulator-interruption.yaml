@@ -5,4 +5,5 @@ appId: dev.ipf.whitenoise.android.maestrolab
     when:
       visible: "Pixel Launcher isn't responding"
     commands:
-    - tapOn: "Close app"
+    - tapOn:
+        id: android:id/aerr_close

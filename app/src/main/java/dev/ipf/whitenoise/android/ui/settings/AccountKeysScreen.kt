@@ -758,41 +758,66 @@ private fun ProfileKeysDialogs(
             onHide = ui::cancelExport,
         )
     }
-    ui.nativeExportError?.let { title ->
+    ProfileKeyFeedbackDialogs(
+        nativeExportError = ui.nativeExportError,
+        shareErrorDialog = ui.shareErrorDialog,
+        saveErrorDialog = ui.saveErrorDialog,
+        expiredExportDialog = ui.expiredExportDialog,
+        onNativeErrorDismiss = { ui.nativeExportError = null },
+        onShareErrorDismiss = { ui.shareErrorDialog = false },
+        onSaveErrorDismiss = { ui.saveErrorDialog = false },
+        onExpiryDismiss = { ui.expiredExportDialog = false },
+    )
+}
+
+/** Actual export feedback; callers keep operation ownership and clearing each error flag. */
+@Composable
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
+internal fun ProfileKeyFeedbackDialogs(
+    nativeExportError: Int?,
+    shareErrorDialog: Boolean,
+    saveErrorDialog: Boolean,
+    expiredExportDialog: Boolean,
+    onNativeErrorDismiss: () -> Unit,
+    onShareErrorDismiss: () -> Unit,
+    onSaveErrorDismiss: () -> Unit,
+    onExpiryDismiss: () -> Unit,
+) {
+    nativeExportError?.let { title ->
         WhiteNoiseAlertDialog(
-            onDismissRequest = { ui.nativeExportError = null },
+            onDismissRequest = onNativeErrorDismiss,
             title = { Text(stringResource(title)) },
             confirmButton = {
-                TextButton(onClick = { ui.nativeExportError = null }) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = onNativeErrorDismiss) { Text(stringResource(R.string.ok)) }
             },
         )
     }
-    if (ui.shareErrorDialog) {
+    if (shareErrorDialog) {
         WhiteNoiseAlertDialog(
-            onDismissRequest = { ui.shareErrorDialog = false },
+            onDismissRequest = onShareErrorDismiss,
             title = { Text(stringResource(R.string.outbound_share_failed)) },
             confirmButton = {
-                TextButton(onClick = { ui.shareErrorDialog = false }) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = onShareErrorDismiss) { Text(stringResource(R.string.ok)) }
             },
         )
     }
-    if (ui.saveErrorDialog) {
+    if (saveErrorDialog) {
         WhiteNoiseAlertDialog(
-            onDismissRequest = { ui.saveErrorDialog = false },
+            onDismissRequest = onSaveErrorDismiss,
             title = { Text(stringResource(R.string.couldnt_save_file)) },
             text = { Text(stringResource(R.string.choose_another_location_and_try_again)) },
             confirmButton = {
-                TextButton(onClick = { ui.saveErrorDialog = false }) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = onSaveErrorDismiss) { Text(stringResource(R.string.ok)) }
             },
         )
     }
-    if (ui.expiredExportDialog) {
+    if (expiredExportDialog) {
         WhiteNoiseAlertDialog(
-            onDismissRequest = { ui.expiredExportDialog = false },
+            onDismissRequest = onExpiryDismiss,
             title = { Text(stringResource(R.string.key_export_expired_title)) },
             text = { Text(stringResource(R.string.key_export_expired_body)) },
             confirmButton = {
-                TextButton(onClick = { ui.expiredExportDialog = false }) { Text(stringResource(R.string.close)) }
+                TextButton(onClick = onExpiryDismiss) { Text(stringResource(R.string.close)) }
             },
         )
     }
@@ -870,7 +895,7 @@ private fun ExportPasswordDialog(
 /** Temporary account-owned encrypted result; copying and file export are separate deliberate actions. */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
-private fun EncryptedBackupResultDialog(
+internal fun EncryptedBackupResultDialog(
     backup: String,
     copied: Boolean,
     onCopy: () -> Unit,
@@ -1159,7 +1184,10 @@ internal fun SignOutProgressDialog() {
                 usePlatformDefaultWidth = false,
             ),
     ) {
-        Box(Modifier.fillMaxSize().testTag("settings.sign_out_progress"), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxSize().testTag("settings.sign_out_progress").exposePerformanceTestTags(),
+            contentAlignment = Alignment.Center,
+        ) {
             // The full-window dim layer can cover either theme; white stays visible against that scrim.
             LoadingIndicator(color = Color.White)
         }

@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-large-continue
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Invite to a large group?
+- tapOn: Continue
+- assertVisible:
+    id: presentation.complete

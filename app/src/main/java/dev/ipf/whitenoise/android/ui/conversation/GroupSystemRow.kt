@@ -320,7 +320,7 @@ private fun GroupSystemSummaryAndWave(
 
 @Composable
 @Suppress("FunctionNaming")
-private fun GroupSystemSummaryMenu(
+internal fun GroupSystemSummaryMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     onDelete: (() -> Unit)?,
@@ -328,7 +328,7 @@ private fun GroupSystemSummaryMenu(
     val menuScrollState = rememberScrollState()
     DropdownMenu(
         scrollState = menuScrollState,
-        modifier = Modifier.scrollEdgeFade(menuScrollState),
+        modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
         expanded = expanded,
         onDismissRequest = onDismiss,
         shape = MenuDefaults.shape,

@@ -16,11 +16,16 @@ name: reactions-configure-rotation
 - assertVisible: Tap an emoji to replace it\.
 - setOrientation: PORTRAIT
 - assertVisible: Tap an emoji to replace it\.
-# Material first collapses the expanded sheet after rotation; the next Back dismisses it.
+# Material may expose an intermediate partial anchor after rotation.
 - back
 - waitForAnimationToEnd:
     timeout: 2000
-- assertVisible: Tap an emoji to replace it\.
-- back
+- runFlow:
+    when:
+      visible: Tap an emoji to replace it\.
+    commands:
+      - back
 - assertNotVisible: Tap an emoji to replace it\.
+- assertNotVisible: Search emoji
+- assertNotVisible: Configure Reactions
 - runFlow: ../fixtures/assert-fixture-conversation.yaml

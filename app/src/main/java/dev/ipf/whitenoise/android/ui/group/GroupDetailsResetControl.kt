@@ -25,6 +25,7 @@ internal fun GroupDetailsResetControl(
     enabled: Boolean,
     inProgress: Boolean,
     onResetConfirmed: () -> Unit,
+    identity: (@Composable () -> Unit)? = null,
 ) {
     if (isDm || readOnlyInvite) return
     var confirmOpen by remember { mutableStateOf(false) }
@@ -46,6 +47,8 @@ internal fun GroupDetailsResetControl(
             },
             onDismiss = { confirmOpen = false },
             destructive = true,
+            identity = identity,
+            confirmEnabled = enabled,
         )
     }
 }

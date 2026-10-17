@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-translation-chat-on
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Use global setting
+- assertVisible: "On"
+- assertVisible: "Off"
+- tapOn: "On"
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,43 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-details-blockedleave
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: You're the only admin
+- assertVisible:
+    text: Make another member an admin before leaving Fixture confirmation group, so the group keeps an admin\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Alice
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
+- assertNotVisible:
+    text: Leave
+- tapOn:
+    text: Cancel
+- assertNotVisible:
+    text: You're the only admin
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: You're the only admin
+- back
+- assertNotVisible:
+    text: You're the only admin
+- tapOn:
+    text: Reopen group confirmation
+- assertVisible:
+    text: You're the only admin
+- tapOn:
+    text: Cancel
+- tapOn:
+    text: Finish group confirmation check
+- assertVisible:
+    id: presentation.complete

@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-dictation-status-unavailable
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: dictation-recovery-status
+- assertVisible:
+    text: Could\ not\ check\ the\ retained\ audio\.\ Keep\ it\ and\ try\ again\.
+- assertNotVisible:
+    id: dictation-recovery-panel
+- assertNotVisible:
+    id: dictation-partial-send-dialog
+- assertNotVisible:
+    id: dictation-discard-confirmation
