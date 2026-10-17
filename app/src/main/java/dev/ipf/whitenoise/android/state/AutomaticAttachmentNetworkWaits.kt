@@ -128,10 +128,14 @@ internal class AutomaticAttachmentNetworkWaits(
         manager: WorkManager,
         networkTypeFor: (String, MediaAutoDownloadType) -> NetworkType?,
     ): Int {
-        val all = synchronized(this) { records.readAll() }.values.mapNotNull(::decode)
-        return all.sumOf { wait ->
-            val target = networkTypeFor(wait.request.accountRef, wait.type) ?: return@sumOf 0
-            settle(manager, wait.request, wait.type, target, wait.networkType, registeredAtMs = wait.registeredAtMs)
+        // The registry is read under the constraint lock too, so a narrowing that records its wait cannot slip
+        // between this read and the widening that follows it.
+        return synchronized(constraintLock) {
+            val all = synchronized(this) { records.readAll() }.values.mapNotNull(::decode)
+            all.sumOf { wait ->
+                val target = networkTypeFor(wait.request.accountRef, wait.type) ?: return@sumOf 0
+                settle(manager, wait.request, wait.type, target, wait.networkType, registeredAtMs = wait.registeredAtMs)
+            }
         }
     }
 
@@ -214,8 +218,10 @@ internal class AutomaticAttachmentNetworkWaits(
     ) {
         synchronized(constraintLock) {
             val target = type?.let { policyNetworkType?.invoke(request.accountRef, it) } ?: captured
-            manager.updateWork(AttachmentDownloadWorker.buildRequest(request, AttachmentDownloadPriority.Automatic, workId, target)).get()
+            // Recorded before the update, so any sweep that follows this lock always finds the narrowed wait.
             if (type != null) record(request, type, target)
+            val priority = AttachmentDownloadPriority.Automatic
+            manager.updateWork(AttachmentDownloadWorker.buildRequest(request, priority, workId, target)).get()
         }
     }
 
@@ -252,19 +258,6 @@ internal class AutomaticAttachmentNetworkWaits(
             allWide && recorded.isNarrowerThan(target) -> record(request, type, target)
         }
         return widened
-    }
-
-    /** Updates one live spec of [request] to [target] by id, reporting whether WorkManager applied it. */
-    private fun widenInPlace(
-        manager: WorkManager,
-        request: AttachmentTransferRequest,
-        info: WorkInfo,
-        target: NetworkType,
-    ): Boolean {
-        val work = AttachmentDownloadWorker.buildRequest(request, AttachmentDownloadPriority.Automatic, info.id, target)
-        return runCatching { manager.updateWork(work).get() != WorkManager.UpdateResult.NOT_APPLIED }
-            .onFailure { Log.w(TAG, "attachment_network_widening_failed") }
-            .getOrDefault(false)
     }
 
     /** Serialises every constraint write, widening or narrowing, so overlapping updates apply in order. */
@@ -351,4 +344,17 @@ internal class AutomaticAttachmentNetworkWaits(
                 attachmentAutomaticAccountTag(accountRef) in tags &&
                 AttachmentDownloadWorker.RETIRED_TAG !in tags
     }
+}
+
+/** Updates one live spec of [request] to [target] by id, reporting whether WorkManager applied it. */
+private fun widenInPlace(
+    manager: WorkManager,
+    request: AttachmentTransferRequest,
+    info: WorkInfo,
+    target: NetworkType,
+): Boolean {
+    val work = AttachmentDownloadWorker.buildRequest(request, AttachmentDownloadPriority.Automatic, info.id, target)
+    return runCatching { manager.updateWork(work).get() != WorkManager.UpdateResult.NOT_APPLIED }
+        .onFailure { Log.w("DMAttachmentWorker", "attachment_network_widening_failed") }
+        .getOrDefault(false)
 }
