@@ -120,6 +120,38 @@
         "test_ids": [
           "NCH-002"
         ]
+      },
+      {
+        "surface": "Recipient lookup that could not finish is retryable, never missing setup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_directory_lookup_incomplete",
+        "test_ids": [
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "Named recipient lookup that could not finish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_directory_lookup_incomplete_for",
+        "test_ids": [
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "Recipient with only outdated chat keys is asked to update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_obsolete_key_package",
+        "test_ids": [
+          "NCH-006"
+        ]
+      },
+      {
+        "surface": "Named recipient with only outdated chat keys is asked to update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_obsolete_key_package_for",
+        "test_ids": [
+          "NCH-006"
+        ]
       }
     ]
   },

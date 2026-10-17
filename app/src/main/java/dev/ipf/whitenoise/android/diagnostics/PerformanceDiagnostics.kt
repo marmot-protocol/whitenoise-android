@@ -255,6 +255,7 @@ internal enum class PerformanceAttachmentState(
     PREVIOUSLY_ACQUIRED_UNAVAILABLE("previously_acquired_unavailable"),
     COMPLETED_UNRETAINED("completed_unretained"),
     RETRY_EXHAUSTED("retry_exhausted"),
+    STORAGE_BLOCKED("storage_blocked"),
 }
 
 internal class PerformanceTrace internal constructor(

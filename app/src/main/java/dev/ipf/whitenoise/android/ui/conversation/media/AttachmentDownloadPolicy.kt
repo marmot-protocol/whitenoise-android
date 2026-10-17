@@ -54,6 +54,10 @@ internal enum class AttachmentMaterializationIntent {
     val shouldMaterialize: Boolean
         get() = this != Idle
 
+    /** The reader asked for this download themselves, rather than automatic-download policy granting it. */
+    val readerRequested: Boolean
+        get() = this == Interactive
+
     val priority: AttachmentDownloadPriority
         get() =
             when (this) {
@@ -71,6 +75,12 @@ internal enum class AttachmentMaterializationIntent {
         }
 
     fun afterInteractiveRequest(): AttachmentMaterializationIntent = Interactive
+
+    /**
+     * MDK still holds the body parked from the reader's earlier download, so that download resumes as the reader's own.
+     * Joining the park demands nothing new.
+     */
+    fun afterParkedDownloadFound(): AttachmentMaterializationIntent = Interactive
 
     /**
      * Only an explicit stop revokes accepted work: the gate's queued-automatic cancellation or the reader's own Cancel.

@@ -511,6 +511,7 @@ internal fun canRequestAttachmentOpen(
         AttachmentTransferState.Available,
         AttachmentTransferState.NotRetained,
         AttachmentTransferState.Failed,
+        AttachmentTransferState.StorageBlocked,
         AttachmentTransferState.Cancelled,
         -> mine || sourceEpoch != 0uL
     }

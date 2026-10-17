@@ -1,10 +1,15 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.whitenoise.android.state.GroupChangeDeclinedException
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val CHAT_DEPARTURE_STEP_TIMEOUT_MS = 30_000L
+private const val CHAT_DEPARTURE_BUDGET_SLICE_MS = 250L
 
 internal data class ChatDepartureTarget(
     val groupId: String,
@@ -32,6 +37,8 @@ internal class ChatDepartureCallbacks(
     val choose: suspend (ChatDepartureTarget, List<AppGroupMemberRecordFfi>) -> AppGroupMemberRecordFfi?,
     val remove: suspend (ChatDepartureTarget, AppGroupMemberRecordFfi?) -> Boolean,
     val onProgress: (String, Int, Int) -> Unit = { _, _, _ -> },
+    /** True while a group-change question waits for the user; that time is not native work's to spend. */
+    val questionOpen: () -> Boolean = { false },
 )
 
 private class ChatDeparturePreparation(
@@ -53,7 +60,9 @@ internal suspend fun runChatDepartureBatch(
         val completed = prepared.outcomes.values.count { it == ChatDepartureOutcome.COMPLETED }
         callbacks.onProgress(target.title, completed, targets.size)
         val removed =
-            departureStep { callbacks.remove(target, prepared.successors[target.groupId]) }.getOrDefault(false)
+            departureStep(callbacks.questionOpen) {
+                callbacks.remove(target, prepared.successors[target.groupId])
+            }.getOrDefault(false)
         // Replaced accounts cannot receive a late success or a retry bound to the replacement.
         if (isCurrent()) {
             val outcome = if (removed) ChatDepartureOutcome.COMPLETED else ChatDepartureOutcome.FAILED
@@ -78,13 +87,15 @@ private suspend fun prepareChatDepartures(
     return prepared
 }
 
+/** Records one chat's handover decision, or marks it failed or skipped, before anything destructive starts. */
 private suspend fun prepareChatDeparture(
     target: ChatDepartureTarget,
     isCurrent: () -> Boolean,
     callbacks: ChatDepartureCallbacks,
     prepared: ChatDeparturePreparation,
 ) {
-    val preflight = departureStep { if (target.isDm) emptyList() else callbacks.prepare(target.groupId) }
+    val preflight =
+        departureStep(callbacks.questionOpen) { if (target.isDm) emptyList() else callbacks.prepare(target.groupId) }
     if (!isCurrent()) return
     if (preflight.isFailure) {
         prepared.outcomes[target.groupId] = ChatDepartureOutcome.FAILED
@@ -101,9 +112,46 @@ private suspend fun prepareChatDeparture(
     }
 }
 
-/** A UI deadline means unfinished/uncertain; retry reconciles native state before any further mutation. */
-private suspend fun <T> departureStep(block: suspend () -> T): Result<T> =
-    runCatchingCancellable {
-        withTimeoutOrNull(CHAT_DEPARTURE_STEP_TIMEOUT_MS) { Result.success(block()) }
-            ?: Result.failure(IllegalStateException("Native operation has not settled within the UI budget"))
-    }.getOrElse { Result.failure(it) }
+/**
+ * A UI deadline means unfinished/uncertain; retry reconciles native state before any further mutation. The deadline
+ * covers native work only: while [questionOpen], the user is reading a group-change question and the clock stops. A
+ * group change the user chose to wait on is unfinished too, never a silent end to the whole batch.
+ */
+private suspend fun <T> departureStep(
+    questionOpen: () -> Boolean,
+    block: suspend () -> T,
+): Result<T> =
+    try {
+        runCatchingCancellable {
+            withNativeTimeoutOrNull(CHAT_DEPARTURE_STEP_TIMEOUT_MS, questionOpen) { Result.success(block()) }
+                ?: Result.failure(IllegalStateException("Native operation has not settled within the UI budget"))
+        }.getOrElse { Result.failure(it) }
+    } catch (declined: GroupChangeDeclinedException) {
+        // Waiting on one chat's group change leaves that chat unfinished, with its stage shown, and the batch goes on.
+        Result.failure(declined.refusal)
+    }
+
+/**
+ * Like withTimeoutOrNull, except that time spent while [paused] does not count against [budgetMillis]. The budget is
+ * spent in short slices, so a question opening or closing moves the deadline within one slice.
+ */
+internal suspend fun <T> withNativeTimeoutOrNull(
+    budgetMillis: Long,
+    paused: () -> Boolean,
+    block: suspend () -> T,
+): T? =
+    coroutineScope {
+        val work = async { block() }
+        var remaining = budgetMillis
+        while (!work.isCompleted && remaining > 0) {
+            val slice = minOf(CHAT_DEPARTURE_BUDGET_SLICE_MS, remaining)
+            withTimeoutOrNull(slice) { work.join() }
+            if (!paused()) remaining -= slice
+        }
+        if (work.isCompleted) {
+            work.await()
+        } else {
+            work.cancelAndJoin()
+            null
+        }
+    }

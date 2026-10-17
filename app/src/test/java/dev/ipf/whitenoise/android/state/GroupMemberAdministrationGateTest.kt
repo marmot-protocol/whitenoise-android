@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CompletableDeferred
@@ -327,9 +328,11 @@ class GroupMemberAdministrationGateTest {
             assertEquals(AppText.Resource(R.string.error_invalid_key_package), state.toast?.detail)
         }
 
+    /** Each typed invite refusal paired with the per-recipient copy it must produce. */
     private fun inviteFailures(): List<Pair<Throwable, Int>> =
         listOf(
-            MarmotKitException.MissingKeyPackage(invitee) to R.string.error_missing_key_package_for,
+            MarmotKitException.MissingKeyPackage(invitee, MissingKeyPackageReasonFfi.NOT_FOUND) to
+                R.string.error_missing_key_package_for,
             MarmotKitException.MissingMemberInboxRoute(invitee) to R.string.error_missing_member_inbox_for,
             MarmotKitException.InvalidKeyPackageEvent("private") to R.string.error_invalid_key_package_for,
             MarmotKitException.Publish("private") to R.string.error_try_again,
