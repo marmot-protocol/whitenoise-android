@@ -52,7 +52,9 @@ class GroupImageFailureDetailTest {
         )
         assertEquals(
             AppText.Resource(R.string.error_try_again),
-            groupImageFailureDetail(GroupAvatarUploadFailure(GroupAvatarUploadStage.Upload, 3L, IllegalStateException())),
+            groupImageFailureDetail(
+                GroupAvatarUploadFailure(GroupAvatarUploadStage.Upload, 3L, IllegalStateException()),
+            ),
         )
     }
 
