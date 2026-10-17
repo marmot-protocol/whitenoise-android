@@ -183,7 +183,7 @@ class PushTokenPreferencesTest {
         assertEquals(setOf("account-b"), PushTokenStore(adapter()).pendingDisables())
     }
 
-    /** Explicit retry bypasses only the import throttle, preserving and unioning a temporarily unreadable legacy source. */
+    /** Retry bypasses the import throttle while preserving and unioning a temporarily unreadable legacy source. */
     @Test
     fun retryImportsRetainedLegacyObligationsWithoutErasingNewWrites() {
         PushTokenStore.installKeyProvider(

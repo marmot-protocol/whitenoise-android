@@ -530,14 +530,17 @@ class ExternalSignerSignOutLifecycleTest {
                     .getDeclaredField("marmotRuntime")
                     .apply { isAccessible = true }
                     .set(state, AppMarmotRuntime(rootPath = "replacement", marmot = marmot))
-                state.activeAccountRef = OTHER_ACCOUNT_REF
+                state.switchMediaSessionForTest(OTHER_ACCOUNT_REF)
             }
             assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
             assertEquals(OTHER_ACCOUNT_REF, state.activeAccountRef)
             assertEquals(originalPhase, state.phase)
             assertTrue(state.accounts.single().signedOut)
             assertNull(state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
-            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID))
+            assertEquals(
+                COMPOSER_EXPANSION,
+                state.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
+            )
             assertContactPicturesRemovedOnlyForThisAccount(state)
         }
 

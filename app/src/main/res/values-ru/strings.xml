@@ -2393,4 +2393,7 @@
     <string name="share_connect_save_to_gallery">Сохранить в галерею</string>
     <string name="starting_as">Начать от имени</string>
     <string name="starting_as_account">Начать от имени %1$s</string>
+    <string name="notification_push_storage_unavailable">Не удалось прочитать сохранённые настройки push-уведомлений. Они сохранены, а регистрация push-уведомлений приостановлена. Повторите попытку после разблокировки устройства.</string>
+    <string name="notification_push_import_pending">Не удалось восстановить некоторые прежние настройки push-уведомлений. Они сохранены, а регистрация push-уведомлений приостановлена. Повторите попытку, чтобы проверить их снова.</string>
+    <string name="notification_push_cleanup_unknown">Не удалось подтвердить прежнюю очистку push-уведомлений. Регистрация push-уведомлений приостановлена. Повторная попытка проверит сохранённое состояние, не удаляя и не сбрасывая его.</string>
 </resources>

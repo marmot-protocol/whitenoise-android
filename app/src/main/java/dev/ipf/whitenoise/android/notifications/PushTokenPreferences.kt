@@ -61,10 +61,14 @@ internal class PushTokenPreferences(
 
     override fun edit(): SharedPreferences.Editor = Editor()
 
-    override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) =
+    override fun registerOnSharedPreferenceChangeListener(
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) =
         error("Push state does not use preference listeners")
 
-    override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) =
+    override fun unregisterOnSharedPreferenceChangeListener(
+        listener: SharedPreferences.OnSharedPreferenceChangeListener,
+    ) =
         error("Push state does not use preference listeners")
 
     /** A durable target receipt makes an unreadable leftover source irrelevant. */

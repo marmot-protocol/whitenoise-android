@@ -106,20 +106,7 @@ class PushWakeBookkeepingFailureTest {
                 val callsBeforeRejectedWake = nativeCatchUps.get()
                 val rejectedWake =
                     fixture.runWithMainLooperPumping {
-                        val launch =
-                            fixture.appState.javaClass
-                                .getDeclaredMethod(
-                                    "launchAccountCatchUp",
-                                    java.lang.Long::class.java,
-                                    PerformanceTrigger::class.java,
-                                    Boolean::class.javaPrimitiveType,
-                                ).apply { isAccessible = true }
-
-                        @Suppress("UNCHECKED_CAST")
-                        val work =
-                            launch.invoke(fixture.appState, null, PerformanceTrigger.PUSH_WAKE, true) as
-                                kotlinx.coroutines.Deferred<dev.ipf.whitenoise.android.state.AccountCatchUpResult>
-                        work.await()
+                        launchRejectedPushWake(fixture)
                     }
                 assertFalse(rejectedWake.succeeded)
                 assertEquals(callsBeforeRejectedWake, nativeCatchUps.get())
@@ -141,6 +128,26 @@ class PushWakeBookkeepingFailureTest {
                 fixture.close()
             }
         }
+
+    /** Invokes the production push-wake admission path without another lifecycle trigger. */
+    private suspend fun launchRejectedPushWake(
+        fixture: NotificationBootstrapTestFixture,
+    ): dev.ipf.whitenoise.android.state.AccountCatchUpResult {
+        val launch =
+            fixture.appState.javaClass
+                .getDeclaredMethod(
+                    "launchAccountCatchUp",
+                    java.lang.Long::class.java,
+                    PerformanceTrigger::class.java,
+                    Boolean::class.javaPrimitiveType,
+                ).apply { isAccessible = true }
+
+        @Suppress("UNCHECKED_CAST")
+        val work =
+            launch.invoke(fixture.appState, null, PerformanceTrigger.PUSH_WAKE, true) as
+                kotlinx.coroutines.Deferred<dev.ipf.whitenoise.android.state.AccountCatchUpResult>
+        return work.await()
+    }
 
     /** A token commit followed by Keystore loss cannot escape the launched marker-write coroutine. */
     @Test
@@ -190,7 +197,11 @@ class PushWakeBookkeepingFailureTest {
                 fixture.appState.onPushTokenRotated("rotated-token")
                 fixture.runWithMainLooperPumping {
                     withTimeout(5_000L) {
-                        while (ShadowLog.getLogsForTag("PushTokenStorage").none { it.msg == "lifecycle_work_deferred" }) delay(5L)
+                        while (
+                            ShadowLog.getLogsForTag("PushTokenStorage").none { it.msg == "lifecycle_work_deferred" }
+                        ) {
+                            delay(5L)
+                        }
                     }
                 }
                 assertTrue(fixture.upsertedPushTokens.isEmpty())

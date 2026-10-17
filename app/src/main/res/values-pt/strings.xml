@@ -2321,4 +2321,7 @@
     <string name="share_connect_save_to_gallery">Salvar na galeria</string>
     <string name="starting_as">Iniciar como</string>
     <string name="starting_as_account">Iniciar como %1$s</string>
+    <string name="notification_push_storage_unavailable">Não foi possível ler as definições de push guardadas. Foram mantidas e o registo de push está em pausa. Tenta novamente quando o dispositivo estiver desbloqueado.</string>
+    <string name="notification_push_import_pending">Não foi possível recuperar algumas definições de push anteriores. Foram mantidas e o registo de push está em pausa. Tenta novamente para as verificar.</string>
+    <string name="notification_push_cleanup_unknown">Não é possível confirmar uma limpeza de push anterior. O registo de push está em pausa. Tentar novamente verifica o estado guardado, sem o apagar nem repor.</string>
 </resources>

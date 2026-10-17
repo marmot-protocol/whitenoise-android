@@ -63,7 +63,12 @@ class NotificationDeliverySelectorScreenshotTest {
     /** Shows historical cleanup uncertainty separately under large-font RTL and dark theme. */
     @Test
     fun retainedPushCleanupDarkLargeRtl() {
-        renderRecovery(PushStorageRecovery.CleanupReconciliationRequired, darkTheme = true, rtl = true, fontScale = 1.4f)
+        renderRecovery(
+            PushStorageRecovery.CleanupReconciliationRequired,
+            darkTheme = true,
+            rtl = true,
+            fontScale = 1.4f,
+        )
         capture("notification_push_cleanup_unknown_dark_large_rtl.png")
     }
 

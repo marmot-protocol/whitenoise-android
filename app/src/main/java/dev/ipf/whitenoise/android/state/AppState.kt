@@ -4389,7 +4389,8 @@ class WhiteNoiseAppState private constructor(
                     ?: if (trigger == PerformanceTrigger.PUSH_WAKE) {
                         PushWakeAdmission.Rejected
                     } else {
-                        // Ordinary foreground/connectivity work is independently bounded and cannot settle an unknown wake.
+                        // Ordinary foreground/connectivity work is independently bounded
+                        // and cannot settle an unknown wake.
                         PushWakeAdmission.Admitted(claim = null)
                     }
             when (admission) {
@@ -4398,7 +4399,9 @@ class WhiteNoiseAppState private constructor(
                     if (isCatchUpKeyCurrent(key)) {
                         performAdmittedAccountCatchUp(key, trigger, admission.claim)
                     } else {
-                        admission.claim?.let { reserved -> observePushState { pushWakeAttemptBudget().release(reserved) } }
+                        admission.claim?.let { reserved ->
+                            observePushState { pushWakeAttemptBudget().release(reserved) }
+                        }
                         false
                     }
                 }
@@ -4415,7 +4418,9 @@ class WhiteNoiseAppState private constructor(
         var settlementSucceeded = nativeSucceeded && isCatchUpKeyCurrent(key)
         if (claim != null) {
             settlementSucceeded =
-                observePushState { pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) } } == true
+                observePushState {
+                    pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) }
+                } == true
         }
         val succeeded = settlementSucceeded && isCatchUpKeyCurrent(key)
         if (claim != null) {
@@ -5287,11 +5292,11 @@ class WhiteNoiseAppState private constructor(
             withContext(pushWakeStorageDispatcher) {
                 observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
             } ?: return false
-        if (pendingGeneration == 0L) return true
-        return catchUpAfterObservedPushWake(
-            pendingGeneration = pendingGeneration,
-            trigger = PerformanceTrigger.PUSH_WAKE,
-        ).succeeded
+        return pendingGeneration == 0L ||
+            catchUpAfterObservedPushWake(
+                pendingGeneration = pendingGeneration,
+                trigger = PerformanceTrigger.PUSH_WAKE,
+            ).succeeded
     }
 
     /**
@@ -6607,7 +6612,8 @@ class WhiteNoiseAppState private constructor(
     /**
      * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
      * local fallback behavior only after durable push cleanup admission; a structured unfinished-local
-     * outcome or unavailable cleanup authority retains the active session. Credential revocation failure returns an incomplete result before
+     * outcome or unavailable cleanup authority retains the active session. Credential revocation failure
+     * returns an incomplete result before
      * native admission; errors after admission retain their established propagation.
      * Returns null when no account is active.
      */
@@ -6639,13 +6645,8 @@ class WhiteNoiseAppState private constructor(
         // Serialize admission/native teardown with mode changes, then release before activating another account.
         // Activation performs its own delivery reconciliation and cannot re-enter this non-reentrant mutex.
         val engineResult =
-            notificationDeliveryModeMutex.withLock {
-                if (marmotRuntime !== signOutRuntime || !prepareSignOutPushCleanup(signedOutRef)) return@withLock null
-                if (marmotRuntime !== signOutRuntime || activeAccountRef != signedOutRef) return@withLock null
-                runCatchingCancellable {
-                    withContext(marmotIoDispatcher) { checkNotNull(signOutRuntime).marmot.signOut(signedOutRef, deleteKeyPackages) }
-                }
-            } ?: return SignOutCompletion.AccountCleanupIncomplete
+            admittedNativeSignOut(signedOutRef, signOutRuntime, deleteKeyPackages)
+                ?: return SignOutCompletion.AccountCleanupIncomplete
         val engineOutcome = engineResult.getOrNull()
         if (engineOutcome?.localCleanup?.completed == false) {
             appStateDebug {
@@ -6717,6 +6718,22 @@ class WhiteNoiseAppState private constructor(
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
         return signOutCompletion(engineOutcome)
     }
+
+    /** Serializes sign-out admission and native teardown with notification delivery changes. */
+    private suspend fun admittedNativeSignOut(
+        signedOutRef: String,
+        signOutRuntime: AppMarmotRuntime?,
+        deleteKeyPackages: Boolean,
+    ): Result<dev.ipf.marmotkit.SignOutOutcomeFfi>? =
+        notificationDeliveryModeMutex.withLock {
+            if (marmotRuntime !== signOutRuntime || !prepareSignOutPushCleanup(signedOutRef)) return@withLock null
+            if (marmotRuntime !== signOutRuntime || activeAccountRef != signedOutRef) return@withLock null
+            runCatchingCancellable {
+                withContext(marmotIoDispatcher) {
+                    checkNotNull(signOutRuntime).marmot.signOut(signedOutRef, deleteKeyPackages)
+                }
+            }
+        }
 
     /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
     private fun clearSignedOutAccountMemory(account: String) {

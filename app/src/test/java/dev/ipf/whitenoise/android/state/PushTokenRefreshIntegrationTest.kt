@@ -96,7 +96,7 @@ class PushTokenRefreshIntegrationTest {
             }
         }
 
-    /** Restart-replayed account cleanup is acknowledged only after disabled settings, while another account can register. */
+    /** Replayed cleanup requires confirmed disabled settings while another account can register. */
     @Test
     fun replayedDisableRemainsPendingUntilNativeConfirmsAndDoesNotDisableAnotherAccount() =
         runBlocking {
@@ -114,7 +114,9 @@ class PushTokenRefreshIntegrationTest {
                         ),
                     initialNotificationSettings = NotificationSettingsFfi("account-a", "id-a", true, true),
                     emitStartupNotification = false,
-                    onSetNativePushEnabled = { account, _ -> NotificationSettingsFfi(account, "id-a", true, !confirmDisable) },
+                    onSetNativePushEnabled = { account, _ ->
+                        NotificationSettingsFfi(account, "id-a", true, !confirmDisable)
+                    },
                     onUpsertPushRegistration = { registered += it },
                     nativePushFallbackPlatform = RecordingNativePushFallbackPlatform(context),
                     pushServerConfigProvider = { PushServerConfig("0".repeat(64), null) },
