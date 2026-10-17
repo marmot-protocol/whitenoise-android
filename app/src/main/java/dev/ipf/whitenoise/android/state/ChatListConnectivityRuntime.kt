@@ -45,7 +45,9 @@ internal class ConnectivitySignalOwner {
             val nextHasActiveNetwork = hasActiveNetwork ?: current.hasActiveNetwork
             if (nextHasValidatedInternet != current.hasValidatedInternet ||
                 nextHasActiveNetwork != current.hasActiveNetwork
-            ) networkLifetime.advance()
+            ) {
+                networkLifetime.advance()
+            }
             mutableSignals.value =
                 current.copy(
                     hasValidatedInternet = nextHasValidatedInternet,
