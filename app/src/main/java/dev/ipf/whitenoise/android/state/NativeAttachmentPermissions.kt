@@ -19,6 +19,9 @@ internal class NativeAttachmentPermissions {
     private val updates = Mutex()
     private val applied = MutableStateFlow(AppliedPermissions(revision = 0L, accounts = emptyMap()))
 
+    /** The revision whose refresh is still applying, or 0 when none is. */
+    private val inFlight = AtomicLong()
+
     /** The permission the native runtime holds for each account under one host revision. */
     private data class AppliedPermissions(
         val revision: Long,
@@ -55,6 +58,24 @@ internal class NativeAttachmentPermissions {
     internal fun waitersForTest(): StateFlow<Int> = applied.subscriptionCount
 
     /** Whether a retry still belongs to both the latest host inputs and native runtime. */
+
+    /** Marks [revision]'s refresh as applying, so a settle timeout does not supersede it with a new one. */
+    fun beginRefresh(revision: Long) = inFlight.set(revision)
+
+    /** Clears [revision]'s in-flight mark once its refresh has finished, applied or not. */
+    fun endRefresh(revision: Long) {
+        inFlight.compareAndSet(revision, 0L)
+    }
+
+    /**
+     * Whether a refresh under the latest revision for [owner] is still applying. A settle timeout then waits for it
+     * instead of starting a new generation, which would revoke and supersede the one about to land.
+     */
+    fun refreshInFlight(owner: Any?): Boolean {
+        val pending = inFlight.get()
+        return pending != 0L && pending == revision.get() && runtimeOwner.get() === owner
+    }
+
     fun isCurrent(
         expectedRevision: Long,
         expectedOwner: Any,

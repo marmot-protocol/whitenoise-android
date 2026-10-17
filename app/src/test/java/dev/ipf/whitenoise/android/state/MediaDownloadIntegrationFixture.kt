@@ -71,6 +71,9 @@ internal class MediaDownloadIntegrationFixture(
 
     @Volatile private var nativeImagesAllowed = false
     val permissionApplications = AtomicInteger()
+
+    /** Native permission generations begun, one per refresh that reached the runtime. */
+    val permissionBegins = AtomicInteger()
     val active = AtomicInteger()
     val peak = AtomicInteger()
     var onDownload: (Call) -> Unit = {}
@@ -224,6 +227,7 @@ internal class MediaDownloadIntegrationFixture(
                 }
                 "beginAttachmentPermissionUpdate" -> {
                     // Beginning an update revokes the current approval, as MDK does.
+                    permissionBegins.incrementAndGet()
                     nativeImagesAllowed = false
                     "fixture-generation"
                 }

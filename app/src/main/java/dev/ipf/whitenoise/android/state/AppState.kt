@@ -1442,6 +1442,11 @@ class WhiteNoiseAppState private constructor(
     /** Questions about overriding MDK's advisory refusals of a group change, shown at app level (#3289). */
     internal val groupChangeConfirmations = GroupChangeConfirmations()
 
+    /** Whether a coalesced network-triggered permission refresh is queued and has not started yet. */
+    private val networkPermissionRefreshPending =
+        java.util.concurrent.atomic
+            .AtomicBoolean(false)
+
     /** Bounds concurrent receipt history lookups across the notification and runtime-event receipt sources. */
     private val receiptLookupGate = Semaphore(RECEIPT_LOOKUP_CONCURRENCY)
 
@@ -1459,34 +1464,62 @@ class WhiteNoiseAppState private constructor(
         if (widenWaiting) widenWaitingAutomaticDownloads(accountRefs)
         val engine = runtime?.marmot ?: return
         // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
+        nativeAttachmentPermissions.beginRefresh(revision)
         mutationsScope.launch {
-            var pending = accountRefs.toSet()
-            var attempt = 0
-            while (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
-                pending =
-                    nativeAttachmentPermissions.update(revision, runtime, engine, pending.toList()) { account ->
-                        // The editor commits off-main. Revoke first, then wait for queued
-                        // settings saves so this generation never restores an obsolete matrix.
-                        hostPreferenceCommitMutex.withLock {
-                            loadMediaAutoDownloadMatrix(account).nativePermission(
-                                activeNetworkTypes(),
-                                hasValidatedInternet(),
-                                attachmentDownloadIntents.isAutomaticPaused(account),
-                            )
-                        }
+            try {
+                applyNativeAttachmentPermissions(revision, runtime, engine, accountRefs)
+            } finally {
+                nativeAttachmentPermissions.endRefresh(revision)
+            }
+        }
+    }
+
+    /**
+     * Coalesces refreshes requested by network callbacks, which can arrive in bursts: callbacks made before the
+     * pending refresh runs join it, and it reads the network when it runs, so the latest state applies. Such
+     * refreshes never widen waiting work, since a network edge cannot change its target.
+     */
+    private fun requestNetworkPermissionRefresh() {
+        if (!networkPermissionRefreshPending.compareAndSet(false, true)) return
+        mutationsScope.launch {
+            networkPermissionRefreshPending.set(false)
+            refreshNativeAttachmentPermissions(widenWaiting = false)
+        }
+    }
+
+    /** Applies [revision]'s permissions for [accountRefs], retrying failed accounts while it stays current. */
+    private suspend fun applyNativeAttachmentPermissions(
+        revision: Long,
+        runtime: AppMarmotRuntime,
+        engine: MarmotInterface,
+        accountRefs: List<String>,
+    ) {
+        var pending = accountRefs.toSet()
+        var attempt = 0
+        while (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
+            pending =
+                nativeAttachmentPermissions.update(revision, runtime, engine, pending.toList()) { account ->
+                    // The editor commits off-main. Revoke first, then wait for queued
+                    // settings saves so this generation never restores an obsolete matrix.
+                    hostPreferenceCommitMutex.withLock {
+                        loadMediaAutoDownloadMatrix(account).nativePermission(
+                            activeNetworkTypes(),
+                            hasValidatedInternet(),
+                            attachmentDownloadIntents.isAutomaticPaused(account),
+                        )
                     }
-                if (!nativeAttachmentPermissions.isCurrent(revision, runtime)) return@launch
-                if (pending.isEmpty()) {
-                    attachmentDownloadPolicyRevision += 1
-                    return@launch
                 }
-                attempt += 1
-                if (attempt >= NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT) break
-                delay(NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS * attempt)
+            if (!nativeAttachmentPermissions.isCurrent(revision, runtime)) return
+            if (pending.isEmpty()) {
+                attachmentDownloadPolicyRevision += 1
+                return
             }
-            if (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
-                Log.w("AttachmentPermissions", "permission_update_failed accounts=${pending.size}")
-            }
+            attempt += 1
+            if (attempt >= NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT) break
+            delay(NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS * attempt)
+        }
+        if (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
+            Log.w("AttachmentPermissions", "permission_update_failed accounts=${pending.size}")
         }
     }
 
@@ -4996,7 +5029,11 @@ class WhiteNoiseAppState private constructor(
         return withTimeoutOrNull(NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS) {
             nativeAttachmentPermissions.awaitApplied(accountRef) { it.allows(type) }
         } ?: run {
-            refreshNativeAttachmentPermissions(widenWaiting = false)
+            // A refresh still applying under the latest revision is left to land: starting another would revoke and
+            // supersede it, and every album worker that timed out together would keep superseding the others.
+            if (!nativeAttachmentPermissions.refreshInFlight(marmotRuntime)) {
+                refreshNativeAttachmentPermissions(widenWaiting = false)
+            }
             throw AttachmentPermissionPendingException()
         }
     }
@@ -8520,7 +8557,7 @@ class WhiteNoiseAppState private constructor(
             hasValidatedInternet = recovery.hasUsableInternet,
             hasActiveNetwork = hasActiveNetworkSnapshot,
         )
-        refreshNativeAttachmentPermissions(widenWaiting = false)
+        requestNetworkPermissionRefresh()
         if (!recovery.restored) return
         resumePushWakeEpisodeFromLifecycle()
         AvatarLoadRecovery.onNetworkRestored()

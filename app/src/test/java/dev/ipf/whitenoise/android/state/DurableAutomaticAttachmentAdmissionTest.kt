@@ -179,6 +179,34 @@ class DurableAutomaticAttachmentAdmissionTest {
             assertEquals(1, fixture.automaticDemands.get())
         }
 
+    /**
+     * Album workers that time out together while a refresh is still applying leave that refresh to land. None
+     * starts a new generation, which would revoke the one about to apply and supersede it, so the refresh in
+     * flight is the only one MDK sees and its approval is the one that applies.
+     */
+    @Test
+    fun concurrentSettleTimeoutsLeaveTheInFlightRefreshToLand() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            val commits = hostPreferenceCommits()
+            commits.lock()
+            fixture.state.refreshNativeAttachmentPermissions()
+            advanceUntilIdle()
+            assertEquals("the refresh began and waits on the queued settings save", 1, fixture.permissionBegins.get())
+
+            val first = async { runCatching { durable(AttachmentDownloadPriority.Automatic) }.exceptionOrNull() }
+            val second = async { runCatching { durable(AttachmentDownloadPriority.Automatic) }.exceptionOrNull() }
+            advanceTimeBy(NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS + 1)
+            advanceUntilIdle()
+            assertTrue("${first.await()}", first.await() is AttachmentPermissionPendingException)
+            assertTrue("${second.await()}", second.await() is AttachmentPermissionPendingException)
+
+            commits.unlock()
+            advanceUntilIdle()
+            assertEquals("no timeout began another generation", 1, fixture.permissionBegins.get())
+            assertEquals("the refresh in flight applied", 1, fixture.permissionApplications.get())
+        }
+
     /** A refusal from a revocation window is asked again once the host's approval has moved on. */
     @Test
     fun policyBlockedRequestIsAskedAgainOnceTheApprovalMovesOn() =
@@ -326,6 +354,13 @@ class DurableAutomaticAttachmentAdmissionTest {
             .getDeclaredField("nativeAttachmentPermissions")
             .apply { isAccessible = true }
             .get(fixture.state) as NativeAttachmentPermissions
+
+    /** The fixture state's settings-commit lock, which a permission evaluation waits on. */
+    private fun hostPreferenceCommits(): kotlinx.coroutines.sync.Mutex =
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("hostPreferenceCommitMutex")
+            .apply { isAccessible = true }
+            .get(fixture.state) as kotlinx.coroutines.sync.Mutex
 
     /** The fixture state's durable intent store, which records a stopped backlog. */
     private fun intents(): AttachmentDownloadIntentStore =
