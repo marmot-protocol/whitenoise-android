@@ -344,6 +344,7 @@ class StalenessGuardCoverageTest {
                         "nextActivitySequence",
                         "streamDebugEventSequence",
                     ),
+                "ConversationTimelineSession.kt" to listOf("lastStartedGeneration"),
                 "TtsPlaybackQueue.kt" to
                     listOf("messageProgressGeneration", "edgeRequestGeneration", "parkedTerminalGeneration"),
                 "NotificationStreamForegroundService.kt" to
