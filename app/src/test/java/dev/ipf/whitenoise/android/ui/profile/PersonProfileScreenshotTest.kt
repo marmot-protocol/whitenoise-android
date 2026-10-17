@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -64,7 +65,14 @@ class PersonProfileScreenshotTest {
     @Test fun privateDetails() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                ContactPrivateDetailsDialog("Public name", "Local nickname", "Private local note", {}, { _, _ -> })
+                ContactPrivateDetailsDialog(
+                    "Public name",
+                    "Local nickname",
+                    "Private local note",
+                    {},
+                    { _, _ -> },
+                    viewportInsets = WindowInsets(0),
+                )
             }
         }
         capture("private_details")

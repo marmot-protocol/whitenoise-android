@@ -1251,6 +1251,7 @@ internal fun ContactPrivateDetailsDialog(
     onPickPicture: () -> Unit = {},
     onRepositionPicture: () -> Unit = {},
     onClearPicture: () -> Unit = {},
+    viewportInsets: WindowInsets? = null,
 ) {
     val nickname =
         remember(initialNickname) {
@@ -1268,6 +1269,7 @@ internal fun ContactPrivateDetailsDialog(
     ) {
         ContactPrivateDetailsFrame(
             securePolicy = securePolicy,
+            viewportInsets = viewportInsets,
             onDismiss = onDismiss,
             actions = {
                 TextButton(

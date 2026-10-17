@@ -86,6 +86,7 @@ class ContactPrivateDetailsViewportScreenshotTest {
                         onDismiss = {},
                         onSave = { _, _ -> },
                         securePolicy = SecureFlagPolicy.SecureOff,
+                        viewportInsets = WindowInsets(0),
                         pictureState = ContactPictureEditorState(),
                     )
                 }
