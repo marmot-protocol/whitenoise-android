@@ -55,6 +55,54 @@
         "test_ids": [
           "GRP-030"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "surface": "R.string.add_member",
+        "anchor": "R.string.add_member",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "surface": "R.string.chat_list_search_groups",
+        "anchor": "R.string.chat_list_search_groups",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "surface": "R.string.group_name",
+        "anchor": "R.string.group_name",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "surface": "R.string.member",
+        "anchor": "R.string.member",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "surface": "R.string.members",
+        "anchor": "R.string.members",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "surface": "R.string.remove_member",
+        "anchor": "R.string.remove_member",
+        "test_ids": [
+          "GRP-030"
+        ]
       }
     ]
   },

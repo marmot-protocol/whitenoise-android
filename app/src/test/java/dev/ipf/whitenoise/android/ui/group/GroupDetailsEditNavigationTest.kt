@@ -567,35 +567,14 @@ class GroupDetailsEditNavigationTest {
         val mutations = java.util.concurrent.CopyOnWriteArrayList<String>()
         val nativeCalls = java.util.concurrent.CopyOnWriteArrayList<String>()
         val promotionTargets = java.util.concurrent.CopyOnWriteArrayList<String>()
-        val native =
-            java.lang.reflect.Proxy.newProxyInstance(
-                dev.ipf.marmotkit.MarmotInterface::class.java.classLoader,
-                arrayOf(dev.ipf.marmotkit.MarmotInterface::class.java),
-            ) { _, method, arguments ->
-                nativeCalls += method.name
-                when (method.name.substringBefore('-')) {
-                    "groupMembers" -> listOf(member(SELF_HEX, local = true), member("member-b"), member("member-c"))
-                    "npub" -> null
-                    "recordHostTiming" -> dev.ipf.marmotkit.ProductRecordResultFfi.IGNORED_DISABLED
-                    "promoteAdminDetailed", "selfDemoteAdminDetailed", "leaveGroup" -> {
-                        if (method.name.substringBefore('-') == "promoteAdminDetailed") promotionTargets += arguments?.get(2).toString()
-                        mutations += method.name.substringBefore('-')
-                        error("Native mutation deliberately rejected by the test fixture")
-                    }
-                    else -> error("Unexpected native call: ${method.name}")
-                }
-            } as dev.ipf.marmotkit.MarmotInterface
         val testController =
             controller(
                 group(),
                 verifiedRoster = true,
-                marmotRuntime =
-                    dev.ipf.whitenoise.android.state
-                        .AppMarmotRuntime("test", native),
-                memberNames =
-                    mapOf(
-                        "member-b" to "Bob",
-                        "member-c" to "Carol",
+                identity =
+                    GroupDetailsIdentityFixture(
+                        memberNames = mapOf("member-b" to "Bob", "member-c" to "Carol"),
+                        marmotRuntime = rejectingGroupAdminRuntime(mutations, nativeCalls, promotionTargets),
                     ),
             )
         render(testController)
@@ -605,11 +584,15 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
         composeRule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
         composeRule
-            .onNode(hasText(successorName) and hasAnyAncestor(hasTestTag("group.members.review.member")), useUnmergedTree = true)
-            .assertIsDisplayed()
+            .onNode(
+                hasText(successorName) and hasAnyAncestor(hasTestTag("group.members.review.member")),
+                useUnmergedTree = true,
+            ).assertIsDisplayed()
         composeRule
-            .onNode(hasText(GROUP_NAME) and hasAnyAncestor(hasTestTag("group.members.review.destination")), useUnmergedTree = true)
-            .assertIsDisplayed()
+            .onNode(
+                hasText(GROUP_NAME) and hasAnyAncestor(hasTestTag("group.members.review.destination")),
+                useUnmergedTree = true,
+            ).assertIsDisplayed()
         assertEquals(emptyList<String>(), mutations)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/group_leave_successor_review.png")
         composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
@@ -622,7 +605,9 @@ class GroupDetailsEditNavigationTest {
             composeRule.waitUntil(timeoutMillis = 5_000) { mutations.isNotEmpty() }
         } catch (failure: androidx.compose.ui.test.ComposeTimeoutException) {
             throw AssertionError(
-                "Native calls: $nativeCalls; roster=${testController.controller.memberRosterState}; error=${testController.controller.lastMutationError}",
+                "Native calls: $nativeCalls; " +
+                    "roster=${testController.controller.memberRosterState}; " +
+                    "error=${testController.controller.lastMutationError}",
                 failure,
             )
         }
@@ -635,7 +620,7 @@ class GroupDetailsEditNavigationTest {
     }
 
     private fun render(
-        testController: TestController,
+        testController: GroupDetailsTestController,
         onOpenSearch: (() -> Unit)? = null,
         onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
     ) {
@@ -659,165 +644,203 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.group_name)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.group_description)).assertIsDisplayed()
     }
+}
 
-    /** Controller. */
-    private fun controller(
-        group: AppGroupRecordFfi,
-        extraMembers: Int = 0,
-        verifiedRoster: Boolean = false,
-        membersOverride: List<AppGroupMemberRecordFfi>? = null,
-        memberNames: Map<String, String> = emptyMap(),
-        marmotRuntime: dev.ipf.whitenoise.android.state.AppMarmotRuntime? = null,
-    ): TestController {
-        val appState = testAppState(memberNames, marmotRuntime)
-        val members =
-            membersOverride
-                ?: (
-                    listOf(member(SELF_HEX, local = true), member("member-b"), member("member-c")) +
-                        ('d'..'z').take(extraMembers).map { member("member-$it") }
-                )
-        val controller =
-            ConversationController(
-                appState = appState,
-                initialGroup = group,
-                initialMemberSnapshot = GroupMemberSnapshot(members),
-                groupRosterReader = { account, groupId ->
-                    assertEquals(ACCOUNT_REF, account)
-                    assertEquals(group.groupIdHex, groupId)
-                    GroupRosterFfi(
-                        groupIdHex = groupId,
-                        members =
-                            members.map { member ->
-                                GroupMemberDetailsFfi(
-                                    memberIdHex = member.memberIdHex,
-                                    account = member.account,
-                                    local = member.local,
-                                    isAdmin = member.memberIdHex in group.admins,
-                                    isSelf = member.memberIdHex == SELF_HEX,
-                                    npub = "npub-${member.memberIdHex}",
-                                    displayName = memberNames[member.memberIdHex],
-                                )
-                            },
-                        epoch = 1uL,
-                        rosterRevision = 1uL,
-                        selfMembership = group.selfMembership,
-                        memberCount = members.size.toUInt(),
-                        lifecycleState = GroupLifecycleStateFfi.STABLE,
-                    )
-                },
+/** Builds the details controller with optional public-identity fixtures. */
+private fun controller(
+    group: AppGroupRecordFfi,
+    extraMembers: Int = 0,
+    verifiedRoster: Boolean = false,
+    membersOverride: List<AppGroupMemberRecordFfi>? = null,
+    identity: GroupDetailsIdentityFixture = GroupDetailsIdentityFixture(),
+): GroupDetailsTestController {
+    val memberNames = identity.memberNames
+    val appState = testAppState(memberNames, identity.marmotRuntime)
+    val members =
+        membersOverride
+            ?: (
+                listOf(member(SELF_HEX, local = true), member("member-b"), member("member-c")) +
+                    ('d'..'z').take(extraMembers).map { member("member-$it") }
             )
-        if (verifiedRoster) {
-            // A cached opening snapshot does not grant authoritative roster access.
-            runBlocking { controller.retryMembers() }
-            assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
-        }
-        return TestController(appState, controller)
+    val controller =
+        ConversationController(
+            appState = appState,
+            initialGroup = group,
+            initialMemberSnapshot = GroupMemberSnapshot(members),
+            groupRosterReader = { account, groupId ->
+                assertEquals(ACCOUNT_REF, account)
+                assertEquals(group.groupIdHex, groupId)
+                GroupRosterFfi(
+                    groupIdHex = groupId,
+                    members =
+                        members.map { member ->
+                            GroupMemberDetailsFfi(
+                                memberIdHex = member.memberIdHex,
+                                account = member.account,
+                                local = member.local,
+                                isAdmin = member.memberIdHex in group.admins,
+                                isSelf = member.memberIdHex == SELF_HEX,
+                                npub = "npub-${member.memberIdHex}",
+                                displayName = memberNames[member.memberIdHex],
+                            )
+                        },
+                    epoch = 1uL,
+                    rosterRevision = 1uL,
+                    selfMembership = group.selfMembership,
+                    memberCount = members.size.toUInt(),
+                    lifecycleState = GroupLifecycleStateFfi.STABLE,
+                )
+            },
+        )
+    if (verifiedRoster) {
+        // A cached opening snapshot does not grant authoritative roster access.
+        runBlocking { controller.retryMembers() }
+        assertEquals(GroupRosterLoadState.READY, controller.memberRosterState)
     }
+    return GroupDetailsTestController(appState, controller)
+}
 
-    private fun group(
-        groupId: String = "group-a",
-        name: String = GROUP_NAME,
-        admin: Boolean = true,
-        pendingConfirmation: Boolean = false,
-        disbanded: Boolean = false,
-    ): AppGroupRecordFfi =
-        AppGroupRecordFfi(
-            selfMembership = SelfMembershipFfi.MEMBER,
-            groupIdHex = groupId,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            profilePresent = false,
-            endpoint = "endpoint",
-            name = name,
-            description = "",
-            admins = if (admin) listOf(SELF_HEX) else listOf("member-b"),
-            relays = emptyList(),
-            nostrGroupIdHex = "nostr-$groupId",
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia = encryptedMedia(),
-            archived = false,
-            pendingConfirmation = pendingConfirmation,
-            unrecoverable = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-            disappearingMessageSecs = 0uL,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbanded = disbanded,
-            disbandRequest = null,
-        )
-
-    private fun encryptedMedia(): AppGroupEncryptedMediaComponentFfi =
-        AppGroupEncryptedMediaComponentFfi(
-            componentId = 0x8008u,
-            component = "marmot.group.encrypted-media.v1",
-            required = true,
-            version = EncryptedMediaVersionFfi.V1,
-            mediaFormat = "encrypted-media-v1",
-            allowedLocatorKinds = listOf("blossom-v1"),
-            defaultBlobEndpoints =
-                listOf(
-                    AppBlobEndpointFfi(
-                        locatorKind = "blossom-v1",
-                        baseUrl = "https://blossom.primal.net",
-                    ),
-                ),
-        )
-
-    private fun member(
-        memberId: String,
-        local: Boolean = false,
-    ): AppGroupMemberRecordFfi =
-        AppGroupMemberRecordFfi(
-            memberIdHex = memberId,
-            account = if (local) ACCOUNT_REF else null,
-            local = local,
-        )
-
-    private fun testAppState(
-        memberNames: Map<String, String> = emptyMap(),
-        marmotRuntime: dev.ipf.whitenoise.android.state.AppMarmotRuntime? = null,
-    ): WhiteNoiseAppState =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(InMemoryDraftPersistence()),
-            accountIdHexResolver = { SELF_HEX },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = SELF_HEX,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
-                ),
-            activeAccountRef = ACCOUNT_REF,
-            initialMarmotRuntime = marmotRuntime,
-            profileReader = { hex -> memberNames[hex]?.let { dev.ipf.marmotkit.UserProfileMetadataFfi(it, null, null, null, null, null, null) } },
-        )
-
-    private data class TestController(
-        val appState: WhiteNoiseAppState,
-        val controller: ConversationController,
+private fun group(
+    groupId: String = "group-a",
+    name: String = GROUP_NAME,
+    admin: Boolean = true,
+    pendingConfirmation: Boolean = false,
+    disbanded: Boolean = false,
+): AppGroupRecordFfi =
+    AppGroupRecordFfi(
+        selfMembership = SelfMembershipFfi.MEMBER,
+        groupIdHex = groupId,
+        protocolProfile = AppProtocolProfileFfi.LEGACY,
+        profilePresent = false,
+        endpoint = "endpoint",
+        name = name,
+        description = "",
+        admins = if (admin) listOf(SELF_HEX) else listOf("member-b"),
+        relays = emptyList(),
+        nostrGroupIdHex = "nostr-$groupId",
+        avatarUrl = null,
+        avatarDim = null,
+        avatarThumbhash = null,
+        imageHashHex = null,
+        encryptedMedia = encryptedMedia(),
+        archived = false,
+        pendingConfirmation = pendingConfirmation,
+        unrecoverable = false,
+        welcomerAccountIdHex = null,
+        viaWelcomeMessageIdHex = null,
+        disappearingMessageSecs = 0uL,
+        leaveRequestPending = false,
+        leaveRequestedAtMs = null,
+        disbanding = false,
+        disbanded = disbanded,
+        disbandRequest = null,
     )
 
-    private class InMemoryDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
+private fun encryptedMedia(): AppGroupEncryptedMediaComponentFfi =
+    AppGroupEncryptedMediaComponentFfi(
+        componentId = 0x8008u,
+        component = "marmot.group.encrypted-media.v1",
+        required = true,
+        version = EncryptedMediaVersionFfi.V1,
+        mediaFormat = "encrypted-media-v1",
+        allowedLocatorKinds = listOf("blossom-v1"),
+        defaultBlobEndpoints =
+            listOf(
+                AppBlobEndpointFfi(
+                    locatorKind = "blossom-v1",
+                    baseUrl = "https://blossom.primal.net",
+                ),
+            ),
+    )
 
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
+private fun member(
+    memberId: String,
+    local: Boolean = false,
+): AppGroupMemberRecordFfi =
+    AppGroupMemberRecordFfi(
+        memberIdHex = memberId,
+        account = if (local) ACCOUNT_REF else null,
+        local = local,
+    )
 
-    private companion object {
-        const val ACCOUNT_REF = "account-a"
-        const val SELF_HEX = "self-a"
-        const val GROUP_NAME = "Weekend hikers"
-    }
+private fun testAppState(
+    memberNames: Map<String, String> = emptyMap(),
+    marmotRuntime: dev.ipf.whitenoise.android.state.AppMarmotRuntime? = null,
+): WhiteNoiseAppState =
+    WhiteNoiseAppState(
+        context = ApplicationProvider.getApplicationContext(),
+        draftStore = DraftStore(GroupDetailsDraftPersistence()),
+        accountIdHexResolver = { SELF_HEX },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = ACCOUNT_REF,
+                    accountIdHex = SELF_HEX,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                ),
+            ),
+        activeAccountRef = ACCOUNT_REF,
+        initialMarmotRuntime = marmotRuntime,
+        profileReader = { hex ->
+            memberNames[hex]?.let {
+                dev.ipf.marmotkit.UserProfileMetadataFfi(it, null, null, null, null, null, null)
+            }
+        },
+    )
+
+private data class GroupDetailsTestController(
+    val appState: WhiteNoiseAppState,
+    val controller: ConversationController,
+)
+
+private class GroupDetailsDraftPersistence : DraftPersistence {
+    override fun read(): Map<String, String> = emptyMap()
+
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
+}
+
+private const val ACCOUNT_REF = "account-a"
+private const val SELF_HEX = "self-a"
+private const val GROUP_NAME = "Weekend hikers"
+
+/** Optional public-identity and native-runtime fixtures for the real details-screen tests. */
+private data class GroupDetailsIdentityFixture(
+    val memberNames: Map<String, String> = emptyMap(),
+    val marmotRuntime: dev.ipf.whitenoise.android.state.AppMarmotRuntime? = null,
+)
+
+/** Rejects the requested promotion so the UI test can prove no demotion or leave follows failure. */
+private fun rejectingGroupAdminRuntime(
+    mutations: MutableList<String>,
+    nativeCalls: MutableList<String>,
+    promotionTargets: MutableList<String>,
+): dev.ipf.whitenoise.android.state.AppMarmotRuntime {
+    val native =
+        java.lang.reflect.Proxy.newProxyInstance(
+            dev.ipf.marmotkit.MarmotInterface::class.java.classLoader,
+            arrayOf(dev.ipf.marmotkit.MarmotInterface::class.java),
+        ) { _, method, arguments ->
+            nativeCalls += method.name
+            when (method.name.substringBefore('-')) {
+                "groupMembers" -> listOf(member(SELF_HEX, local = true), member("member-b"), member("member-c"))
+                "npub" -> null
+                "recordHostTiming" -> dev.ipf.marmotkit.ProductRecordResultFfi.IGNORED_DISABLED
+                "promoteAdminDetailed", "selfDemoteAdminDetailed", "leaveGroup" -> {
+                    if (method.name.substringBefore('-') == "promoteAdminDetailed") {
+                        promotionTargets += arguments?.get(2).toString()
+                    }
+                    mutations += method.name.substringBefore('-')
+                    error("Native mutation deliberately rejected by the test fixture")
+                }
+                else -> error("Unexpected native call: ${method.name}")
+            }
+        } as dev.ipf.marmotkit.MarmotInterface
+    return dev.ipf.whitenoise.android.state
+        .AppMarmotRuntime("test", native)
 }

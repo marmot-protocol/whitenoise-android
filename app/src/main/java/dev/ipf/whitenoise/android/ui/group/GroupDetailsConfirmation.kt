@@ -96,7 +96,11 @@ internal fun GroupDetailsConfirmation(
                 }
             },
             confirmButton = {
-                TextButton(onClick = model.onConfirm, enabled = confirmEnabled, modifier = Modifier.testTag("group.details.confirm")) {
+                TextButton(
+                    onClick = model.onConfirm,
+                    enabled = confirmEnabled,
+                    modifier = Modifier.testTag("group.details.confirm"),
+                ) {
                     Text(stringResource(R.string.transfer_admin))
                 }
             },
@@ -138,9 +142,11 @@ internal fun GroupDetailsConfirmation(
                 stringResource(R.string.confirm_remove_member_message, subject ?: model.memberName)
             is GroupDetailsConfirmationState.TransferAdmin ->
                 stringResource(R.string.confirm_transfer_admin_message, subject ?: model.memberName)
-            is GroupDetailsConfirmationState.StepDown -> stringResource(R.string.confirm_step_down_admin_message)
+            is GroupDetailsConfirmationState.StepDown ->
+                stringResource(R.string.confirm_step_down_admin_message)
             is GroupDetailsConfirmationState.Leave -> stringResource(R.string.confirm_leave_message_named)
-            is GroupDetailsConfirmationState.LeaveSoleMember -> stringResource(R.string.confirm_leave_sole_member_message)
+            is GroupDetailsConfirmationState.LeaveSoleMember ->
+                stringResource(R.string.confirm_leave_sole_member_message)
             is GroupDetailsConfirmationState.TransferThenLeave ->
                 stringResource(R.string.confirm_sole_admin_transfer_then_leave_message, subject ?: model.memberName)
         }

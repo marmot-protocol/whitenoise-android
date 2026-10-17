@@ -85,7 +85,8 @@ internal fun GroupMembersReviewDialog(
                 onClick = onConfirm,
                 colors =
                     ButtonDefaults.textButtonColors(
-                        contentColor = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        contentColor =
+                            if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     ),
                 enabled = !busy && members.isNotEmpty() && groups.isNotEmpty(),
                 modifier = Modifier.testTag(SELECTED_MEMBERS_CONFIRM_TAG),
@@ -190,12 +191,20 @@ internal fun GroupMemberReviewPair(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    stringResource(if (otherGroups.isEmpty()) R.string.group_name else R.string.chat_list_search_groups),
+                    stringResource(
+                        if (otherGroups.isEmpty()) R.string.group_name else R.string.chat_list_search_groups,
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                 )
                 (listOf(group) + otherGroups).forEach { destination ->
                     key(destination.id) {
-                        Avatar(destination.name, destination.id, 48.dp, pictureUrl = destination.pictureUrl, picture = destination.image)
+                        Avatar(
+                            destination.name,
+                            destination.id,
+                            48.dp,
+                            pictureUrl = destination.pictureUrl,
+                            picture = destination.image,
+                        )
                         EmojiLabel(destination.name, style = MaterialTheme.typography.titleSmall)
                     }
                 }
@@ -223,4 +232,7 @@ internal fun GroupMemberReviewPair(
 }
 
 /** Rejects identity placeholders as names so an unnamed person has one abbreviated identifier. */
-internal fun reviewMemberPublicName(value: String?): String? = ProfileSanitizer.displayName(value)?.takeUnless(IdentityFormatter::isNostrIdentityFallback)
+internal fun reviewMemberPublicName(value: String?): String? {
+    val publicName = ProfileSanitizer.displayName(value) ?: return null
+    return publicName.takeUnless(IdentityFormatter::isNostrIdentityFallback)
+}

@@ -235,8 +235,19 @@ class GroupMembersReviewScreenshotTest {
             WhiteNoiseTheme {
                 GroupMembersReviewDialog(
                     appState = state,
-                    groups = listOf(MemberReviewGroup("garden", "Garden club"), MemberReviewGroup("orchard", "Orchard club")),
-                    members = listOf(RecipientSearch.Candidate("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f", npub, npub)),
+                    groups =
+                        listOf(
+                            MemberReviewGroup("garden", "Garden club"),
+                            MemberReviewGroup("orchard", "Orchard club"),
+                        ),
+                    members =
+                        listOf(
+                            RecipientSearch.Candidate(
+                                "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+                                npub,
+                                npub,
+                            ),
+                        ),
                     busy = false,
                     onDismiss = {},
                     onConfirm = {},
@@ -280,7 +291,9 @@ class GroupMembersReviewScreenshotTest {
                 )
             }
         rule.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
                 WhiteNoiseTheme(fontScale = 1.5f) {
                     GroupMembersReviewDialog(
                         appState = state,
@@ -299,7 +312,8 @@ class GroupMembersReviewScreenshotTest {
         }
         rule.onNodeWithContentDescription("Admin, Alice").assertIsOn()
         rule.onNodeWithContentDescription("Admin, Bob").performScrollTo().assertIsOff()
-        rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_member_review_multiple_${if (rtl) "rtl" else "ltr"}.png")
+        val suffix = if (rtl) "rtl" else "ltr"
+        rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_member_review_multiple_$suffix.png")
     }
 
     /** Renders the production member-review dialog in the requested visual variant. */
@@ -349,6 +363,19 @@ class GroupMembersReviewScreenshotTest {
         }
         rule.onNodeWithContentDescription("Review selected members").performClick()
         rule.onNode(isDialog()).assertExists()
+        assertPublicReviewIdentity(npub, rtl)
+        rule
+            .onNodeWithTag("group.members.review.dialog")
+            .captureRoboImage("src/test/snapshots/group_member_review_$name.png")
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed().performClick()
+        assertEquals(1, submits)
+    }
+
+    /** Verifies public identity, privacy and logical column order before the golden is captured. */
+    private fun assertPublicReviewIdentity(
+        npub: String,
+        rtl: Boolean,
+    ) {
         rule.onNodeWithText("Garden club").assertIsDisplayed()
         rule.onNodeWithText("alice").performScrollTo().assertIsDisplayed()
         rule
@@ -363,10 +390,5 @@ class GroupMembersReviewScreenshotTest {
         val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
         val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
         assertTrue(if (rtl) person.center.x > group.center.x else person.center.x < group.center.x)
-        rule
-            .onNodeWithTag("group.members.review.dialog")
-            .captureRoboImage("src/test/snapshots/group_member_review_$name.png")
-        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed().performClick()
-        assertEquals(1, submits)
     }
 }

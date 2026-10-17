@@ -84,7 +84,9 @@ class GroupActionIdentityScreenshotTest {
         val npub = "npub1yqsjygeyy5nzw2pf9g4jctfw9ucrzv3nxs6nvdec8yark0pa8clst3m4tg"
         var submitted = 0
         rule.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = if (rtl) 2f else 1f) {
                     GroupDetailsConfirmation(
                         model = GroupDetailsConfirmationState.TransferAdmin("Private alias") { submitted += 1 },
@@ -98,7 +100,8 @@ class GroupActionIdentityScreenshotTest {
                                         hex,
                                         "Private alias",
                                         npub,
-                                        searchProfile = UserProfileMetadataFfi("Public Alice", null, null, null, null, null, null),
+                                        searchProfile =
+                                            UserProfileMetadataFfi("Public Alice", null, null, null, null, null, null),
                                     ),
                             )
                         },

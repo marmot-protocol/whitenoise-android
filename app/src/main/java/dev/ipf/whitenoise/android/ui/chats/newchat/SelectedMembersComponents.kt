@@ -252,8 +252,15 @@ internal fun SelectedMembersReviewScreen(
                         avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
                         titleMaxLines = Int.MAX_VALUE,
                         trailing = {
-                            IconButton(onClick = { onRemove(member) }, enabled = !busy, modifier = Modifier.size(48.dp)) {
-                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.remove_member_named, memberName))
+                            IconButton(
+                                onClick = { onRemove(member) },
+                                enabled = !busy,
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.remove_member_named, memberName),
+                                )
                             }
                         },
                     )

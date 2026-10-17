@@ -204,8 +204,14 @@ class SelectedMembersReviewScreenTest {
         }
         val adminLabel = context.getString(R.string.admin)
         composeRule.onNodeWithContentDescription("$adminLabel, ${members.first().displayName}").performClick()
-        composeRule.onNodeWithContentDescription("$adminLabel, ${members.first().displayName}").assertIsDisplayed().assertIsOn()
-        composeRule.onNodeWithContentDescription("$adminLabel, ${members.last().displayName}").assertIsDisplayed().assertIsOff()
+        composeRule
+            .onNodeWithContentDescription("$adminLabel, ${members.first().displayName}")
+            .assertIsDisplayed()
+            .assertIsOn()
+        composeRule
+            .onNodeWithContentDescription("$adminLabel, ${members.last().displayName}")
+            .assertIsDisplayed()
+            .assertIsOff()
         assertEquals(0, removed)
         assertEquals(0, confirmed)
         composeRule.onNodeWithText(context.getString(R.string.add_member)).performClick()
@@ -238,7 +244,10 @@ class SelectedMembersReviewScreenTest {
             .onNodeWithContentDescription("$adminLabel, ${members.first().displayName}")
             .assertIsNotEnabled()
             .performClick()
-        composeRule.onNodeWithContentDescription("$adminLabel, ${members.last().displayName}").assertIsNotEnabled().assertIsOff()
+        composeRule
+            .onNodeWithContentDescription("$adminLabel, ${members.last().displayName}")
+            .assertIsNotEnabled()
+            .assertIsOff()
         assertEquals(0, changes)
     }
 

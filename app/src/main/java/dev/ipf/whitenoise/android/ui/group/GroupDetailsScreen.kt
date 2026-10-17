@@ -410,7 +410,13 @@ internal fun GroupDetailsScreen(
             val avatar = rememberConversationGroupAvatar(appState, controller)
             GroupMemberReviewPair(
                 appState = appState,
-                group = MemberReviewGroup(controller.group.groupIdHex, conversationTitle, avatar.pictureUrl, avatar.image),
+                group =
+                    MemberReviewGroup(
+                        controller.group.groupIdHex,
+                        conversationTitle,
+                        avatar.pictureUrl,
+                        avatar.image,
+                    ),
                 member = RecipientSearch.Candidate(memberHex, "", appState.npubForDisplay(memberHex)),
             )
         }

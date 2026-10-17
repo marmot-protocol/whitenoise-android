@@ -4,8 +4,11 @@ import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.activity.ComponentDialog
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -192,28 +195,32 @@ class ProfileAddToGroupsFlowTest {
 
     /** Returns the chosen shared group from the Make-admin picker. */
     @Test
+    @OptIn(ExperimentalMaterial3Api::class)
     fun makeAdminPickerReturnsTheSelectedSharedGroup() {
         val appState = testAppState()
         val group = groupItem("friends", "Friends")
         var promotedGroupId: String? = null
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface {
-                    ProfileMakeAdminContent(
-                        appState = appState,
-                        targetName = "Alice",
-                        target = RecipientSearch.Candidate("b".repeat(64), "Alice", "npub1alice"),
-                        state =
-                            ProfileGroupPickerState(
-                                groups = listOf(group),
-                                pendingGroupIds = emptySet(),
-                                loadState = ProfileGroupPickerLoadState.READY,
-                            ),
-                        busy = false,
-                        onClose = {},
-                        onRetry = {},
-                        onPromote = { promotedGroupId = it.group.groupIdHex },
-                    )
+            // Disable transient touch ripples for deterministic layout snapshots.
+            CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                WhiteNoiseTheme(darkTheme = true) {
+                    Surface {
+                        ProfileMakeAdminContent(
+                            appState = appState,
+                            targetName = "Alice",
+                            target = RecipientSearch.Candidate("b".repeat(64), "Alice", "npub1alice"),
+                            state =
+                                ProfileGroupPickerState(
+                                    groups = listOf(group),
+                                    pendingGroupIds = emptySet(),
+                                    loadState = ProfileGroupPickerLoadState.READY,
+                                ),
+                            busy = false,
+                            onClose = {},
+                            onRetry = {},
+                            onPromote = { promotedGroupId = it.group.groupIdHex },
+                        )
+                    }
                 }
             }
         }
@@ -224,6 +231,8 @@ class ProfileAddToGroupsFlowTest {
             .captureRoboImage("src/test/snapshots/profile_make_admin_ready_dark.png")
         composeRule.onNode(hasText(app.getString(R.string.make_admin)) and hasClickAction()).performClick()
         composeRule.runOnIdle { assertEquals(null, promotedGroupId) }
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("group.members.review.destination").assertIsDisplayed()
         composeRule
             .onNodeWithTag("group.members.review.dialog")
