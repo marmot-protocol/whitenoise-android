@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
+import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
+import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -75,39 +77,82 @@ internal fun WhiteNoiseAppState.forwardTransport(
             }
         }
 
-        /** Uploads already-materialized bytes strictly through the destination account. */
+        /**
+         * Uploads already-materialized bytes strictly through the destination account. The upload goes through
+         * MDK's file-backed path, so a transfer whose byte counter stops moving is cancelled and fails at the
+         * upload stage instead of looking stalled for minutes (#2556), and the user's Cancel stops it natively.
+         * Without the native library, as in JVM tests, the in-memory upload is used unchanged.
+         */
         override suspend fun upload(
             targetGroupIdHex: String,
             message: PreparedForwardMessage.Media,
         ): List<MediaAttachmentReferenceFfi> {
             requireDestinationAccount()
+            val batchCiphertextBytes =
+                withContext(Dispatchers.IO) { nativeFileBackedSendLimits()?.batchCiphertextBytes }
             val uploaded =
                 diagnostics.span(ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn) {
-                    marmotIo {
-                        uploadMedia(
-                            account,
-                            targetGroupIdHex,
-                            MediaUploadRequestFfi(
-                                attachments =
-                                    message.attachments.map { attachment ->
-                                        MediaUploadAttachmentRequestFfi(
-                                            fileName = attachment.fileName,
-                                            mediaType = attachment.mediaType,
-                                            plaintext = attachment.plaintextBytes,
-                                            dim = attachment.dim,
-                                            thumbhash = attachment.thumbhash,
-                                        )
-                                    },
-                                caption = message.caption,
-                                send = false,
-                                blossomServer = null,
-                            ),
-                        ).attachments.map { it.reference }
+                    if (batchCiphertextBytes == null) {
+                        uploadInMemory(targetGroupIdHex, message)
+                    } else {
+                        uploadFileBacked(targetGroupIdHex, message, batchCiphertextBytes)
                     }
                 }
             requireDestinationAccount()
             return uploaded
         }
+
+        /** Stages the bytes as private snapshots for one native file upload watched for stalls. */
+        private suspend fun uploadFileBacked(
+            targetGroupIdHex: String,
+            message: PreparedForwardMessage.Media,
+            batchCiphertextBytes: Long,
+        ): List<MediaAttachmentReferenceFfi> =
+            withFileUploadRequest(
+                message.attachments,
+                message.caption,
+                uploadSourcesDirectory(appContext.cacheDir),
+                batchCiphertextBytes,
+            ) { request ->
+                withNativeTransferControl(register = {}) { control ->
+                    withUploadStallWatchdog(
+                        stallMillis = FORWARD_UPLOAD_STALL_MILLIS,
+                        progress = { control.processedBytes().toLong() },
+                        cancel = control::cancel,
+                    ) {
+                        marmotIo { uploadMediaFiles(account, targetGroupIdHex, request, control) }
+                            .attachments
+                            .map { it.reference }
+                    }
+                }
+            }
+
+        /** Passes the bytes across the binding in memory, for runtimes without the native file path. */
+        private suspend fun uploadInMemory(
+            targetGroupIdHex: String,
+            message: PreparedForwardMessage.Media,
+        ): List<MediaAttachmentReferenceFfi> =
+            marmotIo {
+                uploadMedia(
+                    account,
+                    targetGroupIdHex,
+                    MediaUploadRequestFfi(
+                        attachments =
+                            message.attachments.map { attachment ->
+                                MediaUploadAttachmentRequestFfi(
+                                    fileName = attachment.fileName,
+                                    mediaType = attachment.mediaType,
+                                    plaintext = attachment.plaintextBytes,
+                                    dim = attachment.dim,
+                                    thumbhash = attachment.thumbhash,
+                                )
+                            },
+                        caption = message.caption,
+                        send = false,
+                        blossomServer = null,
+                    ),
+                ).attachments.map { it.reference }
+            }
 
         /** Reads enough recent destination history to classify an uncertain batch publication. */
         private suspend fun recentForwardTimeline(
