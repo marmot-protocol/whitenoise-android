@@ -9,7 +9,7 @@ import threading
 import time
 import uuid
 
-from apk_checker import cases_for, check_apk
+from apk_checker import cases_for, check_apk, expected_fetches
 from apk_installer_runner import instrument, set_install_permission, stages_for
 from apk_payload import MAX_BYTES, MIN_BYTES, has_manifest, sha256_of, signer_digest
 from budget_checker import PROFILES
@@ -193,8 +193,9 @@ def run(adb, serial, root, output, distribution, physical_fixture_serial=None, b
         # Failed and partial attempts stay in the ledger and report, nothing is reset.
         cases = cases_for(payload is not None)
         # The deliberately cancelled attempt ends with the client's disconnect, so only that run counts it as terminal.
+        # A case repeating earlier bytes is served from MDK's verified copy, so only distinct contents are fetched.
         events, report["ledger_finalized"] = wait_for_completion(
-            server.ledger, start, len(cases), len(cases) + int(cancel_retry),
+            server.ledger, start, len(cases), expected_fetches(report["metrics"], cases) + int(cancel_retry),
             terminal_kinds=("complete", "disconnect") if cancel_retry else ("complete",))
         time.sleep(0.5)
         events = server.ledger.snapshot()[start:]

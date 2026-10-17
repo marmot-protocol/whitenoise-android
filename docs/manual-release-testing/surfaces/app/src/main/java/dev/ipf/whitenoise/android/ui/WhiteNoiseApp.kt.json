@@ -117,6 +117,14 @@
         "test_ids": [
           "DIC-001"
         ]
+      },
+      {
+        "surface": "App-level question before overriding a refused group change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "GroupChangeConfirmationDialog(groupChangeQuestion)",
+        "test_ids": [
+          "GRP-032"
+        ]
       }
     ]
   },

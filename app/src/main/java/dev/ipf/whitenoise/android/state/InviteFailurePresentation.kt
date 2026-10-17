@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import androidx.annotation.StringRes
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotKitException.MissingKeyPackage
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.whitenoise.android.R
 
 private fun recipientFailureDetail(
@@ -28,12 +29,30 @@ internal fun inviteFailureDetail(
 ): AppText =
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> AppText.Resource(R.string.toast_no_active_account)
+        // Only obsolete KeyPackages means the recipient must update; none at all means they still need setup.
         is MissingKeyPackage ->
+            if (throwable.reason == MissingKeyPackageReasonFfi.OBSOLETE_ONLY) {
+                recipientFailureDetail(
+                    throwable.account,
+                    displayName,
+                    R.string.error_obsolete_key_package,
+                    R.string.error_obsolete_key_package_for,
+                )
+            } else {
+                recipientFailureDetail(
+                    throwable.account,
+                    displayName,
+                    R.string.error_missing_key_package,
+                    R.string.error_missing_key_package_for,
+                )
+            }
+        // The lookup ran out of time or relay coverage: nothing is known to be missing, so retry, never "set up".
+        is MarmotKitException.DirectoryLookupIncomplete ->
             recipientFailureDetail(
                 throwable.account,
                 displayName,
-                R.string.error_missing_key_package,
-                R.string.error_missing_key_package_for,
+                R.string.error_directory_lookup_incomplete,
+                R.string.error_directory_lookup_incomplete_for,
             )
         is MarmotKitException.MissingMemberInboxRoute ->
             recipientFailureDetail(
@@ -56,8 +75,12 @@ internal fun groupCreateFailureDetail(
     displayName: (String) -> String,
 ): AppText = inviteFailureDetail(throwable, displayName, fallbackResource = R.string.error_group_create_failed_retry)
 
-/** Sharing an install link is optional help for a missing package, never an invalid-package diagnosis. */
-internal fun startProfileChatFailureIsMissingSetup(throwable: Throwable): Boolean = throwable is MissingKeyPackage
+/**
+ * Sharing an install link is optional help for a confirmed missing package, never an invalid-package diagnosis, an
+ * outdated recipient or a lookup that could not finish.
+ */
+internal fun startProfileChatFailureIsMissingSetup(throwable: Throwable): Boolean =
+    throwable is MissingKeyPackage && throwable.reason == MissingKeyPackageReasonFfi.NOT_FOUND
 
 internal fun startProfileChatFailureDetail(
     throwable: Throwable,
@@ -78,14 +101,21 @@ internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
 
 internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean = groupCreateFailureCopyable(throwable)
 
-/** Founding-roster recovery names only a recipient matched to the submitted selection. */
+/**
+ * Founding-roster recovery names only a recipient matched to the submitted selection. An incomplete lookup is never
+ * matched, because retrying, not removing the recipient, is its remedy.
+ */
 internal fun groupCreateSelectionFailureDetail(
     throwable: Throwable,
     recipientName: String?,
 ): AppText =
     when {
         recipientName != null -> groupCreateFailureDetail(throwable) { recipientName }
+        throwable is MissingKeyPackage && throwable.reason == MissingKeyPackageReasonFfi.OBSOLETE_ONLY ->
+            AppText.Resource(R.string.error_obsolete_key_package)
         throwable is MissingKeyPackage -> AppText.Resource(R.string.error_missing_key_package)
+        throwable is MarmotKitException.DirectoryLookupIncomplete ->
+            AppText.Resource(R.string.error_directory_lookup_incomplete)
         throwable is MarmotKitException.MissingMemberInboxRoute -> AppText.Resource(R.string.error_missing_member_inbox)
         else -> groupCreateFailureDetail(throwable) { "" }
     }

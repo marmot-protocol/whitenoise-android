@@ -10,6 +10,9 @@ internal class ScopedGroupImageMutation<out T>(
     var reconcilePrimary: Boolean = false
         private set
 
+    /** False once a viewer attempt has lost its owner; editor attempts keep committing after their screen closes. */
+    fun stillOwned(): Boolean = !viewerPermissionCheck || isActive()
+
     /** Opts this single viewer attempt into authoritative admission and committed-image reconciliation. */
     fun forViewer(reconcile: Boolean): ScopedGroupImageMutation<T> {
         viewerPermissionCheck = true

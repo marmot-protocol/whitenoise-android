@@ -834,6 +834,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">Não foi possível adicionar %1$s. Já é membro ou a chave de assinatura conflita com a de um membro existente.</string>
     <string name="toast_invites_sent_to_groups">Convites enviados aos grupos selecionados</string>
     <string name="toast_invites_sent_to_groups_partial">Convites enviados a alguns grupos; alguns falharam</string>
+    <string name="toast_invites_sent_to_groups_waited">Convites enviados a alguns grupos; os outros aguardam uma nova tentativa</string>
     <string name="toast_member_removed">Membro removido</string>
     <string name="toast_couldnt_remove_member">Não foi possível remover o membro. Tente novamente.</string>
     <string name="toast_group_roster_changed">Os membros do grupo mudaram. Verifique o grupo e tente novamente.</string>
@@ -2320,6 +2321,21 @@
     <string name="media_reply_draft_conflict">Seu rascunho mudou. Mantenha esta resposta e tente novamente, ou cancele a resposta antes de enviar.</string>
     <string name="photo_editor_budget_exceeded">Este recorte exige mais detalhes da imagem ou memória do que é possível processar com segurança. Escolha um recorte mais amplo ou uma qualidade inferior. O anexo anterior permanece inalterado.</string>
     <string name="share_connect_save_to_gallery">Salvar na galeria</string>
+    <string name="media_storage_blocked_short">Armazenamento insuficiente</string>
+    <string name="media_storage_blocked">Armazenamento insuficiente. Libere espaço e toque para tentar novamente.</string>
+    <string name="error_obsolete_key_package">Esta pessoa precisa atualizar o White Noise antes de ser adicionada. Peça para ela atualizar e abrir o app e tente novamente.</string>
+    <string name="error_obsolete_key_package_for">%1$s precisa atualizar o White Noise antes de ser adicionado(a). Peça para atualizar e abrir o app e tente novamente.</string>
+    <string name="error_directory_lookup_incomplete">Não conseguimos concluir a verificação de que esta pessoa pode ser adicionada. Verifique sua conexão e tente novamente.</string>
+    <string name="error_directory_lookup_incomplete_for">Não conseguimos concluir a verificação de que %1$s pode ser adicionado(a). Verifique sua conexão e tente novamente.</string>
+    <string name="error_message_not_editable">Esta mensagem não pode mais ser editada.</string>
+    <string name="group_change_catching_up_title">Esta conversa pode estar desatualizada</string>
+    <string name="group_change_catching_up_message">Esta conversa pode estar desatualizada neste dispositivo. Alterar o grupo agora pode dividi-lo para todos. Aguardar a sincronização ou continuar mesmo assim?</string>
+    <string name="group_change_catching_up_invite_message">Esta conversa pode estar desatualizada neste dispositivo. Se o grupo avançou, as pessoas que você convidar agora podem receber um convite que não funciona mais, e o grupo pode se dividir para todos. Aguardar a sincronização ou convidar mesmo assim?</string>
+    <string name="group_change_undelivered_title">Sua última alteração ainda está sendo entregue</string>
+    <string name="group_change_undelivered_message">Sua última alteração neste grupo ainda não chegou a todos os seus relays. Se você continuar, membros que usam apenas esses relays podem não conseguir acompanhar o grupo. Aguardar ou continuar mesmo assim?</string>
+    <string name="group_change_wait">Aguardar</string>
+    <string name="group_change_continue_anyway">Continuar mesmo assim</string>
+    <string name="group_change_invite_anyway">Convidar mesmo assim</string>
     <string name="starting_as">Iniciar como</string>
     <string name="starting_as_account">Iniciar como %1$s</string>
 </resources>

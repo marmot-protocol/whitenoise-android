@@ -64,6 +64,7 @@ private class ManifestAttachment(
 internal object MediaLifecycleAttachmentProbe {
     internal const val MANIFEST = "media-lifecycle.json"
     private const val MIB = 1024 * 1024
+    private const val ALBUM_CLIP_BYTES = 24 * 1024
     private const val DEADLINE_MILLIS = 600_000L
     private const val PROJECTION_TIMEOUT_MILLIS = 30_000L
     private const val POLL_MILLIS = 100L
@@ -124,11 +125,9 @@ internal object MediaLifecycleAttachmentProbe {
                 listOf(video("clip-24mib.mp4", padded))
             },
             FixtureMessage("album-3", "album", false) {
-                listOf(
-                    image("album-a.jpg", 2L),
-                    image("album-b.jpg", 3L),
-                    video("album-clip.mp4", FixtureMediaAssets.video()),
-                )
+                // Its own bytes: MDK stores identical content once, so a copy of the small clip would never be fetched.
+                val clip = FixtureMediaAssets.paddedVideo(FixtureMediaAssets.video(), ALBUM_CLIP_BYTES, 3L)
+                listOf(image("album-a.jpg", 2L), image("album-b.jpg", 3L), video("album-clip.mp4", clip))
             },
         )
 

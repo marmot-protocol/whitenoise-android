@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.state.GroupChangeDeclinedException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -184,5 +186,31 @@ class ChatListLeaveAndDeleteTest {
             job.cancel()
             job.join()
             assertTrue(cancelled)
+        }
+
+    /** Waiting on one chat's group change leaves that chat unfinished, keeps its stage, and the batch goes on. */
+    @Test
+    fun waitingOnOneChatLeavesItUnfinishedAndTheBatchGoesOn() =
+        runTest {
+            val removed = mutableListOf<String>()
+            val result =
+                runChatDepartureBatch(
+                    listOf(target("waited"), target("next")),
+                    { true },
+                    ChatDepartureCallbacks(
+                        { emptyList() },
+                        { _, _ -> error("no successor should be requested") },
+                        { item, _ ->
+                            removed += item.groupId
+                            if (item.groupId == "waited") {
+                                throw GroupChangeDeclinedException(MarmotKitException.GroupCatchingUp("waited"))
+                            }
+                            true
+                        },
+                    ),
+                )
+            assertEquals(listOf("waited", "next"), removed)
+            assertEquals(setOf("waited"), result.outstanding)
+            assertEquals(1, result.completed)
         }
 }

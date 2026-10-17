@@ -820,6 +820,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">无法添加 %1$s。对方已是成员，或其签名密钥与现有成员冲突。</string>
     <string name="toast_invites_sent_to_groups">邀请已发送到所选群组</string>
     <string name="toast_invites_sent_to_groups_partial">邀请已发送到部分群组；有些失败了</string>
+    <string name="toast_invites_sent_to_groups_waited">邀请已发送到部分群组；其余群组等待你重试</string>
     <string name="toast_member_removed">会员已删除</string>
     <string name="toast_couldnt_remove_member">移除成员失败。请重试。</string>
     <string name="toast_group_roster_changed">群组成员已更改。请检查群组并重试。</string>
@@ -2286,6 +2287,21 @@
     <string name="media_reply_draft_conflict">草稿已更改。请保留此回复并重试，或在发送前取消回复。</string>
     <string name="photo_editor_budget_exceeded">此裁剪所需的图像细节或内存超出安全处理范围。请选择更大的裁剪区域或降低画质。原附件保持不变。</string>
     <string name="share_connect_save_to_gallery">保存到相册</string>
+    <string name="media_storage_blocked_short">存储空间不足</string>
+    <string name="media_storage_blocked">存储空间不足。请释放空间，然后点按重试。</string>
+    <string name="error_obsolete_key_package">此用户需要先更新 White Noise 才能被添加。请对方更新并打开应用，然后重试。</string>
+    <string name="error_obsolete_key_package_for">%1$s 需要先更新 White Noise 才能被添加。请对方更新并打开应用，然后重试。</string>
+    <string name="error_directory_lookup_incomplete">未能完成检查此用户是否可以被添加。请检查网络连接，然后重试。</string>
+    <string name="error_directory_lookup_incomplete_for">未能完成检查 %1$s 是否可以被添加。请检查网络连接，然后重试。</string>
+    <string name="error_message_not_editable">此消息已无法编辑。</string>
+    <string name="group_change_catching_up_title">此聊天可能不是最新的</string>
+    <string name="group_change_catching_up_message">此聊天在此设备上可能不是最新的。现在更改群组可能会让群组为所有人分裂。等待同步，还是仍然继续？</string>
+    <string name="group_change_catching_up_invite_message">此聊天在此设备上可能不是最新的。如果群组已经更新，你现在邀请的人可能会收到无法使用的邀请，群组也可能为所有人分裂。等待同步，还是仍然邀请？</string>
+    <string name="group_change_undelivered_title">你的上一次更改仍在投递中</string>
+    <string name="group_change_undelivered_message">你对此群组的上一次更改尚未到达其所有中继。如果继续，只使用这些中继的成员可能无法继续跟上群组。等待，还是仍然继续？</string>
+    <string name="group_change_wait">等待</string>
+    <string name="group_change_continue_anyway">仍然继续</string>
+    <string name="group_change_invite_anyway">仍然邀请</string>
     <string name="starting_as">以此身份发起</string>
     <string name="starting_as_account">以 %1$s 的身份发起</string>
 </resources>

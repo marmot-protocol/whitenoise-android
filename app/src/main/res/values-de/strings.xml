@@ -834,6 +834,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s konnte nicht hinzugefügt werden. Die Person ist bereits Mitglied oder ihr Signaturschlüssel steht im Konflikt mit dem eines vorhandenen Mitglieds.</string>
     <string name="toast_invites_sent_to_groups">Einladungen an ausgewählte Gruppen gesendet</string>
     <string name="toast_invites_sent_to_groups_partial">Einladungen an einige Gruppen gesendet; einige sind fehlgeschlagen</string>
+    <string name="toast_invites_sent_to_groups_waited">Einladungen an einige Gruppen gesendet; die übrigen warten auf einen neuen Versuch</string>
     <string name="toast_member_removed">Mitglied entfernt</string>
     <string name="toast_couldnt_remove_member">Mitglied konnte nicht entfernt werden. Bitte erneut versuchen.</string>
     <string name="toast_group_roster_changed">Die Gruppenmitgliedschaft hat sich geändert. Prüfen Sie die Gruppe und versuchen Sie es erneut.</string>
@@ -2337,6 +2338,21 @@
     <string name="media_reply_draft_conflict">Dein Entwurf wurde geändert. Behalte diese Antwort und versuche es erneut, oder brich die Antwort vor dem Senden ab.</string>
     <string name="photo_editor_budget_exceeded">Dieser Zuschnitt benötigt mehr Bilddaten oder Arbeitsspeicher, als sicher verarbeitet werden können. Wähle einen größeren Bildausschnitt oder eine niedrigere Qualität. Der bisherige Anhang bleibt unverändert.</string>
     <string name="share_connect_save_to_gallery">In Galerie speichern</string>
+    <string name="media_storage_blocked_short">Nicht genügend Speicherplatz</string>
+    <string name="media_storage_blocked">Nicht genügend Speicherplatz. Geben Sie Speicherplatz frei und tippen Sie dann zum Wiederholen.</string>
+    <string name="error_obsolete_key_package">Diese Person muss White Noise aktualisieren, bevor sie hinzugefügt werden kann. Bitten Sie die Person, die App zu aktualisieren und zu öffnen, und versuchen Sie es dann erneut.</string>
+    <string name="error_obsolete_key_package_for">%1$s muss White Noise aktualisieren, bevor die Person hinzugefügt werden kann. Bitten Sie die Person, die App zu aktualisieren und zu öffnen, und versuchen Sie es dann erneut.</string>
+    <string name="error_directory_lookup_incomplete">Wir konnten nicht vollständig prüfen, ob diese Person hinzugefügt werden kann. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
+    <string name="error_directory_lookup_incomplete_for">Wir konnten nicht vollständig prüfen, ob %1$s hinzugefügt werden kann. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
+    <string name="error_message_not_editable">Diese Nachricht kann nicht mehr bearbeitet werden.</string>
+    <string name="group_change_catching_up_title">Dieser Chat ist möglicherweise nicht aktuell</string>
+    <string name="group_change_catching_up_message">Dieser Chat ist auf diesem Gerät möglicherweise nicht aktuell. Eine Änderung der Gruppe könnte sie jetzt für alle aufspalten. Auf die Synchronisierung warten oder trotzdem fortfahren?</string>
+    <string name="group_change_catching_up_invite_message">Dieser Chat ist auf diesem Gerät möglicherweise nicht aktuell. Falls sich die Gruppe weiterentwickelt hat, erhalten jetzt eingeladene Personen womöglich eine Einladung, die nicht mehr funktioniert, und die Gruppe könnte sich für alle aufspalten. Auf die Synchronisierung warten oder trotzdem einladen?</string>
+    <string name="group_change_undelivered_title">Ihre letzte Änderung wird noch zugestellt</string>
+    <string name="group_change_undelivered_message">Ihre letzte Änderung an dieser Gruppe hat noch nicht alle Relays der Gruppe erreicht. Mitglieder, die nur diese Relays nutzen, können der Gruppe womöglich nicht folgen, wenn Sie fortfahren. Warten oder trotzdem fortfahren?</string>
+    <string name="group_change_wait">Warten</string>
+    <string name="group_change_continue_anyway">Trotzdem fortfahren</string>
+    <string name="group_change_invite_anyway">Trotzdem einladen</string>
     <string name="starting_as">Starten als</string>
     <string name="starting_as_account">Starten als %1$s</string>
 </resources>

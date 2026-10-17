@@ -834,6 +834,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">Impossibile aggiungere %1$s. È già un membro oppure la sua chiave di firma è in conflitto con quella di un membro esistente.</string>
     <string name="toast_invites_sent_to_groups">Inviti inviati ai gruppi selezionati</string>
     <string name="toast_invites_sent_to_groups_partial">Inviti inviati ad alcuni gruppi; alcuni non sono riusciti</string>
+    <string name="toast_invites_sent_to_groups_waited">Inviti inviati ad alcuni gruppi; gli altri attendono un nuovo tentativo</string>
     <string name="toast_member_removed">Membro rimosso</string>
     <string name="toast_couldnt_remove_member">Impossibile rimuovere il membro. Riprova.</string>
     <string name="toast_group_roster_changed">I membri del gruppo sono cambiati. Controlla il gruppo e riprova.</string>
@@ -2320,6 +2321,21 @@
     <string name="media_reply_draft_conflict">La bozza è cambiata. Mantieni questa risposta e riprova, oppure annulla la risposta prima di inviare.</string>
     <string name="photo_editor_budget_exceeded">Questo ritaglio richiede più dettagli dell’immagine o memoria di quanto sia possibile elaborare in sicurezza. Scegli un ritaglio più ampio o una qualità inferiore. L’allegato precedente rimane invariato.</string>
     <string name="share_connect_save_to_gallery">Salva nella galleria</string>
+    <string name="media_storage_blocked_short">Spazio di archiviazione insufficiente</string>
+    <string name="media_storage_blocked">Spazio di archiviazione insufficiente. Libera spazio, poi tocca per riprovare.</string>
+    <string name="error_obsolete_key_package">Questa persona deve aggiornare White Noise prima di poter essere aggiunta. Chiedile di aggiornarlo e aprirlo, poi riprova.</string>
+    <string name="error_obsolete_key_package_for">%1$s deve aggiornare White Noise prima di poter essere aggiunto/a. Chiedigli di aggiornarlo e aprirlo, poi riprova.</string>
+    <string name="error_directory_lookup_incomplete">Non siamo riusciti a completare il controllo per capire se questa persona può essere aggiunta. Controlla la connessione, poi riprova.</string>
+    <string name="error_directory_lookup_incomplete_for">Non siamo riusciti a completare il controllo per capire se %1$s può essere aggiunto/a. Controlla la connessione, poi riprova.</string>
+    <string name="error_message_not_editable">Questo messaggio non può più essere modificato.</string>
+    <string name="group_change_catching_up_title">Questa chat potrebbe non essere aggiornata</string>
+    <string name="group_change_catching_up_message">Questa chat potrebbe non essere aggiornata su questo dispositivo. Modificare il gruppo ora potrebbe dividerlo per tutti. Aspettare la sincronizzazione o continuare comunque?</string>
+    <string name="group_change_catching_up_invite_message">Questa chat potrebbe non essere aggiornata su questo dispositivo. Se il gruppo è andato avanti, le persone che inviti ora potrebbero ricevere un invito che non funziona più e il gruppo potrebbe dividersi per tutti. Aspettare la sincronizzazione o invitare comunque?</string>
+    <string name="group_change_undelivered_title">La tua ultima modifica è ancora in consegna</string>
+    <string name="group_change_undelivered_message">La tua ultima modifica a questo gruppo non ha ancora raggiunto tutti i suoi relay. Se continui, i membri che usano solo quei relay potrebbero non riuscire a seguire il gruppo. Aspettare o continuare comunque?</string>
+    <string name="group_change_wait">Aspetta</string>
+    <string name="group_change_continue_anyway">Continua comunque</string>
+    <string name="group_change_invite_anyway">Invita comunque</string>
     <string name="starting_as">Avvio come</string>
     <string name="starting_as_account">Avvio come %1$s</string>
 </resources>
