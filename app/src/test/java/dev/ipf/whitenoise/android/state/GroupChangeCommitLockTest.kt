@@ -39,7 +39,7 @@ class GroupChangeCommitLockTest {
     @Test
     fun anOpenQuestionDoesNotHoldUpSendsToTheGroup() =
         runBlocking {
-            val state = appState(runtime { name -> check(name == "groupCommitDelivery") { "Unexpected: $name" } })
+            val state = appState(runtime(::nothingOwed))
             val change =
                 background.async {
                     runCatching {
@@ -69,6 +69,7 @@ class GroupChangeCommitLockTest {
             val state =
                 appState(
                     runtime { name ->
+                        if (name == "groupCommitDelivery") return@runtime null
                         check(name == "acknowledgeGroupCatchingUp") { "Unexpected native call: $name" }
                         acknowledging.countDown()
                         finishAcknowledgement.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -104,7 +105,7 @@ class GroupChangeCommitLockTest {
     @Test
     fun anAnswerAfterAnAccountSwitchNeverRetriesTheOldChange() =
         runBlocking {
-            val state = appState(runtime { name -> error("nothing may reach the runtime: $name") })
+            val state = appState(runtime(::nothingOwed))
             var attempts = 0
             val change =
                 background.async {
@@ -121,17 +122,18 @@ class GroupChangeCommitLockTest {
 
             switchActiveAccount(state, "bob")
             assertFalse(state.ownsGroupChange(question.target))
+            awaitUntil { state.groupChangeConfirmations.pending == null }
             question.answer(proceed = true)
 
             assertTrue(change.await() is GroupChangeDeclinedException)
             assertEquals(1, attempts)
         }
 
-    /** Continue given after the change stopped applying, such as a superseded avatar, acknowledges nothing. */
+    /** A question whose change stopped applying, such as a superseded avatar, is withdrawn without an answer. */
     @Test
-    fun anAnswerAfterTheChangeStoppedApplyingAcknowledgesNothing() =
+    fun aQuestionWhoseChangeStoppedApplyingIsWithdrawn() =
         runBlocking {
-            val state = appState(runtime { name -> check(name == "groupCommitDelivery") { "Unexpected: $name" } })
+            val state = appState(runtime(::nothingOwed))
             val wanted = AtomicBoolean(true)
             var attempts = 0
             val change =
@@ -146,17 +148,68 @@ class GroupChangeCommitLockTest {
             awaitUntil { state.groupChangeConfirmations.pending != null }
 
             wanted.set(false)
-            checkNotNull(state.groupChangeConfirmations.pending).answer(proceed = true)
+            awaitUntil { state.groupChangeConfirmations.pending == null }
 
             assertTrue(change.await() is GroupChangeDeclinedException)
             assertEquals(1, attempts)
+        }
+
+    /** When the owed-commit read fails, both cautions are asked before either is acknowledged. */
+    @Test
+    fun aFailedOwedCommitReadAsksAboutBothCautions() =
+        runBlocking {
+            val native = Collections.synchronizedList(mutableListOf<String>())
+            val state =
+                appState(
+                    runtime { name ->
+                        native += name
+                        check(name == "groupCommitDelivery") { "Unexpected native call: $name" }
+                        error("delivery state unavailable")
+                    },
+                )
+            var attempts = 0
+            val change =
+                background.async {
+                    runCatching {
+                        state.runGroupChange(ACCOUNT, GROUP) {
+                            attempts += 1
+                            throw MarmotKitException.GroupCatchingUp(GROUP)
+                        }
+                    }.exceptionOrNull()
+                }
+            awaitUntil { state.groupChangeConfirmations.pending?.caution == GroupChangeCaution.CatchingUp }
+            checkNotNull(state.groupChangeConfirmations.pending).answer(proceed = true)
+            awaitUntil { state.groupChangeConfirmations.pending?.caution == GroupChangeCaution.Undelivered }
+            checkNotNull(state.groupChangeConfirmations.pending).answer(proceed = false)
+
+            assertTrue(change.await() is GroupChangeDeclinedException)
+            assertEquals("nothing was acknowledged", listOf("groupCommitDelivery"), native.distinct())
+            assertEquals(1, attempts)
+        }
+
+    /** A change the user never asked for, such as cleaning up a superseded image, is refused without a question. */
+    @Test
+    fun aChangeTheUserNeverAskedForIsNeverAsked() =
+        runBlocking {
+            val state = appState(runtime(::nothingOwed))
+            val refusal = MarmotKitException.GroupCatchingUp(GROUP)
+
+            val failure =
+                runCatching {
+                    withTimeout(TIMEOUT_SECONDS * MILLIS_PER_SECOND) {
+                        state.runGroupChange(ACCOUNT, GROUP, askUser = false) { throw refusal }
+                    }
+                }.exceptionOrNull()
+
+            assertSame(refusal, failure)
+            assertNull(state.groupChangeConfirmations.pending)
         }
 
     /** A refusal for an account that is not the active one cannot be asked about, so it is an ordinary failure. */
     @Test
     fun aRefusalForAnInactiveAccountIsAnOrdinaryFailure() =
         runBlocking {
-            val state = appState(runtime { name -> error("nothing may reach the runtime: $name") })
+            val state = appState(runtime(::nothingOwed))
             val refusal = MarmotKitException.GroupCatchingUp(GROUP)
 
             val failure =
@@ -169,6 +222,12 @@ class GroupChangeCommitLockTest {
             assertSame(refusal, failure)
             assertNull(state.groupChangeConfirmations.pending)
         }
+
+    /** Answers the owed-commit read with no owed commit; any other native call is unexpected. */
+    private fun nothingOwed(name: String): Any? {
+        check(name == "groupCommitDelivery") { "nothing else may reach the runtime: $name" }
+        return null
+    }
 
     /** Polls [done] for up to the test timeout. */
     private suspend fun awaitUntil(done: () -> Boolean) {

@@ -99,6 +99,7 @@ internal fun ChatDepartureBatchDialog(
         ui.busy = true
         actions.onBusyChange(true)
         ui.result = null
+        val departingGroups = targets.mapTo(mutableSetOf()) { it.groupId }
         appState.launchMutation {
             try {
                 val result =
@@ -112,7 +113,11 @@ internal fun ChatDepartureBatchDialog(
                                 removeChatDepartureTarget(target, successor, controller, ui, isCurrent)
                             },
                             onProgress = { title, completed, total -> ui.progress = "$completed / $total · $title" },
-                            questionOpen = { appState.groupChangeConfirmations.pending != null },
+                            // Only a question about one of these chats pauses the budget, not one from elsewhere.
+                            questionOpen = {
+                                val question = appState.groupChangeConfirmations.pending
+                                question != null && question.target.groupIdHex in departingGroups
+                            },
                         ),
                     )
                 if (isCurrent()) ui.result = result

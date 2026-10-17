@@ -141,6 +141,7 @@ class GroupDepartureQuestionTest {
                 "groupMembers" -> roster()
                 "npub" -> null
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "groupCommitDelivery" -> null
                 "selfDemoteAdminDetailed" ->
                     failSuspendedNativeCall(arguments, MarmotKitException.GroupCatchingUp(GROUP))
                 "promoteAdminDetailed" -> promoted()

@@ -3137,6 +3137,40 @@ class ConversationSendRetryIntegrationTest {
             }
         }
 
+    /** A pending edit MDK refuses as not editable closes the editor, instead of repeating the refusal on every Send. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun aPendingEditMdkWillNotAcceptClosesTheEditor() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = appState()
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    pendingMessageEditPublisher = { _, _, _, _, _ -> throw MarmotKitException.InvalidEditTarget() },
+                    messageEditPublisher = { _, _, _, _ -> error("retained native original must keep ordering") },
+                )
+            try {
+                controller.retryMembers()
+                applyProjection(
+                    controller,
+                    projectedMessage(5uL, null, null).copy(clientToken = "retained-original-token"),
+                )
+                controller.beginMessageEdit(CONFIRMED_MESSAGE_ID)
+                controller.send("revision")
+
+                assertNull("the editor stayed open on a message that can never be edited", controller.editingMessageId)
+                assertEquals(AppText.Resource(R.string.error_message_not_editable), state.toast?.detail)
+                assertFalse(controller.timeline.any { it.status == MessageStatus.Failed })
+            } finally {
+                clearAndAwaitConversationTestFixture(controller)
+                Dispatchers.resetMain()
+            }
+        }
+
     /** A retry that publishes retires the failure notice its own first attempt raised (#2666). */
     @Test
     fun successfulRetryDismissesItsStaleFailureNotice() =

@@ -125,6 +125,7 @@ class ProfileGroupInviteWaitTest {
             ->
             when (val name = method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "groupCommitDelivery" -> null
                 "inviteMembersDetailed" -> {
                     val group = arguments?.get(1) as String
                     invites += group

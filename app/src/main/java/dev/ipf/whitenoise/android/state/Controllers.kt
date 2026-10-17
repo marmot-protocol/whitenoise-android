@@ -10178,7 +10178,8 @@ class ConversationController(
                         true
                     } else {
                         failPendingEditAdmission(intent, target, account, cause)
-                        false
+                        // A message MDK will never let this account edit ends the edit too, so the editor closes.
+                        cause is MarmotKitException.InvalidEditTarget
                     }
                 },
             )
@@ -10227,6 +10228,7 @@ class ConversationController(
             }
     }
 
+    /** Shows a refused pending edit as Failed with Retry, or restores the original text when MDK says it is final. */
     private fun failPendingEditAdmission(
         intent: DurablePendingEditIntent,
         target: String,
@@ -11670,22 +11672,18 @@ class ConversationController(
         }
 
     /**
-     * Best-effort clean-up of the encrypted image a public avatar supersedes. MDK can hold it back like any group
-     * change, so it is asked about too; a refusal, failure or Wait leaves the encrypted image in place, and the public
-     * avatar still wins for display.
+     * Best-effort clean-up of the encrypted image a public avatar supersedes. The user never asked for it, so when MDK
+     * holds it back nobody is asked: the refusal, like any failure, leaves the encrypted image in place, and the
+     * public avatar still wins for display.
      */
     private suspend fun clearSupersededGroupImage(account: String): Boolean =
-        try {
-            runCatchingCancellable {
-                appState.runGroupChange(account, group.groupIdHex) {
-                    appState.marmotIo { clearGroupImage(account, group.groupIdHex) }
-                }
-            }.onFailure {
-                if (BuildConfig.DEBUG) Log.w("DMConversation", "encrypted avatar cleanup failed", it)
-            }.isSuccess
-        } catch (_: GroupChangeDeclinedException) {
-            false
-        }
+        runCatchingCancellable {
+            appState.runGroupChange(account, group.groupIdHex, askUser = false) {
+                appState.marmotIo { clearGroupImage(account, group.groupIdHex) }
+            }
+        }.onFailure {
+            if (BuildConfig.DEBUG) Log.w("DMConversation", "encrypted avatar cleanup failed", it)
+        }.isSuccess
 
     /** Commits the encrypted image and reports failure only while [change] owns the attempt. */
     internal suspend fun updateGroupImage(change: ScopedGroupImageMutation<ImageUploadDraft?>): Boolean {

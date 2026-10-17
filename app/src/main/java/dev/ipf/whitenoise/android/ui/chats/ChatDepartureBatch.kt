@@ -87,6 +87,7 @@ private suspend fun prepareChatDepartures(
     return prepared
 }
 
+/** Records one chat's handover decision, or marks it failed or skipped, before anything destructive starts. */
 private suspend fun prepareChatDeparture(
     target: ChatDepartureTarget,
     isCurrent: () -> Boolean,
