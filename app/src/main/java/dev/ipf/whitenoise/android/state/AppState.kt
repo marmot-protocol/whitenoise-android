@@ -1441,15 +1441,21 @@ class WhiteNoiseAppState private constructor(
     /** Questions about overriding MDK's advisory refusals of a group change, shown at app level (#3289). */
     internal val groupChangeConfirmations = GroupChangeConfirmations()
 
+    /** Bounds concurrent receipt history lookups across the notification and runtime-event receipt sources. */
+    private val receiptLookupGate = Semaphore(RECEIPT_LOOKUP_CONCURRENCY)
+
     /**
-     * Refreshes runtime-scoped permissions after network, preference, or account changes, and widens any automatic
-     * downloads still waiting on a network narrower than the refreshed policy now allows.
+     * Refreshes runtime-scoped permissions after network, preference, or account changes. When [widenWaiting], it
+     * also widens any automatic downloads still waiting on a network narrower than the refreshed policy now allows.
+     * Network callbacks pass false: the widening target comes from the matrix and account state, which a network
+     * edge cannot change, and those callbacks arrive often.
      */
-    internal fun refreshNativeAttachmentPermissions() {
+    internal fun refreshNativeAttachmentPermissions(widenWaiting: Boolean = true) {
         val runtime = marmotRuntime
         val revision = nativeAttachmentPermissions.invalidate(runtime)
         val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
-        widenWaitingAutomaticDownloads(accountRefs)
+        AutomaticAttachmentNetworkWaits.policyNetworkType = ::liveAutomaticNetworkType
+        if (widenWaiting) widenWaitingAutomaticDownloads(accountRefs)
         val engine = runtime?.marmot ?: return
         // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
         mutationsScope.launch {
@@ -1489,6 +1495,19 @@ class WhiteNoiseAppState private constructor(
      * work queued under the old one without a new receipt or a reconnect. Only work recorded as narrowed is read;
      * the policy is computed after queued settings saves, and the WorkManager reads run off the main thread.
      */
+
+    /**
+     * The network [accountRef]'s live policy allows [type] on, for settling a receipt against the current policy.
+     * Null for an account that is not loaded and signed in, so an unknown policy never widens a waiting spec.
+     */
+    private fun liveAutomaticNetworkType(
+        accountRef: String,
+        type: MediaAutoDownloadType,
+    ): NetworkType? {
+        if (accounts.none { it.label == accountRef && !it.signedOut }) return null
+        return runCatching { automaticAttachmentPolicy(accountRef).networkType(type) }.getOrNull()
+    }
+
     private fun widenWaitingAutomaticDownloads(accountRefs: List<String>) {
         if (accountRefs.isEmpty()) return
         val waits = AutomaticAttachmentNetworkWaits.get(appContext)
@@ -1496,12 +1515,14 @@ class WhiteNoiseAppState private constructor(
             val policies =
                 hostPreferenceCommitMutex.withLock { accountRefs.associateWith(::automaticAttachmentPolicy) }
             withContext(Dispatchers.IO) {
-                policies.forEach { (account, policy) ->
-                    runCatching { waits.widen(WorkManager.getInstance(appContext), account, policy::networkType) }
-                        .onSuccess { count ->
-                            if (count > 0) Log.i(INCOMING_ATTACHMENT_TAG, "attachment_network_widened count=$count")
-                        }.onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "attachment_network_widening_failed") }
-                }
+                // One read of the sealed records serves every account of the sweep.
+                runCatching {
+                    waits.widenAll(WorkManager.getInstance(appContext)) { account, type ->
+                        policies[account]?.networkType(type)
+                    }
+                }.onSuccess { count ->
+                    if (count > 0) Log.i(INCOMING_ATTACHMENT_TAG, "attachment_network_widened count=$count")
+                }.onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "attachment_network_widening_failed") }
             }
         }
     }
@@ -4975,7 +4996,7 @@ class WhiteNoiseAppState private constructor(
         return withTimeoutOrNull(NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS) {
             nativeAttachmentPermissions.awaitApplied(accountRef) { it.allows(type) }
         } ?: run {
-            refreshNativeAttachmentPermissions()
+            refreshNativeAttachmentPermissions(widenWaiting = false)
             throw AttachmentPermissionPendingException()
         }
     }
@@ -8489,7 +8510,7 @@ class WhiteNoiseAppState private constructor(
                 hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
             )
         updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
-        refreshNativeAttachmentPermissions()
+        refreshNativeAttachmentPermissions(widenWaiting = false)
         if (!recovery.restored) return
         resumePushWakeEpisodeFromLifecycle()
         AvatarLoadRecovery.onNetworkRestored()
@@ -11477,7 +11498,10 @@ class WhiteNoiseAppState private constructor(
         }
         val lookup =
             runCatchingCancellable {
-                receivedMessageAttachments(accountRef, groupIdHex, messageIdHex, receivedAtMillis)
+                // Both receipt sources share one bound, so a catch-up burst cannot fan out unbounded history reads.
+                receiptLookupGate.withPermit {
+                    receivedMessageAttachments(accountRef, groupIdHex, messageIdHex, receivedAtMillis)
+                }
             }.onFailure {
                 Log.w(INCOMING_ATTACHMENT_TAG, "attachment_receipt_lookup_failed type=${it.javaClass.simpleName}")
             }.getOrNull() ?: return
@@ -12574,6 +12598,9 @@ class WhiteNoiseAppState private constructor(
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
         private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
+
+        /** How many receipt history lookups run at once; more wait their turn rather than fan out. */
+        private const val RECEIPT_LOOKUP_CONCURRENCY = 4
 
         /** The Marmot app-event kind of a chat message, the only kind that carries attachments. */
         private const val MARMOT_CHAT_EVENT_KIND = 9uL

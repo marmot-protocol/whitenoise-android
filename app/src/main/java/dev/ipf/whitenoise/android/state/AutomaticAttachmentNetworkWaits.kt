@@ -44,11 +44,15 @@ internal fun NetworkType.isNarrowerThan(requested: NetworkType): Boolean =
 internal class AutomaticAttachmentNetworkWaits(
     private val records: AttachmentInstallerHandoffRecordStore,
 ) {
-    /** One recorded wait: the request, its policy row and the network it was last queued on. */
+    /**
+     * One recorded wait: the request, its policy row, the network it was last queued on, and when it was first
+     * registered, so a record whose work never appeared can be pruned once [REGISTRATION_GRACE_MS] has passed.
+     */
     data class Wait(
         val request: AttachmentTransferRequest,
         val type: MediaAutoDownloadType,
         val networkType: NetworkType,
+        val registeredAtMs: Long = 0L,
     )
 
     /** Records [request] as automatic work of [type] waiting on [networkType], or forgets it on any network. */
@@ -56,9 +60,40 @@ internal class AutomaticAttachmentNetworkWaits(
         request: AttachmentTransferRequest,
         type: MediaAutoDownloadType,
         networkType: NetworkType,
+        nowMs: Long = System.currentTimeMillis(),
     ) {
         if (networkType == NetworkType.CONNECTED) return forget(request)
-        update { it + (attachmentDownloadWorkName(request) to encode(Wait(request, type, networkType))) }
+        val name = attachmentDownloadWorkName(request)
+        update { current ->
+            val since = current[name]?.let(::decode)?.registeredAtMs ?: nowMs
+            current + (name to encode(Wait(request, type, networkType, since)))
+        }
+    }
+
+    /**
+     * Registers [request] before its automatic work is enqueued on the narrowed [networkType], so a policy that
+     * widens while the enqueue is still landing, or a process that dies before it lands, always leaves a record for
+     * a later sweep to reconcile. An existing record is kept, since its spec's network is settled after the
+     * enqueue. Returns whether this call created the record, so a failed enqueue can withdraw it.
+     */
+    fun register(
+        request: AttachmentTransferRequest,
+        type: MediaAutoDownloadType,
+        networkType: NetworkType,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (networkType == NetworkType.CONNECTED) return false
+        val name = attachmentDownloadWorkName(request)
+        var created = false
+        update { current ->
+            if (name in current) {
+                current
+            } else {
+                created = true
+                current + (name to encode(Wait(request, type, networkType, nowMs)))
+            }
+        }
+        return created
     }
 
     /** Drops [request]'s record, once its work finished or no longer waits on a narrowed network. */
@@ -82,10 +117,23 @@ internal class AutomaticAttachmentNetworkWaits(
         manager: WorkManager,
         accountRef: String,
         networkTypeFor: (MediaAutoDownloadType) -> NetworkType,
-    ): Int =
-        waiting(accountRef).sumOf { wait ->
-            settle(manager, wait.request, wait.type, networkTypeFor(wait.type), recorded = wait.networkType)
+    ): Int = widenAll(manager) { account, type -> networkTypeFor(type).takeIf { account == accountRef } }
+
+    /**
+     * Widens every recorded wait whose account and type [networkTypeFor] answers, reading the sealed records once
+     * for the whole sweep rather than once per account. A null answer skips that wait. Blocks on WorkManager, so
+     * callers run it off the main thread. Returns how many specs were widened.
+     */
+    fun widenAll(
+        manager: WorkManager,
+        networkTypeFor: (String, MediaAutoDownloadType) -> NetworkType?,
+    ): Int {
+        val all = synchronized(this) { records.readAll() }.values.mapNotNull(::decode)
+        return all.sumOf { wait ->
+            val target = networkTypeFor(wait.request.accountRef, wait.type) ?: return@sumOf 0
+            settle(manager, wait.request, wait.type, target, wait.networkType, registeredAtMs = wait.registeredAtMs)
         }
+    }
 
     /**
      * Records the outcome of a receipt for [request] once its KEEP enqueue has settled: the spec it kept, waiting or
@@ -99,7 +147,19 @@ internal class AutomaticAttachmentNetworkWaits(
         networkType: NetworkType,
     ) {
         val recorded = synchronized(this) { records.readAll()[attachmentDownloadWorkName(request)] }?.let(::decode)
-        settle(manager, request, type ?: recorded?.type, networkType, recorded?.networkType, recordable = type != null)
+        val settledType = type ?: recorded?.type
+        // Reconcile against the policy as it is now, not as it was when the receipt was read: a policy that widened
+        // while this enqueue was landing must not leave the spec on the older, narrower network.
+        val current = settledType?.let { policyNetworkType?.invoke(request.accountRef, it) }
+        settle(
+            manager,
+            request,
+            settledType,
+            current ?: networkType,
+            recorded?.networkType,
+            recordable = type != null,
+            registeredAtMs = recorded?.registeredAtMs,
+        )
     }
 
     /**
@@ -119,6 +179,8 @@ internal class AutomaticAttachmentNetworkWaits(
         target: NetworkType,
         recorded: NetworkType?,
         recordable: Boolean = true,
+        registeredAtMs: Long? = null,
+        nowMs: Long = System.currentTimeMillis(),
     ): Int {
         val infos = manager.getWorkInfosForUniqueWork(attachmentDownloadWorkName(request)).get()
         val live = infos.filter { it.isLiveAutomatic(request.accountRef) }
@@ -132,6 +194,9 @@ internal class AutomaticAttachmentNetworkWaits(
         val allWide = effective.none { it.isNarrowerThan(target) }
         val waitsOn = effective.firstOrNull { it != NetworkType.CONNECTED }
         when {
+            // Registration precedes the enqueue, so a record whose work has not appeared yet is kept for a grace
+            // period, and pruned only once that work finished or never landed.
+            infos.isEmpty() && registeredAtMs != null && nowMs - registeredAtMs < REGISTRATION_GRACE_MS -> Unit
             infos.none { !it.state.isFinished } -> forget(request)
             type == null || !recordable && recorded == null -> Unit
             recorded == null -> if (waitsOn != null) record(request, type, waitsOn)
@@ -167,6 +232,16 @@ internal class AutomaticAttachmentNetworkWaits(
         private const val SECURE_FILE = "whitenoise.attachment_network_waits.keystore"
         private const val KEY_ALIAS = "whitenoise.attachment_network_waits.aes_gcm.v1"
 
+        /** How long a registered wait may exist before its work appears, far longer than any enqueue takes. */
+        internal const val REGISTRATION_GRACE_MS = 10 * 60 * 1000L
+
+        /**
+         * The network the account's live policy allows a type on now, installed by the app state, so a receipt
+         * settles against the current policy rather than the one read before its enqueue. Null before it is set.
+         */
+        @Volatile
+        internal var policyNetworkType: ((String, MediaAutoDownloadType) -> NetworkType?)? = null
+
         @Volatile
         private var instance: AutomaticAttachmentNetworkWaits? = null
 
@@ -193,6 +268,7 @@ internal class AutomaticAttachmentNetworkWaits(
                 .put("source", wait.request.sourceMessageIdHex ?: JSONObject.NULL)
                 .put("type", wait.type.preferenceKey)
                 .put("network", wait.networkType.name)
+                .put("since", wait.registeredAtMs)
                 .toString()
 
         /** Decodes one recorded wait, dropping any that is malformed. */
@@ -210,6 +286,7 @@ internal class AutomaticAttachmentNetworkWaits(
                         ),
                     type = checkNotNull(MediaAutoDownloadType.fromKey(json.getString("type"))),
                     networkType = NetworkType.valueOf(json.getString("network")),
+                    registeredAtMs = json.optLong("since", 0L),
                 )
             }.getOrNull()
 

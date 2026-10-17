@@ -584,13 +584,22 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 enqueueExplicit(context.applicationContext, request, work, intentStore)
             } else {
                 val manager = WorkManager.getInstance(context.applicationContext)
+                val waits = AutomaticAttachmentNetworkWaits.get(context.applicationContext)
+                // Registered before the enqueue, so no window leaves a narrowed spec without a record to widen.
+                val registered =
+                    type != null &&
+                        runCatching { waits.register(request, type, networkType) }
+                            .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
+                            .getOrDefault(false)
                 runCatching {
                     manager.enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.KEEP, work)
                 }.onSuccess { operation ->
-                    val waits = AutomaticAttachmentNetworkWaits.get(context.applicationContext)
                     val settle = Runnable { settleReceipt(waits, manager, request, type, networkType) }
                     operation.result.addListener(settle, receiptSettleExecutor)
-                }.onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
+                }.onFailure {
+                    if (registered) runCatching { waits.forget(request) }
+                    Log.w(TAG, "attachment_download_enqueue_failed")
+                }
             }
         }
 
