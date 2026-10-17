@@ -2330,7 +2330,7 @@
     <string name="group_change_catching_up_message">Puede que este chat no esté al día en este dispositivo. Cambiar el grupo ahora podría dividirlo para todos. ¿Esperar a que se sincronice o continuar de todos modos?</string>
     <string name="group_change_catching_up_invite_message">Puede que este chat no esté al día en este dispositivo. Si el grupo ha avanzado, las personas que invites ahora podrían recibir una invitación que ya no funciona y el grupo podría dividirse para todos. ¿Esperar a que se sincronice o invitar de todos modos?</string>
     <string name="group_change_undelivered_title">Tu último cambio aún se está entregando</string>
-    <string name="group_change_undelivered_message">Tu último cambio en este grupo aún no ha llegado a todos sus relays. Si continúas, los miembros que solo usan esos relays podrían no poder seguir el grupo. ¿Esperar o continuar de todos modos?</string>
+    <string name="group_change_undelivered_message">Tu último cambio en este grupo aún no ha llegado a todos sus relés. Si continúas, los miembros que solo usan esos relés podrían no poder seguir el grupo. ¿Esperar o continuar de todos modos?</string>
     <string name="group_change_wait">Esperar</string>
     <string name="group_change_continue_anyway">Continuar de todos modos</string>
     <string name="group_change_invite_anyway">Invitar de todos modos</string>

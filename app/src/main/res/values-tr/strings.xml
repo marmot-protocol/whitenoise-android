@@ -2328,7 +2328,7 @@
     <string name="group_change_catching_up_message">Bu sohbet bu cihazda güncel olmayabilir. Grubu şimdi değiştirmek onu herkes için bölebilir. Eşitlenmesini beklemek mi yoksa yine de devam etmek mi istersiniz?</string>
     <string name="group_change_catching_up_invite_message">Bu sohbet bu cihazda güncel olmayabilir. Grup ilerlemişse, şimdi davet ettiğiniz kişiler artık çalışmayan bir davet alabilir ve grup herkes için bölünebilir. Eşitlenmesini beklemek mi yoksa yine de davet etmek mi istersiniz?</string>
     <string name="group_change_undelivered_title">Son değişikliğiniz hâlâ iletiliyor</string>
-    <string name="group_change_undelivered_message">Bu gruptaki son değişikliğiniz henüz grubun tüm relay sunucularına ulaşmadı. Devam ederseniz yalnızca bu relay sunucularını kullanan üyeler grubu takip edemeyebilir. Beklemek mi yoksa yine de devam etmek mi istersiniz?</string>
+    <string name="group_change_undelivered_message">Bu gruptaki son değişikliğiniz henüz grubun tüm rölelerine ulaşmadı. Devam ederseniz yalnızca bu röleleri kullanan üyeler grubu takip edemeyebilir. Beklemek mi yoksa yine de devam etmek mi istersiniz?</string>
     <string name="group_change_wait">Bekle</string>
     <string name="group_change_continue_anyway">Yine de devam et</string>
     <string name="group_change_invite_anyway">Yine de davet et</string>

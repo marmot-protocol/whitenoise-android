@@ -21,6 +21,8 @@ import dev.ipf.whitenoise.android.state.AttachmentCancellationState
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -67,7 +69,10 @@ class TileTransferTest {
         composeRule.onNodeWithText("Not enough storage. Free up space, then tap to retry.").assertExists()
     }
 
-    /** The feed opens for a materializing tile or a download another surface started, never for an idle one. */
+    /**
+     * The feed opens for a materializing tile, a download another surface started or a storage-parked body MDK may
+     * readmit, never for an idle one.
+     */
     @Test
     fun theEngineFeedOpensOnlyForMaterializingOrSharedDownloads() {
         val downloading = AttachmentTransferState.Downloading
@@ -76,7 +81,32 @@ class TileTransferTest {
         assertFalse(tileObservesNative(materializing = false, mine = false, host = AttachmentTransferState.Remote))
         assertFalse(tileObservesNative(false, false, AttachmentTransferState.Cancelled))
         assertFalse("own sends have no download to show", tileObservesNative(true, true, downloading))
+        assertTrue(
+            "MDK readmits a parked body without a tap",
+            tileObservesNative(false, false, AttachmentTransferState.StorageBlocked),
+        )
     }
+
+    /** A parked surface reloads once MDK reports the readmitted body ready, whatever it reported before. */
+    @Test
+    fun aParkedSurfaceReloadsOnceTheReadmittedBodyIsReady() =
+        runBlocking {
+            val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
+            val resumed = progress(2, 4)
+            val ready = progress(4, 4, phase = AttachmentTransferStateFfi.READY)
+
+            assertTrue(awaitStorageReadmission(flowOf(null, parked, resumed, ready)))
+        }
+
+    /** Observation that ends while the body is still parked asks for no reload, so nothing loops. */
+    @Test
+    fun observationEndingWhileParkedAsksForNoReload() =
+        runBlocking {
+            val parked = progress(0, 4, phase = AttachmentTransferStateFfi.STORAGE_BLOCKED)
+
+            assertFalse(awaitStorageReadmission(flowOf(null, parked, null)))
+            assertFalse(awaitStorageReadmission(flowOf()))
+        }
 
     /** Each step owns exactly one meaning, and an idle or finished attachment shows no control. */
     @Test

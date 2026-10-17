@@ -347,6 +347,11 @@ internal fun MediaVoiceBubble(
             startDownload,
         )
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
 
     val playback by remember(pillKey, presentationRuntime) {
         presentationRuntime.playbackState

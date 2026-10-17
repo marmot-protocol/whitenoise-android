@@ -45,7 +45,8 @@ internal class KeyedMutexPool {
     /**
      * Runs [block] with [key] released when the calling coroutine holds it, and holds it again before returning, even
      * when [block] is cancelled. Others may take the lock meanwhile, so state read under it before [block] can be
-     * stale afterwards. A key the caller does not hold is left alone.
+     * stale afterwards. A key the caller does not hold is left alone, and inside [block] this key no longer counts as
+     * held, so nothing nested can release a lock another caller has taken meanwhile.
      */
     suspend fun <T> releasedWhile(
         key: String,
@@ -56,7 +57,7 @@ internal class KeyedMutexPool {
         if (entry == null || entry !in held) return block()
         entry.mutex.unlock()
         try {
-            return block()
+            return withContext(Held(held - entry)) { block() }
         } finally {
             withContext(NonCancellable) { entry.mutex.lock() }
         }

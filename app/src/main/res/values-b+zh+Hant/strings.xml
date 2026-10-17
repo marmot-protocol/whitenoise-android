@@ -2297,7 +2297,7 @@
     <string name="group_change_catching_up_message">此聊天在此裝置上可能不是最新的。現在變更群組可能會讓群組為所有人分裂。等待同步，還是仍要繼續？</string>
     <string name="group_change_catching_up_invite_message">此聊天在此裝置上可能不是最新的。如果群組已經更新，你現在邀請的人可能會收到無法使用的邀請，群組也可能為所有人分裂。等待同步，還是仍要邀請？</string>
     <string name="group_change_undelivered_title">你的上一次變更仍在傳送中</string>
-    <string name="group_change_undelivered_message">你對此群組的上一次變更尚未到達其所有 relay。如果繼續，只使用這些 relay 的成員可能無法繼續跟上群組。等待，還是仍要繼續？</string>
+    <string name="group_change_undelivered_message">你對此群組的上一次變更尚未到達其所有中繼。如果繼續，只使用這些中繼的成員可能無法繼續跟上群組。等待，還是仍要繼續？</string>
     <string name="group_change_wait">等待</string>
     <string name="group_change_continue_anyway">仍要繼續</string>
     <string name="group_change_invite_anyway">仍要邀請</string>

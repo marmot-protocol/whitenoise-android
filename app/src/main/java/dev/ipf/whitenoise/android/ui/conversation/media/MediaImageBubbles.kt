@@ -200,6 +200,11 @@ internal fun MediaImageBubble(
     // viewer instead, where Save and Share still work.
     var tooLargeToPreview by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, key, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
     val cacheAvailability =
         rememberImageAttachmentCacheAvailability(controller, key, attachmentIndex, epoch, presentation != null)
     var cachedPlaintextOnEntry by cacheAvailability.cached
@@ -696,6 +701,11 @@ internal fun MediaImageGridTile(
     // Mirrors the single bubble: a verified image above the preview budget opens the viewer instead of retrying.
     var tooLargeToPreview by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
     val cacheAvailability =
         rememberImageAttachmentCacheAvailability(
             controller,

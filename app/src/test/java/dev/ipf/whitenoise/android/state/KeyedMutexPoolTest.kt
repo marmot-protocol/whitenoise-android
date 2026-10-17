@@ -69,6 +69,44 @@ class KeyedMutexPoolTest {
             assertEquals("other", other.await())
         }
 
+    /** Inside the released block the key no longer counts as held, so a nested release leaves another holder alone. */
+    @Test
+    fun aNestedReleaseCannotFreeAnotherCallersLock() =
+        runTest {
+            val answer = CompletableDeferred<Unit>()
+            val otherHolds = CompletableDeferred<Unit>()
+            val finishOther = CompletableDeferred<Unit>()
+            val holder =
+                async {
+                    pool.withLock(KEY) {
+                        pool.releasedWhile(KEY) {
+                            otherHolds.await()
+                            pool.releasedWhile(KEY) { "nested" }
+                            answer.await()
+                        }
+                    }
+                }
+            runCurrent()
+            val other =
+                async {
+                    pool.withLock(KEY) {
+                        otherHolds.complete(Unit)
+                        finishOther.await()
+                    }
+                }
+            runCurrent()
+
+            val third = async { pool.withLock(KEY) { "third" } }
+            runCurrent()
+            assertFalse("a nested release freed the lock another caller holds", third.isCompleted)
+
+            finishOther.complete(Unit)
+            answer.complete(Unit)
+            other.await()
+            holder.await()
+            assertEquals("third", third.await())
+        }
+
     /** A holder cancelled while outside the lock takes it back before leaving, so the lock ends free, not broken. */
     @Test
     fun cancellationOutsideTheLockStillLeavesItUsable() =

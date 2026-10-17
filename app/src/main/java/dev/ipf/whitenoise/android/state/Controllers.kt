@@ -4797,15 +4797,20 @@ class ChatsController private constructor(
         }
     }
 
-    /** Steps down as admin, asking first if MDK holds that back, then leaves, even if the chat list goes away. */
-    private suspend fun demoteAndLeaveChat(attempt: ChatListDepartureAttempt) =
-        withContext(NonCancellable) {
-            val demotion =
-                appState.runGroupChange(attempt.account, attempt.groupId) {
+    /**
+     * Steps down as admin, asking first if MDK holds that back, then leaves, even if the chat list goes away. Only the
+     * commits are protected: a departure cancelled while the user decides withdraws its question and changes nothing.
+     */
+    private suspend fun demoteAndLeaveChat(attempt: ChatListDepartureAttempt) {
+        val demotion =
+            appState.runGroupChange(attempt.account, attempt.groupId) {
+                withContext(NonCancellable) {
                     appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
                         selfDemoteAdminDetailed(attempt.account, attempt.groupId)
                     }
                 }
+            }
+        withContext(NonCancellable) {
             attempt.demoted = true
             if (attempt.isCurrent()) {
                 attempt.onStage(ChatDepartureStage.ADMIN_DEMOTED)
@@ -4813,6 +4818,7 @@ class ChatsController private constructor(
             }
             appState.marmotIo { leaveGroup(attempt.account, attempt.groupId) }
         }
+    }
 
     private fun chatListDepartureAllowed(
         group: AppGroupRecordFfi,
@@ -11264,8 +11270,8 @@ class ConversationController(
                         appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
                     } else {
                         if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
+                            val demoteResult = selfDemoteBeforeLeave(account)
                             withContext(NonCancellable) {
-                                val demoteResult = selfDemoteBeforeLeave(account)
                                 demotedBeforeLeave = true
                                 applyMutationDetails(account, demoteResult.details)
                                 appState.marmotIo { leaveGroup(account, group.groupIdHex) }
@@ -11319,11 +11325,16 @@ class ConversationController(
             }
         }
 
-    /** Steps [account] down as admin before leaving, asking first if MDK holds the change back. */
+    /**
+     * Steps [account] down as admin before leaving, asking first if MDK holds the change back. The question stays
+     * cancellable, and only the commit itself runs to completion once started.
+     */
     private suspend fun selfDemoteBeforeLeave(account: String): GroupMutationResultFfi =
         appState.runGroupChange(account, group.groupIdHex) {
-            appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                selfDemoteAdminDetailed(account, group.groupIdHex)
+            withContext(NonCancellable) {
+                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                    selfDemoteAdminDetailed(account, group.groupIdHex)
+                }
             }
         }
 

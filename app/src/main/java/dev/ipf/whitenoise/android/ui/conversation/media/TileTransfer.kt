@@ -180,15 +180,22 @@ internal fun storageBlockedTileTransfer(): TileTransfer =
     )
 
 /**
- * The engine feed is opened only while this tile is materializing or another surface is downloading its attachment,
- * so idle tiles in a long conversation hold no subscription yet a shared download still shows its received bytes.
- * Own sends have no download to show.
+ * The engine feed is opened only while this tile is materializing, another surface is downloading its attachment, or
+ * MDK has parked it for storage, so idle tiles in a long conversation hold no subscription yet a shared download still
+ * shows its received bytes and a readmitted body is seen. Own sends have no download to show.
  */
 internal fun tileObservesNative(
     materializing: Boolean,
     mine: Boolean,
     host: AttachmentTransferState,
-): Boolean = !mine && (materializing || host == AttachmentTransferState.Downloading)
+): Boolean =
+    !mine &&
+        (
+            materializing ||
+                host == AttachmentTransferState.Downloading ||
+                // MDK readmits a storage-parked body on its own, so the tile keeps watching for it.
+                host == AttachmentTransferState.StorageBlocked
+        )
 
 /**
  * A tile restarts its download without the coordinator that publishes Downloading for a file card, so a Cancelled left

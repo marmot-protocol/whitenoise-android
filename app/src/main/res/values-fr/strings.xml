@@ -2330,7 +2330,7 @@
     <string name="group_change_catching_up_message">Cette discussion n’est peut-être pas à jour sur cet appareil. Modifier le groupe maintenant pourrait le scinder pour tout le monde. Attendre la synchronisation ou continuer quand même ?</string>
     <string name="group_change_catching_up_invite_message">Cette discussion n’est peut-être pas à jour sur cet appareil. Si le groupe a évolué, les personnes que vous invitez maintenant pourraient recevoir une invitation qui ne fonctionne plus, et le groupe pourrait se scinder pour tout le monde. Attendre la synchronisation ou inviter quand même ?</string>
     <string name="group_change_undelivered_title">Votre dernière modification est encore en cours de distribution</string>
-    <string name="group_change_undelivered_message">Votre dernière modification de ce groupe n’a pas encore atteint tous ses relays. Si vous continuez, les membres qui n’utilisent que ces relays pourraient ne plus pouvoir suivre le groupe. Attendre ou continuer quand même ?</string>
+    <string name="group_change_undelivered_message">Votre dernière modification de ce groupe n’a pas encore atteint tous ses relais. Si vous continuez, les membres qui n’utilisent que ces relais pourraient ne plus pouvoir suivre le groupe. Attendre ou continuer quand même ?</string>
     <string name="group_change_wait">Attendre</string>
     <string name="group_change_continue_anyway">Continuer quand même</string>
     <string name="group_change_invite_anyway">Inviter quand même</string>

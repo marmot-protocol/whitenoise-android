@@ -271,6 +271,11 @@ internal fun MediaVideoGridTile(
     // The transfer owns the play disc while it is queued, running, being cancelled, cancelled or failed.
     val transferShown = transfer.visible && localFile == null
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
     val materializationLock = remember(messageIdHex, attachmentIndex, epoch) { Mutex() }
 
     /**
@@ -718,6 +723,11 @@ internal fun MediaVideoBubble(
         )
     }
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
     val materializationLock = remember(pillKey, epoch) { Mutex() }
 
     LaunchedEffect(
