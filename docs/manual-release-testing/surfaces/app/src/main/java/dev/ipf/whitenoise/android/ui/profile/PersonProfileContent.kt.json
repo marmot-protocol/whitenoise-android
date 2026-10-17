@@ -250,6 +250,14 @@
         "test_ids": [
           "ACC-004"
         ]
+      },
+      {
+        "surface": "Full public key caption: R.string.public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.public_key",
+        "test_ids": [
+          "ACC-001"
+        ]
       }
     ],
     "source_coverage": [

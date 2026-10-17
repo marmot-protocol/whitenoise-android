@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.Block
+import dev.ipf.whitenoise.android.ui.settings.FullPublicKey
 import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
@@ -417,6 +418,13 @@ private fun PersonProfileIdentity(
                     "person_profile.copy_public_key",
                     "person_profile.copy_public_key.visual",
                     Modifier.padding(top = 4.dp),
+                )
+                // The capsule abbreviates; the whole key stays readable for comparison (#3321).
+                FullPublicKey(
+                    npub = person.publicKey,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = WhiteNoiseSpacing.Related),
+                    testTag = "person_profile.full_public_key",
+                    label = stringResource(R.string.public_key),
                 )
             }
         }
