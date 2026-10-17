@@ -120,5 +120,4 @@ internal class ExternalSignerPushCleanupAdmissionTest : ExternalSignerSignOutFix
             assertEquals(accountRef, state.activeAccountRef)
             assertFalse(state.accounts.single().signedOut)
         }
-
 }

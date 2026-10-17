@@ -45,7 +45,11 @@ class PushTokenPreferencesTest {
 
     // Clear cached SharedPreferences as well as disk state between independent import scenarios.
     private fun clearPreferences(name: String) {
-        context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
+        context
+            .getSharedPreferences(name, Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         context.deleteSharedPreferences(name)
     }
 
@@ -287,7 +291,11 @@ class PushTokenPreferencesTest {
                         lock,
                     )
                 assertFalse(target.hasImported(sourceName))
-                source.edit().remove(KEY_WAKE_ATTEMPTS).remove(KEY_PENDING_CLEARS).commit()
+                source
+                    .edit()
+                    .remove(KEY_WAKE_ATTEMPTS)
+                    .remove(KEY_PENDING_CLEARS)
+                    .commit()
                 assertEquals(PushStorageRecovery.Ready, recreated.recoveryState(retry = true))
                 assertTrue(target.hasImported(sourceName))
                 assertTrue(safety.getStringSet("quarantined_sources", emptySet()).orEmpty().isEmpty())

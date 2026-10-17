@@ -144,9 +144,7 @@ class PushWakeBookkeepingFailureTest {
     }
 
     /** Invokes the production push-wake admission path without another lifecycle trigger. */
-    private suspend fun launchRejectedPushWake(
-        fixture: NotificationBootstrapTestFixture,
-    ): dev.ipf.whitenoise.android.state.AccountCatchUpResult {
+    private suspend fun launchRejectedPushWake(fixture: NotificationBootstrapTestFixture): dev.ipf.whitenoise.android.state.AccountCatchUpResult {
         val launch =
             fixture.appState.javaClass
                 .getDeclaredMethod(

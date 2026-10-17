@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
+import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
@@ -197,7 +198,7 @@ internal abstract class ExternalSignerSignOutFixture {
                     defValues: MutableSet<String>?,
                 ): MutableSet<String>? {
                     beforeRead()
-                    throw dev.ipf.whitenoise.android.notifications.PushTokenStorageException()
+                    throw PushTokenStorageException()
                 }
             },
         )

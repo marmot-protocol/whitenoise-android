@@ -386,5 +386,4 @@ internal class ExternalSignerSignOutLifecycleTest : ExternalSignerSignOutFixture
             assertEquals(phaseBefore, appState.phase)
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId })
         }
-
 }
