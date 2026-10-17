@@ -1,14 +1,35 @@
 package dev.ipf.whitenoise.android.state
 
+import android.graphics.Bitmap
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+/** Which avatars a notification warms before posting, and which warmed bitmap becomes the card's identity. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class NotificationAvatarPreWarmTriggerTest {
+    /** #3311: a direct chat's identity image is the sender's picture, and a group's comes only from the group. */
+    @Test
+    fun identityBitmapFollowsTheConversationKind() {
+        val sender = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val group = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val warmed = PreWarmedNotificationAvatars(null, null, senderAvatarBitmap = sender, groupAvatarBitmap = group)
+        assertSame(sender, warmed.conversationBitmap(isDm = true))
+        assertSame(group, warmed.conversationBitmap(isDm = false))
+        val senderOnly = PreWarmedNotificationAvatars(null, null, senderAvatarBitmap = sender)
+        assertNull("a group never borrows the sender's face", senderOnly.conversationBitmap(isDm = false))
+    }
+
     @Test
     fun dmPreWarmUsesTheNotificationPayloadBeforeProfileMaterialization() {
         val target =

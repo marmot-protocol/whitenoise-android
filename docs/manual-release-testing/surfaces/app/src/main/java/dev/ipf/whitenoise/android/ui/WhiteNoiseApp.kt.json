@@ -13,30 +13,13 @@
         ]
       },
       {
-        "surface": "GlobalTransientNotice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "fun GlobalTransientNotice(",
-        "test_ids": [
-          "INT-004",
-          "SET-023"
-        ]
-      },
-      {
         "surface": "ShellTransientNoticeLayout",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "fun ShellTransientNoticeLayout(",
         "test_ids": [
           "INT-004",
-          "SET-023"
-        ]
-      },
-      {
-        "surface": "Global transient notice bottom obstruction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
-        "anchor": "val globalTransientNoticeInsets: WindowInsets",
-        "test_ids": [
-          "PRO-001",
-          "SET-023"
+          "SET-023",
+          "CON-034"
         ]
       },
       {
@@ -111,11 +94,36 @@
         ]
       },
       {
+        "surface": "App root banner slot for surfaces without their own",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "TopNoticeSlot(Modifier.zIndex(1f)",
+        "test_ids": [
+          "CON-034",
+          "INT-004"
+        ]
+      },
+      {
+        "surface": "App lock hides every temporary banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "presentationAllowed = { !appState.appLockScreenVisible }",
+        "test_ids": [
+          "CON-034"
+        ]
+      },
+      {
         "surface": "Shared modal presentation: DictationDisclosureDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
         "anchor": "DictationDisclosureDialog(",
         "test_ids": [
           "DIC-001"
+        ]
+      },
+      {
+        "surface": "App-level question before overriding a refused group change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "GroupChangeConfirmationDialog(groupChangeQuestion)",
+        "test_ids": [
+          "GRP-032"
         ]
       }
     ]

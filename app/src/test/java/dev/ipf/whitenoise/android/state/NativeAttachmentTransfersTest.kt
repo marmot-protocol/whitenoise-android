@@ -50,6 +50,29 @@ class NativeAttachmentTransfersTest {
             AttachmentTransferState.Remote,
             status(AttachmentTransferStateFfi.POLICY_BLOCKED).toPresentationState(),
         )
+        assertEquals(
+            AttachmentTransferState.StorageBlocked,
+            status(AttachmentTransferStateFfi.STORAGE_BLOCKED).toPresentationState(),
+        )
+    }
+
+    /**
+     * A body parked for lack of free space ends observation, since MDK readmits it itself, and presents as a storage
+     * problem rather than an ordinary failure; every other failure still presents as Failed.
+     */
+    @Test
+    fun `a storage-parked body ends observation and presents as storage`() {
+        assertTrue(AttachmentTransferStateFfi.STORAGE_BLOCKED in NATIVE_TRANSFER_TERMINAL_FAILURES)
+        assertEquals(
+            AttachmentTransferState.StorageBlocked,
+            NativeAttachmentTerminalException(AttachmentTransferStateFfi.STORAGE_BLOCKED).failedTransferState(),
+        )
+        assertEquals(
+            AttachmentTransferState.Failed,
+            NativeAttachmentTerminalException(AttachmentTransferStateFfi.FAILED).failedTransferState(),
+        )
+        assertEquals(AttachmentTransferState.Failed, IllegalStateException("x").failedTransferState())
+        assertFalse(AttachmentTransferState.StorageBlocked.isTransferInProgress())
     }
 
     /** Observer disposal closes only its feed; explicit cancellation owns native cancellation. */

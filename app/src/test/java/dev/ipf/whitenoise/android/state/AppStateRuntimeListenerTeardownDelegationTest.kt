@@ -14,6 +14,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -75,6 +76,7 @@ class AppStateRuntimeListenerTeardownDelegationTest {
             }
         }
 
+    /** Concurrent facade calls retain one account-session coordinator while its shipped listener owner drains. */
     @Test
     fun concurrentAccountTeardownWaitsForCancelledReceiverCleanupAndRefusesReplacement() =
         runBlocking {
@@ -100,6 +102,7 @@ class AppStateRuntimeListenerTeardownDelegationTest {
                     }
                 }
             state = state { subscription }
+            val session = state.accountSession
             val ownerStops = AtomicInteger()
             val receiverPublications = AtomicInteger()
             observeProductionOwnerStops(state, ownerStops, receiverPublications)
@@ -117,6 +120,7 @@ class AppStateRuntimeListenerTeardownDelegationTest {
                     launch(start = CoroutineStart.UNDISPATCHED) {
                         state.stopNotificationListenerForAccountTeardown()
                     }
+                assertSame(session, state.accountSession)
                 assertEquals(2, ownerStops.get())
                 assertFalse(first.isCompleted)
                 assertFalse(second.isCompleted)

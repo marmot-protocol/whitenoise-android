@@ -1,14 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
-import android.content.Context
-import android.os.Looper
 import androidx.compose.material3.SnackbarResult
-import androidx.test.core.app.ApplicationProvider
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
-import dev.ipf.marmotkit.MessageDraftRevisionFfi
-import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.chats.PendingLocalChatDelete
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
@@ -29,15 +22,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import java.lang.reflect.Proxy
-import java.time.Duration
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 
 /** Exercises the actual controller, platform journal and privacy-safe notice boundary. */
 @RunWith(RobolectricTestRunner::class)
@@ -369,100 +354,17 @@ class LocalGroupDeleteControllerTest {
             }
         }
 
+    /** The shared fake-native fixture, cleared with this test's controllers. */
     private fun TestScope.fixture(
         failing: String? = null,
         onRowRead: () -> Unit = {},
-    ): Fixture {
-        val calls = ConcurrentLinkedQueue<String>()
-        val present = AtomicBoolean(true)
-        val failureMethod = AtomicReference(failing)
-        val native = native(calls, present, failureMethod, onRowRead)
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val state =
-            WhiteNoiseAppState(
-                context = context,
-                draftStore = DraftStore.forContext(context),
-                accountIdHexResolver = { ACCOUNT_ID },
-                accounts = listOf(AccountSummaryFfi(ACCOUNT, ACCOUNT_ID, true, false, false, true)),
-                activeAccountRef = ACCOUNT,
-                initialMarmotRuntime = AppMarmotRuntime("local-delete-test", native),
-                // Share the virtual readiness deadline's clock instead of racing real IO dispatch.
-                marmotIoDispatcher = StandardTestDispatcher(testScheduler),
-            )
-        val controller = ChatsController(state, ACCOUNT) { _, _ -> emptyList() }
-        controllers += controller
-        controller.setChatListVisible(false)
-        controller.applyChatListRow(chatRow(GROUP))
-        controller.setChatListVisible(true)
-        assertEquals("fixture must begin with the real visible row", listOf(GROUP), controller.items.map { it.id })
-        return Fixture(state, controller, calls, failureMethod)
-    }
+    ): LocalGroupDeleteFixture = localGroupDeleteFixture(controllers, failing, onRowRead)
 
     /** Exercise the production debounced projection before checking visible-row mutations. */
-    private fun flushChatRows() {
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
-    }
-
-    private fun native(
-        calls: ConcurrentLinkedQueue<String>,
-        present: AtomicBoolean,
-        failing: AtomicReference<String?>,
-        onRowRead: () -> Unit,
-    ): MarmotInterface =
-        Proxy.newProxyInstance(
-            MarmotInterface::class.java.classLoader,
-            arrayOf(MarmotInterface::class.java),
-        ) { proxy, method, arguments ->
-            val name = method.name.substringBefore('-')
-            calls += name
-            if (name == failing.get()) {
-                val failure = MarmotKitException.TransportClosed()
-                val continuation = arguments?.lastOrNull() as? Continuation<*>
-                if (continuation != null) {
-                    continuation.resumeWith(Result.failure(failure))
-                    return@newProxyInstance COROUTINE_SUSPENDED
-                }
-                throw failure
-            }
-            when (name) {
-                "chatListRow" -> {
-                    onRowRead()
-                    if (present.get()) chatRow(GROUP) else null
-                }
-                "listMedia" -> emptyList<Any>()
-                "catchUpAccounts" -> Unit
-                "deleteGroupLocal", "forgetGroupLocal" -> {
-                    present.set(false)
-                    true
-                }
-                "selectedMessageDraft", "clearMessageDraftIfRevision" ->
-                    SelectedMessageDraftFfi(draftRevisionStub(), null)
-                "toString" -> "LocalDeleteTestNative"
-                "hashCode" -> System.identityHashCode(proxy)
-                "equals" -> proxy === arguments?.firstOrNull()
-                else -> error("Unexpected local-delete native call: $name")
-            }
-        } as MarmotInterface
-
-    /** The revision is passed opaquely to the fake; never invoke or load its native handle. */
-    private fun draftRevisionStub(): MessageDraftRevisionFfi {
-        val unsafeClass = Class.forName("sun.misc.Unsafe")
-        val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
-        return unsafeClass
-            .getMethod("allocateInstance", Class::class.java)
-            .invoke(unsafe, MessageDraftRevisionFfi::class.java) as MessageDraftRevisionFfi
-    }
-
-    private data class Fixture(
-        val state: WhiteNoiseAppState,
-        val controller: ChatsController,
-        val calls: ConcurrentLinkedQueue<String>,
-        val failureMethod: AtomicReference<String?>,
-    )
+    private fun flushChatRows() = flushLocalDeleteChatRows()
 
     private companion object {
-        const val ACCOUNT = "local-delete-account"
-        val ACCOUNT_ID = "a1".repeat(32)
-        val GROUP = "b1".repeat(16)
+        const val ACCOUNT = LOCAL_DELETE_ACCOUNT
+        val GROUP = LOCAL_DELETE_GROUP
     }
 }

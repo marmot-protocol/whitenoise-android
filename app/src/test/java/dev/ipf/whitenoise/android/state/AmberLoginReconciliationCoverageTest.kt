@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,6 +27,7 @@ class AmberLoginReconciliationCoverageTest {
         )
     }
 
+    /** Amber shares imported-identity completion only after its stable signer has been reconciled. */
     @Test
     fun externalSignerIsReconciledBeforeTheAccountIsExposed() {
         val source = appStateSource().readText()
@@ -36,17 +38,19 @@ class AmberLoginReconciliationCoverageTest {
 
         val loginIndex = body.indexOf("loginExternalSigner(")
         val reconcileIndex = body.indexOf("registerExternalSigner(", loginIndex + 1)
-        val refreshIndex = body.indexOf("refreshAccounts()", reconcileIndex + 1)
-        val activateIndex = body.indexOf("setActiveAccount(summary.label)", refreshIndex + 1)
+        val importedActivation = body.indexOf("activateImportedIdentity(summary)", reconcileIndex + 1)
+        val imported = source.functionBody("activateImportedIdentity")
+        val refreshIndex = imported.indexOf("refreshAccounts()")
+        val activateIndex = imported.indexOf("activateAccountSession(", refreshIndex + 1)
 
         assertTrue("Amber login must create the external-signer account", loginIndex >= 0)
         assertTrue(
             "the stable signer must be re-registered after login and before account refresh",
-            reconcileIndex > loginIndex && refreshIndex > reconcileIndex,
+            reconcileIndex > loginIndex && importedActivation > reconcileIndex,
         )
         assertTrue(
             "the reconciled account must not become active before refresh completes",
-            activateIndex > refreshIndex,
+            refreshIndex >= 0 && activateIndex > refreshIndex,
         )
         assertTrue(
             "the reconciliation must target the new account with its canonical signer key",

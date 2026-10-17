@@ -31,16 +31,24 @@ internal data class DraftSendClearToken(
 
 internal class StartProfileChatNoActiveAccountException : IllegalStateException("No active account")
 
+/**
+ * The one toast that sums up [outcome]. Groups the user chose to wait on are never called failures: if every group
+ * waited it stays as quiet as a single Wait, and if some were invited it says the rest wait for another try.
+ */
 internal fun profileGroupInviteToast(outcome: ProfileGroupInviteOutcome): ProfileGroupInviteToast? {
     require(outcome.attempted >= 0) { "attempted must be non-negative" }
     require(outcome.failures in 0..outcome.attempted) { "failures must be between 0 and attempted" }
+    require(outcome.waited in 0..outcome.attempted - outcome.failures) { "waited must fit beside failures" }
     if (outcome.attempted == 0) return null
     val failureDetail = outcome.firstFailure ?: AppText.Plain("")
     return when {
-        outcome.failures == 0 && outcome.attempted == 1 ->
+        outcome.failures == 0 && outcome.waited == 0 && outcome.attempted == 1 ->
             ProfileGroupInviteToast(R.string.toast_invite_sent)
-        outcome.failures == 0 ->
+        outcome.failures == 0 && outcome.waited == 0 ->
             ProfileGroupInviteToast(R.string.toast_invites_sent_to_groups)
+        outcome.failures == 0 && outcome.delivered == 0 -> null
+        outcome.failures == 0 ->
+            ProfileGroupInviteToast(R.string.toast_invites_sent_to_groups_waited)
         outcome.delivered == 0 ->
             ProfileGroupInviteToast(R.string.toast_couldnt_add_members, failureDetail, copyable = true)
         else ->

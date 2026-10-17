@@ -38,6 +38,35 @@ class NotificationFirstPostAvatarOwnerTest {
         checkOwner("account-b", expectedImage = false, encrypted = true)
     }
 
+    /**
+     * #3311: a direct chat's first card takes the sender's ready picture as its conversation identity image,
+     * while a group snapshot never borrows that face for the group.
+     */
+    @Test
+    fun directChatSnapshotUsesTheSenderPictureAsItsIdentityImage() {
+        val context = RuntimeEnvironment.getApplication()
+        val url = "https://profiles.example/alice.png"
+        val fixture = NotificationBootstrapTestFixture(context = context, senderPictureUrl = url, isDm = true)
+        val state =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = fixture.appState.draftStore,
+                accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = "account-a",
+            )
+        val image = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        try {
+            AvatarImageLoader.putCached(url, image.asImageBitmap())
+            val snapshot = state.readyNotificationAvatars(fixture.update)
+            assertSame(image, snapshot.conversationBitmap(isDm = true))
+            assertNull(snapshot.conversationBitmap(isDm = false))
+        } finally {
+            AvatarImageLoader.clear()
+            fixture.close()
+        }
+    }
+
     /** Exercises AppState's production snapshot boundary with a real retained ChatsController. */
     private fun checkOwner(
         controllerAccount: String,

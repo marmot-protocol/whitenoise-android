@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.ScaffoldTopBarWithNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
@@ -130,11 +131,18 @@ internal fun WelcomeScreen(
     onOfflineRetry: () -> Unit,
     onBack: (() -> Unit)? = null,
 ) {
+    val contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
+        contentWindowInsets = contentWindowInsets,
         topBar = {
-            if (onBack != null) WhiteNoiseTopBar(title = stringResource(R.string.settings_add_profile), onBack = onBack)
+            // The bar is absent on first run, so the shared bar slot keeps the top inset for the content and
+            // places app banners below the bar when there is one (#3312).
+            ScaffoldTopBarWithNoticeSlot(contentWindowInsets) {
+                if (onBack != null) {
+                    WhiteNoiseTopBar(title = stringResource(R.string.settings_add_profile), onBack = onBack)
+                }
+            }
         },
     ) { contentPadding ->
         Column(

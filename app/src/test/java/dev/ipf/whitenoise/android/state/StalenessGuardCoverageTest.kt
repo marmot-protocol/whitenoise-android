@@ -76,6 +76,14 @@ class StalenessGuardCoverageTest {
                     listOf("accountListLifetime.capture", "accountListLifetime.isCurrent"),
                 "AppState.kt:refreshAccountSnapshot" to
                     listOf("accountListLifetime.advance", "accountListLifetime.runIfCurrent"),
+                "AppState.kt:refreshLocalNotificationSettings" to
+                    listOf(
+                        "accountSwitchHandoff.capture()",
+                        "accountSwitchHandoff.isCurrent(activationGeneration)",
+                        "activeAccountRef == account",
+                        "runtimeGeneration == requestRuntimeGeneration",
+                        "localNotificationSettings = settings",
+                    ),
                 "AppState.kt:recordStartupLocalSnapshotRendered" to
                     listOf("accountListLifetime.isCurrent", "stillCurrent = accountListIsCurrent"),
                 "AppState.kt:refreshPinnedConversationPresentation" to

@@ -73,7 +73,10 @@ internal data class KeptMessagesOverlayState(
  * The floating card that keeps chosen messages above the transcript. It is
  * draggable, snaps to whichever side edge it is released nearer, and toggles
  * between a four-line preview and a scrollable expanded view on long-press.
- * An empty stack draws nothing.
+ * An empty stack draws nothing. Its safe-drawing padding keeps the card clear of a
+ * side cutout when the overlay sits outside padded content, and adds nothing inside
+ * the transcript, which is padded by its scaffold and consumes those insets, so the
+ * card keeps only its own side margin from the transcript's edge (#3312).
  */
 @Composable
 internal fun KeptMessagesOverlay(

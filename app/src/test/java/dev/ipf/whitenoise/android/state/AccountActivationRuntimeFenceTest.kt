@@ -4,10 +4,12 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,6 +87,113 @@ class AccountActivationRuntimeFenceTest {
                 fixture.close()
             }
         }
+
+    /** Cold initialization followed by warm resume retains the same process session and passive receiver. */
+    @Test
+    fun warmBootstrapReusesRuntimeAndReceiver() =
+        runBlocking {
+            val fixture = fixture(AtomicInteger())
+            try {
+                fixture.bootstrap()
+                val session = fixture.appState.accountSession
+                val subscriptions = fixture.subscriptionCalls.get()
+                fixture.bootstrap()
+                assertSame(session, fixture.appState.accountSession)
+                assertEquals(1, fixture.runtimeStartCalls.get())
+                assertEquals(subscriptions, fixture.subscriptionCalls.get())
+                assertEquals("self", fixture.appState.activeAccountRef)
+                assertEquals(AppPhase.Ready, fixture.appState.phase)
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** The old account's native settings response cannot overwrite the newly active account's projection. */
+    @Test
+    fun delayedSettingsReadCannotOverwriteAnotherAccount() =
+        runBlocking {
+            withDelayedSettingsRead { state ->
+                assertTrue(
+                    state.setActiveAccount(
+                        "other",
+                        preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
+                    ),
+                )
+            }
+        }
+
+    /** Returning to the same label does not re-admit an older selection's settings response. */
+    @Test
+    fun delayedSettingsReadCannotOverwriteANewerSameAccountSelection() =
+        runBlocking {
+            withDelayedSettingsRead { state ->
+                assertTrue(
+                    state.setActiveAccount(
+                        "other",
+                        preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
+                    ),
+                )
+                assertTrue(
+                    state.setActiveAccount(
+                        "self",
+                        preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
+                    ),
+                )
+            }
+        }
+
+    /** A replacement runtime with the same active account rejects the old runtime's native response. */
+    @Test
+    fun delayedSettingsReadCannotOverwriteReplacementRuntimeSettings() =
+        runBlocking {
+            withDelayedSettingsRead { state ->
+                replaceRuntimeOwner(state)
+                state.refreshLocalNotificationSettings()
+            }
+        }
+
+    /** Holds one real facade settings read while a newer activation/runtime publishes a distinguishable result. */
+    private suspend fun withDelayedSettingsRead(transition: suspend (WhiteNoiseAppState) -> Unit) {
+        val holdOldRead = AtomicBoolean(false)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val fixture =
+            NotificationBootstrapTestFixture(
+                context = RuntimeEnvironment.getApplication(),
+                accounts =
+                    listOf(
+                        AccountSummaryFfi("self", "11".repeat(32), true, false, false, true),
+                        AccountSummaryFfi("other", "22".repeat(32), true, false, false, true),
+                    ),
+                emitStartupNotification = false,
+                onNotificationSettings = { account ->
+                    val old = account == "self" && holdOldRead.compareAndSet(true, false)
+                    if (old) {
+                        entered.countDown()
+                        check(release.await(5, TimeUnit.SECONDS))
+                    }
+                    val id = if (account == "self") "11".repeat(32) else "22".repeat(32)
+                    NotificationSettingsFfi(account, id, !old, false)
+                },
+            )
+        try {
+            fixture.bootstrap()
+            holdOldRead.set(true)
+            coroutineScope {
+                val oldRead = async { fixture.appState.refreshLocalNotificationSettings() }
+                withTimeout(3_000) { while (entered.count > 0) yield() }
+                transition(fixture.appState)
+                val current = checkNotNull(fixture.appState.localNotificationSettings)
+                assertTrue(current.localNotificationsEnabled)
+                release.countDown()
+                oldRead.await()
+                assertEquals(current, fixture.appState.localNotificationSettings)
+            }
+        } finally {
+            release.countDown()
+            fixture.close()
+        }
+    }
 
     /** Existing FFI hooks count observable settings reads without introducing production test hooks. */
     private fun fixture(

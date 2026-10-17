@@ -1,0 +1,48 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
+  "legacy_sha256": "98ba0bbd41fedd18aa65ede657690d3ad8299e8f29545515c922ddb43013c9f1",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.whiteNoiseVerticalScroll",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
+        "anchor": "fun Modifier.whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseScaffold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
+        "anchor": "fun WhiteNoiseScaffold(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ScaffoldTopBarWithNoticeSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
+        "anchor": "fun ScaffoldTopBarWithNoticeSlot(",
+        "test_ids": [
+          "CON-034",
+          "ONB-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: WhiteNoiseScaffold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
+        "anchor": ".whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

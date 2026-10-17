@@ -351,7 +351,10 @@ class NotificationFirstPostIntegrationTest {
             }
         }
 
-    /** Starts cold remote avatar download only after the bounded first platform write. */
+    /**
+     * Starts cold remote avatar download only after the bounded first platform write, and then gives that card its
+     * picture in exactly one more write that does not alert again (#3311).
+     */
     @Test
     fun coldRemoteAvatarWorkStartsOnlyAfterTheBoundedFirstWrite() =
         runBlocking {
@@ -402,8 +405,12 @@ class NotificationFirstPostIntegrationTest {
                     withTimeout(5_000L) {
                         while (AvatarImageLoader.peekBitmap(AVATAR_URL) == null) delay(10L)
                     }
+                    awaitPlatformWrites(expectedWritesBeforeAvatar + 1)
                     delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
-                    assertEquals(expectedWritesBeforeAvatar, FirstPostRecordingNotificationManager.posts.size)
+                    assertEquals(expectedWritesBeforeAvatar + 1, FirstPostRecordingNotificationManager.posts.size)
+                    val pictured = FirstPostRecordingNotificationManager.posts.last()
+                    assertTrue(pictured.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+                    assertEquals("the picture is not a text correction", expectedWritesBeforeAvatar, writes.get())
                 }
             } finally {
                 releaseFetch.countDown()
@@ -814,6 +821,16 @@ class NotificationFirstPostIntegrationTest {
     ) {
         withTimeout(5_000L) {
             while (writes.get() < expected) {
+                shadowOf(android.os.Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
+    /** Pumps Robolectric main until the platform has received [expected] writes for the fixture card. */
+    private suspend fun awaitPlatformWrites(expected: Int) {
+        withTimeout(5_000L) {
+            while (FirstPostRecordingNotificationManager.posts.size < expected) {
                 shadowOf(android.os.Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
                 delay(1L)
             }

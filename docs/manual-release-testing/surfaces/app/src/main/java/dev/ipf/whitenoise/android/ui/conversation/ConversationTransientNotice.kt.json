@@ -1,0 +1,19 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTransientNotice.kt",
+  "legacy_sha256": "37116debb99a9d79722a57d313e98fef1d7cd194209669c682806cbb2bc37ced",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationTransientNoticeLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTransientNotice.kt",
+        "anchor": "fun ConversationTransientNoticeLayout(",
+        "test_ids": [
+          "CON-006",
+          "CON-015",
+          "CON-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

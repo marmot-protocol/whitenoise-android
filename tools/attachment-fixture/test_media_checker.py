@@ -6,7 +6,7 @@ import unittest
 from media_checker import CIPHERTEXT_OVERHEAD, EXPECTED, MIB, ROLES, check_media
 
 SIZES = {("single-image", 0): 301_234, ("video-small", 0): 19_832, ("video-9mib", 0): 9 * MIB,
-         ("video-24mib", 0): 24 * MIB, ("album-3", 0): 310_001, ("album-3", 1): 305_002, ("album-3", 2): 19_832}
+         ("video-24mib", 0): 24 * MIB, ("album-3", 0): 310_001, ("album-3", 1): 305_002, ("album-3", 2): 24_576}
 
 
 def measure(phase, payload):

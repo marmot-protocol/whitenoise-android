@@ -23,16 +23,12 @@ internal val CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT =
     Arrangement.spacedBy(CONVERSATION_TIMELINE_ROW_SPACING, Alignment.Bottom)
 
 /**
- * Applies the resting tail gap and any temporary snackbar clearance at the
- * content edge, where Compose can keep the real final row as the scroll anchor.
+ * Applies the resting tail gap and the foreground overlap the transcript may paint under, at
+ * the content edge where Compose can keep the real final row as the scroll anchor. Temporary
+ * notices sit in the conversation's top row, so no bottom clearance exists for them (#3312).
  */
-internal fun conversationTimelineContentPadding(
-    snackbarContentInset: Dp,
-    foregroundOverlap: Dp = 0.dp,
-): PaddingValues =
-    PaddingValues(
-        bottom = CONVERSATION_TIMELINE_TAIL_GAP + snackbarContentInset + foregroundOverlap,
-    )
+internal fun conversationTimelineContentPadding(foregroundOverlap: Dp = 0.dp): PaddingValues =
+    PaddingValues(bottom = CONVERSATION_TIMELINE_TAIL_GAP + foregroundOverlap)
 
 /**
  * Whether the transcript emits its group-recovery card as a list row.

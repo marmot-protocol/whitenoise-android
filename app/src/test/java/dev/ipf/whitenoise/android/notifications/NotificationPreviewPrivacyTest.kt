@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ShortcutManager
+import android.graphics.Bitmap
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -47,6 +48,55 @@ class NotificationPreviewPrivacyTest {
             .edit()
             .putBoolean("show_notification_previews", false)
             .commit()
+    }
+
+    /**
+     * #3311: with previews hidden, neither a direct chat nor a group card carries its identity picture, the
+     * picture's contact key or a picture on the lock-screen version, even when ready pictures were supplied.
+     */
+    @Test
+    fun hiddenPreviewsDropTheConversationIdentityImage() {
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
+        presenter.ensureChannels()
+        val picture = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        listOf(true, false).forEach { directChat ->
+            manager.cancelAll()
+            assertTrue(
+                runBlocking {
+                    presenter.show(
+                        update().copy(isDm = directChat),
+                        conversationAvatarBitmap = picture,
+                        senderAvatarBitmap = picture,
+                        shortNpub = { "Private sender" },
+                    )
+                },
+            )
+            val card =
+                manager.activeNotifications
+                    .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+                    .notification
+            assertNull(card.getLargeIcon())
+            assertNull(card.extras.getBundle(EXTRA_IDENTITY_IMAGE))
+            assertNull(card.publicVersion?.getLargeIcon())
+        }
+    }
+
+    /** Scrubbing a live rich card for a privacy transition removes its identity picture and contact key. */
+    @Test
+    fun scrubbedRichCardLosesItsIdentityImage() {
+        val picture = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val rich =
+            NotificationCompat
+                .Builder(context, NotificationChannelSpec.DIRECT_MESSAGES.id)
+                .setSmallIcon(R.drawable.ic_stat_whitenoise)
+                .setContentTitle("Private sender")
+                .setConversationIdentityImage(NotificationIdentityImage(picture, "Private sender", "seed", "contact"))
+                .build()
+
+        val hidden = notificationWithoutPreview(context, rich, silent = true)
+
+        assertNull(hidden.getLargeIcon())
+        assertNull(hidden.extras.getBundle(EXTRA_IDENTITY_IMAGE))
     }
 
     /** Even direct presenter callers must respect device-wide privacy before the OS write. */

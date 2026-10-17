@@ -209,6 +209,22 @@
     <string name="toast_group_reset_done">Group reset. It will reappear when a new invite arrives.</string>
     <string name="toast_group_reset_already_waiting">This group is already waiting for a new invite.</string>
     <string name="toast_couldnt_reset_group">Couldn’t reset the group. Try again.</string>
+    <string name="chat_abandon_action">Abandon chat on this device</string>
+    <string name="chat_abandon_dialog_title">Abandon this chat on this device?</string>
+    <string name="chat_abandon_dialog_message">White Noise erases this chat’s history and encryption state for this account on this device, and this device stops receiving it. Nothing is sent: the other person may still see you in the chat, and your other devices keep their copy. To talk again, start a new chat or accept a new invite.</string>
+    <string name="chat_abandon_confirm">Abandon</string>
+    <string name="abandon_identity_chat">Direct chat: %1$s</string>
+    <string name="abandon_identity_group">Group: %1$s</string>
+    <string name="abandon_identity_account">Your account: %1$s</string>
+    <string name="chats_abandon_action">Abandon chats on this device</string>
+    <string name="chats_abandon_dialog_title">Abandon the selected chats on this device?</string>
+    <string name="toast_chat_abandoned">Chat abandoned on this device.</string>
+    <string name="toast_chat_already_abandoned">This chat is already abandoned on this device.</string>
+    <string name="toast_couldnt_abandon_chat">Couldn’t abandon the chat. Try again.</string>
+    <string name="leave_blocked_abandon_hint_dm">Leaving didn’t finish. You can abandon this chat on this device instead. Nothing is sent to the other person.</string>
+    <string name="leave_blocked_abandon_hint_group">Leaving didn’t finish. You can reset this group on this device instead. Nothing is sent to the group.</string>
+    <string name="sole_admin_abandon_hint_dm">If no one can receive admin, abandoning this chat on this device is the way out, and nothing is sent to the other person.</string>
+    <string name="sole_admin_abandon_hint_group">If no one can receive admin, resetting this group on this device is the way out, and nothing is sent to the group.</string>
     <string name="key_package_relay_history">Relay history</string>
     <string name="key_package_current">Current</string>
     <string name="key_package_superseded">Superseded</string>
@@ -1178,6 +1194,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">Couldn\'t add %1$s. They\'re already a member, or their signing key conflicts with an existing member.</string>
     <string name="toast_invites_sent_to_groups">Invites sent to selected groups</string>
     <string name="toast_invites_sent_to_groups_partial">Invites sent to some groups; some failed</string>
+    <string name="toast_invites_sent_to_groups_waited">Invites sent to some groups; the others wait for you to try again</string>
     <string name="toast_member_removed">Member removed</string>
     <string name="toast_couldnt_remove_member">Couldn\'t remove member</string>
     <string name="toast_group_roster_changed">Group membership changed. Review the group and try again.</string>
@@ -2381,6 +2398,8 @@
     <string name="onboarding_details_collapsed">Collapsed</string>
     <!-- Keep first-strong isolation balanced so counts and punctuation stay readable in RTL layouts. -->
     <string name="local_delete_retry_detail">\u2068Deletion stopped. Try Delete from this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
+    <string name="local_abandon_retry_detail">\u2068Abandoning stopped. Try Abandon chat on this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
+    <string name="local_reset_retry_detail">\u2068Reset stopped. Try Reset and wait for a new invite again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
     <string name="chat_list_delete_stopped">Deletion stopped</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
@@ -2486,4 +2505,19 @@
     <string name="group_create_unattributed_failure">We could not identify an affected person. Retry or edit your members.</string>
     <string name="media_reply_draft_conflict">Your draft changed. Keep this reply and try again, or cancel the reply before sending.</string>
     <string name="share_connect_save_to_gallery">Save to Gallery</string>
+    <string name="media_storage_blocked_short">Not enough storage</string>
+    <string name="media_storage_blocked">Not enough storage. Free up space, then tap to retry.</string>
+    <string name="error_obsolete_key_package">This person needs to update White Noise before they can be added. Ask them to update and open it, then retry.</string>
+    <string name="error_obsolete_key_package_for">%1$s needs to update White Noise before they can be added. Ask them to update and open it, then retry.</string>
+    <string name="error_directory_lookup_incomplete">We couldn’t finish checking whether this person can be added. Check your connection, then retry.</string>
+    <string name="error_directory_lookup_incomplete_for">We couldn’t finish checking whether %1$s can be added. Check your connection, then retry.</string>
+    <string name="error_message_not_editable">This message can no longer be edited.</string>
+    <string name="group_change_catching_up_title">This chat may be out of date</string>
+    <string name="group_change_catching_up_message">This chat may be out of date on this device. Changing the group now could split it for everyone. Wait for it to sync, or continue anyway?</string>
+    <string name="group_change_catching_up_invite_message">This chat may be out of date on this device. If the group has moved on, people you invite now could get an invitation that no longer works, and the group could split for everyone. Wait for it to sync, or invite anyway?</string>
+    <string name="group_change_undelivered_title">Your last change is still being delivered</string>
+    <string name="group_change_undelivered_message">Your last change to this group hasn’t reached all of its relays yet. Members who only use those relays may not be able to follow the group if you continue. Wait, or continue anyway?</string>
+    <string name="group_change_wait">Wait</string>
+    <string name="group_change_continue_anyway">Continue anyway</string>
+    <string name="group_change_invite_anyway">Invite anyway</string>
 </resources>

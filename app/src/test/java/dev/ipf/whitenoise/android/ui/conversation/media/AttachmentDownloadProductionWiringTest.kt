@@ -43,7 +43,10 @@ class AttachmentDownloadProductionWiringTest {
         assertTrue("EncryptedAttachmentInstallerHandoffRecordStore.create(context)" in worker)
     }
 
-    /** Verifies every visual-media tap promotes transfer work before delegating viewer ownership. */
+    /**
+     * Verifies every visual-media tap promotes transfer work before delegating viewer ownership, and that each surface
+     * restores a download MDK still holds parked for storage when its chat is reopened.
+     */
     @Test
     fun visibleMediaPromotesAnAutomaticTransferWhenTheUserTapsIt() {
         val image = source("MediaImageBubbles.kt").normalized()
@@ -54,6 +57,15 @@ class AttachmentDownloadProductionWiringTest {
         assertEquals(4, occurrences(video, "afterInteractiveRequest()"))
         assertEquals(1, occurrences(voice, "afterInteractiveRequest()"))
         assertEquals(2, occurrences(image, "persistedAttachmentOpenEffect("))
+        // Reopening a chat restores a download MDK still holds parked for storage, once per surface.
+        assertEquals(2, occurrences(image, "restoreParkedDownloadOnEntry("))
+        assertEquals(2, occurrences(video, "restoreParkedDownloadOnEntry("))
+        assertEquals(1, occurrences(voice, "restoreParkedDownloadOnEntry("))
+        // Only the reader's own download is restored, so an automatic one never becomes an explicit request.
+        val readerPark = "parkedByReader = failed && storageFailed && materializationIntent.readerRequested,"
+        assertEquals(2, occurrences(image, readerPark))
+        assertEquals(2, occurrences(video, readerPark))
+        assertEquals(1, occurrences(voice, readerPark))
         assertEquals(2, occurrences(video, "persistedAttachmentOpenEffect("))
         assertEquals(1, occurrences(voice, "persistedAttachmentOpenEffect("))
         assertTrue(occurrences(image, "requestAttachmentOpen(") >= 5)

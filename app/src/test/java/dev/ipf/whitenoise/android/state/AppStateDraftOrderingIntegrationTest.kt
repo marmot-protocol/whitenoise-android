@@ -58,10 +58,13 @@ class AppStateDraftOrderingIntegrationTest {
         try {
             val appState = appState(drafts, repository(gateway, dispatcher))
 
+            appState.accountSession.publishCreatedIdentity(ACCOUNT_A) { appState.switchMediaSessionForTest(ACCOUNT_A) }
             appState.refreshDraftSummaries(ACCOUNT_A)
             gateway.awaitStarted(0)
+            appState.accountSession.publishCreatedIdentity(ACCOUNT_B) { appState.switchMediaSessionForTest(ACCOUNT_B) }
             appState.refreshDraftSummaries(ACCOUNT_B)
             gateway.awaitStarted(1)
+            appState.accountSession.publishCreatedIdentity(ACCOUNT_A) { appState.switchMediaSessionForTest(ACCOUNT_A) }
             appState.refreshDraftSummaries(ACCOUNT_A)
             gateway.awaitStarted(2)
 

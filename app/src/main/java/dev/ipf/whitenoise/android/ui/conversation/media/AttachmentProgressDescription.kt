@@ -17,6 +17,7 @@ internal fun nativeProgressDescription(
     when {
         host == AttachmentTransferState.Available -> null
         host == AttachmentTransferState.Cancelled -> stringResource(R.string.media_download_cancelled)
+        host == AttachmentTransferState.StorageBlocked -> stringResource(R.string.media_storage_blocked_short)
         progress?.phase == AttachmentTransferStateFfi.POLICY_BLOCKED ->
             stringResource(R.string.media_download_policy_blocked)
         progress?.phase in

@@ -1,8 +1,13 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -16,6 +21,10 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
+import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -92,7 +101,11 @@ class ViewerGroupPictureScreenshotTest {
         composeRule.onNodeWithText(context.getString(R.string.media_set_group_picture)).assertIsNotEnabled()
     }
 
-    /** Source preparation failures remain readable in the fullscreen viewer rather than the covered Activity. */
+    /**
+     * Source preparation failures remain readable in the fullscreen viewer rather than the covered Activity: the
+     * viewer's modal owns the app banner slot, so the app toast with its Copy action shows at the top of the
+     * viewer window, once (#3312).
+     */
     @Test
     fun groupPictureFailureInViewerWindow() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -114,17 +127,33 @@ class ViewerGroupPictureScreenshotTest {
             )
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
-                val host = remember { SnackbarHostState() }
-                dev.ipf.whitenoise.android.ui.conversation.media
-                    .ViewerGroupPictureFailureNotice(notice, host)
-                MediaViewerFrame(
-                    senderLabel = "Alex",
-                    recordedAtLabel = "Oct 7, 2026",
-                    onDismiss = {},
-                    onSave = {},
-                    onShare = {},
-                    snackbarHostState = host,
-                ) {}
+                val appSnackbars = remember { SnackbarHostState() }
+                val noticeHost = remember(appSnackbars) { TopNoticeHost(appSnackbars, notice = { null }) }
+                LaunchedEffect(appSnackbars) {
+                    appSnackbars.showSnackbar(
+                        ToastSnackbarVisuals(
+                            message =
+                                listOfNotNull(notice.title.resolve(context), notice.detail?.resolve(context))
+                                    .joinToString("\n"),
+                            copyable = notice.copyable,
+                            tier = notice.tier,
+                            copyText = notice.diagnosticReport,
+                        ),
+                    )
+                }
+                CompositionLocalProvider(LocalTopNoticeHost provides noticeHost) {
+                    Column(Modifier.fillMaxSize()) {
+                        TopNoticeSlot()
+                        MediaViewerFrame(
+                            senderLabel = "Alex",
+                            recordedAtLabel = "Oct 7, 2026",
+                            onDismiss = {},
+                            onSave = {},
+                            onShare = {},
+                            snackbarHostState = remember { SnackbarHostState() },
+                        ) {}
+                    }
+                }
             }
         }
         composeRule

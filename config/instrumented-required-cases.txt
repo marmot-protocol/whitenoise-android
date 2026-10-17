@@ -14,6 +14,13 @@
 dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePreparationAndroidTest#recipientRemainsActionableWhileProfilePrewarmAndLookupAreDelayed
 dev.ipf.whitenoise.android.state.ChatListColdStartDirectPeerPresentationFfiIntegrationTest#processRecreation_unnamedDirectChat_rendersDurablePeerPresentationOnFirstFrame
 
+# #3310: a DM abandoned after a refused handover stays forgotten through real old-group delivery and restart.
+dev.ipf.whitenoise.android.state.DmAbandonmentAndroidTest#newlyStartedDm_abandonedAfterHandoverAttempt_staysForgottenThroughDeliveryAndRestart
+
+# #3312: banners land in the top row above a real keyboard and never move the composer.
+dev.ipf.whitenoise.android.ui.TopNoticeComposerBoundsAndroidTest#invitationResultLandsBelowTheHeaderWithoutMovingTheComposer
+dev.ipf.whitenoise.android.ui.TopNoticeComposerBoundsAndroidTest#transcriptionFailureLandsBelowTheHeaderWithoutMovingTheComposer
+
 # Attachment progress and cancellation-before-external-dispatch regressions.
 dev.ipf.whitenoise.android.media.AttachmentProgressDeviceTest#phaseAndCancellationSemanticsRemainAccessibleAtLargeFontRtl
 dev.ipf.whitenoise.android.media.AttachmentOpenDispatchDeviceTest#cancelledOpenCannotLaunchBeforeDiskCleanup

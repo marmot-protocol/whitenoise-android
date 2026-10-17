@@ -3,8 +3,8 @@
 from copy import deepcopy
 import unittest
 
-from forward_checker import (CEILING_MS, CIPHERTEXT_OVERHEAD, FINAL_MARKER, MARKERS, PAYLOAD_BYTES, PHASE_FIELDS,
-                             REPETITIONS, SOURCE, VARIANTS, check_forward, expected_gets, expected_uploads)
+from forward_checker import (CEILING_MS, CIPHERTEXT_OVERHEAD, FINAL_MARKER, FIRST_FORWARD, MARKERS, PAYLOAD_BYTES,
+                             PHASE_FIELDS, REPETITIONS, SOURCE, VARIANTS, check_forward, expected_gets, expected_uploads)
 
 MIB = 1024 * 1024
 CIPHERTEXT = PAYLOAD_BYTES + CIPHERTEXT_OVERHEAD
@@ -102,7 +102,8 @@ def events():
             ledger.upload(token)
             if SOURCE[variant]["download"]:
                 ledger.get(source)
-            ledger.get(token)
+            if (variant, rep) == FIRST_FORWARD:
+                ledger.get(token)
     ledger.marker(FINAL_MARKER)
     return ledger.rows
 
@@ -253,6 +254,23 @@ class ForwardEvidenceTest(unittest.TestCase):
         self.assertFalse(check_forward(rows + [measure("forward-direct-1")], events())["passed"])
         self.assertFalse(check_forward(rows + [dict(sample("cached", 1), variant="other")], events())["passed"])
         self.assertFalse(check_forward(["not a metric"], events())["passed"])
+
+    def test_a_later_copy_acquired_again_or_a_first_copy_never_acquired_fails(self):
+        """The author holds the forwarded bytes after the first receipt, so refetching a later copy is a violation,
+        and a first copy that never reached the server leaves its receipt unproven."""
+        ledger = events()
+        position = next(i for i, e in enumerate(ledger)
+                        if e["kind"] == "marker" and e["value"] == MARKERS["retained"] + 3)
+        refetch = LedgerBuilder()
+        refetch.rows = deepcopy(ledger[:position])
+        refetch.get("upload-retained-2")
+        moved = refetch.rows + deepcopy(ledger[position:])
+        for index, event in enumerate(moved):
+            event["seq"] = index + 1
+        self.assertFalse(check_forward(metrics(), moved)["passed"])
+        first = next(e for e in ledger if e["kind"] == "get" and e["fixture"] == "upload-uncached-1")
+        missing = [e for e in ledger if e["seq"] != first["seq"] and e.get("request") != first["seq"]]
+        self.assertFalse(check_forward(metrics(), missing)["passed"])
 
     def test_unexpected_requests_fail(self):
         """An extra acquisition inside a sample or after the final marker, a HEAD or a disconnect fails the ledger."""

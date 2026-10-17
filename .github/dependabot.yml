@@ -6,7 +6,9 @@
 #
 # Dependabot PRs are gated by the existing android-ci.yml workflow (compile +
 # unit tests + ktlint + detekt + Android lint) exactly like any other PR, so a breaking
-# minor/major bump cannot land green without passing CI.
+# minor/major bump cannot land green without passing CI. Gradle bumps also fail
+# strict locks and checksum verification until a maintainer finishes the reviewed
+# update in docs/dependency-security.md, one update at a time.
 version: 2
 updates:
   # GitHub Actions used by .github/workflows/android-ci.yml

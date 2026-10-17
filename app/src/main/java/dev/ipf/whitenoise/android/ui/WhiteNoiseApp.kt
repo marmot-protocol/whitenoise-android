@@ -11,17 +11,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -35,15 +32,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -60,22 +58,26 @@ import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.state.WarmResumeRenderedSurface
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.ownsGroupChange
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
-import dev.ipf.whitenoise.android.ui.common.InlineConfirmationNotice
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
-import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
-import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
+import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.StartupFailureScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLocalProjectionScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
+import dev.ipf.whitenoise.android.ui.common.TopNoticeHost
+import dev.ipf.whitenoise.android.ui.common.TopNoticeRegion
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSnackbarTimeoutEffect
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
+import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
+import dev.ipf.whitenoise.android.ui.group.GroupChangeConfirmationDialog
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.navigation.NotificationFirstFrameWatchdog
@@ -101,7 +103,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 internal const val TRANSIENT_NOTICE_DURATION_MILLIS = 2_000L
-internal const val GLOBAL_TRANSIENT_NOTICE_TAG = "global-transient-notice"
 
 /** Keeps exactly one dictation control visible without duplicating the origin composer. */
 internal fun shouldShowConversationDictationPersistentControl(
@@ -143,36 +144,11 @@ internal fun TransientNoticeTimeoutEffect(
 }
 
 /**
- * The bottom obstruction an app-global confirmation has to clear.
- *
- * The keyboard already reaches past the navigation bar, so padding for both would lift the notice
- * by their sum. Taking the taller of the two leaves exactly one gap, and reading it through
- * [windowInsetsPadding] keeps an inset an ancestor has already consumed — the shell applies
- * `imePadding()` for the persistent dictation strip — from being applied a second time here.
+ * The shell's notice layout (#3312): persistent top strips first, then the shell's temporary-banner slot, then the
+ * destination, with durable bottom controls last. The slot presents banners only for destinations that have no
+ * slot of their own below their bars, and it sits in the top region, so bottom chrome such as a composer or a
+ * form action bar keeps its own size and keyboard handling while a banner appears, clears or is dismissed.
  */
-internal val globalTransientNoticeInsets: WindowInsets
-    @Composable get() = WindowInsets.ime.union(WindowInsets.navigationBars)
-
-/** True only for a notice this host owns: conversation-scoped ones are rendered by the conversation. */
-internal fun TransientNotice?.isGlobalTransientNotice(): Boolean = this != null && conversation == null
-
-@Composable
-@Suppress("FunctionNaming")
-internal fun GlobalTransientNotice(
-    notice: TransientNotice?,
-    modifier: Modifier = Modifier,
-) {
-    notice?.takeIf { it.conversation == null }?.let {
-        InlineConfirmationNotice(
-            notice = it,
-            modifier =
-                modifier
-                    .windowInsetsPadding(globalTransientNoticeInsets)
-                    .testTag(GLOBAL_TRANSIENT_NOTICE_TAG),
-        )
-    }
-}
-
 @Composable
 @Suppress("FunctionNaming")
 internal fun ShellTransientNoticeLayout(
@@ -183,30 +159,27 @@ internal fun ShellTransientNoticeLayout(
     persistentBottomContent: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    // Only the bottom edge is a real obstruction here; consuming the full inset would also eat
-    // left/right navigation-bar padding that this layout never re-applies, letting content render
-    // under a side navigation bar while a global notice is visible.
-    val bottomObstruction = globalTransientNoticeInsets.only(WindowInsetsSides.Bottom)
-    val noticeOwnsTheBottom = notice.isGlobalTransientNotice()
+    val slot = rememberTopNoticeSlot()
+    // Conversation-scoped notices belong to their conversation's own region, never the shell's.
+    val presenting = slot.presents(notice, scope = null)
+    // The first thing drawn at the top owns the status bar: the persistent strip when there is one,
+    // otherwise a presented banner, and the destination below must not pad for it a second time.
+    val bannerOwnsStatusBar = presenting && !persistentTopContentConsumesStatusBars
     Column(modifier.fillMaxSize()) {
         persistentTopContent()
+        TopNoticeRegion(
+            slot = slot,
+            notice = notice,
+            scope = null,
+            modifier = if (bannerOwnsStatusBar) Modifier.statusBarsPadding() else Modifier,
+        )
         Box(
             Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .then(
-                    if (persistentTopContentConsumesStatusBars) {
+                    if (persistentTopContentConsumesStatusBars || bannerOwnsStatusBar) {
                         Modifier.consumeWindowInsets(WindowInsets.statusBars)
-                    } else {
-                        Modifier
-                    },
-                ).then(
-                    // While the notice stands clear of the keyboard and navigation bar, the
-                    // destination is already measured above both, so its own inset-aware bottom
-                    // chrome — a StickyFormActionBar, a composer — must not lift over the same
-                    // obstruction again and float a gap above the confirmation.
-                    if (noticeOwnsTheBottom) {
-                        Modifier.consumeWindowInsets(bottomObstruction)
                     } else {
                         Modifier
                     },
@@ -215,12 +188,10 @@ internal fun ShellTransientNoticeLayout(
             content()
         }
         persistentBottomContent()
-        GlobalTransientNotice(notice)
     }
 }
 
 /** Owns top-level privacy gates and records the first app-rendered useful surface. */
-
 @Composable
 @Suppress(
     "CyclomaticComplexMethod",
@@ -252,12 +223,15 @@ internal fun WhiteNoiseApp(
     var diagnosticsPromptOpen by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     val diagnosticsEligible = appState.phase == AppPhase.Ready && appState.activeAccountRef != null
 
-    // Mutable bottom-chrome inset so screens further down the tree
-    // (e.g. ConversationScreen) can push the snackbar above their
-    // composer. Owned here so the host — which lives at this level —
-    // can read it; child screens mutate via [LocalSnackbarBottomInset].
-    val snackbarBottomInset = remember { mutableStateOf(0.dp) }
-    val snackbarContentInset = remember { mutableStateOf(0.dp) }
+    // One owner decides which top slot shows the app's temporary banners; under app lock none does.
+    val topNoticeHost =
+        remember(appState, snackbarHostState) {
+            TopNoticeHost(
+                snackbarHostState = snackbarHostState,
+                notice = { appState.transientNotice },
+                presentationAllowed = { !appState.appLockScreenVisible },
+            )
+        }
     val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
@@ -460,6 +434,9 @@ internal fun WhiteNoiseApp(
         }
     }
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)
+    // Snackbars time out here, at the root, so a slot that is hidden by app lock or replaced by a modal
+    // cannot pause the clock and show a confirmation for its full length a second time.
+    TopNoticeSnackbarTimeoutEffect(snackbarHostState)
     LaunchedEffect(inboundProfilePayload, appState.phase) {
         val payload = inboundProfilePayload ?: return@LaunchedEffect
         if (appState.phase == AppPhase.Ready && appState.presentProfilePayload(payload)) {
@@ -520,8 +497,7 @@ internal fun WhiteNoiseApp(
     // the IME (no learning / suggestion history / cloud sync of typed content).
     IncognitoKeyboardScope(enabled = appState.forceIncognitoKeyboard) {
         CompositionLocalProvider(
-            LocalSnackbarBottomInset provides snackbarBottomInset,
-            LocalSnackbarContentInset provides snackbarContentInset,
+            LocalTopNoticeHost provides topNoticeHost,
             LocalCustomEmoji provides customEmojiStore.emoji,
         ) {
             Scaffold(
@@ -530,9 +506,11 @@ internal fun WhiteNoiseApp(
                         .performanceTestTag("${PerformanceTestTags.ACTIVITY_INSTANCE_PREFIX}$warmResumeTraceToken")
                         .exposePerformanceTestTags(),
                 contentWindowInsets = WindowInsets(0.dp),
-                snackbarHost = { WhiteNoiseSnackbarHost(snackbarHostState) },
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
+                    // Composed first so every screen's own slot claims after it, and drawn last so a
+                    // surface without a slot of its own (onboarding, startup) still shows its banners on top.
+                    TopNoticeSlot(Modifier.zIndex(1f).align(Alignment.TopCenter).statusBarsPadding())
                     if (appState.appLockScreenVisible) {
                         // Privacy boundary: the protected shell is not composed
                         // underneath the lock. Its Activity-scoped controllers
@@ -785,6 +763,16 @@ internal fun WhiteNoiseApp(
     }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
+    }
+    // A refused group change waits for the user's answer wherever it was started, even after its screen closed, but
+    // only while its account and runtime are current: after a switch it is withdrawn as Wait, never shown to another.
+    val groupChangeQuestion = appState.groupChangeConfirmations.pending
+    val groupChangeQuestionOwned = groupChangeQuestion?.let { appState.ownsGroupChange(it.target) } == true
+    LaunchedEffect(groupChangeQuestion, groupChangeQuestionOwned) {
+        if (!groupChangeQuestionOwned) groupChangeQuestion?.answer(proceed = false)
+    }
+    if (!appState.appLockScreenVisible && groupChangeQuestion != null && groupChangeQuestionOwned) {
+        GroupChangeConfirmationDialog(groupChangeQuestion)
     }
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(

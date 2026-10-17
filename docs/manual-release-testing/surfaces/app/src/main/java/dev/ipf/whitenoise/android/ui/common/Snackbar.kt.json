@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
+  "legacy_sha256": "b8e6a35869af15db8a94ba3684e13665f4a7c15e0879970966e1662f3753c944",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.snackbarSurfaceBoundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
+        "anchor": "fun Modifier.snackbarSurfaceBoundary(",
+        "test_ids": [
+          "AXY-001"
+        ]
+      },
+      {
+        "surface": "SwipeDismissibleSnackbar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
+        "anchor": "fun SwipeDismissibleSnackbar(",
+        "test_ids": [
+          "AXY-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "Diagnostic snackbar dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseSnackbarHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Snackbar.kt",
+        "anchor": "fun WhiteNoiseSnackbarHost(",
+        "test_ids": [
+          "AXY-001",
+          "CON-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

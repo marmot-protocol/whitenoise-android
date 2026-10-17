@@ -61,11 +61,10 @@ class AttachmentPolicyStartupOrderingTest {
         val appState = source("AppState.kt").readText()
         val imported = appState.functionBody("activateImportedIdentity")
         assertOrdered(imported, "enforceAppOwnedAttachmentAcquisitionPolicy", "refreshAccounts()")
-        assertOrdered(imported, "refreshAccounts()", "setActiveAccount(summary.label)")
+        assertOrdered(imported, "refreshAccounts()", "activateAccountSession(")
 
         val amber = appState.functionBody("loginWithAmber")
-        assertOrdered(amber, "enforceAppOwnedAttachmentAcquisitionPolicy", "refreshAccounts()")
-        assertOrdered(amber, "refreshAccounts()", "setActiveAccount(summary.label)")
+        assertOrdered(amber, "registerExternalSigner(", "activateImportedIdentity(summary)")
 
         val refresh = appState.functionBody("refreshAccountSnapshot")
         assertTrue(refresh.contains("listAccountsWithAppAttachmentPolicy()"))
