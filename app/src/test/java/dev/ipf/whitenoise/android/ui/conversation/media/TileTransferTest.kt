@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentCancellationState
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
+import dev.ipf.whitenoise.android.state.NativeAttachmentTerminalException
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -97,6 +98,18 @@ class TileTransferTest {
 
             assertTrue(awaitStorageReadmission(flowOf(null, parked, resumed, ready)))
         }
+
+    /** Only a storage park, even wrapped, reads as storage; anything else, or no cause, is an ordinary failure. */
+    @Test
+    fun onlyAStorageParkReadsAsStorage() {
+        val park = NativeAttachmentTerminalException(AttachmentTransferStateFfi.STORAGE_BLOCKED)
+
+        assertTrue(park.parksForStorage())
+        assertTrue(IllegalStateException("wrapped", park).parksForStorage())
+        assertFalse(NativeAttachmentTerminalException(AttachmentTransferStateFfi.FAILED).parksForStorage())
+        assertFalse(IllegalStateException("decode").parksForStorage())
+        assertFalse(null.parksForStorage())
+    }
 
     /** Observation that ends while the body is still parked asks for no reload, so nothing loops. */
     @Test

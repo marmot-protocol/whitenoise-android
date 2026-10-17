@@ -5,9 +5,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import dev.ipf.whitenoise.android.state.AttachmentTransferState.StorageBlocked
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.state.attachmentNativeProgress
+import dev.ipf.whitenoise.android.state.failedTransferState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 
@@ -34,3 +36,9 @@ internal fun storageReadmissionEffect(
 /** True once native progress reports the parked body ready, false when observation ends first. */
 internal suspend fun awaitStorageReadmission(progress: Flow<NativeAttachmentProgress?>): Boolean =
     progress.firstOrNull { it?.phase == AttachmentTransferStateFfi.READY } != null
+
+/**
+ * True when this failure is MDK parking the body for lack of storage. A surface sets its storage wording from this on
+ * every failure, so an earlier park never relabels a later, unrelated failure.
+ */
+internal fun Throwable?.parksForStorage(): Boolean = this?.failedTransferState() == StorageBlocked

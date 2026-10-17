@@ -20,7 +20,7 @@ internal fun ConversationController.retryAttachmentTransfer(
     messageIdHex: String,
     attachmentIndex: Int,
     onAccepted: () -> Unit,
-    onFailure: () -> Unit,
+    onFailure: (Throwable) -> Unit,
 ): Boolean {
     val request =
         attachmentTransferRequest(messageIdHex, attachmentIndex)
@@ -53,7 +53,7 @@ internal fun ConversationController.retryAttachmentTransfer(
                     reopen = { destination != null && requestAttachmentOpen(messageIdHex, attachmentIndex) },
                     notify = {
                         appState.present(R.string.media_couldnt_load)
-                        onFailure()
+                        onFailure(failure)
                     },
                 )
             }
@@ -96,7 +96,7 @@ internal fun ConversationController.performAttachmentUserAction(
     onFailure: () -> Unit,
 ) {
     if (attachmentActionNeedsRetry(state, automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex))) {
-        retryAttachmentTransfer(messageIdHex, attachmentIndex, onAccepted, onFailure)
+        retryAttachmentTransfer(messageIdHex, attachmentIndex, onAccepted) { onFailure() }
     } else {
         onAccepted()
     }

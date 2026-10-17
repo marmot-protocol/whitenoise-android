@@ -69,7 +69,6 @@ import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.holdCacheFileInUse
 import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
-import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.KeyedMutexPool
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -77,7 +76,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
-import dev.ipf.whitenoise.android.state.failedTransferState
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
@@ -310,6 +308,12 @@ internal fun MediaVoiceBubble(
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     var storageFailed by remember(pillKey, epoch) { mutableStateOf(false) }
+
+    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
+    fun markFailed(cause: Throwable? = null) {
+        storageFailed = cause.parksForStorage()
+        failed = true
+    }
     // Auto-download gate (#407): retained/cached own clips always materialize;
     // a cache-missing own clip waits during an explicit backlog pause. Incoming
     // clips honor the Audio matrix row unless the attachment is already local.
@@ -382,7 +386,7 @@ internal fun MediaVoiceBubble(
         )
         localFile = null
         totalDurationMs = 0
-        failed = true
+        markFailed()
         val retryAllowedByPolicy =
             shouldStartVoiceAttachmentDownload(
                 mine = mine,
@@ -469,8 +473,7 @@ internal fun MediaVoiceBubble(
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
                 Log.w("MediaVoiceBubble", "voice_auto_materialize_failed")
-                storageFailed = it.failedTransferState() == AttachmentTransferState.StorageBlocked
-                failed = true
+                markFailed(it)
             }
         }
         loading = false
@@ -540,7 +543,7 @@ internal fun MediaVoiceBubble(
                 messageIdHex,
                 attachmentIndex,
                 onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                onFailure = { failed = true },
+                onFailure = { markFailed(it) },
             )
         },
         onActionClick = {
@@ -550,7 +553,7 @@ internal fun MediaVoiceBubble(
                         messageIdHex,
                         attachmentIndex,
                         onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                        onFailure = { failed = true },
+                        onFailure = { markFailed(it) },
                     )
                 loading || localFile == null ->
                     controller.requestAttachmentOpen(messageIdHex, attachmentIndex)

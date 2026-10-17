@@ -57,7 +57,6 @@ import dev.ipf.whitenoise.android.media.holdCacheFileInUse
 import dev.ipf.whitenoise.android.media.playbackErrorInvalidatesAttachmentCache
 import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
-import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -66,7 +65,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
-import dev.ipf.whitenoise.android.state.failedTransferState
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -235,6 +233,12 @@ internal fun MediaVideoGridTile(
     }
     var failed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
     var storageFailed by remember(messageIdHex, attachmentIndex, epoch) { mutableStateOf(false) }
+
+    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
+    fun markFailed(cause: Throwable? = null) {
+        storageFailed = cause.parksForStorage()
+        failed = true
+    }
     var tileDurationMs by remember(messageIdHex, attachmentIndex, epoch) { mutableLongStateOf(0L) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
@@ -300,7 +304,7 @@ internal fun MediaVideoGridTile(
             onTap()
         }
         if (retry) {
-            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { failed = true })
+            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { markFailed(it) })
         } else {
             open()
         }
@@ -339,8 +343,7 @@ internal fun MediaVideoGridTile(
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
                 Log.w("MediaVideoGridTile", "video_tile_auto_materialize_failed")
-                storageFailed = it.failedTransferState() == AttachmentTransferState.StorageBlocked
-                failed = true
+                markFailed(it)
             }
         }
     }
@@ -639,6 +642,12 @@ internal fun MediaVideoBubble(
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
     var storageFailed by remember(pillKey, epoch) { mutableStateOf(false) }
+
+    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
+    fun markFailed(cause: Throwable? = null) {
+        storageFailed = cause.parksForStorage()
+        failed = true
+    }
     // Seed the poster from the epoch-independent thumbnail cache (mirrors
     // MediaImageBubble). A sourceEpoch upgrade re-keys this state, so without
     // the cache seed the poster would reset to null and flash back to the
@@ -712,14 +721,14 @@ internal fun MediaVideoBubble(
                         } catch (t: Throwable) {
                             currentCoroutineContext().ensureActive()
                             if (t is CancellationException) throw t
-                            failed = true
+                            markFailed(t)
                             localFile = null
                         } finally {
                             loading = false
                         }
                     }
             },
-            onFailure = { failed = true },
+            onFailure = { markFailed(it) },
         )
     }
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
@@ -763,8 +772,7 @@ internal fun MediaVideoBubble(
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
                 Log.w("MediaVideoBubble", "video_auto_materialize_failed")
-                storageFailed = it.failedTransferState() == AttachmentTransferState.StorageBlocked
-                failed = true
+                markFailed(it)
             }
         }
         loading = false
@@ -795,7 +803,7 @@ internal fun MediaVideoBubble(
             )
         }
         if (retry) {
-            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { failed = true })
+            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { markFailed(it) })
         } else {
             open()
         }
