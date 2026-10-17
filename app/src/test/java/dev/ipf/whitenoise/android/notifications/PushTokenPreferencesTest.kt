@@ -30,8 +30,23 @@ class PushTokenPreferencesTest {
     @Before
     fun prepare() {
         context = ApplicationProvider.getApplicationContext()
-        listOf("push-target", "legacy-a", "legacy-b").forEach(context::deleteSharedPreferences)
+        listOf(
+            "push-target",
+            "legacy-a",
+            "legacy-b",
+            "whitenoise.push.tokens.keystore",
+            "whitenoise.push.safety",
+            "whitenoise.push.tokens.secure",
+            "whitenoise.push.tokens.fallback",
+            "whitenoise.push.tokens",
+        ).forEach(::clearPreferences)
         key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+    }
+
+    // Clear cached SharedPreferences as well as disk state between independent import scenarios.
+    private fun clearPreferences(name: String) {
+        context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
+        context.deleteSharedPreferences(name)
     }
 
     private fun adapter(unavailable: Boolean = false) =
@@ -236,7 +251,7 @@ class PushTokenPreferencesTest {
         try {
             for (cleanup in listOf(null, emptySet<String>(), setOf("old-account"), "malformed")) {
                 listOf("whitenoise.push.tokens.keystore", "whitenoise.push.safety", "whitenoise.push.tokens.fallback")
-                    .forEach(context::deleteSharedPreferences)
+                    .forEach(::clearPreferences)
                 val sourceName = "whitenoise.push.tokens.fallback"
                 val source = context.getSharedPreferences(sourceName, Context.MODE_PRIVATE)
                 source
@@ -250,7 +265,8 @@ class PushTokenPreferencesTest {
                     }.commit()
                 val before = source.all
                 val blocked = cleanup is String || (cleanup is Set<*> && cleanup.isNotEmpty())
-                val expected = if (blocked) PushStorageRecovery.CleanupReconciliationRequired else PushStorageRecovery.Ready
+                val expected =
+                    if (blocked) PushStorageRecovery.CleanupReconciliationRequired else PushStorageRecovery.Ready
                 val store = PushTokenStore.create(context)
                 assertEquals(expected, store.recoveryState())
                 assertEquals(!blocked, store.registrationAllowed())

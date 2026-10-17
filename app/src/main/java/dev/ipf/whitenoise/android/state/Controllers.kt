@@ -11910,11 +11910,17 @@ class ConversationController(
                     } catch (throwable: Throwable) {
                         diagnostic.invitationFailed(throwable, nativeInvoked, nativeAccepted)
                         throwable.rethrowIfCancellation()
-                        val reconcilable = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(throwable)
+                        val reconcilable = canReconcileInviteReply(nativeInvoked, absentBefore, throwable)
                         if (reconcilable) {
                             diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.START)
                             val reconciled =
-                                reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore, nativeInvoked, throwable)
+                                reconcileInitialAdminInvite(
+                                    refs,
+                                    canonicalAdmins,
+                                    absentBefore,
+                                    nativeInvoked,
+                                    throwable,
+                                )
                             if (reconciled) {
                                 diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.SUCCESS)
                                 presentConversationTransient(R.string.toast_invite_sent)
@@ -11999,6 +12005,13 @@ class ConversationController(
             else -> true
         }
 
+    /** Only an uncertain first invitation for absent recipients may reconcile by reading membership. */
+    private fun canReconcileInviteReply(
+        nativeInvoked: Boolean,
+        absentBefore: Boolean,
+        failure: Throwable,
+    ): Boolean = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
+
     /** Read actual membership after an uncertain reply, without issuing a second invitation. */
     private suspend fun reconcileInitialAdminInvite(
         refs: List<String>,
@@ -12007,7 +12020,7 @@ class ConversationController(
         nativeInvoked: Boolean,
         failure: Throwable,
     ): Boolean {
-        val eligible = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
+        val eligible = canReconcileInviteReply(nativeInvoked, absentBefore, failure)
         if (!eligible) return false
         val beforeRead = groupAuthorityEpoch
         refreshManagementState()

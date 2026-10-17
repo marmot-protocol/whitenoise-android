@@ -106,7 +106,8 @@ internal class PushTokenPreferences(
                 // A nonempty or malformed cleanup queue cannot be discarded with the bad value.
                 val cleanupRequired =
                     CLEANUP_KEYS.any { key ->
-                        key in legacyValues && (legacyValues[key] !is Set<*> || (legacyValues[key] as Set<*>).isNotEmpty())
+                        val value = legacyValues[key]
+                        key in legacyValues && (value !is Set<*> || value.isNotEmpty())
                     }
                 throw MalformedLegacyPushSource(cleanupRequired)
             }
