@@ -80,6 +80,24 @@ class AutomaticAttachmentNetworkWaitsTest {
         assertTrue("work on any network is no longer recorded", waits.waiting(ACCOUNT).isEmpty())
     }
 
+    /** A not-roaming wait takes an unmetered policy or receipt, which admits the unmetered roaming it refused. */
+    @Test
+    fun notRoamingWaitTakesAnUnmeteredPolicyOrReceipt() {
+        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.NOT_ROAMING, type = IMAGE)
+        val queued = single()
+
+        assertEquals(1, waits.widen(manager(), ACCOUNT) { NetworkType.UNMETERED })
+        assertEquals(queued.id, single().id)
+        assertEquals(NetworkType.UNMETERED, single().constraints.requiredNetworkType)
+
+        waits.widen(manager(), ACCOUNT) { NetworkType.NOT_ROAMING }
+        assertEquals(NetworkType.NOT_ROAMING, single().constraints.requiredNetworkType)
+        AttachmentDownloadWorker.enqueue(context, request, networkType = NetworkType.UNMETERED, type = IMAGE)
+
+        assertEquals(queued.id, single().id)
+        assertEquals(NetworkType.UNMETERED, single().constraints.requiredNetworkType)
+    }
+
     /** Another account's policy, and a policy that is no wider, leave the spec as it is. */
     @Test
     fun onlyAWiderPolicyForTheSameAccountWidens() {
