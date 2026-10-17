@@ -109,7 +109,9 @@ class GroupAvatarDestinationRefusalScreenshotTest {
         composeRule.onNodeWithText(message).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Copy").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
-        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/group_avatar_destination_refusal_$suffix.png")
+        composeRule.onNodeWithTag(TAG).captureRoboImage(
+            "src/test/snapshots/group_avatar_destination_refusal_$suffix.png",
+        )
     }
 
     private companion object {
