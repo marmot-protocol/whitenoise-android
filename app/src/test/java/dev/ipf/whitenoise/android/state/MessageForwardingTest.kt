@@ -271,6 +271,40 @@ class MessageForwardingTest {
             assertEquals(listOf("target"), transport.convergenceTargets)
         }
 
+    /**
+     * A destination upload that stalls fails that target at the upload stage instead of looking stuck (#2556), and
+     * Retry uploads again and publishes the message exactly once.
+     */
+    @Test
+    fun aStalledUploadFailsAtTheUploadStageAndRetryPublishesOnce() =
+        runTest {
+            val transport = RecordingForwardTransport(stallUploadOnceFor = mutableSetOf("target"))
+            val session =
+                ForwardSession(
+                    scope = this,
+                    messages = listOf(mediaPayload("media", null, "notes.txt")),
+                    targetGroupIds = listOf("target"),
+                    transport = transport,
+                )
+
+            session.start()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Failed, session.state.value.phase)
+            val failed =
+                session.state.value.targets
+                    .single()
+            assertEquals(ForwardFailureStage.Upload, failed.failureStage)
+            assertEquals(emptyList<Pair<String, Int>>(), transport.published)
+
+            session.retryFailed()
+            advanceUntilIdle()
+
+            assertEquals(ForwardOperationPhase.Completed, session.state.value.phase)
+            assertEquals(listOf("target", "target"), transport.uploadTargets)
+            assertEquals(listOf("target" to 0), transport.published)
+        }
+
     /** Cancellation after upload begins must not cancel unrelated source-cache work. */
     @Test
     fun cancellationWhileUploadingPublishesNothing() =
@@ -867,6 +901,7 @@ class MessageForwardingTest {
 
     private class RecordingForwardTransport(
         private val failUploadOnceFor: MutableSet<String> = mutableSetOf(),
+        private val stallUploadOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishUncertainOnceFor: MutableSet<String> = mutableSetOf(),
         private val failPublishBeforeCommitOnceFor: MutableSet<String> = mutableSetOf(),
         private val uploadGate: CompletableDeferred<Unit>? = null,
@@ -930,6 +965,7 @@ class MessageForwardingTest {
             onUpload()
             uploadGate?.await()
             if (failUploadOnceFor.remove(targetGroupIdHex)) error("upload failed")
+            if (stallUploadOnceFor.remove(targetGroupIdHex)) throw ForwardUploadStalledException(null)
             return message.attachments.mapIndexed { index, attachment ->
                 reference(
                     fileName = attachment.fileName,
