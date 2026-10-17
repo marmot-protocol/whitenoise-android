@@ -72,7 +72,9 @@ class SignUpProfileDraftSubmissionTest {
     /** The real Welcome/form wiring reaches native creation once after an offline retry. */
     @Test fun welcomeSignupRetriesMissingRouteThroughActualCreationAdapter() {
         var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
-        val creations = java.util.concurrent.atomic.AtomicInteger()
+        val creations =
+            java.util.concurrent.atomic
+                .AtomicInteger()
         val native =
             java.lang.reflect.Proxy
                 .newProxyInstance(
