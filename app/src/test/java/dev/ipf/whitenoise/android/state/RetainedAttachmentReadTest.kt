@@ -8,9 +8,11 @@ import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.DiskByteCacheLease
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -55,10 +57,24 @@ class RetainedAttachmentReadTest {
             )
     }
 
-    /** Restores the shared dispatcher after every bounded scenario. */
+    /** Joins fixture-owned background work before restoring the shared dispatcher. */
     @After
     fun tearDown() {
-        Dispatchers.resetMain()
+        try {
+            runTest(dispatcher) {
+                val jobs =
+                    appState.javaClass.declaredFields
+                        .filter { CoroutineScope::class.java.isAssignableFrom(it.type) }
+                        .map { field ->
+                            (field.apply { isAccessible = true }.get(appState) as CoroutineScope).coroutineContext.job
+                        }
+                        .distinct()
+                jobs.forEach { it.cancel() }
+                jobs.forEach { it.join() }
+            }
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     /** A file-sized read must run on a worker, never on the thread that renders the tile. */
