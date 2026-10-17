@@ -164,7 +164,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "private suspend fun scheduleIncomingAttachmentDownloads(",
         "test_ids": [
-          "MED-034",
+          "MED-036",
           "SET-011"
         ]
       },
@@ -173,7 +173,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "private suspend fun awaitAutomaticAttachmentAdmission(",
         "test_ids": [
-          "MED-034",
+          "MED-036",
           "MED-022"
         ]
       },
@@ -182,7 +182,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "private fun widenWaitingAutomaticDownloads(",
         "test_ids": [
-          "MED-034",
+          "MED-036",
           "MED-022"
         ]
       },
