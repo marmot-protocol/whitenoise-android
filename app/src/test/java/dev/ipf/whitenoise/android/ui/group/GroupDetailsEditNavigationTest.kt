@@ -581,7 +581,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
         val successor = testController.controller.transferAdminCandidates().first()
         val successorName = testController.controller.memberDisplayName(successor)
-        composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
+        pickLeaveSuccessor(successorName)
         composeRule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
         composeRule
             .onNode(
@@ -599,7 +599,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("confirmation.confirm").assertDoesNotExist()
         assertEquals(emptyList<String>(), mutations)
         composeRule.onNodeWithText(context.getString(R.string.leave_group)).performScrollTo().performClick()
-        composeRule.onNode(hasText(successorName) and hasClickAction()).performClick()
+        pickLeaveSuccessor(successorName)
         composeRule.onNodeWithTag("confirmation.confirm").assertIsEnabled().performClick()
         try {
             composeRule.waitUntil(timeoutMillis = 5_000) { mutations.isNotEmpty() }
@@ -617,6 +617,15 @@ class GroupDetailsEditNavigationTest {
         // demotes or leaves after rejection. Successful transfer/leave needs device evidence.
         assertEquals(listOf("promoteAdminDetailed"), mutations)
         assertEquals(listOf("member-b"), promotionTargets)
+    }
+
+    private fun pickLeaveSuccessor(name: String) {
+        val matcher = hasText(name) and hasClickAction()
+        // Leave resolves the live roster on IO before opening the picker.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(matcher).fetchSemanticsNodes().size == 1
+        }
+        composeRule.onNode(matcher).performClick()
     }
 
     private fun render(

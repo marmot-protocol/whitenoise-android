@@ -168,13 +168,7 @@ class NostrEventReaderTest {
             up()
         }
         composeRule.runOnIdle {
-            assertEquals(
-                destination,
-                clipboard.primaryClip
-                    ?.getItemAt(0)
-                    ?.text
-                    .toString(),
-            )
+            assertClipboardText(clipboard, destination)
             clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", "keep this"))
             block = paragraph(MarkdownInlineFfi.Text(replacement))
         }
@@ -185,13 +179,7 @@ class NostrEventReaderTest {
             up()
         }
         composeRule.runOnIdle {
-            assertEquals(
-                "keep this",
-                clipboard.primaryClip
-                    ?.getItemAt(0)
-                    ?.text
-                    .toString(),
-            )
+            assertClipboardText(clipboard, "keep this")
             visible = false
         }
         composeRule.onNodeWithText(replacement).assertDoesNotExist()
@@ -202,14 +190,15 @@ class NostrEventReaderTest {
             up()
         }
         composeRule.runOnIdle {
-            assertEquals(
-                "keep this",
-                clipboard.primaryClip
-                    ?.getItemAt(0)
-                    ?.text
-                    .toString(),
-            )
+            assertClipboardText(clipboard, "keep this")
         }
+    }
+
+    private fun assertClipboardText(
+        clipboard: ClipboardManager,
+        expected: String,
+    ) {
+        assertEquals(expected, clipboard.primaryClip?.getItemAt(0)?.text.toString())
     }
 
     private fun readerLink(destination: String): MarkdownBlockFfi =
