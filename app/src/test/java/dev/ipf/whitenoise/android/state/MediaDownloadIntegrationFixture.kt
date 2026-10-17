@@ -290,6 +290,25 @@ internal class MediaDownloadIntegrationFixture(
         check(entered.trySend(call).isSuccess)
     }
 
+    /**
+     * Marks attachment [index] as already retained by MDK with [bytes], as a background automatic download leaves it,
+     * without recording a transfer call or touching the Android-side caches.
+     */
+    fun retainNatively(
+        index: Int,
+        bytes: ByteArray,
+    ) {
+        val request = qualifiedRequest(index)
+        val target =
+            AttachmentLocalTargetFfi(
+                request.messageIdHex,
+                checkNotNull(request.sourceMessageIdHex),
+                request.attachmentIndex.toUInt(),
+            )
+        jobs[key(request.accountRef, request.groupIdHex, target)] =
+            Call(request.accountRef, request.groupIdHex, reference(index)).also { it.succeed(bytes) }
+    }
+
     /** Returns local-only transfer metadata, never creating a job from a read. */
     private fun status(key: String): AttachmentTransferStatusFfi {
         val call = jobs[key]
