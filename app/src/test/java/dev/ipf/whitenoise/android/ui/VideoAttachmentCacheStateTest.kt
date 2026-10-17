@@ -393,4 +393,23 @@ class VideoAttachmentCacheStateTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing MediaVideo.kt source file")
+
+    /**
+     * The in-chat video bubble keys its local-availability probe on the source epoch, as the grid tile and voice
+     * bubble do, so a probe made before MDK retained the bytes is asked again once a newer epoch arrives.
+     */
+    @Test
+    fun videoBubbleProbesLocalAvailabilityPerSourceEpoch() {
+        val source =
+            listOf(
+                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
+                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
+            ).first { it.exists() }.readText()
+        val bubble = source.substringAfter("internal fun MediaVideoBubble(").substringBefore("@VisibleForTesting")
+        assertTrue(
+            "the bubble's probe must re-key on the source epoch",
+            "rememberLocalAttachmentAvailability(controller, messageIdHex, attachmentIndex, Pair(pillKey, epoch))" in bubble,
+        )
+    }
+
 }

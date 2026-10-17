@@ -15,6 +15,8 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companio
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
+import dev.ipf.whitenoise.android.state.localTimelineMessage
+import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -90,6 +92,31 @@ class NativeRetainedMediaOfflineTest {
         assertNoTransfer()
     }
 
+    /** A video MDK retains plays offline in the chat: the bubble materializes it without any transfer request. */
+    @Test
+    fun aNativelyRetainedVideoBubbleMaterializesOffline() {
+        fixture.retainNatively(0, VIDEO_BYTES)
+        assertFalse(fixture.state.shouldAutoDownloadMedia(MediaAutoDownloadType.Video))
+
+        composeRule.setContent { WhiteNoiseTheme { VideoBubble() } }
+
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.waitForIdle()
+            materializations.get() >= 1
+        }
+        assertNoTransfer()
+    }
+
+    /** A video bubble MDK does not hold stays a Download offline, with no materialization and no transfer request. */
+    @Test
+    fun aVideoBubbleNotRetainedStaysRemoteOffline() {
+        composeRule.setContent { WhiteNoiseTheme { VideoBubble() } }
+
+        settle()
+        assertEquals(0, materializations.get())
+        assertNoTransfer()
+    }
+
     /** A voice note or audio file MDK retains plays offline: the bubble materializes it without a transfer. */
     @Test
     fun aNativelyRetainedVoiceClipMaterializesOffline() {
@@ -127,6 +154,22 @@ class NativeRetainedMediaOfflineTest {
             mine = false,
             onTap = {},
             overflowCount = 0,
+            modifier = Modifier.size(160.dp),
+            videoFileResolver = { _, _, _, _, _, _, _ -> materialized() },
+        )
+    }
+
+    /** The production in-chat video bubble, with its file materialization counted instead of decoded. */
+    @androidx.compose.runtime.Composable
+    private fun VideoBubble() {
+        MediaVideoBubble(
+            item = localTimelineMessage(timelineAppMessage(request(0).messageIdHex)),
+            attachmentIndex = 0,
+            reference = reference(0).copy(fileName = "clip.mp4", mediaType = "video/mp4"),
+            controller = controller,
+            appState = fixture.state,
+            onOpenConversationMedia = {},
+            mine = false,
             modifier = Modifier.size(160.dp),
             videoFileResolver = { _, _, _, _, _, _, _ -> materialized() },
         )

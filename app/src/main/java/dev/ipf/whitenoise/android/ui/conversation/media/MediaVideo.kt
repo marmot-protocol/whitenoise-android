@@ -639,7 +639,7 @@ internal fun MediaVideoBubble(
         )
     // MDK-retained bytes from a background download count as local, so the pill plays offline (#3308).
     val cachedPlaintextOnEntry by
-        rememberLocalAttachmentAvailability(controller, messageIdHex, attachmentIndex, pillKey)
+        rememberLocalAttachmentAvailability(controller, messageIdHex, attachmentIndex, Pair(pillKey, epoch))
     val pendingAttachment =
         if (mine) controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) else null
     // A message still queued for upload has no materialized file to seek in, so
