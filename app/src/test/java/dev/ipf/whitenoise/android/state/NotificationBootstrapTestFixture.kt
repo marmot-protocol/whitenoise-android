@@ -112,6 +112,7 @@ internal class NotificationBootstrapTestFixture(
     senderPictureUrl: String? = null,
     isDm: Boolean = false,
     private val accounts: List<AccountSummaryFfi> = emptyList(),
+    initialActiveAccountRef: String? = accounts.firstOrNull()?.label.orEmpty(),
     private val groupMemberAccountRefs: Set<String> = emptySet(),
     private val chatListRows: List<ChatListRowFfi> = emptyList(),
     private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
@@ -443,7 +444,7 @@ internal class NotificationBootstrapTestFixture(
                     npubCalls.incrementAndGet()
                     "npub1coldidentityfallback"
                 }
-                "listAccounts" -> accounts
+                "listAccounts" -> accounts.toList()
                 "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
                 "setAttachmentDownloadPolicy" -> Unit
                 "beginAttachmentPermissionUpdate" -> "fixture-permission-generation"
@@ -558,7 +559,7 @@ internal class NotificationBootstrapTestFixture(
             draftStore = DraftStore(EmptyDraftPersistence),
             accountIdHexResolver = accountIdHexResolver,
             accounts = emptyList(),
-            activeAccountRef = accounts.firstOrNull()?.label.orEmpty(),
+            activeAccountRef = initialActiveAccountRef,
             profileReader = if (profileRefreshRequest != null) { _ -> null } else null,
             profileRefreshRequest = profileRefreshRequest,
             marmotRuntimeFactory = { AppMarmotRuntime(rootPath = "test", marmot = marmot) },

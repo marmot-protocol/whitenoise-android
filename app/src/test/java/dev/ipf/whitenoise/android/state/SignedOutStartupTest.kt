@@ -1,10 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
+import android.app.Application
+import android.content.Context
 import dev.ipf.marmotkit.AccountSummaryFfi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -155,6 +158,8 @@ class SignedOutStartupTest {
     ) {
         assertEquals(AppPhase.Onboarding, fixture.appState.phase)
         assertNull(fixture.appState.activeAccountRef)
+        val context: Application = RuntimeEnvironment.getApplication()
+        assertFalse(context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE).contains("active_account"))
         assertNull(fixture.appState.localNotificationSettings)
         assertEquals(accounts, fixture.appState.accounts)
         assertTrue(fixture.signInRequests.isEmpty())
@@ -168,20 +173,30 @@ class SignedOutStartupTest {
         onSignInAccount: ((String) -> Unit)? = null,
         block: suspend (NotificationBootstrapTestFixture) -> Unit,
     ) {
+        val context: Application = RuntimeEnvironment.getApplication()
+        val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+        val savedSelection = preferences.edit()
+        if (selected == null) {
+            savedSelection.remove("active_account")
+        } else {
+            savedSelection.putString("active_account", selected)
+        }
+        assertTrue(savedSelection.commit())
         val fixture =
             NotificationBootstrapTestFixture(
-                context = RuntimeEnvironment.getApplication(),
+                context = context,
                 accounts = accounts,
+                initialActiveAccountRef = null,
                 emitStartupNotification = false,
                 signInFailure = signInFailure,
                 onSignInAccount = onSignInAccount,
             )
         try {
-            fixture.appState.activeAccountRef = selected
             fixture.bootstrap()
             block(fixture)
         } finally {
             fixture.close()
+            preferences.edit().remove("active_account").commit()
         }
     }
 
