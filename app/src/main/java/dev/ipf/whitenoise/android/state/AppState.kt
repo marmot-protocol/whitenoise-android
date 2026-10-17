@@ -1483,7 +1483,6 @@ class WhiteNoiseAppState private constructor(
         nativeAttachmentPermissions.invalidate(null)
     }
 
-    private val bootstrapAttempts = BootstrapAttemptCoordinator()
     private val bootstrapRuntime = BootstrapRuntimeCoordinator<AppMarmotRuntime>()
     private val startupPerformance = StartupPerformanceDiagnostics()
     private var startupSystemSplashHandoffRecorded = false
@@ -2612,10 +2611,18 @@ class WhiteNoiseAppState private constructor(
         )
     }
     private val notificationEnrichmentGate = Semaphore(NOTIFICATION_ENRICHMENT_FANOUT)
+    internal val accountSession by lazy {
+        AppAccountSessionCoordinator(
+            mutationScope = mutationsScope,
+            stateDispatcher = Dispatchers.Main.immediate,
+            listenerTeardown = { runtimeListenerTeardownOwner },
+            activation = AccountSessionActivation(),
+        )
+    }
     private val accountCatchUpCoordinator =
         AccountCatchUpCoordinator(notificationScope, localNotificationPresenter.catchUpWindow)
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
-    private val accountSwitchHandoff = AccountSwitchLocalSnapshotHandoff()
+    private val accountSwitchHandoff get() = accountSession.handoff
 
     // Bumped whenever cross-account caches are cleared (switch / sign-out). An
     // in-flight profile refresh captures it at start and discards its result if
@@ -3382,30 +3389,33 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Fences runtime recovery and drains account subscriptions before the destructive engine wipe. */
-    private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean {
-        // Fence any foreground-service retry that was captured before this
-        // destructive teardown. The wipe/restore path owns listener restart;
-        // a delayed service retry must not reinstall work across that boundary.
-        accountSetup.close()
-        notificationRuntimeRecovery.advance()
-        networkNotificationRecoverySuppressed = true
-        val restartNotifications =
-            backgroundConnectionEnabled ||
-                notificationJob.isActive() ||
-                notificationNetworkRecovery.isActive() ||
-                pushWakeCatchUpDrainJob.isActive()
-        val chatsControllerForTeardown = chatsController
-        val conversationControllersForTeardown = conversationControllersForAccountTeardown()
-        applyDestructiveWipeRuntimeState(prepareDestructiveAccountWipeRuntimeState(destructiveWipeRuntimeState()))
-        reloadMediaAutoDownloadMatrix()
-        // Capture controller references before the first suspending teardown.
-        // Recomposition is allowed to detach/replace them after activeAccountRef
-        // changes, but the destructive wipe still has to drain the old handles.
-        chatsControllerForTeardown?.closeLiveSubscriptionsForAccountTeardown(accountRef)
-        conversationControllersForTeardown.forEach { it.closeLiveSubscriptionsForAccountTeardown(accountRef) }
-        stopNotificationListenerForAccountTeardown()
-        return restartNotifications
-    }
+    private suspend fun prepareForDestructiveAccountWipe(accountRef: String): Boolean =
+        accountSession.prepareForAccountTeardown {
+            // Fence recovery before setup cancellation suspends; capture controller handles before their drain.
+            notificationRuntimeRecovery.advance()
+            networkNotificationRecoverySuppressed = true
+            accountSetup.close()
+            val restartNotifications =
+                backgroundConnectionEnabled ||
+                    notificationJob.isActive() ||
+                    notificationNetworkRecovery.isActive() ||
+                    pushWakeCatchUpDrainJob.isActive()
+            val oldChats = chatsController
+            val oldConversations = conversationControllersForAccountTeardown()
+            AccountSessionTeardown(
+                restartNotifications = restartNotifications,
+                invalidateActiveSession = {
+                    applyDestructiveWipeRuntimeState(
+                        prepareDestructiveAccountWipeRuntimeState(destructiveWipeRuntimeState()),
+                    )
+                    reloadMediaAutoDownloadMatrix()
+                },
+                closeControllers = {
+                    oldChats?.closeLiveSubscriptionsForAccountTeardown(accountRef)
+                    oldConversations.forEach { it.closeLiveSubscriptionsForAccountTeardown(accountRef) }
+                },
+            )
+        }
 
     /** Restores account and notification state after a wipe fails before commit. */
     private suspend fun restoreAfterFailedDestructiveAccountWipe(
@@ -3426,7 +3436,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Cancels reconnect producers before stopping the passive notification receiver. */
     internal suspend fun stopNotificationListenerForAccountTeardown() {
-        runtimeListenerTeardownOwner.stopForAccountTeardown()
+        accountSession.stopListenersForAccountTeardown()
     }
 
     /** Bridges native projection gaps for matching accounts; null retains active-controller routing. */
@@ -4772,12 +4782,7 @@ class WhiteNoiseAppState private constructor(
      * second Marmot runtime beside a blocked native call.
      */
     suspend fun bootstrap() {
-        val attempt =
-            withContext(Dispatchers.Main.immediate) {
-                bootstrapAttempts.currentOrStart {
-                    mutationsScope.async { bootstrapLocked() }
-                }
-            }
+        val attempt = accountSession.bootstrapAttempt { bootstrapLocked() }
         val completed = awaitBootstrapAttempt(attempt, bootstrapActionableTimeoutMillis())
         if (!completed) {
             withContext(Dispatchers.Main.immediate) {
@@ -5324,19 +5329,20 @@ class WhiteNoiseAppState private constructor(
     suspend fun createIdentity() = profileSignUp.createIdentityWithoutProfile()
 
     /** Activates a newly created identity and invalidates older account-list reads atomically. */
-    private fun activateCreatedIdentity(summary: AccountSummaryFfi) {
-        if (summary.label != activeAccountRef) {
-            clearInMemoryMediaCaches()
-            clearCrossAccountCaches()
+    private fun activateCreatedIdentity(summary: AccountSummaryFfi) =
+        accountSession.publishCreatedIdentity(summary.label) {
+            if (summary.label != activeAccountRef) {
+                clearInMemoryMediaCaches()
+                clearCrossAccountCaches()
+            }
+            accountListLifetime.advance {
+                accounts = accountSummariesWithCreatedIdentity(accounts, summary)
+            }
+            activeAccountRef = summary.label
+            preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
+            localNotificationSettings = null
+            reloadMediaAutoDownloadMatrix()
         }
-        accountListLifetime.advance {
-            accounts = accountSummariesWithCreatedIdentity(accounts, summary)
-        }
-        activeAccountRef = summary.label
-        preferences.edit().putString(ACTIVE_ACCOUNT_KEY, summary.label).apply()
-        localNotificationSettings = null
-        reloadMediaAutoDownloadMatrix()
-    }
 
     /** Runs post-create enrichment without delaying the accepted identity or actionable route. */
     private fun launchIdentityPostCreateWarmup(summary: AccountSummaryFfi) = profileSignUp.launchIdentityPostCreateWarmup(summary)
@@ -5438,15 +5444,22 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Qualifies a returned import receipt before Android publishes or activates the account. */
+    /** Pending setup keeps its route; only a completed activation receipt can announce an imported identity. */
     private suspend fun activateImportedIdentity(summary: AccountSummaryFfi) {
         marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
         refreshAccounts()
-        setActiveAccount(summary.label)
-        refreshLocalNotificationSettings()
-        phase = AppPhase.Ready
-        presentTransient(R.string.toast_identity_imported)
-        warmProfile(summary.accountIdHex)
+        val receipt = activateAccountSession(AccountSessionActivationRequest(summary.label))
+        if (receipt != null) {
+            accountSession.finishImportedIdentity(
+                receipt = receipt,
+                refreshSettings = ::refreshLocalNotificationSettings,
+                publishReady = {
+                    phase = AppPhase.Ready
+                    presentTransient(R.string.toast_identity_imported)
+                },
+                warmProfile = { warmProfile(summary.accountIdHex) },
+            )
+        }
     }
 
     // The submitted nsec can surface in the engine's error text, so redact
@@ -5513,13 +5526,7 @@ class WhiteNoiseAppState private constructor(
                     amberSigner.buildSigner(pubkeyHex),
                 )
             }
-            marmotIo { enforceAppOwnedAttachmentAcquisitionPolicy(listOf(summary.label)) }
-            refreshAccounts()
-            setActiveAccount(summary.label)
-            refreshLocalNotificationSettings()
-            phase = AppPhase.Ready
-            presentTransient(R.string.toast_identity_imported)
-            warmProfile(summary.accountIdHex)
+            activateImportedIdentity(summary)
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             if (error is MarmotKitException.ExternalSignerRejected) {
@@ -5841,11 +5848,6 @@ class WhiteNoiseAppState private constructor(
 
     private fun isAccountSwitchCurrent(generation: Long) = accountSwitchHandoff.isCurrent(generation)
 
-    private fun isCurrentPostActivationAccountSwitch(
-        label: String,
-        generation: Long,
-    ): Boolean = activeAccountRef == label && isAccountSwitchCurrent(generation)
-
     private fun ensureAccountSwitchRequestIsCurrent(generation: Long) {
         if (!isAccountSwitchCurrent(generation)) throw AccountSwitchSnapshotSuperseded()
     }
@@ -6069,13 +6071,7 @@ class WhiteNoiseAppState private constructor(
         return required
     }
 
-    /** Publishes a generation-fenced account switch and releases activation intent on every exit path. */
-    @Suppress(
-        "ReturnCount",
-        "LongMethod",
-        "CyclomaticComplexMethod",
-        "ThrowsCount",
-    ) // Sign-in failure, supersession, and telemetry outcomes share one atomic activation boundary.
+    /** Keeps the screen-facing Boolean contract while the session owner retains a precise activation receipt. */
     suspend fun setActiveAccount(
         label: String,
         deferUnreadRefresh: Boolean = false,
@@ -6083,72 +6079,32 @@ class WhiteNoiseAppState private constructor(
         preloadPolicy: AccountSwitchPreloadPolicy = AccountSwitchPreloadPolicy.FULL_LOCAL_SNAPSHOT,
         awaitPostActivationWork: suspend () -> Unit = {},
         onActivated: () -> Unit = {},
-    ): Boolean {
-        if (routePendingAccountSetup(label)) return false
+    ): Boolean =
+        activateAccountSession(
+            AccountSessionActivationRequest(label, deferUnreadRefresh, shouldActivate, preloadPolicy),
+            awaitPostActivationWork,
+            onActivated,
+        ) != null
+
+    /** Retains host telemetry and pending setup routing without recapturing the accepted activation's lifetime. */
+    @Suppress("ThrowsCount") // Preserve the separate timeout, cancellation and failure telemetry outcomes.
+    private suspend fun activateAccountSession(
+        request: AccountSessionActivationRequest,
+        awaitPostActivationWork: suspend () -> Unit = {},
+        onActivated: () -> Unit = {},
+    ): AccountSessionActivationReceipt? {
+        if (routePendingAccountSetup(request.label)) return null
         val accountSwitchAttempt =
-            if (label != activeAccountRef) {
+            if (request.label != activeAccountRef) {
                 beginHostPerformance(HostPerformanceOperationFfi.ACCOUNT_SWITCH)
             } else {
                 null
             }
         var accountSwitchOutcome = HostPerformanceOutcomeFfi.UNAVAILABLE
-        val requestGeneration = accountSwitchHandoff.beginRequest(label)
         try {
-            val switchingAccounts = label != activeAccountRef
-            updatePendingAccountSwitchTrace(label, switchingAccounts)
-            val target = accounts.firstOrNull { it.label == label }
-            if (!restoreSignedOutAccountForActivation(target, label, deferUnreadRefresh)) return false
-            val activationStillWanted =
-                shouldActivate() && isAccountSwitchCurrent(requestGeneration)
-            val preloadPlan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, preloadPolicy)
-            val activationRuntimeGeneration = runtimeGeneration
-            // Self metadata remains independent of the chat-row read and its failure boundary.
-            val startupProfile =
-                preloadStartupSelfProfile(preloadPolicy, target?.accountIdHex, activationStillWanted) {
-                    loadAccountSwitchProfileSeed(it)
-                }
-            val localSnapshot =
-                if (preloadPlan.loadLocalRows) {
-                    loadAccountSwitchLocalSnapshot(label, requestGeneration, preloadPlan)
-                } else {
-                    null
-                }
-            val activationAllowed = {
-                shouldActivate() &&
-                    isAccountSwitchCurrent(requestGeneration) &&
-                    canPublishAccountActivation(label, activationRuntimeGeneration)
-            }
-            // Reject expired UI intent without cancelling process-lifetime sign-in work.
-            if (!activationAllowed()) return false
-            if (switchingAccounts) hideConversationShortcutsFromDirectShare()
-            // Shortcut cleanup suspends: reject supersession/deletion again before publishing seeds.
-            if (!activationAllowed()) return false
-            val currentStartupProfiles = startupSeeds(startupProfile)
-            // Publish without suspension to retain profiles on rejection; account-keyed disk media survives switches.
-            if (switchingAccounts) {
-                clearInMemoryMediaCaches()
-                clearCrossAccountCaches()
-            }
-            stageAccountSwitchLocalSnapshot(label, switchingAccounts, requestGeneration, localSnapshot)
-            currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)
-            activeAccountRef = label
-            preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
-            reloadMediaAutoDownloadMatrix()
-            // Local-ready lets callers reset navigation before process-lifetime background refreshes.
-            onActivated()
-            // Notification routes wait for their target frame, failure, or supersession; ordinary switches do not wait.
-            awaitPostActivationWork()
-            refreshActivatedAccount(
-                label = label,
-                requestGeneration = requestGeneration,
-                activationRuntimeGeneration = activationRuntimeGeneration,
-                includeBackgroundAccountModes =
-                    switchingAccounts && preloadPolicy != AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
-                reconcileNotificationDelivery =
-                    preloadPolicy != AccountSwitchPreloadPolicy.STARTUP_RESTORATION || appInForeground,
-            )
-            accountSwitchOutcome = HostPerformanceOutcomeFfi.SUCCESS
-            return true
+            val receipt = accountSession.activate(request, awaitPostActivationWork, onActivated)
+            if (receipt != null) accountSwitchOutcome = HostPerformanceOutcomeFfi.SUCCESS
+            return receipt
         } catch (timeout: TimeoutCancellationException) {
             accountSwitchOutcome = HostPerformanceOutcomeFfi.TIMEOUT
             throw timeout
@@ -6160,8 +6116,80 @@ class WhiteNoiseAppState private constructor(
             throw throwable
         } finally {
             accountSwitchAttempt?.complete(accountSwitchOutcome)
-            accountSwitchHandoff.finishRequest(requestGeneration)
         }
+    }
+
+    /** Adapts existing MDK reads and Android publication without owning another account lifetime. */
+    private inner class AccountSessionActivation : AppAccountSessionActivation {
+        override val activeAccount: String? get() = activeAccountRef
+
+        /** Restores native sign-in and reads the selected policy's local projection before publication. */
+        override suspend fun prepare(
+            request: AccountSessionActivationRequest,
+            generation: Long,
+            switchingAccounts: Boolean,
+        ): PreparedAccountSessionActivation? {
+            updatePendingAccountSwitchTrace(request.label, switchingAccounts)
+            val target = accounts.firstOrNull { it.label == request.label }
+            if (!restoreSignedOutAccountForActivation(target, request.label, request.deferUnreadRefresh)) return null
+            val activationStillWanted = request.shouldActivate() && isAccountSwitchCurrent(generation)
+            val plan = accountSwitchPreloadPlan(switchingAccounts, activationStillWanted, request.preloadPolicy)
+            val activationRuntimeGeneration = runtimeGeneration
+            val profile =
+                preloadStartupSelfProfile(request.preloadPolicy, target?.accountIdHex, activationStillWanted) {
+                    loadAccountSwitchProfileSeed(it)
+                }
+            val snapshot =
+                if (plan.loadLocalRows) loadAccountSwitchLocalSnapshot(request.label, generation, plan) else null
+            return PreparedAccountSessionActivation(activationRuntimeGeneration, profile, snapshot)
+        }
+
+        /** Rejects revoked identities, replacement runtimes and publication during destructive account teardown. */
+        override fun canPublish(
+            label: String,
+            runtime: Int,
+        ): Boolean = !networkNotificationRecoverySuppressed && canPublishAccountActivation(label, runtime)
+
+        /** Hides platform share targets before publishing a different active account. */
+        override suspend fun hidePreviousAccountShortcuts() = hideConversationShortcutsFromDirectShare()
+
+        /** Commits the prepared projection and active label together without a suspension. */
+        override fun publish(
+            label: String,
+            generation: Long,
+            switchingAccounts: Boolean,
+            prepared: PreparedAccountSessionActivation,
+        ) {
+            val currentStartupProfiles = startupSeeds(prepared.profilePresentation)
+            if (switchingAccounts) {
+                clearInMemoryMediaCaches()
+                clearCrossAccountCaches()
+            }
+            stageAccountSwitchLocalSnapshot(label, switchingAccounts, generation, prepared.snapshot)
+            currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)
+            activeAccountRef = label
+            preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
+            reloadMediaAutoDownloadMatrix()
+        }
+
+        /** Warms only the activated account's existing self-profile cache. */
+        override suspend fun warmAccountProfile(label: String) {
+            accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
+        }
+
+        /** Applies the existing native privacy runtime configuration. */
+        override suspend fun configurePrivacy() = configurePrivacyRuntime()
+
+        /** Refreshes the current Android notification settings using the existing native path. */
+        override suspend fun refreshNotificationSettings() = refreshLocalNotificationSettings()
+
+        /** Preserves foreground/startup delivery admission and background-account mode reconciliation. */
+        override suspend fun reconcileNotificationDelivery(includeBackgroundAccountModes: Boolean) {
+            reconcileNotificationDeliveryModeAfterActivation(includeBackgroundAccountModes)
+        }
+
+        /** Reads foreground state at delivery admission rather than capturing it before the frame wait. */
+        override fun isInForeground(): Boolean = appInForeground
     }
 
     /** Starts or clears the debug-only latency trace without adding policy branches to activation. */
@@ -6178,30 +6206,6 @@ class WhiteNoiseAppState private constructor(
         } else if (pendingAccountSwitchTrace?.accountRef != label) {
             pendingAccountSwitchTrace = null
         }
-    }
-
-    /** Rechecks activation and runtime ownership before each best-effort step after the first-frame wait. */
-    @Suppress("ReturnCount") // Every suspending step is a separate stale-owner admission boundary.
-    private suspend fun refreshActivatedAccount(
-        label: String,
-        requestGeneration: Long,
-        activationRuntimeGeneration: Int,
-        includeBackgroundAccountModes: Boolean,
-        reconcileNotificationDelivery: Boolean,
-    ) {
-        val isCurrent = {
-            runtimeGeneration == activationRuntimeGeneration &&
-                isCurrentPostActivationAccountSwitch(label, requestGeneration)
-        }
-        if (!isCurrent()) return
-        accounts.firstOrNull { it.label == label }?.accountIdHex?.let { warmProfile(it) }
-        if (!isCurrent()) return
-        configurePrivacyRuntime()
-        if (!isCurrent()) return
-        refreshLocalNotificationSettings()
-        if (!isCurrent()) return
-        if (!reconcileNotificationDelivery) return
-        reconcileNotificationDeliveryModeAfterActivation(includeBackgroundAccountModes)
     }
 
     /**
@@ -6559,6 +6563,8 @@ class WhiteNoiseAppState private constructor(
      * the established local fail-open behavior; a structured unfinished-local
      * outcome retains the active session. Credential revocation failure returns an incomplete result before
      * native admission; errors after admission retain their established propagation.
+     * Final deactivation retires selections through the account session; native per-account cleanup remains
+     * here, while the shared process runtime/listener is retained for other identities and later sign-in.
      * Returns null when no account is active.
      */
     @Suppress("ReturnCount") // No account, retained engine session, or completed local sign-out.
@@ -6594,6 +6600,7 @@ class WhiteNoiseAppState private constructor(
             }
             return SignOutCompletion.AccountCleanupIncomplete
         }
+        accountSession.retireSelectionsForSignOut()
         engineResult.exceptionOrNull()?.let { failure ->
             appStateDebug(failure) {
                 "signOut failed account=${signedOutRef.take(8)}: ${failure.readableMessage()}"
@@ -6635,9 +6642,11 @@ class WhiteNoiseAppState private constructor(
         if (next != null) {
             setActiveAccount(next)
         } else {
-            activeAccountRef = null
-            preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
-            reloadMediaAutoDownloadMatrix()
+            accountSession.publishSignedOutIdentity {
+                activeAccountRef = null
+                preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
+                reloadMediaAutoDownloadMatrix()
+            }
         }
         // Signing out the last active account must leave a usable state, not a
         // MainShell with no active account. See issue #11.
@@ -8863,9 +8872,12 @@ class WhiteNoiseAppState private constructor(
 
     fun launchVerifiedAppSelfUpdate(context: Context = appContext): Boolean = appSelfUpdateFlow.launchInstall(context) { appSelfUpdateState = it }
 
+    /** Publishes native settings only for the same account selection and runtime that requested them. */
     suspend fun refreshLocalNotificationSettings() {
         val account = activeAccountRef
-        localNotificationSettings =
+        val activationGeneration = accountSwitchHandoff.capture()
+        val requestRuntimeGeneration = runtimeGeneration
+        val settings =
             if (account == null) {
                 null
             } else {
@@ -8873,6 +8885,13 @@ class WhiteNoiseAppState private constructor(
                     marmotIo { notificationSettings(account) }
                 }.getOrNull()
             }
+        if (
+            activeAccountRef == account &&
+            runtimeGeneration == requestRuntimeGeneration &&
+            accountSwitchHandoff.isCurrent(activationGeneration)
+        ) {
+            localNotificationSettings = settings
+        }
     }
 
     internal suspend fun sendNotificationReply(

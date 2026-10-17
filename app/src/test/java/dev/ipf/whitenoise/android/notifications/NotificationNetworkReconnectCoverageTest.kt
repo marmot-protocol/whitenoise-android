@@ -238,6 +238,12 @@ class NotificationNetworkReconnectCoverageTest {
         val prepare = appState.functionBody("prepareForDestructiveAccountWipe")
         val restore = appState.functionBody("restoreAfterFailedDestructiveAccountWipe")
         val teardown = appState.functionBody("stopNotificationListenerForAccountTeardown")
+        val session = File(appStateSource().parentFile, "AppAccountSessionCoordinator.kt").readText()
+        val sessionTeardown = session.substringAfter("suspend fun stopListenersForAccountTeardown()")
+        val sessionBindings =
+            appState
+                .substringAfter("internal val accountSession by lazy {")
+                .substringBefore("private val accountCatchUpCoordinator")
         val teardownBindings = appState.propertyInitializerCall("runtimeListenerTeardownOwner")
         val teardownOwner =
             File(appStateSource().parentFile, "AppRuntimeListenerTeardownOwner.kt")
@@ -258,7 +264,9 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "teardown must cancel producers before they can reinstall the notification listener",
-            "runtimeListenerTeardownOwner.stopForAccountTeardown()" in teardown &&
+            "accountSession.stopListenersForAccountTeardown()" in teardown &&
+                "listenerTeardown().stopForAccountTeardown()" in sessionTeardown &&
+                "listenerTeardown = { runtimeListenerTeardownOwner }" in sessionBindings &&
                 "cancelNetworkRecovery = { notificationNetworkRecovery.cancelAndJoin() }" in teardownBindings &&
                 "cancelPushWakeDrain = { pushWakeCatchUpDrainJob.cancelAndJoin() }" in teardownBindings &&
                 "cancelListener = { notificationJob.cancelAndJoin() }" in teardownBindings &&
@@ -270,7 +278,7 @@ class NotificationNetworkReconnectCoverageTest {
         assertTrue(
             "teardown must suppress connectivity callbacks before its first suspension",
             prepare.indexOf("networkNotificationRecoverySuppressed = true") in 0 until
-                prepare.indexOf("closeLiveSubscriptionsForAccountTeardown"),
+                prepare.indexOf("accountSetup.close()"),
         )
         assertTrue(
             "destructive teardown must invalidate captured service retries before suppression or suspension",
