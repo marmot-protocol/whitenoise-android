@@ -150,7 +150,7 @@ internal class NotificationBootstrapTestFixture(
     private val onSetNativePushEnabled: ((accountRef: String, enabled: Boolean) -> NotificationSettingsFfi)? = null,
     private val onClearPushRegistration: ((accountRef: String) -> PushRegistrationShareOutcomeFfi)? = null,
     private val onUpsertPushRegistration: ((accountRef: String) -> Unit)? = null,
-    private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi)? = null,
+    private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi?)? = null,
     private val onChatNotificationSettings: ((String, String) -> ChatNotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
     pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
@@ -231,6 +231,11 @@ internal class NotificationBootstrapTestFixture(
 
     /** Runtime events the fixture's firehose delivers, in order, to every subscriber. */
     private val runtimeEvents = Channel<MarmotEventFfi>(Channel.UNLIMITED)
+
+    /** How many of the next runtime event-stream opens fail, as an unavailable binding would. */
+    val eventOpenFailures =
+        java.util.concurrent.atomic
+            .AtomicInteger()
 
     /** Emits one runtime event on the firehose, as MDK does for every delivered message. */
     fun emitRuntimeEvent(event: MarmotEventFfi) {
@@ -342,8 +347,12 @@ internal class NotificationBootstrapTestFixture(
                     AuditLogSettingsFfi(enabled = false)
                 }
                 "setAuditLogSettings" -> arguments?.first()
-                "subscribeEvents" ->
+                "subscribeEvents" -> {
+                    if (eventOpenFailures.getAndUpdate { (it - 1).coerceAtLeast(0) } > 0) {
+                        error("fixture event stream unavailable")
+                    }
                     allocateWithoutConstructor(FixtureEventsSubscription::class.java).apply { events = runtimeEvents }
+                }
                 "chatNotificationSettings" -> {
                     val accountRef = arguments?.get(0) as String
                     val groupIdHex = arguments[1] as String

@@ -237,6 +237,84 @@ class IncomingAttachmentAutoDownloadTest {
             }
         }
 
+    /** A runtime event stream that fails to open is retried, so a later message in a muted chat is still scheduled. */
+    @Test
+    fun aFailedEventStreamOpenIsRetried() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            val fixture = fixture(history = mixedHistory(), muted = true)
+            try {
+                fixture.eventOpenFailures.set(1)
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.ensureNotificationRuntimeStarted()
+
+                fixture.emitRuntimeEvent(receivedChatMessage())
+
+                val expected = targetSlots().map { request(it.index) }
+                assertTrue(
+                    "queued=${expected.map(::queued)}",
+                    fixture.runWithMainLooperPumping { awaitQueued(expected) },
+                )
+                assertEquals("the failed open was consumed", 0, fixture.eventOpenFailures.get())
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /**
+     * When the suppression reads fail, the message is scheduled anyway: scheduling is idempotent, and treating it
+     * as notified would leave the media of a muted chat unscheduled for good.
+     */
+    @Test
+    fun aFailedSuppressionReadStillSchedulesTheMedia() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            var failing = false
+            val fixture = fixture(history = mixedHistory(), muted = true, failSuppressionReads = { failing })
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.ensureNotificationRuntimeStarted()
+                failing = true
+
+                fixture.emitRuntimeEvent(receivedChatMessage())
+
+                val expected = targetSlots().map { request(it.index) }
+                assertTrue(
+                    "queued=${expected.map(::queued)}",
+                    fixture.runWithMainLooperPumping { awaitQueued(expected) },
+                )
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** A failed read of the account's notification settings schedules the media too, rather than dropping it. */
+    @Test
+    fun aFailedNotificationSettingsReadStillSchedulesTheMedia() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, everyTypeOn(MediaAutoDownloadNetwork.WiFi))
+            var failing = false
+            val fixture = fixture(history = mixedHistory(), muted = false, failNotificationSettingsReads = { failing })
+            try {
+                fixture.bootstrap()
+                setNetwork(fixture.appState, setOf(MediaAutoDownloadNetwork.WiFi))
+                fixture.ensureNotificationRuntimeStarted()
+                failing = true
+
+                fixture.emitRuntimeEvent(receivedChatMessage())
+
+                val expected = targetSlots().map { request(it.index) }
+                assertTrue(
+                    "queued=${expected.map(::queued)}",
+                    fixture.runWithMainLooperPumping { awaitQueued(expected) },
+                )
+            } finally {
+                fixture.close()
+            }
+        }
+
     /** An unmuted chat's runtime event leaves scheduling to its notification update, so it reads no history. */
     @Test
     fun unmutedChatRuntimeEventLeavesSchedulingToTheNotification() =
@@ -600,6 +678,8 @@ class IncomingAttachmentAutoDownloadTest {
         signedOutB: Boolean = false,
         historyRestarts: Int = 0,
         onMuteRead: () -> Unit = {},
+        failSuppressionReads: () -> Boolean = { false },
+        failNotificationSettingsReads: () -> Boolean = { false },
     ): NotificationBootstrapTestFixture {
         context.getSystemService(NotificationManager::class.java).cancelAll()
         return NotificationBootstrapTestFixture(
@@ -612,7 +692,12 @@ class IncomingAttachmentAutoDownloadTest {
             attachmentHistoryRestarts = historyRestarts,
             onChatNotificationSettings = { accountRef, groupIdHex ->
                 onMuteRead()
+                check(!failSuppressionReads()) { "fixture mute read failed" }
                 ChatNotificationSettingsFfi(accountRef, accountRef, groupIdHex, muted, null, 0L)
+            },
+            onNotificationSettings = {
+                check(!failNotificationSettingsReads()) { "fixture notification settings read failed" }
+                null
             },
         )
     }
