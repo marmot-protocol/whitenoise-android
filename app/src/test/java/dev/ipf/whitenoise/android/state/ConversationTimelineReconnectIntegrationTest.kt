@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -238,10 +239,10 @@ class ConversationTimelineReconnectIntegrationTest {
             val controller = conversationController(scripts.subscriptions)
             try {
                 awaitConversationCondition { controller.hasMoreBefore && !controller.isLoading }
-                val page = async(start = CoroutineStart.UNDISPATCHED) { controller.loadOlderTimelinePage() }
+                val page = async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) { controller.loadOlderTimelinePage() }
                 awaitConversationCondition { pageEntered.isCompleted }
                 val teardown =
-                    async(start = CoroutineStart.UNDISPATCHED) {
+                    async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
                         controller.closeLiveSubscriptionsForAccountTeardown(ConversationTimelineTestIds.ACCOUNT_REF)
                     }
                 awaitConversationCondition { controller.accountTeardownRequested }
