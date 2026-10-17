@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.NetworkType
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -23,6 +24,7 @@ import dev.ipf.marmotkit.NotificationUserFfi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -46,13 +48,69 @@ import org.robolectric.shadows.ShadowLog
 class IncomingAttachmentAutoDownloadTest {
     private lateinit var context: Application
 
-    /** Each test observes real WorkManager enqueues through the test driver; constraints keep work queued. */
+    /**
+     * Each test observes real WorkManager enqueues through the test driver; constraints keep work queued. The
+     * narrowed-network registry is volatile here, since the test JVM has no Android Keystore.
+     */
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        AutomaticAttachmentNetworkWaits.installForTest(
+            AutomaticAttachmentNetworkWaits(VolatileAttachmentInstallerHandoffRecordStore()),
+        )
     }
+
+    /** Restores the process registry so later tests never see this one. */
+    @After
+    fun tearDown() {
+        AutomaticAttachmentNetworkWaits.installForTest(null)
+    }
+
+    /**
+     * An image received on metered mobile under the default settings waits for an unmetered network. Turning on
+     * metered image downloads widens that same queued work to a network the new policy allows, with no new receipt
+     * and no Wi-Fi, and the worker's live admission then allows it on the metered network.
+     */
+    @Test
+    fun widerPolicyWidensWaitingWorkWithoutANewReceipt() =
+        runBlocking {
+            persistMatrix(ACCOUNT_A, MediaAutoDownloadMatrix.DEFAULT)
+            val fixture = fixture(history = mixedHistory())
+            try {
+                fixture.bootstrap()
+                val metered = setOf(MediaAutoDownloadNetwork.Mobile, MediaAutoDownloadNetwork.Metered)
+                setNetwork(fixture.appState, metered)
+                fixture.appState.scheduleIncomingAttachmentDownloadsForTest(fixture.update)
+                val image = request(IMAGE_INDEX)
+                assertTrue(awaitQueued(listOf(image)))
+                val queued = workInfos(image).single { !it.state.isFinished }
+                assertEquals(NetworkType.UNMETERED, queued.constraints.requiredNetworkType)
+                val policy = { fixture.appState.automaticAttachmentPolicy(ACCOUNT_A) }
+                assertEquals(AutomaticAttachmentHold.Network, policy().hold(MediaAutoDownloadType.Image))
+
+                fixture.runWithMainLooperPumping {
+                    fixture.appState.setMediaAutoDownload(
+                        MediaAutoDownloadType.Image,
+                        MediaAutoDownloadNetwork.Metered,
+                        enabled = true,
+                    )
+                }
+
+                // The sweep runs on the state's main-thread scope, so the wait keeps the main looper moving.
+                assertTrue(
+                    "constraint=${constraints(image).requiredNetworkType}",
+                    fixture.runWithMainLooperPumping { awaitConstraint(image, NetworkType.NOT_ROAMING) },
+                )
+                val widened = workInfos(image).single { !it.state.isFinished }
+                assertEquals("the same queued work widens", queued.id, widened.id)
+                assertEquals(WorkInfo.State.ENQUEUED, widened.state)
+                assertNull("admitted on the metered network", policy().hold(MediaAutoDownloadType.Image))
+            } finally {
+                fixture.close()
+            }
+        }
 
     /** Images, video, audio and files each queue their own durable work, and no history scan is made. */
     @Test
@@ -551,6 +609,16 @@ class IncomingAttachmentAutoDownloadTest {
     /** Every WorkManager row recorded under [request]'s unique identity. */
     private fun workInfos(request: AttachmentTransferRequest) =
         WorkManager.getInstance(context).getWorkInfosForUniqueWork(attachmentDownloadWorkName(request)).get()
+
+    /** Waits for [request]'s live work to require [networkType]. */
+    private suspend fun awaitConstraint(
+        request: AttachmentTransferRequest,
+        networkType: NetworkType,
+    ): Boolean =
+        withTimeoutOrNull(5_000L) {
+            while (constraints(request).requiredNetworkType != networkType) delay(10L)
+            true
+        } == true
 
     /** Waits for asynchronous receipt scheduling to queue every one of [requests]. */
     private suspend fun awaitQueued(requests: List<AttachmentTransferRequest>): Boolean =

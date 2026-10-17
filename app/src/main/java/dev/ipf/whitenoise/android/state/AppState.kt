@@ -21,6 +21,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.work.NetworkType
+import androidx.work.WorkManager
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -1439,12 +1440,16 @@ class WhiteNoiseAppState private constructor(
     /** Questions about overriding MDK's advisory refusals of a group change, shown at app level (#3289). */
     internal val groupChangeConfirmations = GroupChangeConfirmations()
 
-    /** Refreshes runtime-scoped permissions after network, preference, or account changes. */
+    /**
+     * Refreshes runtime-scoped permissions after network, preference, or account changes, and widens any automatic
+     * downloads still waiting on a network narrower than the refreshed policy now allows.
+     */
     internal fun refreshNativeAttachmentPermissions() {
         val runtime = marmotRuntime
         val revision = nativeAttachmentPermissions.invalidate(runtime)
-        val engine = runtime?.marmot ?: return
         val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
+        widenWaitingAutomaticDownloads(accountRefs)
+        val engine = runtime?.marmot ?: return
         // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
         mutationsScope.launch {
             var pending = accountRefs.toSet()
@@ -1473,6 +1478,29 @@ class WhiteNoiseAppState private constructor(
             }
             if (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
                 Log.w("AttachmentPermissions", "permission_update_failed accounts=${pending.size}")
+            }
+        }
+    }
+
+    /**
+     * Widens waiting automatic downloads of the signed-in [accountRefs] to the network each one's type is allowed
+     * on now (#3308), so a policy that starts allowing a wider network, such as metered downloads turned on, reaches
+     * work queued under the old one without a new receipt or a reconnect. Only work recorded as narrowed is read;
+     * the policy is computed after queued settings saves, and the WorkManager reads run off the main thread.
+     */
+    private fun widenWaitingAutomaticDownloads(accountRefs: List<String>) {
+        if (accountRefs.isEmpty()) return
+        val waits = AutomaticAttachmentNetworkWaits.get(appContext)
+        mutationsScope.launch {
+            val policies =
+                hostPreferenceCommitMutex.withLock { accountRefs.associateWith(::automaticAttachmentPolicy) }
+            withContext(Dispatchers.IO) {
+                policies.forEach { (account, policy) ->
+                    runCatching { waits.widen(WorkManager.getInstance(appContext), account, policy::networkType) }
+                        .onSuccess { count ->
+                            if (count > 0) Log.i(INCOMING_ATTACHMENT_TAG, "attachment_network_widened count=$count")
+                        }.onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "attachment_network_widening_failed") }
+                }
             }
         }
     }
@@ -4750,6 +4778,7 @@ class WhiteNoiseAppState private constructor(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
         networkType: NetworkType = NetworkType.CONNECTED,
+        type: MediaAutoDownloadType? = null,
     ) {
         if (priority == AttachmentDownloadPriority.Interactive) {
             attachmentDownloadIntents.setInteractive(request, interactive = true)
@@ -4757,7 +4786,7 @@ class WhiteNoiseAppState private constructor(
         } else if (attachmentDownloadIntents.isAutomaticSuppressed(request)) {
             return
         }
-        AttachmentDownloadWorker.enqueue(appContext, request, priority, userVisible = appInForeground, networkType)
+        AttachmentDownloadWorker.enqueue(appContext, request, priority, appInForeground, networkType, type)
     }
 
     /** Clears a completed foreground request without changing its automatic-download policy. */
@@ -11457,7 +11486,9 @@ class WhiteNoiseAppState private constructor(
                 Log.w(INCOMING_ATTACHMENT_TAG, "attachment_receipt_lookup_failed type=${it.javaClass.simpleName}")
             }.getOrNull() ?: return
         val (eligible, held) = lookup.attachments.partition { it.type in wanted }
-        eligible.forEach { enqueueAttachmentDownload(it.request, networkType = policy.networkType(it.type)) }
+        eligible.forEach {
+            enqueueAttachmentDownload(it.request, networkType = policy.networkType(it.type), type = it.type)
+        }
         logReceiptScheduling(policy, lookup, eligible, held)
     }
 
