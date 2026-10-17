@@ -2,11 +2,16 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentsFor
@@ -19,10 +24,15 @@ import kotlinx.coroutines.ensureActive
 internal class TextAttachmentNativeActions(
     private val sourceIsCurrent: () -> Boolean,
     val playbackSource: dev.ipf.whitenoise.android.audio.AttachmentSpeechOwner? = null,
+    private val shareSource: suspend () -> Unit = {},
     private val saveSource: suspend () -> Unit,
 ) {
     private var attached = true
     private var saving = false
+
+    /** True while a share is being prepared, so the reader offers no second one meanwhile. */
+    var sharing by mutableStateOf(false)
+        private set
 
     /** True while the actions are attached and their source message is still current. */
     fun isCurrent(): Boolean = attached && sourceIsCurrent()
@@ -35,6 +45,17 @@ internal class TextAttachmentNativeActions(
             saveSource()
         } finally {
             saving = false
+        }
+    }
+
+    /** Serializes explicit shares: repeated taps while one is being prepared open a single share sheet. */
+    suspend fun share() {
+        if (!isCurrent() || sharing) return
+        sharing = true
+        try {
+            shareSource()
+        } finally {
+            sharing = false
         }
     }
 
@@ -70,8 +91,9 @@ internal fun rememberTextAttachmentNativeActions(
 ): TextAttachmentNativeActions {
     val context = LocalContext.current
     val fallback = rememberDocumentSaveFallback()
+    val shareTitle = stringResource(R.string.shared_media_share)
     val actions =
-        remember(controller, messageIdHex, attachmentIndex, reference, mine, fallback) {
+        remember(controller, messageIdHex, attachmentIndex, reference, mine, fallback, shareTitle) {
             val account = controller.boundAccountRef
             val runtime = appState.runtimeGeneration
             val group = controller.group.groupIdHex
@@ -106,6 +128,23 @@ internal fun rememberTextAttachmentNativeActions(
                             dev.ipf.whitenoise.android.audio
                                 .AttachmentSpeechOwner(it, group, messageIdHex, attachmentIndex)
                         },
+                    shareSource = {
+                        // The original file, so a preview truncated for display never narrows what is shared.
+                        runCatchingCancellable {
+                            shareAttachmentExternally(
+                                context,
+                                controller,
+                                messageIdHex,
+                                attachmentIndex,
+                                reference,
+                                mine,
+                                shareTitle,
+                                owned::isCurrent,
+                            )
+                        }.onFailure { failure ->
+                            if (owned.isCurrent()) appState.presentOutboundShareFailure("TEXT_READER_SHARE", failure)
+                        }
+                    },
                 ) {
                     val outcome =
                         runCatchingCancellable {

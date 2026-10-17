@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.MarkdownAlignmentFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
@@ -168,6 +170,7 @@ class TextAttachmentReaderScreenshotTest {
         var spoken = 0
         var opened = 0
         var saved = 0
+        var shared = 0
         render(
             candidate = markdownCandidate,
             state = TextAttachmentReaderState.Ready(markdownPreview()),
@@ -176,6 +179,7 @@ class TextAttachmentReaderScreenshotTest {
             onReadAloud = { spoken += 1 },
             onOpenExternal = { opened += 1 },
             onSave = { saved += 1 },
+            onShare = { shared += 1 },
         )
 
         composeRule.onNodeWithContentDescription(string(R.string.back)).performClick()
@@ -195,7 +199,52 @@ class TextAttachmentReaderScreenshotTest {
         composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
         composeRule.onNodeWithText(string(R.string.save)).assertIsEnabled().performClick()
         assertEquals(1, saved)
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
+        composeRule.onNodeWithText(string(R.string.share)).assertIsEnabled().performClick()
+        assertEquals(1, shared)
         composeRule.onNodeWithText(string(R.string.edit)).assertDoesNotExist()
+    }
+
+    /** While a share is being prepared the reader offers no second one, and Save and Open stay available. */
+    @Test
+    fun aShareBeingPreparedDisablesOnlyShare() {
+        var shared = 0
+        render(
+            candidate = markdownCandidate,
+            state = TextAttachmentReaderState.Ready(markdownPreview()),
+            onShare = { shared += 1 },
+            shareBusy = true,
+        )
+
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
+        composeRule.onNodeWithText(string(R.string.share)).assertIsNotEnabled().performClick()
+        composeRule.onNodeWithText(string(R.string.save)).assertIsEnabled()
+        composeRule.onNodeWithText(string(R.string.text_attachment_open_external)).assertIsEnabled()
+        assertEquals(0, shared)
+    }
+
+    /** The overflow menu offers Save, Share and Open in another app (#3331). */
+    @Test
+    fun overflowMenuLight() {
+        render(candidate = markdownCandidate, state = TextAttachmentReaderState.Ready(markdownPreview()))
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
+        composeRule.waitForIdle()
+        captureScreenRoboImage("src/test/snapshots/text_attachment_reader_overflow_menu_light.png")
+    }
+
+    /** The overflow menu at large text in a right-to-left dark theme keeps every action readable. */
+    @Test
+    fun overflowMenuDarkLargeRtl() {
+        render(
+            candidate = markdownCandidate,
+            state = TextAttachmentReaderState.Ready(markdownPreview()),
+            darkTheme = true,
+            fontScale = 1.6f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
+        composeRule.waitForIdle()
+        captureScreenRoboImage("src/test/snapshots/text_attachment_reader_overflow_menu_dark_large_rtl.png")
     }
 
     /** Top back clears a real selection before closing the reader. */
@@ -392,6 +441,8 @@ class TextAttachmentReaderScreenshotTest {
         onReadAloud: (TextAttachmentPreview) -> Unit = {},
         onOpenExternal: () -> Unit = {},
         onSave: () -> Unit = {},
+        onShare: () -> Unit = {},
+        shareBusy: Boolean = false,
         isReading: Boolean = false,
     ) {
         composeRule.setContent {
@@ -411,6 +462,8 @@ class TextAttachmentReaderScreenshotTest {
                             onReadAloud = onReadAloud,
                             onOpenExternal = onOpenExternal,
                             onSave = onSave,
+                            onShare = onShare,
+                            shareBusy = shareBusy,
                             isReading = isReading,
                         )
                     }
