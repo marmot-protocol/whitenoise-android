@@ -209,17 +209,73 @@ class PushTokenPreferencesTest {
             }
         try {
             val store = PushTokenStore.create(owner)
-            assertEquals(PushStorageRecovery.LegacyImportPending, store.recoveryState())
+            assertEquals(PushStorageRecovery.CleanupReconciliationRequired, store.recoveryState())
             assertFalse(store.registrationAllowed())
             assertTrue(source.contains("pending_native_push_disables"))
             assertTrue(store.recordPendingDisable("new-account"))
             val recreated = PushTokenStore.create(owner)
-            assertEquals(PushStorageRecovery.LegacyImportPending, recreated.recoveryState(retry = true))
+            assertEquals(PushStorageRecovery.CleanupReconciliationRequired, recreated.recoveryState(retry = true))
             assertTrue(source.contains("pending_native_push_disables"))
             unavailable = false
             assertEquals(PushStorageRecovery.Ready, recreated.recoveryState(retry = true))
             assertEquals(setOf("legacy-account", "new-account"), recreated.pendingDisables())
             assertFalse(source.contains("pending_native_push_disables"))
+        } finally {
+            PushTokenStore.installKeyProvider(null)
+        }
+    }
+
+    /** Quarantine preserves bytes and receipts, and only known-empty cleanup permits registration. */
+    @Test
+    fun malformedSourcesKeepSeparateQuarantineAndCleanupSafetyAcrossRetry() {
+        PushTokenStore.installKeyProvider(
+            object : SecureStoreKeyProvider {
+                override fun secretKey(): SecretKey = key
+            },
+        )
+        try {
+            for (cleanup in listOf(null, emptySet<String>(), setOf("old-account"), "malformed")) {
+                listOf("whitenoise.push.tokens.keystore", "whitenoise.push.safety", "whitenoise.push.tokens.fallback")
+                    .forEach(context::deleteSharedPreferences)
+                val sourceName = "whitenoise.push.tokens.fallback"
+                val source = context.getSharedPreferences(sourceName, Context.MODE_PRIVATE)
+                source
+                    .edit()
+                    .putString(KEY_WAKE_ATTEMPTS, "invalid")
+                    .apply {
+                        when (cleanup) {
+                            is Set<*> -> putStringSet(KEY_PENDING_CLEARS, cleanup.filterIsInstance<String>().toSet())
+                            is String -> putString(KEY_PENDING_CLEARS, cleanup)
+                        }
+                    }.commit()
+                val before = source.all
+                val blocked = cleanup is String || (cleanup is Set<*> && cleanup.isNotEmpty())
+                val expected = if (blocked) PushStorageRecovery.CleanupReconciliationRequired else PushStorageRecovery.Ready
+                val store = PushTokenStore.create(context)
+                assertEquals(expected, store.recoveryState())
+                assertEquals(!blocked, store.registrationAllowed())
+                val recreated = PushTokenStore.create(context)
+                assertEquals(expected, recreated.recoveryState(retry = true))
+                assertEquals(before, source.all)
+                val safety = context.getSharedPreferences("whitenoise.push.safety", Context.MODE_PRIVATE)
+                assertEquals(setOf(sourceName), safety.getStringSet("quarantined_sources", emptySet()))
+                val target =
+                    PushTokenPreferences(
+                        KeystoreSecureStore(
+                            context,
+                            "whitenoise.push.tokens.keystore",
+                            object : SecureStoreKeyProvider {
+                                override fun secretKey(): SecretKey = key
+                            },
+                        ),
+                        lock,
+                    )
+                assertFalse(target.hasImported(sourceName))
+                source.edit().remove(KEY_WAKE_ATTEMPTS).remove(KEY_PENDING_CLEARS).commit()
+                assertEquals(PushStorageRecovery.Ready, recreated.recoveryState(retry = true))
+                assertTrue(target.hasImported(sourceName))
+                assertTrue(safety.getStringSet("quarantined_sources", emptySet()).orEmpty().isEmpty())
+            }
         } finally {
             PushTokenStore.installKeyProvider(null)
         }

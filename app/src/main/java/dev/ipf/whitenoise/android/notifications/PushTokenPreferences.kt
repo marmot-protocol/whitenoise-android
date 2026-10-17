@@ -9,6 +9,11 @@ import java.security.GeneralSecurityException
 /** Durable push state is unavailable; callers must defer registration rather than assume empty state. */
 internal class PushTokenStorageException : GeneralSecurityException("Push state unavailable")
 
+/** A malformed source is retained; cleanup safety is independent of its other typed values. */
+internal class MalformedLegacyPushSource(
+    val cleanupRequired: Boolean,
+) : IllegalArgumentException("Malformed legacy push state")
+
 /** Push-only preference adapter: each editor batch seals and commits one complete logical map. */
 @Suppress("TooManyFunctions") // Implements the existing push-only preferences contract.
 internal class PushTokenPreferences(
@@ -92,7 +97,20 @@ internal class PushTokenPreferences(
             val touched = stringSet(current[TOUCHED])
             val merged = current.toMutableMap()
             val existingWakeEpisode = WAKE_KEYS.any { it in current || it in touched }
-            for ((key, value) in legacy.all) {
+            val legacyValues = runCatching { legacy.all }.getOrElse { throw MalformedLegacyPushSource(true) }
+            val malformed =
+                legacyValues.any { (key, value) ->
+                    canImport(key, value, touched, existingWakeEpisode) && !validValue(key, requireNotNull(value))
+                }
+            if (malformed) {
+                // A nonempty or malformed cleanup queue cannot be discarded with the bad value.
+                val cleanupRequired =
+                    CLEANUP_KEYS.any { key ->
+                        key in legacyValues && (legacyValues[key] !is Set<*> || (legacyValues[key] as Set<*>).isNotEmpty())
+                    }
+                throw MalformedLegacyPushSource(cleanupRequired)
+            }
+            for ((key, value) in legacyValues) {
                 if (canImport(key, value, touched, existingWakeEpisode)) {
                     mergeLegacyValue(key, value, current, merged)
                 }
@@ -251,6 +269,7 @@ internal class PushTokenPreferences(
             value: Any,
         ): Boolean =
             when (key) {
+                KEY_PENDING_CLEARS, KEY_PENDING_DISABLES -> value is Set<*> && value.all { it is String }
                 KEY_FCM_TOKEN -> value is String
                 KEY_PENDING_NATIVE_PUSH_REGISTRATION_SYNC, KEY_PENDING_PUSH_WAKE_CATCH_UP -> value is Boolean
                 KEY_WAKE_ATTEMPTS -> value is Int

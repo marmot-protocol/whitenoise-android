@@ -11910,13 +11910,21 @@ class ConversationController(
                     } catch (throwable: Throwable) {
                         diagnostic.invitationFailed(throwable, nativeInvoked, nativeAccepted)
                         throwable.rethrowIfCancellation()
-                        diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.START)
-                        val reconciled =
-                            reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore, nativeInvoked, throwable)
-                        if (reconciled) {
-                            diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.SUCCESS)
-                            presentConversationTransient(R.string.toast_invite_sent)
-                            return@track true
+                        val reconcilable = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(throwable)
+                        if (reconcilable) {
+                            diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.START)
+                            val reconciled =
+                                reconcileInitialAdminInvite(refs, canonicalAdmins, absentBefore, nativeInvoked, throwable)
+                            if (reconciled) {
+                                diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.SUCCESS)
+                                presentConversationTransient(R.string.toast_invite_sent)
+                                return@track true
+                            }
+                            diagnostic.record(
+                                DmCreationPhase.RECONCILIATION,
+                                DmCreationOutcome.FAILURE,
+                                DmCreationFailure.UNKNOWN,
+                            )
                         }
                         presentInviteFailure(throwable, refs)
                     }

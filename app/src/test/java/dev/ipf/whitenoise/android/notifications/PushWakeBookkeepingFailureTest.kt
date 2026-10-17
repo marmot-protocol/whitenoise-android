@@ -67,24 +67,7 @@ class PushWakeBookkeepingFailureTest {
         runBlocking {
             val context: Application = RuntimeEnvironment.getApplication()
             val unavailable = AtomicBoolean(false)
-            val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
-            // Keep the scripted key separate from app startup's rule-owned encrypted store.
-            val store =
-                PushTokenStore(
-                    PushTokenPreferences(
-                        KeystoreSecureStore(
-                            context,
-                            "push-wake-unavailable-key",
-                            object : SecureStoreKeyProvider {
-                                override fun secretKey(): SecretKey {
-                                    if (unavailable.get()) throw GeneralSecurityException("scripted unavailable key")
-                                    return key
-                                }
-                            },
-                        ),
-                        Any(),
-                    ),
-                )
+            val store = unavailableKeyStore(context, unavailable)
             val nativeCatchUps = AtomicInteger(0)
             val fixture =
                 NotificationBootstrapTestFixture(
@@ -136,6 +119,29 @@ class PushWakeBookkeepingFailureTest {
                 fixture.close()
             }
         }
+
+    /** Keeps the scripted key separate from app startup's rule-owned encrypted store. */
+    private fun unavailableKeyStore(
+        context: Context,
+        unavailable: AtomicBoolean,
+    ): PushTokenStore {
+        val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        return PushTokenStore(
+            PushTokenPreferences(
+                KeystoreSecureStore(
+                    context,
+                    "push-wake-unavailable-key",
+                    object : SecureStoreKeyProvider {
+                        override fun secretKey(): SecretKey {
+                            if (unavailable.get()) throw GeneralSecurityException("scripted unavailable key")
+                            return key
+                        }
+                    },
+                ),
+                Any(),
+            ),
+        )
+    }
 
     /** Invokes the production push-wake admission path without another lifecycle trigger. */
     private suspend fun launchRejectedPushWake(

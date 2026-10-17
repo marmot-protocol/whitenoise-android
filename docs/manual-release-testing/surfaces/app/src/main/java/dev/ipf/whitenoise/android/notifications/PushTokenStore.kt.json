@@ -10,6 +10,14 @@
         "test_ids": [
           "SEC-017"
         ]
+      },
+      {
+        "surface": "Legacy quarantine retains sources and blocks uncertain cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PushTokenStore.kt",
+        "anchor": "private fun importSource(",
+        "test_ids": [
+          "SEC-017"
+        ]
       }
     ]
   },

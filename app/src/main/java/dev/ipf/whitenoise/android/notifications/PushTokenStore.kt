@@ -403,6 +403,47 @@ class PushTokenStore(
             }
         }
 
+        private enum class LegacyImportResult(
+            val quarantined: Boolean = false,
+        ) {
+            IMPORTED,
+            PENDING,
+            QUARANTINED(true),
+            BLOCKED(true),
+        }
+
+        /** Quarantine never writes a receipt or removes source keys; target failures remain retryable. */
+        private fun importSource(
+            context: Context,
+            source: String,
+            secure: PushTokenPreferences,
+        ): LegacyImportResult {
+            val receipt = secure.hasImported(source)
+            val legacy =
+                runCatching {
+                    if (source == SECURE_PREFS_NAME) {
+                        LegacySecurePreferences.openForImport(context, source)
+                    } else {
+                        context.getSharedPreferences(source, Context.MODE_PRIVATE)
+                    }
+                }
+            return when {
+                receipt -> {
+                    // Cleanup failure cannot invalidate a durable target receipt.
+                    runCatching { legacy.getOrNull()?.let(secure::cleanupImportedSource) }
+                    LegacyImportResult.IMPORTED
+                }
+                legacy.isFailure -> LegacyImportResult.BLOCKED
+                else ->
+                    try {
+                        legacy.getOrNull()?.let { secure.importLegacy(source, it) }
+                        LegacyImportResult.IMPORTED
+                    } catch (malformed: MalformedLegacyPushSource) {
+                        if (malformed.cleanupRequired) LegacyImportResult.BLOCKED else LegacyImportResult.QUARANTINED
+                    }
+            }
+        }
+
         /** Constructs lazily so a locked Keystore cannot crash AppState initialization. */
         @Suppress("LongMethod") // One serialized import and registration-safety boundary for three legacy sources.
         fun create(context: Context): PushTokenStore =
@@ -422,31 +463,25 @@ class PushTokenStore(
                         LOCK,
                         prepare = {
                             if (!initialized && android.os.SystemClock.elapsedRealtime() >= nextImportAttemptMs) {
-                                var unknown = false
-                                for (source in listOf(SECURE_PREFS_NAME, FALLBACK_PREFS_NAME, PREFS_NAME)) {
-                                    val imported =
-                                        runCatching {
-                                            val receipt = secure.hasImported(source)
-                                            val sourceStore = {
-                                                if (source == SECURE_PREFS_NAME) {
-                                                    LegacySecurePreferences.openForImport(appContext, source)
-                                                } else {
-                                                    appContext.getSharedPreferences(source, Context.MODE_PRIVATE)
-                                                }
-                                            }
-                                            if (receipt) {
-                                                // A failed source cleanup cannot invalidate a durable target receipt.
-                                                runCatching { sourceStore()?.let(secure::cleanupImportedSource) }
-                                            } else {
-                                                sourceStore()?.let { secure.importLegacy(source, it) }
-                                            }
-                                        }.isSuccess
-                                    unknown = unknown || !imported
+                                val results =
+                                    listOf(SECURE_PREFS_NAME, FALLBACK_PREFS_NAME, PREFS_NAME).associateWith { source ->
+                                        runCatching { importSource(appContext, source, secure) }.getOrDefault(LegacyImportResult.PENDING)
+                                    }
+                                val pending = results.containsValue(LegacyImportResult.PENDING)
+                                val quarantined = results.filterValues { it.quarantined }.keys
+                                check(
+                                    safety
+                                        .edit()
+                                        .putBoolean("migration_unknown", pending)
+                                        .putStringSet("quarantined_sources", quarantined)
+                                        .putBoolean("quarantine_cleanup_unknown", results.containsValue(LegacyImportResult.BLOCKED))
+                                        .commit(),
+                                )
+                                initialized = !pending && quarantined.isEmpty()
+                                if (!initialized) {
+                                    android.util.Log.w("PushTokenStorage", "legacy_import_deferred")
+                                    nextImportAttemptMs = android.os.SystemClock.elapsedRealtime() + 30_000L
                                 }
-                                check(safety.edit().putBoolean("migration_unknown", unknown).commit())
-                                if (unknown) android.util.Log.w("PushTokenStorage", "legacy_import_deferred")
-                                initialized = !unknown
-                                if (unknown) nextImportAttemptMs = android.os.SystemClock.elapsedRealtime() + 30_000L
                             }
                         },
                     )
@@ -456,7 +491,8 @@ class PushTokenStore(
                     secure,
                     recoveryStatus = {
                         when {
-                            safety.getBoolean("cleanup_unknown", false) ->
+                            safety.getBoolean("cleanup_unknown", false) ||
+                                safety.getBoolean("quarantine_cleanup_unknown", false) ->
                                 PushStorageRecovery.CleanupReconciliationRequired
                             safety.getBoolean("migration_unknown", true) -> PushStorageRecovery.LegacyImportPending
                             else -> PushStorageRecovery.Ready
