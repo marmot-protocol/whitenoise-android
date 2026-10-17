@@ -834,6 +834,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s eklenemedi. Zaten üye ya da imzalama anahtarı mevcut bir üyeninkiyle çakışıyor.</string>
     <string name="toast_invites_sent_to_groups">Davetler seçili gruplara gönderildi</string>
     <string name="toast_invites_sent_to_groups_partial">Davetler bazı gruplara gönderildi; bazıları başarısız oldu</string>
+    <string name="toast_invites_sent_to_groups_waited">Davetler bazı gruplara gönderildi; diğerleri yeniden denemeyi bekliyor</string>
     <string name="toast_member_removed">Üye kaldırıldı</string>
     <string name="toast_couldnt_remove_member">Üye çıkarılamadı. Lütfen tekrar deneyin.</string>
     <string name="toast_group_roster_changed">Grup üyeliği değişti. Grubu gözden geçirip tekrar deneyin.</string>
@@ -2317,6 +2318,21 @@
     <string name="media_reply_draft_conflict">Taslağınız değişti. Bu yanıtı koruyup yeniden deneyin veya göndermeden önce yanıtı iptal edin.</string>
     <string name="photo_editor_budget_exceeded">Bu kırpma, güvenli şekilde işlenebilecek olandan daha fazla görüntü ayrıntısı veya bellek gerektiriyor. Daha geniş bir alanı kırpın veya daha düşük bir kalite seçin. Önceki ek değişmeden kalır.</string>
     <string name="share_connect_save_to_gallery">Galeriye kaydet</string>
+    <string name="media_storage_blocked_short">Yeterli depolama alanı yok</string>
+    <string name="media_storage_blocked">Yeterli depolama alanı yok. Yer açın, ardından yeniden denemek için dokunun.</string>
+    <string name="error_obsolete_key_package">Bu kişinin eklenebilmesi için White Noise uygulamasını güncellemesi gerekiyor. Uygulamayı güncelleyip açmasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_obsolete_key_package_for">%1$s eklenebilmek için White Noise uygulamasını güncellemeli. Uygulamayı güncelleyip açmasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_directory_lookup_incomplete">Bu kişinin eklenip eklenemeyeceğini kontrol etmeyi bitiremedik. Bağlantınızı kontrol edin, sonra tekrar deneyin.</string>
+    <string name="error_directory_lookup_incomplete_for">%1$s kişisinin eklenip eklenemeyeceğini kontrol etmeyi bitiremedik. Bağlantınızı kontrol edin, sonra tekrar deneyin.</string>
+    <string name="error_message_not_editable">Bu mesaj artık düzenlenemez.</string>
+    <string name="group_change_catching_up_title">Bu sohbet güncel olmayabilir</string>
+    <string name="group_change_catching_up_message">Bu sohbet bu cihazda güncel olmayabilir. Grubu şimdi değiştirmek onu herkes için bölebilir. Eşitlenmesini beklemek mi yoksa yine de devam etmek mi istersiniz?</string>
+    <string name="group_change_catching_up_invite_message">Bu sohbet bu cihazda güncel olmayabilir. Grup ilerlemişse, şimdi davet ettiğiniz kişiler artık çalışmayan bir davet alabilir ve grup herkes için bölünebilir. Eşitlenmesini beklemek mi yoksa yine de davet etmek mi istersiniz?</string>
+    <string name="group_change_undelivered_title">Son değişikliğiniz hâlâ iletiliyor</string>
+    <string name="group_change_undelivered_message">Bu gruptaki son değişikliğiniz henüz grubun tüm rölelerine ulaşmadı. Devam ederseniz yalnızca bu röleleri kullanan üyeler grubu takip edemeyebilir. Beklemek mi yoksa yine de devam etmek mi istersiniz?</string>
+    <string name="group_change_wait">Bekle</string>
+    <string name="group_change_continue_anyway">Yine de devam et</string>
+    <string name="group_change_invite_anyway">Yine de davet et</string>
     <string name="starting_as">Şu hesapla başlat</string>
     <string name="starting_as_account">Şu hesapla başlat: %1$s</string>
 </resources>

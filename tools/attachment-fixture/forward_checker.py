@@ -1,4 +1,8 @@
-"""Fail-closed judgement of the small text attachment forward fixture: every phase timed, every copy received once."""
+"""Fail-closed judgement of the small text attachment forward fixture: every phase timed, every copy received once.
+
+MarmotKit keeps one verified copy per content. Every forward carries the source's bytes, so only the first forwarded
+copy reaches the server for the author's receipt, and the author reads every later copy, byte-exact, from that one.
+"""
 
 import math
 from statistics import median
@@ -13,6 +17,8 @@ MARKERS = {"direct": 0, "uncached": 10, "retained": 20, "cached": 30}
 # Only the retained source has a setup step of its own (the one acquisition); both source sends precede the markers.
 SETUP_STAGES = ("retained",)
 FINAL_MARKER = 40
+# The one forward whose copy the author acquires over HTTP; every later copy repeats its bytes.
+FIRST_FORWARD = (VARIANTS[0], 1)
 # What each variant's source phase must look like: which local layers hold the bytes before the forward, whether the
 # forward's own local lookup hits (the Android caches or MarmotKit's retained copy), and whether the forward downloads
 # the source again over HTTP. Only a source no local layer holds may be downloaded.
@@ -36,9 +42,9 @@ def expected_uploads():
 
 def expected_gets():
     """Source downloads by the forwards that must download, the one acquisition that retains the source, and the
-    author's receipt of every forwarded copy."""
+    author's receipt of the first forwarded copy, the only one whose bytes the author does not hold yet."""
     downloads = sum(REPETITIONS for variant in VARIANTS if SOURCE[variant]["download"])
-    return downloads + 1 + REPETITIONS * len(VARIANTS)
+    return downloads + 1 + 1
 
 
 def _finite(value):
@@ -249,7 +255,8 @@ def _check_ledger(events, violations):
             if len(uploads) != 1:
                 violations.append(f"{label}: expected exactly one destination upload")
                 continue
-            expected = [uploads[0]] + ([source_token] if SOURCE[variant]["download"] else [])
+            receipt = [uploads[0]] if (variant, rep) == FIRST_FORWARD else []
+            expected = receipt + ([source_token] if SOURCE[variant]["download"] else [])
             _check_slice_gets(_gets(events_of, events), label, expected, violations)
     trailing = slices[FINAL_MARKER]
     if _uploads(trailing) or _gets(trailing, events):

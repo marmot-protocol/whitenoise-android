@@ -213,6 +213,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
                 assertNull(controller.attachmentOpenRequest(CONFIRMED_MESSAGE_ID, 0))
                 var acceptedCallbacks = 0
                 var failedCallbacks = 0
+                var failure: Throwable? = null
                 val result = CompletableDeferred<Unit>()
                 assertTrue(
                     controller.retryAttachmentTransfer(
@@ -224,6 +225,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
                         },
                         onFailure = {
                             failedCallbacks++
+                            failure = it
                             result.complete(Unit)
                         },
                     ),
@@ -232,6 +234,8 @@ class ConversationMediaSendReconciliationIntegrationTest {
                 assertEquals(1, admissions)
                 assertEquals(if (accepted) 1 else 0, acceptedCallbacks)
                 assertEquals(if (accepted) 0 else 1, failedCallbacks)
+                // The surface needs the cause to tell a storage park from any other failure.
+                assertEquals(!accepted, failure != null)
                 if (accepted) {
                     assertNull(state.toast)
                 } else {

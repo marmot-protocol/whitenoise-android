@@ -4,10 +4,13 @@ from copy import deepcopy
 import unittest
 
 from apk_checker import (CASES, CIPHERTEXT_OVERHEAD, HELD_PREFIX_BYTES, LARGE_CASE, NO_INSTALLER_PERMISSION,
-                         cases_for, check_apk, table_for)
+                         cases_for, check_apk, expected_fetches, fetched_cases, table_for)
 
 SIZES = {"valid": 8_000_001, "generic": 8_000_001, "conflict": 8_000_001, "no-manifest": 4_222,
          "truncated": 4_000_001, LARGE_CASE: 32_440_320}
+# The generic and conflict cases send the valid package's own bytes, so they share its content.
+CONTENTS = {"valid": "a" * 64, "generic": "a" * 64, "conflict": "a" * 64, "no-manifest": "b" * 64,
+            "truncated": "c" * 64, LARGE_CASE: "d" * 64}
 MODES = (
     ("Play", {}), ("Zapstore", {}),
     ("Play", {"cancel_retry": True}), ("Zapstore", {"cancel_retry": True}),
@@ -31,7 +34,8 @@ def evidence(distribution, cancel_retry=False, large=False, no_installer=False):
     for case in cases:
         metrics += [{"phase": f"apk-transfer-{case}", "success": True, "payload_bytes": SIZES[case], "elapsed_ms": 40.0,
                      "java_peak_bytes": 30 * 2**20, "native_peak_bytes": 90 * 2**20},
-                    {"phase": "apk-received", "case": case, "bytes": SIZES[case], "exact": True}]
+                    {"phase": "apk-received", "case": case, "bytes": SIZES[case], "exact": True,
+                     "content": CONTENTS[case]}]
     if cancel_retry:
         metrics.append(cancellation_row())
     for (case, permission), (allowed, installer) in table_for(distribution, large, no_installer).items():
@@ -47,7 +51,10 @@ def evidence(distribution, cancel_retry=False, large=False, no_installer=False):
                  (len(rows) + 1, "upload_complete", 0, f"upload-{number}")]
     if large:
         rows += [(None, "payload_fetch", SIZES[LARGE_CASE], "large-apk"), (len(rows) + 1, "payload_complete", 0, "large-apk")]
+    fetched = fetched_cases(cases, CONTENTS)
     for number, case in enumerate(cases, 1):
+        if case not in fetched:
+            continue
         if cancel_retry and case == "valid":
             rows.append((None, "hold_acquisition", 0, "control"))
             start = len(rows) + 1
@@ -165,6 +172,31 @@ class ApkEvidenceTest(unittest.TestCase):
             extra = events + [{"seq": 999, "request": None, "kind": "get", "value": 0, "fixture": "upload-1"}]
             self.assertFalse(check_apk(metrics, extra, distribution, **mode)["passed"], (distribution, mode))
 
+    def test_a_repeat_of_earlier_bytes_is_never_fetched_again(self):
+        """MDK serves a repeat of verified content from its copy, so fetching the generic case again is a violation."""
+        self.assertEqual(["valid", "no-manifest", "truncated"], fetched_cases(CASES, CONTENTS))
+        for distribution, mode in MODES:
+            metrics, events, _ = evidence(distribution, **mode)
+            extra = events + [{"seq": 999, "request": None, "kind": "get", "value": 0, "fixture": "upload-2"},
+                              {"seq": 1000, "request": 999, "kind": "status", "value": 200, "fixture": "upload-2"},
+                              {"seq": 1001, "request": 999, "kind": "complete", "value": 0, "fixture": "upload-2"}]
+            self.assertFalse(check_apk(metrics, extra, distribution, **mode)["passed"], (distribution, mode))
+
+    def test_runners_wait_for_one_fetch_per_distinct_content(self):
+        """The runner's ledger wait counts distinct contents, and every case while any content is unreported."""
+        metrics, _, _ = evidence("Zapstore")
+        self.assertEqual(3, expected_fetches(metrics, CASES))
+        self.assertEqual(4, expected_fetches(evidence("Zapstore", large=True)[0], cases_for(True)))
+        unreported = [m for m in metrics if not (m["phase"] == "apk-received" and m["case"] == "generic")]
+        self.assertEqual(len(CASES), expected_fetches(unreported, CASES))
+
+    def test_distinct_content_that_was_never_fetched_fails(self):
+        """A case whose bytes differ from every earlier case must reach the server, or its transfer is unproven."""
+        metrics, events, distribution = evidence("Zapstore")
+        altered = deepcopy(metrics)
+        next(m for m in altered if m["phase"] == "apk-received" and m["case"] == "generic")["content"] = "e" * 64
+        self.assertFalse(check_apk(altered, events, distribution)["passed"])
+
     def test_cancellation_evidence_must_be_bounded_exact_and_singular(self):
         """The cancel row needs a bounded socket close, exact retry bytes, a confirmed cancel and one held attempt."""
         metrics, events, distribution = evidence("Zapstore", cancel_retry=True)
@@ -219,7 +251,7 @@ class ApkEvidenceTest(unittest.TestCase):
     def test_inexact_transfer_or_invalid_measurement_fails(self):
         """Bytes must be exact, and latency and peaks must be finite measurements."""
         metrics, events, distribution = evidence("Zapstore")
-        for field, value in (("exact", False), ("bytes", 1)):
+        for field, value in (("exact", False), ("bytes", 1), ("content", None), ("content", "A" * 64)):
             altered = deepcopy(metrics)
             next(m for m in altered if m["phase"] == "apk-received")[field] = value
             self.assertFalse(check_apk(altered, events, distribution)["passed"], field)

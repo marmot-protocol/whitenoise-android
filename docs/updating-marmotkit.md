@@ -32,6 +32,40 @@ remain visible as their exact canonical token rather than wrapping or crashing.
 Chat previews combine built-in emoji with attachment icons; reply previews keep
 the quoted message's emoji map instead of inheriting the containing message's map.
 
+## Group-change admission, recipient lookups and storage parks
+
+Snapshot `88d1683e` adds typed outcomes that Android must not collapse into generic failures (#3289):
+
+- `GroupCatchingUp` and `GroupCommitUndelivered` refuse group changes advisorily. Route every guarded binding
+  call through `runGroupChange`, which asks the user, calls the matching `acknowledge…` for one attempt and
+  retries. The group's commit lock is released while the user decides, because sends take it too.
+  `GroupChangeAdmissionCoverageTest` lists the guarded methods; extend it when MDK guards another.
+- `DirectoryLookupIncomplete` means nothing is known to be missing: offer Retry and keep the selection. A
+  `MissingKeyPackage` with reason `OBSOLETE_ONLY` asks the recipient to update; only `NOT_FOUND` is missing setup.
+- `STORAGE_BLOCKED` keeps the checkpoint and readmits on free space or Retry. Present it as a storage problem,
+  never as a retry timer or an ordinary failure.
+- `InvalidEditTarget` restores the original text; retrying such an edit can never succeed.
+
+### Recovery qualification
+
+`MarmotKitRecoveryQualificationTest` checks a candidate's offline replay, epoch-gap fallback and lookup retry
+on recovered messages, against a loopback relay that clamps queries to 500 events and refuses history
+comparison. It is a manual device fixture of about five minutes; run it on an emulator before adopting a pin
+that touches replay or recovery:
+
+```bash
+adb shell am instrument -w -r \
+  -e class dev.ipf.whitenoise.android.state.MarmotKitRecoveryQualificationTest \
+  dev.ipf.whitenoise.android.dev.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Pass `-e comparison ignore` to make the relay drop comparison requests instead of refusing them, and
+`-e offlineMillis <ms>` to keep the replay receiver offline longer. Two cases stay ignored until MDK fixes
+ship: one sender beyond 100 messages ([MDK #2375](https://github.com/marmot-protocol/mdk/issues/2375)) and
+a receiver offline past the two-minute replay lookback ([MDK #2381](https://github.com/marmot-protocol/mdk/issues/2381)).
+A physical phone sends the 600 replay messages too slowly to stay inside that lookback, so run the replay case
+on an emulator; the other cases also pass on a Pixel 9a.
+
 ## 1. Select and inspect the release
 
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,

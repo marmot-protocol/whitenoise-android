@@ -44,7 +44,10 @@ class NativeAttachmentDemandTest {
             }
         }
 
-    /** A new deliberate request retains recovery for failed, cancelled and exhausted work. */
+    /**
+     * A new deliberate request retains recovery for failed, cancelled, exhausted and storage-parked work. A parked body
+     * is readmitted only by download-again, so Retry must not take the explicit-request path that leaves it parked.
+     */
     @Test
     fun terminalTransfersKeepDeliberateRetry() =
         runTest {
@@ -55,6 +58,7 @@ class NativeAttachmentDemandTest {
                 AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
                 AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
                 AttachmentTransferStateFfi.RETRY_EXHAUSTED,
+                AttachmentTransferStateFfi.STORAGE_BLOCKED,
             )) {
                 var retries = 0
                 assertEquals(
@@ -84,6 +88,7 @@ class NativeAttachmentDemandTest {
                 AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
                 AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
                 AttachmentTransferStateFfi.RETRY_EXHAUSTED,
+                AttachmentTransferStateFfi.STORAGE_BLOCKED,
             )) {
                 repeat(10) {
                     assertEquals(

@@ -59,6 +59,8 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
+import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
+import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
@@ -193,10 +195,22 @@ internal fun MediaImageBubble(
         onDispose(mediaApplyHostAttempt::cancel)
     }
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
+    var storageFailed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
+
+    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
+    fun markFailed(cause: Throwable? = null) {
+        storageFailed = cause.parksForStorage()
+        failed = true
+    }
     // A verified image above the preview budget is not a failure: Retry cannot shrink it, so the tile opens the
     // viewer instead, where Save and Share still work.
     var tooLargeToPreview by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, key, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
     val cacheAvailability =
         rememberImageAttachmentCacheAvailability(controller, key, attachmentIndex, epoch, presentation != null)
     var cachedPlaintextOnEntry by cacheAvailability.cached
@@ -231,6 +245,15 @@ internal fun MediaImageBubble(
     val cacheAvailabilityResolved by cacheAvailability.resolved
     // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
     val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, key, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedByReader = failed && storageFailed && materializationIntent.readerRequested,
+        recordParkedByReader = { controller.recordReaderParkedDownload(key, attachmentIndex) },
+        readerParkHeld = { controller.readerDownloadParkedForStorage(key, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterParkedDownloadFound()
+    }
     val transfer =
         rememberTileTransfer(controller, key, attachmentIndex, reference, mine, cancelledByReader, startDownload)
 
@@ -288,15 +311,18 @@ internal fun MediaImageBubble(
                 )
                 presentation = decoded
             } else {
-                failed = true
+                markFailed()
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             materializationIntent = materializationIntent.afterProducerCancellation(cancel)
         } catch (_: AttachmentTooLargeToPresentException) {
             tooLargeToPreview = true
-        } catch (_: Throwable) {
+        } catch (
+            // Any failure leaves Retry; only a storage-parked body changes what it says.
+            @Suppress("TooGenericExceptionCaught") failure: Throwable,
+        ) {
             android.util.Log.w("MediaImageBubble", "image_auto_download_failed")
-            failed = true
+            markFailed(failure)
         }
     }
 
@@ -390,6 +416,20 @@ internal fun MediaImageBubble(
                     when {
                         tooLargeToPreview ->
                             MediaTooLargeToPreviewControl(onOpen = ::dispatchViewerOpen, showCaption = true)
+                        // A load parked for lack of free space names storage beside its Retry.
+                        failed && storageFailed ->
+                            TileTransferControl(
+                                transfer = storageBlockedTileTransfer(),
+                                onRetry = {
+                                    controller.retryAttachmentTransfer(
+                                        key,
+                                        attachmentIndex,
+                                        onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
+                                        onFailure = { markFailed(it) },
+                                    )
+                                },
+                                showCaption = true,
+                            )
                         failed ->
                             MediaCircleAction(
                                 icon = Icons.Default.Refresh,
@@ -399,7 +439,7 @@ internal fun MediaImageBubble(
                                         key,
                                         attachmentIndex,
                                         onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
-                                        onFailure = { failed = true },
+                                        onFailure = { markFailed(it) },
                                     )
                                 },
                             )
@@ -411,7 +451,7 @@ internal fun MediaImageBubble(
                                         key,
                                         attachmentIndex,
                                         onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
-                                        onFailure = { failed = true },
+                                        onFailure = { markFailed(it) },
                                     )
                                 },
                                 showCaption = true,
@@ -671,9 +711,21 @@ internal fun MediaImageGridTile(
         onDispose(mediaApplyHostAttempt::cancel)
     }
     var failed by remember(decodeKey) { mutableStateOf(false) }
+    var storageFailed by remember(decodeKey) { mutableStateOf(false) }
+
+    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
+    fun markFailed(cause: Throwable? = null) {
+        storageFailed = cause.parksForStorage()
+        failed = true
+    }
     // Mirrors the single bubble: a verified image above the preview budget opens the viewer instead of retrying.
     var tooLargeToPreview by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
     val cacheAvailability =
         rememberImageAttachmentCacheAvailability(
             controller,
@@ -715,6 +767,15 @@ internal fun MediaImageGridTile(
     val cacheAvailabilityResolved by cacheAvailability.resolved
     // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
     val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, messageIdHex, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedByReader = failed && storageFailed && materializationIntent.readerRequested,
+        recordParkedByReader = { controller.recordReaderParkedDownload(messageIdHex, attachmentIndex) },
+        readerParkHeld = { controller.readerDownloadParkedForStorage(messageIdHex, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterParkedDownloadFound()
+    }
     val transfer =
         rememberTileTransfer(
             controller,
@@ -766,15 +827,18 @@ internal fun MediaImageGridTile(
                 )
                 presentation = decoded
             } else {
-                failed = true
+                markFailed()
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             materializationIntent = materializationIntent.afterProducerCancellation(cancel)
         } catch (_: AttachmentTooLargeToPresentException) {
             tooLargeToPreview = true
-        } catch (_: Throwable) {
+        } catch (
+            // Any failure leaves Retry; only a storage-parked body changes what it says.
+            @Suppress("TooGenericExceptionCaught") failure: Throwable,
+        ) {
             android.util.Log.w("MediaImageGridTile", "image_tile_auto_download_failed")
-            failed = true
+            markFailed(failure)
         }
     }
 
@@ -814,7 +878,7 @@ internal fun MediaImageGridTile(
                                 messageIdHex,
                                 attachmentIndex,
                                 onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                                onFailure = { failed = true },
+                                onFailure = { markFailed(it) },
                             )
                         presentation != null -> onTap()
                         else -> controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
@@ -854,13 +918,16 @@ internal fun MediaImageGridTile(
                     failed ->
                         MediaCircleAction(
                             icon = Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.media_tap_to_retry),
+                            contentDescription =
+                                stringResource(
+                                    if (storageFailed) R.string.media_storage_blocked else R.string.media_tap_to_retry,
+                                ),
                             onClick = {
                                 controller.retryAttachmentTransfer(
                                     messageIdHex,
                                     attachmentIndex,
                                     onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                                    onFailure = { failed = true },
+                                    onFailure = { markFailed(it) },
                                 )
                             },
                         )
@@ -872,7 +939,7 @@ internal fun MediaImageGridTile(
                                     messageIdHex,
                                     attachmentIndex,
                                     onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                                    onFailure = { failed = true },
+                                    onFailure = { markFailed(it) },
                                 )
                             },
                         )

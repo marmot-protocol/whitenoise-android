@@ -15,6 +15,7 @@ import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 /**
@@ -51,6 +52,68 @@ internal class LoopbackNostrRelay(
     /** Pauses a specific recipient's real package reads until the device test changes account ownership. */
     @Volatile var packageReadHold: PackageReadHold? = null
 
+    /** Clamps every filter's result count, as deployed strfry silently clamps REQ limits to 500. */
+    @Volatile var requestLimitClamp: Int? = null
+
+    /** Answers NIP-77 history comparison with NEG-ERR; when false the request goes unanswered, as without NIP-77. */
+    @Volatile var refuseComparison: Boolean = false
+
+    /** Acknowledges the next publication of one kind without storing it, until [releaseWithheld] lands it late. */
+    @Volatile var withholdNextPublicationOfKind: Int? = null
+
+    private var withheld: JSONObject? = null
+    private val refusedComparisonCount = AtomicInteger()
+    private val ignoredComparisonCount = AtomicInteger()
+    private val deliveriesBySubscription = ConcurrentHashMap<String, MutableSet<String>>()
+
+    /** The id of the publication currently withheld, if any. */
+    fun withheldEventId(): String? = synchronized(lock) { withheld?.getString("id") }
+
+    /**
+     * Stores the withheld publication as a commit that reached the relay long after it was created: queries can
+     * return it, but no live subscription receives it, because its timestamp is older than their cursors.
+     */
+    fun releaseWithheld(): String =
+        synchronized(lock) {
+            val event = checkNotNull(withheld) { "nothing was withheld" }
+            withheld = null
+            events[event.getString("id")] = event
+            event.getString("id")
+        }
+
+    /** How many NIP-77 comparisons this relay refused. */
+    fun refusedComparisons(): Int = refusedComparisonCount.get()
+
+    /** How many NIP-77 comparisons this relay left unanswered. */
+    fun ignoredComparisons(): Int = ignoredComparisonCount.get()
+
+    /** Every answered query of [kind] in order, as its filters and the number of stored events it returned. */
+    fun answeredQueries(kind: Int): List<Pair<List<JSONObject>, Int>> =
+        synchronized(lock) {
+            answeredFilters.entries
+                .sortedBy { it.key.substringAfterLast('#').toLong() }
+                .filter { (_, filters) ->
+                    filters.any { filter ->
+                        val kinds = filter.optJSONArray("kinds")
+                        kinds != null && (0 until kinds.length()).any { kinds.getInt(it) == kind }
+                    }
+                }.map { (key, filters) -> filters to (deliveriesBySubscription[key]?.size ?: 0) }
+        }
+
+    /** The filters of every query whose stored results included [eventId], as the relay answered them. */
+    fun queriesThatReturned(eventId: String): List<List<JSONObject>> =
+        synchronized(lock) {
+            deliveriesBySubscription
+                .filterValues { eventId in it }
+                .keys
+                .mapNotNull { key -> answeredFilters[key]?.map { JSONObject(it.toString()) } }
+        }
+
+    private val answeredFilters = ConcurrentHashMap<String, List<JSONObject>>()
+    private val queryCounter =
+        java.util.concurrent.atomic
+            .AtomicLong()
+
     /** Bounded network barrier; closing the fixture always releases blocked clients. */
     class PackageReadHold(
         val author: String,
@@ -78,6 +141,9 @@ internal class LoopbackNostrRelay(
 
     /** Returns requested filters so tests can attribute discovery work to a particular recipient. */
     fun recordedRequests(): List<JSONObject> = synchronized(lock) { requests.map { JSONObject(it.toString()) } }
+
+    /** Counts live deliveries per kind, across every client and subscription. */
+    val liveDeliveries = ConcurrentHashMap<Int, AtomicInteger>()
 
     /** Counts exact kind reads so recovery tests can prove the actual route used. */
     val kindReads = ConcurrentHashMap<Int, java.util.concurrent.atomic.AtomicInteger>()
@@ -185,63 +251,90 @@ internal class LoopbackNostrRelay(
             }
         }
 
-        /** Handles EVENT, REQ and CLOSE, including controlled authentication-required query failures. */
+        /** Handles EVENT, REQ, NEG-OPEN and CLOSE. */
         private fun handle(message: JSONArray) {
             when (message.getString(0)) {
-                "EVENT" -> {
-                    val event = message.getJSONObject(1)
-                    val accepted = event.getInt("kind") !in rejectedPublicationKinds
-                    synchronized(lock) {
-                        publications += JSONObject(event.toString())
-                        if (accepted) {
-                            if (event.getInt("kind") in authAfterPublicationKinds) {
-                                authRequiredKinds += event.getInt("kind")
-                            }
-                            events[event.getString("id")] = event
-                            clients.forEach { client -> runCatching { client.deliver(event) } }
-                        }
-                    }
-                    sendJson(
-                        JSONArray()
-                            .put("OK")
-                            .put(event.getString("id"))
-                            .put(accepted)
-                            .put(if (accepted) "" else "blocked: controlled fixture rejection"),
-                    )
-                }
-                "REQ" -> {
-                    val id = message.getString(1)
-                    val filters = (2 until message.length()).map(message::getJSONObject)
-                    synchronized(lock) { requests += filters.map { JSONObject(it.toString()) } }
-                    holdPackageRead(filters)
-                    if (filters.any { filter ->
-                            val kinds = filter.optJSONArray("kinds")
-                            kinds != null && (0 until kinds.length()).any { kinds.getInt(it) in authRequiredKinds }
-                        }
-                    ) {
-                        sendJson(JSONArray().put("AUTH").put("isolated-fixture-challenge"))
-                        sendJson(JSONArray().put("CLOSED").put(id).put("auth-required: fixture access denied"))
-                        return
-                    }
-                    filters.forEach { filter ->
-                        val kinds = filter.optJSONArray("kinds")
-                        if (kinds != null) {
-                            for (index in 0 until kinds.length()) {
-                                kindReads
-                                    .computeIfAbsent(kinds.getInt(index)) {
-                                        java.util.concurrent.atomic
-                                            .AtomicInteger()
-                                    }.incrementAndGet()
-                            }
-                        }
-                    }
-                    synchronized(lock) {
-                        subscriptions[id] = filters
-                        stored(filters).forEach { sendJson(JSONArray().put("EVENT").put(id).put(it)) }
-                        sendJson(JSONArray().put("EOSE").put(id))
-                    }
-                }
+                "EVENT" -> handleEvent(message)
+                "REQ" -> handleRequest(message)
+                "NEG-OPEN" -> handleComparison(message)
                 "CLOSE" -> subscriptions.remove(message.getString(1))
+            }
+        }
+
+        /** Refuses a NIP-77 comparison with NEG-ERR, or ignores it as a relay without NIP-77 does. */
+        private fun handleComparison(message: JSONArray) {
+            if (refuseComparison) {
+                refusedComparisonCount.incrementAndGet()
+                sendJson(JSONArray().put("NEG-ERR").put(message.getString(1)).put("blocked: comparison unsupported"))
+            } else {
+                ignoredComparisonCount.incrementAndGet()
+            }
+        }
+
+        /** Stores and broadcasts an accepted publication, or withholds it to land late, then acknowledges it. */
+        private fun handleEvent(message: JSONArray) {
+            val event = message.getJSONObject(1)
+            val accepted = event.getInt("kind") !in rejectedPublicationKinds
+            synchronized(lock) {
+                publications += JSONObject(event.toString())
+                if (accepted && withholdNextPublicationOfKind == event.getInt("kind")) {
+                    // Acknowledged like a relay that will store it eventually; nobody can see it yet.
+                    withholdNextPublicationOfKind = null
+                    withheld = JSONObject(event.toString())
+                } else if (accepted) {
+                    if (event.getInt("kind") in authAfterPublicationKinds) {
+                        authRequiredKinds += event.getInt("kind")
+                    }
+                    events[event.getString("id")] = event
+                    clients.forEach { client -> runCatching { client.deliver(event) } }
+                }
+            }
+            sendJson(
+                JSONArray()
+                    .put("OK")
+                    .put(event.getString("id"))
+                    .put(accepted)
+                    .put(if (accepted) "" else "blocked: controlled fixture rejection"),
+            )
+        }
+
+        /** Answers a query from stored events, including controlled authentication-required failures. */
+        private fun handleRequest(message: JSONArray) {
+            val id = message.getString(1)
+            val filters = (2 until message.length()).map(message::getJSONObject)
+            synchronized(lock) { requests += filters.map { JSONObject(it.toString()) } }
+            holdPackageRead(filters)
+            if (filters.any { filter ->
+                    val kinds = filter.optJSONArray("kinds")
+                    kinds != null && (0 until kinds.length()).any { kinds.getInt(it) in authRequiredKinds }
+                }
+            ) {
+                sendJson(JSONArray().put("AUTH").put("isolated-fixture-challenge"))
+                sendJson(JSONArray().put("CLOSED").put(id).put("auth-required: fixture access denied"))
+                return
+            }
+            filters.forEach { filter ->
+                val kinds = filter.optJSONArray("kinds")
+                if (kinds != null) {
+                    for (index in 0 until kinds.length()) {
+                        kindReads
+                            .computeIfAbsent(kinds.getInt(index)) {
+                                java.util.concurrent.atomic
+                                    .AtomicInteger()
+                            }.incrementAndGet()
+                    }
+                }
+            }
+            synchronized(lock) {
+                subscriptions[id] = filters
+                val query = "$id#${queryCounter.incrementAndGet()}"
+                answeredFilters[query] = filters.map { JSONObject(it.toString()) }
+                val answered = deliveriesBySubscription.getOrPut(query) { ConcurrentHashMap.newKeySet() }
+                stored(filters).forEach {
+                    answered += it.getString("id")
+                    sendJson(JSONArray().put("EVENT").put(id).put(it))
+                }
+                sendJson(JSONArray().put("EOSE").put(id))
             }
         }
 
@@ -263,9 +356,10 @@ internal class LoopbackNostrRelay(
             val newestFirst = events.values.sortedByDescending { it.optLong("created_at") }
             val selected = LinkedHashMap<String, JSONObject>()
             filters.forEach { filter ->
+                val requested = filter.optInt("limit", Int.MAX_VALUE)
                 newestFirst
                     .filter { visible(it) && matches(it, filter) }
-                    .take(filter.optInt("limit", Int.MAX_VALUE))
+                    .take(requestLimitClamp?.let { minOf(it, requested) } ?: requested)
                     .forEach { selected[it.getString("id")] = it }
             }
             return selected.values
@@ -275,7 +369,10 @@ internal class LoopbackNostrRelay(
         fun deliver(event: JSONObject) {
             if (!visible(event)) return
             subscriptions.forEach { (id, filters) ->
-                if (filters.any { matches(event, it) }) sendJson(JSONArray().put("EVENT").put(id).put(event))
+                if (filters.any { matches(event, it) }) {
+                    liveDeliveries.computeIfAbsent(event.optInt("kind")) { AtomicInteger() }.incrementAndGet()
+                    sendJson(JSONArray().put("EVENT").put(id).put(event))
+                }
             }
         }
 
