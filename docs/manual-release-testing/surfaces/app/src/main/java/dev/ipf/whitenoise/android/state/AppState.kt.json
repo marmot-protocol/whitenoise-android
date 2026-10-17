@@ -153,7 +153,7 @@
       {
         "surface": "automatic-attachment-permission-commit-order",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "internal fun refreshNativeAttachmentPermissions()",
+        "anchor": "internal fun refreshNativeAttachmentPermissions(widenWaiting: Boolean = true)",
         "test_ids": [
           "SET-010",
           "MED-022"
