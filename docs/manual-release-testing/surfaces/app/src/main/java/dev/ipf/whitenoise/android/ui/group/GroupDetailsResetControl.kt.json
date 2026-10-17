@@ -74,6 +74,22 @@
         ]
       },
       {
+        "surface": "Failed abandonment's in-dialog error detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.latest_group_error",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
+        "surface": "Failed abandonment's in-dialog Copy action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "GRP-031"
+        ]
+      },
+      {
         "surface": "GroupLeaveBlockedNotice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
         "anchor": "fun GroupLeaveBlockedNotice(",

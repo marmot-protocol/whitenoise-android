@@ -295,18 +295,18 @@ private fun GroupAbandonmentFailure(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val summary = if (isDm) R.string.toast_couldnt_abandon_chat else R.string.toast_couldnt_reset_group
                 Text(stringResource(summary), style = MaterialTheme.typography.bodySmall)
-                error?.let {
+                if (error != null) {
                     SelectionContainer(Modifier.testTag("group.abandon.error.detail")) {
                         Text(
-                            stringResource(R.string.latest_group_error, it.message.resolve(context)),
+                            stringResource(R.string.latest_group_error, error.message.resolve(context)),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }
             }
-            error?.let {
+            if (error != null) {
                 IconButton(
-                    onClick = { clipboard.setText(AnnotatedString(it.report)) },
+                    onClick = { clipboard.setText(AnnotatedString(error.report)) },
                     modifier = Modifier.testTag("group.abandon.error.copy"),
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.copy))
