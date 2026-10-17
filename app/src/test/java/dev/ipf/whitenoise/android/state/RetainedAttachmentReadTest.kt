@@ -67,8 +67,7 @@ class RetainedAttachmentReadTest {
                         .filter { CoroutineScope::class.java.isAssignableFrom(it.type) }
                         .map { field ->
                             (field.apply { isAccessible = true }.get(appState) as CoroutineScope).coroutineContext.job
-                        }
-                        .distinct()
+                        }.distinct()
                 jobs.forEach { it.cancel() }
                 jobs.forEach { it.join() }
             }

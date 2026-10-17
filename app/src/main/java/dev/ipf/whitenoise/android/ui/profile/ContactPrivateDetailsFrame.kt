@@ -41,7 +41,7 @@ internal fun ContactPrivateDetailsFrame(
     onDismiss: () -> Unit,
     actions: @Composable () -> Unit,
     form: @Composable () -> Unit,
-    viewportInsets: WindowInsets = WindowInsets.safeDrawing.union(WindowInsets.ime),
+    viewportInsets: WindowInsets? = null,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -55,7 +55,7 @@ internal fun ContactPrivateDetailsFrame(
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(viewportInsets)
+                .windowInsetsPadding(viewportInsets ?: WindowInsets.safeDrawing.union(WindowInsets.ime))
                 .padding(WhiteNoiseSpacing.Section)
                 .exposePerformanceTestTags(),
             contentAlignment = Alignment.Center,

@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -64,7 +65,7 @@ import java.util.Locale
 internal fun PollCreateDialog(
     onDismiss: () -> Unit,
     onSubmit: (String, List<String>, PollTypeFfi, Long?, (Boolean) -> Unit) -> Unit,
-    viewportInsets: WindowInsets = WindowInsets.safeDrawing.union(WindowInsets.ime),
+    viewportInsets: WindowInsets? = null,
 ) {
     var question by rememberSaveable { mutableStateOf("") }
     var options by rememberSaveable { mutableStateOf(listOf("", "")) }
@@ -85,7 +86,10 @@ internal fun PollCreateDialog(
     var deadlineAttempted by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = { if (!submitting) onDismiss() },
-        modifier = Modifier.windowInsetsPadding(viewportInsets).exposePerformanceTestTags(),
+        modifier =
+            Modifier
+                .composed { windowInsetsPadding(viewportInsets ?: WindowInsets.safeDrawing.union(WindowInsets.ime)) }
+                .exposePerformanceTestTags(),
         properties = DialogProperties(decorFitsSystemWindows = false),
         title = { Text(stringResource(R.string.poll_create)) },
         text = {
