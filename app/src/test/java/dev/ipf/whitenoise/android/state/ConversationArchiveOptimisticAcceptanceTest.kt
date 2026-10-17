@@ -25,6 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -260,6 +261,94 @@ class ConversationArchiveOptimisticAcceptanceTest {
             assertTrue(chats.items.single().hasUnread)
             assertEquals(3uL, chats.items.single().unreadCount)
             chats.onCleared()
+        }
+
+    /** A committed command survives disposal while its late record and feedback cannot reach the new route. */
+    @Test
+    fun disposedArchiveOwnerFinishesNativeWorkWithoutReplacingNewerPresentation() =
+        runBlocking {
+            val state = testAppState()
+            val releaseCommit = CompletableDeferred<Unit>()
+            var commits = 0
+            val controller =
+                conversationController(appState = state) { _, _, archived ->
+                    commits += 1
+                    releaseCommit.await()
+                    group(archived).copy(name = "stale completion")
+                }
+            val action = async(start = CoroutineStart.UNDISPATCHED) { controller.setArchived(true) }
+            try {
+                assertTrue(controller.presentedArchived)
+                controller.onCleared()
+                state.presentTransient(AppText.Plain("replacement route notice"))
+                val newerNotice = state.transientNotice
+                releaseCommit.complete(Unit)
+                assertTrue("native commitment still succeeds", action.await())
+                assertEquals(1, commits)
+                assertFalse(controller.group.archived)
+                assertFalse(controller.presentedArchived)
+                assertEquals("Archive group", controller.group.name)
+                assertSame(newerNotice, state.transientNotice)
+                assertFalse("a disposed UI cannot admit another command", controller.setArchived(false))
+                assertEquals(1, commits)
+            } finally {
+                releaseCommit.complete(Unit)
+                controller.onCleared()
+            }
+        }
+
+    /** A late archive refusal cannot replace feedback already owned by a replacement conversation. */
+    @Test
+    fun disposedArchiveFailureLeavesTheReplacementNoticeAlone() =
+        runBlocking {
+            val state = testAppState()
+            val releaseCommit = CompletableDeferred<Unit>()
+            val controller =
+                conversationController(appState = state) { _, _, _ ->
+                    releaseCommit.await()
+                    throw MarmotKitException.Publish("refused archive")
+                }
+            val action = async(start = CoroutineStart.UNDISPATCHED) { controller.setArchived(true) }
+            try {
+                controller.onCleared()
+                state.presentTransient(AppText.Plain("replacement route notice"))
+                val newerNotice = state.transientNotice
+                releaseCommit.complete(Unit)
+                assertFalse(action.await())
+                assertSame(newerNotice, state.transientNotice)
+                assertNull(controller.lastMutationError)
+                assertFalse(controller.mutationInFlight)
+            } finally {
+                releaseCommit.complete(Unit)
+                controller.onCleared()
+            }
+        }
+
+    /** A notification-pinned controller cannot publish an archive record into another account's attached list. */
+    @Test
+    fun archiveCompletionRoutesItsLocalRecordOnlyToThePinnedAccount() =
+        runBlocking {
+            val state = testAppState()
+            val chats =
+                ChatsController(
+                    appState = state,
+                    initialAccountRef = "other-profile",
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                )
+            state.attachChatsController(chats)
+            seed(chats)
+            val controller =
+                conversationController(appState = state) { _, _, archived -> group(archived) }
+            try {
+                assertEquals(listOf(GROUP_ID), chats.items.map { it.id })
+                assertTrue(controller.setArchived(true))
+                assertTrue(controller.group.archived)
+                assertEquals(listOf(GROUP_ID), chats.items.map { it.id })
+                assertTrue(chats.archivedItems.isEmpty())
+            } finally {
+                controller.onCleared()
+                chats.onCleared()
+            }
         }
 
     private fun conversationController(
