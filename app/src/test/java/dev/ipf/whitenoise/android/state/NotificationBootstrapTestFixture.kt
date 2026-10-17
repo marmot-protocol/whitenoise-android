@@ -112,11 +112,13 @@ internal class NotificationBootstrapTestFixture(
     senderPictureUrl: String? = null,
     isDm: Boolean = false,
     private val accounts: List<AccountSummaryFfi> = emptyList(),
+    initialActiveAccountRef: String? = accounts.firstOrNull()?.label.orEmpty(),
     private val groupMemberAccountRefs: Set<String> = emptySet(),
     private val chatListRows: List<ChatListRowFfi> = emptyList(),
     private val chatGroups: List<AppGroupRecordFfi> = emptyList(),
     private val markReadRow: ChatListRowFfi? = null,
     private val signInFailure: Throwable? = null,
+    private val onSignInAccount: ((String) -> Unit)? = null,
     initialNotificationSettings: NotificationSettingsFfi? = null,
     // Optional behavior hooks so worker/reconciliation tests can steer the FFI
     // boundary per call; every default preserves the fixture's original shape.
@@ -195,6 +197,7 @@ internal class NotificationBootstrapTestFixture(
     val directChatListCalls = AtomicInteger(0)
     val memberProjectionCalls = AtomicInteger(0)
     val signerRegistrationCalls = AtomicInteger(0)
+    val signInRequests = CopyOnWriteArrayList<String>()
     val markReadRequests = CopyOnWriteArrayList<Triple<String, String, String>>()
     val markReadCalls = AtomicInteger(0)
     val manualUnreadWrites = CopyOnWriteArrayList<Triple<String, String, Boolean>>()
@@ -441,7 +444,7 @@ internal class NotificationBootstrapTestFixture(
                     npubCalls.incrementAndGet()
                     "npub1coldidentityfallback"
                 }
-                "listAccounts" -> accounts
+                "listAccounts" -> accounts.toList()
                 "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(false, 2_000uL, 300uL, 40uL)
                 "setAttachmentDownloadPolicy" -> Unit
                 "beginAttachmentPermissionUpdate" -> "fixture-permission-generation"
@@ -536,7 +539,13 @@ internal class NotificationBootstrapTestFixture(
                     signerRegistrationCalls.incrementAndGet()
                     Unit
                 }
-                "signInAccount" -> signInFailure?.let { throw it } ?: Unit
+                "signInAccount" -> {
+                    val accountRef = arguments?.first() as String
+                    signInRequests += accountRef
+                    signInFailure?.let { throw it }
+                    onSignInAccount?.invoke(accountRef)
+                    accounts.first { it.label == accountRef }
+                }
                 "toString" -> "NotificationBootstrapMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
@@ -550,7 +559,7 @@ internal class NotificationBootstrapTestFixture(
             draftStore = DraftStore(EmptyDraftPersistence),
             accountIdHexResolver = accountIdHexResolver,
             accounts = emptyList(),
-            activeAccountRef = accounts.firstOrNull()?.label.orEmpty(),
+            activeAccountRef = initialActiveAccountRef,
             profileReader = if (profileRefreshRequest != null) { _ -> null } else null,
             profileRefreshRequest = profileRefreshRequest,
             marmotRuntimeFactory = { AppMarmotRuntime(rootPath = "test", marmot = marmot) },

@@ -214,6 +214,15 @@
         ]
       },
       {
+        "surface": "Signed-in-only startup selection with retained-profile onboarding",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private fun startupAccount(): AccountSummaryFfi?",
+        "test_ids": [
+          "ACC-013",
+          "INT-003"
+        ]
+      },
+      {
         "surface": "Account-session native and platform activation adapters",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "private inner class AccountSessionActivation",
