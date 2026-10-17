@@ -11,7 +11,9 @@ import androidx.compose.runtime.setValue
  * updates advance the existing authority receipt so a late command cannot replace newer state.
  * Disposing a timeline never cancels an admitted command or removes an app-owned optimistic send.
  */
-internal class ConversationMutationPresentation {
+internal class ConversationMutationPresentation(
+    private val ownsPresentation: () -> Boolean,
+) {
     /** Identity, rather than its value, decides which archive overlay may settle. */
     class ArchiveIntent(
         val archived: Boolean,
@@ -23,6 +25,17 @@ internal class ConversationMutationPresentation {
     var error by mutableStateOf<ErrorPresentation?>(null)
     var authorityEpoch = 0L
         private set
+
+    /** A retired controller may finish its command, but cannot publish into the replacement route. */
+    fun ownsCurrentPresentation(): Boolean = ownsPresentation()
+
+    /** Applies a command result only while its original controller and authoritative receipt still own it. */
+    fun applyIfCurrent(
+        receipt: Long,
+        apply: () -> Unit,
+    ) {
+        if (ownsCurrentPresentation() && authorityEpoch == receipt) apply()
+    }
 
     /** Records an authoritative group application without creating a second generation owner. */
     fun authoritativeGroupApplied() {

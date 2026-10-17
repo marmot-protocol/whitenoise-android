@@ -342,7 +342,6 @@ class StalenessGuardCoverageTest {
                         "forwardTargetsRevision",
                         "memberSnapshotsRevision",
                         "nextActivitySequence",
-                        "lastStartedGeneration",
                         "streamDebugEventSequence",
                     ),
                 "TtsPlaybackQueue.kt" to
