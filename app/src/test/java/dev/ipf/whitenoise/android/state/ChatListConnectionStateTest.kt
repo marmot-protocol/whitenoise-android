@@ -419,7 +419,9 @@ class ChatListConnectionStateTest {
                 ChatListConnectionOwner(
                     runtimeGeneration = { 4 },
                     hasValidatedInternet = { signals.hasAppNetwork },
-                    launchCatchUpRequest = { CompletableDeferred(AccountCatchUpResult(AccountCatchUpOutcome.Succeeded)) },
+                    launchCatchUpRequest = {
+                        CompletableDeferred(AccountCatchUpResult(AccountCatchUpOutcome.Succeeded))
+                    },
                     hasCurrentSubscriptions = { true },
                 )
             try {

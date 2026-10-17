@@ -103,7 +103,8 @@ class NostrEventReaderTest {
     @Test
     fun draggingReaderLinkBeforeTimeoutLeavesClipboardUnchanged() {
         val destination = "https://example.com/drag"
-        val clipboard = ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText("sentinel", "keep this"))
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -143,7 +144,8 @@ class NostrEventReaderTest {
         val replacement = "Ordinary replacement text"
         var block by mutableStateOf(readerLink(destination))
         var visible by mutableStateOf(true)
-        val clipboard = ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
+        val clipboard =
+            ApplicationProvider.getApplicationContext<Context>().getSystemService(ClipboardManager::class.java)
         composeRule.setContent {
             WhiteNoiseTheme {
                 if (visible) {

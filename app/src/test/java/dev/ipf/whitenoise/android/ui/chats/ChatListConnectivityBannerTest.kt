@@ -1,8 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import dev.ipf.whitenoise.android.state.ConnectivitySignals
 import dev.ipf.whitenoise.android.state.ChatListConnectionPhase
 import dev.ipf.whitenoise.android.state.ChatListConnectionState
+import dev.ipf.whitenoise.android.state.ConnectivitySignals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,7 +36,10 @@ class ChatListConnectivityBannerTest {
         )
         assertEquals(
             ConnectivityBannerTarget.Offline,
-            target(signals.copy(hasActiveNetwork = false).hasAppNetwork, connectionState(ChatListConnectionPhase.Ready)),
+            target(
+                signals.copy(hasActiveNetwork = false).hasAppNetwork,
+                connectionState(ChatListConnectionPhase.Ready),
+            ),
         )
     }
 

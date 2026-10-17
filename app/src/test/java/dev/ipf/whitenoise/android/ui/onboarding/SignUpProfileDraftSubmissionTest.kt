@@ -30,6 +30,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowNetworkCapabilities
 import org.robolectric.shadows.ShadowNetworkInfo
 
 /** Tests actual form navigation and explicit submission, not source-string wiring. */
@@ -224,10 +225,11 @@ internal fun unvalidatedSignUpAvailability(
     )
     connectivity.activeNetwork?.let { network ->
         val capabilities =
-            NetworkCapabilities()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .removeCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            ShadowNetworkCapabilities.newInstance().apply {
+                shadowOf(this).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                shadowOf(this).removeCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                shadowOf(this).removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            }
         shadowOf(connectivity).setNetworkCapabilities(network, capabilities)
     }
     WhiteNoiseAppState::class.java
