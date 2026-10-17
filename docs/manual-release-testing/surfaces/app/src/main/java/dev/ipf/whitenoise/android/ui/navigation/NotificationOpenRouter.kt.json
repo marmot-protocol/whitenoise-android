@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationOpenRouter.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Notification tap for a removed or signed-out account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationOpenRouter.kt",
+        "anchor": "R.string.toast_notification_account_unavailable",
+        "test_ids": [
+          "NTF-015",
+          "NTF-009"
+        ]
+      },
+      {
+        "surface": "Notification tap for a conversation that is gone",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationOpenRouter.kt",
+        "anchor": "R.string.toast_notification_conversation_unavailable",
+        "test_ids": [
+          "NTF-015",
+          "NTF-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

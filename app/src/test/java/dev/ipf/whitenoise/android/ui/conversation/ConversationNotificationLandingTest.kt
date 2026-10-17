@@ -558,7 +558,7 @@ class ConversationNotificationLandingTest {
                                 rendered,
                             ).testTag(LIST_TAG),
                     reverseLayout = true,
-                    contentPadding = conversationTimelineContentPadding(0.dp),
+                    contentPadding = conversationTimelineContentPadding(),
                 ) {
                     items(rendered.asReversed(), key = { it.presentationId }) { item ->
                         Row(item.record.messageIdHex)

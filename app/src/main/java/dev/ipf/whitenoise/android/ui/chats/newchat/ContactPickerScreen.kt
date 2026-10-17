@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
@@ -183,29 +184,36 @@ internal fun ContactPickerScreen(
     Scaffold(
         modifier = Modifier.imePadding().exposePerformanceTestTags(),
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(title)
-                        if (selected.isNotEmpty()) {
-                            Text(
-                                pluralStringResource(
-                                    R.plurals.selected_members_count,
-                                    selected.size,
-                                    selected.size,
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // App banners sit below this screen's bar rather than over it (#3312).
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(title)
+                            if (selected.isNotEmpty()) {
+                                Text(
+                                    pluralStringResource(
+                                        R.plurals.selected_members_count,
+                                        selected.size,
+                                        selected.size,
+                                    ),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack, enabled = !busy) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack, enabled = !busy) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-            )
+                    },
+                )
+                TopNoticeSlot()
+            }
         },
         floatingActionButton = {
             FloatingActionButton(

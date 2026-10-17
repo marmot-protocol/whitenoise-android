@@ -63,6 +63,25 @@ class LocalGroupDeleteRecoveryTest {
             assertEquals(listOf("delete", "present", "delete"), events)
         }
 
+    /** #3310: an abandonment's forget that committed before its response was lost is never sent a second time. */
+    @Test
+    fun committedForgetWithLostResponseIsReconciledAsAbandoned() =
+        runTest {
+            var forgets = 0
+            var present = true
+            deleteLocalGroupWithRecovery(
+                isCurrent = { true },
+                delete = {
+                    forgets += 1
+                    present = false
+                    throw MarmotKitException.TransportClosed()
+                },
+                isGroupPresent = { present },
+            )
+            assertEquals(1, forgets)
+            assertFalse(present)
+        }
+
     @Test
     fun committedDeleteWithLostResponseDoesNotRepeatMutation() =
         runTest {

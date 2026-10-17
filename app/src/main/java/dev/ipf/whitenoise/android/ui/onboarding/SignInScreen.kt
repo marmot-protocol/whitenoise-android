@@ -40,7 +40,6 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
-import dev.ipf.whitenoise.android.ui.common.reserveSnackbarSpace
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.flow.collect
@@ -125,7 +124,6 @@ internal fun SignInContent(
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .imePadding()
-                    .reserveSnackbarSpace()
                     .padding(WhiteNoiseSpacing.PinnedActionInset),
                 contentAlignment = Alignment.Center,
             ) {

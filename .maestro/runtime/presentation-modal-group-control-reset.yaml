@@ -26,6 +26,6 @@ name: presentation-modal-group-control-reset
 - assertVisible:
     text: Reset this group on this device\?
 - tapOn:
-    id: confirmation.confirm
+    id: group.abandon.confirm
 - assertVisible:
     id: presentation.complete

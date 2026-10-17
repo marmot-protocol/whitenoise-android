@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.common.reserveSnackbarSpace
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 
 /**
@@ -47,7 +46,6 @@ internal fun SetupPage(
                     Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .reserveSnackbarSpace()
                         .padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) {

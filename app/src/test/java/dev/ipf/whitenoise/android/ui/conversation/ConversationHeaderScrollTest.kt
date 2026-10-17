@@ -142,7 +142,7 @@ class ConversationHeaderScrollTest {
                                 .testTag("header-scroll-transcript")
                                 .trackWhiteNoiseHeader(list),
                         verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-                        contentPadding = conversationTimelineContentPadding(0.dp),
+                        contentPadding = conversationTimelineContentPadding(),
                     ) {
                         items(count, key = { it }) { Text("Message $it", Modifier.height(48.dp)) }
                     }

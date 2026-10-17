@@ -21,6 +21,32 @@ internal fun conversationShortcutIds(shortcuts: List<ShortcutInfoCompat>): List<
         .filter(::isConversationShortcutId)
         .distinct()
 
+/**
+ * The conversation shortcuts to remove before [shortcutId] can be published under the per-activity cap, least recently
+ * used first, never one of [protectedShortcutIds] (shortcuts backing a live card or held for a pending card write).
+ * Returns null when the protected shortcuts leave too little room, so the caller skips the publication rather than
+ * let the platform evict a protected shortcut.
+ */
+internal fun conversationShortcutPrunePlan(
+    dynamicShortcutIds: Set<String>,
+    manifestShortcutCount: Int,
+    maxShortcuts: Int,
+    shortcutId: String,
+    protectedShortcutIds: Set<String>,
+    lastUsed: Map<String, Long>,
+): List<String>? {
+    val removeCount =
+        conversationShortcutPruneCount(dynamicShortcutIds, manifestShortcutCount, maxShortcuts, shortcutId)
+    if (removeCount <= 0) return emptyList()
+    val removable =
+        dynamicShortcutIds.filterTo(mutableSetOf()) {
+            it.startsWith(CONVERSATION_SHORTCUT_PREFIX) && it !in protectedShortcutIds
+        }
+    return conversationShortcutRemovalOrder(removable, lastUsed, shortcutId)
+        .take(removeCount)
+        .takeIf { it.size == removeCount }
+}
+
 internal data class ConversationShortcutCleanupPlan(
     val dynamicIds: List<String>,
     val longLivedIds: List<String>,

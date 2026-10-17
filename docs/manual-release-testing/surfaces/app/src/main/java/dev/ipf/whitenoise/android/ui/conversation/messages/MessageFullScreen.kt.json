@@ -1,0 +1,115 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+  "legacy_sha256": "e7b5c134666f3a55c042067a89adf06698df317ee248cb6115ec32f0159fe001",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: MessageFullScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "MessageFullScreenBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "fun MessageFullScreenBody(",
+        "test_ids": [
+          "MSG-013"
+        ]
+      },
+      {
+        "surface": "MessageFullScreenView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "fun MessageFullScreenView(",
+        "test_ids": [
+          "MSG-013",
+          "MSG-026"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.copy_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "R.string.copy_text",
+        "test_ids": [
+          "MSG-002",
+          "MSG-004",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "R.string.delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "R.string.delete",
+        "test_ids": [
+          "MSG-002",
+          "MSG-004",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "R.string.message_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "R.string.message_actions",
+        "test_ids": [
+          "MSG-002",
+          "MSG-004",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "R.string.message_react",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "R.string.message_react",
+        "test_ids": [
+          "MSG-002",
+          "MSG-004",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "R.string.reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "R.string.reply",
+        "test_ids": [
+          "MSG-002",
+          "MSG-004",
+          "MSG-009"
+        ]
+      },
+      {
+        "surface": "Bounded reader viewport during native edge drags",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "internal const val MESSAGE_FULL_SCREEN_VIEWPORT_TAG",
+        "test_ids": [
+          "MSG-026"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: MessageFullScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "MSG-002",
+          "MSG-004",
+          "MSG-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

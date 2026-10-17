@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,6 +39,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -124,6 +128,74 @@ class NotificationMessageRouteExactReadNavigationTest {
     }
 
     /**
+     * A newer tap for another message replaces the pending one while its exact read is still held. The newer read
+     * opens the conversation and is acknowledged once. Releasing the retired read afterwards must neither consume
+     * nor reopen anything, so the selection keeps the newer request's open context (#3309).
+     */
+    @Test
+    fun aHeldExactReadReleasedAfterANewerTapNeitherConsumesNorReopensIt() {
+        val firstReadStarted = CountDownLatch(1)
+        val releaseRetiredReads = CountDownLatch(1)
+        // Chat-list updates can re-run the older request's pass, so every read it starts is held, not just the first.
+        val holdReads = AtomicBoolean(true)
+        val exactReads = AtomicInteger(0)
+        val appState =
+            appState(
+                fakeMarmot(RowAnswer.FOUND, exactReads) {
+                    if (holdReads.get()) {
+                        firstReadStarted.countDown()
+                        val released = releaseRetiredReads.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+                        check(released) { "the retired reads were never released" }
+                    }
+                },
+            )
+        val holder = MainShellStateHolder(appState, SavedStateHandle())
+        val inbound = mutableStateOf<NotificationTarget?>(messageTarget())
+        val requestId = mutableLongStateOf(REQUEST_ID)
+        val handled = CopyOnWriteArrayList<Pair<Long, String?>>()
+        appState.setAppInForeground(true)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MainShell(
+                    appState = appState,
+                    stateHolder = holder,
+                    inboundNotificationTarget = inbound.value,
+                    inboundNotificationRequestId = requestId.longValue,
+                    onNotificationTargetHandled = { target, handledRequestId ->
+                        handled += handledRequestId to target.messageIdHex
+                        if (handledRequestId == requestId.longValue) inbound.value = null
+                    },
+                )
+            }
+        }
+        try {
+            check(firstReadStarted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) { "the first read never ran" }
+            composeRule.runOnIdle {
+                holdReads.set(false)
+                inbound.value = messageTarget().copy(messageIdHex = NEWEST_ID)
+                requestId.longValue = REQUEST_ID + 1L
+            }
+            awaitCondition("the newer tap was never consumed") { handled.isNotEmpty() }
+            val openedContext = holder.selectedChatOpenContext.value
+
+            releaseRetiredReads.countDown()
+            repeat(SETTLE_POLLS) {
+                composeRule.waitForIdle()
+                Thread.sleep(POLL_MILLIS)
+            }
+
+            assertEquals(listOf((REQUEST_ID + 1L) to NEWEST_ID), handled.toList())
+            assertEquals(openedContext, holder.selectedChatOpenContext.value)
+            assertEquals(REQUEST_ID + 1L, openedContext.notificationRouteTraceRequestId)
+            assertEquals(NEWEST_ID, openedContext.notificationTarget?.messageIdHex)
+            assertNull("a retired read must not present anything", appState.toast)
+        } finally {
+            releaseRetiredReads.countDown()
+            composeRule.runOnIdle { holder.release() }
+        }
+    }
+
+    /**
      * Renders MainShell over a ready, empty chat list with one pending message notification. With
      * [withHolder] the shell shares a state holder the test can read the committed open context from.
      */
@@ -193,11 +265,15 @@ class NotificationMessageRouteExactReadNavigationTest {
         throw AssertionError(failureMessage)
     }
 
-    /** An engine whose broad list is empty and whose per-group read answers as the case requires. */
+    /**
+     * An engine whose broad list is empty and whose per-group read answers as the case requires. [beforeRead] runs
+     * on the read's worker thread first, so a case can hold reads there.
+     */
     @Suppress("CyclomaticComplexMethod")
     private fun fakeMarmot(
         answer: RowAnswer,
         exactReads: AtomicInteger,
+        beforeRead: () -> Unit = {},
     ): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -216,6 +292,7 @@ class NotificationMessageRouteExactReadNavigationTest {
                 "subscribeBlockedUsers" -> MarmotWindowTestFakes.blockList()
                 "chatListRow" -> {
                     exactReads.incrementAndGet()
+                    beforeRead()
                     when (answer) {
                         RowAnswer.FOUND -> chatListRow()
                         RowAnswer.MISSING -> throw NoSuchElementException("no such chat-list row")
@@ -308,6 +385,7 @@ class NotificationMessageRouteExactReadNavigationTest {
         const val REQUEST_ID = 41L
         const val ROUTE_TIMEOUT_MILLIS = 10_000L
         const val POLL_MILLIS = 20L
+        const val SETTLE_POLLS = 25
         val ACCOUNT_ID = "aa".repeat(32)
         val GROUP_ID = "bb".repeat(32)
         val MESSAGE_ID = NotificationScenario.NOTIFIED_ID
