@@ -178,6 +178,12 @@ def qualify_presentation(case, verified):
             or (not observing and observed.get('observationOnly') is True)):
         raise ValueError('Production presentation dispatch was not verified')
     scenario = case['presentation']
+    if scenario in {f'modal-translation-{suffix}' for suffix in ('missing', 'unverified', 'detection', 'model', 'engine')}:
+        acquisition = observed.get('translationAcquisition')
+        if (not isinstance(acquisition, dict) or acquisition.get('enginePackageAbsent') is not True
+                or acquisition.get('package') != 'dev.davidv.translator'
+                or acquisition.get('acquisitionRoute') != 'GITHUB_RELEASE'):
+            raise ValueError('Actual native translation acquisition prerequisites were not retained')
     if scenario == 'nostr-image-failure' and (
             type(observed.get('nostrImageLoads')) is not int or observed['nostrImageLoads'] != 2):
         raise ValueError('Image Retry did not verify exactly two loader requests')

@@ -13,6 +13,8 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.ui.group.GroupDetailsConfirmationKind
+import dev.ipf.whitenoise.android.ui.group.groupActionMemberHex
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -98,6 +100,15 @@ class ConversationControllerAccountPinningTest {
             )
 
         assertEquals(TARGET_ID, controller.boundAccountIdHex)
+        listOf(
+            GroupDetailsConfirmationKind.StepDown,
+            GroupDetailsConfirmationKind.StepDownSoleAdmin,
+            GroupDetailsConfirmationKind.Leave,
+            GroupDetailsConfirmationKind.LeaveSoleMember,
+            GroupDetailsConfirmationKind.BlockedLeave,
+        ).forEach { kind ->
+            assertEquals(TARGET_ID, groupActionMemberHex(kind, controller.boundAccountIdHex, PREVIOUS_ID))
+        }
     }
 
     @Test
@@ -111,6 +122,15 @@ class ConversationControllerAccountPinningTest {
 
         assertEquals("vanished-account", controller.boundAccountRef)
         assertEquals(null, controller.boundAccountIdHex)
+        listOf(
+            GroupDetailsConfirmationKind.StepDown,
+            GroupDetailsConfirmationKind.StepDownSoleAdmin,
+            GroupDetailsConfirmationKind.Leave,
+            GroupDetailsConfirmationKind.LeaveSoleMember,
+            GroupDetailsConfirmationKind.BlockedLeave,
+        ).forEach { kind ->
+            assertEquals(null, groupActionMemberHex(kind, controller.boundAccountIdHex, PREVIOUS_ID))
+        }
     }
 
     @Test

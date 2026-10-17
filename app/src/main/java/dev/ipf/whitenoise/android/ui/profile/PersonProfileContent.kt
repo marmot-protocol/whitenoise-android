@@ -41,6 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
+import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -95,8 +97,10 @@ internal fun PersonProfileContent(
     sharedAvatars: @Composable () -> Unit = {},
     error: @Composable () -> Unit = {},
     adminActions: @Composable () -> Unit = {},
+    startingAs: StartingAccount? = null,
 ) {
     SettingsScaffold(
+        topBarActions = { StartingAccountIndicator(startingAs) },
         title = stringResource(R.string.person_profile_title),
         onBack = onBack,
         bottomBar = {

@@ -9,15 +9,20 @@ name: presentation-surface-review-confirm
 - assertVisible:
     text: Fixture confirm
 - assertVisible:
-    text: "Maestro Bob, Member"
-- assertNotVisible:
-    text: Admin
-- tapOn: "Maestro Bob, Member"
+    text: Admin, Maestro Bob
+    checked: false
+- tapOn: Admin, Maestro Bob
 - assertVisible:
-    text: Admin
-- tapOn: Admin
+    text: Admin, Maestro Bob
+    checked: true
+- tapOn: Admin, Maestro Bob
 - assertVisible:
-    text: "Maestro Bob, Admin"
+    text: Admin, Maestro Bob
+    checked: false
+- tapOn: Admin, Maestro Bob
+- assertVisible:
+    text: Admin, Maestro Bob
+    checked: true
 - tapOn: Fixture confirm
 - assertVisible:
     id: presentation.complete

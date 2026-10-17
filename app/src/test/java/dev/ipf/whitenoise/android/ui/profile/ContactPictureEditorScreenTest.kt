@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.profile
 
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -60,6 +61,7 @@ class ContactPictureEditorScreenTest {
                     "Local note",
                     {},
                     { _, _ -> saved++ },
+                    viewportInsets = WindowInsets(0),
                     pictureState = ContactPictureEditorState(hasPicture = true),
                     onPickPicture = { picked++ },
                     onRepositionPicture = { cropped++ },
@@ -84,6 +86,7 @@ class ContactPictureEditorScreenTest {
                     "",
                     {},
                     { _, _ -> },
+                    viewportInsets = WindowInsets(0),
                     pictureState = ContactPictureEditorState(busy = true),
                 )
             }
@@ -114,6 +117,7 @@ class ContactPictureEditorScreenTest {
                         "Met at the Android meetup",
                         {},
                         { _, _ -> },
+                        viewportInsets = WindowInsets(0),
                         pictureState =
                             ContactPictureEditorState(
                                 hasPicture = picture,

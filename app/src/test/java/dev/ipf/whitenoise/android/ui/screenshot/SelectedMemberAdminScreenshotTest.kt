@@ -1,10 +1,11 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.isPopup
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -48,7 +49,8 @@ class SelectedMemberAdminScreenshotTest {
     @Config(qualifiers = "ar-rEG-ldrtl-w320dp-h1280dp-mdpi")
     fun mixedRolesLargeRtl() = capture("invite_roles_large_rtl", rtl = true)
 
-    @Test fun roleMenuShowsFullIdentity() = capture("invite_roles_menu", menu = true)
+    /** Toggling a privilege keeps the public review identity visible and changes only that person. */
+    @Test fun roleControlKeepsIdentityVisible() = capture("invite_roles_control", toggle = true)
 
     private fun capture(
         name: String,
@@ -56,7 +58,7 @@ class SelectedMemberAdminScreenshotTest {
         amoled: Boolean = false,
         busy: Boolean = false,
         rtl: Boolean = false,
-        menu: Boolean = false,
+        toggle: Boolean = false,
     ) {
         val people =
             listOf(
@@ -71,6 +73,7 @@ class SelectedMemberAdminScreenshotTest {
                     "npub1hwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwamhwasxw04hu",
                 ),
             )
+        val roles = mutableStateListOf(people.first().accountIdHex)
         val state =
             WhiteNoiseAppState(
                 context = ApplicationProvider.getApplicationContext<android.content.Context>(),
@@ -92,20 +95,24 @@ class SelectedMemberAdminScreenshotTest {
                         onConfirm = {},
                         confirmIcon = Icons.Default.Check,
                         confirmLabel = stringResource(R.string.add_member),
-                        initialAdminIds = setOf(people.first().accountIdHex),
-                        onInitialAdminChange = { _, _ -> },
+                        initialAdminIds = roles.toSet(),
+                        onInitialAdminChange = { member, admin ->
+                            roles.remove(member.accountIdHex)
+                            if (admin) roles.add(member.accountIdHex)
+                        },
                     )
                 }
             }
         }
-        if (menu) {
+        if (toggle) {
             val adminLabel =
                 ApplicationProvider.getApplicationContext<android.content.Context>().getString(R.string.admin)
-            composeRule.onNodeWithContentDescription("${people.first().displayName}, $adminLabel").performClick()
+            composeRule.onNodeWithContentDescription("$adminLabel, ${people.first().displayName}").performClick()
             composeRule.mainClock.advanceTimeBy(500)
             composeRule.waitForIdle()
-            composeRule.onNodeWithText(people.first().npub).assertIsDisplayed()
-            composeRule.onNode(isPopup()).captureRoboImage("src/test/snapshots/$name.png")
+            composeRule.onNodeWithContentDescription("$adminLabel, ${people.first().displayName}").assertIsOff()
+            composeRule.onNodeWithText(people.first().displayName).assertIsDisplayed()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
         } else {
             composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
         }

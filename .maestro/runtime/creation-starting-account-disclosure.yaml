@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: creation-starting-account-disclosure
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "New Message"
+- assertVisible:
+    id: "new_message.screen"
+- tapOn:
+    id: "creation.starting_account"
+- assertVisible:
+    id: "creation.starting_account.disclosure"
+- assertVisible: "Starting as Maestro Alice"
+- back
+- assertNotVisible:
+    id: "creation.starting_account.disclosure"
+- assertVisible:
+    id: "new_message.screen"
+- back
+- assertVisible: "Maestro group"

@@ -255,6 +255,8 @@
     </plurals>
     <string name="scan_qr_code">Scan QR Code</string>
     <string name="show_my_qr_code">Show my QR code</string>
+    <string name="starting_as">Starting as</string>
+    <string name="starting_as_account">Starting as %1$s</string>
     <string name="new_group">New Group</string>
     <string name="invite">Invite</string>
     <string name="new_chat">New Chat</string>

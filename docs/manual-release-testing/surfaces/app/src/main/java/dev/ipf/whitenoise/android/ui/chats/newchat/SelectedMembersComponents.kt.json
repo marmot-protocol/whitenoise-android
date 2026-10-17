@@ -32,8 +32,8 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
-        "surface": "R.string.member",
-        "anchor": "R.string.member",
+        "surface": "Accessible admin switch state",
+        "anchor": "role = Role.Switch",
         "test_ids": [
           "GRP-030"
         ]
@@ -73,11 +73,19 @@
         ]
       },
       {
-        "surface": "SelectedMemberRoleMenu",
+        "surface": "SelectedMemberRoleControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
-        "anchor": "fun SelectedMemberRoleMenu(",
+        "anchor": "fun SelectedMemberRoleControl(",
         "test_ids": [
           "GRP-030"
+        ]
+      },
+      {
+        "surface": "SelectedMembersReviewScreen UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "fun SelectedMembersReviewScreen(",
+        "test_ids": [
+          "NCH-002"
         ]
       }
     ]

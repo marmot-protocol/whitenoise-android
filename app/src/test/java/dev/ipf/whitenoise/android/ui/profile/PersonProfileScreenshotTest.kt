@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -63,7 +65,14 @@ class PersonProfileScreenshotTest {
     @Test fun privateDetails() {
         composeRule.setContent {
             WhiteNoiseTheme {
-                ContactPrivateDetailsDialog("Public name", "Local nickname", "Private local note", {}, { _, _ -> })
+                ContactPrivateDetailsDialog(
+                    "Public name",
+                    "Local nickname",
+                    "Private local note",
+                    {},
+                    { _, _ -> },
+                    viewportInsets = WindowInsets(0),
+                )
             }
         }
         capture("private_details")
@@ -87,21 +96,28 @@ class PersonProfileScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = scale) {
                     PersonProfileContent(
-                        PersonProfilePresentation(
-                            "Alice",
-                            "Alice",
-                            "public-person",
-                            null,
-                            null,
-                            false,
-                            "Building useful things with friends.",
-                            "npub1" + "a".repeat(58),
-                            "alice@example.com",
-                            true,
-                            "alice@example.com",
-                            true,
-                            self,
-                        ),
+                        startingAs =
+                            if (self) {
+                                null
+                            } else {
+                                StartingAccount("a".repeat(64), "Carol", null, "npub1carol")
+                            },
+                        person =
+                            PersonProfilePresentation(
+                                "Alice",
+                                "Alice",
+                                "public-person",
+                                null,
+                                null,
+                                false,
+                                "Building useful things with friends.",
+                                "npub1" + "a".repeat(58),
+                                "alice@example.com",
+                                true,
+                                "alice@example.com",
+                                true,
+                                self,
+                            ),
                         scroll = rememberScrollState(),
                         follow = follow,
                         busy = busy,

@@ -8,10 +8,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMemberReviewPair
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.conversation.media.GroupPictureFailureDialog
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsConfirmation
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsConfirmationKind
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsConfirmationState
+import dev.ipf.whitenoise.android.ui.group.groupActionMemberHex
 
 /** All production group-detail confirmation shapes; bounded callbacks never alter group membership. */
 @Composable
@@ -34,7 +38,27 @@ internal fun MaestroGroupConfirmationPresentation(fixture: MaestroPresentationFi
             fixture.finish("confirm-${kind.name.lowercase()}")
         }
         val model = maestroGroupConfirmationState(kind, confirm)
+        val memberHex =
+            checkNotNull(
+                groupActionMemberHex(
+                    kind,
+                    checkNotNull(fixture.appState.activeAccount?.accountIdHex),
+                    fixture.peerAccountIdHex,
+                ),
+            )
         GroupDetailsConfirmation(
+            identity = {
+                GroupMemberReviewPair(
+                    appState = fixture.appState,
+                    group = MemberReviewGroup("fixture-confirmation-group", "Fixture confirmation group"),
+                    member =
+                        RecipientSearch.Candidate(
+                            memberHex,
+                            "",
+                            fixture.appState.npubForDisplay(memberHex),
+                        ),
+                )
+            },
             model = model,
             onDismiss = {
                 fixture.record("group-confirm-dismiss")

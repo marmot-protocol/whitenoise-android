@@ -22,6 +22,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
+import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -52,8 +54,10 @@ internal fun NewGroupRecipientContent(
     actions: NewGroupRecipientActions,
     isValidNpub: (String) -> Boolean,
     addressLookupFailed: Boolean = false,
+    startingAs: StartingAccount? = null,
 ) {
     SettingsScaffold(
+        topBarActions = { StartingAccountIndicator(startingAs) },
         title = stringResource(R.string.new_group),
         onBack = actions.back,
         modifier = Modifier.imePadding().testTag("new_group.screen"),

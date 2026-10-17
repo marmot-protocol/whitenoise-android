@@ -57,9 +57,11 @@ internal class MaestroMessageTranslationState(
                 false
             }
         check(!installed) { "Translation recovery requires an absent Offline Translator package" }
-        check(offlineTranslatorRoute() == OfflineTranslatorRoute.GITHUB_RELEASE) {
+        val route = offlineTranslatorRoute()
+        check(route == OfflineTranslatorRoute.GITHUB_RELEASE) {
             "Translation recovery expects the reviewed GitHub acquisition route"
         }
+        fixture.recordTranslationAcquisition(enginePackageAbsent = !installed, acquisitionRoute = route)
         Log.i(
             "Maestro",
             "translation-precondition scenario=${fixture.scenario} " +

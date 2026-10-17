@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+  "legacy_sha256": "eded966e873bf01a1ce352752a2c64aaf37fb74f6143037d46b8b5e2f582403f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NewGroupRecipientAccountScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "fun NewGroupRecipientAccountScreen(",
+        "test_ids": [
+          "NCH-003",
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "NewGroupRecipientPickerScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "fun NewGroupRecipientPickerScreen(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "NewGroupRecipientAccountScreen UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "fun NewGroupRecipientAccountScreen(",
+        "test_ids": [
+          "NCH-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:user_search_address_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "R.string.user_search_address_result",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_identity_reference",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "R.string.error_invalid_identity_reference",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:error_qr_not_valid_npub_or_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "R.string.error_qr_not_valid_npub_or_public_key",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:group_continue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "R.string.group_continue",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:user_search_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "R.string.user_search_result",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:user_search_you_follow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "R.string.user_search_you_follow",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

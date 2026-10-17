@@ -497,26 +497,6 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
-      "symbol": "SelectedMemberRoleMenu",
-      "bindings": [
-        {
-          "case": "presentation-surface-review-confirm",
-          "selector": {
-            "text": "Admin"
-          },
-          "scope": "Open the selected member role menu, choose Admin, assert the updated role and confirm the exact candidate callback.",
-          "entry_assertion": {
-            "text": "Admin"
-          },
-          "opened_by": {
-            "text": "Maestro Bob, Member"
-          }
-        }
-      ],
-      "remaining": "Relay-backed group creation and invitation role persistence require native device cases; this fixture verifies the production menu and callback."
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
       "symbol": "SelectedMembersReviewScreen",
       "bindings": [
         {
@@ -2850,25 +2830,6 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-      "symbol": "ProfileAddToGroupsSheet",
-      "bindings": [
-        {
-          "case": "profiles-add-group-back",
-          "selector": {
-            "text": "Add Maestro Bob to groups"
-          },
-          "scope": "Bob private profile group picker opens and cancels, without adding membership.",
-          "opened_by": {
-            "text": "Add to a group"
-          },
-          "entry_assertion": {
-            "text": "Add Maestro Bob to groups"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
       "symbol": "ProfileSheet",
       "bindings": [
         {
@@ -5168,19 +5129,57 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-      "symbol": "ProfileAddToGroupsContent",
+      "symbol": "ProfileAddToGroupsScreen",
       "bindings": [
         {
           "case": "profiles-add-group-back",
           "selector": {
             "text": "Add Maestro Bob to groups"
           },
-          "scope": "Actual member-profile Add to a group sheet and content entered through owning native group, then backed out without membership mutation.",
+          "scope": "The production profile Add-to-group full-screen route opens and Back restores the profile. This case does not verify keyboard insets, list selection or native invitations.",
           "opened_by": {
             "text": "Add to a group"
           },
           "entry_assertion": {
             "text": "Add Maestro Bob to groups"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+      "symbol": "GroupMembersReviewDialog",
+      "bindings": [
+        {
+          "case": "presentation-surface-contact-group-selected",
+          "selector": {
+            "id": "group.members.review.dialog"
+          },
+          "scope": "Production picker opens the real destination/member review dialog; Cancel and Back preserve selection, then exact bounded confirmation is checked. Controlled destination; no native invitation or admin-role mutation credit.",
+          "opened_by": {
+            "text": "Fixture next"
+          },
+          "entry_assertion": {
+            "id": "group.members.review.dialog"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/StartingAccountIndicator.kt",
+      "symbol": "StartingAccountIndicator",
+      "bindings": [
+        {
+          "case": "creation-starting-account-disclosure",
+          "selector": {
+            "id": "creation.starting_account.disclosure"
+          },
+          "scope": "The actual starting-account menu displays the active generated account name and dismisses without leaving the recipient screen. Account/runtime changes are separately qualified.",
+          "opened_by": {
+            "id": "creation.starting_account"
+          },
+          "entry_assertion": {
+            "id": "creation.starting_account.disclosure"
           }
         }
       ]

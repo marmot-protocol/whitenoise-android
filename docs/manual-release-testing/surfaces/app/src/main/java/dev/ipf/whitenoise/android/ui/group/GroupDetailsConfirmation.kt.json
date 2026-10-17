@@ -485,6 +485,16 @@
           "GRP-001",
           "GRP-008"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsConfirmation.kt",
+        "surface": "R.string.member",
+        "anchor": "R.string.member",
+        "test_ids": [
+          "GRP-001",
+          "GRP-008",
+          "GRP-009"
+        ]
       }
     ]
   },

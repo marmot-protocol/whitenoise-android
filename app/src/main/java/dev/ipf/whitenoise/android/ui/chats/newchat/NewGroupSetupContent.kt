@@ -36,6 +36,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
+import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -87,8 +89,10 @@ internal fun NewGroupSetupContent(
     state: NewGroupSetupPresentation,
     actions: NewGroupSetupActions,
     photoMenu: @Composable () -> Unit = {},
+    startingAs: StartingAccount? = null,
 ) {
     SettingsScaffold(
+        topBarActions = { StartingAccountIndicator(startingAs) },
         title = stringResource(R.string.group_setup_title),
         onBack = { if (!state.busy) actions.back() },
         modifier = Modifier.imePadding().testTag("group_setup.screen"),
