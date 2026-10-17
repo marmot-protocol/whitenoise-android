@@ -10,7 +10,8 @@ import org.json.JSONObject
 /**
  * How wide a WorkManager network constraint is, for the constraints automatic work uses: [NetworkType.CONNECTED]
  * admits any network, [NetworkType.NOT_ROAMING] drops roaming, and [NetworkType.UNMETERED] admits only unmetered
- * ones. A smaller rank is wider.
+ * ones. A smaller rank is wider, except that [NetworkType.NOT_ROAMING] and [NetworkType.UNMETERED] are not
+ * ordered — each admits a network the other refuses, a metered home network or an unmetered roaming one.
  */
 internal fun NetworkType.automaticWidthRank(): Int =
     when (this) {
@@ -20,11 +21,14 @@ internal fun NetworkType.automaticWidthRank(): Int =
         else -> 0
     }
 
-/** Whether [requested] admits more networks than this constraint does. */
-internal fun NetworkType.isNarrowerThan(requested: NetworkType): Boolean {
-    val requestedRank = requested.automaticWidthRank()
-    return requestedRank < automaticWidthRank()
-}
+/**
+ * Whether [requested] admits a network this constraint refuses, so work waiting on this one should take it.
+ * [NetworkType.UNMETERED] admits unmetered roaming networks that [NetworkType.NOT_ROAMING] refuses, so it counts
+ * here too, just as [NetworkType.NOT_ROAMING] does over [NetworkType.UNMETERED] by rank.
+ */
+internal fun NetworkType.isNarrowerThan(requested: NetworkType): Boolean =
+    requested.automaticWidthRank() < automaticWidthRank() ||
+        (this == NetworkType.NOT_ROAMING && requested == NetworkType.UNMETERED)
 
 /**
  * Automatic downloads queued on a network narrower than [NetworkType.CONNECTED], so a policy that later allows
