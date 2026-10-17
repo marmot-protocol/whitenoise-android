@@ -102,6 +102,7 @@ import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
+import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -619,7 +620,7 @@ internal fun GroupDetailsScreen(
             abandonment.open(
                 GroupAbandonmentTarget(
                     accountRef = account,
-                    accountName = activeAccountIdHex?.let(appState::accountDisplayNameCached) ?: account,
+                    accountName = abandonmentAccountName(appState, account),
                     groupIdHex = controller.group.groupIdHex,
                     conversationTitle = conversationTitle,
                     isDm = isDm,
@@ -1107,6 +1108,7 @@ internal fun GroupDetailsScreen(
                     GroupSoleAdminLeaveDialog(
                         groupName = confirm.groupName,
                         isDm = isDm,
+                        identity = identity,
                         onAbandon = {
                             pendingConfirm = null
                             requestAbandonment()
@@ -1139,7 +1141,8 @@ internal fun GroupDetailsScreen(
 
         abandonment.target?.let { target ->
             GroupAbandonmentDialog(
-                target = target,
+                // The acting account's name resolves while the review shows, as the group-action identity does.
+                target = target.copy(accountName = abandonmentAccountName(appState, target.accountRef)),
                 status =
                     when {
                         activeMutation?.action == GroupMutationAction.Reset -> GroupAbandonmentStatus.Running
@@ -2137,7 +2140,7 @@ internal fun GroupDetailsScreen(
                         readOnlyInvite = readOnlyInvite,
                         isSelfMember = controller.isSelfMember && !disbanded,
                         membersVerified = controller.membersVerified || disbanded,
-                        enabled = !mutationsBlocked,
+                        enabled = !mutationsBlocked && (isDm || actingMemberHex != null),
                         inProgress = activeMutation?.action == GroupMutationAction.Delete,
                         onDeleteConfirmed = {
                             runGroupMutation(
@@ -2148,7 +2151,6 @@ internal fun GroupDetailsScreen(
                         },
                     )
                     GroupDetailsResetControl(
-                        identity = ownIdentity,
                         isDm = isDm,
                         offered = controller.group.offersLocalAbandonment(),
                         enabled = !mutationsBlocked,

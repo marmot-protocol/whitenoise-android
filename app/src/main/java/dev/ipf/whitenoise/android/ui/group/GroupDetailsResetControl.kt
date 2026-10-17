@@ -313,7 +313,8 @@ internal fun GroupLeaveBlockedNotice(
 /**
  * The You're the only admin gate when no member can receive admin, the fallback of the transfer-then-leave route.
  * Cancel only dismisses, and the error-coloured action opens the reviewed abandonment, which the body names as the
- * way out on this device (#3310).
+ * way out on this device (#3310). [identity] names the acting account below that guidance, as every group
+ * action does (#3282).
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -322,6 +323,7 @@ internal fun GroupSoleAdminLeaveDialog(
     isDm: Boolean,
     onAbandon: () -> Unit,
     onDismiss: () -> Unit,
+    identity: (@Composable () -> Unit)? = null,
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
@@ -338,6 +340,7 @@ internal fun GroupSoleAdminLeaveDialog(
                         if (isDm) R.string.sole_admin_abandon_hint_dm else R.string.sole_admin_abandon_hint_group,
                     ),
                 )
+                identity?.invoke()
             }
         },
         confirmButton = {

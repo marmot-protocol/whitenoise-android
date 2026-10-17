@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.abandonChatFromList
 import dev.ipf.whitenoise.android.state.isNonMember
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
+import dev.ipf.whitenoise.android.ui.chats.newchat.reviewMemberPublicName
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentDialog
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentStatus
 import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
@@ -67,14 +68,19 @@ internal class PendingChatAbandonment private constructor(
 
 /**
  * The acting account a confirmation names, resolved from the captured [account] reference rather than whichever
- * account is active now: its cached display name, else the reference itself.
+ * account is active now: its public profile name, as the group-action identity shows it (#3282), else its cached
+ * display name, else the reference itself.
  */
 internal fun abandonmentAccountName(
     appState: WhiteNoiseAppState,
     account: String,
 ): String {
-    val accountIdHex = appState.accounts.firstOrNull { it.label == account }?.accountIdHex
-    return accountIdHex?.let(appState::accountDisplayNameCached) ?: account
+    val accountIdHex = appState.accounts.firstOrNull { it.label == account }?.accountIdHex ?: return account
+    // Requests a missing profile and observes its arrival, so a review composed before it loads updates in place.
+    val profile = appState.userProfile(accountIdHex)
+    return reviewMemberPublicName(profile?.name)
+        ?: reviewMemberPublicName(profile?.displayName)
+        ?: appState.accountDisplayNameCached(accountIdHex)
 }
 
 /**
