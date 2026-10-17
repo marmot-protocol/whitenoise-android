@@ -6,8 +6,10 @@ import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** Why MDK refused a group change in a way the user may override for one attempt (#3289). */
 internal enum class GroupChangeCaution {
@@ -100,13 +102,16 @@ internal class GroupChangeConfirmations {
  * again before the acknowledgement, so no other change can spend that one-attempt acknowledgement before the retry.
  * MDK checks the retried change against the group as it is then.
  *
- * The question belongs to [accountRef] in the current runtime. Continue counts only while both are still current, so
- * an answer given after switching accounts never changes the previous account's group.
+ * The question belongs to [accountRef] in the current runtime. When that account is not the active one the question
+ * cannot be shown, so the refusal is reported as an ordinary failure. Continue counts only while the account and
+ * runtime are still current and [stillWanted] still holds, so an answer given after switching accounts, or after the
+ * change stopped applying, never acknowledges anything.
  */
 internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
     accountRef: String,
     groupIdHex: String,
     invite: Boolean = false,
+    stillWanted: () -> Boolean = { true },
     change: suspend () -> T,
 ): T =
     withGroupCommitLockHeld(accountRef, groupIdHex) {
@@ -114,11 +119,14 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
             ask = { caution ->
                 val title = chatTitle(accountRef, groupIdHex)
                 val target = GroupChangeTarget(accountRef, groupIdHex, runtimeGeneration, title)
-                val proceed =
-                    outsideGroupCommitLock(accountRef, groupIdHex) {
+                when {
+                    !ownsGroupChange(target) -> GroupChangeAnswer.Unavailable
+                    !outsideGroupCommitLock(accountRef, groupIdHex) {
                         groupChangeConfirmations.ask(caution, invite, target)
-                    }
-                proceed && ownsGroupChange(target)
+                    } -> GroupChangeAnswer.Wait
+                    !ownsGroupChange(target) || !stillWanted() -> GroupChangeAnswer.Wait
+                    else -> GroupChangeAnswer.Continue
+                }
             },
             acknowledge = { caution ->
                 marmotIo {
@@ -128,6 +136,14 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
                     }
                 }
             },
+            // MDK checks catching up first, so an owed commit's refusal hides behind it until the retry.
+            hiddenBehind = { caution ->
+                val owed =
+                    caution == GroupChangeCaution.CatchingUp &&
+                        runCatchingCancellable { marmotIo { groupCommitDelivery(accountRef, groupIdHex) } }
+                            .getOrNull() != null
+                if (owed) listOf(GroupChangeCaution.Undelivered) else emptyList()
+            },
             change = change,
         )
     }
@@ -136,28 +152,66 @@ internal suspend fun <T> WhiteNoiseAppState.runGroupChange(
 internal fun WhiteNoiseAppState.ownsGroupChange(target: GroupChangeTarget): Boolean =
     activeAccountRef == target.accountRef && runtimeGeneration == target.runtimeGeneration
 
+/** What became of one group-change question. */
+internal enum class GroupChangeAnswer {
+    /** The user accepted the risk for this one attempt. */
+    Continue,
+
+    /** The user chose to wait, or the change stopped applying; nothing is acknowledged. */
+    Wait,
+
+    /** The question could not be asked for this account, so the refusal is an ordinary failure. */
+    Unavailable,
+}
+
 /**
  * Runs [change], and after each overridable refusal [ask]s the user and, if they continue, [acknowledge]s that caution
  * and retries. A change can need both acknowledgements, and each is asked at most once per run, so the same refusal
  * again is rethrown as an ordinary failure. Waiting ends the change with a [GroupChangeDeclinedException] carrying
- * the refusal; any other failure is rethrown unchanged.
+ * the refusal; a question that could not be asked rethrows the refusal; any other failure is rethrown unchanged.
+ *
+ * MDK keeps an acknowledgement until an attempt spends it, even when the other caution then refuses that attempt. So
+ * every caution the attempt will meet, including those [hiddenBehind] the reported one, is asked about before any is
+ * acknowledged: a Wait at any question leaves nothing acknowledged. Once the user continues, the acknowledgements and
+ * their retry run together even if the caller is cancelled meanwhile, so none is left for some later change.
  */
 internal suspend fun <T> admitGroupChange(
-    ask: suspend (GroupChangeCaution) -> Boolean,
+    ask: suspend (GroupChangeCaution) -> GroupChangeAnswer,
     acknowledge: suspend (GroupChangeCaution) -> Unit,
+    hiddenBehind: suspend (GroupChangeCaution) -> List<GroupChangeCaution> = { emptyList() },
     change: suspend () -> T,
 ): T {
     val asked = mutableSetOf<GroupChangeCaution>()
+    var consented = emptyList<GroupChangeCaution>()
     while (true) {
         val refusal =
             try {
-                return change()
+                val admitted = consented
+                return if (admitted.isEmpty()) {
+                    change()
+                } else {
+                    withContext(NonCancellable) {
+                        admitted.forEach { acknowledge(it) }
+                        change()
+                    }
+                }
             } catch (refused: MarmotKitException) {
                 refused
             }
         val caution = refusal.groupChangeCaution()
         if (caution == null || !asked.add(caution)) throw refusal
-        if (!ask(caution)) throw GroupChangeDeclinedException(refusal)
-        acknowledge(caution)
+        val needed = listOf(caution) + hiddenBehind(caution).filter { asked.add(it) }
+        consented = needed.map { each -> ask(each).consentTo(each, refusal) }
     }
 }
+
+/** The caution this answer lets through, or the end of the change: quietly for Wait, as [refusal] when unavailable. */
+private fun GroupChangeAnswer.consentTo(
+    caution: GroupChangeCaution,
+    refusal: MarmotKitException,
+): GroupChangeCaution =
+    when (this) {
+        GroupChangeAnswer.Continue -> caution
+        GroupChangeAnswer.Wait -> throw GroupChangeDeclinedException(refusal)
+        GroupChangeAnswer.Unavailable -> throw refusal
+    }

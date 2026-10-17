@@ -6,7 +6,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.intrinsics.startCoroutineUninterceptedOrReturn
+import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 
 /** A self-pruning set of mutexes keyed by an application-owned identifier. */
 internal class KeyedMutexPool {
@@ -33,7 +36,7 @@ internal class KeyedMutexPool {
         val entry = synchronized(entriesLock) { entries.getOrPut(key) { Entry() }.also { it.users += 1 } }
         try {
             val held = currentCoroutineContext()[Held]?.entries.orEmpty()
-            return entry.mutex.withLock { withContext(Held(held + entry)) { block() } }
+            return entry.mutex.withLock { withHeld(Held(held + entry), block) }
         } finally {
             synchronized(entriesLock) {
                 entry.users -= 1
@@ -67,10 +70,33 @@ internal class KeyedMutexPool {
         if (entry == null || entry !in held) return block()
         entry.mutex.unlock()
         try {
-            return withContext(Held(held - entry)) { block() }
+            return withHeld(Held(held - entry), block)
         } finally {
             withContext(NonCancellable) { entry.mutex.lock() }
         }
+    }
+
+    /**
+     * Runs [block] with [held] in its context but no child job of its own, so a block that finishes after its caller
+     * was cancelled still hands its result back, exactly as an unmarked lock body would.
+     */
+    private suspend fun <T> withHeld(
+        held: Held,
+        block: suspend () -> T,
+    ): T =
+        suspendCoroutineUninterceptedOrReturn { caller ->
+            block.startCoroutineUninterceptedOrReturn(HeldContinuation(caller, held))
+        }
+
+    /** Resumes [caller] directly, with [held] added to the context the block sees. */
+    private class HeldContinuation<T>(
+        private val caller: Continuation<T>,
+        held: Held,
+    ) : Continuation<T> {
+        override val context: CoroutineContext = caller.context + held
+
+        /** Hands the block's outcome straight to the caller. */
+        override fun resumeWith(result: Result<T>) = caller.resumeWith(result)
     }
 
     /** Forgets every entry nobody holds or waits for. */

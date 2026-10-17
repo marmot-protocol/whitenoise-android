@@ -101,6 +101,7 @@ class GroupChangeAdmissionCoverageTest {
                 "replaceEncryptedMediaBlobEndpoints",
                 "updateGroupAvatarUrl",
                 "updateGroupImage",
+                "clearGroupImage",
                 "updateGroupProfile",
             )
 

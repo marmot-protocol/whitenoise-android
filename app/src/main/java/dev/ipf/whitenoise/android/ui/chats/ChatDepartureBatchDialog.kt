@@ -112,6 +112,7 @@ internal fun ChatDepartureBatchDialog(
                                 removeChatDepartureTarget(target, successor, controller, ui, isCurrent)
                             },
                             onProgress = { title, completed, total -> ui.progress = "$completed / $total · $title" },
+                            questionOpen = { appState.groupChangeConfirmations.pending != null },
                         ),
                     )
                 if (isCurrent()) ui.result = result

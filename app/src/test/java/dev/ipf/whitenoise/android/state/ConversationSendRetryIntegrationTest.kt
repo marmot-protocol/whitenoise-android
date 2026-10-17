@@ -3091,6 +3091,52 @@ class ConversationSendRetryIntegrationTest {
             )
         }
 
+    /** A message MDK refuses to edit gets its original text back, says why, and offers no Retry that cannot work. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun aMessageMdkWillNotEditGetsItsOriginalTextBack() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val releaseOriginal = CompletableDeferred<Unit>()
+            val refused = CompletableDeferred<Unit>()
+            val state = appState()
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    textPublisher = { _, _, _, _ ->
+                        releaseOriginal.await()
+                        successfulSendSummary()
+                    },
+                    messageEditPublisher = { _, _, _, _ ->
+                        refused.complete(Unit)
+                        throw MarmotKitException.InvalidEditTarget()
+                    },
+                )
+            try {
+                controller.retryMembers()
+                val original = async(start = CoroutineStart.UNDISPATCHED) { controller.send("original") }
+                val pending = controller.timeline.single()
+                controller.beginMessageEdit(pending.record.messageIdHex)
+                controller.send("revision")
+                releaseOriginal.complete(Unit)
+                original.await()
+                withTimeout(5_000) { refused.await() }
+                runCurrent()
+
+                val shown = controller.timeline.single()
+                assertEquals("original", shown.record.plaintext)
+                assertEquals("a Retry that can never succeed was offered", MessageStatus.Sent, shown.status)
+                assertEquals(AppText.Resource(R.string.error_message_not_editable), state.toast?.detail)
+            } finally {
+                releaseOriginal.complete(Unit)
+                clearAndAwaitConversationTestFixture(controller)
+                Dispatchers.resetMain()
+            }
+        }
+
     /** A retry that publishes retires the failure notice its own first attempt raised (#2666). */
     @Test
     fun successfulRetryDismissesItsStaleFailureNotice() =

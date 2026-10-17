@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.group.groupChangeConfirmationText
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
@@ -78,6 +79,86 @@ class GroupChangeAdmissionTest {
             assertSame(second, failure)
             assertEquals(listOf(GroupChangeCaution.CatchingUp), asked)
             assertEquals(2, attempts.count)
+        }
+
+    /** A caution hidden behind the reported one is asked first, so waiting at it leaves nothing acknowledged. */
+    @Test
+    fun aHiddenCautionIsAskedBeforeAnythingIsAcknowledged() =
+        runTest {
+            val attempts = scripted(MarmotKitException.GroupCatchingUp(GROUP))
+            val answers =
+                mapOf(
+                    GroupChangeCaution.CatchingUp to GroupChangeAnswer.Continue,
+                    GroupChangeCaution.Undelivered to GroupChangeAnswer.Wait,
+                )
+
+            val failure = runCatching { admitHiding(answers, attempts) }.exceptionOrNull()
+
+            assertTrue("$failure", failure is GroupChangeDeclinedException)
+            assertEquals(listOf(GroupChangeCaution.CatchingUp, GroupChangeCaution.Undelivered), asked)
+            assertTrue("consent was spent before every question was answered", acknowledged.isEmpty())
+            assertEquals(1, attempts.count)
+        }
+
+    /** Continuing past both cautions acknowledges both, in MDK's checking order, before a single retry. */
+    @Test
+    fun continuingPastAHiddenCautionAcknowledgesBothBeforeOneRetry() =
+        runTest {
+            val attempts = scripted(MarmotKitException.GroupCatchingUp(GROUP))
+            val answers = GroupChangeCaution.entries.associateWith { GroupChangeAnswer.Continue }
+
+            assertEquals("done", admitHiding(answers, attempts))
+            val both = listOf(GroupChangeCaution.CatchingUp, GroupChangeCaution.Undelivered)
+            assertEquals(both, asked)
+            assertEquals(both, acknowledged)
+            assertEquals(2, attempts.count)
+        }
+
+    /** A question that cannot be asked reports the refusal itself, as an ordinary failure rather than a quiet wait. */
+    @Test
+    fun anUnaskableQuestionReportsTheRefusal() =
+        runTest {
+            val refusal = MarmotKitException.GroupCatchingUp(GROUP)
+            val attempts = scripted(refusal)
+
+            val failure =
+                runCatching {
+                    admitGroupChange(
+                        ask = { GroupChangeAnswer.Unavailable },
+                        acknowledge = { acknowledged += it },
+                        change = { attempts.attempt() },
+                    )
+                }.exceptionOrNull()
+
+            assertSame(refusal, failure)
+            assertTrue(acknowledged.isEmpty())
+            assertEquals(1, attempts.count)
+        }
+
+    /** Once the user continues, the acknowledgement and its retry finish together even if the caller is cancelled. */
+    @Test
+    fun acknowledgementAndRetryFinishTogetherDespiteCancellation() =
+        runTest {
+            val attempts = scripted(MarmotKitException.GroupCatchingUp(GROUP))
+            val acknowledging = CompletableDeferred<Unit>()
+            val run =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    admitGroupChange(
+                        ask = { GroupChangeAnswer.Continue },
+                        acknowledge = {
+                            acknowledging.await()
+                            acknowledged += it
+                        },
+                        change = { attempts.attempt() },
+                    )
+                }
+
+            run.cancel()
+            acknowledging.complete(Unit)
+            runCatching { run.await() }
+
+            assertEquals(listOf(GroupChangeCaution.CatchingUp), acknowledged)
+            assertEquals("the acknowledgement was left for some later change", 2, attempts.count)
         }
 
     /** Any other failure passes through untouched and nobody is asked. */
@@ -171,9 +252,26 @@ class GroupChangeAdmissionTest {
         admitGroupChange(
             ask = { caution ->
                 asked += caution
-                proceed
+                if (proceed) GroupChangeAnswer.Continue else GroupChangeAnswer.Wait
             },
             acknowledge = { acknowledged += it },
+            change = { attempts.attempt() },
+        )
+
+    /** Runs the admission loop where an undelivered refusal hides behind catching up, answering from [answers]. */
+    private suspend fun admitHiding(
+        answers: Map<GroupChangeCaution, GroupChangeAnswer>,
+        attempts: Scripted,
+    ): String =
+        admitGroupChange(
+            ask = { caution ->
+                asked += caution
+                answers.getValue(caution)
+            },
+            acknowledge = { acknowledged += it },
+            hiddenBehind = { caution ->
+                if (caution == GroupChangeCaution.CatchingUp) listOf(GroupChangeCaution.Undelivered) else emptyList()
+            },
             change = { attempts.attempt() },
         )
 

@@ -4798,25 +4798,24 @@ class ChatsController private constructor(
     }
 
     /**
-     * Steps down as admin, asking first if MDK holds that back, then leaves, even if the chat list goes away. Only the
-     * commits are protected: a departure cancelled while the user decides withdraws its question and changes nothing.
+     * Steps down as admin, asking first if MDK holds that back, then leaves, even if the chat list goes away. The
+     * question stays cancellable, so a departure cancelled while the user decides changes nothing; once the step-down
+     * starts, it and the leave after it run to completion together.
      */
     private suspend fun demoteAndLeaveChat(attempt: ChatListDepartureAttempt) {
-        val demotion =
-            appState.runGroupChange(attempt.account, attempt.groupId) {
-                withContext(NonCancellable) {
+        appState.runGroupChange(attempt.account, attempt.groupId) {
+            withContext(NonCancellable) {
+                val demotion =
                     appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
                         selfDemoteAdminDetailed(attempt.account, attempt.groupId)
                     }
+                attempt.demoted = true
+                if (attempt.isCurrent()) {
+                    attempt.onStage(ChatDepartureStage.ADMIN_DEMOTED)
+                    appState.applyLocalGroupUpdate(demotion.details.group)
                 }
+                appState.marmotIo { leaveGroup(attempt.account, attempt.groupId) }
             }
-        withContext(NonCancellable) {
-            attempt.demoted = true
-            if (attempt.isCurrent()) {
-                attempt.onStage(ChatDepartureStage.ADMIN_DEMOTED)
-                appState.applyLocalGroupUpdate(demotion.details.group)
-            }
-            appState.marmotIo { leaveGroup(attempt.account, attempt.groupId) }
         }
     }
 
@@ -10235,8 +10234,10 @@ class ConversationController(
         cause: Throwable,
     ) {
         val current = optimisticEdits.entries.firstOrNull { it.value.durableIntent == intent }
+        // A message that can no longer be edited gets its original text back; a Retry could never succeed.
+        val notEditable = cause is MarmotKitException.InvalidEditTarget
         if (current != null) {
-            if (optimisticMessages["msg:$target"]?.status == MessageStatus.Failed) {
+            if (notEditable || optimisticMessages["msg:$target"]?.status == MessageStatus.Failed) {
                 optimisticEdits.remove(current.key)
             } else {
                 optimisticEdits[current.key] = current.value.copy(status = MessageStatus.Failed)
@@ -10244,7 +10245,9 @@ class ConversationController(
         }
         publishTimelineFromIndexes()
         if (current != null && appState.activeAccountRef == account) {
-            appState.presentFailure(R.string.toast_couldnt_edit_message, "MESSAGE_EDIT", cause)
+            val detail = if (notEditable) R.string.error_message_not_editable else R.string.error_try_again
+            val title = R.string.toast_couldnt_edit_message
+            appState.presentFailure(title, "MESSAGE_EDIT", cause, AppText.Resource(detail))
         }
     }
 
@@ -11270,12 +11273,7 @@ class ConversationController(
                         appState.deleteGroupLocalWithClientCleanup(account, group.groupIdHex)
                     } else {
                         if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, liveMemberCount)) {
-                            val demoteResult = selfDemoteBeforeLeave(account)
-                            withContext(NonCancellable) {
-                                demotedBeforeLeave = true
-                                applyMutationDetails(account, demoteResult.details)
-                                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
-                            }
+                            demoteThenLeave(account) { demotedBeforeLeave = true }
                         } else {
                             appState.marmotIo { leaveGroup(account, group.groupIdHex) }
                         }
@@ -11326,17 +11324,25 @@ class ConversationController(
         }
 
     /**
-     * Steps [account] down as admin before leaving, asking first if MDK holds the change back. The question stays
-     * cancellable, and only the commit itself runs to completion once started.
+     * Steps [account] down as admin, then leaves, asking first if MDK holds the step-down back. The question stays
+     * cancellable; once the step-down starts, it, [onDemoted] and the leave run to completion together.
      */
-    private suspend fun selfDemoteBeforeLeave(account: String): GroupMutationResultFfi =
+    private suspend fun demoteThenLeave(
+        account: String,
+        onDemoted: () -> Unit,
+    ) {
         appState.runGroupChange(account, group.groupIdHex) {
             withContext(NonCancellable) {
-                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                    selfDemoteAdminDetailed(account, group.groupIdHex)
-                }
+                val demoteResult =
+                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                        selfDemoteAdminDetailed(account, group.groupIdHex)
+                    }
+                onDemoted()
+                applyMutationDetails(account, demoteResult.details)
+                appState.marmotIo { leaveGroup(account, group.groupIdHex) }
             }
         }
+    }
 
     suspend fun dismissConversationNotifications() {
         val account = conversationAccountRef ?: return
@@ -11632,7 +11638,7 @@ class ConversationController(
                         // Queuing behind another commit can outlive this editor or account.
                         if (!commitIfCurrent()) return@withGroupCommitLock false
                         val wroteAvatar =
-                            appState.runGroupChange(account, group.groupIdHex) {
+                            appState.runGroupChange(account, group.groupIdHex, stillWanted = commitIfCurrent) {
                                 appState.marmotIo {
                                     // Dispatch to IO can also wait after the group lock was acquired.
                                     if (!commitIfCurrent()) {
@@ -11647,16 +11653,7 @@ class ConversationController(
                         // A public avatar supersedes the encrypted component. Clear it
                         // after the URL is durable so another client cannot resurrect it.
                         if (normalized != null && group.imageHashHex != null) {
-                            encryptedImageCleared =
-                                runCatchingCancellable {
-                                    appState.marmotIo {
-                                        clearGroupImage(account, group.groupIdHex)
-                                    }
-                                }.onFailure {
-                                    if (BuildConfig.DEBUG) {
-                                        Log.w("DMConversation", "encrypted avatar cleanup failed", it)
-                                    }
-                                }.isSuccess
+                            encryptedImageCleared = clearSupersededGroupImage(account)
                         }
                         true
                     }
@@ -11670,6 +11667,24 @@ class ConversationController(
             }.onFailure {
                 if (report()) recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_AVATAR_URL_UPDATE", it)
             }.getOrDefault(false)
+        }
+
+    /**
+     * Best-effort clean-up of the encrypted image a public avatar supersedes. MDK can hold it back like any group
+     * change, so it is asked about too; a refusal, failure or Wait leaves the encrypted image in place, and the public
+     * avatar still wins for display.
+     */
+    private suspend fun clearSupersededGroupImage(account: String): Boolean =
+        try {
+            runCatchingCancellable {
+                appState.runGroupChange(account, group.groupIdHex) {
+                    appState.marmotIo { clearGroupImage(account, group.groupIdHex) }
+                }
+            }.onFailure {
+                if (BuildConfig.DEBUG) Log.w("DMConversation", "encrypted avatar cleanup failed", it)
+            }.isSuccess
+        } catch (_: GroupChangeDeclinedException) {
+            false
         }
 
     /** Commits the encrypted image and reports failure only while [change] owns the attempt. */
@@ -11744,13 +11759,17 @@ class ConversationController(
             ) {
                 pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
                 onLegacyClearAttempt()
-                appState.runGroupChange(account, capturedGroupId) {
-                    appState.marmotIo {
-                        if (change.viewerPermissionCheck && !change.isActive()) {
-                            throw CancellationException("Viewer owner replaced")
+                try {
+                    appState.runGroupChange(account, capturedGroupId, stillWanted = { change.stillOwned() }) {
+                        appState.marmotIo {
+                            if (!change.stillOwned()) throw CancellationException("Viewer owner replaced")
+                            updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
                         }
-                        updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
                     }
+                } catch (declined: GroupChangeDeclinedException) {
+                    // Waiting after the new image landed must say so, not end quietly behind the old URL avatar.
+                    if (!change.stillOwned()) throw declined
+                    throw declined.refusal
                 }
                 pendingLegacyAvatarClearAfterImageMutationKey = null
             }
@@ -11779,11 +11798,9 @@ class ConversationController(
         draft: ImageUploadDraft?,
         change: ScopedGroupImageMutation<ImageUploadDraft?>,
     ) {
-        appState.runGroupChange(account, groupId) {
+        appState.runGroupChange(account, groupId, stillWanted = { change.stillOwned() }) {
             appState.marmotIo {
-                if (change.viewerPermissionCheck && !change.isActive()) {
-                    throw CancellationException("Viewer owner replaced")
-                }
+                if (!change.stillOwned()) throw CancellationException("Viewer owner replaced")
                 if (draft != null) {
                     updateGroupImage(account, groupId, draft.plaintext, draft.mediaType)
                 } else {

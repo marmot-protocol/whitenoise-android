@@ -7,16 +7,15 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,6 +25,7 @@ import java.lang.reflect.Proxy
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Group changes run inside the group's commit lock, which sends to that group also take (#3289). Asking the user about
@@ -34,27 +34,25 @@ import java.util.concurrent.TimeUnit
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-@OptIn(ExperimentalCoroutinesApi::class)
 class GroupChangeCommitLockTest {
     /** A send to the group goes through while the question is open, and the lock is free once the user waits. */
     @Test
     fun anOpenQuestionDoesNotHoldUpSendsToTheGroup() =
-        runTest {
-            val state = appState()
+        runBlocking {
+            val state = appState(runtime { name -> check(name == "groupCommitDelivery") { "Unexpected: $name" } })
             val change =
-                async {
+                background.async {
                     runCatching {
                         state.withGroupCommitLock(ACCOUNT, GROUP) {
                             state.runGroupChange(ACCOUNT, GROUP) { throw MarmotKitException.GroupCatchingUp(GROUP) }
                         }
                     }.exceptionOrNull()
                 }
-            runCurrent()
-            val question = checkNotNull(state.groupChangeConfirmations.pending) { "the user was never asked" }
+            awaitUntil { state.groupChangeConfirmations.pending != null }
+            val question = checkNotNull(state.groupChangeConfirmations.pending)
 
-            val send = async { state.withGroupCommitLock(ACCOUNT, GROUP) { "sent" } }
-            runCurrent()
-            assertTrue("a send waited for the user's answer", send.isCompleted)
+            val send = background.async { state.withGroupCommitLock(ACCOUNT, GROUP) { "sent" } }
+            assertEquals("a send waited for the user's answer", "sent", withTimeout(SETTLE_MILLIS * 5) { send.await() })
 
             question.answer(proceed = false)
             assertTrue(change.await() is GroupChangeDeclinedException)
@@ -127,6 +125,49 @@ class GroupChangeCommitLockTest {
 
             assertTrue(change.await() is GroupChangeDeclinedException)
             assertEquals(1, attempts)
+        }
+
+    /** Continue given after the change stopped applying, such as a superseded avatar, acknowledges nothing. */
+    @Test
+    fun anAnswerAfterTheChangeStoppedApplyingAcknowledgesNothing() =
+        runBlocking {
+            val state = appState(runtime { name -> check(name == "groupCommitDelivery") { "Unexpected: $name" } })
+            val wanted = AtomicBoolean(true)
+            var attempts = 0
+            val change =
+                background.async {
+                    runCatching {
+                        state.runGroupChange(ACCOUNT, GROUP, stillWanted = { wanted.get() }) {
+                            attempts += 1
+                            throw MarmotKitException.GroupCatchingUp(GROUP)
+                        }
+                    }.exceptionOrNull()
+                }
+            awaitUntil { state.groupChangeConfirmations.pending != null }
+
+            wanted.set(false)
+            checkNotNull(state.groupChangeConfirmations.pending).answer(proceed = true)
+
+            assertTrue(change.await() is GroupChangeDeclinedException)
+            assertEquals(1, attempts)
+        }
+
+    /** A refusal for an account that is not the active one cannot be asked about, so it is an ordinary failure. */
+    @Test
+    fun aRefusalForAnInactiveAccountIsAnOrdinaryFailure() =
+        runBlocking {
+            val state = appState(runtime { name -> error("nothing may reach the runtime: $name") })
+            val refusal = MarmotKitException.GroupCatchingUp(GROUP)
+
+            val failure =
+                runCatching {
+                    withTimeout(TIMEOUT_SECONDS * MILLIS_PER_SECOND) {
+                        state.runGroupChange("bob", GROUP) { throw refusal }
+                    }
+                }.exceptionOrNull()
+
+            assertSame(refusal, failure)
+            assertNull(state.groupChangeConfirmations.pending)
         }
 
     /** Polls [done] for up to the test timeout. */

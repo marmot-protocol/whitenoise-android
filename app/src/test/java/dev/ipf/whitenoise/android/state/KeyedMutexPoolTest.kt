@@ -3,10 +3,13 @@ package dev.ipf.whitenoise.android.state
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -119,6 +122,31 @@ class KeyedMutexPoolTest {
 
             assertTrue("$failure", failure is CancellationException)
             assertEquals("free", pool.withLock(KEY) { "free" })
+        }
+
+    /** A commit that finishes after its caller was cancelled still hands its result back, as a plain lock does. */
+    @Test
+    fun aBlockFinishingAfterItsCallerWasCancelledStillReturnsItsValue() =
+        runTest {
+            val release = CompletableDeferred<Unit>()
+            var observed: String? = null
+            val caller =
+                launch {
+                    val committed =
+                        pool.withLock(KEY) {
+                            withContext(NonCancellable) {
+                                release.await()
+                                "committed"
+                            }
+                        }
+                    observed = committed
+                }
+            runCurrent()
+            caller.cancel()
+            release.complete(Unit)
+            caller.join()
+
+            assertEquals("the lock turned a finished commit into a cancellation", "committed", observed)
         }
 
     private companion object {
