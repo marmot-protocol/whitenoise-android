@@ -60,14 +60,6 @@
         ]
       },
       {
-        "surface": "ProfileAddToGroupsSheet",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "fun ProfileAddToGroupsSheet(",
-        "test_ids": [
-          "ACC-008"
-        ]
-      },
-      {
         "surface": "ProfileBannerImage",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
         "anchor": "fun ProfileBannerImage(",
@@ -147,6 +139,23 @@
         "test_ids": [
           "ACC-007"
         ]
+      },
+      {
+        "surface": "ProfileAddToGroupsContent UI polish regression",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileAddToGroupsContent(",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileAddToGroupsScreen(",
+        "test_ids": [
+          "ACC-002",
+          "ACC-008"
+        ]
       }
     ],
     "settings_controls": [
@@ -169,7 +178,7 @@
       {
         "surface": "string:make_admin_question",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "R.string.make_admin_question",
+        "anchor": "R.string.make_admin",
         "test_ids": [
           "ACC-007"
         ]
@@ -185,7 +194,7 @@
       {
         "surface": "string:remove_admin_question",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "R.string.remove_admin_question",
+        "anchor": "R.string.remove_admin",
         "test_ids": [
           "ACC-007"
         ]
@@ -201,7 +210,7 @@
       {
         "surface": "string:remove_member_question",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "R.string.remove_member_question",
+        "anchor": "R.string.remove_from_group",
         "test_ids": [
           "ACC-007"
         ]
@@ -284,7 +293,7 @@
       {
         "surface": "Stored group-avatar surface: R.string.profile_make_admin_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
-        "anchor": "R.string.profile_make_admin_title",
+        "anchor": "R.string.profile_make_admin_description",
         "test_ids": [
           "CHL-017"
         ]
@@ -402,6 +411,14 @@
         "anchor": "rememberProfileAccountWideGroups(",
         "test_ids": [
           "ACC-021"
+        ]
+      },
+      {
+        "surface": "Recipient-scoped add-to-groups state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "remember(appState.activeAccountRef, appState.runtimeGeneration, target.accountIdHex)",
+        "test_ids": [
+          "ACC-002"
         ]
       }
     ]

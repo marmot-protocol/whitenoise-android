@@ -2334,4 +2334,6 @@
     <string name="group_change_wait">Attendre</string>
     <string name="group_change_continue_anyway">Continuer quand même</string>
     <string name="group_change_invite_anyway">Inviter quand même</string>
+    <string name="starting_as">Démarrer en tant que</string>
+    <string name="starting_as_account">Démarrer en tant que %1$s</string>
 </resources>

@@ -2334,4 +2334,6 @@
     <string name="group_change_wait">Esperar</string>
     <string name="group_change_continue_anyway">Continuar de todos modos</string>
     <string name="group_change_invite_anyway">Invitar de todos modos</string>
+    <string name="starting_as">Iniciar como</string>
+    <string name="starting_as_account">Iniciar como %1$s</string>
 </resources>

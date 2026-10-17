@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,40 +22,36 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
+import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
 
@@ -70,11 +66,18 @@ private const val SUMMARY_AVATAR_COUNT = 3
 internal fun selectedMemberDisplayName(
     member: RecipientSearch.Candidate,
     liveDisplayName: String?,
-): String =
-    liveDisplayName?.takeIf { it.isNotBlank() }
-        ?: ProfileSanitizer.displayName(member.searchProfile?.displayName)
-        ?: ProfileSanitizer.displayName(member.searchProfile?.name)
-        ?: member.displayName
+): String {
+    val name =
+        liveDisplayName?.takeIf { it.isNotBlank() }
+            ?: ProfileSanitizer.displayName(member.searchProfile?.displayName)
+            ?: ProfileSanitizer.displayName(member.searchProfile?.name)
+            ?: member.displayName
+    return if (IdentityFormatter.isNostrIdentityFallback(name)) {
+        IdentityFormatter.short(name, prefix = 10, suffix = 8)
+    } else {
+        name
+    }
+}
 
 internal fun selectedMemberDisplayName(
     member: RecipientSearch.Candidate,
@@ -181,10 +184,12 @@ internal fun SelectedMembersReviewScreen(
     confirmLabel: String,
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
+    startingAs: StartingAccount? = null,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
+                actions = { StartingAccountIndicator(startingAs) },
                 title = {
                     Column {
                         Text(stringResource(R.string.review_selection))
@@ -236,85 +241,67 @@ internal fun SelectedMembersReviewScreen(
         ) {
             items(members, key = { it.accountIdHex }) { member ->
                 val memberName = selectedMemberDisplayName(member, appState)
-                ContactRow(
-                    title = memberName,
-                    subtitle = appState.shortNpub(member.accountIdHex).takeIf { it.isNotBlank() },
-                    avatarSeed = member.accountIdHex,
-                    avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
-                    titleMaxLines = Int.MAX_VALUE,
-                    secondaryContent = {
-                        onInitialAdminChange?.let { change ->
-                            SelectedMemberRoleMenu(
+                Column(Modifier.fillMaxWidth()) {
+                    ContactRow(
+                        title = memberName,
+                        subtitle =
+                            appState.shortNpub(member.accountIdHex).takeIf {
+                                it.isNotBlank() && !IdentityFormatter.isNostrIdentityFallback(memberName)
+                            },
+                        avatarSeed = member.accountIdHex,
+                        avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
+                        titleMaxLines = Int.MAX_VALUE,
+                        trailing = {
+                            IconButton(
+                                onClick = { onRemove(member) },
+                                enabled = !busy,
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.remove_member_named, memberName),
+                                )
+                            }
+                        },
+                    )
+                    onInitialAdminChange?.let { change ->
+                        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                            SelectedMemberRoleControl(
                                 name = memberName,
-                                identifier =
-                                    presentationNpubFromReference(
-                                        member.npub,
-                                        member.accountIdHex,
-                                        appState::npubForDisplay,
-                                    ),
                                 admin = initialAdminIds.any { it.equals(member.accountIdHex, ignoreCase = true) },
                                 enabled = !busy,
                                 onChange = { change(member, it) },
                             )
                         }
-                    },
-                    trailing = {
-                        IconButton(
-                            onClick = { onRemove(member) },
-                            enabled = !busy,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = stringResource(R.string.remove_member_named, memberName),
-                            )
-                        }
-                    },
-                )
+                    }
+                }
             }
         }
     }
 }
 
-/** Keeps the privilege choice beside the full identity without consuming the name column. */
+/** A separate full-width privilege row keeps a large touch target clear of member identity. */
 @Composable
 @Suppress("FunctionNaming")
-private fun SelectedMemberRoleMenu(
+internal fun SelectedMemberRoleControl(
     name: String,
-    identifier: String,
     admin: Boolean,
     enabled: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val memberLabel = stringResource(R.string.member)
     val adminLabel = stringResource(R.string.admin)
-    val role = if (admin) adminLabel else memberLabel
-    Box {
-        TextButton(
-            onClick = { expanded = true },
-            enabled = enabled,
-            contentPadding = PaddingValues(horizontal = Dimens.spaceSm),
-            modifier = Modifier.semantics { contentDescription = "$name, $role" },
-        ) {
-            Text(role)
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
-        }
-        WhiteNoiseDropdownMenu(
-            expanded = expanded && enabled,
-            onDismissRequest = { expanded = false },
-            header = {
-                Column(Modifier.widthIn(max = 280.dp).padding(Dimens.spaceLg)) {
-                    EmojiLabel(name, style = MaterialTheme.typography.bodyLarge)
-                    Text(identifier, style = MaterialTheme.typography.bodySmall)
-                }
-            },
-            items =
-                listOf(
-                    WhiteNoiseMenuItem(memberLabel, { onChange(false) }, enabled = enabled),
-                    WhiteNoiseMenuItem(adminLabel, { onChange(true) }, enabled = enabled),
-                ),
-        )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .toggleable(value = admin, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+            .padding(horizontal = Dimens.spaceSm)
+            .semantics { contentDescription = "$adminLabel, $name" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(stringResource(R.string.admin), modifier = Modifier.weight(1f))
+        Switch(checked = admin, onCheckedChange = null, enabled = enabled)
     }
 }
 

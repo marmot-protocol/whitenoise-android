@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -7,10 +8,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -21,6 +28,8 @@ import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -134,7 +143,74 @@ class PollScreenshotTest {
                 }
             }
         }
+        val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
+        assertTrue(form.boundsInRoot.height > 400f)
+        assertEquals(0f, form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue(), 0f)
         composeRule.onNodeWithTag("poll-create-form").captureRoboImage("src/test/snapshots/poll_create_form_light.png")
+    }
+
+    /** Uses the available tall-window height for poll creation. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h1000dp-mdpi")
+    fun tallCreateDialogUsesAvailableHeight() {
+        composeRule.setContent {
+            WhiteNoiseTheme { PollCreateDialog({}, { _, _, _, _, _ -> }) }
+        }
+        val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
+        assertTrue(form.boundsInRoot.height > 400f)
+        assertEquals(0f, form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue(), 0f)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/poll_create_dialog_tall_light.png")
+    }
+
+    /** Keeps poll actions visible while a compact window scrolls its fields. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h320dp-mdpi")
+    fun compactCreateDialogScrollsWithVisibleActions() {
+        composeRule.setContent {
+            WhiteNoiseTheme { PollCreateDialog({}, { _, _, _, _, _ -> }) }
+        }
+        val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
+        assertTrue(form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue() > 0f)
+        composeRule.onNodeWithText("Cancel").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/poll_create_dialog_compact_light.png")
+    }
+
+    /** The footer must stay above the keyboard, rather than merely exist behind it. */
+    @Test fun keyboardCreateDialogKeepsActionsVisible() = captureKeyboardCreateDialog("light")
+
+    @Test fun keyboardCreateDialogLargeRtl() = captureKeyboardCreateDialog("large_rtl", largeRtl = true)
+
+    private fun captureKeyboardCreateDialog(
+        name: String,
+        largeRtl: Boolean = false,
+    ) {
+        var dismissed = false
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(fontScale = if (largeRtl) 2f else 1f) {
+                    PollCreateDialog(
+                        onDismiss = { dismissed = true },
+                        onSubmit = { _, _, _, _, _ -> error("No poll should be posted") },
+                        viewportInsets = WindowInsets(bottom = 300.dp),
+                    )
+                }
+            }
+        }
+        val dialogRoot = composeRule.onNode(isRoot() and hasAnyDescendant(hasText("Create poll")))
+        val root = dialogRoot.fetchSemanticsNode().boundsInRoot
+        val keyboardHeight = with(composeRule.density) { 300.dp.toPx() }
+        assertEquals(with(composeRule.density) { 780.dp.toPx() }, root.height, 1f)
+        val cancel = composeRule.onNodeWithText("Cancel").assertIsDisplayed()
+        val submit = composeRule.onNodeWithText("Post poll").assertIsDisplayed()
+        assertTrue(cancel.fetchSemanticsNode().boundsInRoot.bottom <= root.bottom - keyboardHeight)
+        assertTrue(submit.fetchSemanticsNode().boundsInRoot.bottom <= root.bottom - keyboardHeight)
+        val form = composeRule.onNodeWithTag("poll.create.form").fetchSemanticsNode()
+        assertTrue(form.config[SemanticsProperties.VerticalScrollAxisRange].maxValue() > 0f)
+        dialogRoot.captureRoboImage("src/test/snapshots/poll_create_dialog_ime_$name.png")
+        cancel.performClick()
+        assertTrue(dismissed)
     }
 
     /** A rejected duplicate option shows the reason without hiding the form controls. */

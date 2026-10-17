@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -465,7 +466,7 @@ class GroupAvatarLocalAssetScreenshotTest {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     ProfileAddToGroupsContent(
                         fixture.state,
-                        "Alice",
+                        RecipientSearch.Candidate("b".repeat(64), "Alice", "npub1alice"),
                         ProfileGroupPickerState(listOf(item), emptySet(), ProfileGroupPickerLoadState.READY),
                         busy = false,
                         onClose = {},

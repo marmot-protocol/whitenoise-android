@@ -148,6 +148,27 @@ class ScreenProofTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 qualify_presentation(case, {'presentation': invalid})
 
+    def test_translation_faults_require_durable_native_prerequisites_after_log_clear(self):
+        """UI callbacks survive log clearing only with retained actual package and route observations."""
+        for suffix in ('missing', 'unverified', 'detection', 'model', 'engine'):
+            scenario = f'modal-translation-{suffix}'
+            case = {'postcondition': 'presentation-checked', 'presentation': scenario,
+                    'presentation_actions': ['dismiss']}
+            proof = {'scenario': scenario, 'callbacks': ['dismiss'], 'verified': True}
+            with self.subTest(scenario=scenario):
+                with self.assertRaisesRegex(ValueError, 'prerequisites'):
+                    qualify_presentation(case, {'presentation': proof})
+                acquisition = {'package': 'dev.davidv.translator', 'enginePackageAbsent': True,
+                               'acquisitionRoute': 'GITHUB_RELEASE'}
+                # No log field exists: the generation-bound native receipt is the proof.
+                qualify_presentation(case, {'presentation': {**proof, 'translationAcquisition': acquisition}})
+                for invalid in (None, {}, {**acquisition, 'enginePackageAbsent': False},
+                                {**acquisition, 'enginePackageAbsent': 1},
+                                {**acquisition, 'package': 'other.package'},
+                                {**acquisition, 'acquisitionRoute': 'INSTALLED_ENGINE'}):
+                    with self.assertRaisesRegex(ValueError, 'prerequisites'):
+                        qualify_presentation(case, {'presentation': {**proof, 'translationAcquisition': invalid}})
+
     def test_search_menu_requires_dismissal_before_the_selected_action(self):
         """The production dropdown closes before dispatch; UI success alone missed this order."""
         root = Path(__file__).resolve().parents[1]

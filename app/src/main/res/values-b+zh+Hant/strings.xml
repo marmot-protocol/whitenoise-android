@@ -2301,4 +2301,6 @@
     <string name="group_change_wait">等待</string>
     <string name="group_change_continue_anyway">仍要繼續</string>
     <string name="group_change_invite_anyway">仍要邀請</string>
+    <string name="starting_as">以此身分發起</string>
+    <string name="starting_as_account">以 %1$s 的身分發起</string>
 </resources>

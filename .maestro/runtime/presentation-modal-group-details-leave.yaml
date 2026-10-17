@@ -6,6 +6,18 @@ name: presentation-modal-group-details-leave
     text: Leave Fixture confirmation group\?
 - assertVisible:
     text: You'll be removed from this group and will need a new invitation to rejoin\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Alice
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
 - tapOn:
     text: Cancel
 - assertNotVisible:

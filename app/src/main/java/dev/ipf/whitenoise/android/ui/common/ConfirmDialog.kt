@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -8,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 
 /**
@@ -24,12 +28,15 @@ internal fun ConfirmDialog(
     onDismiss: () -> Unit,
     destructive: Boolean = false,
     dismissLabel: String? = null,
+    identity: (@Composable () -> Unit)? = null,
+    confirmEnabled: Boolean = true,
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
+                enabled = confirmEnabled,
                 modifier = Modifier.testTag("confirmation.confirm"),
                 colors =
                     if (destructive) {
@@ -45,6 +52,18 @@ internal fun ConfirmDialog(
             }
         },
         title = { Text(title) },
-        text = { Text(message) },
+        text = {
+            if (identity == null) {
+                Text(message)
+            } else {
+                Column(
+                    Modifier.fadingVerticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Text(message)
+                    identity()
+                }
+            }
+        },
     )
 }

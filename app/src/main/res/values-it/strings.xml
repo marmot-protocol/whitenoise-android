@@ -2334,4 +2334,6 @@
     <string name="group_change_wait">Aspetta</string>
     <string name="group_change_continue_anyway">Continua comunque</string>
     <string name="group_change_invite_anyway">Invita comunque</string>
+    <string name="starting_as">Avvio come</string>
+    <string name="starting_as_account">Avvio come %1$s</string>
 </resources>

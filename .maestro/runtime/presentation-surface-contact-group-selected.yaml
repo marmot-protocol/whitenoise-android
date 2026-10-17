@@ -1,0 +1,37 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-contact-group-selected
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: "Fixture contacts"
+- assertVisible: "Maestro Bob"
+- tapOn: "Fixture next"
+- assertVisible:
+    id: "group.members.review.dialog"
+- assertVisible:
+    id: "group.members.review.destination"
+- assertVisible: "Fixture destination"
+- assertVisible:
+    id: "group.members.review.member"
+- assertVisible:
+    text: "Maestro Bob"
+    childOf:
+      id: "group.members.review.member"
+- tapOn: "Cancel"
+- assertNotVisible:
+    id: "group.members.review.dialog"
+- assertVisible: "Fixture contacts"
+- assertVisible: "Maestro Bob"
+- tapOn: "Fixture next"
+- assertVisible:
+    id: "group.members.review.dialog"
+- back
+- assertNotVisible:
+    id: "group.members.review.dialog"
+- assertVisible: "Fixture contacts"
+- tapOn: "Fixture next"
+- assertVisible:
+    id: "group.members.review.dialog"
+- tapOn:
+    id: "selected_members_confirm"
+- assertVisible:
+    id: "presentation.complete"

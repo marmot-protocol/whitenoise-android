@@ -2351,4 +2351,6 @@
     <string name="group_change_wait">Warten</string>
     <string name="group_change_continue_anyway">Trotzdem fortfahren</string>
     <string name="group_change_invite_anyway">Trotzdem einladen</string>
+    <string name="starting_as">Starten als</string>
+    <string name="starting_as_account">Starten als %1$s</string>
 </resources>

@@ -12,6 +12,7 @@ import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageActions
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageContent
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePerson
@@ -207,6 +208,7 @@ class NewMessageScreenshotTest {
                         error,
                         NewMessageActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
                         isValidNpub = { true },
+                        startingAs = StartingAccount("a".repeat(64), "Carol", null, "npub1carol"),
                         identifierLookupFailed = lookupFailed,
                         addressFallback = identifier,
                     )

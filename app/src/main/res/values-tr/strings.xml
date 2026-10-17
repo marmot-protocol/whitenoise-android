@@ -2332,4 +2332,6 @@
     <string name="group_change_wait">Bekle</string>
     <string name="group_change_continue_anyway">Yine de devam et</string>
     <string name="group_change_invite_anyway">Yine de davet et</string>
+    <string name="starting_as">Şu hesapla başlat</string>
+    <string name="starting_as_account">Şu hesapla başlat: %1$s</string>
 </resources>

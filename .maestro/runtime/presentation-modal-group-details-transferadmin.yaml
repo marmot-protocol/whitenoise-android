@@ -5,8 +5,19 @@ name: presentation-modal-group-details-transferadmin
 - assertVisible:
     text: Transfer admin\?
 - assertVisible:
-    text: Fixture successor becomes an admin and you step down\. You can be made admin
-      again later\.
+    text: Member\ becomes\ an\ admin\ and\ you\ step\ down\.\ You\ can\ be\ made\ admin\ again\ later\.
+- assertVisible:
+    id: group.members.review.member
+- assertVisible:
+    text: Maestro Bob
+    childOf:
+      id: group.members.review.member
+- assertVisible:
+    id: group.members.review.destination
+- assertVisible:
+    text: Fixture confirmation group
+    childOf:
+      id: group.members.review.destination
 - tapOn:
     text: Cancel
 - assertNotVisible:

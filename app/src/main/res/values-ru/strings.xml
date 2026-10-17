@@ -2406,4 +2406,6 @@
     <string name="group_change_wait">Подождать</string>
     <string name="group_change_continue_anyway">Всё равно продолжить</string>
     <string name="group_change_invite_anyway">Всё равно пригласить</string>
+    <string name="starting_as">Начать от имени</string>
+    <string name="starting_as_account">Начать от имени %1$s</string>
 </resources>
