@@ -21,8 +21,12 @@ internal fun NostrEvent.toCardModel(): NostrEventCardModel {
         mediaUrl = videoMetadata?.url,
         mediaMimeType = videoMetadata?.mimeType,
         imageUrls = imageMetadataUrls(),
+        publishedAt = if (cardKind == NostrEventCardKind.Article) publishedAtSeconds() else null,
     )
 }
+
+/** The `published_at` tag as Unix seconds, or null when it is absent, malformed or not after the epoch. */
+private fun NostrEvent.publishedAtSeconds(): Long? = firstSafeTag("published_at")?.toLongOrNull()?.takeIf { it > 0 }
 
 private fun NostrEvent.cardKind(): NostrEventCardKind =
     when (kind) {
@@ -62,12 +66,14 @@ private fun NostrEvent.cardSummary(
         tagSummary ?: content.safeExcerpt()
     }
 
+/** Kind-specific details shown under a card, never a second date beside the one in its header. */
 private fun NostrEvent.cardMetadata(
     cardKind: NostrEventCardKind,
     videoMetadata: NostrEventVideoMetadata?,
 ): List<String> =
     when (cardKind) {
-        NostrEventCardKind.Article -> listOfNotNull(firstSafeTag("published_at")?.asEpochLabel())
+        // The publication time is the article's one date, shown where the date belongs instead of a second one here.
+        NostrEventCardKind.Article -> emptyList()
         NostrEventCardKind.Video ->
             listOfNotNull(
                 (videoMetadata?.duration ?: firstSafeTag("duration"))?.asDurationLabel(),

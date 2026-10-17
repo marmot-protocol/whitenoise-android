@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -31,6 +32,31 @@ class NostrEventExpansionTest {
         val changelog = "Fixes and improvements.\n".repeat(100).trim()
         val card = event(30063, "Release description", listOf(listOf("changelog", changelog))).toCardModel()
         assertEquals("Release description\n\n$changelog", card.readerBody)
+    }
+
+    /**
+     * An article has one date: its signed publication time when the tag holds a valid one, otherwise the event time.
+     * The publication time is never repeated as a second, unlabelled metadata date (#3317).
+     */
+    @Test
+    fun anArticleCarriesOneDatePreferringItsPublicationTime() {
+        val published = event(30023, "Body", listOf(listOf("published_at", "1600038000"))).toCardModel()
+        assertEquals(1_600_038_000L, published.publishedAt)
+        assertEquals(1_600_038_000L, published.displayEpochSeconds())
+        assertEquals(emptyList<String>(), published.metadata)
+
+        val sameInstant = event(30023, "Body", listOf(listOf("published_at", "1"))).toCardModel()
+        assertEquals(sameInstant.createdAt, sameInstant.displayEpochSeconds())
+
+        listOf(null, "", "soon", "0", "-5", "99999999999999999999").forEach { raw ->
+            val tags = raw?.let { listOf(listOf("published_at", it)) }.orEmpty()
+            val card = event(30023, "Body", tags).toCardModel()
+            assertNull("published_at=$raw", card.publishedAt)
+            assertEquals(card.createdAt, card.displayEpochSeconds())
+            assertEquals(emptyList<String>(), card.metadata)
+        }
+        val note = event(1, "Note", listOf(listOf("published_at", "1600038000"))).toCardModel()
+        assertNull("only an article has a publication time", note.publishedAt)
     }
 
     @Test

@@ -54,7 +54,15 @@ internal data class NostrEventCardModel(
     val mediaMimeType: String? = null,
     val imageUrls: List<String> = emptyList(),
     val authorMetadata: NostrEventAuthorMetadata? = null,
+    /** An article's signed publication time in Unix seconds, when its `published_at` tag holds a valid one. */
+    val publishedAt: Long? = null,
 )
+
+/**
+ * The one date a card or reader shows for this event (#3317): an article's publication time when it has a valid
+ * one, otherwise the event's own creation time. The two are never shown side by side.
+ */
+internal fun NostrEventCardModel.displayEpochSeconds(): Long = publishedAt ?: createdAt
 
 internal data class NostrEventAuthorMetadata(
     val displayName: String?,
