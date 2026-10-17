@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AttachmentAutomaticPermissionFfi
 import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
@@ -31,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.RandomAccessFile
@@ -42,7 +45,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.spec.SecretKeySpec
 
 /** Real host download/cache plumbing with a controllable, network-free native boundary. */
-internal class MediaDownloadIntegrationFixture : AutoCloseable {
+internal class MediaDownloadIntegrationFixture(
+    accounts: List<AccountSummaryFfi> = emptyList(),
+) : AutoCloseable {
     private val root = Files.createTempDirectory("media-host-regression").toFile()
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
     private val diskRoot = java.io.File(root, "encrypted")
@@ -54,6 +59,18 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
     val automaticDemands = AtomicInteger()
     val explicitDemands = AtomicInteger()
     val retryDemands = AtomicInteger()
+
+    /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
+    val automaticPolicyBlocks = AtomicInteger()
+
+    /** Runs as each policy-blocked refusal is returned, so a test can move the host's approval meanwhile. */
+    @Volatile var onAutomaticPolicyBlock: () -> Unit = {}
+
+    /** When set, automatic requests are refused unless the last applied approval allows images, as in MDK. */
+    @Volatile var enforceNativePermission = false
+
+    @Volatile private var nativeImagesAllowed = false
+    val permissionApplications = AtomicInteger()
     val active = AtomicInteger()
     val peak = AtomicInteger()
     var onDownload: (Call) -> Unit = {}
@@ -63,7 +80,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
             context = ApplicationProvider.getApplicationContext<Context>(),
             draftStore = DraftStore(DiscardedDrafts),
             accountIdHexResolver = { null },
-            accounts = emptyList(),
+            accounts = accounts,
             activeAccountRef = ACCOUNT,
         ).also {
             field("marmotRuntime").set(it, AppMarmotRuntime("test", nativeBoundary()))
@@ -82,6 +99,15 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
         @Volatile var bytes: ByteArray? = null
 
         @Volatile var failure: Throwable? = null
+
+        @Volatile var paused = false
+        internal val pausedSignal = CompletableDeferred<Unit>()
+
+        /** Holds the job paused, as MDK does when the host revokes its automatic permission mid-transfer. */
+        fun pause() {
+            paused = true
+            pausedSignal.complete(Unit)
+        }
 
         /** Completes one synthetic native operation successfully. */
         fun succeed(bytes: ByteArray) {
@@ -169,6 +195,15 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                     val retry = method.name.substringBefore('-') == "downloadAttachmentAgain"
                     if (automatic) {
                         automaticDemands.incrementAndGet()
+                        val denied = enforceNativePermission && !nativeImagesAllowed
+                        if (denied || automaticPolicyBlocks.getAndUpdate { maxOf(0, it - 1) } > 0) {
+                            onAutomaticPolicyBlock()
+                            val blocked = AttachmentTransferStateFfi.POLICY_BLOCKED
+                            return@newProxyInstance AutomaticAttachmentRequestFfi(
+                                AttachmentTransferStatusFfi(null, blocked, 0u, 0u, null, null),
+                                false,
+                            )
+                        }
                     } else if (retry) {
                         retryDemands.incrementAndGet()
                     } else {
@@ -187,8 +222,16 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                     cancellationObserved.complete(Unit)
                     true
                 }
-                "beginAttachmentPermissionUpdate" -> "fixture-generation"
-                "setAttachmentAutomaticPermission" -> true
+                "beginAttachmentPermissionUpdate" -> {
+                    // Beginning an update revokes the current approval, as MDK does.
+                    nativeImagesAllowed = false
+                    "fixture-generation"
+                }
+                "setAttachmentAutomaticPermission" -> {
+                    permissionApplications.incrementAndGet()
+                    nativeImagesAllowed = (args!![2] as AttachmentAutomaticPermissionFfi).images
+                    true
+                }
                 "downloadMedia" -> error("Legacy network fallback is forbidden")
                 "toString" -> "SyntheticMediaBoundary"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -247,6 +290,25 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
         check(entered.trySend(call).isSuccess)
     }
 
+    /**
+     * Marks attachment [index] as already retained by MDK with [bytes], as a background automatic download leaves it,
+     * without recording a transfer call or touching the Android-side caches.
+     */
+    fun retainNatively(
+        index: Int,
+        bytes: ByteArray,
+    ) {
+        val request = qualifiedRequest(index)
+        val target =
+            AttachmentLocalTargetFfi(
+                request.messageIdHex,
+                checkNotNull(request.sourceMessageIdHex),
+                request.attachmentIndex.toUInt(),
+            )
+        jobs[key(request.accountRef, request.groupIdHex, target)] =
+            Call(request.accountRef, request.groupIdHex, reference(index)).also { it.succeed(bytes) }
+    }
+
     /** Returns local-only transfer metadata, never creating a job from a read. */
     private fun status(key: String): AttachmentTransferStatusFfi {
         val call = jobs[key]
@@ -256,16 +318,21 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                 call.bytes != null -> AttachmentTransferStateFfi.READY
                 call.failure != null -> AttachmentTransferStateFfi.FAILED
                 call.result.isCancelled -> AttachmentTransferStateFfi.CANCELLED
+                call.paused -> AttachmentTransferStateFfi.PAUSED
                 else -> AttachmentTransferStateFfi.DOWNLOADING
             }
         return AttachmentTransferStatusFfi(if (call == null) null else key, state, 0u, 0u, null, null)
     }
 
-    /** Emits an initial snapshot; later observation awaits native work without owning or cancelling it. */
+    /**
+     * Emits an initial snapshot; later observation awaits native work without owning or cancelling it. A paused
+     * job is reported once per subscription, then the feed waits for the job to end.
+     */
     private fun subscription(key: String): AttachmentTransferSubscription {
         val initialSnapshot = AttachmentTransferSnapshotFfi(listOf(status(key)))
         return nativeStub(FixtureTransferFeed::class.java).also {
             var initial = true
+            var pauseDelivered = false
             it.nextSnapshot = {
                 if (initial) {
                     initial = false
@@ -273,7 +340,13 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                 } else {
                     val call = checkNotNull(jobs[key])
                     call.observed.complete(Unit)
-                    call.result.await()
+                    val deliverPause =
+                        !pauseDelivered &&
+                            select {
+                                call.result.onJoin { false }
+                                call.pausedSignal.onJoin { true }
+                            }
+                    if (deliverPause) pauseDelivered = true else call.result.await()
                     AttachmentTransferSnapshotFfi(listOf(status(key)))
                 }
             }

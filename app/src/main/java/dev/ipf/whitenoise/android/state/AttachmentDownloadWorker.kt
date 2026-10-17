@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.Executor
@@ -199,6 +201,21 @@ internal fun attachmentDownloadWorkState(
 
 internal class AttachmentReferenceNotReadyException : IllegalStateException("attachment reference is not projected yet")
 
+/**
+ * Automatic work the live policy does not allow when it runs, for the [hold] reason, after a network or settings
+ * change since it was queued. No fetch starts. A [AutomaticAttachmentHold.Network] hold waits for a network the
+ * policy allows, which [networkType] narrows the queued work to; any other finishes, and the attachment's bubble
+ * still offers it on demand.
+ */
+internal class AttachmentAutomaticPolicyDeferredException(
+    val type: MediaAutoDownloadType?,
+    val hold: AutomaticAttachmentHold,
+    val networkType: NetworkType = NetworkType.CONNECTED,
+) : IllegalStateException("automatic attachment policy does not allow this download now")
+
+/** The native runtime does not hold the live automatic approval yet, so the work retries after its backoff. */
+internal class AttachmentPermissionPendingException : IOException("automatic attachment permission is not applied yet")
+
 internal typealias PerformDurableAttachmentDownload = suspend (
     WhiteNoiseApplication,
     AttachmentTransferRequest,
@@ -206,10 +223,10 @@ internal typealias PerformDurableAttachmentDownload = suspend (
 ) -> Boolean
 
 /**
- * Durable safety net for document downloads. Foreground UI callers still join
- * the same app-level in-flight Deferred for immediate response; this worker
- * makes the intent survive process death and verifies that the result reached
- * the encrypted disk cache before declaring success.
+ * Durable owner for received attachments of every type and for explicit downloads. Foreground UI callers still
+ * join the same app-level in-flight Deferred for immediate response; this worker makes the intent survive process
+ * death, holds automatic work to the live policy when it runs, and verifies that the result is locally available
+ * before declaring success.
  */
 class AttachmentDownloadWorker : CoroutineWorker {
     private val performDownloadOverride: PerformDurableAttachmentDownload?
@@ -227,8 +244,20 @@ class AttachmentDownloadWorker : CoroutineWorker {
         this.performDownloadOverride = performDownloadOverride
     }
 
-    /** Resumes a durable download, promoting explicit work to a typed foreground service. */
-    override suspend fun doWork(): Result {
+    /**
+     * Resumes a durable download, promoting explicit work to a typed foreground service. A run that ends the
+     * work, rather than retrying it, drops any recorded network wait for it.
+     */
+    override suspend fun doWork(): Result =
+        runWork().also { result ->
+            val request = AttachmentDownloadWorkData.decode(inputData)
+            if (request != null && result != Result.retry()) {
+                runCatching { AutomaticAttachmentNetworkWaits.get(applicationContext).forget(request) }
+            }
+        }
+
+    /** Decides and runs one durable attempt for the encoded request. */
+    private suspend fun runWork(): Result {
         val request = AttachmentDownloadWorkData.decode(inputData)
         val application = applicationContext as? WhiteNoiseApplication
         return if (request == null || application == null) {
@@ -242,6 +271,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 priority == AttachmentDownloadPriority.Automatic &&
                 (intentStore.isAutomaticPaused(request.accountRef) || intentStore.isAutomaticSuppressed(request))
             ) {
+                val reason = if (intentStore.isAutomaticPaused(request.accountRef)) "paused" else "cancelled"
+                Log.i(TAG, "attachment_work_skipped reason=$reason")
                 intentStore.resetTransientRetry(request)
                 Result.success()
             } else {
@@ -321,6 +352,28 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 intentStore.resetTransientRetry(request)
                 Result.success()
             }
+        } catch (deferred: AttachmentAutomaticPolicyDeferredException) {
+            // Not a failure: the live policy holds this type back, and no network work was started. A network
+            // hold waits for an allowed connection without spending the failure retry, however long that takes,
+            // and first narrows the queued work so it waits in WorkManager rather than waking on this network.
+            val retry = deferred.hold.waits
+            Log.i(
+                TAG,
+                "attachment_work_policy_deferred type=${deferred.type?.preferenceKey ?: "unknown"} " +
+                    "reason=${deferred.hold.reason} retry=$retry",
+            )
+            if (retry) {
+                narrowAutomaticNetwork(request, deferred.type, deferred.networkType)
+                Result.retry()
+            } else {
+                intentStore.resetTransientRetry(request)
+                Result.success()
+            }
+        } catch (_: AttachmentPermissionPendingException) {
+            // The policy allows the type, but the native approval for the live network has not landed. That is
+            // a network change still settling, not a failed transfer, so it waits without spending the retry.
+            Log.i(TAG, "attachment_work_permission_pending run_attempt=$runAttemptCount")
+            Result.retry()
         } catch (cancel: CancellationException) {
             // A cancelled shared fetch does not mean WorkManager stopped this
             // worker. Finish that transfer so its foreground notification and
@@ -374,6 +427,24 @@ class AttachmentDownloadWorker : CoroutineWorker {
     }
 
     /**
+     * Narrows this automatic work's network constraint for its next run, so a spec queued wider than the policy
+     * (before its account loaded, or before a settings change) next runs only on a network the policy allows. The
+     * registry applies the live policy under the lock it shares with every widening, falling back to the captured
+     * [networkType], so a settings change made meanwhile is never overwritten, and records the wait under [type].
+     */
+    private fun narrowAutomaticNetwork(
+        request: AttachmentTransferRequest,
+        type: MediaAutoDownloadType?,
+        networkType: NetworkType,
+    ) {
+        runCatching {
+            AutomaticAttachmentNetworkWaits
+                .get(applicationContext)
+                .narrow(WorkManager.getInstance(applicationContext), request, type, id, networkType)
+        }.onFailure { Log.w(TAG, "attachment_network_narrowing_failed") }
+    }
+
+    /**
      * Upgrades a spec persisted before the interruption backoff existed. It is updated in place by
      * id, so it can never recreate work that was cancelled meanwhile, and a running spec takes the
      * change for its next run. The first stop of the current run still follows the old behavior.
@@ -391,6 +462,14 @@ class AttachmentDownloadWorker : CoroutineWorker {
         internal const val BACKOFF_SECONDS = 30L
         private const val EXPLICIT_LOOKUP_RETRIES = 1
         internal const val RETIRED_TAG = "attachment_download_retired"
+
+        /**
+         * Settles receipts off WorkManager's own serial task thread, where waiting on another WorkManager future
+         * would deadlock, and off the caller's thread, which may be the main thread. Tests replace it to observe
+         * when each settle has finished.
+         */
+        @Volatile
+        internal var receiptSettleExecutor: Executor = Dispatchers.IO.asExecutor()
         private val explicitFence = ExplicitEnqueueFence()
 
         /**
@@ -398,12 +477,14 @@ class AttachmentDownloadWorker : CoroutineWorker {
          * backoff for system interruptions: a job stopped by Android resumes after an exponential delay
          * from [BACKOFF_SECONDS], doubling per run up to WorkManager's five-hour
          * ceiling, instead of restarting at once. Explicit work does not opt in, so a stopped explicit
-         * download resumes immediately. [id] updates an existing spec in place.
+         * download resumes immediately. Automatic work runs only on [networkType], the narrowest network its
+         * policy could allow it on. [id] updates an existing spec in place.
          */
         internal fun buildRequest(
             request: AttachmentTransferRequest,
             priority: AttachmentDownloadPriority,
             id: UUID? = null,
+            networkType: NetworkType = NetworkType.CONNECTED,
         ): OneTimeWorkRequest {
             val ordinary = priority == AttachmentDownloadPriority.Automatic
             return OneTimeWorkRequestBuilder<AttachmentDownloadWorker>()
@@ -411,7 +492,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 .setConstraints(
                     Constraints
                         .Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .setRequiredNetworkType(if (ordinary) networkType else NetworkType.CONNECTED)
                         .setRequiresStorageNotLow(true)
                         .build(),
                 ).setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
@@ -464,7 +545,9 @@ class AttachmentDownloadWorker : CoroutineWorker {
 
         /**
          * Persists one transfer as unique WorkManager work. Automatic work coalesces onto any existing
-         * work and backs off after platform interruptions. An explicit request replaces waiting
+         * work, waits for [networkType] and backs off after platform interruptions; a duplicate receipt for
+         * waiting work queued on a narrower network widens it in place, and work of a known [type] queued on a
+         * narrowed network is recorded so a later policy can widen it. An explicit request replaces waiting
          * automatic work instead, and on Android 14 or later a visible one runs as a user-initiated job.
          */
         internal fun enqueue(
@@ -472,6 +555,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
             request: AttachmentTransferRequest,
             priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
             userVisible: Boolean = false,
+            networkType: NetworkType = NetworkType.CONNECTED,
+            type: MediaAutoDownloadType? = null,
         ) {
             val intentStore = attachmentIntentStore(context.applicationContext)
             if (
@@ -493,18 +578,44 @@ class AttachmentDownloadWorker : CoroutineWorker {
                     return
                 }
             }
-            val work = buildRequest(request, priority)
+            val work = buildRequest(request, priority, networkType = networkType)
             if (priority == AttachmentDownloadPriority.Interactive) {
                 enqueueExplicit(context.applicationContext, request, work, intentStore)
             } else {
+                val manager = WorkManager.getInstance(context.applicationContext)
+                val waits = AutomaticAttachmentNetworkWaits.get(context.applicationContext)
+                // Registered before the enqueue, so no window leaves a narrowed spec without a record to widen.
+                val registered =
+                    type != null &&
+                        runCatching { waits.register(request, type, networkType) }
+                            .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
+                            .getOrDefault(false)
                 runCatching {
-                    WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-                        attachmentDownloadWorkName(request),
-                        ExistingWorkPolicy.KEEP,
-                        work,
-                    )
-                }.onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
+                    manager.enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.KEEP, work)
+                }.onSuccess { operation ->
+                    val settle = Runnable { settleReceipt(waits, manager, request, type, networkType) }
+                    operation.result.addListener(settle, receiptSettleExecutor)
+                }.onFailure {
+                    if (registered) runCatching { waits.forget(request) }
+                    Log.w(TAG, "attachment_download_enqueue_failed")
+                }
             }
+        }
+
+        /**
+         * Settles one automatic receipt once its KEEP enqueue has completed, through the same widening rule as the
+         * policy sweep: the spec it kept, waiting or running, takes [networkType] when that is wider, and the
+         * narrowed-wait record follows only what the live spec actually waits on.
+         */
+        private fun settleReceipt(
+            waits: AutomaticAttachmentNetworkWaits,
+            manager: WorkManager,
+            request: AttachmentTransferRequest,
+            type: MediaAutoDownloadType?,
+            networkType: NetworkType,
+        ) {
+            runCatching { waits.settleReceipt(manager, request, type, networkType) }
+                .onFailure { Log.w(TAG, "attachment_network_wait_unsaved") }
         }
 
         /**

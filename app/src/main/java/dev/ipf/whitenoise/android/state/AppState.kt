@@ -20,6 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.work.NetworkType
+import androidx.work.WorkManager
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -27,11 +29,13 @@ import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -47,6 +51,7 @@ import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
+import dev.ipf.marmotkit.RuntimeMessageReceivedFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
@@ -113,7 +118,6 @@ import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
-import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -239,6 +243,13 @@ import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as 
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
+
+/** How long durable automatic work waits for the native runtime to apply the live approval before retrying. */
+internal const val NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS = 10_000L
+
+/** Automatic requests made per durable run before a refusal or a lasting pause becomes a retryable failure. */
+private const val AUTOMATIC_ADMISSION_ATTEMPTS = 2
+private const val INCOMING_ATTACHMENT_TAG = "DMAttachmentReceipt"
 
 /**
  * How inviting one profile to several groups went: of [attempted] groups, [failures] failed and in [waited] the user
@@ -1431,12 +1442,22 @@ class WhiteNoiseAppState private constructor(
     /** Questions about overriding MDK's advisory refusals of a group change, shown at app level (#3289). */
     internal val groupChangeConfirmations = GroupChangeConfirmations()
 
-    /** Refreshes runtime-scoped permissions after network, preference, or account changes. */
-    internal fun refreshNativeAttachmentPermissions() {
+    /** Bounds concurrent receipt history lookups across the notification and runtime-event receipt sources. */
+    private val receiptLookupGate = Semaphore(RECEIPT_LOOKUP_CONCURRENCY)
+
+    /**
+     * Refreshes runtime-scoped permissions after network, preference, or account changes. When [widenWaiting], it
+     * also widens any automatic downloads still waiting on a network narrower than the refreshed policy now allows.
+     * Network callbacks pass false: the widening target comes from the matrix and account state, which a network
+     * edge cannot change, and those callbacks arrive often.
+     */
+    internal fun refreshNativeAttachmentPermissions(widenWaiting: Boolean = true) {
         val runtime = marmotRuntime
         val revision = nativeAttachmentPermissions.invalidate(runtime)
-        val engine = runtime?.marmot ?: return
         val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
+        AutomaticAttachmentNetworkWaits.policyNetworkType = ::liveAutomaticNetworkType
+        if (widenWaiting) widenWaitingAutomaticDownloads(accountRefs)
+        val engine = runtime?.marmot ?: return
         // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
         mutationsScope.launch {
             var pending = accountRefs.toSet()
@@ -1465,6 +1486,43 @@ class WhiteNoiseAppState private constructor(
             }
             if (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
                 Log.w("AttachmentPermissions", "permission_update_failed accounts=${pending.size}")
+            }
+        }
+    }
+
+    /**
+     * The network [accountRef]'s live policy allows [type] on, for settling a receipt against the current policy.
+     * Null for an account that is not loaded and signed in, so an unknown policy never widens a waiting spec.
+     */
+    private fun liveAutomaticNetworkType(
+        accountRef: String,
+        type: MediaAutoDownloadType,
+    ): NetworkType? {
+        if (accounts.none { it.label == accountRef && !it.signedOut }) return null
+        return runCatching { automaticAttachmentPolicy(accountRef).networkType(type) }.getOrNull()
+    }
+
+    /**
+     * Widens waiting automatic downloads of the signed-in [accountRefs] to the network each one's type is allowed
+     * on now (#3308), so a policy that starts allowing a wider network, such as metered downloads turned on, reaches
+     * work queued under the old one without a new receipt or a reconnect. Only work recorded as narrowed is read;
+     * the policy is computed after queued settings saves, and the WorkManager reads run off the main thread.
+     */
+    private fun widenWaitingAutomaticDownloads(accountRefs: List<String>) {
+        if (accountRefs.isEmpty()) return
+        val waits = AutomaticAttachmentNetworkWaits.get(appContext)
+        mutationsScope.launch {
+            val policies =
+                hostPreferenceCommitMutex.withLock { accountRefs.associateWith(::automaticAttachmentPolicy) }
+            withContext(Dispatchers.IO) {
+                // One read of the sealed records serves every account of the sweep.
+                runCatching {
+                    waits.widenAll(WorkManager.getInstance(appContext)) { account, type ->
+                        policies[account]?.networkType(type)
+                    }
+                }.onSuccess { count ->
+                    if (count > 0) Log.i(INCOMING_ATTACHMENT_TAG, "attachment_network_widened count=$count")
+                }.onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "attachment_network_widening_failed") }
             }
         }
     }
@@ -4734,10 +4792,15 @@ class WhiteNoiseAppState private constructor(
     @Suppress("MaxLineLength") // Kept as an expression body by ktlint's formatter.
     internal suspend fun resolveAttachmentReference(request: AttachmentTransferRequest): MediaAttachmentReferenceFfi? = findNativeAttachment(request)?.reference
 
-    /** Persists durable work and promotes explicit requests above automatic-download policy. */
+    /**
+     * Persists durable work and promotes explicit requests above automatic-download policy. Automatic work waits
+     * for [networkType], the narrowest network its policy could allow it on.
+     */
     internal fun enqueueAttachmentDownload(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
+        networkType: NetworkType = NetworkType.CONNECTED,
+        type: MediaAutoDownloadType? = null,
     ) {
         if (priority == AttachmentDownloadPriority.Interactive) {
             attachmentDownloadIntents.setInteractive(request, interactive = true)
@@ -4745,7 +4808,7 @@ class WhiteNoiseAppState private constructor(
         } else if (attachmentDownloadIntents.isAutomaticSuppressed(request)) {
             return
         }
-        AttachmentDownloadWorker.enqueue(appContext, request, priority, userVisible = appInForeground)
+        AttachmentDownloadWorker.enqueue(appContext, request, priority, appInForeground, networkType, type)
     }
 
     /** Clears a completed foreground request without changing its automatic-download policy. */
@@ -4845,20 +4908,97 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Ensures durable work consumes large cache hits as leases instead of full heap copies. */
+    /**
+     * Ensures durable work consumes large cache hits as leases instead of full heap copies. Automatic work that a
+     * bubble already made local finishes at once. Otherwise it is held to the live policy for its type, since the
+     * network or settings may have changed since it was queued, and waits for the native runtime to hold that
+     * approval (#3308).
+     */
     internal suspend fun downloadAttachmentForDurableWork(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
     ): Boolean {
+        val automatic = priority == AttachmentDownloadPriority.Automatic
+        if (automatic) {
+            if (request.sourceMessageIdHex != null && hasCachedAttachmentAfterHydration(request)) return true
+            // Account-wide holds are decided before the history lookup the type check needs.
+            automaticAttachmentPolicy(request.accountRef).accountHold()?.let { hold ->
+                throw AttachmentAutomaticPolicyDeferredException(type = null, hold = hold)
+            }
+        }
         val match = findNativeAttachment(request) ?: throw AttachmentReferenceNotReadyException()
         val resolved = request.copy(sourceMessageIdHex = match.target.sourceMessageIdHex)
-        downloadAttachmentPlaintextSource(
-            request = resolved,
-            reference = match.reference,
-            priority = priority,
-            demandIntent = AttachmentDemandIntent.Observe,
-        ).use { }
+        val download =
+            suspend {
+                downloadAttachmentPlaintextSource(
+                    request = resolved,
+                    reference = match.reference,
+                    priority = priority,
+                    demandIntent = AttachmentDemandIntent.Observe,
+                ).use { }
+            }
+        if (automatic) {
+            downloadAutomaticAttachment(resolved.accountRef, match.category.autoDownloadType(), download)
+        } else {
+            download()
+        }
         return hasCachedAttachmentAfterHydration(resolved)
+    }
+
+    /**
+     * Runs automatic [download] once the live policy allows [type] and the native runtime holds that approval. A
+     * network change revokes approval before re-evaluating it, and a request that lands in that window is
+     * refused without recording demand, so a refusal is asked again once the host's approval has moved on. A
+     * refusal under an unchanged approval that allows the type is MDK's own final answer, such as a size cap,
+     * and ends the work. A transfer MDK keeps paused, usually because its type was turned off mid-download, is
+     * re-admitted the same way after it frees its download slot.
+     */
+    private suspend fun downloadAutomaticAttachment(
+        accountRef: String,
+        type: MediaAutoDownloadType?,
+        download: suspend () -> Unit,
+    ) {
+        repeat(AUTOMATIC_ADMISSION_ATTEMPTS) {
+            val revision = awaitAutomaticAttachmentAdmission(accountRef, type)
+            try {
+                download()
+                return
+            } catch (blocked: NativeAttachmentTerminalException) {
+                val approvalUnchanged = nativeAttachmentPermissions.appliedRevision(accountRef) == revision
+                if (blocked.state != AttachmentTransferStateFfi.POLICY_BLOCKED || approvalUnchanged) throw blocked
+            } catch (_: NativeAttachmentPausedException) {
+                Log.i(INCOMING_ATTACHMENT_TAG, "attachment_work_paused type=${type?.preferenceKey ?: "unknown"}")
+            }
+        }
+        throw AttachmentPermissionPendingException()
+    }
+
+    /**
+     * Holds automatic work to the live policy for [type], then waits until the native runtime holds an approval
+     * that allows [type], and returns that approval's host revision. Live inputs can change before their refresh
+     * runs, so an approval that was merely applied could still be the previous network's denial. An approval
+     * that never lands asks for a fresh one before the work retries. A network hold carries the narrowest network
+     * the policy could allow [type] on, so the worker can wait for it in WorkManager.
+     */
+    private suspend fun awaitAutomaticAttachmentAdmission(
+        accountRef: String,
+        type: MediaAutoDownloadType?,
+    ): Long {
+        val policy = automaticAttachmentPolicy(accountRef)
+        val hold = if (type == null) AutomaticAttachmentHold.Disabled else policy.hold(type)
+        if (hold != null || type == null) {
+            throw AttachmentAutomaticPolicyDeferredException(
+                type = type,
+                hold = hold ?: AutomaticAttachmentHold.Disabled,
+                networkType = type?.let(policy::networkType) ?: NetworkType.CONNECTED,
+            )
+        }
+        return withTimeoutOrNull(NATIVE_ATTACHMENT_PERMISSION_SETTLE_MILLIS) {
+            nativeAttachmentPermissions.awaitApplied(accountRef) { it.allows(type) }
+        } ?: run {
+            refreshNativeAttachmentPermissions(widenWaiting = false)
+            throw AttachmentPermissionPendingException()
+        }
     }
 
     /**
@@ -8370,7 +8510,7 @@ class WhiteNoiseAppState private constructor(
                 hasValidatedPhysicalNetwork = validatedInternetNetworks.hasValidatedInternet(),
             )
         updateConnectivitySignals(hasValidatedInternet = recovery.hasUsableInternet)
-        refreshNativeAttachmentPermissions()
+        refreshNativeAttachmentPermissions(widenWaiting = false)
         if (!recovery.restored) return
         resumePushWakeEpisodeFromLifecycle()
         AvatarLoadRecovery.onNetworkRestored()
@@ -11335,48 +11475,95 @@ class WhiteNoiseAppState private constructor(
         }
 
     /**
-     * Start document policy downloads from the receipt pipeline rather than
-     * waiting for a Compose bubble to become visible. The worker persists only
-     * the lookup identity and resolves the authoritative reference from MDK.
+     * Queues durable automatic downloads for every attachment a received message carries, from the receipt
+     * pipeline rather than a Compose bubble, so media is locally ready before the reader returns (#3308). Each
+     * slot is held to its own type's policy for the receiving account, which need not be the active one, and
+     * waits in WorkManager for a network that policy could allow. The worker persists only the lookup identity
+     * and re-checks the live policy against MDK's reference when it runs.
      */
-    private suspend fun scheduleIncomingDocumentDownloads(update: NotificationUpdateFfi) {
+    private suspend fun scheduleIncomingAttachmentDownloads(update: NotificationUpdateFfi) {
         val messageIdHex = update.messageIdHex
-        val isIncomingMessage = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && !update.isFromSelf
-        if (
-            isIncomingMessage &&
-            messageIdHex != null &&
-            !attachmentDownloadIntents.isAutomaticPaused(update.accountRef)
-        ) {
-            val matrix = loadMediaAutoDownloadMatrix(update.accountRef)
-            if (matrix.shouldAutoDownload(MediaAutoDownloadType.Document, activeNetworkTypes())) {
-                val records =
-                    runCatchingCancellable {
-                        marmotIo(MarmotTraceSection.MEDIA_LIST) {
-                            listMedia(update.accountRef, update.groupIdHex, null)
-                        }
-                    }.getOrNull()
-                        .orEmpty()
-                records
-                    .asSequence()
-                    .filter { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
-                    .filter { record ->
-                        val reference = record.reference
-                        reference.sourceEpoch != 0uL &&
-                            !MediaReferenceSupport.isImageMedia(reference) &&
-                            !MediaReferenceSupport.isVideoMedia(reference) &&
-                            !MediaReferenceSupport.isAudioMedia(reference)
-                    }.forEach { record ->
-                        enqueueAttachmentDownload(
-                            AttachmentTransferRequest(
-                                accountRef = update.accountRef,
-                                groupIdHex = update.groupIdHex,
-                                messageIdHex = record.messageIdHex,
-                                attachmentIndex = record.attachmentIndex.toInt(),
-                            ),
-                        )
-                    }
-            }
+        if (update.trigger != NotificationTriggerFfi.NEW_MESSAGE || update.isFromSelf || messageIdHex == null) return
+        scheduleReceivedMessageAttachments(update.accountRef, update.groupIdHex, messageIdHex, update.timestampMs)
+    }
+
+    /**
+     * The receipt scheduling both receipt sources share, for one received message of [accountRef]'s group
+     * [groupIdHex]: a bounded authoritative lookup of its attachments, each queued under its own type's policy.
+     */
+    @Suppress("ReturnCount") // A held account and a failed lookup each end the receipt early.
+    private suspend fun scheduleReceivedMessageAttachments(
+        accountRef: String,
+        groupIdHex: String,
+        messageIdHex: String,
+        receivedAtMillis: Long,
+    ) {
+        val policy = automaticAttachmentPolicy(accountRef)
+        val wanted = policy.receiptTypes()
+        if (wanted.isEmpty()) {
+            Log.i(INCOMING_ATTACHMENT_TAG, "attachment_receipt_skipped reason=${policy.receiptSkipReason().reason}")
+            return
         }
+        val lookup =
+            runCatchingCancellable {
+                // Both receipt sources share one bound, so a catch-up burst cannot fan out unbounded history reads.
+                receiptLookupGate.withPermit {
+                    receivedMessageAttachments(accountRef, groupIdHex, messageIdHex, receivedAtMillis)
+                }
+            }.onFailure {
+                Log.w(INCOMING_ATTACHMENT_TAG, "attachment_receipt_lookup_failed type=${it.javaClass.simpleName}")
+            }.getOrNull() ?: return
+        val (eligible, held) = lookup.attachments.partition { it.type in wanted }
+        eligible.forEach {
+            enqueueAttachmentDownload(it.request, networkType = policy.networkType(it.type), type = it.type)
+        }
+        logReceiptScheduling(policy, lookup, eligible, held)
+    }
+
+    /**
+     * Logs one receipt's outcome without attachment identity: queued work, the part of it waiting for an allowed
+     * network, held types, and how the history read ended. A text message's ordinary read logs nothing.
+     */
+    private fun logReceiptScheduling(
+        policy: AutomaticAttachmentPolicy,
+        lookup: ReceiptAttachmentLookup,
+        eligible: List<IncomingAttachment>,
+        held: List<IncomingAttachment>,
+    ) {
+        val incomplete = lookup.end == ReceiptLookupEnd.Exhausted || lookup.end == ReceiptLookupEnd.Unavailable
+        if (lookup.attachments.isEmpty() && !incomplete) return
+        val waiting = eligible.count { policy.hold(it.type) != null }
+        val heldTypes =
+            held
+                .map { it.type.preferenceKey }
+                .distinct()
+                .sorted()
+                .joinToString(",")
+        Log.i(
+            INCOMING_ATTACHMENT_TAG,
+            "attachment_receipt_scheduled queued=${eligible.size} waiting=$waiting held=${held.size} " +
+                "held_types=$heldTypes pages=${lookup.pages} end=${lookup.end.key}",
+        )
+    }
+
+    /**
+     * [accountRef]'s automatic-download inputs right now. Receipt scheduling and durable work both decide with
+     * this, and [AutomaticAttachmentPolicy.allowedNow] matches the native permission exactly.
+     */
+    internal fun automaticAttachmentPolicy(accountRef: String): AutomaticAttachmentPolicy {
+        val account = accounts.firstOrNull { it.label == accountRef }
+        return AutomaticAttachmentPolicy(
+            account =
+                when {
+                    account == null -> AutomaticPolicyAccount.Unknown
+                    account.signedOut -> AutomaticPolicyAccount.SignedOut
+                    else -> AutomaticPolicyAccount.SignedIn
+                },
+            paused = attachmentDownloadIntents.isAutomaticPaused(accountRef),
+            matrix = loadMediaAutoDownloadMatrix(accountRef),
+            networks = activeNetworkTypes(),
+            validatedInternet = hasValidatedInternet(),
+        )
     }
 
     private suspend fun notificationTimelineRecord(update: NotificationUpdateFfi) =
@@ -11811,9 +11998,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private fun scheduleIncomingDocumentDownloadMaintenance(update: NotificationUpdateFfi) {
+    /** Runs receipt scheduling beside the first post, so queueing media never delays the notification. */
+    private fun scheduleIncomingAttachmentDownloadMaintenance(update: NotificationUpdateFfi) {
         notificationScope.launch(notificationDispatcher) {
-            scheduleIncomingDocumentDownloads(update)
+            scheduleIncomingAttachmentDownloads(update)
         }
     }
 
@@ -11831,6 +12019,77 @@ class WhiteNoiseAppState private constructor(
             runNotificationListenerLoop(marmot())
         }
 
+    /**
+     * Schedules the media of messages the notification stream never carries: those in muted chats, and every
+     * message of an account whose local notifications are off. MarmotKit 0.13.0 resolves an ordinary message in a
+     * muted chat to no notification update, and refuses every update while notifications are off, so receipt
+     * scheduling, which rides that stream, would leave their attachments unscheduled even though #3308 holds them
+     * to the account's media policy. MDK offers no opt-in for those updates, so this follows the runtime's
+     * own event stream for received chat messages and schedules only those it drops, through the same
+     * bounded lookup and policy as a notification receipt; anything the notification stream did carry, such as a
+     * mention, joins the same durable identity. A stream that ends or fails is reopened with backoff, but one that
+     * cannot be opened at all ends the loop until the listener restarts.
+     */
+    internal suspend fun runMutedChatReceiptLoop(marmot: MarmotInterface) {
+        var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+        while (currentCoroutineContext().isActive) {
+            val subscription =
+                runCatchingCancellable { marmot.subscribeEvents() }
+                    .onFailure {
+                        val type = it.javaClass.simpleName
+                        Log.w(INCOMING_ATTACHMENT_TAG, "muted_receipt_stream_unavailable type=$type")
+                    }.getOrNull() ?: return
+            try {
+                runCatchingCancellable {
+                    var event = subscription.next()
+                    while (event != null) {
+                        backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+                        val received = (event as? MarmotEventFfi.MessageReceived)?.received
+                        if (received != null && isMutedChatReceipt(received)) scheduleMutedChatReceipt(received)
+                        event = subscription.next()
+                    }
+                }.onFailure { Log.w(INCOMING_ATTACHMENT_TAG, "muted_receipt_stream_failed") }
+            } finally {
+                withContext(NonCancellable) { runCatching { subscription.destroy() } }
+            }
+            delay(backoffMillis)
+            backoffMillis = nextRetryBackoffMillis(backoffMillis, NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS)
+        }
+    }
+
+    /**
+     * Whether [received] is a chat message from someone else that the notification stream drops: its account has
+     * turned local notifications off, which MDK resolves to no update for any message, or its chat is muted. Only
+     * chat messages carry attachments, and each read fails closed to the notification stream.
+     */
+    private suspend fun isMutedChatReceipt(received: RuntimeMessageReceivedFfi): Boolean {
+        val message = received.message
+        if (message.kind != MARMOT_CHAT_EVENT_KIND || message.sender.equals(received.accountIdHex, ignoreCase = true)) {
+            return false
+        }
+        val notificationsOff =
+            runCatchingCancellable {
+                !marmotIo { notificationSettings(received.accountLabel) }.localNotificationsEnabled
+            }.getOrDefault(false)
+        return notificationsOff ||
+            runCatchingCancellable {
+                chatMuteRepository.settings(received.accountLabel, message.groupIdHex).getOrThrow().muted
+            }.getOrDefault(false)
+    }
+
+    /** Runs one muted-chat receipt's scheduling beside the stream, so a slow lookup never delays the next event. */
+    private fun scheduleMutedChatReceipt(received: RuntimeMessageReceivedFfi) {
+        val message = received.message
+        notificationScope.launch(notificationDispatcher) {
+            scheduleReceivedMessageAttachments(
+                accountRef = received.accountLabel,
+                groupIdHex = message.groupIdHex,
+                messageIdHex = message.messageIdHex,
+                receivedAtMillis = message.receivedAt.toLong() * MILLIS_PER_SECOND_LONG,
+            )
+        }
+    }
+
     internal suspend fun runNotificationListenerLoop(marmot: MarmotInterface) {
         // Restart the subscription on any failure (or clean end-of-stream)
         // with exponential backoff, so a transient relay/binding error
@@ -11838,10 +12097,17 @@ class WhiteNoiseAppState private constructor(
         // each received update; cancellation propagates and stops the loop.
         // See #56.
         var backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
+        var receiptLoop: Job? = null
         while (currentCoroutineContext().isActive) {
             val retryWakeGeneration = notificationReceiverRetryWake.value
             try {
                 val subscription = notificationSubscriber(marmot)
+                // Only once the notification subscription is open, so start's no-replay window stays unwidened, and
+                // as a child of this listener on IO, so it stops with notifications without delaying them.
+                receiptLoop =
+                    receiptLoop ?: CoroutineScope(currentCoroutineContext()).launch(Dispatchers.IO) {
+                        runMutedChatReceiptLoop(marmot)
+                    }
                 runtimeListenerTeardownOwner.withNotificationSubscription(subscription) {
                     while (currentCoroutineContext().isActive) {
                         val update = subscription.next() ?: break
@@ -11874,7 +12140,7 @@ class WhiteNoiseAppState private constructor(
             outcome = "observed",
         )
         applyNotificationDisplayNameHint(update)
-        scheduleIncomingDocumentDownloadMaintenance(update)
+        scheduleIncomingAttachmentDownloadMaintenance(update)
         val postEpoch = notificationPostEpoch.capture()
         val accountCacheEpoch = profileCacheLifetime.capture()
         val engineMuted = engineNotificationMuted(update)
@@ -11905,6 +12171,11 @@ class WhiteNoiseAppState private constructor(
     /** Exercises the exact typed-update production path from JVM or instrumentation acceptance tests. */
     internal suspend fun processNotificationUpdateForTest(update: NotificationUpdateFfi) {
         withContext(Dispatchers.Main.immediate) { processNotificationUpdate(update) }
+    }
+
+    /** Runs receipt scheduling to completion, so a test can assert that a receipt queued nothing. */
+    internal suspend fun scheduleIncomingAttachmentDownloadsForTest(update: NotificationUpdateFfi) {
+        scheduleIncomingAttachmentDownloads(update)
     }
 
     /** Resolves all first-write content under the coordinator's one absolute budget. */
@@ -12417,6 +12688,15 @@ class WhiteNoiseAppState private constructor(
         private const val MAX_GROUP_MEMBER_SNAPSHOT_CACHE_ENTRIES = 1024
         private const val MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES = 4096
         private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
+
+        /** How many receipt history lookups run at once; more wait their turn rather than fan out. */
+        private const val RECEIPT_LOOKUP_CONCURRENCY = 4
+
+        /** The Marmot app-event kind of a chat message, the only kind that carries attachments. */
+        private const val MARMOT_CHAT_EVENT_KIND = 9uL
+
+        /** Converts the runtime's second timestamps for receipt lookups, which work in milliseconds. */
+        private const val MILLIS_PER_SECOND_LONG = 1_000L
         private const val NOTIFICATION_RETRY_MAX_BACKOFF_MILLIS = 60_000L
         private const val NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS = 5_000L
         private const val NOTIFICATION_NETWORK_RECOVERY_RECEIVER_TIMEOUT_MILLIS = 3_000L
