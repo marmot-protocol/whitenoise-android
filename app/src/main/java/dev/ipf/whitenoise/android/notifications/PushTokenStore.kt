@@ -465,8 +465,7 @@ class PushTokenStore(
                             if (!initialized && android.os.SystemClock.elapsedRealtime() >= nextImportAttemptMs) {
                                 val results =
                                     listOf(SECURE_PREFS_NAME, FALLBACK_PREFS_NAME, PREFS_NAME).associateWith { source ->
-                                        runCatching { importSource(appContext, source, secure) }
-                                            .getOrDefault(LegacyImportResult.PENDING)
+                                        runCatching { importSource(appContext, source, secure) }.getOrDefault(LegacyImportResult.PENDING)
                                     }
                                 val pending = results.containsValue(LegacyImportResult.PENDING)
                                 val quarantined = results.filterValues { it.quarantined }.keys
