@@ -1113,13 +1113,13 @@ class WhiteNoiseAppState private constructor(
             initialActiveAccountRef = null,
         )
 
-    /** JVM Compose tests inject the profile resolver/state and do not start Android platform services. */
+    /** Tests inject runtime/state seams; a null account override preserves production preference restoration. */
     internal constructor(
         context: Context,
         draftStore: DraftStore,
         accountIdHexResolver: suspend (String) -> String?,
         accounts: List<AccountSummaryFfi>,
-        activeAccountRef: String,
+        activeAccountRef: String?,
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
@@ -4840,25 +4840,22 @@ class WhiteNoiseAppState private constructor(
             appStateDebug {
                 "accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"
             }
-            if (accounts.isEmpty()) {
+            if (accounts.isNotEmpty()) {
+                // Retained Amber profiles still need their callbacks when the user later chooses Continue.
+                startupPerformance.stage(PerformancePhase.EXTERNAL_SIGNER_REGISTRATION) { reregisterExternalSigners() }
+            }
+            val targetAccount = startupAccount()
+            if (targetAccount == null) {
+                accountSession.publishSignedOutIdentity {
+                    activeAccountRef = null
+                    preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
+                }
                 localNotificationSettings = null
                 pendingStartupUnreadRefresh = null
                 completeReceiverGatedStartup()
                 phase = AppPhase.Onboarding
             } else {
-                // The receiver attempt already owns its process-lifetime job,
-                // but signer callbacks are an account-readiness prerequisite:
-                // once Ready is visible, UI work may require signing even while
-                // receiver convergence continues in the background.
-                startupPerformance.stage(PerformancePhase.EXTERNAL_SIGNER_REGISTRATION) { reregisterExternalSigners() }
-                val targetAccount = startupAccount()
                 val target = targetAccount.label
-                if (targetAccount.signedOut) {
-                    // A signed-out account is not a safe locally authenticated
-                    // shell. Preserve the notification ordering barrier before
-                    // sign-in can emit work or request external signatures.
-                    completeReceiverGatedStartup()
-                }
                 val activated =
                     startupPerformance.stage(PerformancePhase.ACCOUNT_ACTIVATION) {
                         // The callback is the local-ready boundary. The shell mounts before
@@ -4867,9 +4864,7 @@ class WhiteNoiseAppState private constructor(
                             label = target,
                             deferUnreadRefresh = true,
                             preloadPolicy = AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
-                            awaitPostActivationWork = {
-                                if (!targetAccount.signedOut) completeReceiverGatedStartup()
-                            },
+                            awaitPostActivationWork = { completeReceiverGatedStartup() },
                             onActivated = { phase = AppPhase.Ready },
                         )
                     }
@@ -4901,9 +4896,10 @@ class WhiteNoiseAppState private constructor(
     private fun bootstrapFailure(error: Throwable): ErrorPresentation =
         privacySafeErrorPresentation("APP_BOOTSTRAP", error, startupDetail = StartupDiagnostics.failureDetail())
 
-    private fun startupAccount(): AccountSummaryFfi = configuredAccount() ?: accounts.first()
-
-    private fun configuredAccount(): AccountSummaryFfi? = accounts.firstOrNull { it.label == activeAccountRef }
+    /** Restores only a native signed-in profile; retained signed-out identities require an explicit selection. */
+    private fun startupAccount(): AccountSummaryFfi? =
+        accounts.firstOrNull { it.label == activeAccountRef && !it.signedOut }
+            ?: accounts.firstOrNull { !it.signedOut }
 
     /**
      * Starts the process-owned listener with Marmot while deferring only its bounded readiness wait until a safe
