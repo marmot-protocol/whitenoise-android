@@ -76,6 +76,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
+import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
+import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
@@ -307,6 +309,13 @@ internal fun MediaVoiceBubble(
     var totalDurationMs by remember(pillKey, epoch) { mutableIntStateOf(0) }
     var loading by remember(pillKey, epoch) { mutableStateOf(false) }
     var failed by remember(pillKey, epoch) { mutableStateOf(false) }
+    var storageFailed by remember(pillKey, epoch) { mutableStateOf(false) }
+
+    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
+    fun markFailed(cause: Throwable? = null) {
+        storageFailed = cause.parksForStorage()
+        failed = true
+    }
     // Auto-download gate (#407): retained/cached own clips always materialize;
     // a cache-missing own clip waits during an explicit backlog pause. Incoming
     // clips honor the Audio matrix row unless the attachment is already local.
@@ -333,6 +342,15 @@ internal fun MediaVoiceBubble(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+    restoreParkedDownloadOnEntry(
+        identity = Triple(controller, messageIdHex, attachmentIndex),
+        enabled = !mine && !startDownload && !cancelledByReader,
+        parkedByReader = failed && storageFailed && materializationIntent.readerRequested,
+        recordParkedByReader = { controller.recordReaderParkedDownload(messageIdHex, attachmentIndex) },
+        readerParkHeld = { controller.readerDownloadParkedForStorage(messageIdHex, attachmentIndex) },
+    ) {
+        materializationIntent = materializationIntent.afterParkedDownloadFound()
+    }
     val transfer =
         rememberTileTransfer(
             controller,
@@ -344,6 +362,11 @@ internal fun MediaVoiceBubble(
             startDownload,
         )
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
+    storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
+        failed = false
+        storageFailed = false
+        reloadToken++
+    }
 
     val playback by remember(pillKey, presentationRuntime) {
         presentationRuntime.playbackState
@@ -374,7 +397,7 @@ internal fun MediaVoiceBubble(
         )
         localFile = null
         totalDurationMs = 0
-        failed = true
+        markFailed()
         val retryAllowedByPolicy =
             shouldStartVoiceAttachmentDownload(
                 mine = mine,
@@ -461,7 +484,7 @@ internal fun MediaVoiceBubble(
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
                 Log.w("MediaVoiceBubble", "voice_auto_materialize_failed")
-                failed = true
+                markFailed(it)
             }
         }
         loading = false
@@ -504,6 +527,7 @@ internal fun MediaVoiceBubble(
     VoiceAttachmentContent(
         loading = loading,
         failed = failed,
+        storageBlocked = failed && storageFailed,
         startDownload = startDownload,
         localFileAvailable = localFile != null,
         isPlaying = isPlayingThis,
@@ -530,7 +554,7 @@ internal fun MediaVoiceBubble(
                 messageIdHex,
                 attachmentIndex,
                 onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                onFailure = { failed = true },
+                onFailure = { markFailed(it) },
             )
         },
         onActionClick = {
@@ -540,7 +564,7 @@ internal fun MediaVoiceBubble(
                         messageIdHex,
                         attachmentIndex,
                         onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                        onFailure = { failed = true },
+                        onFailure = { markFailed(it) },
                     )
                 loading || localFile == null ->
                     controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
@@ -598,6 +622,7 @@ internal fun VoiceAttachmentContent(
     onSeek: ((Float) -> Unit)? = null,
     onCycleSpeed: () -> Unit = {},
     modifier: Modifier = Modifier,
+    storageBlocked: Boolean = false,
 ) {
     val bubbleContent = LocalContentColor.current
     val tinted = outgoing && !isAmoledSurfaceTheme()
@@ -610,7 +635,7 @@ internal fun VoiceAttachmentContent(
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         }
-    val actionVisual = voiceActionVisual(loading, failed, startDownload, localFileAvailable, isPlaying)
+    val actionVisual = voiceActionVisual(loading, failed, startDownload, localFileAvailable, isPlaying, storageBlocked)
     val action = voiceAction(transfer?.takeUnless { localFileAvailable }, actionVisual, onActionClick, onRetryTransfer)
     val actionDescription = action.description
     Surface(
@@ -836,7 +861,9 @@ private fun VoiceActionGlyph(actionVisual: VoiceActionVisual) {
                 strokeWidth = 2.dp,
                 color = LocalContentColor.current,
             )
-        VoiceActionVisual.FAILED ->
+        VoiceActionVisual.FAILED,
+        VoiceActionVisual.STORAGE_BLOCKED,
+        ->
             Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(24.dp))
         VoiceActionVisual.DOWNLOAD ->
             Icon(imageVector = Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -872,6 +899,7 @@ private enum class VoiceActionVisual(
 ) {
     LOADING(R.string.media_downloading),
     FAILED(R.string.voice_message_failed),
+    STORAGE_BLOCKED(R.string.media_storage_blocked),
     DOWNLOAD(R.string.media_tap_to_download),
     PAUSE(R.string.voice_message_pause),
     PLAY(R.string.voice_message_play),
@@ -884,9 +912,11 @@ private fun voiceActionVisual(
     startDownload: Boolean,
     localFileAvailable: Boolean,
     isPlaying: Boolean,
+    storageBlocked: Boolean = false,
 ): VoiceActionVisual =
     when {
         loading -> VoiceActionVisual.LOADING
+        failed && storageBlocked -> VoiceActionVisual.STORAGE_BLOCKED
         failed -> VoiceActionVisual.FAILED
         !startDownload && !localFileAvailable -> VoiceActionVisual.DOWNLOAD
         isPlaying -> VoiceActionVisual.PAUSE

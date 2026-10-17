@@ -150,7 +150,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_reset_group",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-033"
         ]
       },
       {
@@ -158,7 +159,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_group_reset_already_waiting",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-033"
         ]
       },
       {
@@ -166,7 +168,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_group_reset_done",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-033"
         ]
       },
       {
@@ -259,6 +262,30 @@
         "anchor": "R.string.media_file_too_large",
         "test_ids": [
           "MED-030"
+        ]
+      },
+      {
+        "surface": "toast chat abandoned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_chat_abandoned",
+        "test_ids": [
+          "GRP-033"
+        ]
+      },
+      {
+        "surface": "toast couldnt abandon chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_abandon_chat",
+        "test_ids": [
+          "GRP-033"
+        ]
+      },
+      {
+        "surface": "toast chat already abandoned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_chat_already_abandoned",
+        "test_ids": [
+          "GRP-033"
         ]
       }
     ],
@@ -749,6 +776,14 @@
         "test_ids": [
           "GRP-001",
           "GRP-030"
+        ]
+      },
+      {
+        "surface": "Edit that MarmotKit refuses because the message can no longer be edited",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_message_not_editable",
+        "test_ids": [
+          "MSG-007"
         ]
       }
     ]

@@ -98,9 +98,11 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
+import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -117,7 +119,6 @@ import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
-import dev.ipf.whitenoise.android.ui.conversation.ConversationTransientNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.WrapText
@@ -352,6 +353,8 @@ internal fun GroupDetailsScreen(
         // dispatched so the menu's progress label can never read the pre-intent
         // presented state and show the opposite direction.
         var pendingConfirm by remember { mutableStateOf<DetailsConfirm?>(null) }
+        // #3310: the reviewed local-abandonment target and a Leave that did not finish, scoped to this account.
+        val abandonment = remember(controller, appState.activeAccountRef) { GroupAbandonmentReview() }
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
         val transcriptSave = rememberConversationTranscriptSave(appState, controller)
@@ -568,7 +571,9 @@ internal fun GroupDetailsScreen(
             controller.clearLastMutationError()
             appState.launchMutation {
                 try {
-                    if (mutation()) onSuccess()
+                    val succeeded = mutation()
+                    abandonment.recordMutation(leave = action == GroupMutationAction.Leave, succeeded = succeeded)
+                    if (succeeded) onSuccess()
                 } finally {
                     // onSuccess() may have already dismissed this sheet; clearing
                     // detached Compose state is harmless in that case.
@@ -604,6 +609,23 @@ internal fun GroupDetailsScreen(
                     LeaveAction.Standard -> pendingConfirm = DetailsConfirm.Leave(displayName)
                 }
             }
+        }
+
+        /**
+         * Opens the abandonment review for this exact conversation under the current account (#3310, #3282), and
+         * only once the conversation's account is the active one, so the review names the account that will forget.
+         */
+        fun requestAbandonment() {
+            val account = abandonmentAccount(controller.boundAccountRef, appState.activeAccountRef) ?: return
+            abandonment.open(
+                GroupAbandonmentTarget(
+                    accountRef = account,
+                    accountName = abandonmentAccountName(appState, account),
+                    groupIdHex = controller.group.groupIdHex,
+                    conversationTitle = conversationTitle,
+                    isDm = isDm,
+                ),
+            )
         }
 
         /** Exports the transcript through the native save flow. */
@@ -1079,15 +1101,18 @@ internal fun GroupDetailsScreen(
                             ),
                         onDismiss = { pendingConfirm = null },
                     )
-                // #1131: with no eligible successor, keep the sole admin in the group.
                 is DetailsConfirm.LeaveSoleAdmin ->
-                    GroupDetailsConfirmation(
+                    // Fallback for the (unexpected) no-transfer-candidate case. The normal sole-admin Leave
+                    // routes to LeaveSoleAdminTransfer or the picker in leave mode (#1131). With no eligible
+                    // successor, local abandonment is the way out of this gate (#3310).
+                    GroupSoleAdminLeaveDialog(
+                        groupName = confirm.groupName,
+                        isDm = isDm,
                         identity = identity,
-                        confirmEnabled = memberHex != null,
-                        model =
-                            GroupDetailsConfirmationState.BlockedLeave(
-                                groupName = confirm.groupName,
-                            ),
+                        onAbandon = {
+                            pendingConfirm = null
+                            requestAbandonment()
+                        },
                         onDismiss = { pendingConfirm = null },
                     )
                 is DetailsConfirm.LeaveSoleAdminTransfer ->
@@ -1114,19 +1139,52 @@ internal fun GroupDetailsScreen(
             }
         }
 
+        abandonment.target?.let { target ->
+            GroupAbandonmentDialog(
+                // The acting account's name resolves while the review shows, as the group-action identity does.
+                target = target.copy(accountName = abandonmentAccountName(appState, target.accountRef)),
+                status =
+                    when {
+                        activeMutation?.action == GroupMutationAction.Reset -> GroupAbandonmentStatus.Running
+                        abandonment.attempted && controller.lastMutationError != null -> GroupAbandonmentStatus.Failed
+                        else -> GroupAbandonmentStatus.Review
+                    },
+                onConfirm = {
+                    val actingAccount = abandonmentAccount(controller.boundAccountRef, appState.activeAccountRef)
+                    if (!abandonment.targets(actingAccount, controller.group.groupIdHex)) {
+                        abandonment.dismiss()
+                    } else if (activeMutation == null && !controller.mutationInFlight) {
+                        abandonment.attempted = true
+                        runGroupMutation(
+                            action = GroupMutationAction.Reset,
+                            mutation = { controller.forgetGroupLocal() },
+                            onSuccess = {
+                                abandonment.dismiss()
+                                onLeft()
+                            },
+                        )
+                    }
+                },
+                onDismiss = abandonment::dismiss,
+                // The screen's error banner sits behind this modal, so the failed review carries its Copy action.
+                error = controller.lastMutationError.takeIf { abandonment.attempted },
+            )
+        }
+        // #3310: the escape path after a Leave that did not finish, under the error banner wherever it shows.
+        val leaveBlockedNotice: @Composable (Modifier) -> Unit = { modifier ->
+            if (abandonment.leaveBlocked && controller.group.offersLocalAbandonment()) {
+                Box(modifier) {
+                    GroupLeaveBlockedNotice(isDm = isDm, enabled = !mutationsBlocked, onAbandon = ::requestAbandonment)
+                }
+            }
+        }
         val groupFeedback: @Composable () -> Unit = {
             controller.lastMutationError?.let { error ->
                 Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     GroupMutationErrorBanner(error = error, onDismiss = { controller.clearLastMutationError() })
                 }
             }
-        }
-        val groupNotice: @Composable () -> Unit = {
-            ConversationTransientNotice(
-                notice = appState.transientNotice,
-                accountRef = appState.activeAccountRef,
-                groupIdHex = controller.group.groupIdHex,
-            )
+            leaveBlockedNotice(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
         val memberContent: @Composable () -> Unit = {
             if (!isDm) {
@@ -1353,7 +1411,6 @@ internal fun GroupDetailsScreen(
                 onBack = { membersExpanded = false },
                 scrollState = membersScrollState,
                 feedback = groupFeedback,
-                bottomBar = groupNotice,
                 content = memberContent,
             )
             return@PreparedGroupAvatarContent
@@ -1364,7 +1421,6 @@ internal fun GroupDetailsScreen(
                 relays = controller.group.relays,
                 onBack = { showChatRelays = false },
                 feedback = groupFeedback,
-                bottomBar = groupNotice,
             )
             return@PreparedGroupAvatarContent
         }
@@ -1424,13 +1480,6 @@ internal fun GroupDetailsScreen(
                             )
                         }
                     },
-                )
-            },
-            bottomBar = {
-                ConversationTransientNotice(
-                    notice = appState.transientNotice,
-                    accountRef = appState.activeAccountRef,
-                    groupIdHex = controller.group.groupIdHex,
                 )
             },
         ) { padding ->
@@ -1574,6 +1623,7 @@ internal fun GroupDetailsScreen(
                         )
                     }
                 }
+                leaveBlockedNotice(Modifier.padding(horizontal = Dimens.spaceLg).padding(top = 8.dp))
 
                 memberContent()
 
@@ -2083,12 +2133,15 @@ internal fun GroupDetailsScreen(
                             onDismiss = { disbandConfirmOpen = false },
                         )
                     }
+                    // A disbanded group has ended even while its roster still lists this account, and the shared
+                    // abandonment rule withdraws Reset there, so local deletion is its way out of Details.
+                    val disbanded = controller.group.disbanded
                     GroupDetailsLocalDeleteControl(
                         identity = ownIdentity,
                         isDm = isDm,
                         readOnlyInvite = readOnlyInvite,
-                        isSelfMember = controller.isSelfMember,
-                        membersVerified = controller.membersVerified,
+                        isSelfMember = controller.isSelfMember && !disbanded,
+                        membersVerified = controller.membersVerified || disbanded,
                         enabled = !mutationsBlocked && (isDm || actingMemberHex != null),
                         inProgress = activeMutation?.action == GroupMutationAction.Delete,
                         onDeleteConfirmed = {
@@ -2100,18 +2153,11 @@ internal fun GroupDetailsScreen(
                         },
                     )
                     GroupDetailsResetControl(
-                        identity = ownIdentity,
                         isDm = isDm,
-                        readOnlyInvite = readOnlyInvite,
-                        enabled = !mutationsBlocked && (isDm || actingMemberHex != null),
+                        offered = controller.group.offersLocalAbandonment(),
+                        enabled = !mutationsBlocked,
                         inProgress = activeMutation?.action == GroupMutationAction.Reset,
-                        onResetConfirmed = {
-                            runGroupMutation(
-                                action = GroupMutationAction.Reset,
-                                mutation = { controller.forgetGroupLocal() },
-                                onSuccess = onLeft,
-                            )
-                        },
+                        onRequest = ::requestAbandonment,
                     )
                 }
 

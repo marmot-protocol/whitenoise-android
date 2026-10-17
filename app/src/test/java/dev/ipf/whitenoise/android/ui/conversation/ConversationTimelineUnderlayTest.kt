@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -295,7 +296,7 @@ class ConversationTimelineUnderlayTest {
 
     /** Measured base clearance cannot be mistaken for overlay, even when the total native padding is unchanged. */
     @Test
-    fun snackbarAndComposerExchangePaddingWithoutAFictitiousReadingFrame() {
+    fun baseClearanceAndComposerExchangePaddingWithoutAFictitiousReadingFrame() {
         render()
         rule.waitForIdle()
         rule.runOnIdle {
@@ -450,7 +451,10 @@ class ConversationTimelineUnderlayTest {
                                             timelinePublication = emptyList(),
                                         ).onGloballyPositioned(viewport::onPaintViewportMeasured),
                                 reverseLayout = true,
-                                contentPadding = conversationTimelineContentPadding(notice.dp, overlap),
+                                // The production padding has no bottom clearance beyond the tail gap and overlap,
+                                // this harness adds a measured base clearance to tell it apart from overlay.
+                                contentPadding =
+                                    PaddingValues(bottom = CONVERSATION_TIMELINE_TAIL_GAP + notice.dp + overlap),
                             ) {
                                 items((0..19).toList().asReversed(), key = { it }) { index ->
                                     val rowInstance = remember(index) { Any() }

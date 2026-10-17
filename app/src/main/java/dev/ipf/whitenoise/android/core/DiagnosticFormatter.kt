@@ -199,6 +199,17 @@ object DiagnosticFormatter {
         return "contention=$code"
     }
 
+    /** Native refusals that wait on relays, delivery or catch-up rather than on the request itself. */
+    private fun isConnectivityError(error: MarmotKitException?): Boolean =
+        error is MarmotKitException.Publish ||
+            error is MarmotKitException.TransportClosed ||
+            error is MarmotKitException.AccountCatchUp ||
+            error is MarmotKitException.DirectoryLookupIncomplete ||
+            error is MarmotKitException.GroupCatchingUp ||
+            error is MarmotKitException.GroupCommitUndelivered ||
+            error is MarmotKitException.FollowListUnavailable ||
+            error is MarmotKitException.BlockPublicationUncertain
+
     /** Classifies the first known native cause without copying private exception messages into a report. */
     @Suppress("CyclomaticComplexMethod") // One ordered taxonomy prevents error-code precedence from drifting.
     internal fun errorCode(throwable: Throwable): String {
@@ -219,6 +230,8 @@ object DiagnosticFormatter {
                 marmotError is MarmotKitException.InvalidHex ||
                 marmotError is MarmotKitException.InvalidIdentity ||
                 marmotError is MarmotKitException.InvalidKeyPackageEvent ||
+                marmotError is MarmotKitException.InvalidEditTarget ||
+                marmotError is MarmotKitException.InvalidPublicEventReferences ||
                 marmotError is MarmotKitException.EmptyPassphrase -> "INVALID_INPUT"
             marmotError is MarmotKitException.UnknownAccount ||
                 marmotError is MarmotKitException.UnknownGroup ||
@@ -236,11 +249,7 @@ object DiagnosticFormatter {
                 marmotError is MarmotKitException.WouldRemoveLastAdmin ||
                 marmotError is MarmotKitException.MediaUnfetchable ||
                 marmotError is MarmotKitException.UserBlocked -> "PERMISSION_DENIED"
-            marmotError is MarmotKitException.Publish ||
-                marmotError is MarmotKitException.TransportClosed ||
-                marmotError is MarmotKitException.AccountCatchUp ||
-                marmotError is MarmotKitException.FollowListUnavailable ||
-                marmotError is MarmotKitException.BlockPublicationUncertain -> "CONNECTIVITY"
+            isConnectivityError(marmotError) -> "CONNECTIVITY"
             marmotError is MarmotKitException.KeystoreUnavailable ||
                 marmotError is MarmotKitException.ExternalSignerUnavailable ||
                 marmotError is MarmotKitException.BlockListUnavailable -> "PLATFORM_UNAVAILABLE"

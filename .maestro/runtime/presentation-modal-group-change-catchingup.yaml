@@ -1,0 +1,36 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-group-change-catchingup
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: This chat may be out of date
+- assertVisible:
+    text: This chat may be out of date on this device\. Changing the group now could split it for everyone\. Wait for it to sync, or continue anyway\?
+- assertVisible:
+    text: Fixture confirmation group
+    id: group.change.target
+- assertVisible:
+    text: Wait
+    id: confirmation.cancel
+- assertVisible:
+    text: Continue anyway
+    id: confirmation.confirm
+- tapOn:
+    id: confirmation.cancel
+- assertNotVisible:
+    text: This chat may be out of date
+- tapOn:
+    text: Reopen group change question
+- assertVisible:
+    text: This chat may be out of date
+- back
+- assertNotVisible:
+    text: This chat may be out of date
+- tapOn:
+    text: Reopen group change question
+- assertVisible:
+    text: This chat may be out of date
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

@@ -2125,6 +2125,23 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+      "symbol": "GroupChangeConfirmationDialog",
+      "bindings": [
+        {
+          "case": "presentation-modal-group-change-catchingup",
+          "selector": {
+            "text": "This chat may be out of date"
+          },
+          "scope": "Actual app-level question for a catching-up refusal with Wait/Back/reopen and the Continue anyway callback; the answer reaches only the fixture, never acknowledge or a group change. Undelivered and invite wording are pinned by GroupChangeConfirmationScreenshotTest.",
+          "entry_assertion": {
+            "text": "This chat may be out of date"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
       "symbol": "DeveloperInfoPanel",
       "bindings": [
@@ -4507,6 +4524,23 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+      "symbol": "ChatDepartureReview",
+      "bindings": [
+        {
+          "case": "presentation-modal-departure-review-abandon",
+          "selector": {
+            "text": "Abandon the selected chats on this device\\?"
+          },
+          "scope": "Actual bulk abandonment review with group, direct chat and acting-account identities, Cancel/Back/reopen and bounded confirm; the batch progress and native forget remain separate.",
+          "entry_assertion": {
+            "text": "Abandon the selected chats on this device\\?"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
       "symbol": "ChatsNewMessageFab",
       "bindings": [
@@ -4823,7 +4857,7 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-      "symbol": "GroupDetailsResetControl",
+      "symbol": "GroupAbandonmentReviewDialog",
       "bindings": [
         {
           "case": "presentation-modal-group-control-reset",
@@ -4837,6 +4871,42 @@
           "opened_by": {
             "text": "Reset and wait for a new invite"
           }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+      "symbol": "GroupAbandonmentDialog",
+      "bindings": [
+        {
+          "case": "presentation-modal-group-control-reset",
+          "selector": {
+            "text": "Reset this group on this device\\?"
+          },
+          "scope": "The shared single-chat abandonment review opened from the group reset control; the same reset fixture covers its Cancel/Back/reopen and bounded confirm dispatch, no history or encryption deletion.",
+          "entry_assertion": {
+            "text": "Reset this group on this device\\?"
+          },
+          "opened_by": {
+            "text": "Reset and wait for a new invite"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+      "symbol": "GroupSoleAdminLeaveDialog",
+      "bindings": [
+        {
+          "case": "presentation-modal-group-sole-admin-leave",
+          "selector": {
+            "text": "You're the only admin"
+          },
+          "scope": "Actual sole-admin Leave fallback content, Cancel/Back/reopen and the bounded abandon callback; the group-details route and native forget remain owned by GroupDetailsScreen.",
+          "entry_assertion": {
+            "text": "You're the only admin"
+          },
+          "visible_on_entry": true
         }
       ]
     },

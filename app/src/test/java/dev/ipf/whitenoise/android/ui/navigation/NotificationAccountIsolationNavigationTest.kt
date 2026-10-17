@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Bundle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -119,6 +120,62 @@ class NotificationAccountIsolationNavigationTest {
             holder.release()
         }
         awaitCondition { state.mutationsScope.coroutineContext[Job]?.isCompleted != false }
+    }
+
+    /**
+     * The production seam at MainShell: a newer tap for the source account opens its conversation while the older
+     * inactive-account tap's exact preload is still held. Releasing that retired read afterwards must leave the
+     * current selection, its open context, every handled request id and the first-frame gate owner unchanged.
+     */
+    @Test
+    fun heldInactivePreloadReleasedAfterANewerTapLeavesTheNewerRouteUnchanged() {
+        val gate = AccountRouteOrderGate(preloadFinishesFirst = false)
+        val state = appState(fakeMarmot(gate))
+        state.setAppInForeground(true)
+        val holder = MainShellStateHolder(state, SavedStateHandle())
+        var routing = routedTarget(TARGET_ACCOUNT)
+        val inbound = mutableStateOf(routing.notificationTarget)
+        val requestId = mutableLongStateOf(routing.notificationRequestId)
+        val handled = CopyOnWriteArrayList<Long>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MainShell(
+                    appState = state,
+                    stateHolder = holder,
+                    inboundNotificationTarget = inbound.value,
+                    inboundNotificationRequestId = requestId.longValue,
+                    onNotificationTargetHandled = { _, handledRequestId ->
+                        handled += handledRequestId
+                        if (handledRequestId == requestId.longValue) inbound.value = null
+                    },
+                )
+            }
+        }
+        try {
+            awaitCondition { gate.preloadStarted.count == 0L }
+            routing = NotificationRouteHarness.routedTarget(SOURCE_ACCOUNT, current = routing)
+            val newerRequestId = routing.notificationRequestId
+            composeRule.runOnIdle {
+                inbound.value = routing.notificationTarget
+                requestId.longValue = newerRequestId
+            }
+            awaitCondition {
+                newerRequestId in handled &&
+                    holder.selectedChatOpenContext.value.notificationRouteTraceRequestId == newerRequestId &&
+                    holder.notificationFirstFrame.gate == null
+            }
+            val before = HeldRouteSnapshot.of(holder, state, handled)
+
+            gate.releasePreload.countDown()
+            check(gate.preloadCompleted.await(ROUTE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+                "the retired preload never completed"
+            }
+
+            assertStaysUnchanged(before) { HeldRouteSnapshot.of(holder, state, handled) }
+            assertEquals(listOf(newerRequestId), handled.toList())
+        } finally {
+            composeRule.runOnIdle { holder.release() }
+        }
     }
 
     @Test
@@ -476,6 +533,44 @@ class NotificationAccountIsolationNavigationTest {
         verifyRouteCompletion(appState, gate, handled, (sourceKeys + lateSource).toSet())
     }
 
+    /** What a retired route must never change once a newer route owns the shell. */
+    private data class HeldRouteSnapshot(
+        val selectedChatId: String?,
+        val openContext: ConversationOpenContext,
+        val handled: List<Long>,
+        val gateRequestId: Long?,
+        val activeAccountRef: String?,
+    ) {
+        companion object {
+            /** Reads the shell selection, the acknowledgements and the first-frame owner together. */
+            fun of(
+                holder: MainShellStateHolder,
+                state: WhiteNoiseAppState,
+                handled: List<Long>,
+            ) = HeldRouteSnapshot(
+                selectedChatId = holder.selectedChat.value?.id,
+                openContext = holder.selectedChatOpenContext.value,
+                handled = handled.toList(),
+                gateRequestId = holder.notificationFirstFrame.gate?.requestId,
+                activeAccountRef = state.activeAccountRef,
+            )
+        }
+    }
+
+    /** Lets the released work run to completion and fails if [current] ever differs from [expected]. */
+    private fun assertStaysUnchanged(
+        expected: HeldRouteSnapshot,
+        current: () -> HeldRouteSnapshot,
+    ) {
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(SETTLE_MILLIS)
+        while (System.nanoTime() <= deadline) {
+            composeRule.waitForIdle()
+            ShadowLooper.idleMainLooper()
+            assertEquals("a retired callback changed the newer route", expected, current())
+            Thread.sleep(POLL_INTERVAL_MILLIS)
+        }
+    }
+
     /** The app summary has no account ownership; every actual child key still participates. */
     private fun activeUserCardKeys(): Set<Pair<String?, Int>> =
         manager.activeNotifications
@@ -589,5 +684,6 @@ class NotificationAccountIsolationNavigationTest {
         const val TEST_CHANNEL = "notification-account-isolation-test"
         const val ROUTE_TIMEOUT_MILLIS = NotificationRouteHarness.ROUTE_TIMEOUT_MILLIS
         const val POLL_INTERVAL_MILLIS = 20L
+        const val SETTLE_MILLIS = 1_000L
     }
 }

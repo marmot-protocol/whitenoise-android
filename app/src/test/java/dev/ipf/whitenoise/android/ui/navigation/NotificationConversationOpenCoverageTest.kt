@@ -25,48 +25,43 @@ class NotificationConversationOpenCoverageTest {
     /** A pin tap waits for the App Lock decision instead of being armed, consumed or routed while it is pending. */
     @Test
     fun pinnedShortcutRouteWaitsForThePendingLockDecision() {
-        val source = mainShellSource()
-        val effect = source.substring(source.indexOf("LaunchedEffect(\n        inboundNotificationTarget,"))
-        val keys = effect.substringBefore(") {")
-        assertTrue("the routing effect must re-run on the lock decision", keys.contains("appUnlockEvaluationPending"))
-        val wait =
-            effect.indexOf(
-                "if (target.shortcutCapability != null && appState.appUnlockEvaluationPending) return@LaunchedEffect",
-            )
-        val arm = effect.indexOf("if (routingRequestId != armedNotificationRequestId) {")
+        assertTrue("the pass must re-run on the lock decision", "appUnlockEvaluationPending" in routeEffectKeys())
+        val route = routerSource().between("suspend fun route(", "private fun retireClearedTarget")
+        val wait = route.indexOf("target.shortcutCapability != null && appState.appUnlockEvaluationPending -> Unit")
+        val arm = route.indexOf("else -> routeArmed(")
         assertTrue("pins must wait before the request is armed or consumed", wait >= 0 && wait < arm)
+        val armed = routerSource().between("private suspend fun routeArmed(", "private fun awaitAccounts")
+        assertTrue("arming happens only inside routeArmed", "state.armedRequestId = attempt.requestId" in armed)
     }
 
     /** A lock that shows while accounts are still loading consumes the pin before a later unlock could route it. */
     @Test
     fun pinnedShortcutRouteFailsClosedWhenTheLockShowsBeforeAccountsLoad() {
-        val source = mainShellSource()
-        val effect = source.substring(source.indexOf("LaunchedEffect(\n        inboundNotificationTarget,"))
-        val keys = effect.substringBefore(") {")
-        assertTrue("the routing effect must re-run when the lock shows", keys.contains("appState.appLockScreenVisible"))
-        val accountsEmpty = effect.indexOf("if (appState.accounts.isEmpty()) {")
-        val block = effect.substring(accountsEmpty).substringBefore("val broadChatListReady")
+        assertTrue("the pass must re-run when the lock shows", "appState.appLockScreenVisible" in routeEffectKeys())
+        val router = routerSource()
+        val armed = router.between("private suspend fun routeArmed(", "private fun awaitAccounts")
+        assertTrue(
+            "an empty account list waits instead of resolving",
+            armed.indexOf("awaitAccounts(attempt)") in 0 until armed.indexOf("resolveAndAct(attempt)"),
+        )
+        val block = router.between("private fun awaitAccounts(", "private suspend fun resolveAndAct")
         assertTrue(block.contains("pinnedShortcutLockDecision() == PinnedShortcutLockDecision.LOCKED"))
-        val consume = block.indexOf("onNotificationTargetHandled(target, routingRequestId)")
-        val earlyReturn = block.indexOf("return@LaunchedEffect")
-        assertTrue("a locked pin is consumed before the early return", consume >= 0 && consume < earlyReturn)
+        assertTrue("a locked pin is consumed", "shell.targetHandled(attempt.target, attempt.requestId)" in block)
     }
 
     /** Route state is published only after the awaited card cancellation has returned. */
     @Test
     fun routeCommitAwaitsDismissalBeforePublishingNavigationState() {
-        val source = mainShellSource()
-        val start = source.indexOf("suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {")
-        assertTrue("route commit must be suspendable", start >= 0)
-        val commit =
-            source
-                .substring(start)
-                .substringBefore("when (step)")
+        val commit = commitSource()
         val dismiss = commit.indexOf("appState.dismissNotificationRouteCards(")
-        val navigation = commit.indexOf("sectionName = MainSection.Chats.name")
-        val selected = commit.indexOf("selectedChat = chatItem")
+        val recheck = commit.indexOf("if (rejectUnavailablePin(attempt)) return", dismiss)
+        val navigation = commit.indexOf("shell.openRoutedConversation(")
         assertTrue("cancellation must precede every route-state publication", dismiss >= 0 && navigation > dismiss)
-        assertTrue("selected chat must commit after cancellation", selected > navigation)
+        assertTrue("pin authority is rechecked after the suspension", recheck in dismiss until navigation)
+        val shellOpen = mainShellSource().between("override fun openRoutedConversation(", "override fun targetHandled")
+        val section = shellOpen.indexOf("sectionName = MainSection.Chats.name")
+        val selected = shellOpen.indexOf("selectedChat = item")
+        assertTrue("selected chat must commit last, after the section", section >= 0 && selected > section)
     }
 
     @Test
@@ -103,10 +98,7 @@ class NotificationConversationOpenCoverageTest {
     @Test
     fun routeCommitCapturesTheTappedMessageAndHandsItToTheConversationScreen() {
         val source = mainShellSource().replace(Regex("\\s+"), " ")
-        val commit =
-            source
-                .substringAfter("suspend fun commitNotificationConversationOpen(")
-                .substringBefore("when (step)")
+        val commit = commitSource().replace(Regex("\\s+"), " ")
 
         assertTrue(
             "the commit must capture the card's message",
@@ -220,44 +212,20 @@ class NotificationConversationOpenCoverageTest {
     /** The inactive-account route holds its priority window from activation until the first conversation frame. */
     @Test
     fun inactiveAccountProductionRoutePrioritizesTargetUntilFirstFrame() {
-        val source = mainShellSource()
-        val gateCreated = source.indexOf("NotificationRouteFirstFrameGate(")
+        val switch = sourceFile("NotificationAccountSwitchRoute.kt").readText()
+        val gateCreated = switch.indexOf("NotificationRouteFirstFrameGate(")
         val prioritySwitch =
-            source.indexOf(
+            switch.indexOf(
                 "AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST",
                 startIndex = gateCreated,
             )
-        val broadBindGuard = source.indexOf("if (deferNotificationChatListBind) return@LaunchedEffect")
-        val firstFrameCallback = source.indexOf("onFirstFrameCommitted = {")
-        val release =
-            source.indexOf(
-                "releaseNotificationFirstFrameGate(requestId)",
-                startIndex = firstFrameCallback,
-            )
-        val failedPreload = source.indexOf("NotificationMessagePreloadState.Failed ->")
-        val readyPreload = source.indexOf("is NotificationMessagePreloadState.Ready ->")
-        val readyOpen = source.indexOf("commitNotificationConversationOpen(preloadState.item)", readyPreload)
-        val activeRetry =
-            source.indexOf(
-                "shouldRetryNotificationMessageLoadAfterActivation(",
-                startIndex = failedPreload,
-            )
-        val retryDirectLoad = source.indexOf("loadNotificationMessageDirectly {", startIndex = activeRetry)
-        val retryReady = source.indexOf("NotificationMessagePreloadState.Ready(outcome.item)", retryDirectLoad)
-        val retryBranchEnd = source.indexOf("null ->", startIndex = failedPreload)
-        assertTrue("the retry branch must publish its successful result", retryBranchEnd > retryReady)
-        // The retry's own block ends where the spent-retry branch begins. Holding the overlay is
-        // only right while a retry is in flight; once the exact read has answered inconclusively
-        // and its one retry is used up, the overlay comes down and the tap stays pending rather
-        // than the route claiming the conversation is gone (#2580).
-        val spentRetryBranch = source.indexOf("} else {", startIndex = activeRetry)
-        val exposesChatListDuringRetry =
-            source
-                .indexOf("routingNotification = false", startIndex = failedPreload)
-                .let { it in failedPreload until spentRetryBranch }
-        val targetFirstEligibility = source.indexOf("val canUseTargetFirst =")
-        val signedInPreloadEligibility = source.indexOf("val canPreload =", startIndex = targetFirstEligibility)
-        val signedOutGate = source.indexOf("if (canUseTargetFirst) {", startIndex = signedInPreloadEligibility)
+        val targetFirstEligibility = switch.indexOf("val canUseTargetFirst =")
+        val signedInPreloadEligibility = switch.indexOf("val canPreload =", startIndex = targetFirstEligibility)
+        val signedOutGate = switch.indexOf("if (canUseTargetFirst) NotificationRouteFirstFrameGate(")
+        val shell = mainShellSource()
+        val broadBindGuard = shell.indexOf("if (deferNotificationChatListBind) return@LaunchedEffect")
+        val firstFrameCallback = shell.indexOf("onFirstFrameCommitted = {")
+        val release = shell.indexOf("releaseNotificationFirstFrameGate(requestId)", startIndex = firstFrameCallback)
 
         assertTrue("the production switch route must own a first-frame priority gate", gateCreated >= 0)
         assertTrue(
@@ -269,16 +237,30 @@ class NotificationConversationOpenCoverageTest {
         assertTrue("notification activation must select target-first preload", prioritySwitch > gateCreated)
         assertTrue("the broad chat-list bind must honor the priority window", broadBindGuard >= 0)
         assertTrue("the readable conversation frame must release deferred work", release > firstFrameCallback)
+
+        val reads = readsSource()
+        val load = reads.between("suspend fun loadMessage(", "private fun retryAfterActivation")
+        val readyStep = "is NotificationMessagePreloadState.Ready -> completion.commit(attempt, preloadState.item)"
+        val readyOpen = load.indexOf(readyStep)
+        val failedPreload = load.indexOf("NotificationMessagePreloadState.Failed ->")
+        val activeRetry = load.indexOf("shouldRetryNotificationMessageLoadAfterActivation(", startIndex = failedPreload)
+        val retryCall = load.indexOf("retryAfterActivation(attempt)", startIndex = activeRetry)
+        // Holding the overlay is only right while a retry is in flight. Once the exact read has answered
+        // inconclusively and its one retry is used up, the overlay comes down and the tap stays pending
+        // rather than the route claiming the conversation is gone (#2580).
+        val spentRetry = load.indexOf("completion.releaseInconclusive(attempt)", startIndex = retryCall)
+        assertTrue("the ready preload must open the conversation", readyOpen in 0 until failedPreload)
         assertTrue("a failed inactive preload must retry after activation", activeRetry > failedPreload)
-        assertTrue("the active-account retry must perform an exact local load", retryDirectLoad > activeRetry)
+        assertTrue("a spent retry must release the routing overlay", spentRetry > retryCall)
+
+        val retry = reads.between("private fun retryAfterActivation(", "private suspend fun readTarget")
+        val retryDirectLoad = retry.indexOf("loadNotificationMessageDirectly {")
+        val retryReady = retry.indexOf("NotificationMessagePreloadState.Ready(outcome.item)", retryDirectLoad)
+        assertTrue("the active-account retry must perform an exact local load", retryDirectLoad >= 0)
         assertTrue("a successful retry must publish the exact target", retryReady > retryDirectLoad)
-        assertTrue("the ready preload must open the conversation", readyOpen in (readyPreload + 1) until failedPreload)
-        assertTrue("the chat list must stay hidden during active retry", !exposesChatListDuringRetry)
-        assertTrue(
-            "a spent retry must release the routing overlay rather than hold it forever",
-            source.indexOf("routingNotification = false", startIndex = spentRetryBranch) in
-                spentRetryBranch until retryBranchEnd,
-        )
+        assertFalse("the chat list must stay hidden during active retry", "routing = false" in retry)
+        val inconclusive = commitSource(whole = true).between("fun releaseInconclusive(", "suspend fun openListed")
+        assertTrue("an inconclusive read lowers the overlay", "state.routing = false" in inconclusive)
     }
 
     /** The shell's priority window is process-owned: a shell unmount cannot be what releases it (#586). */
@@ -334,35 +316,144 @@ class NotificationConversationOpenCoverageTest {
     /** A failed exact preload keeps broad work deferred until its one retry settles. */
     @Test
     fun failedPreloadDefersBroadWorkUntilExactRetrySettles() {
-        val source = mainShellSource()
-        val preloadCallback = source.indexOf("onPreload = {")
-        val preloadCallbackEnd = source.indexOf("} else {\n                        activateAccount()", preloadCallback)
-        val firstReleaseAfterPreload =
-            source.indexOf("releaseNotificationFirstFrameGate(routingRequestId)", preloadCallback)
-        val failedPreload = source.indexOf("NotificationMessagePreloadState.Failed ->")
-        val retryFallback =
-            source.indexOf("NotificationMessageDirectLoadOutcome.AwaitChatList -> {", failedPreload)
-        val retryBranchEnd = source.indexOf("null ->", failedPreload)
-        val retryRelease = source.indexOf("releaseNotificationFirstFrameGate(routingRequestId)", retryFallback)
-        val directFallback =
-            source.indexOf("NotificationMessageDirectLoadOutcome.AwaitChatList -> {", retryBranchEnd)
-        val directRelease = source.indexOf("releaseNotificationFirstFrameGate(routingRequestId)", directFallback)
-        val directFallbackEnd = source.indexOf("routingNotification = false", directFallback)
+        val switch = sourceFile("NotificationAccountSwitchRoute.kt").readText()
+        val preloadCallback = switch.substringAfter("onPreload = {").substringBefore("}")
+        assertFalse("an initial preload failure must retain the gate", "release" in preloadCallback)
 
-        assertTrue("the preload callback boundary must be found", preloadCallbackEnd > preloadCallback)
-        assertTrue("an initial preload failure must retain the gate", firstReleaseAfterPreload > preloadCallbackEnd)
-        assertTrue("the active retry fallback must be found", retryFallback > failedPreload)
-        assertTrue("the active retry boundary must be found", retryBranchEnd > retryFallback)
-        assertTrue("the direct fallback must be found", directFallback > retryBranchEnd)
-        assertTrue("the direct fallback boundary must be found", directFallbackEnd > directFallback)
+        val retry = readsSource().between("private fun retryAfterActivation(", "private suspend fun readTarget")
+        val retryFallback = retry.substringAfter("NotificationMessageDirectLoadOutcome.AwaitChatList -> {")
+        val retryRelease = "retryGate?.let(owners.firstFrame::releaseOwned)"
+        assertTrue("a failed active retry must release deferred work", retryRelease in retryFallback)
         assertTrue(
-            "a failed active retry must release deferred work",
-            retryRelease in retryFallback until retryBranchEnd,
+            "the retry captures its own gate before it suspends, so it never releases a successor's",
+            retry.indexOf("val retryGate = owners.firstFrame.gateFor(requestId)") in
+                0 until retry.indexOf("launchMutation"),
         )
+        assertFalse("the retry must not release by request id", "owners.firstFrame.release(requestId)" in retry)
+
+        val load = readsSource().between("suspend fun loadMessage(", "private fun retryAfterActivation")
+        val directFallback = load.substringAfter("null ->")
+        val directRelease = "AwaitChatList -> completion.releaseInconclusive(attempt)"
+        assertTrue("a direct-load fallback must release deferred work", directRelease in directFallback)
+        val inconclusive = commitSource(whole = true).between("fun releaseInconclusive(", "suspend fun openListed")
         assertTrue(
-            "a direct-load fallback must release deferred work",
-            directRelease in directFallback until directFallbackEnd,
+            "the inconclusive fallback releases the window before it lowers the overlay",
+            inconclusive.indexOf("owners.firstFrame.release(attempt.requestId)") in
+                0 until inconclusive.indexOf("state.routing = false"),
         )
+    }
+
+    /**
+     * Process-scoped switch work outlives the pass that started it, so it releases only the gate object it began:
+     * a successor that reuses the request id, after a remount or a new task, keeps its own window (#3309).
+     */
+    @Test
+    fun processScopedSwitchCompletionsReleaseOnlyTheirOwnGate() {
+        val switch = sourceFile("NotificationAccountSwitchRoute.kt").readText()
+        assertFalse("no request-scoped release from the retired route", "firstFrame.release(" in switch)
+        val ownedRelease = "ownedGate?.let(owners.firstFrame::releaseOwned)"
+        assertTrue("the owned gate is released by identity", ownedRelease in switch)
+        assertTrue(
+            "a lost pin abandons the route through the owned release",
+            "completion.rejectUnavailablePin(attempt, releaseGate = ::releaseOwnedGate)" in switch,
+        )
+        val failure = switch.between("private fun reconcileAfterActivation()", "private fun releaseStuckPreload")
+        assertTrue("a switch that never landed releases its own gate", "releaseOwnedGate()" in failure)
+        assertFalse("a switch that never landed never names a request id", "release(requestId)" in failure)
+        val claimed = failure.indexOf("owners.firstFrame.routeClaimIsCurrent(claim)")
+        assertTrue(
+            "the failure path asks the process-owned route claim before any write",
+            claimed in 0 until failure.indexOf("rejectUnavailablePin("),
+        )
+        val current = switch.between("private fun switchStillCurrent()", "private suspend fun runSwitch")
+        assertTrue(
+            "activation currency starts from the route claim, not the frozen request reader",
+            "owners.firstFrame.routeClaimIsCurrent(claim) &&" in current,
+        )
+        assertTrue("every switch takes its own claim", "private val claim = owners.firstFrame.claimRoute()" in switch)
+        val armed = routerSource().between("private suspend fun routeArmed(", "private fun awaitAccounts")
+        assertTrue("arming a request claims it for the routing shell", "owners.firstFrame.claimRoute()" in armed)
+    }
+
+    /** Every process-scoped completion asks the live request and runtime fence before it writes shell state. */
+    @Test
+    fun processScopedCompletionsAskTheLiveFenceBeforeWriting() {
+        val switch = sourceFile("NotificationAccountSwitchRoute.kt").readText().replace(Regex("\\s+"), " ")
+        val preloadFence = "isCurrent = { currency.offers(requestId, target, routeRuntimeGeneration) }"
+        assertTrue("the preload publishes only for the offered request", preloadFence in switch)
+        assertTrue("activation runs only while the request owns it", "shouldActivate = ::switchStillCurrent" in switch)
+        assertTrue(
+            "a lost pin is failed only while the request is still offered",
+            "if (offered && completion.rejectUnavailablePin(" in switch,
+        )
+        assertTrue("a never-landed switch fails only while still current", "if (!switchStillCurrent() ||" in switch)
+        val retry = readsSource().replace(Regex("\\s+"), " ")
+        val retryFence = "if (currency.offers(requestId, attempt.target, retryRuntimeGeneration))"
+        assertTrue("the exact retry publishes only for the offered request", retryFence in retry)
+        val state = sourceFile("NotificationOpenRouteState.kt").readText().replace(Regex("\\s+"), " ")
+        val liveRead = "liveRuntimeGeneration() == runtimeGeneration"
+        assertTrue("the runtime fence reads the live generation", liveRead in state)
+    }
+
+    /** The route's request and runtime fence sees a replaced runtime even after its composition stopped updating. */
+    @Test
+    fun aFrozenComposedReaderStillRejectsALiveRuntimeReplacement() {
+        val target =
+            dev.ipf.whitenoise.android.notifications.NotificationScenario
+                .target(accountRef = "account-b", groupIdHex = "group")
+        var liveRuntime = 4
+        val currency =
+            NotificationOpenCurrency(
+                request = androidx.compose.runtime.mutableStateOf(NotificationOpenRequest(target, 9L)),
+                composedRuntimeGeneration = androidx.compose.runtime.mutableIntStateOf(4),
+                liveRuntimeGeneration = { liveRuntime },
+            )
+        assertTrue(currency.offers(9L, target, 4))
+        liveRuntime = 5
+        assertFalse("a retired callback must see the live replacement", currency.offers(9L, target, 4))
+        assertFalse("a stale request never matches", currency.offers(8L, target, 5))
+    }
+
+    /** MainShell keeps no inline notification orchestration, and the seam writes shell state only through its port. */
+    @Test
+    fun notificationOrchestrationLivesInTheSeamAndWritesThroughTheInjectedShell() {
+        val shell = mainShellSource()
+        assertFalse("MainShell must not resolve notification steps inline", "resolveNotificationNav(" in shell)
+        assertTrue("MainShell runs the seam", "NotificationOpenRouteEffect(" in shell)
+        val seamFiles =
+            listOf(
+                "NotificationOpenRouter.kt",
+                "NotificationExactOpenReads.kt",
+                "NotificationAccountSwitchRoute.kt",
+            )
+        seamFiles.forEach { name ->
+            val source = sourceFile(name).readText()
+            listOf("selectedChat =", "sectionName =", "shellNavState =", "selectedChatOpenContext =").forEach { write ->
+                assertFalse("$name must write $write only through NotificationOpenShell", write in source)
+            }
+        }
+    }
+
+    /** The seam's effect keeps every key the inline effect had, so the route re-fires exactly as before. */
+    @Test
+    fun theRouteEffectKeepsEveryInlineKey() {
+        val keys = routeEffectKeys().replace(Regex("\\s+"), " ")
+        listOf(
+            "inboundTarget,",
+            "inboundRequestId,",
+            "inboundTarget?.replyDraft != null && appState.appInForeground",
+            "inboundTarget?.shortcutCapability != null && appState.appUnlockEvaluationPending",
+            "inboundTarget?.shortcutCapability != null && appState.appLockScreenVisible",
+            "appState.activeAccountRef",
+            "appState.runtimeGeneration",
+            "appState.accounts",
+            "chats.boundAccountRef",
+            "chats.isLoading",
+            "chats.items",
+            "chats.materializedGroupsRevision",
+            "route.inviteSlots.authoritativelyUnavailable",
+            "route.preloadSlot.preload",
+        ).forEach { key -> assertTrue("missing route key $key", key in keys) }
     }
 
     /** The Activity holds a pin tap while the App Lock decision loads and re-parses it once the decision exists. */
@@ -397,6 +488,33 @@ class NotificationConversationOpenCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt"),
         ).first(File::exists)
             .readText()
+
+    /** The keys of the seam's routing effect, up to the block that runs the pass. */
+    private fun routeEffectKeys(): String =
+        sourceFile("NotificationOpenRouteState.kt")
+            .readText()
+            .substringAfter("internal fun NotificationOpenRouteEffect(")
+            .substringAfter("LaunchedEffect(")
+            .substringBefore(") {")
+
+    /** The router's source. */
+    private fun routerSource(): String = sourceFile("NotificationOpenRouter.kt").readText()
+
+    /** The exact-read source. */
+    private fun readsSource(): String = sourceFile("NotificationExactOpenReads.kt").readText()
+
+    /** The completion's commit, or the whole completion class with [whole]. */
+    private fun commitSource(whole: Boolean = false): String {
+        val completion = routerSource().substringAfter("internal class NotificationOpenCompletion(")
+        val commit = completion.between("suspend fun commit(", "private fun beginConversationPhases")
+        return if (whole) completion else commit
+    }
+
+    /** The text after [start] and before the following [end]. */
+    private fun String.between(
+        start: String,
+        end: String,
+    ): String = substringAfter(start).substringBefore(end)
 
     private fun mainShellSource(): String =
         listOf(

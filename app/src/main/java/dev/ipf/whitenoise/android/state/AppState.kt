@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
+import dev.ipf.whitenoise.android.notifications.LocalNotificationContent
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
@@ -239,13 +240,18 @@ import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
 
+/**
+ * How inviting one profile to several groups went: of [attempted] groups, [failures] failed and in [waited] the user
+ * chose to wait on a group-change question, so those groups were not invited either.
+ */
 internal data class ProfileGroupInviteOutcome(
     val attempted: Int,
     val failures: Int,
     val firstFailure: AppText? = null,
+    val waited: Int = 0,
 ) {
-    val delivered: Int = attempted - failures
-    val completedSuccessfully: Boolean = attempted > 0 && failures == 0
+    val delivered: Int = attempted - failures - waited
+    val completedSuccessfully: Boolean = attempted > 0 && failures == 0 && waited == 0
 }
 
 internal object ChatScreenshotPreferences {
@@ -1113,13 +1119,13 @@ class WhiteNoiseAppState private constructor(
             initialActiveAccountRef = null,
         )
 
-    /** JVM Compose tests inject the profile resolver/state and do not start Android platform services. */
+    /** Tests inject runtime/state seams; a null account override preserves production preference restoration. */
     internal constructor(
         context: Context,
         draftStore: DraftStore,
         accountIdHexResolver: suspend (String) -> String?,
         accounts: List<AccountSummaryFfi>,
-        activeAccountRef: String,
+        activeAccountRef: String?,
         profileReader: (suspend (String) -> UserProfileMetadataFfi?)? = null,
         profileDisplayNameReader: (suspend (String) -> String?)? = null,
         profileRefreshRequest: (suspend (String) -> Unit)? = null,
@@ -1421,6 +1427,9 @@ class WhiteNoiseAppState private constructor(
     @Volatile
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
     private val nativeAttachmentPermissions = NativeAttachmentPermissions()
+
+    /** Questions about overriding MDK's advisory refusals of a group change, shown at app level (#3289). */
+    internal val groupChangeConfirmations = GroupChangeConfirmations()
 
     /** Refreshes runtime-scoped permissions after network, preference, or account changes. */
     internal fun refreshNativeAttachmentPermissions() {
@@ -2428,6 +2437,9 @@ class WhiteNoiseAppState private constructor(
 
     internal val attachmentUserActions = AttachmentUserActions(mutationsScope)
 
+    /** Attachments whose download the reader started and MDK parked for storage, for this process only. */
+    internal val readerParkedDownloads: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
+
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
             intentStore = attachmentDownloadIntents,
@@ -3058,11 +3070,42 @@ class WhiteNoiseAppState private constructor(
     private val groupCommitLocks = KeyedMutexPool()
     private val conversationTextSendOrderLocks = KeyedMutexPool()
 
+    /** Runs [block] as the only commit-producing call for this account's group. */
     suspend fun <T> withGroupCommitLock(
         accountRef: String,
         groupIdHex: String,
         block: suspend () -> T,
     ): T = groupCommitLocks.withLock("$accountRef|$groupIdHex", block)
+
+    /** The chat list's title for [groupIdHex] while the chat list shows [accountRef], or null when it is not listed. */
+    internal fun chatTitle(
+        accountRef: String,
+        groupIdHex: String,
+    ): String? {
+        val controller = chatsController?.takeIf { it.accountRef == accountRef }
+        val item =
+            controller
+                ?.let { (it.items + it.archivedItems) }
+                ?.firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+        return item?.let { chatListItemDisplayTitle(it, this, notificationGroupTitleCopy(appContext)) }
+    }
+
+    /** Runs [block] holding this group's commit lock, taking it only when the caller does not hold it already. */
+    internal suspend fun <T> withGroupCommitLockHeld(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T = groupCommitLocks.withLockUnlessHeld("$accountRef|$groupIdHex", block)
+
+    /**
+     * Runs [block], which produces no commit, with this group's commit lock released if the caller holds it, so sends
+     * and other changes to the group are not held up while the user answers a question.
+     */
+    internal suspend fun <T> outsideGroupCommitLock(
+        accountRef: String,
+        groupIdHex: String,
+        block: suspend () -> T,
+    ): T = groupCommitLocks.releasedWhile("$accountRef|$groupIdHex", block)
 
     suspend fun <T> withConversationTextSendOrder(
         accountRef: String,
@@ -4129,6 +4172,7 @@ class WhiteNoiseAppState private constructor(
         chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex, accountWide)
             ?: ProfileGroupPickerState.empty()
 
+    /** Makes [targetRef] an admin of [groupIdHex], asking first if MDK holds the change back. True once committed. */
     suspend fun promoteProfileInGroup(
         targetRef: String,
         groupIdHex: String,
@@ -4138,12 +4182,15 @@ class WhiteNoiseAppState private constructor(
         val account = activeAccountRef
         if (target.isEmpty() || groupId.isEmpty() || account == null) return false
         return runCatchingCancellable {
+            // The lock is released only while the user decides, and held again for the acknowledgement and retry.
             withGroupCommitLock(account, groupId) {
-                val result =
-                    marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
-                        promoteAdminDetailed(account, groupId, target)
-                    }
-                chatsController?.applyProfileGroupDetails(account, result.details)
+                runGroupChange(account, groupId) {
+                    val result =
+                        marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
+                            promoteAdminDetailed(account, groupId, target)
+                        }
+                    chatsController?.applyProfileGroupDetails(account, result.details)
+                }
             }
             presentConversationTransient(
                 accountRef = account,
@@ -4162,7 +4209,9 @@ class WhiteNoiseAppState private constructor(
      * method keeps the commit-producing calls serialized per group and surfaces
      * a single result toast after the fan-out completes. Returns true only when
      * every attempted group accepted the invite, so partial failures can keep the
-     * picker open with the failed groups still selected for retry.
+     * picker open with the failed groups still selected for retry. Choosing Wait on
+     * one group's change question skips only that group and is reported as part of
+     * the result; cancellation still stops the fan-out.
      */
     @Suppress("LongMethod", "ReturnCount") // The fan-out and aggregate result share one failure accumulator.
     suspend fun inviteProfileToGroups(
@@ -4177,47 +4226,46 @@ class WhiteNoiseAppState private constructor(
                 .distinctBy { it.lowercase() }
         if (targets.isEmpty()) return false
         val account = activeAccountRef ?: return false
+        val runtime = runtimeGeneration
+        val stillCurrent = { activeAccountRef == account && runtimeGeneration == runtime }
         var failures = 0
+        var waited = 0
         var firstFailure: AppText? = null
         var firstFailureThrowable: Throwable? = null
         for (groupIdHex in targets) {
-            runCatchingCancellable {
-                withGroupCommitLock(account, groupIdHex) {
-                    val result =
-                        marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
-                            inviteMembersDetailed(account, groupIdHex, listOf(ref))
-                        }
-                    chatsController?.applyProfileGroupDetails(account, result.details)
-                }
-            }.onFailure { error ->
+            // A switch mid-fan-out ends it: the rest belonged to the previous account.
+            if (!stillCurrent()) return false
+            val attempt = inviteProfileToGroup(account, groupIdHex, ref)
+            if (attempt == null) {
+                waited += 1
+                continue
+            }
+            attempt.onFailure { error ->
                 failures += 1
                 if (firstFailure == null) {
                     firstFailureThrowable = error
-                    val message = error.readableMessage()
-                    firstFailure =
-                        if (isDuplicateSignatureKeyError(message)) {
-                            AppText.Resource(
-                                R.string.toast_couldnt_add_member_duplicate_detail,
-                                listOf(displayName(ref)),
-                            )
-                        } else {
-                            inviteFailureDetail(
-                                error,
-                                ::displayName,
-                                if (error is MarmotKitException.InvalidKeyPackageEvent) displayName(ref) else null,
-                            )
-                        }
+                    firstFailure = profileGroupInviteFailureDetail(error, ref)
                 }
             }
         }
+        if (!stillCurrent()) return false
         val outcome =
             ProfileGroupInviteOutcome(
                 attempted = targets.size,
                 failures = failures,
                 firstFailure = firstFailure,
+                waited = waited,
             )
+        presentProfileGroupInvite(outcome, firstFailureThrowable)
+        return outcome.completedSuccessfully
+    }
+
+    /** Shows the one toast that sums up a profile fan-out, with [failure]'s report when it is copyable. */
+    private fun presentProfileGroupInvite(
+        outcome: ProfileGroupInviteOutcome,
+        failure: Throwable?,
+    ) {
         profileGroupInviteToast(outcome)?.let { toast ->
-            val failure = firstFailureThrowable
             if (toast.copyable && failure != null) {
                 presentFailure(
                     titleRes = toast.messageRes,
@@ -4233,8 +4281,47 @@ class WhiteNoiseAppState private constructor(
                 present(toast.messageRes, toast.detail, copyable = toast.copyable)
             }
         }
-        return outcome.completedSuccessfully
     }
+
+    /**
+     * Invites [ref] to one group of a profile fan-out. Returns null when the user chose to wait on that group's
+     * change question, so only that group stays uninvited; cancellation still propagates and stops the fan-out.
+     */
+    private suspend fun inviteProfileToGroup(
+        account: String,
+        groupIdHex: String,
+        ref: String,
+    ): Result<Unit>? =
+        try {
+            runCatchingCancellable {
+                withGroupCommitLock(account, groupIdHex) {
+                    runGroupChange(account, groupIdHex, invite = true) {
+                        val result =
+                            marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
+                                inviteMembersDetailed(account, groupIdHex, listOf(ref))
+                            }
+                        chatsController?.applyProfileGroupDetails(account, result.details)
+                    }
+                }
+            }.map { }
+        } catch (_: GroupChangeDeclinedException) {
+            null
+        }
+
+    /** The detail the fan-out's toast gives for its first failed group, naming [ref] when it is about them. */
+    private fun profileGroupInviteFailureDetail(
+        error: Throwable,
+        ref: String,
+    ): AppText =
+        if (isDuplicateSignatureKeyError(error.readableMessage())) {
+            AppText.Resource(R.string.toast_couldnt_add_member_duplicate_detail, listOf(displayName(ref)))
+        } else {
+            inviteFailureDetail(
+                error,
+                ::displayName,
+                if (error is MarmotKitException.InvalidKeyPackageEvent) displayName(ref) else null,
+            )
+        }
 
     /**
      * Compose-tracked snapshot of the active account's projected chat list.
@@ -4840,25 +4927,22 @@ class WhiteNoiseAppState private constructor(
             appStateDebug {
                 "accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"
             }
-            if (accounts.isEmpty()) {
+            if (accounts.isNotEmpty()) {
+                // Retained Amber profiles still need their callbacks when the user later chooses Continue.
+                startupPerformance.stage(PerformancePhase.EXTERNAL_SIGNER_REGISTRATION) { reregisterExternalSigners() }
+            }
+            val targetAccount = startupAccount()
+            if (targetAccount == null) {
+                accountSession.publishSignedOutIdentity {
+                    activeAccountRef = null
+                    preferences.edit().remove(ACTIVE_ACCOUNT_KEY).apply()
+                }
                 localNotificationSettings = null
                 pendingStartupUnreadRefresh = null
                 completeReceiverGatedStartup()
                 phase = AppPhase.Onboarding
             } else {
-                // The receiver attempt already owns its process-lifetime job,
-                // but signer callbacks are an account-readiness prerequisite:
-                // once Ready is visible, UI work may require signing even while
-                // receiver convergence continues in the background.
-                startupPerformance.stage(PerformancePhase.EXTERNAL_SIGNER_REGISTRATION) { reregisterExternalSigners() }
-                val targetAccount = startupAccount()
                 val target = targetAccount.label
-                if (targetAccount.signedOut) {
-                    // A signed-out account is not a safe locally authenticated
-                    // shell. Preserve the notification ordering barrier before
-                    // sign-in can emit work or request external signatures.
-                    completeReceiverGatedStartup()
-                }
                 val activated =
                     startupPerformance.stage(PerformancePhase.ACCOUNT_ACTIVATION) {
                         // The callback is the local-ready boundary. The shell mounts before
@@ -4867,9 +4951,7 @@ class WhiteNoiseAppState private constructor(
                             label = target,
                             deferUnreadRefresh = true,
                             preloadPolicy = AccountSwitchPreloadPolicy.STARTUP_RESTORATION,
-                            awaitPostActivationWork = {
-                                if (!targetAccount.signedOut) completeReceiverGatedStartup()
-                            },
+                            awaitPostActivationWork = { completeReceiverGatedStartup() },
                             onActivated = { phase = AppPhase.Ready },
                         )
                     }
@@ -4901,9 +4983,10 @@ class WhiteNoiseAppState private constructor(
     private fun bootstrapFailure(error: Throwable): ErrorPresentation =
         privacySafeErrorPresentation("APP_BOOTSTRAP", error, startupDetail = StartupDiagnostics.failureDetail())
 
-    private fun startupAccount(): AccountSummaryFfi = configuredAccount() ?: accounts.first()
-
-    private fun configuredAccount(): AccountSummaryFfi? = accounts.firstOrNull { it.label == activeAccountRef }
+    /** Restores only a native signed-in profile; retained signed-out identities require an explicit selection. */
+    private fun startupAccount(): AccountSummaryFfi? =
+        accounts.firstOrNull { it.label == activeAccountRef && !it.signedOut }
+            ?: accounts.firstOrNull { !it.signedOut }
 
     /**
      * Starts the process-owned listener with Marmot while deferring only its bounded readiness wait until a safe
@@ -8632,6 +8715,14 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Drops the notification presenter's shortcut snapshot for a conversation whose shortcut was just removed. */
+    internal fun forgetNotificationConversationShortcut(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        localNotificationPresenter.forgetConversationShortcut(accountRef, groupIdHex)
+    }
+
     /** Reuses the live native client for a retention preflight when one already exists. */
     internal fun retentionSweepRuntimeOrNull(): MarmotInterface? = marmotRuntime?.marmot
 
@@ -11427,12 +11518,17 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Publishes at most one silent text correction. Imagery is fixed on first
-     * publication so a completed card never repaints solely for an avatar.
+     * Publishes at most one silent text correction. A card first drawn without
+     * its conversation or sender picture then gets at most one silent picture
+     * rewrite once the avatar prewarm has made that picture available (#3311),
+     * and a card that already showed its pictures is never repainted for imagery.
+     * The prewarm runs here, and [deferPicture] receives the picture refresh it
+     * enables, which the caller runs after releasing the enrichment permit.
      */
     private suspend fun enrichPostedNotificationUpdate(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
+        deferPicture: (LateNotificationIdentity) -> Unit,
     ): NotificationLateCorrectionOutcome =
         if (!isNotificationEnrichmentAllowed(update, firstPost)) {
             NotificationLateCorrectionOutcome.Stale
@@ -11447,7 +11543,7 @@ class WhiteNoiseAppState private constructor(
             when {
                 content == null -> NotificationLateCorrectionOutcome.Failed
                 !isNotificationEnrichmentAllowed(update, firstPost) -> NotificationLateCorrectionOutcome.Stale
-                else -> enrichResolvedNotificationUpdate(update, firstPost, content)
+                else -> enrichResolvedNotificationUpdate(update, firstPost, content, deferPicture)
             }
         }
 
@@ -11456,6 +11552,7 @@ class WhiteNoiseAppState private constructor(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: NotificationFirstPostContent,
+        deferPicture: (LateNotificationIdentity) -> Unit,
     ): NotificationLateCorrectionOutcome {
         val resolvedPresentation =
             notificationContentPresentation(
@@ -11464,34 +11561,106 @@ class WhiteNoiseAppState private constructor(
                 content = content,
                 shortNpub = ::shortNpub,
             )
-        return if (
-            notificationLateCorrectionPlan(
-                firstPresentation = firstPost.presentation,
-                resolvedPresentation = resolvedPresentation,
-            ) == NotificationLateCorrectionPlan.Content
-        ) {
-            postNotificationContentCorrection(update, firstPost, content)
-        } else {
-            notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
-            NotificationLateCorrectionOutcome.Unchanged
+        val outcome =
+            if (
+                notificationLateCorrectionPlan(
+                    firstPresentation = firstPost.presentation,
+                    resolvedPresentation = resolvedPresentation,
+                ) == NotificationLateCorrectionPlan.Content
+            ) {
+                postNotificationContentCorrection(update, firstPost, content)
+            } else {
+                NotificationLateCorrectionOutcome.Unchanged
+            }
+        // Prime imagery only after any text correction is visible. A fallback
+        // receives at most one text replacement for this message, and a stale
+        // correction primes nothing.
+        if (outcome != NotificationLateCorrectionOutcome.Stale) {
+            prepareLateNotificationIdentity(update, firstPost, resolvedPresentation.content)?.let(deferPicture)
         }
+        return outcome
     }
 
-    /** Posts corrected text and primes imagery without spending another write. */
+    /** Posts corrected text as this message's one silent late text write. */
     private suspend fun postNotificationContentCorrection(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: NotificationFirstPostContent,
-    ): NotificationLateCorrectionOutcome {
-        val posted = postNotificationLateCorrection(update, firstPost, content)
-        return if (posted) {
-            // Prime future cards only after the text correction is visible. A
-            // fallback receives at most one replacement for this message.
-            notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+    ): NotificationLateCorrectionOutcome =
+        if (postNotificationLateCorrection(update, firstPost, content)) {
             NotificationLateCorrectionOutcome.ContentPosted
         } else {
             NotificationLateCorrectionOutcome.Stale
         }
+
+    /**
+     * #3311: runs the post-write avatar prewarm and returns the late picture
+     * refresh it enables for a card first drawn without its conversation or
+     * sender picture, or null when no picture can still arrive. [content] is
+     * what the card shows.
+     */
+    private suspend fun prepareLateNotificationIdentity(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        content: LocalNotificationContent?,
+    ): LateNotificationIdentity? {
+        val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+        val urlSources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        val sources =
+            if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
+                urlSources.copy(conversationLoader = encryptedGroupIdentityLoader(update))
+            } else {
+                urlSources
+            }
+        return if (content != null && sources.hasMissingPicture) LateNotificationIdentity(content, sources) else null
+    }
+
+    /**
+     * #3311: loads a group's Marmot encrypted picture, which has no URL, through the same MDK download and decoded
+     * cache the group avatar uses on screen, or null when the group record carries no such picture. Nothing is
+     * decrypted while the app lock shows, and a picture that finishes after the lock appears is dropped. A failed
+     * read or download yields no picture, so the late refresh still applies a sender picture that did arrive, while
+     * cancellation still propagates.
+     */
+    private suspend fun encryptedGroupIdentityLoader(update: NotificationUpdateFfi): (suspend () -> Bitmap?)? {
+        val group =
+            runCatchingCancellable { marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group }.getOrNull()
+        val key = group?.let { encryptedGroupAvatarCacheKey(update.accountRef, it) } ?: return null
+        return {
+            if (appLockScreenVisible) {
+                null
+            } else {
+                runCatchingCancellable {
+                    GroupAvatarImageLoader
+                        .load(key) { marmotIo { downloadGroupBlossomImage(update.accountRef, group.groupIdHex) } }
+                        ?.asAndroidBitmap()
+                        ?.takeUnless { appLockScreenVisible }
+                }.getOrNull()
+            }
+        }
+    }
+
+    /**
+     * #3311: gives the card the picture that has since become available, as
+     * one silent rewrite of the same live card under every fence a late
+     * correction obeys. It runs after the enrichment permit is released, since
+     * it may wait for a download. App lock, a switched account, a newer epoch,
+     * or a dismissed, read or replaced card stop it here or at the write, and
+     * the presenter leaves redacted and hidden-preview cards alone.
+     */
+    private suspend fun refreshLateNotificationIdentity(
+        update: NotificationUpdateFfi,
+        firstPost: NotificationFirstPost,
+        late: LateNotificationIdentity,
+    ) {
+        if (!isNotificationEnrichmentAllowed(update, firstPost)) return
+        localNotificationPresenter.refreshLateIdentityImage(
+            update = update,
+            content = late.content,
+            pictures = late.sources,
+            directShareEligible = update.accountRef == activeAccountRef,
+            isRefreshCurrent = { isNotificationEnrichmentAllowed(update, firstPost) },
+        )
     }
 
     /** Posts either the resolved first-draw value or the existing safe fallback. */
@@ -11617,6 +11786,7 @@ class WhiteNoiseAppState private constructor(
         receivedAtElapsedMs: Long,
     ) {
         notificationScope.launch(notificationDispatcher) {
+            var latePicture: LateNotificationIdentity? = null
             notificationEnrichmentGate.withPermit {
                 if (
                     !isNotificationEnrichmentAllowed(
@@ -11628,13 +11798,16 @@ class WhiteNoiseAppState private constructor(
                 ) {
                     return@withPermit
                 }
-                val outcome = enrichPostedNotificationUpdate(update, firstPost)
+                val outcome = enrichPostedNotificationUpdate(update, firstPost) { latePicture = it }
                 appStateDebug {
                     "notification timing stage=late-correction " +
                         "elapsed_ms=${(SystemClock.elapsedRealtime() - receivedAtElapsedMs).coerceAtLeast(0L)} " +
                         "outcome=${outcome.timingValue}"
                 }
             }
+            // A late picture may wait for its download, so it runs outside the
+            // permit and never delays other messages' text corrections.
+            latePicture?.let { refreshLateNotificationIdentity(update, firstPost, it) }
         }
     }
 

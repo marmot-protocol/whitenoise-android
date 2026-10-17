@@ -2,11 +2,13 @@ package dev.ipf.whitenoise.android.share
 
 import android.Manifest
 import android.app.NotificationManager
+import android.graphics.Bitmap
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -14,15 +16,19 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA
+import dev.ipf.whitenoise.android.notifications.InFlightConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,6 +50,7 @@ class ShareShortcutPublisherTest {
     @After
     fun clearPlatformShortcuts() {
         ShortcutManagerCompat.removeAllDynamicShortcuts(RuntimeEnvironment.getApplication())
+        InFlightConversationShortcuts.clearForTests()
     }
 
     @Test
@@ -360,6 +367,93 @@ class ShareShortcutPublisherTest {
             kept.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
         )
         assertTrue(kept.categories.isNullOrEmpty())
+    }
+
+    /**
+     * A shortcut the presenter published for a card it has not posted yet, such as a pending invite's first message,
+     * survives a refresh that rebuilds the dynamic set with the presenter's picture and Person, not a monogram rebuilt
+     * from the icon-less platform readback, and is judged as an ordinary shortcut once released.
+     */
+    @Test
+    fun publish_retainsAShortcutHeldForACardAboutToBePosted() {
+        val held = cardShortcut("acct", "invite-group", "Invite")
+        val base =
+            checkNotNull(
+                buildShareShortcut(
+                    RuntimeEnvironment.getApplication(),
+                    ShareShortcutTarget("acct", "invite-group", "Invite"),
+                ),
+            )
+        // The presenter publishes a real picture and Person, which the icon-less platform readback cannot rebuild.
+        val rich =
+            ShortcutInfoCompat
+                .Builder(base)
+                .setIcon(IconCompat.createWithBitmap(Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)))
+                .setPerson(
+                    Person
+                        .Builder()
+                        .setName("Invite sender")
+                        .setKey("invite-sender")
+                        .build(),
+                ).build()
+        // The presenter stamps the current preview policy into the shortcut it publishes and holds.
+        val preview = NotificationPreviewPreferences.capture(RuntimeEnvironment.getApplication())
+        rich.extras?.let { stampShortcutPreview(preview, it) }
+        assertEquals("the held shortcut carries a picture", IconCompat.TYPE_BITMAP, rich.icon?.type)
+        assertEquals("the held shortcut carries its Person", listOf("Invite sender"), personsOf(rich).map { it.name })
+        var published = emptyList<ShortcutInfoCompat>()
+        val publisher =
+            ShareShortcutPublisher(
+                context = RuntimeEnvironment.getApplication(),
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = { published = it },
+                existingShortcuts = { emptyList() },
+                dynamicShortcuts = { listOf(held) },
+                cardShortcutIds = { emptySet() },
+            )
+        val chats = listOf(chat("g1", pending = false), chat("invite-group", pending = true))
+        InFlightConversationShortcuts.hold(held.id, rich)
+
+        publisher.publish("acct", chats) { it.group.name }
+        assertEquals(listOf(conversationShortcutId("acct", "g1"), held.id), published.map { it.id })
+        val retained = published.single { it.id == held.id }
+        assertSame("the published picture is kept", rich.icon, retained.icon)
+        assertEquals("the published Person is kept", listOf("Invite sender"), personsOf(retained).map { it.name })
+        assertFalse(
+            "a held shortcut keeps its picture, so nothing needs publishing again",
+            InFlightConversationShortcuts.consumeIdentityLost(held.id),
+        )
+
+        InFlightConversationShortcuts.release(held.id)
+        publisher.publish("acct", chats) { it.group.name }
+        assertEquals(listOf(conversationShortcutId("acct", "g1")), published.map { it.id })
+    }
+
+    /** A live card's shortcut rebuilt from the icon-less readback is marked so the presenter publishes it again. */
+    @Test
+    fun publish_marksALiveCardShortcutRebuiltWithoutItsPicture() {
+        val live = cardShortcut("acct", "live-group", "Live")
+        val publisher =
+            ShareShortcutPublisher(
+                context = RuntimeEnvironment.getApplication(),
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = {},
+                existingShortcuts = { emptyList() },
+                dynamicShortcuts = { listOf(live) },
+                cardShortcutIds = { setOf(live.id) },
+            )
+
+        publisher.publish("acct", listOf(chat("g1", pending = false))) { it.group.name }
+
+        assertTrue(InFlightConversationShortcuts.consumeIdentityLost(live.id))
+        assertFalse("the mark is consumed once", InFlightConversationShortcuts.consumeIdentityLost(live.id))
+    }
+
+    /** The Person entries a shortcut carries, read from its compat model. */
+    private fun personsOf(shortcut: ShortcutInfoCompat): List<Person> {
+        val field = ShortcutInfoCompat::class.java.getDeclaredField("mPersons").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        return (field.get(shortcut) as Array<Person>?).orEmpty().toList()
     }
 
     /** Card-backed shortcuts take their slots first, so the lowest-ranked recent chats give theirs up. */

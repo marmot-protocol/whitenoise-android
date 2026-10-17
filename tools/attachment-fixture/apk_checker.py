@@ -1,6 +1,7 @@
 """Check genuine received-APK transfer and Android open outcomes; claim no installation, physical or UI result."""
 
 import math
+import re
 
 SCOPE = "genuine-received-apk-transfer-and-platform-open"
 CIPHERTEXT_OVERHEAD = 16
@@ -10,6 +11,7 @@ NO_INSTALLER_PERMISSION = "no-installer-simulated"
 HELD_PREFIX_BYTES = 1024
 CANCEL_CONTROLS = ("hold_acquisition", "cancel_marker", "release_acquisition")
 SOCKET_CLOSE_BUDGET_MS = 5_000
+CONTENT = re.compile(r"[0-9a-f]{64}")
 ORDINARY = ("Opened", "NoHandler")
 # A dispatch that expects no installer must have been watched for at least this long, a little under the probe's window.
 OBSERVE_MIN_MS = 900
@@ -61,8 +63,8 @@ def _finite(value):
             and not (isinstance(value, float) and not math.isfinite(value)) and value >= 0)
 
 
-def _check_transfer(metrics, violations, cases):
-    """Every case was received exactly once, byte-exact, with finite measured latency and memory."""
+def _check_transfer(metrics, violations, cases, contents):
+    """Every case was received exactly once, byte-exact and content-identified, with finite latency and memory."""
     sizes = {}
     named = {m.get("phase"): m for m in metrics if isinstance(m.get("phase"), str) and "elapsed_ms" in m}
     for case in cases:
@@ -71,11 +73,33 @@ def _check_transfer(metrics, violations, cases):
         if (measure is None or measure.get("success") is not True
                 or not all(_finite(measure.get(k)) for k in ("elapsed_ms", "java_peak_bytes", "native_peak_bytes"))
                 or len(rows) != 1 or rows[0].get("exact") is not True
-                or rows[0].get("bytes") != measure.get("payload_bytes") or not rows[0].get("bytes")):
+                or rows[0].get("bytes") != measure.get("payload_bytes") or not rows[0].get("bytes")
+                or not isinstance(rows[0].get("content"), str) or not CONTENT.fullmatch(rows[0]["content"])):
             violations.append(f"missing exact transfer evidence for {case}")
         else:
             sizes[case] = rows[0]["bytes"]
+            contents[case] = rows[0]["content"]
     return sizes
+
+
+def fetched_cases(cases, contents):
+    """The cases the receiver must fetch: MDK keeps one verified copy per content, so a repeat reuses the first."""
+    seen = set()
+    first = []
+    for case in cases:
+        if contents.get(case) not in seen:
+            seen.add(contents.get(case))
+            first.append(case)
+    return first
+
+
+def expected_fetches(metrics, cases):
+    """The acquisitions a runner should wait for: one per distinct content, or one per case while any is unreported."""
+    contents = {m.get("case"): m.get("content") for m in metrics
+                if isinstance(m, dict) and m.get("phase") == "apk-received"}
+    if any(not isinstance(contents.get(case), str) for case in cases):
+        return len(cases)
+    return len(fetched_cases(cases, contents))
 
 
 def _check_dispatch(metrics, distribution, violations, table, case_count):
@@ -137,28 +161,32 @@ def _check_cancellation(metrics, events, valid_token, violations):
         violations.append("the cancelled attempt and its single deliberate retry are not both evidenced")
 
 
-def _check_ledger(metrics, events, sizes, violations, cases, cancel_retry, large):
-    """The server saw each attachment acquired once, a cancelled attempt aside; a blocked dispatch never fetches again."""
+def _check_ledger(metrics, events, sizes, contents, violations, cases, cancel_retry, large):
+    """
+    The server saw each distinct content acquired once, a cancelled attempt aside, and a repeat of earlier bytes never
+    fetched, as MDK serves it from the copy it already verified; a blocked dispatch never fetches again.
+    """
     uploads = [e for e in events if e["kind"] == "upload"]
-    expected = sorted(sizes[c] + CIPHERTEXT_OVERHEAD for c in cases if c in sizes)
-    if len(sizes) != len(cases) or sorted(e["value"] for e in uploads) != expected \
+    if len(sizes) != len(cases) or [e["value"] for e in uploads] != [sizes[c] + CIPHERTEXT_OVERHEAD for c in cases] \
             or sum(e["kind"] == "upload_complete" for e in events) != len(cases):
         violations.append("expected exactly one genuine upload per case")
         return
     # Cases are sent in wire order, so the first upload is the valid package.
-    valid_token = uploads[0]["fixture"]
+    tokens = {case: upload["fixture"] for case, upload in zip(cases, uploads)}
+    valid_token = tokens[cases[0]]
+    fetched = fetched_cases(cases, contents)
     gets = [e for e in events if e["kind"] == "get"]
     cancelled = [e for e in gets if cancel_retry and e["fixture"] == valid_token][:1]
     counted = [e for e in gets if e not in cancelled]
     completed = {e["request"] for e in events if e["kind"] == "complete"}
     statuses = {e["request"]: e["value"] for e in events if e["kind"] == "status"}
-    if len(counted) != len(cases) or len({g["fixture"] for g in counted}) != len(cases) \
+    if len(counted) != len(fetched) or {g["fixture"] for g in counted} != {tokens[c] for c in fetched} \
             or any(statuses.get(g["seq"]) != 200 or g["seq"] not in completed for g in counted):
         violations.append("each case must be acquired exactly once and complete")
     if any(e["kind"] == "head" for e in events):
         violations.append("unexpected HEAD request")
     written = sum(e["value"] for e in events if e["kind"] == "body_bytes")
-    if written != sum(e["value"] for e in uploads) + (HELD_PREFIX_BYTES if cancel_retry else 0):
+    if written != sum(sizes[c] + CIPHERTEXT_OVERHEAD for c in fetched) + (HELD_PREFIX_BYTES if cancel_retry else 0):
         violations.append("ciphertext bytes written differ from bytes uploaded")
     if cancel_retry:
         _check_cancellation(metrics, events, valid_token, violations)
@@ -179,7 +207,8 @@ def check_apk(metrics, events, distribution, cancel_retry=False, large=False, no
         return {**result, "passed": False, "violations": ["invalid input"]}
     violations = []
     cases = cases_for(large)
-    sizes = _check_transfer(metrics, violations, cases)
+    contents = {}
+    sizes = _check_transfer(metrics, violations, cases, contents)
     _check_dispatch(metrics, distribution, violations, table_for(distribution, large, no_installer), len(cases))
-    _check_ledger(metrics, events, sizes, violations, cases, cancel_retry, large)
+    _check_ledger(metrics, events, sizes, contents, violations, cases, cancel_retry, large)
     return {**result, "passed": not violations, "violations": violations, "distribution": distribution}

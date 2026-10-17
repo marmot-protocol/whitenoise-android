@@ -103,6 +103,33 @@ class LocalGroupDeleteAttemptTest {
             assertEquals(listOf("journal-read", "present", "media", "stage", "delete"), events)
         }
 
+    /** #3310: a forget's failed media listing stages its fallback without media keys and still deletes once. */
+    @Test
+    fun failedPreflightWithFallbackStagesNoMediaKeysAndStillDeletesOnce() =
+        runTest {
+            val events = mutableListOf<String>()
+            val fallback = pending.copy(mediaCacheKeys = emptyList(), ciphertextTags = emptySet())
+            var staged: PendingLocalGroupDeleteCleanup? = null
+            val result =
+                stageAndDeleteLocalGroup(
+                    LocalGroupDeleteAttempt({ true }, { error("a failed listing needs no recovery") }),
+                    LocalGroupDeleteOperations(
+                        previous = { null },
+                        present = { true },
+                        prepare = {
+                            events += "media"
+                            throw IllegalStateException("listing failed")
+                        },
+                        stage = { staged = it },
+                        delete = { events += "delete" },
+                        preflightFallback = { fallback },
+                    ),
+                )
+            assertSame(fallback, result)
+            assertSame(fallback, staged)
+            assertEquals(listOf("media", "delete"), events)
+        }
+
     @Test
     fun presentExplicitRetryPreservesOldAndNewCleanupKeysBeforeDeleting() =
         runTest {

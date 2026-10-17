@@ -54,10 +54,9 @@ internal fun ChatRelaysScreen(
     relays: List<String>,
     onBack: () -> Unit,
     feedback: @Composable () -> Unit = {},
-    bottomBar: @Composable () -> Unit = {},
 ) {
     val clipboard = LocalClipboardManager.current
-    SettingsScaffold(title = stringResource(R.string.relays), onBack = onBack, bottomBar = bottomBar) {
+    SettingsScaffold(title = stringResource(R.string.relays), onBack = onBack) {
         Column(Modifier.fillMaxSize()) {
             feedback()
             Column(

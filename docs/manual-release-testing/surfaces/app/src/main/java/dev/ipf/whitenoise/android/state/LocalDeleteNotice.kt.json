@@ -1,0 +1,92 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+  "legacy_sha256": "7f327981da324d878ca6903f5a1cb9f2bd6b09c01fcb357ec9b17ea7a59dac69",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Scoped deletion warning retirement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "internal fun WhiteNoiseAppState.dismissLocalDeleteFailure(",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Local-delete retry guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.local_delete_retry_detail",
+        "test_ids": [
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "local removal wording: local abandon retry detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.local_abandon_retry_detail",
+        "test_ids": [
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "local removal wording: local reset retry detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.local_reset_retry_detail",
+        "test_ids": [
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "local removal wording: toast couldnt abandon chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.toast_couldnt_abandon_chat",
+        "test_ids": [
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "local removal wording: toast couldnt reset group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.toast_couldnt_reset_group",
+        "test_ids": [
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "local removal wording: toast chat abandoned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.toast_chat_abandoned",
+        "test_ids": [
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "local removal wording: toast group reset done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.toast_group_reset_done",
+        "test_ids": [
+          "CHL-026"
+        ]
+      },
+      {
+        "surface": "local removal wording: toast couldnt delete chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.toast_couldnt_delete_chat",
+        "test_ids": [
+          "CHL-010",
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "local removal wording: toast chat deleted local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.toast_chat_deleted_local",
+        "test_ids": [
+          "CHL-010",
+          "CHL-024"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

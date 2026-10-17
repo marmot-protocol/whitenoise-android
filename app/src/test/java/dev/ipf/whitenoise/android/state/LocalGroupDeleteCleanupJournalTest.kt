@@ -157,6 +157,43 @@ class LocalGroupDeleteCleanupJournalTest {
             assertTrue(restarted.pending().isEmpty())
         }
 
+    /**
+     * #3310: an abandoned group's pending cleanup survives a restart and an account switch, finishing only for its
+     * own ready account once the native row is gone. Replay has no native mutation to repeat.
+     */
+    @Test
+    fun abandonmentIntentSurvivesRestartAndAccountSwitchUntilItsOwnerReconciles() =
+        runTest {
+            val directory = folder.newFolder("abandoned")
+            LocalGroupDeleteCleanupJournal(directory).stage(pending)
+            val restarted = LocalGroupDeleteCleanupJournal(directory)
+            var cleanups = 0
+            val whileSwitched =
+                reconcilePendingLocalGroupDeleteCleanup(
+                    pending = restarted.pending().single(),
+                    accountReady = { false },
+                    isGroupPresent = { error("another account must not read this group") },
+                    cleanup = { error("another account must not clean this group") },
+                    finish = restarted::finish,
+                )
+            assertFalse(whileSwitched)
+            assertEquals(listOf(pending), LocalGroupDeleteCleanupJournal(directory).pending())
+            val reconciled =
+                reconcilePendingLocalGroupDeleteCleanup(
+                    pending = restarted.pending().single(),
+                    accountReady = { true },
+                    isGroupPresent = { false },
+                    cleanup = {
+                        cleanups++
+                        true
+                    },
+                    finish = restarted::finish,
+                )
+            assertTrue(reconciled)
+            assertEquals(1, cleanups)
+            assertFalse(LocalGroupDeleteCleanupJournal(directory).hasPending())
+        }
+
     @Test
     fun presentGroupRetainsIntentWithoutClearingData() =
         runTest {

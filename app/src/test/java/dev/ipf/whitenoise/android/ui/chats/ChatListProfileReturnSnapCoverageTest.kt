@@ -162,22 +162,27 @@ class ChatListProfileReturnSnapCoverageTest {
 
         val notificationCommitBlock =
             mainShell.requiredSection(
-                start = "fun commitNotificationConversationOpen(chatItem: ChatListItem) {",
-                end = "\n        when (step) {",
+                start = "override fun openRoutedConversation(",
+                end = "override fun targetHandled(",
             )
         assertTrue(
             "shared notification-open commit must reset armed return-head provenance",
             Regex("""resetChatListReturnHeadSnap\(""").containsMatchIn(notificationCommitBlock),
         )
 
+        val router = notificationOpenRouterSource().readText()
         val notificationOpenBlock =
-            mainShell.requiredSection(
-                start = "is NotificationNavStep.OpenConversation -> {",
-                end = "\n            NotificationNavStep.MissingAccount -> {",
+            router.requiredSection(
+                start = "is NotificationNavStep.OpenConversation ->",
+                end = "\n            NotificationNavStep.MissingAccount ->",
             )
+        val openListed = router.requiredSection(start = "suspend fun openListed(", end = "suspend fun commit(")
+        val commit = router.requiredSection(start = "suspend fun commit(", end = "private fun ")
         assertTrue(
             "notification opens must use the shared state commit",
-            Regex("""commitNotificationConversationOpen\(""").containsMatchIn(notificationOpenBlock),
+            Regex("""completion\.openListed\(""").containsMatchIn(notificationOpenBlock) &&
+                Regex("""\n\s+commit\(attempt, item\)""").containsMatchIn(openListed) &&
+                "shell.openRoutedConversation(" in commit,
         )
 
         assertTrue(
@@ -195,6 +200,7 @@ class ChatListProfileReturnSnapCoverageTest {
         )
     }
 
+    /** The published return head lives only in the shell's single return state machine, not a separate nullable. */
     @Test
     fun returnHeadPublishWiringUsesSingleStateMachine() {
         val mainShell = mainShellSource().readText()
@@ -207,7 +213,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val visibilityEffect =
             mainShell.requiredSection(
                 start = "LaunchedEffect(chatsController, selectedChat == null) {",
-                end = "\n    }\n\n    // Notification tap routing",
+                end = "\n    }\n\n    LaunchedEffect(appState.pendingProfileNpub) {",
             )
         val setVisibleIndex = visibilityEffect.indexOf("setChatListVisible")
         val publishIndex = visibilityEffect.indexOf("onChatListBecameVisible")
@@ -277,6 +283,14 @@ class ChatListProfileReturnSnapCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing MainShell.kt source file")
+
+    /** The notification-open router that owns the routed open's commit (#3309). */
+    private fun notificationOpenRouterSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationOpenRouter.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/NotificationOpenRouter.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing NotificationOpenRouter.kt source file")
 
     private fun mainShellStateHolderSource(): File =
         listOf(

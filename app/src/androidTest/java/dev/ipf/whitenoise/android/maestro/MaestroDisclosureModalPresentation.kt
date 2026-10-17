@@ -77,10 +77,12 @@ private fun OtherModalPresentation(fixture: MaestroPresentationFixture) {
     }
 }
 
+/** Routes group confirmations, group-change questions and viewer failures to their production dialogs. */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupOrViewerPresentation(fixture: MaestroPresentationFixture) {
-    if (fixture.scenario.startsWith("modal-group-details-") || fixture.scenario.startsWith("modal-viewer-failure-")) {
+    val scenario = fixture.scenario
+    if (listOf("modal-group-details-", "modal-group-change-", "modal-viewer-failure-").any(scenario::startsWith)) {
         MaestroGroupConfirmationPresentation(fixture)
     } else {
         MaestroActionModalPresentation(fixture)

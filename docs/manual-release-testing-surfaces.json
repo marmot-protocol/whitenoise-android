@@ -4030,14 +4030,6 @@
         ]
       },
       {
-        "surface": "Modifier.reserveSnackbarSpace",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PinnedActionSnackbarInset.kt",
-        "anchor": "fun Modifier.reserveSnackbarSpace(",
-        "test_ids": [
-          "ONB-001"
-        ]
-      },
-      {
         "surface": "ProfilePublicWarning",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ProfilePublicWarning.kt",
         "anchor": "fun ProfilePublicWarning(",

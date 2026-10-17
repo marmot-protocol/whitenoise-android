@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.SystemClock
 import androidx.compose.runtime.mutableStateMapOf
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticRecorder
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticStore
@@ -37,7 +38,14 @@ internal enum class DmCreationFailure {
 internal fun dmCreationFailure(error: Throwable): DmCreationFailure =
     when (error) {
         is CancellationException -> DmCreationFailure.CANCELLED
-        is MarmotKitException.MissingKeyPackage -> DmCreationFailure.MISSING_KEY_PACKAGE
+        // Obsolete-only KeyPackages arrived as InvalidKeyPackageEvent before MDK typed them (mdk#1975).
+        is MarmotKitException.MissingKeyPackage ->
+            if (error.reason == MissingKeyPackageReasonFfi.OBSOLETE_ONLY) {
+                DmCreationFailure.INVALID_KEY_PACKAGE
+            } else {
+                DmCreationFailure.MISSING_KEY_PACKAGE
+            }
+        is MarmotKitException.DirectoryLookupIncomplete -> DmCreationFailure.LOOKUP_UNAVAILABLE
         is MarmotKitException.MissingMemberInboxRoute -> DmCreationFailure.MISSING_INBOX
         is MarmotKitException.InvalidKeyPackageEvent -> DmCreationFailure.INVALID_KEY_PACKAGE
         is MarmotKitException.InvalidIdentity -> DmCreationFailure.INVALID_IDENTITY

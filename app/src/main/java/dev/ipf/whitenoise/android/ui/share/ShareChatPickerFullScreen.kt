@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
+import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
@@ -160,12 +161,16 @@ private fun ShareChatPickerScaffold(
                         paneTitle = shareToTitle
                     },
             containerColor = amoledSheetContainerColor(),
-            snackbarHost = { WhiteNoiseSnackbarHost(snackbarHostState) },
             topBar = {
-                TopAppBar(
-                    title = { Text(shareToTitle) },
-                    navigationIcon = { ShareChatPickerCloseButton(actions.dismiss) },
-                )
+                // App banners and the picker's own snackbars sit below its bar, never over the footer (#3312).
+                Column {
+                    TopAppBar(
+                        title = { Text(shareToTitle) },
+                        navigationIcon = { ShareChatPickerCloseButton(actions.dismiss) },
+                    )
+                    TopNoticeSlot()
+                    WhiteNoiseSnackbarHost(snackbarHostState)
+                }
             },
             bottomBar = {
                 ShareChatPickerFooter(

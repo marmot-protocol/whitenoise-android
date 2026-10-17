@@ -12,15 +12,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -344,6 +348,10 @@ private fun BoxScope.AvatarViewerImageContent(
     }
 }
 
+/**
+ * Full-screen avatar chrome over [body]: drag-down dismissal, the close and actions row, and the viewer's own
+ * snackbars directly below that row (#3312).
+ */
 @Composable
 internal fun AvatarViewerFrame(
     scale: Float,
@@ -448,12 +456,16 @@ internal fun AvatarViewerFrame(
                 }
             }
         }
+        // The viewer's own snackbars sit below its top controls, like every temporary banner, and clear a side
+        // cutout or side navigation bar in landscape (#3312).
         SnackbarHost(
             hostState = snackbarHostState,
             modifier =
                 Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding(),
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                    .padding(top = AVATAR_VIEWER_TOP_CONTROLS_HEIGHT),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
     }
@@ -603,3 +615,6 @@ internal sealed interface AvatarViewerImageState {
         val bitmap: Bitmap,
     ) : AvatarViewerImageState
 }
+
+/** The viewer's top control row: 8 dp of padding around 48 dp touch targets. */
+private val AVATAR_VIEWER_TOP_CONTROLS_HEIGHT = 64.dp

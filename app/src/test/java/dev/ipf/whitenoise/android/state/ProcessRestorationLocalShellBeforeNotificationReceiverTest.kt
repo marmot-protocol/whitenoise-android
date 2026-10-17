@@ -29,8 +29,9 @@ import org.robolectric.annotation.Config
 class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
     private val context: Application = RuntimeEnvironment.getApplication()
 
+    /** Cold startup must not attempt native sign-in for a retained signed-out profile. */
     @Test
-    fun failedSignedOutAccountRestorationDoesNotPublishReady() =
+    fun signedOutAccountRestorationStaysOnboardingWithoutSigningIn() =
         runBlocking {
             val signedOutAccount =
                 AccountSummaryFfi(
@@ -51,10 +52,10 @@ class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
             try {
                 fixture.bootstrap()
 
-                assertTrue(
-                    "failed signed-out restoration must keep the authenticated shell unavailable",
-                    fixture.appState.phase is AppPhase.Failed,
-                )
+                assertEquals(AppPhase.Onboarding, fixture.appState.phase)
+                assertEquals(null, fixture.appState.activeAccountRef)
+                assertEquals(listOf(signedOutAccount), fixture.appState.accounts)
+                assertTrue("startup must not invoke native sign-in", fixture.signInRequests.isEmpty())
             } finally {
                 fixture.close()
             }

@@ -126,6 +126,8 @@ private fun AttachmentTransferStateFfi.performanceResult(): PerformanceResult =
         AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
         AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
         AttachmentTransferStateFfi.RETRY_EXHAUSTED,
+        // The host stops waiting on a storage park; its attachment state still says storage_blocked.
+        AttachmentTransferStateFfi.STORAGE_BLOCKED,
         -> PerformanceResult.FAILURE
         else -> PerformanceResult.PENDING
     }

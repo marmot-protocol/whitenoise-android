@@ -137,7 +137,7 @@ class DetailsSurfacePolishScreenshotTest {
             fontScale = 2f,
         )
 
-    /** The danger zone's reset row and its confirmation are the admin's path to MDK 0.10.0's local group reset. */
+    /** The danger zone's reset row and its review, which names the acting account, lead to the local reset. */
     @Test
     fun groupAdminResetConfirmationLight() {
         renderGroupDetails(
@@ -151,7 +151,7 @@ class DetailsSurfacePolishScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/group_details_reset_row_light.png")
         composeRule.onNodeWithText(reset).performClick()
         composeRule.onNodeWithText(app.getString(R.string.group_reset_dialog_title)).assertIsDisplayed()
-        composeRule.onNodeWithText("Alice").assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.abandon_identity_account, "Alice")).assertIsDisplayed()
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_details_reset_dialog_light.png")
     }
 
