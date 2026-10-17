@@ -11641,9 +11641,11 @@ class ConversationController(
                         if (!commitIfCurrent()) return@withGroupCommitLock false
                         val wroteAvatar =
                             appState.runGroupChange(account, group.groupIdHex, stillWanted = commitIfCurrent) {
+                                // A retry the user continued past must reach MDK, or its acknowledgement outlives it.
+                                val admitted = isAdmittedGroupChange()
                                 appState.marmotIo {
                                     // Dispatch to IO can also wait after the group lock was acquired.
-                                    if (!commitIfCurrent()) {
+                                    if (!admitted && !commitIfCurrent()) {
                                         false
                                     } else {
                                         updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
@@ -11759,8 +11761,9 @@ class ConversationController(
                 onLegacyClearAttempt()
                 try {
                     appState.runGroupChange(account, capturedGroupId, stillWanted = { change.stillOwned() }) {
+                        val admitted = isAdmittedGroupChange()
                         appState.marmotIo {
-                            if (!change.stillOwned()) throw CancellationException("Viewer owner replaced")
+                            if (!admitted && !change.stillOwned()) throw CancellationException("Viewer owner replaced")
                             updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
                         }
                     }
@@ -11789,7 +11792,10 @@ class ConversationController(
         return applicable
     }
 
-    /** Native command entry rechecks viewer ownership after dispatcher/lock suspension. */
+    /**
+     * Native command entry rechecks viewer ownership after dispatcher/lock suspension, except on the retry of a change
+     * the user continued past, which must reach MDK to spend its acknowledgement.
+     */
     private suspend fun commitGroupImageBytes(
         account: String,
         groupId: String,
@@ -11797,8 +11803,10 @@ class ConversationController(
         change: ScopedGroupImageMutation<ImageUploadDraft?>,
     ) {
         appState.runGroupChange(account, groupId, stillWanted = { change.stillOwned() }) {
+            // A retry the user continued past must reach MDK, or its acknowledgement outlives it.
+            val admitted = isAdmittedGroupChange()
             appState.marmotIo {
-                if (!change.stillOwned()) throw CancellationException("Viewer owner replaced")
+                if (!admitted && !change.stillOwned()) throw CancellationException("Viewer owner replaced")
                 if (draft != null) {
                     updateGroupImage(account, groupId, draft.plaintext, draft.mediaType)
                 } else {

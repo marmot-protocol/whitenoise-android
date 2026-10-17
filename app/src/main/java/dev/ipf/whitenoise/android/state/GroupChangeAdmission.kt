@@ -10,10 +10,13 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 /** Why MDK refused a group change in a way the user may override for one attempt (#3289). */
 internal enum class GroupChangeCaution {
@@ -23,6 +26,20 @@ internal enum class GroupChangeCaution {
     /** The group's last change has not reached every group relay, so members on those relays may not follow. */
     Undelivered,
 }
+
+/** Marks the retry that follows recorded acknowledgements, see [isAdmittedGroupChange]. */
+private object AdmittedGroupChange : AbstractCoroutineContextElement(AdmittedGroupChangeKey)
+
+/** The context key of [AdmittedGroupChange]. */
+private object AdmittedGroupChangeKey : CoroutineContext.Key<AdmittedGroupChange>
+
+/**
+ * True inside the retry of a change whose acknowledgements MDK has just recorded. That retry must reach its native
+ * command: MDK keeps an acknowledgement until an attempt spends it, so a change that bailed out on its own ownership
+ * guard here would leave the user's consent for some later, different change. Whether the change still applies was
+ * settled before acknowledging.
+ */
+internal suspend fun isAdmittedGroupChange(): Boolean = currentCoroutineContext()[AdmittedGroupChangeKey] != null
 
 /** The caution MDK's refusal carries, or null when this is not an overridable group-change refusal. */
 internal fun Throwable.groupChangeCaution(): GroupChangeCaution? =
@@ -245,7 +262,7 @@ internal suspend fun <T> admitGroupChange(
                 return if (admitted.isEmpty()) {
                     change()
                 } else {
-                    withContext(NonCancellable) {
+                    withContext(NonCancellable + AdmittedGroupChange) {
                         admitted.forEach { acknowledge(it) }
                         change()
                     }

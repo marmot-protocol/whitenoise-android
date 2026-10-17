@@ -159,6 +159,26 @@ class GroupChangeAdmissionTest {
             assertEquals(1, attempts.count)
         }
 
+    /** Only the retry after acknowledging is marked admitted, so only it skips the change's own ownership guards. */
+    @Test
+    fun onlyTheRetryAfterAcknowledgingIsMarkedAdmitted() =
+        runTest {
+            val attempts = scripted(MarmotKitException.GroupCatchingUp(GROUP))
+            val admitted = mutableListOf<Boolean>()
+
+            admitGroupChange(
+                ask = { GroupChangeAnswer.Continue },
+                acknowledge = { acknowledged += it },
+                change = {
+                    admitted += isAdmittedGroupChange()
+                    attempts.attempt()
+                },
+            )
+
+            assertEquals(listOf(false, true), admitted)
+            assertEquals("the marker leaked out of the retry", false, isAdmittedGroupChange())
+        }
+
     /** A question that cannot be asked reports the refusal itself, as an ordinary failure rather than a quiet wait. */
     @Test
     fun anUnaskableQuestionReportsTheRefusal() =
