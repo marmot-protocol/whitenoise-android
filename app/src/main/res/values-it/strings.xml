@@ -834,6 +834,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">Impossibile aggiungere %1$s. È già un membro oppure la sua chiave di firma è in conflitto con quella di un membro esistente.</string>
     <string name="toast_invites_sent_to_groups">Inviti inviati ai gruppi selezionati</string>
     <string name="toast_invites_sent_to_groups_partial">Inviti inviati ad alcuni gruppi; alcuni non sono riusciti</string>
+    <string name="toast_invites_sent_to_groups_waited">Inviti inviati ad alcuni gruppi; gli altri attendono un nuovo tentativo</string>
     <string name="toast_member_removed">Membro rimosso</string>
     <string name="toast_couldnt_remove_member">Impossibile rimuovere il membro. Riprova.</string>
     <string name="toast_group_roster_changed">I membri del gruppo sono cambiati. Controlla il gruppo e riprova.</string>

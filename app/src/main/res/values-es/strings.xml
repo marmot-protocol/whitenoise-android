@@ -834,6 +834,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">No se pudo añadir a %1$s. Ya es miembro o su clave de firma entra en conflicto con la de un miembro existente.</string>
     <string name="toast_invites_sent_to_groups">Invitaciones enviadas a los grupos seleccionados</string>
     <string name="toast_invites_sent_to_groups_partial">Invitaciones enviadas a algunos grupos; algunas fallaron</string>
+    <string name="toast_invites_sent_to_groups_waited">Invitaciones enviadas a algunos grupos; las demás esperan a que lo intentes de nuevo</string>
     <string name="toast_member_removed">Miembro eliminado</string>
     <string name="toast_couldnt_remove_member">No se pudo eliminar al miembro. Inténtalo de nuevo.</string>
     <string name="toast_group_roster_changed">La membresía del grupo ha cambiado. Revisa el grupo e inténtalo de nuevo.</string>

@@ -820,6 +820,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">無法新增 %1$s。對方已是成員，或其簽署金鑰與現有成員衝突。</string>
     <string name="toast_invites_sent_to_groups">邀請已傳送到所選群組</string>
     <string name="toast_invites_sent_to_groups_partial">邀請已傳送到部分群組；有些失敗</string>
+    <string name="toast_invites_sent_to_groups_waited">邀請已傳送到部分群組；其餘群組等待你重試</string>
     <string name="toast_member_removed">會員已刪除</string>
     <string name="toast_couldnt_remove_member">移除成員失敗。請再試一次。</string>
     <string name="toast_group_roster_changed">群組成員已變更。請檢查群組並再試一次。</string>

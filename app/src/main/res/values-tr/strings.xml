@@ -834,6 +834,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s eklenemedi. Zaten üye ya da imzalama anahtarı mevcut bir üyeninkiyle çakışıyor.</string>
     <string name="toast_invites_sent_to_groups">Davetler seçili gruplara gönderildi</string>
     <string name="toast_invites_sent_to_groups_partial">Davetler bazı gruplara gönderildi; bazıları başarısız oldu</string>
+    <string name="toast_invites_sent_to_groups_waited">Davetler bazı gruplara gönderildi; diğerleri yeniden denemeyi bekliyor</string>
     <string name="toast_member_removed">Üye kaldırıldı</string>
     <string name="toast_couldnt_remove_member">Üye çıkarılamadı. Lütfen tekrar deneyin.</string>
     <string name="toast_group_roster_changed">Grup üyeliği değişti. Grubu gözden geçirip tekrar deneyin.</string>

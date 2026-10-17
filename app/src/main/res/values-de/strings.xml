@@ -834,6 +834,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s konnte nicht hinzugefügt werden. Die Person ist bereits Mitglied oder ihr Signaturschlüssel steht im Konflikt mit dem eines vorhandenen Mitglieds.</string>
     <string name="toast_invites_sent_to_groups">Einladungen an ausgewählte Gruppen gesendet</string>
     <string name="toast_invites_sent_to_groups_partial">Einladungen an einige Gruppen gesendet; einige sind fehlgeschlagen</string>
+    <string name="toast_invites_sent_to_groups_waited">Einladungen an einige Gruppen gesendet; die übrigen warten auf einen neuen Versuch</string>
     <string name="toast_member_removed">Mitglied entfernt</string>
     <string name="toast_couldnt_remove_member">Mitglied konnte nicht entfernt werden. Bitte erneut versuchen.</string>
     <string name="toast_group_roster_changed">Die Gruppenmitgliedschaft hat sich geändert. Prüfen Sie die Gruppe und versuchen Sie es erneut.</string>

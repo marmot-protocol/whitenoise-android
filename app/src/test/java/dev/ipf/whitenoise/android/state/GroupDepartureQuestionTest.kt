@@ -4,18 +4,10 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
-import dev.ipf.marmotkit.AppGroupMlsStateFfi
-import dev.ipf.marmotkit.GroupDetailsFfi
-import dev.ipf.marmotkit.GroupLifecycleStateFfi
-import dev.ipf.marmotkit.GroupManagementStateFfi
-import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.ProductRecordResultFfi
-import dev.ipf.marmotkit.SendAcceptDispositionFfi
-import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
-import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -35,8 +27,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 import java.util.Collections
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 
 /**
  * Leaving as one of several admins steps down first, and MDK may hold that step back (#3289). A departure cancelled
@@ -151,78 +141,17 @@ class GroupDepartureQuestionTest {
                 "groupMembers" -> roster()
                 "npub" -> null
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
-                "selfDemoteAdminDetailed" -> failSuspendedCall(arguments, MarmotKitException.GroupCatchingUp(GROUP))
+                "selfDemoteAdminDetailed" ->
+                    failSuspendedNativeCall(arguments, MarmotKitException.GroupCatchingUp(GROUP))
                 "promoteAdminDetailed" -> promoted()
                 else -> error("Unexpected native call: $name")
             }
         } as MarmotInterface
 
-    /** Delivers a checked UniFFI error through the suspend continuation, which a proxy cannot throw directly. */
-    private fun failSuspendedCall(
-        arguments: Array<out Any?>?,
-        failure: MarmotKitException,
-    ): Any {
-        @Suppress("UNCHECKED_CAST")
-        val continuation = arguments?.last() as Continuation<Any?>
-        continuation.resumeWith(Result.failure(failure))
-        return COROUTINE_SUSPENDED
-    }
-
     /** The grant as MDK returns it: the successor joins self as admin. */
     private fun promoted(): GroupMutationResultFfi {
         val admins = listOf(SELF, OTHER_ADMIN)
-        val group = conversationTimelineTestGroup().copy(admins = admins)
-        val ids = listOf(SELF, OTHER_ADMIN, MEMBER)
-        val details =
-            GroupDetailsFfi(
-                group,
-                ids.map { id ->
-                    GroupMemberDetailsFfi(
-                        id,
-                        ConversationTimelineTestIds.ACCOUNT_REF.takeIf { id == SELF },
-                        id == SELF,
-                        id in admins,
-                        id == SELF,
-                        "npub-$id",
-                        null,
-                    )
-                },
-                AppGroupMlsStateFfi(
-                    group.groupIdHex,
-                    group.protocolProfile,
-                    GroupLifecycleStateFfi.STABLE,
-                    0uL,
-                    ids.size.toUInt(),
-                    false,
-                    emptyList(),
-                    false,
-                    false,
-                    emptyList(),
-                    null,
-                ),
-            )
-        val management =
-            GroupManagementStateFfi(
-                myAccountIdHex = SELF,
-                isSelfAdmin = true,
-                isLastAdmin = false,
-                canInvite = true,
-                canLeave = false,
-                requiresSelfDemoteBeforeLeave = true,
-                leaveRequestPending = false,
-                leaveRequestedAtMs = null,
-                lifecycleState = GroupLifecycleStateFfi.STABLE,
-                disbandingEnabled = false,
-                disbanding = false,
-                canEnableDisbanding = false,
-                canDisband = false,
-                disbandingBlockers = emptyList(),
-                disbandRequest = null,
-                memberActions = emptyList(),
-            )
-        val sent =
-            SendSummaryFfi(1u, emptyList(), SendAcceptDispositionFfi.PUBLISHED, SendMaintenanceDispositionFfi.READY)
-        return GroupMutationResultFfi(sent, details, management)
+        return testGroupMutationResult(admins + MEMBER, admins)
     }
 
     /** The controller's roster tracker, so a test can mark its roster authoritative. */

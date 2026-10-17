@@ -870,6 +870,7 @@
     <string name="toast_couldnt_add_member_duplicate_detail">Не удалось добавить %1$s. Этот участник уже в группе, либо его ключ подписи конфликтует с ключом существующего участника.</string>
     <string name="toast_invites_sent_to_groups">Приглашения отправлены в выбранные группы</string>
     <string name="toast_invites_sent_to_groups_partial">Приглашения отправлены в некоторые группы; часть не удалась</string>
+    <string name="toast_invites_sent_to_groups_waited">Приглашения отправлены в некоторые группы; остальные ждут повторной попытки</string>
     <string name="toast_member_removed">Участник удален</string>
     <string name="toast_couldnt_remove_member">Не удалось удалить участника. Попробуйте снова.</string>
     <string name="toast_group_roster_changed">Состав группы изменился. Проверьте группу и попробуйте снова.</string>
