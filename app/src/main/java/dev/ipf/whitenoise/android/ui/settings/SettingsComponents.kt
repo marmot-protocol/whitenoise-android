@@ -71,8 +71,6 @@ internal fun SettingsGroup(
     content: SettingsGroupScope.() -> Unit,
 ) {
     val group = SettingsGroupScope().apply(content)
-    val amoled = isAmoledSurfaceTheme()
-    val borderColor = if (amoled) MaterialTheme.colorScheme.outline else Color.Unspecified
     val gap = WhiteNoiseListItemDefaults.segmentedGap
     Column(
         modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
@@ -80,11 +78,21 @@ internal fun SettingsGroup(
     ) {
         group.rows.forEachIndexed { index, entry ->
             key(entry.key) {
-                val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, group.rows.size)
-                entry.content(SettingsRowContext(shapes, containerColor, borderColor))
+                entry.content(settingsRowContext(index, group.rows.size, containerColor))
             }
         }
     }
+}
+
+/** Styling for row [index] of [count] in one segmented group, also for lists too long for [SettingsGroup]. */
+@Composable
+internal fun settingsRowContext(
+    index: Int,
+    count: Int,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
+): SettingsRowContext {
+    val borderColor = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outline else Color.Unspecified
+    return SettingsRowContext(WhiteNoiseListItemDefaults.segmentedShapes(index, count), containerColor, borderColor)
 }
 
 /**

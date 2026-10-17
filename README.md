@@ -218,7 +218,11 @@ hand-pinned gradle dependencies in `gradle/libs.versions.toml`. Each ecosystem
 caps its own open Dependabot PRs at five (the limit is per ecosystem, not
 repo-wide), and GitHub Actions bumps are grouped into a single PR. Those PRs run
 through the same `android-ci.yml` validation as any other change, so a bump
-cannot merge without a green build. Compose-BOM- and Firebase-BOM-managed
+cannot merge without a green build. Gradle bumps also change locked selections,
+checksums and possibly runtime notices, so their CI stays red until a maintainer
+completes the reviewed update in
+[dependency security](docs/dependency-security.md#reviewed-resolution-and-byte-inputs),
+one update at a time. Compose-BOM- and Firebase-BOM-managed
 artifacts (and the intentional `material3` alpha pin) are excluded so Dependabot
 does not fight the BOMs.
 

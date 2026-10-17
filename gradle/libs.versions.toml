@@ -32,7 +32,6 @@ detekt = "2.0.0-alpha.6"
 firebaseBom = "35.0.0"
 googleServices = "4.5.0"
 playServicesBase = "18.11.0"
-ossLicensesPlugin = "0.13.0"
 media3 = "1.11.1"
 securityCrypto = "1.1.0"
 biometric = "1.1.0"
@@ -109,6 +108,5 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
-oss-licenses = { id = "com.google.android.gms.oss-licenses-plugin", version.ref = "ossLicensesPlugin" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
