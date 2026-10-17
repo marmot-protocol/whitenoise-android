@@ -531,6 +531,11 @@ class AttachmentPresentationTest {
 
         assertEquals(AttachmentMaterializationIntent.Interactive, restored)
         assertEquals(AttachmentDownloadPriority.Interactive, restored.priority)
+        assertTrue(restored.readerRequested)
+        assertFalse(
+            "a policy grant is not the reader's own download",
+            AttachmentMaterializationIntent.Idle.withPolicyAllowed(allowed = true).readerRequested,
+        )
         assertEquals(restored, restored.withPolicyAllowed(allowed = false))
     }
 

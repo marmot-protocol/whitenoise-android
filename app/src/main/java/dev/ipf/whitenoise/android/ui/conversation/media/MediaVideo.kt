@@ -62,10 +62,11 @@ import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.attachmentParkedForStorage
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
+import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
+import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -264,7 +265,9 @@ internal fun MediaVideoGridTile(
     restoreParkedDownloadOnEntry(
         identity = Triple(controller, messageIdHex, attachmentIndex),
         enabled = !mine && !startDownload && !cancelledByReader,
-        parkedForStorage = { controller.attachmentParkedForStorage(messageIdHex, attachmentIndex) },
+        parkedByReader = failed && storageFailed && materializationIntent.readerRequested,
+        recordParkedByReader = { controller.recordReaderParkedDownload(messageIdHex, attachmentIndex) },
+        readerParkHeld = { controller.readerDownloadParkedForStorage(messageIdHex, attachmentIndex) },
     ) {
         materializationIntent = materializationIntent.afterParkedDownloadFound()
     }
@@ -694,7 +697,9 @@ internal fun MediaVideoBubble(
     restoreParkedDownloadOnEntry(
         identity = Triple(controller, messageIdHex, attachmentIndex),
         enabled = !mine && !startDownload && !cancelledByReader,
-        parkedForStorage = { controller.attachmentParkedForStorage(messageIdHex, attachmentIndex) },
+        parkedByReader = failed && storageFailed && materializationIntent.readerRequested,
+        recordParkedByReader = { controller.recordReaderParkedDownload(messageIdHex, attachmentIndex) },
+        readerParkHeld = { controller.readerDownloadParkedForStorage(messageIdHex, attachmentIndex) },
     ) {
         materializationIntent = materializationIntent.afterParkedDownloadFound()
     }

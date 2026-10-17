@@ -2436,6 +2436,9 @@ class WhiteNoiseAppState private constructor(
 
     internal val attachmentUserActions = AttachmentUserActions(mutationsScope)
 
+    /** Attachments whose download the reader started and MDK parked for storage, for this process only. */
+    internal val readerParkedDownloads: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
+
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
             intentStore = attachmentDownloadIntents,

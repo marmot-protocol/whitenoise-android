@@ -110,38 +110,72 @@ class TileTransferTest {
             assertTrue(awaitStorageReadmission(flowOf(parked, failed)))
         }
 
-    /** A surface entered while MDK still holds its body parked restores the reader's download once, by itself. */
+    /** A surface entered while the reader's own download is still parked restores it once, by itself. */
     @Test
-    fun aSurfaceEnteredWhileParkedRestoresTheReadersDownload() {
+    fun aSurfaceEnteredWhileTheReadersDownloadIsParkedRestoresIt() {
         var restored = 0
         composeRule.setContent {
-            restoreParkedDownloadOnEntry(identity = "photo#0", enabled = true, parkedForStorage = { true }) {
-                restored += 1
-            }
+            restoreParkedDownloadOnEntry(
+                identity = "photo#0",
+                enabled = true,
+                parkedByReader = false,
+                recordParkedByReader = {},
+                readerParkHeld = { true },
+            ) { restored += 1 }
         }
         composeRule.waitForIdle()
 
         assertEquals(1, restored)
     }
 
-    /** A surface already downloading never asks MDK, and one whose body is not parked restores nothing. */
+    /** A surface already downloading never asks, and one whose reader download is not parked restores nothing. */
     @Test
-    fun onlyAnIdleSurfaceWithAParkedBodyRestoresAnything() {
+    fun onlyAnIdleSurfaceWithTheReadersParkedDownloadRestoresAnything() {
         var asked = 0
         var restored = 0
         composeRule.setContent {
-            restoreParkedDownloadOnEntry(identity = "downloading#0", enabled = false, parkedForStorage = {
-                asked += 1
-                true
-            }) { restored += 1 }
-            restoreParkedDownloadOnEntry(identity = "idle#0", enabled = true, parkedForStorage = { false }) {
-                restored += 1
-            }
+            restoreParkedDownloadOnEntry(
+                identity = "downloading#0",
+                enabled = false,
+                parkedByReader = false,
+                recordParkedByReader = {},
+                readerParkHeld = {
+                    asked += 1
+                    true
+                },
+            ) { restored += 1 }
+            restoreParkedDownloadOnEntry(
+                identity = "idle#0",
+                enabled = true,
+                parkedByReader = false,
+                recordParkedByReader = {},
+                readerParkHeld = { false },
+            ) { restored += 1 }
         }
         composeRule.waitForIdle()
 
         assertEquals("a downloading surface asked MDK", 0, asked)
         assertEquals(0, restored)
+    }
+
+    /** Only a surface parked on the reader's own download records it, so an automatic park is never restored. */
+    @Test
+    fun onlyAParkOnTheReadersOwnDownloadIsRecorded() {
+        val recorded = mutableListOf<String>()
+        composeRule.setContent {
+            for ((identity, byReader) in listOf("tapped#0" to true, "automatic#0" to false)) {
+                restoreParkedDownloadOnEntry(
+                    identity = identity,
+                    enabled = false,
+                    parkedByReader = byReader,
+                    recordParkedByReader = { recorded += identity },
+                    readerParkHeld = { false },
+                ) {}
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(listOf("tapped#0"), recorded)
     }
 
     /** Observation that ends while the body is still parked asks for nothing, so nothing loops. */

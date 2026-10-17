@@ -61,6 +61,11 @@ class AttachmentDownloadProductionWiringTest {
         assertEquals(2, occurrences(image, "restoreParkedDownloadOnEntry("))
         assertEquals(2, occurrences(video, "restoreParkedDownloadOnEntry("))
         assertEquals(1, occurrences(voice, "restoreParkedDownloadOnEntry("))
+        // Only the reader's own download is restored, so an automatic one never becomes an explicit request.
+        val readerPark = "parkedByReader = failed && storageFailed && materializationIntent.readerRequested,"
+        assertEquals(2, occurrences(image, readerPark))
+        assertEquals(2, occurrences(video, readerPark))
+        assertEquals(1, occurrences(voice, readerPark))
         assertEquals(2, occurrences(video, "persistedAttachmentOpenEffect("))
         assertEquals(1, occurrences(voice, "persistedAttachmentOpenEffect("))
         assertTrue(occurrences(image, "requestAttachmentOpen(") >= 5)

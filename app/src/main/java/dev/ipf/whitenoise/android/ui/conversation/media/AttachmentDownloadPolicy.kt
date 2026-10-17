@@ -54,6 +54,10 @@ internal enum class AttachmentMaterializationIntent {
     val shouldMaterialize: Boolean
         get() = this != Idle
 
+    /** The reader asked for this download themselves, rather than automatic-download policy granting it. */
+    val readerRequested: Boolean
+        get() = this == Interactive
+
     val priority: AttachmentDownloadPriority
         get() =
             when (this) {

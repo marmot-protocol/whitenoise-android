@@ -18,8 +18,9 @@ import java.lang.reflect.Proxy
 import java.util.Collections
 
 /**
- * A surface entered after MDK parked its body for storage asks MDK once whether the park still holds (#3289), so it
- * can restore the reader's download. The read must never demand anything and must stay one snapshot.
+ * A surface entered after MDK parked the reader's own download for storage asks MDK once whether the park still holds
+ * (#3289), so it can restore that download. The read never demands anything, stays one snapshot, and never runs for
+ * a park the reader's download did not cause, which would promote an automatic download against their settings.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -62,6 +63,31 @@ class StorageParkReadTest {
             val state = appState { error("snapshot unavailable") }
 
             assertFalse(state.nativeAttachmentParkedForStorage(REQUEST))
+        }
+
+    /** A park the reader's own download did not cause, such as an automatic one, is never restored or even read. */
+    @Test
+    fun anUnrecordedParkIsNeverRestored() =
+        runBlocking {
+            val state = appState { snapshot(AttachmentTransferStateFfi.STORAGE_BLOCKED) }
+
+            assertFalse(state.readerDownloadParkedForStorage(REQUEST))
+            assertTrue("an automatic park reached MDK", calls.isEmpty())
+        }
+
+    /** The reader's own parked download is restored while MDK still holds the park, and forgotten once it ends. */
+    @Test
+    fun aReaderParkIsRestoredWhileHeldAndForgottenOnceItEnds() =
+        runBlocking {
+            var phase = AttachmentTransferStateFfi.STORAGE_BLOCKED
+            val state = appState { snapshot(phase) }
+            state.recordReaderParkedDownload(REQUEST.copy(sourceMessageIdHex = null))
+
+            assertTrue(state.readerDownloadParkedForStorage(REQUEST))
+            phase = AttachmentTransferStateFfi.READY
+            assertFalse(state.readerDownloadParkedForStorage(REQUEST))
+            phase = AttachmentTransferStateFfi.STORAGE_BLOCKED
+            assertFalse("an ended park was restored later", state.readerDownloadParkedForStorage(REQUEST))
         }
 
     /** One signed-in account whose runtime answers the snapshot with [answer]; anything else is unexpected. */

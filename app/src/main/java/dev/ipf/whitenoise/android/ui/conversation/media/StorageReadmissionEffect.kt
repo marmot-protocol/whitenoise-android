@@ -36,22 +36,30 @@ internal fun storageReadmissionEffect(
 }
 
 /**
- * A storage park outlives the screen, but a surface's download intent does not. When a surface enters while MDK still
- * holds its body parked from a download the reader started earlier, [onParked] restores that download, so the surface
- * says "Not enough storage" and reloads on its own once MDK readmits the body, instead of offering Download again.
- * Only an [enabled] surface, one that is not downloading already, asks [parkedForStorage], once per entry.
+ * A storage park outlives the screen, but a surface's download intent does not. While a surface is [parkedByReader],
+ * parked on a download the reader started, [recordParkedByReader] remembers that. When a surface enters and
+ * [readerParkHeld] finds the reader's download still parked, [onParked] restores it, so the surface says "Not enough
+ * storage" and reloads on its own once MDK readmits the body, instead of offering Download again. An automatic
+ * download is never recorded, so reopening never promotes it to an explicit request against the reader's settings.
+ * Only an [enabled] surface, one that is not downloading already, asks, once per entry.
  */
 @Composable
 internal fun restoreParkedDownloadOnEntry(
     identity: Any,
     enabled: Boolean,
-    parkedForStorage: suspend () -> Boolean,
+    parkedByReader: Boolean,
+    recordParkedByReader: () -> Unit,
+    readerParkHeld: suspend () -> Boolean,
     onParked: () -> Unit,
 ) {
+    val record by rememberUpdatedState(recordParkedByReader)
+    LaunchedEffect(identity, parkedByReader) {
+        if (parkedByReader) record()
+    }
     val stillEnabled by rememberUpdatedState(enabled)
     val restore by rememberUpdatedState(onParked)
     LaunchedEffect(identity) {
-        if (stillEnabled && parkedForStorage() && stillEnabled) restore()
+        if (stillEnabled && readerParkHeld() && stillEnabled) restore()
     }
 }
 

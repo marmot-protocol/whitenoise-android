@@ -87,15 +87,23 @@ internal fun ConversationController.attachmentNativeProgress(
     }
 }
 
-/** Whether MDK holds this attachment parked for storage from a demand made before this screen; never demands. */
-internal suspend fun ConversationController.attachmentParkedForStorage(
+/** Records that the reader's own download of this attachment is parked for storage, so reopening can restore it. */
+internal fun ConversationController.recordReaderParkedDownload(
+    messageIdHex: String,
+    attachmentIndex: Int,
+) {
+    attachmentTransferRequest(messageIdHex, attachmentIndex)?.let { appState.recordReaderParkedDownload(it) }
+}
+
+/** Whether the reader's own download of this attachment is still parked for storage; reads, never demands. */
+internal suspend fun ConversationController.readerDownloadParkedForStorage(
     messageIdHex: String,
     attachmentIndex: Int,
 ): Boolean {
     val request =
         attachmentTransferRequest(messageIdHex, attachmentIndex)
             ?.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)) ?: return false
-    return appState.nativeAttachmentParkedForStorage(request)
+    return appState.readerDownloadParkedForStorage(request)
 }
 
 /** An actual Retry/Download again gesture may recover terminal work; ordinary Open/Save only joins. */
