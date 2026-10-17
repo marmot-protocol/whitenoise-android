@@ -74,14 +74,15 @@ class SignUpProfileDraftSubmissionTest {
         var availability = unvalidatedSignUpAvailability(context, hasDefaultRoute = false)
         val creations = java.util.concurrent.atomic.AtomicInteger()
         val native =
-            java.lang.reflect.Proxy.newProxyInstance(
-                MarmotInterface::class.java.classLoader,
-                arrayOf(MarmotInterface::class.java),
-            ) { _, method, _ ->
-                check(method.name == "createIdentity") { "Unexpected native call: ${method.name}" }
-                creations.incrementAndGet()
-                error("Synthetic creation failure")
-            } as MarmotInterface
+            java.lang.reflect.Proxy
+                .newProxyInstance(
+                    MarmotInterface::class.java.classLoader,
+                    arrayOf(MarmotInterface::class.java),
+                ) { _, method, _ ->
+                    check(method.name == "createIdentity") { "Unexpected native call: ${method.name}" }
+                    creations.incrementAndGet()
+                    error("Synthetic creation failure")
+                } as MarmotInterface
         val app =
             WhiteNoiseAppState(
                 context = context,

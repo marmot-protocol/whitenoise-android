@@ -53,7 +53,12 @@ class NostrEventReaderLinkInteractionTest {
                 override suspend fun getClipEntry(): ClipEntry? = null
 
                 override suspend fun setClipEntry(clipEntry: ClipEntry?) {
-                    writes += requireNotNull(clipEntry).clipData.getItemAt(0).text.toString()
+                    writes +=
+                        requireNotNull(clipEntry)
+                            .clipData
+                            .getItemAt(0)
+                            .text
+                            .toString()
                 }
             }
         composeRule.setContent {
