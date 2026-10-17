@@ -60,12 +60,20 @@
         ]
       },
       {
-        "surface": "Automatic attachment work re-checks the live policy and waits out a network hold",
+        "surface": "Automatic attachment work re-checks the live policy and waits out a network hold on a narrowed network",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
         "anchor": "attachment_work_policy_deferred type=",
         "test_ids": [
           "MED-034",
           "MED-022"
+        ]
+      },
+      {
+        "surface": "Automatic attachment work waiting for a new network's native approval retries without spending its failure retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "attachment_work_permission_pending run_attempt=",
+        "test_ids": [
+          "MED-034"
         ]
       },
       {
